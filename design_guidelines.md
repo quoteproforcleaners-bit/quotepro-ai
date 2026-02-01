@@ -1,8 +1,8 @@
-# CleanQuote - Design Guidelines
+# QuotePro - Design Guidelines
 
 ## Brand Identity
 
-**Purpose**: CleanQuote is a professional quoting tool for residential cleaning business owners. It transforms complex pricing calculations into confident, branded customer quotes.
+**Purpose**: QuotePro is a professional quoting tool for residential cleaning business owners. It transforms complex pricing calculations into confident, branded customer quotes.
 
 **Aesthetic Direction**: **Editorial/Professional** - Clean typography hierarchy, structured layouts, and business-focused UI that inspires confidence. Think invoicing software meets messaging app - efficient, trustworthy, with subtle polish.
 
@@ -31,7 +31,7 @@
 ### Onboarding Flow (Stack, shown once on first launch)
 
 **Screen 1: Business Profile**
-- Header: "Welcome to CleanQuote" (large, center-aligned title), Skip button (top-right)
+- Header: "Welcome to QuotePro" (large, center-aligned title), Skip button (top-right)
 - Form fields: Company Name (required), Email, Phone, Address
 - Logo upload button with preview (tap to upload or skip)
 - Bottom: "Next" button (primary CTA)
@@ -170,7 +170,7 @@
 ## Assets to Generate
 
 **Required**:
-1. **icon.png** - App icon: Stylized "CQ" monogram in Primary blue on white, subtle sparkle/clean symbol
+1. **icon.png** - App icon: Stylized "QP" monogram in Primary blue on white, subtle sparkle/clean symbol
 2. **splash-icon.png** - Same as icon.png for splash screen
 3. **empty-quotes.png** - Illustration: Clipboard with checkmarks and dollar sign, soft blue/gray tones. WHERE USED: Quotes tab when no quotes exist
 4. **empty-dashboard.png** - Illustration: Calculator with upward trending arrow, optimistic feel. WHERE USED: Home tab on first launch

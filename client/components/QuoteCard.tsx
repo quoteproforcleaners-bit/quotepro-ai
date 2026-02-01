@@ -81,18 +81,12 @@ export function QuoteCard({
             type="small"
             style={[styles.serviceType, { color: theme.textSecondary }]}
           >
-            {option.serviceType.replace("-", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+            {option.serviceTypeName}
           </ThemedText>
         </View>
         <View style={styles.priceContainer}>
           <ThemedText type="h3" style={{ color: theme.primary }}>
             ${option.price}
-          </ThemedText>
-          <ThemedText
-            type="caption"
-            style={{ color: theme.textSecondary }}
-          >
-            {option.hours} hrs
           </ThemedText>
         </View>
       </View>

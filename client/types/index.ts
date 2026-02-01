@@ -12,6 +12,14 @@ export interface BusinessProfile {
   onboardingComplete: boolean;
 }
 
+export interface ServiceTypeConfig {
+  id: string;
+  name: string;
+  multiplier: number;
+  scope: string;
+  isDefault: boolean;
+}
+
 export interface PricingSettings {
   hourlyRate: number;
   minimumTicket: number;
@@ -32,6 +40,10 @@ export interface PricingSettings {
     biweekly: number;
     monthly: number;
   };
+  serviceTypes: ServiceTypeConfig[];
+  goodOptionId: string;
+  betterOptionId: string;
+  bestOptionId: string;
 }
 
 export interface CustomerInfo {
@@ -68,14 +80,13 @@ export interface AddOns {
 }
 
 export type ServiceFrequency = "one-time" | "weekly" | "biweekly" | "monthly";
-export type ServiceType = "touch-up" | "premium" | "deep-clean" | "move-in-out" | "post-construction";
 
 export interface QuoteOption {
   name: string;
-  serviceType: ServiceType;
+  serviceTypeId: string;
+  serviceTypeName: string;
   scope: string;
   price: number;
-  hours: number;
   addOnsIncluded: string[];
 }
 
@@ -97,6 +108,51 @@ export interface Quote {
   smsDraft?: string;
 }
 
+export const DEFAULT_SERVICE_TYPES: ServiceTypeConfig[] = [
+  {
+    id: "touch-up",
+    name: "Touch Up",
+    multiplier: 0.7,
+    scope: "Kitchen, bathrooms, and floors only",
+    isDefault: true,
+  },
+  {
+    id: "regular",
+    name: "Regular Cleaning",
+    multiplier: 1.0,
+    scope: "Complete whole-home cleaning",
+    isDefault: true,
+  },
+  {
+    id: "deep-clean",
+    name: "Deep Clean",
+    multiplier: 1.35,
+    scope: "Thorough first-time or catch-up cleaning",
+    isDefault: true,
+  },
+  {
+    id: "move-in-out",
+    name: "Move In/Out",
+    multiplier: 1.5,
+    scope: "Detailed move-ready cleaning",
+    isDefault: true,
+  },
+  {
+    id: "post-construction",
+    name: "Post Construction",
+    multiplier: 1.75,
+    scope: "Heavy-duty post-build cleanup",
+    isDefault: true,
+  },
+  {
+    id: "airbnb",
+    name: "Airbnb Turnover",
+    multiplier: 0.85,
+    scope: "Quick turnover cleaning between guests",
+    isDefault: true,
+  },
+];
+
 export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
   hourlyRate: 55,
   minimumTicket: 179,
@@ -117,6 +173,10 @@ export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
     biweekly: 10,
     monthly: 5,
   },
+  serviceTypes: DEFAULT_SERVICE_TYPES,
+  goodOptionId: "touch-up",
+  betterOptionId: "regular",
+  bestOptionId: "deep-clean",
 };
 
 export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {

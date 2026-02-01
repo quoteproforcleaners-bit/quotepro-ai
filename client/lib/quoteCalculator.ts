@@ -2,7 +2,7 @@ import {
   HomeDetails,
   AddOns,
   ServiceFrequency,
-  ServiceType,
+  ServiceTypeConfig,
   PricingSettings,
   QuoteOption,
 } from "@/types";
@@ -50,23 +50,6 @@ function getPetHours(
   if (petType === "dog" || shedding) return 0.5;
   if (petType === "multiple") return shedding ? 1.0 : 0.75;
   return 0;
-}
-
-function getServiceTypeMultiplier(serviceType: ServiceType): number {
-  switch (serviceType) {
-    case "touch-up":
-      return 0.7;
-    case "premium":
-      return 1.0;
-    case "deep-clean":
-      return 1.35;
-    case "move-in-out":
-      return 1.5;
-    case "post-construction":
-      return 1.75;
-    default:
-      return 1.0;
-  }
 }
 
 function getAddOnHours(addOns: AddOns): number {
@@ -137,11 +120,12 @@ export function calculateQuoteOption(
   homeDetails: HomeDetails,
   addOns: AddOns,
   frequency: ServiceFrequency,
-  serviceType: ServiceType,
-  settings: PricingSettings
+  serviceType: ServiceTypeConfig,
+  settings: PricingSettings,
+  optionName: string
 ): QuoteOption {
   const baseHours = calculateBaseHours(homeDetails);
-  const serviceMultiplier = getServiceTypeMultiplier(serviceType);
+  const serviceMultiplier = serviceType.multiplier;
   const addOnHours = getAddOnHours(addOns);
 
   const totalHours = roundHours(baseHours * serviceMultiplier + addOnHours);
@@ -151,7 +135,7 @@ export function calculateQuoteOption(
   let price = basePrice + addOnPrice;
   price = Math.max(price, settings.minimumTicket);
 
-  const canDiscount = serviceType !== "move-in-out" && serviceType !== "post-construction";
+  const canDiscount = serviceType.id !== "move-in-out" && serviceType.id !== "post-construction";
   if (canDiscount && frequency !== "one-time") {
     const discount = getFrequencyDiscount(frequency, settings.frequencyDiscounts);
     price = price * (1 - discount);
@@ -170,35 +154,21 @@ export function calculateQuoteOption(
   if (addOns.dishes) addOnsIncluded.push("Dishes");
   if (addOns.organizationTidy) addOnsIncluded.push("Organization/Tidy");
 
-  const scopeMap: Record<ServiceType, string> = {
-    "touch-up": "Kitchen, bathrooms, and floors only",
-    premium: "Complete whole-home cleaning",
-    "deep-clean": "Thorough first-time or catch-up cleaning",
-    "move-in-out": "Detailed move-ready cleaning",
-    "post-construction": "Heavy-duty post-build cleanup",
-  };
-
   return {
-    name: serviceType === "touch-up" ? "Good" : serviceType === "premium" ? "Better" : "Best",
-    serviceType,
-    scope: scopeMap[serviceType],
+    name: optionName,
+    serviceTypeId: serviceType.id,
+    serviceTypeName: serviceType.name,
+    scope: serviceType.scope,
     price,
-    hours: totalHours,
     addOnsIncluded,
   };
 }
 
-export function getRecommendedServiceType(
-  homeDetails: HomeDetails,
-  isFirstTime: boolean
-): ServiceType {
-  if (isFirstTime && homeDetails.conditionScore <= 6) {
-    return "deep-clean";
-  }
-  if (homeDetails.conditionScore >= 7) {
-    return "premium";
-  }
-  return "deep-clean";
+export function getServiceTypeById(
+  settings: PricingSettings,
+  id: string
+): ServiceTypeConfig | undefined {
+  return settings.serviceTypes.find((st) => st.id === id);
 }
 
 export function calculateAllOptions(
@@ -224,32 +194,20 @@ export function calculateAllOptions(
     organizationTidy: false,
   };
 
-  const recommendedType = getRecommendedServiceType(homeDetails, isFirstTime);
+  const goodType = getServiceTypeById(settings, settings.goodOptionId) || settings.serviceTypes[0];
+  const betterType = getServiceTypeById(settings, settings.betterOptionId) || settings.serviceTypes[1];
+  const bestType = getServiceTypeById(settings, settings.bestOptionId) || settings.serviceTypes[2];
 
-  let goodType: ServiceType = "touch-up";
-  let betterType: ServiceType = recommendedType;
-  let bestType: ServiceType = recommendedType;
+  const good = calculateQuoteOption(homeDetails, emptyAddOns, frequency, goodType, settings, "Good");
 
-  if (recommendedType === "deep-clean") {
-    goodType = "premium";
-    betterType = "deep-clean";
-    bestType = "deep-clean";
-  }
-
-  const good = calculateQuoteOption(homeDetails, emptyAddOns, frequency, goodType, settings);
-  good.name = "Good";
-
-  const better = calculateQuoteOption(homeDetails, emptyAddOns, frequency, betterType, settings);
-  better.name = "Better";
+  const better = calculateQuoteOption(homeDetails, emptyAddOns, frequency, betterType, settings, "Better");
 
   const bestAddOns: AddOns = {
     ...emptyAddOns,
     insideFridge: true,
     insideOven: true,
   };
-  const best = calculateQuoteOption(homeDetails, bestAddOns, frequency, bestType, settings);
-  best.name = "Best";
-  best.addOnsIncluded = ["Inside Fridge", "Inside Oven"];
+  const best = calculateQuoteOption(homeDetails, bestAddOns, frequency, bestType, settings, "Best");
 
   return { good, better, best };
 }

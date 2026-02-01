@@ -1,16 +1,20 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { View, StyleSheet } from "react-native";
+import React, { useState, useCallback } from "react";
+import { View, StyleSheet, Pressable, Platform, Modal, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { v4 as uuidv4 } from "uuid";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
 import { SectionHeader } from "@/components/SectionHeader";
+import { ThemedText } from "@/components/ThemedText";
+import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { PricingSettings, DEFAULT_PRICING_SETTINGS } from "@/types";
+import { PricingSettings, ServiceTypeConfig, DEFAULT_PRICING_SETTINGS } from "@/types";
 import { getPricingSettings, savePricingSettings } from "@/lib/storage";
 
 export default function PricingScreen() {
@@ -21,6 +25,8 @@ export default function PricingScreen() {
   const [settings, setSettings] = useState<PricingSettings>(
     DEFAULT_PRICING_SETTINGS
   );
+  const [editingService, setEditingService] = useState<ServiceTypeConfig | null>(null);
+  const [showServiceModal, setShowServiceModal] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -40,7 +46,9 @@ export default function PricingScreen() {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
     await savePricingSettings(newSettings);
-    Haptics.selectionAsync();
+    if (Platform.OS !== "web") {
+      Haptics.selectionAsync();
+    }
   };
 
   const updateAddOnPrice = async (
@@ -69,154 +77,405 @@ export default function PricingScreen() {
     await savePricingSettings(newSettings);
   };
 
-  return (
-    <KeyboardAwareScrollViewCompat
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={[
-        styles.content,
-        {
-          paddingTop: headerHeight + Spacing.xl,
-          paddingBottom: tabBarHeight + Spacing.xl,
-        },
+  const handleAddService = () => {
+    setEditingService({
+      id: uuidv4(),
+      name: "",
+      multiplier: 1.0,
+      scope: "",
+      isDefault: false,
+    });
+    setShowServiceModal(true);
+  };
+
+  const handleEditService = (service: ServiceTypeConfig) => {
+    setEditingService({ ...service });
+    setShowServiceModal(true);
+  };
+
+  const handleSaveService = async () => {
+    if (!editingService || !editingService.name.trim()) return;
+
+    const existingIndex = settings.serviceTypes.findIndex(
+      (s) => s.id === editingService.id
+    );
+
+    let newServiceTypes: ServiceTypeConfig[];
+    if (existingIndex >= 0) {
+      newServiceTypes = [...settings.serviceTypes];
+      newServiceTypes[existingIndex] = editingService;
+    } else {
+      newServiceTypes = [...settings.serviceTypes, editingService];
+    }
+
+    const newSettings = { ...settings, serviceTypes: newServiceTypes };
+    setSettings(newSettings);
+    await savePricingSettings(newSettings);
+    setShowServiceModal(false);
+    setEditingService(null);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
+  const handleDeleteService = async () => {
+    if (!editingService) return;
+
+    const newServiceTypes = settings.serviceTypes.filter(
+      (s) => s.id !== editingService.id
+    );
+
+    let newGoodId = settings.goodOptionId;
+    let newBetterId = settings.betterOptionId;
+    let newBestId = settings.bestOptionId;
+
+    if (settings.goodOptionId === editingService.id && newServiceTypes.length > 0) {
+      newGoodId = newServiceTypes[0].id;
+    }
+    if (settings.betterOptionId === editingService.id && newServiceTypes.length > 1) {
+      newBetterId = newServiceTypes[1].id;
+    }
+    if (settings.bestOptionId === editingService.id && newServiceTypes.length > 2) {
+      newBestId = newServiceTypes[2].id;
+    }
+
+    const newSettings = {
+      ...settings,
+      serviceTypes: newServiceTypes,
+      goodOptionId: newGoodId,
+      betterOptionId: newBetterId,
+      bestOptionId: newBestId,
+    };
+    setSettings(newSettings);
+    await savePricingSettings(newSettings);
+    setShowServiceModal(false);
+    setEditingService(null);
+  };
+
+  const renderServiceTypeRow = (service: ServiceTypeConfig) => (
+    <Pressable
+      key={service.id}
+      onPress={() => handleEditService(service)}
+      style={[
+        styles.serviceRow,
+        { backgroundColor: theme.cardBackground, borderColor: theme.border },
       ]}
-      scrollIndicatorInsets={{ bottom: insets.bottom }}
     >
-      <SectionHeader
-        title="Base Rates"
-        subtitle="Your standard pricing configuration"
-      />
-
-      <Input
-        label="Hourly Rate ($)"
-        value={settings.hourlyRate.toString()}
-        onChangeText={(v) => updateSetting("hourlyRate", parseFloat(v) || 0)}
-        keyboardType="decimal-pad"
-        leftIcon="dollar-sign"
-      />
-
-      <Input
-        label="Minimum Ticket ($)"
-        value={settings.minimumTicket.toString()}
-        onChangeText={(v) => updateSetting("minimumTicket", parseFloat(v) || 0)}
-        keyboardType="decimal-pad"
-        leftIcon="tag"
-      />
-
-      <Input
-        label="Tax Rate (%)"
-        value={settings.taxRate.toString()}
-        onChangeText={(v) => updateSetting("taxRate", parseFloat(v) || 0)}
-        keyboardType="decimal-pad"
-        leftIcon="percent"
-      />
-
-      <SectionHeader
-        title="Add-on Pricing"
-        subtitle="Prices for additional services"
-      />
-
-      <View style={styles.addOnsGrid}>
-        <View style={styles.addOnRow}>
-          <Input
-            label="Inside Fridge"
-            value={settings.addOnPrices.insideFridge.toString()}
-            onChangeText={(v) => updateAddOnPrice("insideFridge", v)}
-            keyboardType="decimal-pad"
-            style={styles.gridInput}
-          />
-          <Input
-            label="Inside Oven"
-            value={settings.addOnPrices.insideOven.toString()}
-            onChangeText={(v) => updateAddOnPrice("insideOven", v)}
-            keyboardType="decimal-pad"
-            style={styles.gridInput}
-          />
-        </View>
-        <View style={styles.addOnRow}>
-          <Input
-            label="Inside Cabinets"
-            value={settings.addOnPrices.insideCabinets.toString()}
-            onChangeText={(v) => updateAddOnPrice("insideCabinets", v)}
-            keyboardType="decimal-pad"
-            style={styles.gridInput}
-          />
-          <Input
-            label="Interior Windows"
-            value={settings.addOnPrices.interiorWindows.toString()}
-            onChangeText={(v) => updateAddOnPrice("interiorWindows", v)}
-            keyboardType="decimal-pad"
-            style={styles.gridInput}
-          />
-        </View>
-        <View style={styles.addOnRow}>
-          <Input
-            label="Blinds Detail"
-            value={settings.addOnPrices.blindsDetail.toString()}
-            onChangeText={(v) => updateAddOnPrice("blindsDetail", v)}
-            keyboardType="decimal-pad"
-            style={styles.gridInput}
-          />
-          <Input
-            label="Baseboards"
-            value={settings.addOnPrices.baseboardsDetail.toString()}
-            onChangeText={(v) => updateAddOnPrice("baseboardsDetail", v)}
-            keyboardType="decimal-pad"
-            style={styles.gridInput}
-          />
-        </View>
-        <View style={styles.addOnRow}>
-          <Input
-            label="Laundry Fold"
-            value={settings.addOnPrices.laundryFoldOnly.toString()}
-            onChangeText={(v) => updateAddOnPrice("laundryFoldOnly", v)}
-            keyboardType="decimal-pad"
-            style={styles.gridInput}
-          />
-          <Input
-            label="Dishes"
-            value={settings.addOnPrices.dishes.toString()}
-            onChangeText={(v) => updateAddOnPrice("dishes", v)}
-            keyboardType="decimal-pad"
-            style={styles.gridInput}
-          />
-        </View>
-        <Input
-          label="Organization/Tidy"
-          value={settings.addOnPrices.organizationTidy.toString()}
-          onChangeText={(v) => updateAddOnPrice("organizationTidy", v)}
-          keyboardType="decimal-pad"
-        />
+      <View style={styles.serviceInfo}>
+        <ThemedText type="body" style={{ fontWeight: "600" }}>
+          {service.name}
+        </ThemedText>
+        <ThemedText type="small" style={{ color: theme.textSecondary }}>
+          {service.scope}
+        </ThemedText>
       </View>
+      <View style={styles.serviceMultiplier}>
+        <ThemedText type="small" style={{ color: theme.textSecondary }}>
+          {(service.multiplier * 100).toFixed(0)}%
+        </ThemedText>
+        <Feather name="chevron-right" size={16} color={theme.textSecondary} />
+      </View>
+    </Pressable>
+  );
 
-      <SectionHeader
-        title="Frequency Discounts"
-        subtitle="Discounts for recurring customers"
-      />
+  return (
+    <>
+      <KeyboardAwareScrollViewCompat
+        style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: headerHeight + Spacing.xl,
+            paddingBottom: tabBarHeight + Spacing.xl,
+          },
+        ]}
+        scrollIndicatorInsets={{ bottom: insets.bottom }}
+      >
+        <SectionHeader
+          title="Base Rates"
+          subtitle="Your standard pricing configuration"
+        />
 
-      <Input
-        label="Weekly Discount (%)"
-        value={settings.frequencyDiscounts.weekly.toString()}
-        onChangeText={(v) => updateDiscount("weekly", v)}
-        keyboardType="decimal-pad"
-        leftIcon="percent"
-      />
+        <Input
+          label="Hourly Rate ($)"
+          value={settings.hourlyRate.toString()}
+          onChangeText={(v) => updateSetting("hourlyRate", parseFloat(v) || 0)}
+          keyboardType="decimal-pad"
+          leftIcon="dollar-sign"
+        />
 
-      <Input
-        label="Biweekly Discount (%)"
-        value={settings.frequencyDiscounts.biweekly.toString()}
-        onChangeText={(v) => updateDiscount("biweekly", v)}
-        keyboardType="decimal-pad"
-        leftIcon="percent"
-      />
+        <Input
+          label="Minimum Ticket ($)"
+          value={settings.minimumTicket.toString()}
+          onChangeText={(v) => updateSetting("minimumTicket", parseFloat(v) || 0)}
+          keyboardType="decimal-pad"
+          leftIcon="tag"
+        />
 
-      <Input
-        label="Monthly Discount (%)"
-        value={settings.frequencyDiscounts.monthly.toString()}
-        onChangeText={(v) => updateDiscount("monthly", v)}
-        keyboardType="decimal-pad"
-        leftIcon="percent"
-      />
-    </KeyboardAwareScrollViewCompat>
+        <Input
+          label="Tax Rate (%)"
+          value={settings.taxRate.toString()}
+          onChangeText={(v) => updateSetting("taxRate", parseFloat(v) || 0)}
+          keyboardType="decimal-pad"
+          leftIcon="percent"
+        />
+
+        <SectionHeader
+          title="Service Types"
+          subtitle="Configure your cleaning service options"
+          rightAction={
+            <Pressable onPress={handleAddService} style={styles.addButton}>
+              <Feather name="plus" size={20} color={theme.primary} />
+            </Pressable>
+          }
+        />
+
+        <View style={styles.serviceList}>
+          {settings.serviceTypes.map(renderServiceTypeRow)}
+        </View>
+
+        <SectionHeader
+          title="Quote Package Mapping"
+          subtitle="Which service type for each package tier"
+        />
+
+        <View style={styles.mappingContainer}>
+          <View style={[styles.mappingRow, { borderBottomColor: theme.border }]}>
+            <ThemedText type="body">Good Option</ThemedText>
+            <Pressable
+              style={[styles.mappingSelect, { borderColor: theme.border }]}
+              onPress={() => {
+                const options = settings.serviceTypes.map((s) => s.id);
+                const currentIndex = options.indexOf(settings.goodOptionId);
+                const nextIndex = (currentIndex + 1) % options.length;
+                updateSetting("goodOptionId", options[nextIndex]);
+              }}
+            >
+              <ThemedText type="small">
+                {settings.serviceTypes.find((s) => s.id === settings.goodOptionId)?.name || "Select"}
+              </ThemedText>
+              <Feather name="chevron-down" size={14} color={theme.textSecondary} />
+            </Pressable>
+          </View>
+
+          <View style={[styles.mappingRow, { borderBottomColor: theme.border }]}>
+            <ThemedText type="body">Better Option</ThemedText>
+            <Pressable
+              style={[styles.mappingSelect, { borderColor: theme.border }]}
+              onPress={() => {
+                const options = settings.serviceTypes.map((s) => s.id);
+                const currentIndex = options.indexOf(settings.betterOptionId);
+                const nextIndex = (currentIndex + 1) % options.length;
+                updateSetting("betterOptionId", options[nextIndex]);
+              }}
+            >
+              <ThemedText type="small">
+                {settings.serviceTypes.find((s) => s.id === settings.betterOptionId)?.name || "Select"}
+              </ThemedText>
+              <Feather name="chevron-down" size={14} color={theme.textSecondary} />
+            </Pressable>
+          </View>
+
+          <View style={styles.mappingRow}>
+            <ThemedText type="body">Best Option</ThemedText>
+            <Pressable
+              style={[styles.mappingSelect, { borderColor: theme.border }]}
+              onPress={() => {
+                const options = settings.serviceTypes.map((s) => s.id);
+                const currentIndex = options.indexOf(settings.bestOptionId);
+                const nextIndex = (currentIndex + 1) % options.length;
+                updateSetting("bestOptionId", options[nextIndex]);
+              }}
+            >
+              <ThemedText type="small">
+                {settings.serviceTypes.find((s) => s.id === settings.bestOptionId)?.name || "Select"}
+              </ThemedText>
+              <Feather name="chevron-down" size={14} color={theme.textSecondary} />
+            </Pressable>
+          </View>
+        </View>
+
+        <SectionHeader
+          title="Add-on Pricing"
+          subtitle="Prices for additional services"
+        />
+
+        <View style={styles.addOnsGrid}>
+          <View style={styles.addOnRow}>
+            <Input
+              label="Inside Fridge"
+              value={settings.addOnPrices.insideFridge.toString()}
+              onChangeText={(v) => updateAddOnPrice("insideFridge", v)}
+              keyboardType="decimal-pad"
+              style={styles.gridInput}
+            />
+            <Input
+              label="Inside Oven"
+              value={settings.addOnPrices.insideOven.toString()}
+              onChangeText={(v) => updateAddOnPrice("insideOven", v)}
+              keyboardType="decimal-pad"
+              style={styles.gridInput}
+            />
+          </View>
+          <View style={styles.addOnRow}>
+            <Input
+              label="Inside Cabinets"
+              value={settings.addOnPrices.insideCabinets.toString()}
+              onChangeText={(v) => updateAddOnPrice("insideCabinets", v)}
+              keyboardType="decimal-pad"
+              style={styles.gridInput}
+            />
+            <Input
+              label="Interior Windows"
+              value={settings.addOnPrices.interiorWindows.toString()}
+              onChangeText={(v) => updateAddOnPrice("interiorWindows", v)}
+              keyboardType="decimal-pad"
+              style={styles.gridInput}
+            />
+          </View>
+          <View style={styles.addOnRow}>
+            <Input
+              label="Blinds Detail"
+              value={settings.addOnPrices.blindsDetail.toString()}
+              onChangeText={(v) => updateAddOnPrice("blindsDetail", v)}
+              keyboardType="decimal-pad"
+              style={styles.gridInput}
+            />
+            <Input
+              label="Baseboards"
+              value={settings.addOnPrices.baseboardsDetail.toString()}
+              onChangeText={(v) => updateAddOnPrice("baseboardsDetail", v)}
+              keyboardType="decimal-pad"
+              style={styles.gridInput}
+            />
+          </View>
+          <View style={styles.addOnRow}>
+            <Input
+              label="Laundry Fold"
+              value={settings.addOnPrices.laundryFoldOnly.toString()}
+              onChangeText={(v) => updateAddOnPrice("laundryFoldOnly", v)}
+              keyboardType="decimal-pad"
+              style={styles.gridInput}
+            />
+            <Input
+              label="Dishes"
+              value={settings.addOnPrices.dishes.toString()}
+              onChangeText={(v) => updateAddOnPrice("dishes", v)}
+              keyboardType="decimal-pad"
+              style={styles.gridInput}
+            />
+          </View>
+          <Input
+            label="Organization/Tidy"
+            value={settings.addOnPrices.organizationTidy.toString()}
+            onChangeText={(v) => updateAddOnPrice("organizationTidy", v)}
+            keyboardType="decimal-pad"
+          />
+        </View>
+
+        <SectionHeader
+          title="Frequency Discounts"
+          subtitle="Discounts for recurring customers"
+        />
+
+        <Input
+          label="Weekly Discount (%)"
+          value={settings.frequencyDiscounts.weekly.toString()}
+          onChangeText={(v) => updateDiscount("weekly", v)}
+          keyboardType="decimal-pad"
+          leftIcon="percent"
+        />
+
+        <Input
+          label="Biweekly Discount (%)"
+          value={settings.frequencyDiscounts.biweekly.toString()}
+          onChangeText={(v) => updateDiscount("biweekly", v)}
+          keyboardType="decimal-pad"
+          leftIcon="percent"
+        />
+
+        <Input
+          label="Monthly Discount (%)"
+          value={settings.frequencyDiscounts.monthly.toString()}
+          onChangeText={(v) => updateDiscount("monthly", v)}
+          keyboardType="decimal-pad"
+          leftIcon="percent"
+        />
+      </KeyboardAwareScrollViewCompat>
+
+      <Modal
+        visible={showServiceModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowServiceModal(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+            <Pressable onPress={() => setShowServiceModal(false)}>
+              <ThemedText type="link">Cancel</ThemedText>
+            </Pressable>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              {editingService?.isDefault === false && settings.serviceTypes.find((s) => s.id === editingService?.id)
+                ? "Edit Service"
+                : "New Service"}
+            </ThemedText>
+            <Pressable onPress={handleSaveService}>
+              <ThemedText type="link">Save</ThemedText>
+            </Pressable>
+          </View>
+
+          <ScrollView
+            style={styles.modalContent}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+          >
+            <Input
+              label="Service Name"
+              value={editingService?.name || ""}
+              onChangeText={(v) =>
+                setEditingService((prev) => (prev ? { ...prev, name: v } : null))
+              }
+              placeholder="e.g., Deep Clean"
+            />
+
+            <Input
+              label="Description"
+              value={editingService?.scope || ""}
+              onChangeText={(v) =>
+                setEditingService((prev) => (prev ? { ...prev, scope: v } : null))
+              }
+              placeholder="e.g., Thorough first-time or catch-up cleaning"
+            />
+
+            <Input
+              label="Price Multiplier (%)"
+              value={editingService ? (editingService.multiplier * 100).toString() : "100"}
+              onChangeText={(v) =>
+                setEditingService((prev) =>
+                  prev ? { ...prev, multiplier: (parseFloat(v) || 100) / 100 } : null
+                )
+              }
+              keyboardType="decimal-pad"
+              placeholder="100"
+            />
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: -Spacing.md, marginBottom: Spacing.lg }}>
+              100% = base rate. Higher = more expensive, lower = cheaper.
+            </ThemedText>
+
+            {editingService && settings.serviceTypes.find((s) => s.id === editingService.id) ? (
+              <Pressable
+                onPress={handleDeleteService}
+                style={[styles.deleteButton, { backgroundColor: theme.error + "15" }]}
+              >
+                <Feather name="trash-2" size={18} color={theme.error} />
+                <ThemedText type="body" style={{ color: theme.error, marginLeft: Spacing.sm }}>
+                  Delete Service
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </ScrollView>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -234,5 +493,70 @@ const styles = StyleSheet.create({
   },
   gridInput: {
     flex: 1,
+  },
+  addButton: {
+    padding: Spacing.xs,
+  },
+  serviceList: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  serviceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  serviceInfo: {
+    flex: 1,
+  },
+  serviceMultiplier: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  mappingContainer: {
+    marginBottom: Spacing.lg,
+  },
+  mappingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  mappingSelect: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xl,
+  },
+  deleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.xl,
   },
 });
