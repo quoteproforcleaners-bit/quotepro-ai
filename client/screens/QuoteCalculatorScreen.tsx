@@ -200,7 +200,7 @@ export default function QuoteCalculatorScreen() {
           { borderBottomColor: theme.border, paddingTop: insets.top },
         ]}
       >
-        <Pressable onPress={handleCancel} style={styles.headerButton}>
+        <Pressable onPress={handleCancel} style={styles.headerButton} testID="button-cancel">
           <ThemedText type="link">Cancel</ThemedText>
         </Pressable>
         <View style={styles.headerCenter}>
@@ -227,6 +227,7 @@ export default function QuoteCalculatorScreen() {
             onPress={handleNext}
             disabled={!canProceed()}
             style={[styles.headerButton, !canProceed() && { opacity: 0.4 }]}
+            testID="button-next-step"
           >
             <ThemedText type="link">Next</ThemedText>
           </Pressable>
@@ -244,6 +245,7 @@ export default function QuoteCalculatorScreen() {
             styles.backButton,
             { backgroundColor: theme.backgroundSecondary, bottom: insets.bottom + 20 },
           ]}
+          testID="button-back-step"
         >
           <Feather name="arrow-left" size={20} color={theme.text} />
         </Pressable>

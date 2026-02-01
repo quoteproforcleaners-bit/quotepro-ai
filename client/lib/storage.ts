@@ -42,7 +42,25 @@ export async function getPricingSettings(): Promise<PricingSettings> {
   try {
     const data = await AsyncStorage.getItem(KEYS.PRICING_SETTINGS);
     if (data) {
-      return JSON.parse(data);
+      const savedSettings = JSON.parse(data);
+      return {
+        ...DEFAULT_PRICING_SETTINGS,
+        ...savedSettings,
+        addOnPrices: {
+          ...DEFAULT_PRICING_SETTINGS.addOnPrices,
+          ...(savedSettings.addOnPrices || {}),
+        },
+        frequencyDiscounts: {
+          ...DEFAULT_PRICING_SETTINGS.frequencyDiscounts,
+          ...(savedSettings.frequencyDiscounts || {}),
+        },
+        serviceTypes: savedSettings.serviceTypes?.length > 0
+          ? savedSettings.serviceTypes
+          : DEFAULT_PRICING_SETTINGS.serviceTypes,
+        goodOptionId: savedSettings.goodOptionId || DEFAULT_PRICING_SETTINGS.goodOptionId,
+        betterOptionId: savedSettings.betterOptionId || DEFAULT_PRICING_SETTINGS.betterOptionId,
+        bestOptionId: savedSettings.bestOptionId || DEFAULT_PRICING_SETTINGS.bestOptionId,
+      };
     }
     return DEFAULT_PRICING_SETTINGS;
   } catch (error) {
