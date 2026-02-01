@@ -3,19 +3,26 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet } from "react-native";
-import HomeStackNavigator from "@/navigation/HomeStackNavigator";
-import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
+import DashboardScreen from "@/screens/DashboardScreen";
+import PricingScreen from "@/screens/PricingScreen";
+import QuotesScreen from "@/screens/QuotesScreen";
+import SettingsScreen from "@/screens/SettingsScreen";
+import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
+import { useScreenOptions } from "@/hooks/useScreenOptions";
 
 export type MainTabParamList = {
   HomeTab: undefined;
-  ProfileTab: undefined;
+  PricingTab: undefined;
+  QuotesTab: undefined;
+  SettingsTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
+  const screenOptions = useScreenOptions();
 
   return (
     <Tab.Navigator
@@ -40,26 +47,50 @@ export default function MainTabNavigator() {
               style={StyleSheet.absoluteFill}
             />
           ) : null,
-        headerShown: false,
+        ...screenOptions,
       }}
     >
       <Tab.Screen
         name="HomeTab"
-        component={HomeStackNavigator}
+        component={DashboardScreen}
         options={{
           title: "Home",
+          headerTitle: () => <HeaderTitle title="CleanQuote" />,
           tabBarIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="ProfileTab"
-        component={ProfileStackNavigator}
+        name="PricingTab"
+        component={PricingScreen}
         options={{
-          title: "Profile",
+          title: "Pricing",
+          headerTitle: "Default Pricing",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="user" size={size} color={color} />
+            <Feather name="dollar-sign" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="QuotesTab"
+        component={QuotesScreen}
+        options={{
+          title: "Quotes",
+          headerTitle: "Quotes",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="file-text" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="SettingsTab"
+        component={SettingsScreen}
+        options={{
+          title: "Settings",
+          headerTitle: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="settings" size={size} color={color} />
           ),
         }}
       />
