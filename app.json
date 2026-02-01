@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "CleanQuote",
-    "slug": "cleanquote",
+    "name": "QuotePro",
+    "slug": "quotepro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "cleanquote",
+    "scheme": "quotepro",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

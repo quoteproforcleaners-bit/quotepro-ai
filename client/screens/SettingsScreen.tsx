@@ -167,7 +167,7 @@ export default function SettingsScreen() {
         ]}
       >
         <ThemedText type="body" style={{ fontWeight: "600" }}>
-          CleanQuote
+          QuotePro
         </ThemedText>
         <ThemedText
           type="small"

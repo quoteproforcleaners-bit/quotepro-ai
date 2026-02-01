@@ -75,7 +75,7 @@ export default function BusinessProfileScreen({
     >
       <View style={styles.header}>
         <ThemedText type="hero" style={styles.title}>
-          Welcome to CleanQuote
+          Welcome to QuotePro
         </ThemedText>
         <ThemedText
           type="body"

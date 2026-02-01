@@ -55,7 +55,7 @@ export default function MainTabNavigator() {
         component={DashboardScreen}
         options={{
           title: "Home",
-          headerTitle: () => <HeaderTitle title="CleanQuote" />,
+          headerTitle: () => <HeaderTitle title="QuotePro" />,
           tabBarIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),
