@@ -50,7 +50,7 @@ export function QuoteListItem({ quote, onPress }: QuoteListItemProps) {
   };
 
   const price = quote.total || 0;
-  const customerName = quote.customer?.name || (quote.customerId ? "Customer" : "Quick Quote");
+  const customerName = quote.propertyDetails?.customerName || quote.customer?.name || (quote.customerId ? "Customer" : "Quick Quote");
   const beds = quote.propertyBeds ?? quote.homeDetails?.beds ?? 0;
   const baths = quote.propertyBaths ?? quote.homeDetails?.baths ?? 0;
   const sqft = quote.propertySqft ?? quote.homeDetails?.sqft ?? 0;
