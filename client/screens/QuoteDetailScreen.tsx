@@ -1,5 +1,5 @@
-import React from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, Platform } from "react-native";
+import React, { useState, useCallback } from "react";
+import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -20,6 +20,8 @@ type RouteParams = {
   QuoteDetail: { quoteId: string };
 };
 
+type DraftPurpose = "initial_quote" | "follow_up" | "thank_you" | "booking_confirmation" | "reschedule";
+
 export default function QuoteDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -28,6 +30,12 @@ export default function QuoteDetailScreen() {
   const { theme } = useTheme();
   const { businessProfile } = useApp();
   const queryClient = useQueryClient();
+
+  const [aiDraft, setAiDraft] = useState<string | null>(null);
+  const [aiDraftType, setAiDraftType] = useState<"email" | "sms">("email");
+  const [aiDraftPurpose, setAiDraftPurpose] = useState<DraftPurpose>("initial_quote");
+  const [aiDraftLoading, setAiDraftLoading] = useState(false);
+  const [showAiDraft, setShowAiDraft] = useState(false);
 
   const { data: quote, isLoading } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
@@ -95,6 +103,50 @@ export default function QuoteDetailScreen() {
     }
   };
 
+  const fetchAiDraft = useCallback(async (type: "email" | "sms", purpose: DraftPurpose) => {
+    if (!quote) return;
+    setAiDraftType(type);
+    setAiDraftPurpose(purpose);
+    setAiDraftLoading(true);
+    setShowAiDraft(true);
+    setAiDraft(null);
+
+    try {
+      const selectedOpt = quote.options?.[quote.selectedOption || "better"];
+      const res = await apiRequest("POST", "/api/ai/communication-draft", {
+        type,
+        purpose,
+        customerName: quote.propertyDetails?.customerName || "Customer",
+        companyName: businessProfile?.companyName || "Our Company",
+        senderName: businessProfile?.senderName || "Team",
+        quoteDetails: {
+          selectedOption: selectedOpt?.serviceTypeName || selectedOpt?.name || "Cleaning",
+          price: quote.total || selectedOpt?.price || 0,
+          scope: selectedOpt?.scope || "Professional cleaning service",
+          propertyInfo: `${quote.propertyBeds || 0} bed, ${quote.propertyBaths || 0} bath, ${quote.propertySqft || 0} sqft`,
+        },
+        bookingLink: businessProfile?.bookingLink || "",
+      });
+      const data = await res.json();
+      if (data.draft) {
+        setAiDraft(data.draft);
+      }
+    } catch (err) {
+      console.log("AI draft unavailable");
+      setAiDraft(null);
+    } finally {
+      setAiDraftLoading(false);
+    }
+  }, [quote, businessProfile]);
+
+  const handleCopyDraft = async () => {
+    if (!aiDraft) return;
+    await Clipboard.setStringAsync(aiDraft);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
   const handleCopyEmail = async () => {
     if (!quote) return;
     const customerName = quote.propertyDetails?.customerName || "Customer";
@@ -146,6 +198,22 @@ export default function QuoteDetailScreen() {
   const statusColor = statusColors[status] || theme.textSecondary;
   const options = quote.options || {};
   const selectedOpt = quote.selectedOption || "better";
+
+  const purposeLabels: Record<DraftPurpose, string> = {
+    initial_quote: "Send Quote",
+    follow_up: "Follow Up",
+    thank_you: "Thank You",
+    booking_confirmation: "Confirm Booking",
+    reschedule: "Reschedule",
+  };
+
+  const purposeIcons: Record<DraftPurpose, string> = {
+    initial_quote: "send",
+    follow_up: "clock",
+    thank_you: "heart",
+    booking_confirmation: "check-circle",
+    reschedule: "calendar",
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -318,6 +386,138 @@ export default function QuoteDetailScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.sectionRow}>
+          <SectionHeader title="AI Message Writer" />
+          <View style={[styles.aiBadge, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="zap" size={12} color={theme.primary} />
+            <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
+              AI Powered
+            </ThemedText>
+          </View>
+        </View>
+
+        <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
+          Generate personalized messages for your customer
+        </ThemedText>
+
+        <View style={styles.purposeRow}>
+          {(["initial_quote", "follow_up", "thank_you", "booking_confirmation", "reschedule"] as DraftPurpose[]).map((purpose) => (
+            <Pressable
+              key={purpose}
+              onPress={() => setAiDraftPurpose(purpose)}
+              style={[
+                styles.purposeChip,
+                {
+                  backgroundColor: aiDraftPurpose === purpose ? theme.primary : theme.backgroundSecondary,
+                },
+              ]}
+              testID={`purpose-${purpose}`}
+            >
+              <Feather
+                name={purposeIcons[purpose] as any}
+                size={14}
+                color={aiDraftPurpose === purpose ? "#FFFFFF" : theme.textSecondary}
+              />
+              <ThemedText
+                type="caption"
+                style={{
+                  color: aiDraftPurpose === purpose ? "#FFFFFF" : theme.text,
+                  marginLeft: 4,
+                  fontWeight: aiDraftPurpose === purpose ? "600" : "400",
+                }}
+              >
+                {purposeLabels[purpose]}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.aiButtonRow}>
+          <Pressable
+            onPress={() => fetchAiDraft("email", aiDraftPurpose)}
+            style={[styles.aiGenerateBtn, { backgroundColor: theme.primary }]}
+            testID="ai-email-btn"
+          >
+            <Feather name="mail" size={16} color="#FFFFFF" />
+            <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
+              Write Email
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => fetchAiDraft("sms", aiDraftPurpose)}
+            style={[styles.aiGenerateBtn, { backgroundColor: theme.primary }]}
+            testID="ai-sms-btn"
+          >
+            <Feather name="message-square" size={16} color="#FFFFFF" />
+            <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
+              Write SMS
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        {showAiDraft ? (
+          <View
+            style={[
+              styles.aiDraftCard,
+              { backgroundColor: theme.cardBackground, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.aiDraftHeader}>
+              <View style={styles.draftTitleRow}>
+                <Feather
+                  name={aiDraftType === "email" ? "mail" : "message-square"}
+                  size={16}
+                  color={theme.primary}
+                />
+                <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>
+                  {aiDraftType === "email" ? "Email" : "SMS"} - {purposeLabels[aiDraftPurpose]}
+                </ThemedText>
+              </View>
+              <Pressable onPress={() => setShowAiDraft(false)}>
+                <Feather name="x" size={18} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+
+            {aiDraftLoading ? (
+              <View style={styles.draftLoading}>
+                <ActivityIndicator size="small" color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 8 }}>
+                  AI is writing your message...
+                </ThemedText>
+              </View>
+            ) : aiDraft ? (
+              <>
+                <ThemedText type="small" style={styles.draftText}>
+                  {aiDraft}
+                </ThemedText>
+                <View style={styles.aiDraftActions}>
+                  <Pressable onPress={handleCopyDraft} style={styles.draftAction} testID="copy-ai-draft">
+                    <Feather name="copy" size={16} color={theme.primary} />
+                    <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>
+                      Copy
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => fetchAiDraft(aiDraftType, aiDraftPurpose)}
+                    style={styles.draftAction}
+                    testID="regenerate-ai-draft"
+                  >
+                    <Feather name="refresh-cw" size={16} color={theme.primary} />
+                    <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>
+                      Regenerate
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                Could not generate draft. Please try again.
+              </ThemedText>
+            )}
+          </View>
+        ) : null}
+
         <SectionHeader title="Update Status" />
 
         <View style={styles.statusButtons}>
@@ -427,6 +627,82 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: Spacing.md,
     borderRadius: BorderRadius.xs,
+  },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  aiBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    marginBottom: Spacing.sm,
+  },
+  purposeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  purposeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+  },
+  aiButtonRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  aiGenerateBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+  },
+  aiDraftCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  aiDraftHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  draftTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  draftLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+  },
+  draftText: {
+    lineHeight: 20,
+  },
+  aiDraftActions: {
+    flexDirection: "row",
+    gap: Spacing.lg,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.05)",
+  },
+  draftAction: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   statusButtons: {
     flexDirection: "row",

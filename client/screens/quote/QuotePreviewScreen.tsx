@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { View, StyleSheet, ScrollView, Share, Pressable } from "react-native";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { View, StyleSheet, ScrollView, Share, Pressable, ActivityIndicator, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -25,6 +25,7 @@ import {
   generateEmailDraft,
   generateSmsDraft,
 } from "@/lib/quoteCalculator";
+import { apiRequest } from "@/lib/query-client";
 
 interface Props {
   customer: CustomerInfo;
@@ -54,6 +55,12 @@ export default function QuotePreviewScreen({
   const { theme } = useTheme();
   const [showEmail, setShowEmail] = useState(false);
   const [showSms, setShowSms] = useState(false);
+  const [aiDescriptions, setAiDescriptions] = useState<{ good: string; better: string; best: string } | null>(null);
+  const [aiDescLoading, setAiDescLoading] = useState(false);
+  const [aiEmailDraft, setAiEmailDraft] = useState<string | null>(null);
+  const [aiEmailLoading, setAiEmailLoading] = useState(false);
+  const [aiSmsDraft, setAiSmsDraft] = useState<string | null>(null);
+  const [aiSmsLoading, setAiSmsLoading] = useState(false);
 
   const options = useMemo(() => {
     return calculateAllOptions(
@@ -64,6 +71,15 @@ export default function QuotePreviewScreen({
       true
     );
   }, [homeDetails, addOns, frequency, pricingSettings]);
+
+  const enhancedOptions = useMemo(() => {
+    if (!aiDescriptions) return options;
+    return {
+      good: { ...options.good, scope: aiDescriptions.good },
+      better: { ...options.better, scope: aiDescriptions.better },
+      best: { ...options.best, scope: aiDescriptions.best },
+    };
+  }, [options, aiDescriptions]);
 
   const emailDraft = useMemo(() => {
     return generateEmailDraft(
@@ -84,22 +100,128 @@ export default function QuotePreviewScreen({
     );
   }, [customer, businessProfile, options]);
 
+  useEffect(() => {
+    fetchAiDescriptions();
+  }, []);
+
+  const fetchAiDescriptions = useCallback(async () => {
+    setAiDescLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/ai/quote-descriptions", {
+        homeDetails: {
+          sqft: homeDetails.sqft,
+          beds: homeDetails.beds,
+          baths: homeDetails.baths,
+          halfBaths: homeDetails.halfBaths,
+          homeType: homeDetails.homeType,
+          petType: homeDetails.petType,
+          conditionScore: homeDetails.conditionScore,
+          petShedding: homeDetails.petShedding,
+          peopleCount: homeDetails.peopleCount,
+          kitchensCount: homeDetails.kitchensCount,
+        },
+        serviceTypes: {
+          good: options.good.serviceTypeName,
+          better: options.better.serviceTypeName,
+          best: options.best.serviceTypeName,
+        },
+        addOns,
+        companyName: businessProfile.companyName || "Our Company",
+      });
+      const data = await res.json();
+      if (data.good && data.better && data.best) {
+        setAiDescriptions(data);
+      }
+    } catch (err) {
+      console.log("AI descriptions unavailable, using defaults");
+    } finally {
+      setAiDescLoading(false);
+    }
+  }, [homeDetails, options, addOns, businessProfile]);
+
+  const fetchAiEmailDraft = useCallback(async () => {
+    setAiEmailLoading(true);
+    try {
+      const selectedOpt = options[selectedOption];
+      const res = await apiRequest("POST", "/api/ai/communication-draft", {
+        type: "email",
+        purpose: "initial_quote",
+        customerName: customer.name || "Customer",
+        companyName: businessProfile.companyName || "Our Company",
+        senderName: businessProfile.senderName || "Team",
+        quoteDetails: {
+          selectedOption: selectedOpt.serviceTypeName,
+          price: selectedOpt.price,
+          scope: aiDescriptions?.[(selectedOption as keyof typeof aiDescriptions)] || selectedOpt.scope,
+          propertyInfo: `${homeDetails.beds} bed, ${homeDetails.baths} bath, ${homeDetails.sqft} sqft`,
+        },
+        bookingLink: businessProfile.bookingLink || "",
+      });
+      const data = await res.json();
+      if (data.draft) {
+        setAiEmailDraft(data.draft);
+      }
+    } catch (err) {
+      console.log("AI email draft unavailable");
+    } finally {
+      setAiEmailLoading(false);
+    }
+  }, [customer, businessProfile, homeDetails, options, selectedOption, aiDescriptions]);
+
+  const fetchAiSmsDraft = useCallback(async () => {
+    setAiSmsLoading(true);
+    try {
+      const selectedOpt = options[selectedOption];
+      const res = await apiRequest("POST", "/api/ai/communication-draft", {
+        type: "sms",
+        purpose: "initial_quote",
+        customerName: customer.name || "Customer",
+        companyName: businessProfile.companyName || "Our Company",
+        senderName: businessProfile.senderName || "Team",
+        quoteDetails: {
+          selectedOption: selectedOpt.serviceTypeName,
+          price: selectedOpt.price,
+          scope: selectedOpt.scope,
+          propertyInfo: `${homeDetails.beds} bed, ${homeDetails.baths} bath, ${homeDetails.sqft} sqft`,
+        },
+        bookingLink: businessProfile.bookingLink || "",
+      });
+      const data = await res.json();
+      if (data.draft) {
+        setAiSmsDraft(data.draft);
+      }
+    } catch (err) {
+      console.log("AI SMS draft unavailable");
+    } finally {
+      setAiSmsLoading(false);
+    }
+  }, [customer, businessProfile, homeDetails, options, selectedOption]);
+
   const handleCopyEmail = async () => {
-    await Clipboard.setStringAsync(emailDraft);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const text = aiEmailDraft || emailDraft;
+    await Clipboard.setStringAsync(text);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
   };
 
   const handleCopySms = async () => {
-    await Clipboard.setStringAsync(smsDraft);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const text = aiSmsDraft || smsDraft;
+    await Clipboard.setStringAsync(text);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
   };
 
   const handleShareEmail = async () => {
-    await Share.share({ message: emailDraft });
+    const text = aiEmailDraft || emailDraft;
+    await Share.share({ message: text });
   };
 
   const handleSave = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
     onSave();
   };
 
@@ -142,23 +264,40 @@ export default function QuotePreviewScreen({
           </ThemedText>
         </View>
 
-        <SectionHeader title="Quote Options" />
+        <View style={styles.sectionRow}>
+          <SectionHeader title="Quote Options" />
+          {aiDescLoading ? (
+            <View style={styles.aiLoadingBadge}>
+              <ActivityIndicator size="small" color={theme.primary} />
+              <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
+                AI enhancing...
+              </ThemedText>
+            </View>
+          ) : aiDescriptions ? (
+            <View style={[styles.aiBadge, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="zap" size={12} color={theme.primary} />
+              <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
+                AI Enhanced
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
 
         <QuoteCard
-          option={options.good}
+          option={enhancedOptions.good}
           isSelected={selectedOption === "good"}
           onPress={() => onSelectOption("good")}
         />
 
         <QuoteCard
-          option={options.better}
+          option={enhancedOptions.better}
           isSelected={selectedOption === "better"}
           isRecommended
           onPress={() => onSelectOption("better")}
         />
 
         <QuoteCard
-          option={options.best}
+          option={enhancedOptions.best}
           isSelected={selectedOption === "best"}
           onPress={() => onSelectOption("best")}
         />
@@ -166,7 +305,12 @@ export default function QuotePreviewScreen({
         <SectionHeader title="Message Drafts" />
 
         <Pressable
-          onPress={() => setShowEmail(!showEmail)}
+          onPress={() => {
+            if (!showEmail && !aiEmailDraft && !aiEmailLoading) {
+              fetchAiEmailDraft();
+            }
+            setShowEmail(!showEmail);
+          }}
           style={[
             styles.draftHeader,
             { backgroundColor: theme.cardBackground, borderColor: theme.border },
@@ -177,6 +321,14 @@ export default function QuotePreviewScreen({
             <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>
               Email Draft
             </ThemedText>
+            {aiEmailDraft ? (
+              <View style={[styles.aiSmallBadge, { backgroundColor: `${theme.primary}15` }]}>
+                <Feather name="zap" size={10} color={theme.primary} />
+                <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 2 }}>
+                  AI
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
           <Feather
             name={showEmail ? "chevron-up" : "chevron-down"}
@@ -192,9 +344,18 @@ export default function QuotePreviewScreen({
               { backgroundColor: theme.backgroundSecondary },
             ]}
           >
-            <ThemedText type="small" style={styles.draftText}>
-              {emailDraft}
-            </ThemedText>
+            {aiEmailLoading ? (
+              <View style={styles.draftLoading}>
+                <ActivityIndicator size="small" color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 8 }}>
+                  AI is writing your email...
+                </ThemedText>
+              </View>
+            ) : (
+              <ThemedText type="small" style={styles.draftText}>
+                {aiEmailDraft || emailDraft}
+              </ThemedText>
+            )}
             <View style={styles.draftActions}>
               <Pressable onPress={handleCopyEmail} style={styles.draftAction}>
                 <Feather name="copy" size={16} color={theme.primary} />
@@ -214,12 +375,34 @@ export default function QuotePreviewScreen({
                   Share
                 </ThemedText>
               </Pressable>
+              {aiEmailDraft ? (
+                <Pressable
+                  onPress={() => {
+                    setAiEmailDraft(null);
+                    fetchAiEmailDraft();
+                  }}
+                  style={styles.draftAction}
+                >
+                  <Feather name="refresh-cw" size={16} color={theme.primary} />
+                  <ThemedText
+                    type="small"
+                    style={{ color: theme.primary, marginLeft: 4 }}
+                  >
+                    Regenerate
+                  </ThemedText>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         ) : null}
 
         <Pressable
-          onPress={() => setShowSms(!showSms)}
+          onPress={() => {
+            if (!showSms && !aiSmsDraft && !aiSmsLoading) {
+              fetchAiSmsDraft();
+            }
+            setShowSms(!showSms);
+          }}
           style={[
             styles.draftHeader,
             { backgroundColor: theme.cardBackground, borderColor: theme.border },
@@ -231,6 +414,14 @@ export default function QuotePreviewScreen({
             <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>
               SMS Draft
             </ThemedText>
+            {aiSmsDraft ? (
+              <View style={[styles.aiSmallBadge, { backgroundColor: `${theme.primary}15` }]}>
+                <Feather name="zap" size={10} color={theme.primary} />
+                <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 2 }}>
+                  AI
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
           <Feather
             name={showSms ? "chevron-up" : "chevron-down"}
@@ -246,9 +437,18 @@ export default function QuotePreviewScreen({
               { backgroundColor: theme.backgroundSecondary },
             ]}
           >
-            <ThemedText type="small" style={styles.draftText}>
-              {smsDraft}
-            </ThemedText>
+            {aiSmsLoading ? (
+              <View style={styles.draftLoading}>
+                <ActivityIndicator size="small" color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 8 }}>
+                  AI is writing your SMS...
+                </ThemedText>
+              </View>
+            ) : (
+              <ThemedText type="small" style={styles.draftText}>
+                {aiSmsDraft || smsDraft}
+              </ThemedText>
+            )}
             <View style={styles.draftActions}>
               <Pressable onPress={handleCopySms} style={styles.draftAction}>
                 <Feather name="copy" size={16} color={theme.primary} />
@@ -259,6 +459,23 @@ export default function QuotePreviewScreen({
                   Copy
                 </ThemedText>
               </Pressable>
+              {aiSmsDraft ? (
+                <Pressable
+                  onPress={() => {
+                    setAiSmsDraft(null);
+                    fetchAiSmsDraft();
+                  }}
+                  style={styles.draftAction}
+                >
+                  <Feather name="refresh-cw" size={16} color={theme.primary} />
+                  <ThemedText
+                    type="small"
+                    style={{ color: theme.primary, marginLeft: 4 }}
+                  >
+                    Regenerate
+                  </ThemedText>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         ) : null}
@@ -299,6 +516,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: Spacing.md,
   },
+  sectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  aiLoadingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  aiBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    marginBottom: Spacing.sm,
+  },
+  aiSmallBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    marginLeft: 8,
+  },
   draftHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -318,6 +561,12 @@ const styles = StyleSheet.create({
   },
   draftText: {
     lineHeight: 20,
+  },
+  draftLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
   },
   draftActions: {
     flexDirection: "row",
