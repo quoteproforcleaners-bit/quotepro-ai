@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, Share, Pressable, Alert } from "react-native";
+import React from "react";
+import { View, StyleSheet, ScrollView, Pressable, Alert, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -7,16 +7,14 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
-import { QuoteCard } from "@/components/QuoteCard";
 import { Button } from "@/components/Button";
 import { SectionHeader } from "@/components/SectionHeader";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { Quote, BusinessProfile } from "@/types";
-import { getQuotes, saveQuote, deleteQuote } from "@/lib/storage";
 import { useApp } from "@/context/AppContext";
-import { generateEmailDraft, generateSmsDraft } from "@/lib/quoteCalculator";
 
 type RouteParams = {
   QuoteDetail: { quoteId: string };
@@ -29,24 +27,50 @@ export default function QuoteDetailScreen() {
   const route = useRoute<RouteProp<RouteParams, "QuoteDetail">>();
   const { theme } = useTheme();
   const { businessProfile } = useApp();
-  const [quote, setQuote] = useState<Quote | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadData();
-  }, [route.params.quoteId]);
+  const { data: quote, isLoading } = useQuery<any>({
+    queryKey: ['/api/quotes', route.params.quoteId],
+  });
 
-  const loadData = async () => {
-    const quotes = await getQuotes();
-    const found = quotes.find((q) => q.id === route.params.quoteId);
-    setQuote(found || null);
-  };
+  const updateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("PUT", `/api/quotes/${route.params.quoteId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
+    },
+  });
 
-  const handleStatusChange = async (status: Quote["status"]) => {
-    if (!quote) return;
-    const updated = { ...quote, status };
-    await saveQuote(updated);
-    setQuote(updated);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/quotes/${route.params.quoteId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
+      navigation.goBack();
+    },
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async (data: { channel: string; content: string }) => {
+      const res = await apiRequest("POST", `/api/quotes/${route.params.quoteId}/send`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
+    },
+  });
+
+  const handleStatusChange = async (status: string) => {
+    updateMutation.mutate({ status });
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
   };
 
   const handleDelete = () => {
@@ -58,43 +82,44 @@ export default function QuoteDetailScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: async () => {
-            if (quote) {
-              await deleteQuote(quote.id);
-              navigation.goBack();
-            }
-          },
+          onPress: () => deleteMutation.mutate(),
         },
       ]
     );
   };
 
+  const handleMarkSent = () => {
+    sendMutation.mutate({ channel: "manual", content: "" });
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
   const handleCopyEmail = async () => {
-    if (!quote || !businessProfile) return;
-    const email = generateEmailDraft(
-      quote.customer.name,
-      businessProfile.companyName || "Your Company",
-      businessProfile.senderName || "Team",
-      quote.options,
-      businessProfile.bookingLink
-    );
+    if (!quote) return;
+    const customerName = quote.propertyDetails?.customerName || "Customer";
+    const companyName = businessProfile?.companyName || "Our Company";
+    const price = quote.total || 0;
+    const email = `Hi ${customerName},\n\nThank you for your interest in ${companyName}!\n\nBased on your property details, we've prepared a cleaning quote for $${price.toFixed(0)}.\n\nPlease let us know if you'd like to proceed or have any questions.\n\nBest regards,\n${businessProfile?.senderName || companyName}`;
     await Clipboard.setStringAsync(email);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
   };
 
   const handleCopySms = async () => {
-    if (!quote || !businessProfile) return;
-    const sms = generateSmsDraft(
-      quote.customer.name,
-      businessProfile.companyName || "Your Company",
-      quote.options.better.price,
-      businessProfile.bookingLink
-    );
+    if (!quote) return;
+    const customerName = quote.propertyDetails?.customerName || "there";
+    const companyName = businessProfile?.companyName || "us";
+    const price = quote.total || 0;
+    const sms = `Hi ${customerName}! This is ${companyName}. Your cleaning quote is ready: $${price.toFixed(0)}. Reply YES to book or let us know if you have questions!`;
     await Clipboard.setStringAsync(sms);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
   };
 
-  if (!quote) {
+  if (isLoading || !quote) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <View style={styles.loading}>
@@ -104,13 +129,23 @@ export default function QuoteDetailScreen() {
     );
   }
 
-  const selectedOption = quote.options[quote.selectedOption];
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     draft: theme.warning,
     sent: theme.primary,
     accepted: theme.success,
+    declined: theme.error,
     expired: theme.textSecondary,
   };
+
+  const customerName = quote.propertyDetails?.customerName || "Quick Quote";
+  const beds = quote.propertyBeds || 0;
+  const baths = quote.propertyBaths || 0;
+  const sqft = quote.propertySqft || 0;
+  const frequency = quote.frequencySelected || "one-time";
+  const status = quote.status || "draft";
+  const statusColor = statusColors[status] || theme.textSecondary;
+  const options = quote.options || {};
+  const selectedOpt = quote.selectedOption || "better";
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -130,43 +165,35 @@ export default function QuoteDetailScreen() {
           ]}
         >
           <View style={styles.customerHeader}>
-            <ThemedText type="h3">{quote.customer.name}</ThemedText>
+            <ThemedText type="h3">{customerName}</ThemedText>
             <View
               style={[
                 styles.statusBadge,
-                { backgroundColor: `${statusColors[quote.status]}15` },
+                { backgroundColor: `${statusColor}15` },
               ]}
             >
               <ThemedText
                 type="small"
-                style={{ color: statusColors[quote.status], fontWeight: "600" }}
+                style={{ color: statusColor, fontWeight: "600", textTransform: "capitalize" }}
               >
-                {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                {status}
               </ThemedText>
             </View>
           </View>
-          {quote.customer.phone ? (
+          {quote.propertyDetails?.customerPhone ? (
             <ThemedText
               type="small"
               style={{ color: theme.textSecondary, marginTop: 4 }}
             >
-              {quote.customer.phone}
+              {quote.propertyDetails.customerPhone}
             </ThemedText>
           ) : null}
-          {quote.customer.email ? (
+          {quote.propertyDetails?.customerEmail ? (
             <ThemedText
               type="small"
               style={{ color: theme.textSecondary, marginTop: 2 }}
             >
-              {quote.customer.email}
-            </ThemedText>
-          ) : null}
-          {quote.customer.address ? (
-            <ThemedText
-              type="small"
-              style={{ color: theme.textSecondary, marginTop: 2 }}
-            >
-              {quote.customer.address}
+              {quote.propertyDetails.customerEmail}
             </ThemedText>
           ) : null}
         </View>
@@ -182,8 +209,7 @@ export default function QuoteDetailScreen() {
               Property
             </ThemedText>
             <ThemedText type="body">
-              {quote.homeDetails.beds} bed, {quote.homeDetails.baths} bath -{" "}
-              {quote.homeDetails.sqft} sqft
+              {beds} bed, {baths} bath - {sqft} sqft
             </ThemedText>
           </View>
           <View style={styles.detailRow}>
@@ -191,7 +217,7 @@ export default function QuoteDetailScreen() {
               Frequency
             </ThemedText>
             <ThemedText type="body" style={{ textTransform: "capitalize" }}>
-              {quote.frequency}
+              {frequency}
             </ThemedText>
           </View>
           <View style={styles.detailRow}>
@@ -204,84 +230,121 @@ export default function QuoteDetailScreen() {
           </View>
         </View>
 
-        <SectionHeader title="Selected Quote" />
+        <SectionHeader title="Pricing Options" />
 
-        <QuoteCard
-          option={selectedOption}
-          isSelected={true}
-          isRecommended={quote.selectedOption === "better"}
-          onPress={() => {}}
-        />
+        <View style={styles.optionsContainer}>
+          {["good", "better", "best"].map((key) => {
+            const opt = options[key];
+            if (!opt) return null;
+            const isSelected = selectedOpt === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => updateMutation.mutate({ selectedOption: key })}
+                style={[
+                  styles.optionCard,
+                  {
+                    backgroundColor: isSelected ? `${theme.primary}10` : theme.cardBackground,
+                    borderColor: isSelected ? theme.primary : theme.border,
+                  },
+                ]}
+                testID={`option-${key}`}
+              >
+                <View style={styles.optionHeader}>
+                  <ThemedText type="body" style={{ fontWeight: "600", textTransform: "capitalize" }}>
+                    {key}
+                  </ThemedText>
+                  {isSelected ? (
+                    <Feather name="check-circle" size={18} color={theme.primary} />
+                  ) : null}
+                </View>
+                <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                  {opt.serviceTypeName || opt.name || key}
+                </ThemedText>
+                <ThemedText type="h3" style={{ color: theme.primary, marginTop: Spacing.sm }}>
+                  ${opt.price?.toFixed(0) || "0"}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={[styles.totalCard, { backgroundColor: theme.primary }]}>
+          <ThemedText type="body" style={{ color: "#FFFFFF" }}>Total</ThemedText>
+          <ThemedText type="h2" style={{ color: "#FFFFFF" }}>
+            ${quote.total?.toFixed(0) || "0"}
+          </ThemedText>
+        </View>
 
         <SectionHeader title="Quick Actions" />
 
         <View style={styles.actions}>
           <Pressable
             onPress={handleCopyEmail}
-            style={[
-              styles.actionButton,
-              { backgroundColor: theme.backgroundSecondary },
-            ]}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="copy-email-btn"
           >
             <Feather name="mail" size={20} color={theme.primary} />
-            <ThemedText type="small" style={{ marginTop: 4 }}>
-              Copy Email
-            </ThemedText>
+            <ThemedText type="small" style={{ marginTop: 4 }}>Copy Email</ThemedText>
           </Pressable>
 
           <Pressable
             onPress={handleCopySms}
-            style={[
-              styles.actionButton,
-              { backgroundColor: theme.backgroundSecondary },
-            ]}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="copy-sms-btn"
           >
             <Feather name="message-square" size={20} color={theme.primary} />
-            <ThemedText type="small" style={{ marginTop: 4 }}>
-              Copy SMS
-            </ThemedText>
+            <ThemedText type="small" style={{ marginTop: 4 }}>Copy SMS</ThemedText>
           </Pressable>
+
+          {status === "draft" ? (
+            <Pressable
+              onPress={handleMarkSent}
+              style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+              testID="mark-sent-btn"
+            >
+              <Feather name="send" size={20} color={theme.success} />
+              <ThemedText type="small" style={{ marginTop: 4 }}>Mark Sent</ThemedText>
+            </Pressable>
+          ) : null}
 
           <Pressable
             onPress={handleDelete}
-            style={[
-              styles.actionButton,
-              { backgroundColor: theme.backgroundSecondary },
-            ]}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="delete-quote-btn"
           >
             <Feather name="trash-2" size={20} color={theme.error} />
-            <ThemedText type="small" style={{ marginTop: 4, color: theme.error }}>
-              Delete
-            </ThemedText>
+            <ThemedText type="small" style={{ marginTop: 4, color: theme.error }}>Delete</ThemedText>
           </Pressable>
         </View>
 
         <SectionHeader title="Update Status" />
 
         <View style={styles.statusButtons}>
-          {(["draft", "sent", "accepted", "expired"] as const).map((status) => (
+          {["draft", "sent", "accepted", "declined", "expired"].map((s) => (
             <Pressable
-              key={status}
-              onPress={() => handleStatusChange(status)}
+              key={s}
+              onPress={() => handleStatusChange(s)}
               style={[
                 styles.statusButton,
                 {
                   backgroundColor:
-                    quote.status === status
-                      ? statusColors[status]
+                    status === s
+                      ? statusColors[s] || theme.textSecondary
                       : theme.backgroundSecondary,
                 },
               ]}
+              testID={`status-${s}-btn`}
             >
               <ThemedText
                 type="small"
                 style={{
-                  color: quote.status === status ? "#FFFFFF" : theme.text,
-                  fontWeight: quote.status === status ? "600" : "400",
+                  color: status === s ? "#FFFFFF" : theme.text,
+                  fontWeight: status === s ? "600" : "400",
                   textTransform: "capitalize",
                 }}
               >
-                {status}
+                {s}
               </ThemedText>
             </Pressable>
           ))}
@@ -330,12 +393,37 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  optionsContainer: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  optionCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1.5,
+  },
+  optionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  totalCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.lg,
+  },
   actions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: Spacing.sm,
   },
   actionButton: {
     flex: 1,
+    minWidth: 80,
     alignItems: "center",
     padding: Spacing.md,
     borderRadius: BorderRadius.xs,

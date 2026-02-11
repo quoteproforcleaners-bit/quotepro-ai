@@ -1,18 +1,17 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, FlatList, RefreshControl } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useQuery } from "@tanstack/react-query";
 import { QuoteListItem } from "@/components/QuoteListItem";
 import { EmptyState } from "@/components/EmptyState";
 import { FAB } from "@/components/FAB";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
-import { Quote } from "@/types";
-import { getQuotes } from "@/lib/storage";
 
 type FilterType = "all" | "draft" | "sent" | "accepted";
 
@@ -22,24 +21,17 @@ export default function QuotesScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
-  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
+
+  const { data: quotes = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ['/api/quotes'],
+  });
+
   const [refreshing, setRefreshing] = useState(false);
-
-  const loadQuotes = useCallback(async () => {
-    const data = await getQuotes();
-    setQuotes(data);
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadQuotes();
-    }, [loadQuotes])
-  );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadQuotes();
+    await refetch();
     setRefreshing(false);
   };
 
@@ -47,11 +39,11 @@ export default function QuotesScreen() {
     navigation.navigate("QuoteCalculator");
   };
 
-  const handleQuotePress = (quote: Quote) => {
+  const handleQuotePress = (quote: any) => {
     navigation.navigate("QuoteDetail", { quoteId: quote.id });
   };
 
-  const filteredQuotes = quotes.filter((q) => {
+  const filteredQuotes = (quotes || []).filter((q: any) => {
     if (filter === "all") return true;
     return q.status === filter;
   });
@@ -106,7 +98,7 @@ export default function QuotesScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       />
-      <FAB onPress={handleNewQuote} />
+      <FAB onPress={handleNewQuote} testID="create-quote-fab" />
     </View>
   );
 }

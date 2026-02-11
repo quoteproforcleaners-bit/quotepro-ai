@@ -4,8 +4,8 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { v4 as uuidv4 } from "uuid";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
@@ -20,7 +20,7 @@ import {
   DEFAULT_PRICING_SETTINGS,
   DEFAULT_BUSINESS_PROFILE,
 } from "@/types";
-import { saveQuote } from "@/lib/storage";
+import { apiRequest } from "@/lib/query-client";
 import { useApp } from "@/context/AppContext";
 import { calculateAllOptions } from "@/lib/quoteCalculator";
 import CustomerInfoScreen from "@/screens/quote/CustomerInfoScreen";
@@ -35,6 +35,7 @@ export default function QuoteCalculatorScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { pricingSettings, businessProfile } = useApp();
+  const queryClient = useQueryClient();
   const [currentStep, setCurrentStep] = useState(0);
 
   const [customer, setCustomer] = useState<CustomerInfo>({
@@ -105,20 +106,44 @@ export default function QuoteCalculatorScreen() {
       true
     );
 
-    const quote: Quote = {
-      id: uuidv4(),
-      customer,
-      homeDetails,
-      addOns,
-      frequency,
-      options,
-      selectedOption,
-      createdAt: new Date().toISOString(),
-      status: "draft",
-    };
+    const selectedPrice = options[selectedOption]?.price || 0;
+    const taxRate = pricingSettings?.taxRate || 0;
+    const tax = selectedPrice * (taxRate / 100);
 
-    await saveQuote(quote);
-    navigation.goBack();
+    try {
+      const res = await apiRequest("POST", "/api/quotes", {
+        propertyBeds: homeDetails.beds,
+        propertyBaths: homeDetails.baths + homeDetails.halfBaths * 0.5,
+        propertySqft: homeDetails.sqft,
+        propertyDetails: {
+          conditionScore: homeDetails.conditionScore,
+          peopleCount: homeDetails.peopleCount,
+          petType: homeDetails.petType,
+          petShedding: homeDetails.petShedding,
+          homeType: homeDetails.homeType,
+          kitchensCount: homeDetails.kitchensCount,
+          halfBaths: homeDetails.halfBaths,
+          customerName: customer.name,
+          customerPhone: customer.phone,
+          customerEmail: customer.email,
+          customerAddress: customer.address,
+        },
+        addOns,
+        frequencySelected: frequency,
+        selectedOption,
+        options,
+        subtotal: selectedPrice,
+        tax,
+        total: selectedPrice + tax,
+        status: "draft",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
+      navigation.goBack();
+    } catch (error) {
+      console.error("Failed to save quote:", error);
+    }
   };
 
   const canProceed = () => {

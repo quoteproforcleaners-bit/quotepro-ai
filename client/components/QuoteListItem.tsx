@@ -9,10 +9,9 @@ import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { Quote } from "@/types";
 
 interface QuoteListItemProps {
-  quote: Quote;
+  quote: any;
   onPress: () => void;
 }
 
@@ -34,21 +33,30 @@ export function QuoteListItem({ quote, onPress }: QuoteListItemProps) {
     scale.value = withSpring(1, { damping: 15, stiffness: 150 });
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     draft: theme.warning,
     sent: theme.primary,
     accepted: theme.success,
+    declined: theme.error,
     expired: theme.textSecondary,
   };
 
-  const statusLabels = {
+  const statusLabels: Record<string, string> = {
     draft: "Draft",
     sent: "Sent",
     accepted: "Accepted",
+    declined: "Declined",
     expired: "Expired",
   };
 
-  const selectedOption = quote.options[quote.selectedOption];
+  const price = quote.total || 0;
+  const customerName = quote.customer?.name || (quote.customerId ? "Customer" : "Quick Quote");
+  const beds = quote.propertyBeds ?? quote.homeDetails?.beds ?? 0;
+  const baths = quote.propertyBaths ?? quote.homeDetails?.baths ?? 0;
+  const sqft = quote.propertySqft ?? quote.homeDetails?.sqft ?? 0;
+  const status = quote.status || "draft";
+  const statusColor = statusColors[status] || theme.textSecondary;
+
   const formattedDate = new Date(quote.createdAt).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -67,23 +75,24 @@ export function QuoteListItem({ quote, onPress }: QuoteListItemProps) {
         },
         animatedStyle,
       ]}
+      testID={`quote-row-${quote.id}`}
     >
       <View style={styles.content}>
         <View style={styles.header}>
           <ThemedText type="body" style={{ fontWeight: "600" }}>
-            {quote.customer.name}
+            {customerName}
           </ThemedText>
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: `${statusColors[quote.status]}15` },
+              { backgroundColor: `${statusColor}15` },
             ]}
           >
             <ThemedText
               type="caption"
-              style={{ color: statusColors[quote.status], fontWeight: "600" }}
+              style={{ color: statusColor, fontWeight: "600" }}
             >
-              {statusLabels[quote.status]}
+              {statusLabels[status] || status}
             </ThemedText>
           </View>
         </View>
@@ -91,12 +100,11 @@ export function QuoteListItem({ quote, onPress }: QuoteListItemProps) {
           type="small"
           style={[styles.details, { color: theme.textSecondary }]}
         >
-          {quote.homeDetails.beds} bed, {quote.homeDetails.baths} bath -{" "}
-          {quote.homeDetails.sqft} sqft
+          {beds} bed, {baths} bath - {sqft} sqft
         </ThemedText>
         <View style={styles.footer}>
           <ThemedText type="h4" style={{ color: theme.primary }}>
-            ${selectedOption.price}
+            ${price.toFixed(0)}
           </ThemedText>
           <ThemedText
             type="caption"
