@@ -3,7 +3,13 @@ import { createServer, type Server } from "node:http";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
+import OpenAI from "openai";
 import { pool } from "./db";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 import {
   getUserById,
   getUserByEmail,
@@ -887,6 +893,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(data);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get revenue data" });
+    }
+  });
+
+  // ─── AI Endpoints ───
+
+  app.post("/api/ai/quote-descriptions", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { homeDetails, serviceTypes, addOns, companyName } = req.body;
+
+      if (!homeDetails || !serviceTypes) {
+        return res.status(400).json({ message: "homeDetails and serviceTypes are required" });
+      }
+
+      const addOnsList: string[] = [];
+      if (addOns) {
+        if (addOns.insideFridge) addOnsList.push("inside fridge cleaning");
+        if (addOns.insideOven) addOnsList.push("inside oven cleaning");
+        if (addOns.insideWindows) addOnsList.push("inside window cleaning");
+        if (addOns.insideCabinets) addOnsList.push("inside cabinet cleaning");
+        if (addOns.laundry) addOnsList.push("laundry");
+        if (addOns.dishes) addOnsList.push("dishes");
+      }
+
+      const propertyDescription = [
+        homeDetails.sqft ? `${homeDetails.sqft} sq ft` : null,
+        homeDetails.beds ? `${homeDetails.beds} bedroom(s)` : null,
+        homeDetails.baths ? `${homeDetails.baths} bathroom(s)` : null,
+        homeDetails.halfBaths ? `${homeDetails.halfBaths} half bath(s)` : null,
+        homeDetails.homeType ? `${homeDetails.homeType}` : null,
+        homeDetails.petType && homeDetails.petType !== "none" ? `has ${homeDetails.petType}` : null,
+        homeDetails.conditionScore ? `condition score ${homeDetails.conditionScore}/5` : null,
+      ].filter(Boolean).join(", ");
+
+      const systemPrompt = `You are a professional cleaning company copywriter for ${companyName || "our company"}. Generate scope-of-work descriptions for three cleaning service tiers (good, better, best). Rules:
+- Write 1-2 sentences per option, professional but warm tone
+- Include specific property details: ${propertyDescription}
+- Differentiate clearly between the three options
+- Never mention hours or time estimates
+- Never mention pricing or costs
+${addOnsList.length > 0 ? `- The best option includes these add-ons: ${addOnsList.join(", ")}` : ""}
+Respond with a JSON object with keys "good", "better", "best", each containing the description string.`;
+
+      const userPrompt = `Property: ${propertyDescription}
+Good tier: ${serviceTypes.good || "Basic Cleaning"}
+Better tier: ${serviceTypes.better || "Standard Cleaning"}
+Best tier: ${serviceTypes.best || "Deep Clean"}
+${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` : ""}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI" });
+      }
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        parsed = {
+          good: content,
+          better: content,
+          best: content,
+        };
+      }
+
+      return res.json({
+        good: parsed.good || "",
+        better: parsed.better || "",
+        best: parsed.best || "",
+      });
+    } catch (error: any) {
+      console.error("AI quote descriptions error:", error);
+      return res.status(500).json({ message: "Failed to generate quote descriptions" });
+    }
+  });
+
+  app.post("/api/ai/communication-draft", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink } = req.body;
+
+      if (!type || !purpose) {
+        return res.status(400).json({ message: "type and purpose are required" });
+      }
+
+      const purposeDescriptions: Record<string, string> = {
+        initial_quote: "sending an initial quote - be enthusiastic and highlight value",
+        follow_up: "a gentle follow-up on a previously sent quote - be polite and not pushy",
+        thank_you: "thanking the customer for their business - be grateful and warm",
+        booking_confirmation: "confirming a booking - be professional and include key details",
+        reschedule: "requesting or confirming a reschedule - be understanding and accommodating",
+      };
+
+      const purposeInstruction = purposeDescriptions[purpose] || `purpose: ${purpose}`;
+
+      const formatInstruction = type === "sms"
+        ? "Format as an SMS message. Keep under 160 characters if possible, max 300 characters. No subject line needed."
+        : "Format as a professional email. Include a greeting, body paragraphs, and a sign-off.";
+
+      const systemPrompt = `You are a professional communication writer for ${companyName || "our company"}. Write a ${type === "sms" ? "SMS message" : "professional email"} for ${purposeInstruction}.
+
+Rules:
+- Professional but friendly and warm tone
+- ${formatInstruction}
+- Never mention hours or time estimates
+- Include relevant details from the quote if provided
+- Sign off as "${senderName || "Team"}" from "${companyName || "our company"}"
+${bookingLink ? `- Include this booking link where appropriate: ${bookingLink}` : ""}
+
+Respond with a JSON object with a single key "draft" containing the message text.`;
+
+      const quoteContext = quoteDetails
+        ? `\nQuote details: ${quoteDetails.selectedOption || "Cleaning Service"} at $${quoteDetails.price || ""}. Scope: ${quoteDetails.scope || "Professional cleaning"}. Property: ${quoteDetails.propertyInfo || ""}.`
+        : "";
+
+      const userPrompt = `Write a ${type} for: ${purposeInstruction}
+Customer name: ${customerName || "Valued Customer"}${quoteContext}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI" });
+      }
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        parsed = { draft: content };
+      }
+
+      return res.json({ draft: parsed.draft || content });
+    } catch (error: any) {
+      console.error("AI communication draft error:", error);
+      return res.status(500).json({ message: "Failed to generate communication draft" });
     }
   });
 
