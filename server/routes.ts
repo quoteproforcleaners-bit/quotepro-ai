@@ -14,6 +14,44 @@ import {
   updateBusiness,
   getPricingByBusiness,
   upsertPricingSettings,
+  getCustomersByBusiness,
+  getCustomerById,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+  getQuotesByBusiness,
+  getQuoteById,
+  getQuoteByToken,
+  createQuote,
+  updateQuote,
+  deleteQuote as deleteQuoteRow,
+  getLineItemsByQuote,
+  createLineItem,
+  deleteLineItemsByQuote,
+  getJobsByBusiness,
+  getJobById,
+  createJob,
+  updateJob,
+  deleteJob,
+  getChecklistByJob,
+  createChecklistItem,
+  updateChecklistItem,
+  deleteChecklistItem,
+  getCommunicationsByBusiness,
+  createCommunication,
+  cancelPendingCommunicationsForQuote,
+  getAutomationRules,
+  upsertAutomationRules,
+  getTasksByBusiness,
+  getTaskById,
+  createTask,
+  updateTask,
+  deleteTask,
+  getQuoteStats,
+  getRevenueByPeriod,
+  expireOldQuotes,
+  getPendingCommunications,
+  updateCommunication,
 } from "./storage";
 
 declare module "express-session" {
@@ -362,8 +400,528 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── Customers ───
+
+  app.get("/api/customers", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { search, status } = req.query as any;
+      const list = await getCustomersByBusiness(business.id, { search, status });
+      return res.json(list);
+    } catch (error: any) {
+      console.error("Get customers error:", error);
+      return res.status(500).json({ message: "Failed to get customers" });
+    }
+  });
+
+  app.get("/api/customers/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const c = await getCustomerById(req.params.id);
+      if (!c) return res.status(404).json({ message: "Customer not found" });
+      return res.json(c);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get customer" });
+    }
+  });
+
+  app.post("/api/customers", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const c = await createCustomer({ ...req.body, businessId: business.id });
+      return res.json(c);
+    } catch (error: any) {
+      console.error("Create customer error:", error);
+      return res.status(500).json({ message: "Failed to create customer" });
+    }
+  });
+
+  app.put("/api/customers/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const c = await updateCustomer(req.params.id, req.body);
+      return res.json(c);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update customer" });
+    }
+  });
+
+  app.delete("/api/customers/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteCustomer(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete customer" });
+    }
+  });
+
+  // ─── Quotes ───
+
+  app.get("/api/quotes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { status, customerId } = req.query as any;
+      const list = await getQuotesByBusiness(business.id, { status, customerId });
+      return res.json(list);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get quotes" });
+    }
+  });
+
+  app.get("/api/quotes/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const q = await getQuoteById(req.params.id);
+      if (!q) return res.status(404).json({ message: "Quote not found" });
+      const lineItems = await getLineItemsByQuote(q.id);
+      return res.json({ ...q, lineItems });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get quote" });
+    }
+  });
+
+  app.post("/api/quotes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const rules = await getAutomationRules(business.id);
+      const expirationDays = rules?.quoteExpirationDays || 7;
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + expirationDays);
+
+      const q = await createQuote({ ...req.body, businessId: business.id, expiresAt });
+
+      if (req.body.lineItems) {
+        for (const li of req.body.lineItems) {
+          await createLineItem({ ...li, quoteId: q.id });
+        }
+      }
+
+      return res.json(q);
+    } catch (error: any) {
+      console.error("Create quote error:", error);
+      return res.status(500).json({ message: "Failed to create quote" });
+    }
+  });
+
+  app.put("/api/quotes/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { lineItems, ...data } = req.body;
+      const q = await updateQuote(req.params.id, data);
+
+      if (lineItems) {
+        await deleteLineItemsByQuote(q.id);
+        for (const li of lineItems) {
+          await createLineItem({ ...li, quoteId: q.id });
+        }
+      }
+
+      return res.json(q);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update quote" });
+    }
+  });
+
+  app.post("/api/quotes/:id/send", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { channel, content } = req.body;
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const quote = await getQuoteById(req.params.id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const q = await updateQuote(req.params.id, {
+        status: "sent",
+        sentVia: channel,
+        sentAt: new Date(),
+      });
+
+      await createCommunication({
+        businessId: business.id,
+        customerId: quote.customerId || undefined,
+        quoteId: quote.id,
+        channel: channel || "sms",
+        content: content || "",
+        status: "sent",
+      });
+
+      const rules = await getAutomationRules(business.id);
+      if (rules?.quoteFollowupsEnabled && rules.followupSchedule) {
+        const schedule = rules.followupSchedule as any[];
+        for (const step of schedule) {
+          const scheduledFor = new Date();
+          scheduledFor.setMinutes(scheduledFor.getMinutes() + step.delayMinutes);
+          await createCommunication({
+            businessId: business.id,
+            customerId: quote.customerId || undefined,
+            quoteId: quote.id,
+            channel: rules.followupChannel || "sms",
+            templateKey: step.templateKey,
+            content: "",
+            status: "queued",
+            scheduledFor,
+          });
+        }
+      }
+
+      return res.json(q);
+    } catch (error: any) {
+      console.error("Send quote error:", error);
+      return res.status(500).json({ message: "Failed to send quote" });
+    }
+  });
+
+  app.delete("/api/quotes/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteQuoteRow(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete quote" });
+    }
+  });
+
+  // ─── Public Quote Page ───
+
+  app.get("/api/public/quote/:token", async (req: Request, res: Response) => {
+    try {
+      const q = await getQuoteByToken(req.params.token);
+      if (!q) return res.status(404).json({ message: "Quote not found" });
+
+      const business = await db_getBusinessById(q.businessId);
+      const customer = q.customerId ? await getCustomerById(q.customerId) : null;
+      const lineItems = await getLineItemsByQuote(q.id);
+
+      return res.json({
+        quote: {
+          id: q.id,
+          options: q.options,
+          selectedOption: q.selectedOption,
+          addOns: q.addOns,
+          frequencySelected: q.frequencySelected,
+          subtotal: q.subtotal,
+          tax: q.tax,
+          total: q.total,
+          status: q.status,
+          expiresAt: q.expiresAt,
+          lineItems,
+        },
+        business: business
+          ? {
+              companyName: business.companyName,
+              email: business.email,
+              phone: business.phone,
+              logoUri: business.logoUri,
+              primaryColor: business.primaryColor,
+              senderName: business.senderName,
+              senderTitle: business.senderTitle,
+            }
+          : null,
+        customer: customer
+          ? { firstName: customer.firstName, lastName: customer.lastName }
+          : null,
+      });
+    } catch (error: any) {
+      console.error("Public quote error:", error);
+      return res.status(500).json({ message: "Failed to load quote" });
+    }
+  });
+
+  app.post("/api/public/quote/:token/respond", async (req: Request, res: Response) => {
+    try {
+      const { action } = req.body;
+      const q = await getQuoteByToken(req.params.token);
+      if (!q) return res.status(404).json({ message: "Quote not found" });
+
+      if (q.status !== "sent") {
+        return res.status(400).json({ message: "Quote is no longer open for response" });
+      }
+
+      if (action === "accept") {
+        await updateQuote(q.id, { status: "accepted", acceptedAt: new Date() });
+        await cancelPendingCommunicationsForQuote(q.id);
+        if (q.customerId) {
+          await updateCustomer(q.customerId, { status: "active" });
+        }
+      } else if (action === "decline") {
+        await updateQuote(q.id, { status: "declined", declinedAt: new Date() });
+        await cancelPendingCommunicationsForQuote(q.id);
+      }
+
+      return res.json({ message: "Response recorded" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to respond to quote" });
+    }
+  });
+
+  // ─── Jobs ───
+
+  app.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { status, customerId, from, to } = req.query as any;
+      const list = await getJobsByBusiness(business.id, {
+        status,
+        customerId,
+        from: from ? new Date(from) : undefined,
+        to: to ? new Date(to) : undefined,
+      });
+      return res.json(list);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get jobs" });
+    }
+  });
+
+  app.get("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const j = await getJobById(req.params.id);
+      if (!j) return res.status(404).json({ message: "Job not found" });
+      const checklist = await getChecklistByJob(j.id);
+      return res.json({ ...j, checklist });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get job" });
+    }
+  });
+
+  app.post("/api/jobs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const j = await createJob({
+        ...req.body,
+        businessId: business.id,
+        startDatetime: new Date(req.body.startDatetime),
+        endDatetime: req.body.endDatetime ? new Date(req.body.endDatetime) : undefined,
+      });
+
+      if (req.body.checklist) {
+        for (let i = 0; i < req.body.checklist.length; i++) {
+          await createChecklistItem({
+            jobId: j.id,
+            label: req.body.checklist[i].label || req.body.checklist[i],
+            sortOrder: i,
+          });
+        }
+      }
+
+      return res.json(j);
+    } catch (error: any) {
+      console.error("Create job error:", error);
+      return res.status(500).json({ message: "Failed to create job" });
+    }
+  });
+
+  app.put("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = { ...req.body };
+      if (data.startDatetime) data.startDatetime = new Date(data.startDatetime);
+      if (data.endDatetime) data.endDatetime = new Date(data.endDatetime);
+      const j = await updateJob(req.params.id, data);
+      return res.json(j);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update job" });
+    }
+  });
+
+  app.delete("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteJob(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete job" });
+    }
+  });
+
+  // ─── Job Checklist ───
+
+  app.post("/api/jobs/:jobId/checklist", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const item = await createChecklistItem({ jobId: req.params.jobId, ...req.body });
+      return res.json(item);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to create checklist item" });
+    }
+  });
+
+  app.put("/api/checklist/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const item = await updateChecklistItem(req.params.id, req.body);
+      return res.json(item);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update checklist item" });
+    }
+  });
+
+  app.delete("/api/checklist/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteChecklistItem(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete checklist item" });
+    }
+  });
+
+  // ─── Communications ───
+
+  app.get("/api/communications", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { customerId, quoteId, jobId } = req.query as any;
+      const list = await getCommunicationsByBusiness(business.id, { customerId, quoteId, jobId });
+      return res.json(list);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get communications" });
+    }
+  });
+
+  app.post("/api/communications", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const c = await createCommunication({ ...req.body, businessId: business.id });
+      return res.json(c);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to create communication" });
+    }
+  });
+
+  // ─── Automation Rules ───
+
+  app.get("/api/automations", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const rules = await getAutomationRules(business.id);
+      return res.json(rules || null);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get automation rules" });
+    }
+  });
+
+  app.put("/api/automations", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const rules = await upsertAutomationRules(business.id, req.body);
+      return res.json(rules);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update automation rules" });
+    }
+  });
+
+  // ─── Tasks ───
+
+  app.get("/api/tasks", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { completed, customerId, dueToday } = req.query as any;
+      const list = await getTasksByBusiness(business.id, {
+        completed: completed === "true" ? true : completed === "false" ? false : undefined,
+        customerId,
+        dueToday: dueToday === "true",
+      });
+      return res.json(list);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get tasks" });
+    }
+  });
+
+  app.post("/api/tasks", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const data = { ...req.body, businessId: business.id };
+      if (data.dueDate) data.dueDate = new Date(data.dueDate);
+      const t = await createTask(data);
+      return res.json(t);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to create task" });
+    }
+  });
+
+  app.put("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = { ...req.body };
+      if (data.dueDate) data.dueDate = new Date(data.dueDate);
+      if (data.completed && !data.completedAt) data.completedAt = new Date();
+      const t = await updateTask(req.params.id, data);
+      return res.json(t);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update task" });
+    }
+  });
+
+  app.delete("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteTask(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete task" });
+    }
+  });
+
+  // ─── Reporting ───
+
+  app.get("/api/reports/stats", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const stats = await getQuoteStats(business.id);
+      return res.json(stats);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get stats" });
+    }
+  });
+
+  app.get("/api/reports/revenue", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const days = parseInt(req.query.days as string) || 30;
+      const data = await getRevenueByPeriod(business.id, days);
+      return res.json(data);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get revenue data" });
+    }
+  });
+
+  // ─── Background Cron (called periodically) ───
+
+  app.post("/api/internal/cron", async (_req: Request, res: Response) => {
+    try {
+      const expiredCount = await expireOldQuotes();
+      if (expiredCount > 0) console.log(`Expired ${expiredCount} quotes`);
+      return res.json({ expired: expiredCount });
+    } catch (error: any) {
+      console.error("Cron error:", error);
+      return res.status(500).json({ message: "Cron failed" });
+    }
+  });
+
   const httpServer = createServer(app);
+
+  setInterval(async () => {
+    try {
+      await expireOldQuotes();
+    } catch (e) {
+      console.error("Auto-expire error:", e);
+    }
+  }, 60 * 60 * 1000);
+
   return httpServer;
+}
+
+async function db_getBusinessById(businessId: string) {
+  const { db } = await import("./db");
+  const { businesses } = await import("@shared/schema");
+  const { eq } = await import("drizzle-orm");
+  const [b] = await db.select().from(businesses).where(eq(businesses.id, businessId));
+  return b;
 }
 
 function formatBusiness(b: any) {
@@ -378,6 +936,7 @@ function formatBusiness(b: any) {
     senderName: b.senderName,
     senderTitle: b.senderTitle,
     bookingLink: b.bookingLink,
+    timezone: b.timezone,
     onboardingComplete: b.onboardingComplete,
   };
 }
