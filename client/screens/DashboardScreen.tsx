@@ -1,19 +1,19 @@
-import React, { useCallback } from "react";
-import { View, StyleSheet, FlatList, RefreshControl } from "react-native";
+import React from "react";
+import { View, StyleSheet, FlatList, RefreshControl, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { ThemedText } from "@/components/ThemedText";
 import { StatCard } from "@/components/StatCard";
-import { QuoteListItem } from "@/components/QuoteListItem";
 import { EmptyState } from "@/components/EmptyState";
 import { FAB } from "@/components/FAB";
+import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing } from "@/constants/theme";
-import { Quote } from "@/types";
-import { getQuotes } from "@/lib/storage";
+import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 
 export default function DashboardScreen() {
@@ -23,23 +23,37 @@ export default function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const { businessProfile: profile } = useApp();
-  const [quotes, setQuotes] = React.useState<Quote[]>([]);
+
+  const { data: stats, refetch: refetchStats } = useQuery<{
+    totalQuotes: number;
+    sentQuotes: number;
+    acceptedQuotes: number;
+    declinedQuotes: number;
+    expiredQuotes: number;
+    totalRevenue: number;
+    avgQuoteValue: number;
+    closeRate: number;
+  }>({
+    queryKey: ['/api/reports/stats'],
+  });
+
+  const { data: recentQuotes = [], refetch: refetchQuotes } = useQuery<any[]>({
+    queryKey: ['/api/quotes'],
+  });
+
+  const { data: customers = [], refetch: refetchCustomers } = useQuery<any[]>({
+    queryKey: ['/api/customers'],
+  });
+
+  const { data: tasks = [], refetch: refetchTasks } = useQuery<any[]>({
+    queryKey: ['/api/tasks'],
+  });
+
   const [refreshing, setRefreshing] = React.useState(false);
-
-  const loadData = useCallback(async () => {
-    const quotesData = await getQuotes();
-    setQuotes(quotesData);
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [loadData])
-  );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchTasks()]);
     setRefreshing(false);
   };
 
@@ -47,37 +61,31 @@ export default function DashboardScreen() {
     navigation.navigate("QuoteCalculator");
   };
 
-  const handleQuotePress = (quote: Quote) => {
-    navigation.navigate("QuoteDetail", { quoteId: quote.id });
-  };
-
-  const recentQuotes = quotes.slice(0, 5);
-
-  const thisWeekRevenue = quotes
-    .filter((q) => {
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      return new Date(q.createdAt) >= weekAgo && q.status === "accepted";
-    })
-    .reduce((sum, q) => sum + q.options[q.selectedOption].price, 0);
-
-  const pendingQuotes = quotes.filter(
-    (q) => q.status === "sent" || q.status === "draft"
-  ).length;
-
-  const avgQuoteValue =
-    quotes.length > 0
-      ? Math.round(
-          quotes.reduce((sum, q) => sum + q.options[q.selectedOption].price, 0) /
-            quotes.length
-        )
-      : 0;
-
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
     if (hour < 17) return "Good afternoon";
     return "Good evening";
+  };
+
+  const pendingTasks = (tasks || []).filter((t: any) => !t.completed);
+  const recent5Quotes = (recentQuotes || []).slice(0, 5);
+  const activeLeads = (customers || []).filter((c: any) => c.status === "lead").length;
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "accepted": return theme.success;
+      case "sent": return theme.primary;
+      case "draft": return theme.textSecondary;
+      case "declined": return theme.error;
+      case "expired": return theme.warning;
+      default: return theme.textSecondary;
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
   const renderHeader = () => (
@@ -91,31 +99,81 @@ export default function DashboardScreen() {
 
       <View style={styles.stats}>
         <StatCard
-          title="This Week"
-          value={`$${thisWeekRevenue.toLocaleString()}`}
+          title="Revenue"
+          value={`$${(stats?.totalRevenue || 0).toLocaleString()}`}
           icon="trending-up"
           color={theme.success}
         />
         <StatCard
-          title="Pending"
-          value={pendingQuotes.toString()}
-          icon="clock"
-          color={theme.warning}
+          title="Close Rate"
+          value={`${stats?.closeRate || 0}%`}
+          icon="target"
+          color={theme.primary}
         />
         <StatCard
-          title="Avg Quote"
-          value={`$${avgQuoteValue}`}
-          icon="bar-chart-2"
-          color={theme.primary}
+          title="Leads"
+          value={activeLeads.toString()}
+          icon="users"
+          color={theme.warning}
         />
       </View>
 
-      {recentQuotes.length > 0 ? (
-        <View style={styles.sectionHeader}>
-          <ThemedText type="h4">Recent Quotes</ThemedText>
+      {pendingTasks.length > 0 ? (
+        <View style={styles.section}>
+          <ThemedText type="h4" style={styles.sectionTitle}>Tasks Due</ThemedText>
+          {pendingTasks.slice(0, 3).map((task: any) => (
+            <Pressable
+              key={task.id}
+              style={[styles.taskRow, { borderColor: theme.border }]}
+              onPress={() => {}}
+              testID={`task-row-${task.id}`}
+            >
+              <View style={[styles.taskDot, { backgroundColor: theme.warning }]} />
+              <View style={styles.taskContent}>
+                <ThemedText type="small" numberOfLines={1}>{task.title}</ThemedText>
+                {task.dueDate ? (
+                  <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                    {formatDate(task.dueDate)}
+                  </ThemedText>
+                ) : null}
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
+      {recent5Quotes.length > 0 ? (
+        <View style={styles.section}>
+          <ThemedText type="h4" style={styles.sectionTitle}>Recent Quotes</ThemedText>
         </View>
       ) : null}
     </View>
+  );
+
+  const renderQuoteItem = ({ item }: { item: any }) => (
+    <Card
+      style={styles.quoteCard}
+      onPress={() => navigation.navigate("QuoteDetail", { quoteId: item.id })}
+    >
+      <View style={styles.quoteRow}>
+        <View style={styles.quoteInfo}>
+          <ThemedText type="body" numberOfLines={1}>
+            {item.customerId ? "Customer Quote" : "Quick Quote"}
+          </ThemedText>
+          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+            {formatDate(item.createdAt)}
+          </ThemedText>
+        </View>
+        <View style={styles.quoteRight}>
+          <ThemedText type="h4">${item.total.toFixed(0)}</ThemedText>
+          <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
+            <ThemedText type="caption" style={{ color: getStatusColor(item.status) }}>
+              {item.status}
+            </ThemedText>
+          </View>
+        </View>
+      </View>
+    </Card>
   );
 
   const renderEmpty = () => (
@@ -131,11 +189,9 @@ export default function DashboardScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
-        data={recentQuotes}
+        data={recent5Quotes}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <QuoteListItem quote={item} onPress={() => handleQuotePress(item)} />
-        )}
+        renderItem={renderQuoteItem}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={[
@@ -144,14 +200,14 @@ export default function DashboardScreen() {
             paddingTop: headerHeight + Spacing.xl,
             paddingBottom: tabBarHeight + Spacing.xl + 80,
           },
-          quotes.length === 0 && styles.emptyContent,
+          recent5Quotes.length === 0 && styles.emptyContent,
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       />
-      <FAB onPress={handleNewQuote} />
+      <FAB onPress={handleNewQuote} testID="create-quote-fab" />
     </View>
   );
 }
@@ -174,7 +230,48 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.xl,
   },
-  sectionHeader: {
+  section: {
+    marginBottom: Spacing.xl,
+  },
+  sectionTitle: {
     marginBottom: Spacing.md,
+  },
+  taskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+  },
+  taskDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: Spacing.md,
+  },
+  taskContent: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  quoteCard: {
+    marginBottom: Spacing.sm,
+  },
+  quoteRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  quoteInfo: {
+    flex: 1,
+  },
+  quoteRight: {
+    alignItems: "flex-end",
+  },
+  statusBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    marginTop: 4,
   },
 });

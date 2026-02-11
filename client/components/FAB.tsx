@@ -14,11 +14,12 @@ import { Spacing } from "@/constants/theme";
 
 interface FABProps {
   onPress: () => void;
+  testID?: string;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export function FAB({ onPress }: FABProps) {
+export function FAB({ onPress, testID }: FABProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
@@ -43,6 +44,7 @@ export function FAB({ onPress }: FABProps) {
 
   return (
     <AnimatedPressable
+      testID={testID}
       onPress={handlePress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}

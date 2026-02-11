@@ -1,0 +1,717 @@
+import React, { useState, useEffect, useLayoutEffect } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Alert,
+  Linking,
+  ActivityIndicator,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useHeaderHeight, HeaderButton } from "@react-navigation/elements";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Feather } from "@expo/vector-icons";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { useTheme } from "@/hooks/useTheme";
+import { Spacing, BorderRadius } from "@/constants/theme";
+import { ThemedText } from "@/components/ThemedText";
+import { Input } from "@/components/Input";
+import { Button } from "@/components/Button";
+import { SectionHeader } from "@/components/SectionHeader";
+
+interface Customer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  address: string;
+  notes: string;
+  tags: string[];
+  leadSource: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export default function CustomerDetailScreen() {
+  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const route = useRoute();
+  const { customerId } = route.params as { customerId: string };
+  const { theme } = useTheme();
+  const queryClient = useQueryClient();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const { data: customer, isLoading } = useQuery<Customer>({
+    queryKey: ["/api/customers", customerId],
+  });
+
+  const { data: customerQuotes = [] } = useQuery({
+    queryKey: ["/api/quotes", { customerId }],
+    queryFn: async () => {
+      const url = new URL("/api/quotes", getApiUrl());
+      url.searchParams.set("customerId", customerId);
+      const res = await fetch(url, { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  const { data: customerJobs = [] } = useQuery({
+    queryKey: ["/api/jobs", { customerId }],
+    queryFn: async () => {
+      const url = new URL("/api/jobs", getApiUrl());
+      url.searchParams.set("customerId", customerId);
+      const res = await fetch(url, { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    if (customer) {
+      setFirstName(customer.firstName || "");
+      setLastName(customer.lastName || "");
+      setPhone(customer.phone || "");
+      setEmail(customer.email || "");
+      setAddress(customer.address || "");
+      setNotes(customer.notes || "");
+    }
+  }, [customer]);
+
+  useLayoutEffect(() => {
+    const fullName = customer
+      ? `${customer.firstName} ${customer.lastName}`.trim()
+      : "Customer";
+    navigation.setOptions({
+      headerTitle: fullName,
+      headerRight: () => (
+        <HeaderButton
+          onPress={() => setIsEditing((prev) => !prev)}
+          testID="edit-customer-btn"
+        >
+          <Feather
+            name={isEditing ? "check" : "edit-2"}
+            size={20}
+            color={theme.primary}
+          />
+        </HeaderButton>
+      ),
+    });
+  }, [navigation, customer, isEditing, theme]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: Record<string, unknown>) => {
+      const res = await apiRequest("PUT", `/api/customers/${customerId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/customers/${customerId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      navigation.goBack();
+    },
+  });
+
+  const handleSaveEdit = () => {
+    updateMutation.mutate({ firstName, lastName, phone, email, address });
+    setIsEditing(false);
+  };
+
+  const handleSaveNotes = () => {
+    updateMutation.mutate({ notes });
+  };
+
+  const handleStatusChange = (status: string) => {
+    updateMutation.mutate({ status });
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Customer",
+      "Are you sure you want to delete this customer? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteMutation.mutate(),
+        },
+      ]
+    );
+  };
+
+  const handleCall = () => {
+    if (customer?.phone) {
+      Linking.openURL(`tel:${customer.phone}`);
+    }
+  };
+
+  const handleEmail = () => {
+    if (customer?.email) {
+      Linking.openURL(`mailto:${customer.email}`);
+    }
+  };
+
+  const statusColors: Record<string, string> = {
+    lead: theme.warning,
+    active: theme.primary,
+    inactive: theme.textSecondary,
+  };
+
+  if (isLoading) {
+    return (
+      <View
+        style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (!customer) {
+    return (
+      <View
+        style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      >
+        <View style={styles.loadingContainer}>
+          <ThemedText type="body">{"Customer not found"}</ThemedText>
+        </View>
+      </View>
+    );
+  }
+
+  const fullName = `${customer.firstName} ${customer.lastName}`.trim();
+  const tags: string[] = Array.isArray(customer.tags) ? customer.tags : [];
+
+  return (
+    <View
+      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      testID="customer-detail"
+    >
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: headerHeight + Spacing.xl,
+            paddingBottom: insets.bottom + Spacing.xl + 80,
+          },
+        ]}
+        scrollIndicatorInsets={{ bottom: insets.bottom }}
+      >
+        {isEditing ? (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: theme.cardBackground, borderColor: theme.border },
+            ]}
+          >
+            <Input
+              label="First Name"
+              value={firstName}
+              onChangeText={setFirstName}
+              testID="input-first-name"
+            />
+            <Input
+              label="Last Name"
+              value={lastName}
+              onChangeText={setLastName}
+              testID="input-last-name"
+            />
+            <Input
+              label="Phone"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              testID="input-phone"
+            />
+            <Input
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              testID="input-email"
+            />
+            <Input
+              label="Address"
+              value={address}
+              onChangeText={setAddress}
+              testID="input-address"
+            />
+            <View testID="save-customer-btn">
+              <Button onPress={handleSaveEdit}>
+                {"Save Changes"}
+              </Button>
+            </View>
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: theme.cardBackground, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.nameRow}>
+              <ThemedText type="h3" testID="customer-name">
+                {fullName}
+              </ThemedText>
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor: `${statusColors[customer.status] || theme.textSecondary}15`,
+                  },
+                ]}
+              >
+                <ThemedText
+                  type="caption"
+                  style={{
+                    color: statusColors[customer.status] || theme.textSecondary,
+                    fontWeight: "600",
+                  }}
+                >
+                  {customer.status.charAt(0).toUpperCase() +
+                    customer.status.slice(1)}
+                </ThemedText>
+              </View>
+            </View>
+
+            {customer.phone ? (
+              <Pressable
+                onPress={handleCall}
+                style={styles.contactRow}
+                testID="customer-phone"
+              >
+                <Feather
+                  name="phone"
+                  size={16}
+                  color={theme.primary}
+                  style={styles.contactIcon}
+                />
+                <ThemedText type="body" style={{ color: theme.primary }}>
+                  {customer.phone}
+                </ThemedText>
+              </Pressable>
+            ) : null}
+
+            {customer.email ? (
+              <Pressable
+                onPress={handleEmail}
+                style={styles.contactRow}
+                testID="customer-email"
+              >
+                <Feather
+                  name="mail"
+                  size={16}
+                  color={theme.primary}
+                  style={styles.contactIcon}
+                />
+                <ThemedText type="body" style={{ color: theme.primary }}>
+                  {customer.email}
+                </ThemedText>
+              </Pressable>
+            ) : null}
+
+            {customer.address ? (
+              <View style={styles.contactRow}>
+                <Feather
+                  name="map-pin"
+                  size={16}
+                  color={theme.textSecondary}
+                  style={styles.contactIcon}
+                />
+                <ThemedText
+                  type="small"
+                  style={{ color: theme.textSecondary, flex: 1 }}
+                >
+                  {customer.address}
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
+        )}
+
+        <SectionHeader title="Status" />
+        <View style={styles.statusButtons}>
+          {["lead", "active", "inactive"].map((status) => (
+            <Pressable
+              key={status}
+              onPress={() => handleStatusChange(status)}
+              style={[
+                styles.statusButton,
+                {
+                  backgroundColor:
+                    customer.status === status
+                      ? statusColors[status]
+                      : theme.backgroundSecondary,
+                },
+              ]}
+              testID={`status-${status}-btn`}
+            >
+              <ThemedText
+                type="small"
+                style={{
+                  color:
+                    customer.status === status ? "#FFFFFF" : theme.text,
+                  fontWeight: customer.status === status ? "600" : "400",
+                  textTransform: "capitalize",
+                }}
+              >
+                {status}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+
+        {customer.leadSource ? (
+          <>
+            <SectionHeader title="Lead Source" />
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: theme.cardBackground, borderColor: theme.border },
+              ]}
+            >
+              <View style={styles.contactRow}>
+                <Feather
+                  name="target"
+                  size={16}
+                  color={theme.textSecondary}
+                  style={styles.contactIcon}
+                />
+                <ThemedText type="body">{customer.leadSource}</ThemedText>
+              </View>
+            </View>
+          </>
+        ) : null}
+
+        {tags.length > 0 ? (
+          <>
+            <SectionHeader title="Tags" />
+            <View style={styles.tagsContainer}>
+              {tags.map((tag: string, index: number) => (
+                <View
+                  key={`${tag}-${index}`}
+                  style={[
+                    styles.tag,
+                    { backgroundColor: `${theme.primary}15` },
+                  ]}
+                >
+                  <ThemedText
+                    type="caption"
+                    style={{ color: theme.primary, fontWeight: "500" }}
+                  >
+                    {tag}
+                  </ThemedText>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        <SectionHeader title="Notes" />
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.cardBackground, borderColor: theme.border },
+          ]}
+        >
+          <Input
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            numberOfLines={4}
+            placeholder="Add notes about this customer..."
+            style={styles.notesInput}
+            testID="input-notes"
+          />
+          {notes !== (customer.notes || "") ? (
+            <Button onPress={handleSaveNotes}>
+              {"Save Notes"}
+            </Button>
+          ) : null}
+        </View>
+
+        <SectionHeader
+          title="Quotes"
+          subtitle={
+            customerQuotes.length > 0
+              ? `${customerQuotes.length} quote${customerQuotes.length !== 1 ? "s" : ""}`
+              : undefined
+          }
+        />
+        {customerQuotes.length > 0 ? (
+          <View>
+            {customerQuotes.map((q: any) => (
+              <Pressable
+                key={q.id}
+                onPress={() =>
+                  navigation.navigate("QuoteDetail", { quoteId: q.id })
+                }
+                style={[
+                  styles.listItem,
+                  { backgroundColor: theme.cardBackground, borderColor: theme.border },
+                ]}
+                testID={`quote-item-${q.id}`}
+              >
+                <View style={styles.listItemContent}>
+                  <ThemedText type="body" style={{ fontWeight: "500" }}>
+                    {q.total ? `$${Number(q.total).toFixed(2)}` : "No total"}
+                  </ThemedText>
+                  <ThemedText
+                    type="caption"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    {new Date(q.createdAt).toLocaleDateString()}
+                  </ThemedText>
+                </View>
+                <View
+                  style={[
+                    styles.miniStatusBadge,
+                    {
+                      backgroundColor: `${
+                        q.status === "accepted"
+                          ? theme.success
+                          : q.status === "sent"
+                            ? theme.primary
+                            : theme.warning
+                      }15`,
+                    },
+                  ]}
+                >
+                  <ThemedText
+                    type="caption"
+                    style={{
+                      color:
+                        q.status === "accepted"
+                          ? theme.success
+                          : q.status === "sent"
+                            ? theme.primary
+                            : theme.warning,
+                      fontWeight: "600",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {q.status}
+                  </ThemedText>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>
+            {"No quotes yet"}
+          </ThemedText>
+        )}
+
+        <SectionHeader
+          title="Jobs"
+          subtitle={
+            customerJobs.length > 0
+              ? `${customerJobs.length} job${customerJobs.length !== 1 ? "s" : ""}`
+              : undefined
+          }
+        />
+        {customerJobs.length > 0 ? (
+          <View>
+            {customerJobs.map((j: any) => (
+              <Pressable
+                key={j.id}
+                style={[
+                  styles.listItem,
+                  { backgroundColor: theme.cardBackground, borderColor: theme.border },
+                ]}
+                testID={`job-item-${j.id}`}
+              >
+                <View style={styles.listItemContent}>
+                  <ThemedText type="body" style={{ fontWeight: "500" }}>
+                    {j.jobType
+                      ? j.jobType.charAt(0).toUpperCase() + j.jobType.slice(1)
+                      : "Job"}
+                  </ThemedText>
+                  <ThemedText
+                    type="caption"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    {new Date(j.startDatetime).toLocaleDateString()}
+                  </ThemedText>
+                </View>
+                <View style={styles.listItemRight}>
+                  {j.total ? (
+                    <ThemedText type="small" style={{ fontWeight: "500" }}>
+                      {`$${Number(j.total).toFixed(2)}`}
+                    </ThemedText>
+                  ) : null}
+                  <View
+                    style={[
+                      styles.miniStatusBadge,
+                      {
+                        backgroundColor: `${
+                          j.status === "completed"
+                            ? theme.success
+                            : j.status === "in_progress"
+                              ? theme.primary
+                              : theme.warning
+                        }15`,
+                      },
+                    ]}
+                  >
+                    <ThemedText
+                      type="caption"
+                      style={{
+                        color:
+                          j.status === "completed"
+                            ? theme.success
+                            : j.status === "in_progress"
+                              ? theme.primary
+                              : theme.warning,
+                        fontWeight: "600",
+                        textTransform: "capitalize",
+                      }}
+                    >
+                      {j.status}
+                    </ThemedText>
+                  </View>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>
+            {"No jobs yet"}
+          </ThemedText>
+        )}
+
+        <SectionHeader title="Danger Zone" />
+        <Pressable
+          onPress={handleDelete}
+          style={[
+            styles.deleteButton,
+            { backgroundColor: `${theme.error}15` },
+          ]}
+          testID="delete-customer-btn"
+        >
+          <Feather name="trash-2" size={18} color={theme.error} />
+          <ThemedText
+            type="body"
+            style={{ color: theme.error, marginLeft: Spacing.sm, fontWeight: "500" }}
+          >
+            {"Delete Customer"}
+          </ThemedText>
+        </Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: Spacing.lg,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  card: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  nameRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  statusBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  contactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.sm,
+  },
+  contactIcon: {
+    marginRight: Spacing.sm,
+  },
+  statusButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  statusButton: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+  },
+  tagsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  tag: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+  },
+  notesInput: {
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  listItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  listItemContent: {
+    flex: 1,
+    gap: 2,
+  },
+  listItemRight: {
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  miniStatusBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  deleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+  },
+});

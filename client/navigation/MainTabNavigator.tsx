@@ -4,8 +4,9 @@ import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet } from "react-native";
 import DashboardScreen from "@/screens/DashboardScreen";
-import PricingScreen from "@/screens/PricingScreen";
+import CustomersScreen from "@/screens/CustomersScreen";
 import QuotesScreen from "@/screens/QuotesScreen";
+import JobsScreen from "@/screens/JobsScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
@@ -13,8 +14,9 @@ import { useScreenOptions } from "@/hooks/useScreenOptions";
 
 export type MainTabParamList = {
   HomeTab: undefined;
-  PricingTab: undefined;
+  CustomersTab: undefined;
   QuotesTab: undefined;
+  JobsTab: undefined;
   SettingsTab: undefined;
 };
 
@@ -62,13 +64,13 @@ export default function MainTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="PricingTab"
-        component={PricingScreen}
+        name="CustomersTab"
+        component={CustomersScreen}
         options={{
-          title: "Pricing",
-          headerTitle: "Default Pricing",
+          title: "Customers",
+          headerTitle: "Customers",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="dollar-sign" size={size} color={color} />
+            <Feather name="users" size={size} color={color} />
           ),
         }}
       />
@@ -80,6 +82,17 @@ export default function MainTabNavigator() {
           headerTitle: "Quotes",
           tabBarIcon: ({ color, size }) => (
             <Feather name="file-text" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="JobsTab"
+        component={JobsScreen}
+        options={{
+          title: "Jobs",
+          headerTitle: "Jobs",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="calendar" size={size} color={color} />
           ),
         }}
       />
