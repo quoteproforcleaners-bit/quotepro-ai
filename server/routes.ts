@@ -948,7 +948,6 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
           { role: "user", content: userPrompt },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.7,
       });
 
       const content = completion.choices[0]?.message?.content;
@@ -1026,7 +1025,6 @@ Customer name: ${customerName || "Valued Customer"}${quoteContext}`;
           { role: "user", content: userPrompt },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.7,
       });
 
       const content = completion.choices[0]?.message?.content;

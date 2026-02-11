@@ -179,6 +179,10 @@ Reports:
 - `GET /api/reports/stats` - Dashboard statistics (counts, revenue)
 - `GET /api/reports/revenue` - Revenue analytics
 
+AI (OpenAI via Replit AI Integrations, gpt-5-nano):
+- `POST /api/ai/quote-descriptions` - Generate AI-enhanced scope descriptions for Good/Better/Best options
+- `POST /api/ai/communication-draft` - Generate personalized email/SMS drafts (purposes: initial_quote, follow_up, thank_you, booking_confirmation, reschedule)
+
 Public:
 - `GET /api/public/quote/:token` - Public quote acceptance page
 
