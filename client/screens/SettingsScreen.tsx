@@ -15,12 +15,14 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { BusinessProfile, DEFAULT_BUSINESS_PROFILE } from "@/types";
 import { getBusinessProfile, saveBusinessProfile } from "@/lib/storage";
+import { useAuth } from "@/context/AuthContext";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
+  const { user, logout } = useAuth();
   const [profile, setProfile] = useState<BusinessProfile>(
     DEFAULT_BUSINESS_PROFILE
   );
@@ -158,6 +160,38 @@ export default function SettingsScreen() {
         leftIcon="link"
       />
 
+      <SectionHeader title="Account" />
+
+      {user ? (
+        <View
+          style={[
+            styles.aboutCard,
+            { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.md },
+          ]}
+        >
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>
+            Signed in as
+          </ThemedText>
+          <ThemedText type="body" style={{ fontWeight: "600", marginTop: 2 }}>
+            {user.email}
+          </ThemedText>
+        </View>
+      ) : null}
+
+      <Pressable
+        onPress={logout}
+        style={[
+          styles.logoutButton,
+          { backgroundColor: theme.error + "15", borderColor: theme.error + "30" },
+        ]}
+        testID="button-logout"
+      >
+        <Feather name="log-out" size={18} color={theme.error} />
+        <ThemedText type="body" style={{ color: theme.error, fontWeight: "600", marginLeft: Spacing.sm }}>
+          Sign Out
+        </ThemedText>
+      </Pressable>
+
       <SectionHeader title="About" />
 
       <View
@@ -233,5 +267,14 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing["2xl"],
   },
 });

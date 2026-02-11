@@ -5,11 +5,14 @@ import MainTabNavigator from "@/navigation/MainTabNavigator";
 import OnboardingNavigator from "@/navigation/OnboardingNavigator";
 import QuoteCalculatorScreen from "@/screens/QuoteCalculatorScreen";
 import QuoteDetailScreen from "@/screens/QuoteDetailScreen";
+import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
+import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
 
 export type RootStackParamList = {
+  Login: undefined;
   Onboarding: undefined;
   Main: undefined;
   QuoteCalculator: undefined;
@@ -20,10 +23,11 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootStackNavigator() {
   const screenOptions = useScreenOptions();
-  const { isLoading, needsOnboarding } = useApp();
+  const { isLoading: authLoading, user, needsOnboarding: authNeedsOnboarding } = useAuth();
+  const { isLoading: appLoading, needsOnboarding: appNeedsOnboarding } = useApp();
   const { theme } = useTheme();
 
-  if (isLoading) {
+  if (authLoading || (user && appLoading)) {
     return (
       <View
         style={[styles.loading, { backgroundColor: theme.backgroundRoot }]}
@@ -33,9 +37,17 @@ export default function RootStackNavigator() {
     );
   }
 
+  const showOnboarding = user && (authNeedsOnboarding || appNeedsOnboarding);
+
   return (
     <Stack.Navigator screenOptions={screenOptions}>
-      {needsOnboarding ? (
+      {!user ? (
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+      ) : showOnboarding ? (
         <Stack.Screen
           name="Onboarding"
           component={OnboardingNavigator}
