@@ -23,6 +23,16 @@ Multi-user app with authentication (email/password, Apple Sign-In, Google Sign-I
 
 Preferred communication style: Simple, everyday language.
 iPhone-only app. No hours/times shown to customers. Customizable service types.
+Future plan: Freemium model where quoting is free, CRM/jobs/automation are paid (RevenueCat for subscriptions).
+
+## Design System
+
+**Brand Colors**: Teal/emerald primary (#0D9488 light / #14B8A6 dark) with indigo accent (#6366F1 / #818CF8)
+**Typography**: h1-h3 use bold (700) weight, h4 uses semibold (600), subtitle type (500 weight) for secondary emphasis
+**Empty States**: Icon-based with decorative concentric circles (no image assets needed) - use `icon` and `iconColor` props on EmptyState component
+**Stat Cards**: Colored accent bar on top with icon container
+**Dashboard**: Branded greeting (uppercase label + h1 company name), Getting Started checklist for new users (auto-hides when user has quotes and customers)
+**Gradient tokens**: gradientSuccess, gradientPrimary, gradientWarning, gradientAccent available in theme for card backgrounds
 
 ## System Architecture
 
