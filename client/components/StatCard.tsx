@@ -23,18 +23,21 @@ export function StatCard({ title, value, icon, color }: StatCardProps) {
         { backgroundColor: theme.cardBackground, borderColor: theme.border },
       ]}
     >
-      <View style={[styles.iconContainer, { backgroundColor: `${iconColor}15` }]}>
-        <Feather name={icon} size={18} color={iconColor} />
+      <View style={[styles.accentBar, { backgroundColor: iconColor }]} />
+      <View style={styles.content}>
+        <View style={[styles.iconContainer, { backgroundColor: `${iconColor}15` }]}>
+          <Feather name={icon} size={16} color={iconColor} />
+        </View>
+        <ThemedText type="h2" style={styles.value}>
+          {value}
+        </ThemedText>
+        <ThemedText
+          type="caption"
+          style={[styles.title, { color: theme.textSecondary }]}
+        >
+          {title}
+        </ThemedText>
       </View>
-      <ThemedText type="h3" style={styles.value}>
-        {value}
-      </ThemedText>
-      <ThemedText
-        type="caption"
-        style={[styles.title, { color: theme.textSecondary }]}
-      >
-        {title}
-      </ThemedText>
     </View>
   );
 }
@@ -42,9 +45,16 @@ export function StatCard({ title, value, icon, color }: StatCardProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
+    overflow: "hidden",
+  },
+  accentBar: {
+    height: 3,
+    width: "100%",
+  },
+  content: {
+    padding: Spacing.md,
   },
   iconContainer: {
     width: 32,

@@ -284,7 +284,8 @@ export default function CustomersScreen() {
       </View>
     ) : (
       <EmptyState
-        image={require("../../assets/images/empty-dashboard.png")}
+        icon="users"
+        iconColor={theme.primary}
         title="No customers yet"
         description="Add your first customer to start managing your contacts and growing your business."
         actionLabel="Add Customer"

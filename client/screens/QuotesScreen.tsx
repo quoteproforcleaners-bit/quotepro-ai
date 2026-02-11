@@ -67,7 +67,8 @@ export default function QuotesScreen() {
 
   const renderEmpty = () => (
     <EmptyState
-      image={require("../../assets/images/empty-quotes.png")}
+      icon="file-text"
+      iconColor={theme.primary}
       title="No quotes yet"
       description="Create your first quote to start tracking your proposals and close more deals."
       actionLabel="Create Quote"

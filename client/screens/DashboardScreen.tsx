@@ -17,6 +17,34 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 
+function GettingStartedItem({ icon, label, completed, onPress, theme }: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  completed: boolean;
+  onPress: () => void;
+  theme: any;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.gettingStartedItem}>
+      <View style={[
+        styles.gettingStartedCheck,
+        { backgroundColor: completed ? theme.success : theme.backgroundSecondary, borderColor: completed ? theme.success : theme.border }
+      ]}>
+        {completed ? (
+          <Feather name="check" size={14} color="#FFFFFF" />
+        ) : null}
+      </View>
+      <ThemedText type="body" style={[
+        styles.gettingStartedLabel,
+        completed ? { color: theme.textSecondary, textDecorationLine: "line-through" } : {}
+      ]}>
+        {label}
+      </ThemedText>
+      <Feather name="chevron-right" size={16} color={theme.textSecondary} />
+    </Pressable>
+  );
+}
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -106,11 +134,52 @@ export default function DashboardScreen() {
   const renderHeader = () => (
     <View>
       <View style={styles.greeting}>
-        <ThemedText type="h2">
-          {getGreeting()}
-          {profile?.companyName ? `, ${profile.companyName}` : ""}
-        </ThemedText>
+        <View>
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: 2, textTransform: "uppercase", letterSpacing: 1, fontWeight: "600" }}>
+            {getGreeting()}
+          </ThemedText>
+          <ThemedText type="h1">
+            {profile?.companyName || "QuotePro"}
+          </ThemedText>
+        </View>
       </View>
+
+      {(stats?.totalQuotes === 0 || !stats) && customers.length === 0 ? (
+        <View style={[styles.gettingStarted, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <ThemedText type="h4" style={styles.gettingStartedTitle}>Getting Started</ThemedText>
+          <ThemedText type="small" style={[styles.gettingStartedSubtitle, { color: theme.textSecondary }]}>
+            Complete these steps to set up your business
+          </ThemedText>
+          <GettingStartedItem
+            icon="briefcase"
+            label="Set up your business profile"
+            completed={!!profile?.companyName}
+            onPress={() => navigation.navigate("MainTabs", { screen: "Settings" })}
+            theme={theme}
+          />
+          <GettingStartedItem
+            icon="dollar-sign"
+            label="Configure your pricing"
+            completed={false}
+            onPress={() => navigation.navigate("PricingSettings")}
+            theme={theme}
+          />
+          <GettingStartedItem
+            icon="users"
+            label="Add your first customer"
+            completed={customers.length > 0}
+            onPress={() => navigation.navigate("MainTabs", { screen: "Customers" })}
+            theme={theme}
+          />
+          <GettingStartedItem
+            icon="file-text"
+            label="Create your first quote"
+            completed={(stats?.totalQuotes || 0) > 0}
+            onPress={handleNewQuote}
+            theme={theme}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.stats}>
         <StatCard
@@ -222,7 +291,8 @@ export default function DashboardScreen() {
 
   const renderEmpty = () => (
     <EmptyState
-      image={require("../../assets/images/empty-dashboard.png")}
+      icon="file-text"
+      iconColor={theme.primary}
       title="Ready to create your first quote?"
       description="Tap the + button to generate a professional cleaning quote in minutes."
       actionLabel="Create Quote"
@@ -279,6 +349,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginBottom: Spacing.md,
+    letterSpacing: 0.3,
   },
   taskRow: {
     flexDirection: "row",
@@ -335,5 +406,34 @@ const styles = StyleSheet.create({
   activityContent: {
     flex: 1,
     gap: 2,
+  },
+  gettingStarted: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    padding: Spacing.lg,
+    marginBottom: Spacing.xl,
+  },
+  gettingStartedTitle: {
+    marginBottom: 4,
+  },
+  gettingStartedSubtitle: {
+    marginBottom: Spacing.lg,
+  },
+  gettingStartedItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    gap: Spacing.md,
+  },
+  gettingStartedCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gettingStartedLabel: {
+    flex: 1,
   },
 });

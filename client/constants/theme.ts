@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 
-const primaryLight = "#2563EB";
-const primaryDark = "#3B82F6";
+const primaryLight = "#0D9488";
+const primaryDark = "#14B8A6";
 
 export const Colors = {
   light: {
@@ -12,7 +12,7 @@ export const Colors = {
     tabIconSelected: primaryLight,
     link: primaryLight,
     primary: primaryLight,
-    primaryDark: "#1E40AF",
+    primaryDark: "#0F766E",
     backgroundRoot: "#F8FAFC",
     backgroundDefault: "#FFFFFF",
     backgroundSecondary: "#F1F5F9",
@@ -21,8 +21,13 @@ export const Colors = {
     success: "#10B981",
     warning: "#F59E0B",
     error: "#EF4444",
+    accent: "#6366F1",
     inputBackground: "#FFFFFF",
     cardBackground: "#FFFFFF",
+    gradientSuccess: "#ECFDF5",
+    gradientPrimary: "#F0FDFA",
+    gradientWarning: "#FFFBEB",
+    gradientAccent: "#EFF6FF",
   },
   dark: {
     text: "#F8FAFC",
@@ -32,7 +37,7 @@ export const Colors = {
     tabIconSelected: primaryDark,
     link: primaryDark,
     primary: primaryDark,
-    primaryDark: "#2563EB",
+    primaryDark: "#0D9488",
     backgroundRoot: "#0F172A",
     backgroundDefault: "#1E293B",
     backgroundSecondary: "#334155",
@@ -41,8 +46,13 @@ export const Colors = {
     success: "#10B981",
     warning: "#F59E0B",
     error: "#EF4444",
+    accent: "#818CF8",
     inputBackground: "#1E293B",
     cardBackground: "#1E293B",
+    gradientSuccess: "#064E3B",
+    gradientPrimary: "#042F2E",
+    gradientWarning: "#451A03",
+    gradientAccent: "#172554",
   },
 };
 
@@ -85,12 +95,12 @@ export const Typography = {
   h2: {
     fontSize: 24,
     lineHeight: 32,
-    fontWeight: "600" as const,
+    fontWeight: "700" as const,
   },
   h3: {
     fontSize: 20,
     lineHeight: 28,
-    fontWeight: "600" as const,
+    fontWeight: "700" as const,
   },
   h4: {
     fontSize: 18,
@@ -101,6 +111,11 @@ export const Typography = {
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "400" as const,
+  },
+  subtitle: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "500" as const,
   },
   small: {
     fontSize: 14,

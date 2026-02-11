@@ -212,7 +212,8 @@ export default function JobsScreen() {
       </View>
     ) : (
       <EmptyState
-        image={require("../../assets/images/empty-dashboard.png")}
+        icon="calendar"
+        iconColor={theme.primary}
         title="No jobs scheduled"
         description="Tap the + button to schedule your first job and start managing your work."
         actionLabel="Add Job"
