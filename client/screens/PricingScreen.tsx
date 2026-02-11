@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { View, StyleSheet, Pressable, Platform, Modal, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { v4 as uuidv4 } from "uuid";
@@ -19,7 +18,6 @@ import { useApp } from "@/context/AppContext";
 export default function PricingScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
   const { pricingSettings: settings, updatePricingSettings } = useApp();
   const [editingService, setEditingService] = useState<ServiceTypeConfig | null>(null);
@@ -167,7 +165,7 @@ export default function PricingScreen() {
           styles.content,
           {
             paddingTop: headerHeight + Spacing.xl,
-            paddingBottom: tabBarHeight + Spacing.xl,
+            paddingBottom: insets.bottom + Spacing.xl,
           },
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}

@@ -6,6 +6,7 @@ import OnboardingNavigator from "@/navigation/OnboardingNavigator";
 import QuoteCalculatorScreen from "@/screens/QuoteCalculatorScreen";
 import QuoteDetailScreen from "@/screens/QuoteDetailScreen";
 import CustomerDetailScreen from "@/screens/CustomerDetailScreen";
+import PricingScreen from "@/screens/PricingScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
@@ -19,6 +20,7 @@ export type RootStackParamList = {
   QuoteCalculator: undefined;
   QuoteDetail: { quoteId: string };
   CustomerDetail: { customerId: string };
+  PricingSettings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -82,6 +84,13 @@ export default function RootStackNavigator() {
             component={CustomerDetailScreen}
             options={{
               headerTitle: "Customer",
+            }}
+          />
+          <Stack.Screen
+            name="PricingSettings"
+            component={PricingScreen}
+            options={{
+              headerTitle: "Pricing & Services",
             }}
           />
         </>
