@@ -17,7 +17,7 @@ export function SectionHeader({ title, subtitle, rightAction }: SectionHeaderPro
     <View style={styles.container}>
       <View style={styles.titleRow}>
         <View style={styles.titleContent}>
-          <ThemedText type="h4">{title}</ThemedText>
+          <ThemedText type="h4" style={styles.title}>{title}</ThemedText>
           {subtitle ? (
             <ThemedText
               type="small"
@@ -36,7 +36,7 @@ export function SectionHeader({ title, subtitle, rightAction }: SectionHeaderPro
 const styles = StyleSheet.create({
   container: {
     marginBottom: Spacing.lg,
-    marginTop: Spacing.xl,
+    marginTop: Spacing["2xl"],
   },
   titleRow: {
     flexDirection: "row",
@@ -45,6 +45,9 @@ const styles = StyleSheet.create({
   },
   titleContent: {
     flex: 1,
+  },
+  title: {
+    letterSpacing: 0.2,
   },
   subtitle: {
     marginTop: Spacing.xs,
