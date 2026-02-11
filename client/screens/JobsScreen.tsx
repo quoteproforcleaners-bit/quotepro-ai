@@ -50,7 +50,7 @@ const filterOptions: { label: string; value: StatusFilter }[] = [
 ];
 
 const JOB_TYPES = [
-  { label: "Regular", value: "regular" },
+  { label: "Standard", value: "regular" },
   { label: "Deep Clean", value: "deep_clean" },
   { label: "Move In/Out", value: "move_in_out" },
   { label: "Post Construction", value: "post_construction" },

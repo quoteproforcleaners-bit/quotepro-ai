@@ -251,8 +251,8 @@ export default function QuoteDetailScreen() {
                 testID={`option-${key}`}
               >
                 <View style={styles.optionHeader}>
-                  <ThemedText type="body" style={{ fontWeight: "600", textTransform: "capitalize" }}>
-                    {key}
+                  <ThemedText type="body" style={{ fontWeight: "600" }}>
+                    {opt.serviceTypeName || opt.name || key}
                   </ThemedText>
                   {isSelected ? (
                     <Feather name="check-circle" size={18} color={theme.primary} />

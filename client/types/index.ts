@@ -118,7 +118,7 @@ export const DEFAULT_SERVICE_TYPES: ServiceTypeConfig[] = [
   },
   {
     id: "regular",
-    name: "Regular Cleaning",
+    name: "Standard Cleaning",
     multiplier: 1.0,
     scope: "Complete whole-home cleaning",
     isDefault: true,

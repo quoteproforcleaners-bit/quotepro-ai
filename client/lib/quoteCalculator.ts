@@ -223,16 +223,20 @@ export function generateEmailDraft(
   const goodPrice = options.good.price;
   const bestPrice = options.best.price;
 
+  const goodName = options.good.serviceTypeName || "Touch Up";
+  const betterName = options.better.serviceTypeName || "Standard Cleaning";
+  const bestName = options.best.serviceTypeName || "Deep Clean";
+
   let email = `Hi ${customerName},
 
 Thank you for reaching out to ${businessName}! Based on the details you shared, here is your personalized cleaning quote.
 
 Your Options:
-- Good ($${goodPrice}): ${options.good.scope}
-- Better ($${betterPrice}): ${options.better.scope} (Recommended)
-- Best ($${bestPrice}): ${options.best.scope} + premium add-ons
+- ${goodName} ($${goodPrice}): ${options.good.scope}
+- ${betterName} ($${betterPrice}): ${options.better.scope} (Recommended)
+- ${bestName} ($${bestPrice}): ${options.best.scope} + premium add-ons
 
-The Better option at $${betterPrice} is our most popular choice and includes ${options.better.scope.toLowerCase()}.`;
+The ${betterName} option at $${betterPrice} is our most popular choice and includes ${options.better.scope.toLowerCase()}.`;
 
   if (bookingLink) {
     email += `
