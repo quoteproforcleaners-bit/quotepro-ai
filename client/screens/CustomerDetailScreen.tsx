@@ -151,6 +151,7 @@ export default function CustomerDetailScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communications", { customerId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/communications"] });
     },
   });
 
