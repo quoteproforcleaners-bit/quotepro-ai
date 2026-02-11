@@ -25,7 +25,6 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
   const screenOptions = useScreenOptions();
-
   return (
     <Tab.Navigator
       initialRouteName="HomeTab"
@@ -49,7 +48,10 @@ export default function MainTabNavigator() {
               style={StyleSheet.absoluteFill}
             />
           ) : null,
-        ...screenOptions,
+        headerTitleAlign: screenOptions.headerTitleAlign,
+        headerTransparent: screenOptions.headerTransparent,
+        headerTintColor: screenOptions.headerTintColor,
+        headerStyle: screenOptions.headerStyle as any,
       }}
     >
       <Tab.Screen

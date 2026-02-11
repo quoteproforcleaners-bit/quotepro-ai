@@ -52,6 +52,10 @@ export default function CustomerDetailScreen() {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
+  const [showCommForm, setShowCommForm] = useState(false);
+  const [commChannel, setCommChannel] = useState<string>("phone");
+  const [commSubject, setCommSubject] = useState("");
+  const [commContent, setCommContent] = useState("");
 
   const { data: customer, isLoading } = useQuery<Customer>({
     queryKey: ["/api/customers", customerId],
@@ -71,6 +75,16 @@ export default function CustomerDetailScreen() {
     queryKey: ["/api/jobs", { customerId }],
     queryFn: async () => {
       const url = new URL("/api/jobs", getApiUrl());
+      url.searchParams.set("customerId", customerId);
+      const res = await fetch(url, { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  const { data: customerComms = [] } = useQuery<any[]>({
+    queryKey: ["/api/communications", { customerId }],
+    queryFn: async () => {
+      const url = new URL("/api/communications", getApiUrl());
       url.searchParams.set("customerId", customerId);
       const res = await fetch(url, { credentials: "include" });
       return res.json();
@@ -127,6 +141,16 @@ export default function CustomerDetailScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
       navigation.goBack();
+    },
+  });
+
+  const commMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/communications", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications", { customerId }] });
     },
   });
 
@@ -602,6 +626,174 @@ export default function CustomerDetailScreen() {
           </ThemedText>
         )}
 
+        <SectionHeader
+          title="Communications"
+          subtitle={
+            customerComms.length > 0
+              ? `${customerComms.length} communication${customerComms.length !== 1 ? "s" : ""}`
+              : undefined
+          }
+        />
+        <Pressable
+          onPress={() => setShowCommForm((prev) => !prev)}
+          style={[
+            styles.commToggleButton,
+            { backgroundColor: `${theme.primary}15` },
+          ]}
+          testID="log-comm-btn"
+        >
+          <Feather name={showCommForm ? "x" : "plus"} size={16} color={theme.primary} />
+          <ThemedText
+            type="small"
+            style={{ color: theme.primary, fontWeight: "600", marginLeft: Spacing.xs }}
+          >
+            {showCommForm ? "Cancel" : "Log Communication"}
+          </ThemedText>
+        </Pressable>
+
+        {showCommForm ? (
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: theme.cardBackground, borderColor: theme.border },
+            ]}
+          >
+            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: Spacing.xs }}>
+              {"Channel"}
+            </ThemedText>
+            <View style={styles.commChannelRow}>
+              {([
+                { key: "email", icon: "mail" as const, label: "Email" },
+                { key: "sms", icon: "message-square" as const, label: "SMS" },
+                { key: "phone", icon: "phone" as const, label: "Phone" },
+              ] as const).map((ch) => (
+                <Pressable
+                  key={ch.key}
+                  onPress={() => setCommChannel(ch.key)}
+                  style={[
+                    styles.commChannelButton,
+                    {
+                      backgroundColor:
+                        commChannel === ch.key
+                          ? theme.primary
+                          : theme.backgroundSecondary,
+                    },
+                  ]}
+                  testID={`comm-channel-${ch.key}`}
+                >
+                  <Feather
+                    name={ch.icon}
+                    size={14}
+                    color={commChannel === ch.key ? "#FFFFFF" : theme.text}
+                  />
+                  <ThemedText
+                    type="caption"
+                    style={{
+                      color: commChannel === ch.key ? "#FFFFFF" : theme.text,
+                      marginLeft: 4,
+                      fontWeight: commChannel === ch.key ? "600" : "400",
+                    }}
+                  >
+                    {ch.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+            <Input
+              label="Subject"
+              value={commSubject}
+              onChangeText={setCommSubject}
+              placeholder="Subject or title..."
+              testID="input-comm-subject"
+            />
+            <Input
+              label="Content / Notes"
+              value={commContent}
+              onChangeText={setCommContent}
+              placeholder="Details about this communication..."
+              multiline
+              numberOfLines={3}
+              testID="input-comm-content"
+            />
+            <View testID="submit-comm-btn">
+              <Button
+                onPress={() => {
+                  commMutation.mutate(
+                    {
+                      customerId,
+                      channel: commChannel,
+                      subject: commSubject,
+                      content: commContent,
+                    },
+                    {
+                      onSuccess: () => {
+                        setShowCommForm(false);
+                        setCommChannel("phone");
+                        setCommSubject("");
+                        setCommContent("");
+                      },
+                    }
+                  );
+                }}
+              >
+                {"Submit"}
+              </Button>
+            </View>
+          </View>
+        ) : null}
+
+        {customerComms.length > 0 ? (
+          <View>
+            {customerComms.map((comm: any) => {
+              const channelIcon: Record<string, string> = {
+                email: "mail",
+                sms: "message-square",
+                phone: "phone",
+              };
+              return (
+                <View
+                  key={comm.id}
+                  style={[
+                    styles.listItem,
+                    { backgroundColor: theme.cardBackground, borderColor: theme.border },
+                  ]}
+                >
+                  <Feather
+                    name={(channelIcon[comm.channel] || "message-square") as any}
+                    size={18}
+                    color={theme.primary}
+                    style={{ marginRight: Spacing.sm }}
+                  />
+                  <View style={styles.listItemContent}>
+                    <ThemedText type="body" style={{ fontWeight: "500" }}>
+                      {comm.subject || comm.channel}
+                    </ThemedText>
+                    {comm.content ? (
+                      <ThemedText
+                        type="caption"
+                        style={{ color: theme.textSecondary }}
+                        numberOfLines={1}
+                      >
+                        {comm.content}
+                      </ThemedText>
+                    ) : null}
+                    <ThemedText
+                      type="caption"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      {new Date(comm.createdAt).toLocaleDateString()}
+                    </ThemedText>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>
+            {"No communications yet"}
+          </ThemedText>
+        )}
+
         <SectionHeader title="Danger Zone" />
         <Pressable
           onPress={handleDelete}
@@ -713,5 +905,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: Spacing.lg,
     borderRadius: BorderRadius.sm,
+  },
+  commToggleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.md,
+  },
+  commChannelRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  commChannelButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
   },
 });

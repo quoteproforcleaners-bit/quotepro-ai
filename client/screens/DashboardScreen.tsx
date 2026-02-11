@@ -7,6 +7,7 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import { getApiUrl } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
 import { StatCard } from "@/components/StatCard";
 import { EmptyState } from "@/components/EmptyState";
@@ -49,11 +50,15 @@ export default function DashboardScreen() {
     queryKey: ['/api/tasks'],
   });
 
+  const { data: communications = [], refetch: refetchComms } = useQuery<any[]>({
+    queryKey: ['/api/communications'],
+  });
+
   const [refreshing, setRefreshing] = React.useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchTasks()]);
+    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchTasks(), refetchComms()]);
     setRefreshing(false);
   };
 
@@ -70,7 +75,17 @@ export default function DashboardScreen() {
 
   const pendingTasks = (tasks || []).filter((t: any) => !t.completed);
   const recent5Quotes = (recentQuotes || []).slice(0, 5);
+  const recentComms = (communications || []).slice(0, 5);
   const activeLeads = (customers || []).filter((c: any) => c.status === "lead").length;
+
+  const getChannelIcon = (channel: string): "mail" | "message-square" | "phone" => {
+    switch (channel) {
+      case "email": return "mail";
+      case "sms": return "message-square";
+      case "phone": return "phone";
+      default: return "message-square";
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -138,6 +153,35 @@ export default function DashboardScreen() {
                 ) : null}
               </View>
             </Pressable>
+          ))}
+        </View>
+      ) : null}
+
+      {recentComms.length > 0 ? (
+        <View style={styles.section}>
+          <ThemedText type="h4" style={styles.sectionTitle}>Recent Activity</ThemedText>
+          {recentComms.map((comm: any) => (
+            <View
+              key={comm.id}
+              style={[styles.activityRow, { borderColor: theme.border }]}
+            >
+              <View style={[styles.activityIcon, { backgroundColor: `${theme.primary}15` }]}>
+                <Feather name={getChannelIcon(comm.channel)} size={14} color={theme.primary} />
+              </View>
+              <View style={styles.activityContent}>
+                <ThemedText type="small" numberOfLines={1} style={{ fontWeight: "500" }}>
+                  {comm.subject || `${(comm.channel || "").charAt(0).toUpperCase() + (comm.channel || "").slice(1)} communication`}
+                </ThemedText>
+                {comm.content ? (
+                  <ThemedText type="caption" numberOfLines={1} style={{ color: theme.textSecondary }}>
+                    {comm.content}
+                  </ThemedText>
+                ) : null}
+              </View>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                {formatDate(comm.createdAt)}
+              </ThemedText>
+            </View>
           ))}
         </View>
       ) : null}
@@ -273,5 +317,23 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: BorderRadius.full,
     marginTop: 4,
+  },
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    gap: Spacing.sm,
+  },
+  activityIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activityContent: {
+    flex: 1,
+    gap: 2,
   },
 });
