@@ -1,9 +1,8 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, Pressable, Platform, Modal, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { v4 as uuidv4 } from "uuid";
@@ -14,38 +13,24 @@ import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { PricingSettings, ServiceTypeConfig, DEFAULT_PRICING_SETTINGS } from "@/types";
-import { getPricingSettings, savePricingSettings } from "@/lib/storage";
+import { ServiceTypeConfig, PricingSettings } from "@/types";
+import { useApp } from "@/context/AppContext";
 
 export default function PricingScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
-  const [settings, setSettings] = useState<PricingSettings>(
-    DEFAULT_PRICING_SETTINGS
-  );
+  const { pricingSettings: settings, updatePricingSettings } = useApp();
   const [editingService, setEditingService] = useState<ServiceTypeConfig | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadSettings();
-    }, [])
-  );
-
-  const loadSettings = async () => {
-    const data = await getPricingSettings();
-    setSettings(data);
-  };
 
   const updateSetting = async <K extends keyof PricingSettings>(
     key: K,
     value: PricingSettings[K]
   ) => {
     const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    await savePricingSettings(newSettings);
+    await updatePricingSettings(newSettings);
     if (Platform.OS !== "web") {
       Haptics.selectionAsync();
     }
@@ -60,8 +45,7 @@ export default function PricingScreen() {
       ...settings,
       addOnPrices: { ...settings.addOnPrices, [key]: numValue },
     };
-    setSettings(newSettings);
-    await savePricingSettings(newSettings);
+    await updatePricingSettings(newSettings);
   };
 
   const updateDiscount = async (
@@ -73,8 +57,7 @@ export default function PricingScreen() {
       ...settings,
       frequencyDiscounts: { ...settings.frequencyDiscounts, [key]: numValue },
     };
-    setSettings(newSettings);
-    await savePricingSettings(newSettings);
+    await updatePricingSettings(newSettings);
   };
 
   const handleAddService = () => {
@@ -109,8 +92,7 @@ export default function PricingScreen() {
     }
 
     const newSettings = { ...settings, serviceTypes: newServiceTypes };
-    setSettings(newSettings);
-    await savePricingSettings(newSettings);
+    await updatePricingSettings(newSettings);
     setShowServiceModal(false);
     setEditingService(null);
     if (Platform.OS !== "web") {
@@ -146,8 +128,7 @@ export default function PricingScreen() {
       betterOptionId: newBetterId,
       bestOptionId: newBestId,
     };
-    setSettings(newSettings);
-    await savePricingSettings(newSettings);
+    await updatePricingSettings(newSettings);
     setShowServiceModal(false);
     setEditingService(null);
   };

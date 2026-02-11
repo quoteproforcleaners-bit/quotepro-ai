@@ -12,8 +12,9 @@ import { EmptyState } from "@/components/EmptyState";
 import { FAB } from "@/components/FAB";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
-import { Quote, BusinessProfile } from "@/types";
-import { getQuotes, getBusinessProfile } from "@/lib/storage";
+import { Quote } from "@/types";
+import { getQuotes } from "@/lib/storage";
+import { useApp } from "@/context/AppContext";
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -21,17 +22,13 @@ export default function DashboardScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
+  const { businessProfile: profile } = useApp();
   const [quotes, setQuotes] = React.useState<Quote[]>([]);
-  const [profile, setProfile] = React.useState<BusinessProfile | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
 
   const loadData = useCallback(async () => {
-    const [quotesData, profileData] = await Promise.all([
-      getQuotes(),
-      getBusinessProfile(),
-    ]);
+    const quotesData = await getQuotes();
     setQuotes(quotesData);
-    setProfile(profileData);
   }, []);
 
   useFocusEffect(

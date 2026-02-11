@@ -20,11 +20,8 @@ import {
   DEFAULT_PRICING_SETTINGS,
   DEFAULT_BUSINESS_PROFILE,
 } from "@/types";
-import {
-  getPricingSettings,
-  getBusinessProfile,
-  saveQuote,
-} from "@/lib/storage";
+import { saveQuote } from "@/lib/storage";
+import { useApp } from "@/context/AppContext";
 import { calculateAllOptions } from "@/lib/quoteCalculator";
 import CustomerInfoScreen from "@/screens/quote/CustomerInfoScreen";
 import HomeDetailsScreen from "@/screens/quote/HomeDetailsScreen";
@@ -37,13 +34,8 @@ export default function QuoteCalculatorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { pricingSettings, businessProfile } = useApp();
   const [currentStep, setCurrentStep] = useState(0);
-  const [pricingSettings, setPricingSettings] = useState<PricingSettings>(
-    DEFAULT_PRICING_SETTINGS
-  );
-  const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(
-    DEFAULT_BUSINESS_PROFILE
-  );
 
   const [customer, setCustomer] = useState<CustomerInfo>({
     name: "",
@@ -81,19 +73,6 @@ export default function QuoteCalculatorScreen() {
   const [selectedOption, setSelectedOption] = useState<"good" | "better" | "best">(
     "better"
   );
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    const [pricing, profile] = await Promise.all([
-      getPricingSettings(),
-      getBusinessProfile(),
-    ]);
-    setPricingSettings(pricing);
-    setBusinessProfile(profile);
-  };
 
   const handleNext = () => {
     if (currentStep < STEPS.length - 1) {

@@ -14,7 +14,8 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { Quote, BusinessProfile } from "@/types";
-import { getQuotes, saveQuote, deleteQuote, getBusinessProfile } from "@/lib/storage";
+import { getQuotes, saveQuote, deleteQuote } from "@/lib/storage";
+import { useApp } from "@/context/AppContext";
 import { generateEmailDraft, generateSmsDraft } from "@/lib/quoteCalculator";
 
 type RouteParams = {
@@ -27,21 +28,17 @@ export default function QuoteDetailScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const route = useRoute<RouteProp<RouteParams, "QuoteDetail">>();
   const { theme } = useTheme();
+  const { businessProfile } = useApp();
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [profile, setProfile] = useState<BusinessProfile | null>(null);
 
   useEffect(() => {
     loadData();
   }, [route.params.quoteId]);
 
   const loadData = async () => {
-    const [quotes, profileData] = await Promise.all([
-      getQuotes(),
-      getBusinessProfile(),
-    ]);
+    const quotes = await getQuotes();
     const found = quotes.find((q) => q.id === route.params.quoteId);
     setQuote(found || null);
-    setProfile(profileData);
   };
 
   const handleStatusChange = async (status: Quote["status"]) => {
@@ -73,25 +70,25 @@ export default function QuoteDetailScreen() {
   };
 
   const handleCopyEmail = async () => {
-    if (!quote || !profile) return;
+    if (!quote || !businessProfile) return;
     const email = generateEmailDraft(
       quote.customer.name,
-      profile.companyName || "Your Company",
-      profile.senderName || "Team",
+      businessProfile.companyName || "Your Company",
+      businessProfile.senderName || "Team",
       quote.options,
-      profile.bookingLink
+      businessProfile.bookingLink
     );
     await Clipboard.setStringAsync(email);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleCopySms = async () => {
-    if (!quote || !profile) return;
+    if (!quote || !businessProfile) return;
     const sms = generateSmsDraft(
       quote.customer.name,
-      profile.companyName || "Your Company",
+      businessProfile.companyName || "Your Company",
       quote.options.better.price,
-      profile.bookingLink
+      businessProfile.bookingLink
     );
     await Clipboard.setStringAsync(sms);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

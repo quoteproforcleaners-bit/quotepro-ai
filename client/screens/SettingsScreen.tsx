@@ -1,9 +1,8 @@
-import React, { useState, useCallback } from "react";
+import React from "react";
 import { View, StyleSheet, Image, Pressable, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useFocusEffect } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
@@ -13,9 +12,8 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { BusinessProfile, DEFAULT_BUSINESS_PROFILE } from "@/types";
-import { getBusinessProfile, saveBusinessProfile } from "@/lib/storage";
 import { useAuth } from "@/context/AuthContext";
+import { useApp } from "@/context/AppContext";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -23,25 +21,10 @@ export default function SettingsScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
   const { user, logout } = useAuth();
-  const [profile, setProfile] = useState<BusinessProfile>(
-    DEFAULT_BUSINESS_PROFILE
-  );
+  const { businessProfile: profile, updateBusinessProfile } = useApp();
 
-  useFocusEffect(
-    useCallback(() => {
-      loadProfile();
-    }, [])
-  );
-
-  const loadProfile = async () => {
-    const data = await getBusinessProfile();
-    setProfile(data);
-  };
-
-  const updateProfile = async (updates: Partial<BusinessProfile>) => {
-    const newProfile = { ...profile, ...updates };
-    setProfile(newProfile);
-    await saveBusinessProfile(newProfile);
+  const updateProfile = async (updates: Partial<typeof profile>) => {
+    await updateBusinessProfile(updates);
     Haptics.selectionAsync();
   };
 
