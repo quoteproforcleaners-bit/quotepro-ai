@@ -12,7 +12,7 @@ Key capabilities:
 - Configurable pricing settings (hourly rates, minimum tickets, add-on prices, frequency discounts)
 - Email and SMS draft generation for customer communication
 
-This is a single-user business tool with no authentication required.
+Multi-user app with authentication (email/password, Apple Sign-In, Google Sign-In). Business profile and pricing settings are stored server-side per user in PostgreSQL.
 
 ## User Preferences
 
@@ -66,16 +66,34 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 
-**Local Storage**: AsyncStorage for client-side persistence
-- Business profile, pricing settings, and quotes stored locally
-- UUID-based identifiers for all entities
-- No server-side database currently active (schema prepared for PostgreSQL)
-
-**Database Schema** (prepared but not active):
+**PostgreSQL Database** (active, Neon-backed):
 - Drizzle ORM with PostgreSQL dialect
 - Schema defined in `/shared/schema.ts`
-- Users table with id, username, password fields
-- Migrations output to `/migrations` directory
+- Tables: `users`, `businesses`, `pricing_settings`, `session` (auto-created by connect-pg-simple)
+- Business profile and pricing settings stored per user on the server
+- Storage layer in `/server/storage.ts` with CRUD functions
+
+**Authentication**:
+- Session-based auth using `express-session` with `connect-pg-simple` store
+- Auth routes in `/server/routes.ts`: register, login, Apple SSO, Google SSO, me, logout
+- `AuthContext` (`client/context/AuthContext.tsx`) manages auth state on frontend
+- Navigation gated by auth state: Login -> Onboarding -> Main App
+
+**Local Storage**: AsyncStorage for client-side persistence
+- Quotes stored locally (not yet migrated to server)
+- UUID-based identifiers for all entities
+
+**API Endpoints**:
+- `POST /api/auth/register` - Create account with email/password
+- `POST /api/auth/login` - Sign in with email/password
+- `POST /api/auth/apple` - Apple Sign-In
+- `POST /api/auth/google` - Google Sign-In
+- `GET /api/auth/me` - Check current session
+- `POST /api/auth/logout` - Destroy session
+- `GET /api/business` - Get current user's business profile
+- `PUT /api/business` - Update business profile
+- `GET /api/pricing` - Get pricing settings
+- `PUT /api/pricing` - Update pricing settings
 
 ### Quote Calculation Engine
 
