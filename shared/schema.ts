@@ -231,6 +231,144 @@ export const tasks = pgTable("tasks", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const channelConnections = pgTable("channel_connections", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  channel: text("channel").notNull(),
+  status: text("status").notNull().default("disconnected"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  pageId: text("page_id"),
+  pageName: text("page_name"),
+  igUserId: text("ig_user_id"),
+  igUsername: text("ig_username"),
+  webhookVerified: boolean("webhook_verified").notNull().default(false),
+  lastWebhookAt: timestamp("last_webhook_at"),
+  permissions: jsonb("permissions").notNull().default(sql`'[]'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const socialConversations = pgTable("social_conversations", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  channelConnectionId: varchar("channel_connection_id")
+    .references(() => channelConnections.id),
+  channel: text("channel").notNull(),
+  externalConversationId: text("external_conversation_id"),
+  senderName: text("sender_name").notNull().default(""),
+  senderExternalId: text("sender_external_id"),
+  senderProfileUrl: text("sender_profile_url"),
+  status: text("status").notNull().default("active"),
+  autoReplied: boolean("auto_replied").notNull().default(false),
+  optedOut: boolean("opted_out").notNull().default(false),
+  leadId: varchar("lead_id"),
+  lastMessageAt: timestamp("last_message_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const socialMessages = pgTable("social_messages", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id")
+    .notNull()
+    .references(() => socialConversations.id, { onDelete: "cascade" }),
+  direction: text("direction").notNull().default("inbound"),
+  content: text("content").notNull().default(""),
+  externalMessageId: text("external_message_id"),
+  intentDetected: boolean("intent_detected"),
+  intentConfidence: real("intent_confidence"),
+  intentCategory: text("intent_category"),
+  autoReplyContent: text("auto_reply_content"),
+  quoteLink: text("quote_link"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const socialLeads = pgTable("social_leads", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  customerId: varchar("customer_id")
+    .references(() => customers.id),
+  conversationId: varchar("conversation_id")
+    .references(() => socialConversations.id),
+  channel: text("channel").notNull(),
+  attribution: text("attribution").notNull().default("auto_dm"),
+  senderName: text("sender_name").notNull().default(""),
+  senderHandle: text("sender_handle"),
+  dmText: text("dm_text"),
+  quoteId: varchar("quote_id")
+    .references(() => quotes.id),
+  status: text("status").notNull().default("new"),
+  revenue: real("revenue"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const attributionEvents = pgTable("attribution_events", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  socialLeadId: varchar("social_lead_id")
+    .references(() => socialLeads.id),
+  conversationId: varchar("conversation_id")
+    .references(() => socialConversations.id),
+  channel: text("channel").notNull(),
+  eventType: text("event_type").notNull(),
+  metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const socialAutomationSettings = pgTable("social_automation_settings", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  autoRepliesEnabled: boolean("auto_replies_enabled").notNull().default(false),
+  intentThreshold: real("intent_threshold").notNull().default(0.7),
+  quietHoursEnabled: boolean("quiet_hours_enabled").notNull().default(false),
+  quietHoursStart: text("quiet_hours_start").notNull().default("22:00"),
+  quietHoursEnd: text("quiet_hours_end").notNull().default("08:00"),
+  replyTemplate: text("reply_template").notNull().default("Hi! Thanks for reaching out. Here's a quick link to get an instant quote: {link}"),
+  optOutKeywords: jsonb("opt_out_keywords").notNull().default(sql`'["stop","unsubscribe","quit","opt out"]'::jsonb`),
+  socialOnboardingComplete: boolean("social_onboarding_complete").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const socialOptOuts = pgTable("social_opt_outs", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  channel: text("channel").notNull(),
+  externalUserId: text("external_user_id").notNull(),
+  senderName: text("sender_name"),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   name: true,
@@ -251,3 +389,10 @@ export type JobChecklistItem = typeof jobChecklistItems.$inferSelect;
 export type Communication = typeof communications.$inferSelect;
 export type AutomationRule = typeof automationRules.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
+export type ChannelConnection = typeof channelConnections.$inferSelect;
+export type SocialConversation = typeof socialConversations.$inferSelect;
+export type SocialMessage = typeof socialMessages.$inferSelect;
+export type SocialLead = typeof socialLeads.$inferSelect;
+export type AttributionEvent = typeof attributionEvents.$inferSelect;
+export type SocialAutomationSetting = typeof socialAutomationSettings.$inferSelect;
+export type SocialOptOut = typeof socialOptOuts.$inferSelect;
