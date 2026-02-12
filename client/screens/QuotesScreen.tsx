@@ -10,6 +10,7 @@ import { QuoteListItem } from "@/components/QuoteListItem";
 import { EmptyState } from "@/components/EmptyState";
 import { FAB } from "@/components/FAB";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { ProBanner } from "@/components/ProBanner";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
 
@@ -56,12 +57,15 @@ export default function QuotesScreen() {
   ];
 
   const renderHeader = () => (
-    <View style={styles.filterContainer}>
-      <SegmentedControl
-        options={filterOptions}
-        value={filter}
-        onChange={setFilter}
-      />
+    <View>
+      <ProBanner message="Send quotes directly to customers with Pro" />
+      <View style={styles.filterContainer}>
+        <SegmentedControl
+          options={filterOptions}
+          value={filter}
+          onChange={setFilter}
+        />
+      </View>
     </View>
   );
 

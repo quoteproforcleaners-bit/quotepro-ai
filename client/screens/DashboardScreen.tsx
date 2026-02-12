@@ -13,10 +13,10 @@ import { StatCard } from "@/components/StatCard";
 import { EmptyState } from "@/components/EmptyState";
 import { FAB } from "@/components/FAB";
 import { Card } from "@/components/Card";
+import { ProBanner } from "@/components/ProBanner";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
-import { useAuth } from "@/context/AuthContext";
 
 function GettingStartedItem({ icon, label, completed, onPress, theme }: {
   icon: keyof typeof Feather.glyphMap;
@@ -53,9 +53,6 @@ export default function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const { businessProfile: profile } = useApp();
-  const { user } = useAuth();
-  const isPro = user?.subscriptionTier === "pro";
-
   const { data: stats, refetch: refetchStats } = useQuery<{
     totalQuotes: number;
     sentQuotes: number;
@@ -205,26 +202,7 @@ export default function DashboardScreen() {
         />
       </View>
 
-      {!isPro ? (
-        <Pressable
-          onPress={() => navigation.navigate("MainTabs", { screen: "Settings" })}
-          style={[styles.proPromo, { backgroundColor: `${theme.accent}08`, borderColor: `${theme.accent}25` }]}
-          testID="dashboard-pro-promo"
-        >
-          <View style={[styles.proPromoIcon, { backgroundColor: `${theme.accent}15` }]}>
-            <Feather name="zap" size={20} color={theme.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Try QuotePro Pro
-            </ThemedText>
-            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
-              AI-powered messages, direct sending, and smart descriptions
-            </ThemedText>
-          </View>
-          <Feather name="chevron-right" size={18} color={theme.accent} />
-        </Pressable>
-      ) : null}
+      <ProBanner message="AI-powered messages, direct sending, and smart descriptions" />
 
       {pendingTasks.length > 0 ? (
         <View style={styles.section}>
@@ -459,21 +437,5 @@ const styles = StyleSheet.create({
   },
   gettingStartedLabel: {
     flex: 1,
-  },
-  proPromo: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    marginBottom: Spacing.xl,
-    gap: Spacing.md,
-  },
-  proPromoIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

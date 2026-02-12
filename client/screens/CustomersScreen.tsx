@@ -24,6 +24,7 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { ProBanner } from "@/components/ProBanner";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 
@@ -258,6 +259,7 @@ export default function CustomersScreen() {
 
   const renderHeader = () => (
     <View>
+      <ProBanner message="AI-powered follow-ups and automated messaging with Pro" />
       <Input
         testID="search-input"
         placeholder="Search customers..."

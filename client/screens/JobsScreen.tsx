@@ -14,6 +14,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
+import { ProBanner } from "@/components/ProBanner";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
@@ -196,12 +197,15 @@ export default function JobsScreen() {
   });
 
   const renderHeader = () => (
-    <View style={styles.filterContainer}>
-      <SegmentedControl
-        options={filterOptions}
-        value={statusFilter}
-        onChange={setStatusFilter}
-      />
+    <View>
+      <ProBanner message="Automate job reminders and confirmations with Pro" />
+      <View style={styles.filterContainer}>
+        <SegmentedControl
+          options={filterOptions}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+      </View>
     </View>
   );
 
