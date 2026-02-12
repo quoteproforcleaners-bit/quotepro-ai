@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, Modal, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -15,12 +15,37 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 
 type RouteParams = {
   QuoteDetail: { quoteId: string };
 };
 
 type DraftPurpose = "initial_quote" | "follow_up" | "thank_you" | "booking_confirmation" | "reschedule";
+
+function FormattedDraftText({ text, style }: { text: string; style?: any }) {
+  const paragraphs = text.split(/\n\n+/);
+  return (
+    <View style={{ gap: 10 }}>
+      {paragraphs.map((paragraph, index) => {
+        const lines = paragraph.split(/\n/);
+        return (
+          <ThemedText key={index} type="small" style={[{ lineHeight: 20 }, style]}>
+            {lines.map((line, lineIndex) =>
+              lineIndex < lines.length - 1 ? (
+                <ThemedText key={lineIndex} type="small" style={[{ lineHeight: 20 }, style]}>
+                  {line}{"\n"}
+                </ThemedText>
+              ) : (
+                line
+              )
+            )}
+          </ThemedText>
+        );
+      })}
+    </View>
+  );
+}
 
 export default function QuoteDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -29,13 +54,19 @@ export default function QuoteDetailScreen() {
   const route = useRoute<RouteProp<RouteParams, "QuoteDetail">>();
   const { theme } = useTheme();
   const { businessProfile } = useApp();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  const isPro = user?.subscriptionTier === "pro";
 
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const [aiDraftType, setAiDraftType] = useState<"email" | "sms">("email");
   const [aiDraftPurpose, setAiDraftPurpose] = useState<DraftPurpose>("initial_quote");
   const [aiDraftLoading, setAiDraftLoading] = useState(false);
   const [showAiDraft, setShowAiDraft] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [sendingDraft, setSendingDraft] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState<string | null>(null);
 
   const { data: quote, isLoading } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
@@ -103,13 +134,36 @@ export default function QuoteDetailScreen() {
     }
   };
 
+  const handleUpgrade = async () => {
+    try {
+      await apiRequest("POST", "/api/subscription/upgrade");
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      setShowUpgradeModal(false);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.reload();
+        }
+      }, 500);
+    } catch {
+      Alert.alert("Error", "Could not upgrade. Please try again.");
+    }
+  };
+
   const fetchAiDraft = useCallback(async (type: "email" | "sms", purpose: DraftPurpose) => {
     if (!quote) return;
+    if (!isPro) {
+      setShowUpgradeModal(true);
+      return;
+    }
     setAiDraftType(type);
     setAiDraftPurpose(purpose);
     setAiDraftLoading(true);
     setShowAiDraft(true);
     setAiDraft(null);
+    setSendSuccess(null);
 
     try {
       const selectedOpt = quote.options?.[quote.selectedOption || "better"];
@@ -131,13 +185,16 @@ export default function QuoteDetailScreen() {
       if (data.draft) {
         setAiDraft(data.draft);
       }
-    } catch (err) {
-      console.log("AI draft unavailable");
+    } catch (err: any) {
+      if (err?.message?.includes("403") || err?.status === 403) {
+        setShowUpgradeModal(true);
+        setShowAiDraft(false);
+      }
       setAiDraft(null);
     } finally {
       setAiDraftLoading(false);
     }
-  }, [quote, businessProfile]);
+  }, [quote, businessProfile, isPro]);
 
   const handleCopyDraft = async () => {
     if (!aiDraft) return;
@@ -147,12 +204,69 @@ export default function QuoteDetailScreen() {
     }
   };
 
+  const handleSendDraft = async () => {
+    if (!aiDraft || !quote) return;
+
+    const recipientEmail = quote.propertyDetails?.customerEmail;
+    const recipientPhone = quote.propertyDetails?.customerPhone;
+
+    if (aiDraftType === "email" && !recipientEmail) {
+      Alert.alert("No Email", "This customer doesn't have an email address on file. Please add one first.");
+      return;
+    }
+    if (aiDraftType === "sms" && !recipientPhone) {
+      Alert.alert("No Phone", "This customer doesn't have a phone number on file. Please add one first.");
+      return;
+    }
+
+    setSendingDraft(true);
+    setSendSuccess(null);
+
+    try {
+      const endpoint = aiDraftType === "email" ? "/api/send/email" : "/api/send/sms";
+      const subjectMatch = aiDraft.match(/^Subject:\s*(.+?)(?:\n|$)/i);
+      const subject = subjectMatch ? subjectMatch[1].trim() : `Quote from ${businessProfile?.companyName || "QuotePro"}`;
+      const bodyText = subjectMatch ? aiDraft.replace(/^Subject:\s*.+?\n+/i, "").trim() : aiDraft;
+
+      const payload = aiDraftType === "email"
+        ? { to: recipientEmail, subject, body: bodyText, customerId: quote.customerId, quoteId: quote.id }
+        : { to: recipientPhone, body: aiDraft, customerId: quote.customerId, quoteId: quote.id };
+
+      const res = await apiRequest("POST", endpoint, payload);
+      const data = await res.json();
+
+      if (data.success) {
+        setSendSuccess(aiDraftType === "email" ? "Email sent!" : "SMS sent!");
+        sendMutation.mutate({ channel: aiDraftType, content: aiDraft });
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      } else {
+        Alert.alert("Send Failed", data.message || "Could not send message. Please try again.");
+      }
+    } catch (err: any) {
+      const msg = err?.message || "Could not send message.";
+      if (msg.includes("503") || msg.includes("not configured")) {
+        Alert.alert(
+          "Service Not Connected",
+          aiDraftType === "email"
+            ? "Email service isn't set up yet. You can still copy the message and send it manually."
+            : "SMS service isn't set up yet. You can still copy the message and send it manually."
+        );
+      } else {
+        Alert.alert("Send Failed", "Could not send message. You can copy it and send manually.");
+      }
+    } finally {
+      setSendingDraft(false);
+    }
+  };
+
   const handleCopyEmail = async () => {
     if (!quote) return;
-    const customerName = quote.propertyDetails?.customerName || "Customer";
-    const companyName = businessProfile?.companyName || "Our Company";
+    const name = quote.propertyDetails?.customerName || "Customer";
+    const company = businessProfile?.companyName || "Our Company";
     const price = quote.total || 0;
-    const email = `Hi ${customerName},\n\nThank you for your interest in ${companyName}!\n\nBased on your property details, we've prepared a cleaning quote for $${price.toFixed(0)}.\n\nPlease let us know if you'd like to proceed or have any questions.\n\nBest regards,\n${businessProfile?.senderName || companyName}`;
+    const email = `Hi ${name},\n\nThank you for your interest in ${company}!\n\nBased on your property details, we've prepared a cleaning quote for $${price.toFixed(0)}.\n\nPlease let us know if you'd like to proceed or have any questions.\n\nBest regards,\n${businessProfile?.senderName || company}`;
     await Clipboard.setStringAsync(email);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -161,10 +275,10 @@ export default function QuoteDetailScreen() {
 
   const handleCopySms = async () => {
     if (!quote) return;
-    const customerName = quote.propertyDetails?.customerName || "there";
-    const companyName = businessProfile?.companyName || "us";
+    const name = quote.propertyDetails?.customerName || "there";
+    const company = businessProfile?.companyName || "us";
     const price = quote.total || 0;
-    const sms = `Hi ${customerName}! This is ${companyName}. Your cleaning quote is ready: $${price.toFixed(0)}. Reply YES to book or let us know if you have questions!`;
+    const sms = `Hi ${name}! This is ${company}. Your cleaning quote is ready: $${price.toFixed(0)}. Reply YES to book or let us know if you have questions!`;
     await Clipboard.setStringAsync(sms);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -388,17 +502,36 @@ export default function QuoteDetailScreen() {
 
         <View style={styles.sectionRow}>
           <SectionHeader title="AI Message Writer" />
-          <View style={[styles.aiBadge, { backgroundColor: `${theme.primary}15` }]}>
-            <Feather name="zap" size={12} color={theme.primary} />
-            <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
-              AI Powered
-            </ThemedText>
+          <View style={styles.proBadgeRow}>
+            <View style={[styles.aiBadge, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="zap" size={12} color={theme.primary} />
+              <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
+                {isPro ? "PRO" : "PRO Feature"}
+              </ThemedText>
+            </View>
           </View>
         </View>
 
-        <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
-          Generate personalized messages for your customer
-        </ThemedText>
+        {isPro ? (
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
+            Generate and send personalized messages directly to your customer
+          </ThemedText>
+        ) : (
+          <Pressable onPress={() => setShowUpgradeModal(true)} testID="upgrade-prompt">
+            <View style={[styles.upgradeCard, { backgroundColor: `${theme.accent}10`, borderColor: `${theme.accent}30` }]}>
+              <Feather name="lock" size={18} color={theme.accent} />
+              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                <ThemedText type="body" style={{ fontWeight: "600" }}>
+                  Upgrade to Pro
+                </ThemedText>
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                  Unlock AI-powered emails, SMS, and direct sending to customers
+                </ThemedText>
+              </View>
+              <Feather name="chevron-right" size={18} color={theme.accent} />
+            </View>
+          </Pressable>
+        )}
 
         <View style={styles.purposeRow}>
           {(["initial_quote", "follow_up", "thank_you", "booking_confirmation", "reschedule"] as DraftPurpose[]).map((purpose) => (
@@ -435,7 +568,7 @@ export default function QuoteDetailScreen() {
         <View style={styles.aiButtonRow}>
           <Pressable
             onPress={() => fetchAiDraft("email", aiDraftPurpose)}
-            style={[styles.aiGenerateBtn, { backgroundColor: theme.primary }]}
+            style={[styles.aiGenerateBtn, { backgroundColor: isPro ? theme.primary : theme.textSecondary }]}
             testID="ai-email-btn"
           >
             <Feather name="mail" size={16} color="#FFFFFF" />
@@ -446,7 +579,7 @@ export default function QuoteDetailScreen() {
 
           <Pressable
             onPress={() => fetchAiDraft("sms", aiDraftPurpose)}
-            style={[styles.aiGenerateBtn, { backgroundColor: theme.primary }]}
+            style={[styles.aiGenerateBtn, { backgroundColor: isPro ? theme.primary : theme.textSecondary }]}
             testID="ai-sms-btn"
           >
             <Feather name="message-square" size={16} color="#FFFFFF" />
@@ -474,7 +607,7 @@ export default function QuoteDetailScreen() {
                   {aiDraftType === "email" ? "Email" : "SMS"} - {purposeLabels[aiDraftPurpose]}
                 </ThemedText>
               </View>
-              <Pressable onPress={() => setShowAiDraft(false)}>
+              <Pressable onPress={() => { setShowAiDraft(false); setSendSuccess(null); }}>
                 <Feather name="x" size={18} color={theme.textSecondary} />
               </Pressable>
             </View>
@@ -488,10 +621,40 @@ export default function QuoteDetailScreen() {
               </View>
             ) : aiDraft ? (
               <>
-                <ThemedText type="small" style={styles.draftText}>
-                  {aiDraft}
-                </ThemedText>
+                <FormattedDraftText text={aiDraft} />
+
+                {sendSuccess ? (
+                  <View style={[styles.sendSuccessBanner, { backgroundColor: `${theme.success}15` }]}>
+                    <Feather name="check-circle" size={16} color={theme.success} />
+                    <ThemedText type="small" style={{ color: theme.success, marginLeft: 6, fontWeight: "600" }}>
+                      {sendSuccess}
+                    </ThemedText>
+                  </View>
+                ) : null}
+
                 <View style={styles.aiDraftActions}>
+                  <Pressable
+                    onPress={handleSendDraft}
+                    disabled={sendingDraft || !!sendSuccess}
+                    style={[
+                      styles.sendButton,
+                      {
+                        backgroundColor: sendSuccess ? theme.textSecondary : theme.primary,
+                        opacity: sendingDraft ? 0.7 : 1,
+                      },
+                    ]}
+                    testID="send-draft-btn"
+                  >
+                    {sendingDraft ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Feather name="send" size={14} color="#FFFFFF" />
+                    )}
+                    <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
+                      {sendingDraft ? "Sending..." : sendSuccess ? "Sent" : `Send ${aiDraftType === "email" ? "Email" : "SMS"}`}
+                    </ThemedText>
+                  </Pressable>
+
                   <Pressable onPress={handleCopyDraft} style={styles.draftAction} testID="copy-ai-draft">
                     <Feather name="copy" size={16} color={theme.primary} />
                     <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>
@@ -550,6 +713,59 @@ export default function QuoteDetailScreen() {
           ))}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showUpgradeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUpgradeModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowUpgradeModal(false)}>
+          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
+            <View style={[styles.modalIconCircle, { backgroundColor: `${theme.accent}15` }]}>
+              <Feather name="zap" size={32} color={theme.accent} />
+            </View>
+            <ThemedText type="h3" style={{ textAlign: "center", marginTop: Spacing.md }}>
+              Unlock Pro Features
+            </ThemedText>
+            <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
+              Get access to AI-powered messaging and send emails and texts directly from the app.
+            </ThemedText>
+
+            <View style={styles.proFeatures}>
+              {[
+                "AI-written emails and texts",
+                "Send directly from the app",
+                "Personalized for each customer",
+                "Multiple message types",
+              ].map((feature, i) => (
+                <View key={i} style={styles.proFeatureRow}>
+                  <Feather name="check" size={16} color={theme.success} />
+                  <ThemedText type="small" style={{ marginLeft: Spacing.sm }}>
+                    {feature}
+                  </ThemedText>
+                </View>
+              ))}
+            </View>
+
+            <Pressable
+              onPress={handleUpgrade}
+              style={[styles.upgradeButton, { backgroundColor: theme.accent }]}
+              testID="upgrade-btn"
+            >
+              <Feather name="zap" size={18} color="#FFFFFF" />
+              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 8 }}>
+                Upgrade to Pro
+              </ThemedText>
+            </Pressable>
+            <Pressable onPress={() => setShowUpgradeModal(false)} style={styles.dismissButton}>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                Maybe later
+              </ThemedText>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -633,13 +849,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  proBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
   aiBadge: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: BorderRadius.full,
-    marginBottom: Spacing.sm,
+  },
+  upgradeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
   },
   purposeRow: {
     flexDirection: "row",
@@ -689,16 +917,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: Spacing.lg,
   },
-  draftText: {
-    lineHeight: 20,
+  sendSuccessBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.xs,
+    marginTop: Spacing.md,
   },
   aiDraftActions: {
     flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.lg,
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: "rgba(0,0,0,0.05)",
+  },
+  sendButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.xs,
   },
   draftAction: {
     flexDirection: "row",
@@ -713,5 +955,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.xl,
+    alignItems: "center",
+  },
+  modalIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  proFeatures: {
+    width: "100%",
+    marginTop: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  proFeatureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  upgradeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.lg,
+  },
+  dismissButton: {
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
 });

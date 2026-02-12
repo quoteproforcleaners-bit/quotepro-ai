@@ -11,6 +11,7 @@ import { Button } from "@/components/Button";
 import { SectionHeader } from "@/components/SectionHeader";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
 import {
   CustomerInfo,
   HomeDetails,
@@ -26,6 +27,30 @@ import {
   generateSmsDraft,
 } from "@/lib/quoteCalculator";
 import { apiRequest } from "@/lib/query-client";
+
+function FormattedDraftText({ text, style }: { text: string; style?: any }) {
+  const paragraphs = text.split(/\n\n+/);
+  return (
+    <View style={{ gap: 10 }}>
+      {paragraphs.map((paragraph, index) => {
+        const lines = paragraph.split(/\n/);
+        return (
+          <ThemedText key={index} type="small" style={[{ lineHeight: 20 }, style]}>
+            {lines.map((line, lineIndex) =>
+              lineIndex < lines.length - 1 ? (
+                <ThemedText key={lineIndex} type="small" style={[{ lineHeight: 20 }, style]}>
+                  {line}{"\n"}
+                </ThemedText>
+              ) : (
+                line
+              )
+            )}
+          </ThemedText>
+        );
+      })}
+    </View>
+  );
+}
 
 interface Props {
   customer: CustomerInfo;
@@ -53,6 +78,9 @@ export default function QuotePreviewScreen({
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const isPro = user?.subscriptionTier === "pro";
+
   const [showEmail, setShowEmail] = useState(false);
   const [showSms, setShowSms] = useState(false);
   const [aiDescriptions, setAiDescriptions] = useState<{ good: string; better: string; best: string } | null>(null);
@@ -101,10 +129,13 @@ export default function QuotePreviewScreen({
   }, [customer, businessProfile, options]);
 
   useEffect(() => {
-    fetchAiDescriptions();
-  }, []);
+    if (isPro) {
+      fetchAiDescriptions();
+    }
+  }, [isPro]);
 
   const fetchAiDescriptions = useCallback(async () => {
+    if (!isPro) return;
     setAiDescLoading(true);
     try {
       const res = await apiRequest("POST", "/api/ai/quote-descriptions", {
@@ -137,9 +168,10 @@ export default function QuotePreviewScreen({
     } finally {
       setAiDescLoading(false);
     }
-  }, [homeDetails, options, addOns, businessProfile]);
+  }, [homeDetails, options, addOns, businessProfile, isPro]);
 
   const fetchAiEmailDraft = useCallback(async () => {
+    if (!isPro) return;
     setAiEmailLoading(true);
     try {
       const selectedOpt = options[selectedOption];
@@ -166,9 +198,10 @@ export default function QuotePreviewScreen({
     } finally {
       setAiEmailLoading(false);
     }
-  }, [customer, businessProfile, homeDetails, options, selectedOption, aiDescriptions]);
+  }, [customer, businessProfile, homeDetails, options, selectedOption, aiDescriptions, isPro]);
 
   const fetchAiSmsDraft = useCallback(async () => {
+    if (!isPro) return;
     setAiSmsLoading(true);
     try {
       const selectedOpt = options[selectedOption];
@@ -195,7 +228,7 @@ export default function QuotePreviewScreen({
     } finally {
       setAiSmsLoading(false);
     }
-  }, [customer, businessProfile, homeDetails, options, selectedOption]);
+  }, [customer, businessProfile, homeDetails, options, selectedOption, isPro]);
 
   const handleCopyEmail = async () => {
     const text = aiEmailDraft || emailDraft;
@@ -266,20 +299,22 @@ export default function QuotePreviewScreen({
 
         <View style={styles.sectionRow}>
           <SectionHeader title="Quote Options" />
-          {aiDescLoading ? (
-            <View style={styles.aiLoadingBadge}>
-              <ActivityIndicator size="small" color={theme.primary} />
-              <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
-                AI enhancing...
-              </ThemedText>
-            </View>
-          ) : aiDescriptions ? (
-            <View style={[styles.aiBadge, { backgroundColor: `${theme.primary}15` }]}>
-              <Feather name="zap" size={12} color={theme.primary} />
-              <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
-                AI Enhanced
-              </ThemedText>
-            </View>
+          {isPro ? (
+            aiDescLoading ? (
+              <View style={styles.aiLoadingBadge}>
+                <ActivityIndicator size="small" color={theme.primary} />
+                <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
+                  AI enhancing...
+                </ThemedText>
+              </View>
+            ) : aiDescriptions ? (
+              <View style={[styles.aiBadge, { backgroundColor: `${theme.primary}15` }]}>
+                <Feather name="zap" size={12} color={theme.primary} />
+                <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
+                  AI Enhanced
+                </ThemedText>
+              </View>
+            ) : null
           ) : null}
         </View>
 
@@ -306,7 +341,7 @@ export default function QuotePreviewScreen({
 
         <Pressable
           onPress={() => {
-            if (!showEmail && !aiEmailDraft && !aiEmailLoading) {
+            if (!showEmail && !aiEmailDraft && !aiEmailLoading && isPro) {
               fetchAiEmailDraft();
             }
             setShowEmail(!showEmail);
@@ -352,9 +387,7 @@ export default function QuotePreviewScreen({
                 </ThemedText>
               </View>
             ) : (
-              <ThemedText type="small" style={styles.draftText}>
-                {aiEmailDraft || emailDraft}
-              </ThemedText>
+              <FormattedDraftText text={aiEmailDraft || emailDraft} />
             )}
             <View style={styles.draftActions}>
               <Pressable onPress={handleCopyEmail} style={styles.draftAction}>
@@ -398,7 +431,7 @@ export default function QuotePreviewScreen({
 
         <Pressable
           onPress={() => {
-            if (!showSms && !aiSmsDraft && !aiSmsLoading) {
+            if (!showSms && !aiSmsDraft && !aiSmsLoading && isPro) {
               fetchAiSmsDraft();
             }
             setShowSms(!showSms);
@@ -445,9 +478,7 @@ export default function QuotePreviewScreen({
                 </ThemedText>
               </View>
             ) : (
-              <ThemedText type="small" style={styles.draftText}>
-                {aiSmsDraft || smsDraft}
-              </ThemedText>
+              <FormattedDraftText text={aiSmsDraft || smsDraft} />
             )}
             <View style={styles.draftActions}>
               <Pressable onPress={handleCopySms} style={styles.draftAction}>
@@ -558,9 +589,6 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.xs,
     marginTop: Spacing.xs,
-  },
-  draftText: {
-    lineHeight: 20,
   },
   draftLoading: {
     flexDirection: "row",
