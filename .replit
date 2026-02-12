@@ -78,3 +78,4 @@ ensurePreviewReachable = "/status"
 
 [userenv.shared]
 TWILIO_PHONE_NUMBER = "+18339015947"
+SENDGRID_FROM_EMAIL = "quoteproforcleaners@gmail.com"

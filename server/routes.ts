@@ -1259,7 +1259,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
         return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
       }
 
-      const fromEmail = business.email || "noreply@example.com";
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || business.email || "noreply@example.com";
       const fromName = business.companyName || "QuotePro";
 
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
