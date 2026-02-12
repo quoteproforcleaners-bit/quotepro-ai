@@ -1,7 +1,6 @@
 import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { CommonActions, useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
@@ -15,19 +14,21 @@ interface ProBannerProps {
 export function ProBanner({ message }: ProBannerProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const navigation = useNavigation();
 
   if (user?.subscriptionTier === "pro") return null;
 
   return (
     <Pressable
       onPress={() => {
-        const parent = navigation.getParent();
-        if (parent) {
-          parent.navigate("SettingsTab");
-        } else {
-          navigation.navigate("SettingsTab" as any);
-        }
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: "Main",
+            params: {
+              screen: "SettingsTab",
+            },
+          })
+        );
       }}
       style={[styles.container, { backgroundColor: `${theme.accent}08`, borderColor: `${theme.accent}25` }]}
       testID="pro-banner"
