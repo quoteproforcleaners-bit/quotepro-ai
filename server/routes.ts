@@ -60,6 +60,28 @@ import {
   getPendingCommunications,
   updateCommunication,
 } from "./storage";
+import {
+  getChannelConnectionsByBusiness,
+  getChannelConnection,
+  upsertChannelConnection,
+  deleteChannelConnection,
+  getConversationsByBusiness,
+  getConversationById,
+  createConversation,
+  updateConversation,
+  getMessagesByConversation,
+  createMessage,
+  getSocialLeadsByBusiness,
+  getSocialLeadById,
+  createSocialLead,
+  updateSocialLead,
+  createAttributionEvent,
+  getAttributionEventsByBusiness,
+  getSocialAutomationSettings,
+  upsertSocialAutomationSettings,
+  getSocialOptOutsByBusiness,
+  getSocialStats,
+} from "./social-storage";
 
 declare module "express-session" {
   interface SessionData {
@@ -1200,6 +1222,482 @@ Customer name: ${customerName || "Valued Customer"}${quoteContext}`;
     } catch (error: any) {
       console.error("AI communication draft error:", error);
       return res.status(500).json({ message: "Failed to generate communication draft" });
+    }
+  });
+
+  // ─── Social / AI Sales Assistant ───
+
+  app.get("/api/social/connections", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const connections = await getChannelConnectionsByBusiness(business.id);
+      return res.json(connections.map(c => ({
+        id: c.id, channel: c.channel, status: c.status,
+        pageName: c.pageName, igUsername: c.igUsername,
+        webhookVerified: c.webhookVerified, lastWebhookAt: c.lastWebhookAt,
+        tokenExpiresAt: c.tokenExpiresAt, permissions: c.permissions,
+      })));
+    } catch (error: any) {
+      console.error("Get connections error:", error);
+      return res.status(500).json({ message: "Failed to get connections" });
+    }
+  });
+
+  app.post("/api/social/connections", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { channel, status, pageName, igUsername } = req.body;
+      if (!channel) return res.status(400).json({ message: "channel is required" });
+      const conn = await upsertChannelConnection(business.id, channel, {
+        status: status || "connected",
+        pageName: pageName || null,
+        igUsername: igUsername || null,
+        webhookVerified: true,
+        lastWebhookAt: new Date(),
+      });
+      return res.json(conn);
+    } catch (error: any) {
+      console.error("Create connection error:", error);
+      return res.status(500).json({ message: "Failed to create connection" });
+    }
+  });
+
+  app.delete("/api/social/connections/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteChannelConnection(req.params.id);
+      return res.json({ message: "Disconnected" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to disconnect" });
+    }
+  });
+
+  app.get("/api/social/automation", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const settings = await getSocialAutomationSettings(business.id);
+      return res.json(settings || {
+        autoRepliesEnabled: false, intentThreshold: 0.7,
+        quietHoursEnabled: false, quietHoursStart: "22:00", quietHoursEnd: "08:00",
+        replyTemplate: "Hi! Thanks for reaching out. Here's a quick link to get an instant quote: {link}",
+        optOutKeywords: ["stop", "unsubscribe", "quit", "opt out"],
+        socialOnboardingComplete: false,
+      });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get automation settings" });
+    }
+  });
+
+  app.put("/api/social/automation", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const settings = await upsertSocialAutomationSettings(business.id, req.body);
+      return res.json(settings);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update automation settings" });
+    }
+  });
+
+  app.get("/api/social/conversations", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { channel } = req.query as any;
+      const conversations = await getConversationsByBusiness(business.id, { channel });
+      return res.json(conversations);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get conversations" });
+    }
+  });
+
+  app.get("/api/social/conversations/:id/messages", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const messages = await getMessagesByConversation(req.params.id);
+      return res.json(messages);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get messages" });
+    }
+  });
+
+  app.get("/api/social/leads", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { channel, status } = req.query as any;
+      const leads = await getSocialLeadsByBusiness(business.id, { channel, status });
+      return res.json(leads);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get social leads" });
+    }
+  });
+
+  app.get("/api/social/leads/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const lead = await getSocialLeadById(req.params.id);
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      return res.json(lead);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get lead" });
+    }
+  });
+
+  app.post("/api/social/leads", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const lead = await createSocialLead({ ...req.body, businessId: business.id });
+      await createAttributionEvent({
+        businessId: business.id,
+        socialLeadId: lead.id,
+        channel: lead.channel,
+        eventType: "lead_created",
+        metadata: { attribution: lead.attribution },
+      });
+      return res.json(lead);
+    } catch (error: any) {
+      console.error("Create social lead error:", error);
+      return res.status(500).json({ message: "Failed to create lead" });
+    }
+  });
+
+  app.put("/api/social/leads/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const lead = await updateSocialLead(req.params.id, req.body);
+      return res.json(lead);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update lead" });
+    }
+  });
+
+  app.get("/api/social/stats", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { days } = req.query as any;
+      const stats = await getSocialStats(business.id, days ? parseInt(days) : 30);
+      return res.json(stats);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get social stats" });
+    }
+  });
+
+  app.get("/api/social/attribution", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { channel, days } = req.query as any;
+      const events = await getAttributionEventsByBusiness(business.id, { channel, days: days ? parseInt(days) : 30 });
+      return res.json(events);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get attribution events" });
+    }
+  });
+
+  app.get("/api/social/optouts", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const optouts = await getSocialOptOutsByBusiness(business.id);
+      return res.json(optouts);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get opt-outs" });
+    }
+  });
+
+  app.post("/api/social/simulate-dm", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { message, channel, senderName } = req.body;
+      if (!message) return res.status(400).json({ message: "message is required" });
+
+      const dmChannel = channel || "instagram";
+      const dmSender = senderName || "Test User";
+
+      const conversation = await createConversation({
+        businessId: business.id,
+        channel: dmChannel,
+        senderName: dmSender,
+        senderExternalId: `sim_${Date.now()}`,
+      });
+
+      const inboundMsg = await createMessage({
+        conversationId: conversation.id,
+        direction: "inbound",
+        content: message,
+      });
+
+      let intentResult = { intent: false, confidence: 0, category: "general_question" };
+      try {
+        const intentCompletion = await openai.chat.completions.create({
+          model: "gpt-5-nano",
+          messages: [
+            {
+              role: "system",
+              content: `You are an AI intent classifier for a cleaning business. Classify the following DM message. Determine if it shows buying intent (asking about pricing, availability, booking, or services). Categories: pricing_request, booking_request, service_area, general_question, spam. Respond with JSON: {"intent": boolean, "confidence": 0-1, "category": string}`
+            },
+            { role: "user", content: message },
+          ],
+          response_format: { type: "json_object" },
+        });
+        const parsed = JSON.parse(intentCompletion.choices[0]?.message?.content || "{}");
+        intentResult = {
+          intent: parsed.intent ?? false,
+          confidence: parsed.confidence ?? 0,
+          category: parsed.category ?? "general_question",
+        };
+      } catch (e) {
+        console.error("Intent classification error:", e);
+      }
+
+      const automationSettings = await getSocialAutomationSettings(business.id);
+      const threshold = automationSettings?.intentThreshold ?? 0.7;
+      const autoEnabled = automationSettings?.autoRepliesEnabled ?? false;
+
+      let autoReplyContent: string | undefined;
+      let quoteLink: string | undefined;
+
+      if (intentResult.intent && intentResult.confidence >= threshold && autoEnabled) {
+        const domain = process.env.REPLIT_DOMAINS?.split(",")[0] || process.env.REPLIT_DEV_DOMAIN || "localhost:5000";
+        quoteLink = `https://${domain}/q?u=${business.id}&ch=${dmChannel}&cid=${conversation.id}`;
+
+        try {
+          const replyCompletion = await openai.chat.completions.create({
+            model: "gpt-5-nano",
+            messages: [
+              {
+                role: "system",
+                content: `You are a friendly AI assistant for ${business.companyName || "a cleaning company"}. Generate a short, friendly auto-reply to a potential customer's DM. Rules:
+- Under 320 characters
+- At most 1 question
+- Include this quote link: ${quoteLink}
+- Be warm and professional
+- Don't mention pricing numbers
+Respond with JSON: {"reply": string}`
+              },
+              { role: "user", content: message },
+            ],
+            response_format: { type: "json_object" },
+          });
+          const parsed = JSON.parse(replyCompletion.choices[0]?.message?.content || "{}");
+          autoReplyContent = parsed.reply || `Thanks for reaching out! Get an instant quote here: ${quoteLink}`;
+        } catch (e) {
+          console.error("Reply generation error:", e);
+          autoReplyContent = `Thanks for reaching out! Get an instant quote here: ${quoteLink}`;
+        }
+
+        await createMessage({
+          conversationId: conversation.id,
+          direction: "outbound",
+          content: autoReplyContent,
+          intentDetected: true,
+          intentConfidence: intentResult.confidence,
+          intentCategory: intentResult.category,
+          autoReplyContent,
+          quoteLink,
+        });
+
+        await updateConversation(conversation.id, { autoReplied: true, lastMessageAt: new Date() });
+
+        const lead = await createSocialLead({
+          businessId: business.id,
+          conversationId: conversation.id,
+          channel: dmChannel,
+          attribution: "auto_dm",
+          senderName: dmSender,
+          dmText: message,
+        });
+
+        await createAttributionEvent({
+          businessId: business.id,
+          socialLeadId: lead.id,
+          conversationId: conversation.id,
+          channel: dmChannel,
+          eventType: "auto_reply_sent",
+        });
+      }
+
+      await createMessage({
+        conversationId: conversation.id,
+        direction: "inbound",
+        content: message,
+        intentDetected: intentResult.intent,
+        intentConfidence: intentResult.confidence,
+        intentCategory: intentResult.category,
+        autoReplyContent: autoReplyContent || undefined,
+        quoteLink: quoteLink || undefined,
+      });
+
+      return res.json({
+        success: true,
+        conversation: conversation,
+        intent: intentResult,
+        autoReplied: !!autoReplyContent,
+        autoReplyContent: autoReplyContent || null,
+        quoteLink: quoteLink || null,
+      });
+    } catch (error: any) {
+      console.error("Simulate DM error:", error);
+      return res.status(500).json({ message: "Failed to simulate DM" });
+    }
+  });
+
+  app.post("/api/social/tiktok-lead", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { dmText, senderName, senderHandle } = req.body;
+      if (!dmText) return res.status(400).json({ message: "dmText is required" });
+
+      let extractedFields: any = {};
+      try {
+        const completion = await openai.chat.completions.create({
+          model: "gpt-5-nano",
+          messages: [
+            {
+              role: "system",
+              content: `Extract relevant cleaning lead information from a TikTok DM. Return JSON with: {"name": string, "serviceType": "regular"|"deep_clean"|"move_in_out"|"other", "bedrooms": number|null, "bathrooms": number|null, "sqft": number|null, "notes": string}`
+            },
+            { role: "user", content: dmText },
+          ],
+          response_format: { type: "json_object" },
+        });
+        extractedFields = JSON.parse(completion.choices[0]?.message?.content || "{}");
+      } catch (e) {
+        console.error("TikTok field extraction error:", e);
+      }
+
+      const lead = await createSocialLead({
+        businessId: business.id,
+        channel: "tiktok",
+        attribution: "manual_dm",
+        senderName: senderName || extractedFields.name || "TikTok User",
+        senderHandle: senderHandle || null,
+        dmText,
+      });
+
+      await createAttributionEvent({
+        businessId: business.id,
+        socialLeadId: lead.id,
+        channel: "tiktok",
+        eventType: "lead_created",
+        metadata: { attribution: "manual_dm", extractedFields },
+      });
+
+      return res.json({ lead, extractedFields });
+    } catch (error: any) {
+      console.error("TikTok lead error:", error);
+      return res.status(500).json({ message: "Failed to create TikTok lead" });
+    }
+  });
+
+  // ─── Quick Quote Public Page ───
+
+  app.post("/api/public/quick-quote", async (req: Request, res: Response) => {
+    try {
+      const { businessId, channel, conversationId, name, phone, email, zip, beds, baths, sqft, serviceType, frequency } = req.body;
+      if (!businessId) return res.status(400).json({ message: "businessId is required" });
+
+      const pricing = await getPricingByBusiness(businessId);
+      const settings = pricing?.settings as any;
+      if (!settings) return res.status(404).json({ message: "Pricing not configured" });
+
+      const baseRate = settings.hourlyRate || 40;
+      const minTicket = settings.minimumTicket || 100;
+      const bedWeight = 0.25;
+      const bathWeight = 0.5;
+      const sqftFactor = settings.sqftFactor || 0.01;
+
+      let baseHours = (sqft || 1500) * sqftFactor;
+      baseHours += (beds || 3) * bedWeight;
+      baseHours += (baths || 2) * bathWeight;
+
+      let multiplier = 1;
+      if (serviceType === "deep_clean") multiplier = 1.5;
+      if (serviceType === "move_in_out") multiplier = 2;
+
+      let total = Math.max(baseRate * baseHours * multiplier, minTicket);
+
+      let freqDiscount = 1;
+      if (frequency === "weekly") freqDiscount = 0.8;
+      else if (frequency === "biweekly") freqDiscount = 0.85;
+      else if (frequency === "monthly") freqDiscount = 0.9;
+      total *= freqDiscount;
+      total = Math.round(total * 100) / 100;
+
+      const quote = await createQuote({
+        businessId,
+        propertyBeds: beds || 3,
+        propertyBaths: baths || 2,
+        propertySqft: sqft || 1500,
+        propertyDetails: { zip, serviceType, frequency },
+        addOns: {},
+        frequencySelected: frequency || "one-time",
+        selectedOption: "better",
+        options: { good: total * 0.8, better: total, best: total * 1.3 },
+        subtotal: total,
+        tax: 0,
+        total,
+        status: "sent",
+      });
+
+      if (name || email || phone) {
+        const nameParts = (name || "").split(" ");
+        const customer = await createCustomer({
+          businessId,
+          firstName: nameParts[0] || "",
+          lastName: nameParts.slice(1).join(" ") || "",
+          phone: phone || "",
+          email: email || "",
+          address: zip || "",
+          leadSource: channel || "social",
+        });
+        await updateQuote(quote.id, { customerId: customer.id });
+
+        if (conversationId) {
+          const lead = await createSocialLead({
+            businessId,
+            customerId: customer.id,
+            conversationId,
+            channel: channel || "instagram",
+            attribution: "quick_quote",
+            senderName: name || "",
+            quoteId: quote.id,
+          });
+
+          await createAttributionEvent({
+            businessId,
+            socialLeadId: lead.id,
+            conversationId,
+            channel: channel || "instagram",
+            eventType: "quote_created",
+            metadata: { quoteTotal: total },
+          });
+        }
+      }
+
+      const business = await db_getBusinessById(businessId);
+
+      return res.json({
+        quote: {
+          id: quote.id,
+          total,
+          breakdown: {
+            baseRate, sqft: sqft || 1500, beds: beds || 3, baths: baths || 2,
+            serviceType: serviceType || "regular", frequency: frequency || "one-time",
+            multiplier, freqDiscount,
+          },
+        },
+        business: business ? { companyName: business.companyName, phone: business.phone, email: business.email, logoUri: business.logoUri } : null,
+      });
+    } catch (error: any) {
+      console.error("Quick quote error:", error);
+      return res.status(500).json({ message: "Failed to create quick quote" });
     }
   });
 
