@@ -72,27 +72,37 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         const apiKey = config.apiKey;
 
         if (apiKey) {
-          Purchases.configure({ apiKey, appUserID: user.id });
-          setRevenueCatReady(true);
+          try {
+            Purchases.configure({ apiKey, appUserID: user.id });
+            setRevenueCatReady(true);
 
-          const customerInfo = await Purchases.getCustomerInfo();
-          const hasPro = checkEntitlements(customerInfo);
-          await syncSubscriptionToServer(hasPro);
+            const customerInfo = await Purchases.getCustomerInfo();
+            const hasPro = checkEntitlements(customerInfo);
+            await syncSubscriptionToServer(hasPro);
 
-          const offerings = await Purchases.getOfferings();
-          if (offerings.current) {
-            setCurrentOffering(offerings.current);
+            const offerings = await Purchases.getOfferings();
+            if (offerings.current) {
+              setCurrentOffering(offerings.current);
+            }
+
+            Purchases.addCustomerInfoUpdateListener((info) => {
+              const updatedPro = checkEntitlements(info);
+              syncSubscriptionToServer(updatedPro);
+            });
+          } catch (rcError: any) {
+            const msg = rcError?.message || "";
+            if (msg.includes("native store") || msg.includes("Expo Go") || msg.includes("Test Store")) {
+              console.log("RevenueCat: Running in Expo Go — using database subscription status.");
+            } else {
+              console.warn("RevenueCat setup error:", rcError);
+            }
+            setIsPro(user.subscriptionTier === "pro");
           }
-
-          Purchases.addCustomerInfoUpdateListener((info) => {
-            const updatedPro = checkEntitlements(info);
-            syncSubscriptionToServer(updatedPro);
-          });
         } else {
           setIsPro(user.subscriptionTier === "pro");
         }
       } catch (error) {
-        console.error("RevenueCat init error:", error);
+        console.warn("Subscription init error:", error);
         setIsPro(user.subscriptionTier === "pro");
       } finally {
         setIsLoading(false);
