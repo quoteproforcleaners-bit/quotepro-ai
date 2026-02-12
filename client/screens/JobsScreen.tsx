@@ -198,7 +198,7 @@ export default function JobsScreen() {
 
   const renderHeader = () => (
     <View>
-      <ProBanner message="Automate job reminders and confirmations with Pro" />
+      <ProBanner message="Automate job reminders and confirmations with QuotePro AI" />
       <View style={styles.filterContainer}>
         <SegmentedControl
           options={filterOptions}

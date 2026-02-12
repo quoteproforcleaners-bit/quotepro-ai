@@ -37,7 +37,7 @@ export function ProBanner({ message }: ProBannerProps) {
         <Feather name="zap" size={16} color={theme.accent} />
       </View>
       <ThemedText type="small" style={{ flex: 1, color: theme.textSecondary }}>
-        {message || "Unlock AI messaging and direct sending with Pro"}
+        {message || "Unlock AI messaging and direct sending with QuotePro AI"}
       </ThemedText>
       <Feather name="chevron-right" size={16} color={theme.accent} />
     </Pressable>

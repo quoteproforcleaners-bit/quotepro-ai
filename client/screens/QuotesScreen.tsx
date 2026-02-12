@@ -58,7 +58,7 @@ export default function QuotesScreen() {
 
   const renderHeader = () => (
     <View>
-      <ProBanner message="Send quotes directly to customers with Pro" />
+      <ProBanner message="Send quotes directly to customers with QuotePro AI" />
       <View style={styles.filterContainer}>
         <SegmentedControl
           options={filterOptions}

@@ -259,7 +259,7 @@ export default function CustomersScreen() {
 
   const renderHeader = () => (
     <View>
-      <ProBanner message="AI-powered follow-ups and automated messaging with Pro" />
+      <ProBanner message="AI-powered follow-ups and automated messaging with QuotePro AI" />
       <Input
         testID="search-input"
         placeholder="Search customers..."

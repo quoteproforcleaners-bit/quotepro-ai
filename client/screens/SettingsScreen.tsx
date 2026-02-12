@@ -40,7 +40,7 @@ export default function SettingsScreen() {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      Alert.alert("Welcome to Pro!", "You now have access to AI-powered messaging, direct sending, and more.");
+      Alert.alert("Welcome to QuotePro AI!", "You now have access to AI-powered messaging, direct sending, and more.");
       setTimeout(() => {
         if (typeof window !== 'undefined') {
           window.location.reload();
@@ -236,7 +236,7 @@ export default function SettingsScreen() {
             <View style={[styles.proBadge, { backgroundColor: theme.primary }]}>
               <Feather name="zap" size={14} color="#FFFFFF" />
               <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 4 }}>
-                PRO
+                AI
               </ThemedText>
             </View>
             <ThemedText type="small" style={{ color: theme.success, fontWeight: "600" }}>
@@ -244,7 +244,7 @@ export default function SettingsScreen() {
             </ThemedText>
           </View>
           <ThemedText type="body" style={{ fontWeight: "600", marginTop: Spacing.sm }}>
-            Pro Plan
+            QuotePro AI
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4 }}>
             You have access to all AI features and direct sending.
@@ -261,7 +261,7 @@ export default function SettingsScreen() {
             <Feather name="zap" size={28} color={theme.accent} />
           </View>
           <ThemedText type="h4" style={{ marginTop: Spacing.md }}>
-            Upgrade to QuotePro Pro
+            Upgrade to QuotePro AI
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4, textAlign: "center" }}>
             Supercharge your quoting with AI and automation
@@ -301,7 +301,7 @@ export default function SettingsScreen() {
               <Feather name="zap" size={18} color="#FFFFFF" />
             )}
             <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 8 }}>
-              {upgrading ? "Upgrading..." : "Upgrade to Pro"}
+              {upgrading ? "Upgrading..." : "Upgrade to QuotePro AI"}
             </ThemedText>
           </Pressable>
 

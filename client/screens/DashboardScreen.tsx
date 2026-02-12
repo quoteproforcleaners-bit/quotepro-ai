@@ -202,7 +202,7 @@ export default function DashboardScreen() {
         />
       </View>
 
-      <ProBanner message="AI-powered messages, direct sending, and smart descriptions" />
+      <ProBanner message="Unlock AI-powered messages, direct sending, and smart descriptions" />
 
       {pendingTasks.length > 0 ? (
         <View style={styles.section}>
