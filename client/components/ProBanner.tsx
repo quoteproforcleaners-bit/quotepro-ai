@@ -21,7 +21,14 @@ export function ProBanner({ message }: ProBannerProps) {
 
   return (
     <Pressable
-      onPress={() => navigation.navigate("MainTabs", { screen: "Settings" })}
+      onPress={() => {
+        const parent = navigation.getParent();
+        if (parent) {
+          parent.navigate("SettingsTab");
+        } else {
+          navigation.navigate("SettingsTab" as any);
+        }
+      }}
       style={[styles.container, { backgroundColor: `${theme.accent}08`, borderColor: `${theme.accent}25` }]}
       testID="pro-banner"
     >
