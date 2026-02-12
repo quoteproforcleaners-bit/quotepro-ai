@@ -1760,20 +1760,20 @@ function getQuickQuoteHTML(): string {
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;color:#0F172A;min-height:100vh}
 .container{max-width:480px;margin:0 auto;padding:20px}
 .header{text-align:center;padding:32px 0 24px}
-.header h1{font-size:24px;font-weight:700;color:#0D9488;margin-bottom:4px}
+.header h1{font-size:24px;font-weight:700;color:#007AFF;margin-bottom:4px}
 .header p{font-size:14px;color:#64748B}
 .card{background:#fff;border-radius:16px;padding:24px;margin-bottom:16px}
 .card h2{font-size:18px;font-weight:600;margin-bottom:16px}
 label{display:block;font-size:13px;font-weight:500;color:#64748B;margin-bottom:6px}
 input,select{width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:15px;margin-bottom:14px;background:#F8FAFC;color:#0F172A;outline:none;transition:border-color .2s}
-input:focus,select:focus{border-color:#0D9488}
+input:focus,select:focus{border-color:#007AFF}
 .row{display:flex;gap:12px}
 .row>div{flex:1}
-.btn{width:100%;padding:14px;background:#0D9488;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.btn{width:100%;padding:14px;background:#007AFF;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
 .btn:hover{opacity:.9}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .result{display:none;text-align:center;padding:32px 0}
-.result .price{font-size:48px;font-weight:700;color:#0D9488;margin:16px 0 8px}
+.result .price{font-size:48px;font-weight:700;color:#007AFF;margin:16px 0 8px}
 .result .label{font-size:14px;color:#64748B}
 .result .biz{font-size:16px;font-weight:600;margin-top:16px}
 .result .contact{font-size:14px;color:#64748B;margin-top:4px}

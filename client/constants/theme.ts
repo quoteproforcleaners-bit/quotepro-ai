@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 
-const primaryLight = "#0D9488";
-const primaryDark = "#14B8A6";
+const primaryLight = "#007AFF";
+const primaryDark = "#0A84FF";
 
 export const Colors = {
   light: {
@@ -12,7 +12,7 @@ export const Colors = {
     tabIconSelected: primaryLight,
     link: primaryLight,
     primary: primaryLight,
-    primaryDark: "#0F766E",
+    primaryDark: "#0062CC",
     backgroundRoot: "#F8FAFC",
     backgroundDefault: "#FFFFFF",
     backgroundSecondary: "#F1F5F9",
@@ -25,7 +25,7 @@ export const Colors = {
     inputBackground: "#FFFFFF",
     cardBackground: "#FFFFFF",
     gradientSuccess: "#ECFDF5",
-    gradientPrimary: "#F0FDFA",
+    gradientPrimary: "#EBF5FF",
     gradientWarning: "#FFFBEB",
     gradientAccent: "#EFF6FF",
   },
@@ -37,7 +37,7 @@ export const Colors = {
     tabIconSelected: primaryDark,
     link: primaryDark,
     primary: primaryDark,
-    primaryDark: "#0D9488",
+    primaryDark: "#007AFF",
     backgroundRoot: "#0F172A",
     backgroundDefault: "#1E293B",
     backgroundSecondary: "#334155",
@@ -50,7 +50,7 @@ export const Colors = {
     inputBackground: "#1E293B",
     cardBackground: "#1E293B",
     gradientSuccess: "#064E3B",
-    gradientPrimary: "#042F2E",
+    gradientPrimary: "#001A33",
     gradientWarning: "#451A03",
     gradientAccent: "#172554",
   },
