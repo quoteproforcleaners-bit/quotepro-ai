@@ -7,6 +7,8 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
@@ -243,6 +245,42 @@ export default function QuoteDetailScreen() {
     }
   };
 
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (!quote) return;
+    setPdfLoading(true);
+    try {
+      const res = await apiRequest("GET", `/api/quotes/${quote.id}/pdf`);
+      const data = await res.json();
+      if (!data.html) throw new Error("No PDF data");
+
+      if (Platform.OS === "web") {
+        const win = window.open("", "_blank");
+        if (win) {
+          win.document.write(data.html);
+          win.document.close();
+          win.print();
+        }
+      } else {
+        const { uri } = await Print.printToFileAsync({ html: data.html });
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: `Quote for ${data.customerName || "Customer"}`,
+          UTI: "com.adobe.pdf",
+        });
+      }
+
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (err) {
+      Alert.alert("Export Failed", "Could not generate PDF. Please try again.");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const handleCopyEmail = async () => {
     if (!quote) return;
     const name = quote.propertyDetails?.customerName || "Customer";
@@ -471,6 +509,19 @@ export default function QuoteDetailScreen() {
               <ThemedText type="small" style={{ marginTop: 4 }}>Mark Sent</ThemedText>
             </Pressable>
           ) : null}
+
+          <Pressable
+            onPress={handleExportPdf}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="export-pdf-btn"
+          >
+            {pdfLoading ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <Feather name="file-text" size={20} color={theme.primary} />
+            )}
+            <ThemedText type="small" style={{ marginTop: 4 }}>Export PDF</ThemedText>
+          </Pressable>
 
           <Pressable
             onPress={handleDelete}

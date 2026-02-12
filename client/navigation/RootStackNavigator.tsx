@@ -8,6 +8,7 @@ import QuoteDetailScreen from "@/screens/QuoteDetailScreen";
 import CustomerDetailScreen from "@/screens/CustomerDetailScreen";
 import PricingScreen from "@/screens/PricingScreen";
 import PaywallScreen from "@/screens/PaywallScreen";
+import JobDetailScreen from "@/screens/JobDetailScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
@@ -21,6 +22,7 @@ export type RootStackParamList = {
   QuoteCalculator: undefined;
   QuoteDetail: { quoteId: string };
   CustomerDetail: { customerId: string };
+  JobDetail: { jobId: string };
   PricingSettings: undefined;
   Paywall: undefined;
 };
@@ -86,6 +88,13 @@ export default function RootStackNavigator() {
             component={CustomerDetailScreen}
             options={{
               headerTitle: "Customer",
+            }}
+          />
+          <Stack.Screen
+            name="JobDetail"
+            component={JobDetailScreen}
+            options={{
+              headerTitle: "Job Details",
             }}
           />
           <Stack.Screen

@@ -7,10 +7,16 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
@@ -48,6 +54,13 @@ const filterOptions: { label: string; value: StatusFilter }[] = [
   { label: "Scheduled", value: "scheduled" },
   { label: "In Progress", value: "in_progress" },
   { label: "Completed", value: "completed" },
+];
+
+const RECURRENCE_OPTIONS = [
+  { label: "One-Time", value: "none" },
+  { label: "Weekly", value: "weekly" },
+  { label: "Biweekly", value: "biweekly" },
+  { label: "Monthly", value: "monthly" },
 ];
 
 const JOB_TYPES = [
@@ -118,12 +131,14 @@ export default function JobsScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [jobType, setJobType] = useState("regular");
+  const [recurrence, setRecurrence] = useState("none");
   const [startDate, setStartDate] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
@@ -140,6 +155,7 @@ export default function JobsScreen() {
   const createMutation = useMutation({
     mutationFn: async (data: {
       jobType: string;
+      recurrence: string;
       startDatetime: string;
       address: string;
       internalNotes: string;
@@ -155,8 +171,22 @@ export default function JobsScreen() {
     },
   });
 
+  const completeMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const res = await apiRequest("POST", `/api/jobs/${jobId}/complete`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      if (data.nextJob) {
+        Alert.alert("Job Completed", data.message);
+      }
+    },
+  });
+
   const resetForm = () => {
     setJobType("regular");
+    setRecurrence("none");
     setStartDate("");
     setAddress("");
     setNotes("");
@@ -179,6 +209,7 @@ export default function JobsScreen() {
     if (isNaN(parsedDate.getTime())) return;
     createMutation.mutate({
       jobType,
+      recurrence,
       startDatetime: parsedDate.toISOString(),
       address: address.trim(),
       internalNotes: notes.trim(),
@@ -234,7 +265,7 @@ export default function JobsScreen() {
 
     return (
       <Card style={styles.jobCard}>
-        <Pressable testID={`job-row-${item.id}`} style={styles.jobRow}>
+        <Pressable testID={`job-row-${item.id}`} style={styles.jobRow} onPress={() => navigation.navigate("JobDetail", { jobId: item.id })}>
           <View style={styles.jobInfo}>
             <View style={styles.nameRow}>
               <ThemedText type="h4" style={styles.jobTitle}>
@@ -254,6 +285,14 @@ export default function JobsScreen() {
                 </ThemedText>
               </View>
             </View>
+            {item.recurrence !== "none" ? (
+              <View style={[styles.recurrenceBadge, { backgroundColor: `${theme.accent}15` }]}>
+                <Feather name="repeat" size={12} color={theme.accent} />
+                <ThemedText type="caption" style={{ color: theme.accent, marginLeft: 4 }}>
+                  {item.recurrence}
+                </ThemedText>
+              </View>
+            ) : null}
             {customerName ? (
               <View style={styles.detailRow}>
                 <Feather
@@ -315,6 +354,18 @@ export default function JobsScreen() {
               </View>
             ) : null}
           </View>
+          {item.status !== "completed" && item.status !== "canceled" ? (
+            <Pressable
+              testID={`complete-job-${item.id}`}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                completeMutation.mutate(item.id);
+              }}
+              style={[styles.completeBtn, { backgroundColor: `${theme.success}15` }]}
+            >
+              <Feather name="check-circle" size={22} color={theme.success} />
+            </Pressable>
+          ) : null}
         </Pressable>
       </Card>
     );
@@ -405,6 +456,43 @@ export default function JobsScreen() {
                       }}
                     >
                       {type.label}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <ThemedText type="small" style={styles.label}>
+              {"Recurrence"}
+            </ThemedText>
+            <View style={styles.jobTypeContainer}>
+              {RECURRENCE_OPTIONS.map((option) => {
+                const isSelected = recurrence === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    testID={`recurrence-${option.value}`}
+                    onPress={() => setRecurrence(option.value)}
+                    style={[
+                      styles.jobTypeChip,
+                      {
+                        backgroundColor: isSelected
+                          ? theme.primary
+                          : theme.backgroundSecondary,
+                        borderColor: isSelected
+                          ? theme.primary
+                          : theme.border,
+                      },
+                    ]}
+                  >
+                    <ThemedText
+                      type="small"
+                      style={{
+                        color: isSelected ? "#FFFFFF" : theme.text,
+                        fontWeight: isSelected ? "600" : "400",
+                      }}
+                    >
+                      {option.label}
                     </ThemedText>
                   </Pressable>
                 );
@@ -551,5 +639,22 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: Spacing.lg,
+  },
+  recurrenceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    alignSelf: "flex-start",
+    marginBottom: 2,
+  },
+  completeBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: Spacing.sm,
   },
 });

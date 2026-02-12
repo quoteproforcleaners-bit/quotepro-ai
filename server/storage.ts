@@ -9,6 +9,8 @@ import {
   quoteLineItems,
   jobs,
   jobChecklistItems,
+  jobPhotos,
+  pushTokens,
   communications,
   automationRules,
   tasks,
@@ -20,6 +22,8 @@ import {
   type QuoteLineItem,
   type Job,
   type JobChecklistItem,
+  type JobPhoto,
+  type PushToken,
   type Communication,
   type AutomationRule,
   type Task,
@@ -500,6 +504,50 @@ export async function updateChecklistItem(
 
 export async function deleteChecklistItem(id: string): Promise<void> {
   await db.delete(jobChecklistItems).where(eq(jobChecklistItems.id, id));
+}
+
+// ─── Job Photos ───
+
+export async function getPhotosByJob(jobId: string): Promise<JobPhoto[]> {
+  return db.select().from(jobPhotos).where(eq(jobPhotos.jobId, jobId)).orderBy(desc(jobPhotos.createdAt));
+}
+
+export async function createJobPhoto(data: { jobId: string; photoUrl: string; photoType?: string; caption?: string }): Promise<JobPhoto> {
+  const [photo] = await db.insert(jobPhotos).values({
+    jobId: data.jobId,
+    photoUrl: data.photoUrl,
+    photoType: data.photoType || "after",
+    caption: data.caption || "",
+  }).returning();
+  return photo;
+}
+
+export async function deleteJobPhoto(id: string): Promise<void> {
+  await db.delete(jobPhotos).where(eq(jobPhotos.id, id));
+}
+
+// ─── Push Tokens ───
+
+export async function getPushTokensByUser(userId: string): Promise<PushToken[]> {
+  return db.select().from(pushTokens).where(eq(pushTokens.userId, userId));
+}
+
+export async function upsertPushToken(data: { userId: string; token: string; platform?: string }): Promise<PushToken> {
+  const existing = await db.select().from(pushTokens).where(eq(pushTokens.token, data.token));
+  if (existing.length > 0) {
+    const [updated] = await db.update(pushTokens).set({ userId: data.userId }).where(eq(pushTokens.token, data.token)).returning();
+    return updated;
+  }
+  const [token] = await db.insert(pushTokens).values({
+    userId: data.userId,
+    token: data.token,
+    platform: data.platform || "ios",
+  }).returning();
+  return token;
+}
+
+export async function deletePushToken(token: string): Promise<void> {
+  await db.delete(pushTokens).where(eq(pushTokens.token, token));
 }
 
 // ─── Communications ───

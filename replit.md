@@ -14,6 +14,10 @@ Key capabilities include:
 - Configurable pricing settings, including hourly rates, minimums, and frequency discounts.
 - AI-powered draft generation for customer communications.
 - A dashboard providing revenue analytics and task management.
+- Job photo attachments (before/after photos with captions via image picker).
+- Recurring job automation (weekly/biweekly/monthly/quarterly auto-scheduling on completion).
+- Quote PDF export with branded HTML template (uses expo-print and expo-sharing).
+- Push notification support (expo-notifications with token registration).
 
 A new "Social / AI Sales Assistant" feature integrates with Instagram and TikTok DMs for lead capture, AI-powered intent detection, automated replies with quote links, and comprehensive lead management with attribution tracking. This feature is part of the "QuotePro AI" subscription tier, emphasizing AI-driven value. The platform supports multi-user access with various authentication methods and stores all data server-side in PostgreSQL.
 

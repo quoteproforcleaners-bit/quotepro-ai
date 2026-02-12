@@ -59,6 +59,11 @@ import {
   expireOldQuotes,
   getPendingCommunications,
   updateCommunication,
+  getPhotosByJob,
+  createJobPhoto,
+  deleteJobPhoto,
+  upsertPushToken,
+  deletePushToken,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -790,6 +795,260 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ message: "Deleted" });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to delete checklist item" });
+    }
+  });
+
+  // ─── Job Photos ───
+
+  app.get("/api/jobs/:jobId/photos", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const photos = await getPhotosByJob(req.params.jobId);
+      return res.json(photos);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get photos" });
+    }
+  });
+
+  app.post("/api/jobs/:jobId/photos", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { photoData, photoType, caption } = req.body;
+      if (!photoData) return res.status(400).json({ message: "Photo data required" });
+
+      const fs = await import("fs");
+      const path = await import("path");
+      const uploadsDir = path.join(process.cwd(), "uploads", "job-photos");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const filePath = path.join(uploadsDir, fileName);
+
+      const base64Data = photoData.replace(/^data:image\/\w+;base64,/, "");
+      fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+
+      const photoUrl = `/uploads/job-photos/${fileName}`;
+      const photo = await createJobPhoto({
+        jobId: req.params.jobId,
+        photoUrl,
+        photoType: photoType || "after",
+        caption: caption || "",
+      });
+      return res.json(photo);
+    } catch (error: any) {
+      console.error("Photo upload error:", error);
+      return res.status(500).json({ message: "Failed to upload photo" });
+    }
+  });
+
+  app.delete("/api/photos/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteJobPhoto(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete photo" });
+    }
+  });
+
+  // ─── Recurring Job Automation ───
+
+  app.post("/api/jobs/:id/complete", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      const updatedJob = await updateJob(req.params.id, {
+        status: "completed",
+        endDatetime: new Date(),
+      });
+
+      let nextJob = null;
+      if (job.recurrence && job.recurrence !== "none") {
+        const currentDate = new Date(job.startDatetime);
+        let nextDate: Date;
+
+        switch (job.recurrence) {
+          case "weekly":
+            nextDate = new Date(currentDate);
+            nextDate.setDate(nextDate.getDate() + 7);
+            break;
+          case "biweekly":
+            nextDate = new Date(currentDate);
+            nextDate.setDate(nextDate.getDate() + 14);
+            break;
+          case "monthly":
+            nextDate = new Date(currentDate);
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            break;
+          case "quarterly":
+            nextDate = new Date(currentDate);
+            nextDate.setMonth(nextDate.getMonth() + 3);
+            break;
+          default:
+            nextDate = new Date(currentDate);
+            nextDate.setDate(nextDate.getDate() + 7);
+        }
+
+        nextJob = await createJob({
+          businessId: job.businessId,
+          customerId: job.customerId || undefined,
+          quoteId: job.quoteId || undefined,
+          jobType: job.jobType,
+          startDatetime: nextDate,
+          recurrence: job.recurrence,
+          internalNotes: job.internalNotes,
+          address: job.address,
+          total: job.total || undefined,
+        });
+
+        const checklist = await getChecklistByJob(job.id);
+        for (let i = 0; i < checklist.length; i++) {
+          await createChecklistItem({
+            jobId: nextJob.id,
+            label: checklist[i].label,
+            sortOrder: checklist[i].sortOrder,
+          });
+        }
+      }
+
+      return res.json({
+        completedJob: updatedJob,
+        nextJob,
+        message: nextJob
+          ? `Job completed! Next ${job.recurrence} job scheduled.`
+          : "Job completed!",
+      });
+    } catch (error: any) {
+      console.error("Complete job error:", error);
+      return res.status(500).json({ message: "Failed to complete job" });
+    }
+  });
+
+  // ─── Push Notifications ───
+
+  app.post("/api/push-token", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { token, platform } = req.body;
+      if (!token) return res.status(400).json({ message: "Token required" });
+      const saved = await upsertPushToken({
+        userId: req.session.userId!,
+        token,
+        platform: platform || "ios",
+      });
+      return res.json(saved);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to save push token" });
+    }
+  });
+
+  app.delete("/api/push-token", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+      if (!token) return res.status(400).json({ message: "Token required" });
+      await deletePushToken(token);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete push token" });
+    }
+  });
+
+  // ─── Quote PDF ───
+
+  app.get("/api/quotes/:id/pdf", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const quote = await getQuoteById(req.params.id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const selectedOpt = (quote.options as any)?.[quote.selectedOption || "better"];
+      const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
+      const customerEmail = (quote.propertyDetails as any)?.customerEmail || "";
+      const customerPhone = (quote.propertyDetails as any)?.customerPhone || "";
+      const customerAddress = (quote.propertyDetails as any)?.customerAddress || "";
+      const options = quote.options as any;
+
+      const addOnLabels: Record<string, string> = {
+        insideFridge: "Inside Fridge",
+        insideOven: "Inside Oven",
+        insideCabinets: "Inside Cabinets",
+        interiorWindows: "Interior Windows",
+        blindsDetail: "Blinds Detail",
+        baseboardsDetail: "Baseboards Detail",
+        laundryFoldOnly: "Laundry (Fold Only)",
+        dishes: "Dishes",
+        organizationTidy: "Organization/Tidy",
+      };
+
+      const activeAddOns = Object.entries(quote.addOns as any || {})
+        .filter(([_, v]) => v)
+        .map(([k]) => addOnLabels[k] || k);
+
+      const optionRows = ["good", "better", "best"]
+        .map((key) => {
+          const opt = options?.[key];
+          if (!opt) return "";
+          const isSelected = quote.selectedOption === key;
+          return `<tr style="${isSelected ? "background:#EBF5FF;font-weight:600;" : ""}">
+            <td style="padding:12px;border-bottom:1px solid #eee;">${opt.serviceTypeName || opt.name || key}${isSelected ? " *" : ""}</td>
+            <td style="padding:12px;border-bottom:1px solid #eee;text-align:right;">$${(opt.price || 0).toFixed(2)}</td>
+          </tr>`;
+        })
+        .join("");
+
+      const primaryColor = business.primaryColor || "#2563EB";
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;padding:40px;color:#1a1a1a;font-size:14px;}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;border-bottom:3px solid ${primaryColor};padding-bottom:20px;}
+.company{font-size:24px;font-weight:700;color:${primaryColor};}
+.company-details{font-size:12px;color:#666;margin-top:4px;}
+.quote-badge{background:${primaryColor};color:white;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;}
+.section{margin-bottom:24px;}
+.section-title{font-size:16px;font-weight:600;color:${primaryColor};margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:6px;}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.info-item{font-size:13px;}.info-label{color:#666;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:12px;background:#f8f9fa;border-bottom:2px solid #dee2e6;font-size:13px;}
+.total-row{background:${primaryColor};color:white;}
+.total-row td{padding:14px;font-size:16px;font-weight:700;}
+.footer{margin-top:40px;text-align:center;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:16px;}
+.addons{display:flex;flex-wrap:wrap;gap:6px;}.addon-tag{background:#f0f4ff;color:${primaryColor};padding:4px 10px;border-radius:12px;font-size:11px;}
+</style></head><body>
+<div class="header">
+<div><div class="company">${business.companyName || "QuotePro"}</div>
+<div class="company-details">${business.email ? business.email + "<br>" : ""}${business.phone || ""}${business.address ? "<br>" + business.address : ""}</div></div>
+<div class="quote-badge">QUOTE</div>
+</div>
+<div class="section"><div class="section-title">Customer</div>
+<div class="info-grid">
+<div class="info-item"><div class="info-label">Name</div>${customerName}</div>
+<div class="info-item"><div class="info-label">Email</div>${customerEmail || "N/A"}</div>
+<div class="info-item"><div class="info-label">Phone</div>${customerPhone || "N/A"}</div>
+<div class="info-item"><div class="info-label">Address</div>${customerAddress || "N/A"}</div>
+</div></div>
+<div class="section"><div class="section-title">Property Details</div>
+<div class="info-grid">
+<div class="info-item"><div class="info-label">Square Footage</div>${quote.propertySqft} sqft</div>
+<div class="info-item"><div class="info-label">Bedrooms</div>${quote.propertyBeds}</div>
+<div class="info-item"><div class="info-label">Bathrooms</div>${quote.propertyBaths}</div>
+<div class="info-item"><div class="info-label">Frequency</div>${(quote.frequencySelected || "one-time").replace(/-/g, " ")}</div>
+</div></div>
+${activeAddOns.length > 0 ? `<div class="section"><div class="section-title">Add-On Services</div><div class="addons">${activeAddOns.map(a => `<span class="addon-tag">${a}</span>`).join("")}</div></div>` : ""}
+<div class="section"><div class="section-title">Pricing Options</div>
+<table><thead><tr><th>Service Level</th><th style="text-align:right;">Price</th></tr></thead>
+<tbody>${optionRows}
+<tr class="total-row"><td style="padding:14px;">Selected Total</td><td style="padding:14px;text-align:right;">$${(quote.total || 0).toFixed(2)}</td></tr>
+</tbody></table></div>
+${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;color:#666;">Tax: $${quote.tax.toFixed(2)} | Subtotal: $${quote.subtotal.toFixed(2)}</div>` : ""}
+<div class="footer">Quote generated by ${business.companyName || "QuotePro"} | ${new Date().toLocaleDateString()}</div>
+</body></html>`;
+
+      return res.json({ html, customerName, total: quote.total });
+    } catch (error: any) {
+      console.error("PDF generation error:", error);
+      return res.status(500).json({ message: "Failed to generate PDF" });
     }
   });
 

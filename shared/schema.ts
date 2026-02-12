@@ -168,6 +168,23 @@ export const jobChecklistItems = pgTable("job_checklist_items", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+export const jobPhotos = pgTable("job_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  photoType: text("photo_type").notNull().default("after"),
+  caption: text("caption").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const pushTokens = pgTable("push_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  platform: text("platform").notNull().default("ios"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const communications = pgTable("communications", {
   id: varchar("id")
     .primaryKey()
@@ -386,6 +403,8 @@ export type QuoteRow = typeof quotes.$inferSelect;
 export type QuoteLineItem = typeof quoteLineItems.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
 export type JobChecklistItem = typeof jobChecklistItems.$inferSelect;
+export type JobPhoto = typeof jobPhotos.$inferSelect;
+export type PushToken = typeof pushTokens.$inferSelect;
 export type Communication = typeof communications.$inferSelect;
 export type AutomationRule = typeof automationRules.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
