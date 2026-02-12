@@ -1,5 +1,5 @@
-import React from "react";
-import { View, StyleSheet, Image, Pressable, Alert } from "react-native";
+import React, { useState } from "react";
+import { View, StyleSheet, Image, Pressable, Alert, Platform, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -8,6 +8,8 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/query-client";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -25,6 +27,31 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
+  const queryClient = useQueryClient();
+  const [upgrading, setUpgrading] = useState(false);
+
+  const isPro = user?.subscriptionTier === "pro";
+
+  const handleUpgrade = async () => {
+    setUpgrading(true);
+    try {
+      await apiRequest("POST", "/api/subscription/upgrade");
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      Alert.alert("Welcome to Pro!", "You now have access to AI-powered messaging, direct sending, and more.");
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.reload();
+        }
+      }, 500);
+    } catch {
+      Alert.alert("Error", "Could not upgrade. Please try again.");
+    } finally {
+      setUpgrading(false);
+    }
+  };
 
   const updateProfile = async (updates: Partial<typeof profile>) => {
     await updateBusinessProfile(updates);
@@ -196,6 +223,94 @@ export default function SettingsScreen() {
         </View>
       </Pressable>
 
+      <SectionHeader title="Subscription" />
+
+      {isPro ? (
+        <View
+          style={[
+            styles.proActiveCard,
+            { backgroundColor: `${theme.primary}10`, borderColor: `${theme.primary}30` },
+          ]}
+        >
+          <View style={styles.proActiveHeader}>
+            <View style={[styles.proBadge, { backgroundColor: theme.primary }]}>
+              <Feather name="zap" size={14} color="#FFFFFF" />
+              <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 4 }}>
+                PRO
+              </ThemedText>
+            </View>
+            <ThemedText type="small" style={{ color: theme.success, fontWeight: "600" }}>
+              Active
+            </ThemedText>
+          </View>
+          <ThemedText type="body" style={{ fontWeight: "600", marginTop: Spacing.sm }}>
+            Pro Plan
+          </ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4 }}>
+            You have access to all AI features and direct sending.
+          </ThemedText>
+        </View>
+      ) : (
+        <View
+          style={[
+            styles.proUpgradeCard,
+            { backgroundColor: theme.cardBackground, borderColor: theme.border },
+          ]}
+        >
+          <View style={[styles.proUpgradeIcon, { backgroundColor: `${theme.accent}15` }]}>
+            <Feather name="zap" size={28} color={theme.accent} />
+          </View>
+          <ThemedText type="h4" style={{ marginTop: Spacing.md }}>
+            Upgrade to QuotePro Pro
+          </ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4, textAlign: "center" }}>
+            Supercharge your quoting with AI and automation
+          </ThemedText>
+
+          <View style={styles.proFeaturesList}>
+            {[
+              { icon: "edit-3" as const, text: "AI-written emails and text messages" },
+              { icon: "send" as const, text: "Send quotes directly via email or SMS" },
+              { icon: "zap" as const, text: "AI-enhanced quote descriptions" },
+              { icon: "refresh-cw" as const, text: "Regenerate messages with one tap" },
+              { icon: "user" as const, text: "Personalized for each customer" },
+            ].map((feature, i) => (
+              <View key={i} style={styles.proFeatureItem}>
+                <View style={[styles.proFeatureCheck, { backgroundColor: `${theme.success}15` }]}>
+                  <Feather name={feature.icon} size={14} color={theme.success} />
+                </View>
+                <ThemedText type="small" style={{ flex: 1 }}>
+                  {feature.text}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+
+          <Pressable
+            onPress={handleUpgrade}
+            disabled={upgrading}
+            style={[
+              styles.upgradeBtn,
+              { backgroundColor: theme.accent, opacity: upgrading ? 0.7 : 1 },
+            ]}
+            testID="button-upgrade-pro"
+          >
+            {upgrading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Feather name="zap" size={18} color="#FFFFFF" />
+            )}
+            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 8 }}>
+              {upgrading ? "Upgrading..." : "Upgrade to Pro"}
+            </ThemedText>
+          </Pressable>
+
+          <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
+            Free plan includes unlimited quoting and customer management
+          </ThemedText>
+        </View>
+      )}
+
       <SectionHeader title="Account" />
 
       {user ? (
@@ -330,5 +445,63 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+  },
+  proActiveCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing["2xl"],
+  },
+  proActiveHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  proBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  proUpgradeCard: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: "center",
+    marginBottom: Spacing["2xl"],
+  },
+  proUpgradeIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  proFeaturesList: {
+    width: "100%",
+    marginTop: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  proFeatureItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  proFeatureCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  upgradeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.lg,
   },
 });
