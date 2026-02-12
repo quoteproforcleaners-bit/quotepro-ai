@@ -70,7 +70,15 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
             <ThemedText type="body" style={[styles.wizardDesc, { color: theme.text }]}>
               Automatically capture leads from Instagram and TikTok DMs. Our AI detects buying intent and sends instant quote links.
             </ThemedText>
-            <View style={[styles.featureList, { backgroundColor: "#1E1B3A" }]}>
+            <View style={styles.socialIcons}>
+              <View style={[styles.socialIconBubble, { backgroundColor: "#E1306C15" }]}>
+                <Feather name="instagram" size={28} color="#E1306C" />
+              </View>
+              <View style={[styles.socialIconBubble, { backgroundColor: `${theme.text}10` }]}>
+                <Feather name="video" size={28} color={theme.text} />
+              </View>
+            </View>
+            <View style={[styles.featureList, { backgroundColor: theme.backgroundSecondary, borderWidth: 1, borderColor: theme.border }]}>
               {[
                 { icon: "zap" as const, text: "AI-powered intent detection" },
                 { icon: "send" as const, text: "Auto-reply with quote links" },
@@ -78,8 +86,8 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 { icon: "users" as const, text: "Convert DMs to customers" },
               ].map((f, i) => (
                 <View key={i} style={styles.featureRow}>
-                  <Feather name={f.icon} size={16} color="#A78BFA" />
-                  <ThemedText type="small" style={{ marginLeft: Spacing.sm, color: "#FFFFFF" }}>{f.text}</ThemedText>
+                  <Feather name={f.icon} size={16} color={theme.accent} />
+                  <ThemedText type="small" style={{ marginLeft: Spacing.sm, color: theme.text }}>{f.text}</ThemedText>
                 </View>
               ))}
             </View>
@@ -355,7 +363,7 @@ export default function SocialScreen() {
   if (!automation?.socialOnboardingComplete) {
     return (
       <ScrollView
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
         contentContainerStyle={{ paddingTop: headerHeight + Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl, paddingHorizontal: Spacing.lg }}
       >
         <OnboardingWizard onComplete={() => {
@@ -369,7 +377,7 @@ export default function SocialScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
       contentContainerStyle={{
         paddingTop: headerHeight + Spacing.lg,
         paddingBottom: tabBarHeight + Spacing.xl,
@@ -378,6 +386,34 @@ export default function SocialScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
     >
       <ProBanner message="Social AI features require QuotePro AI" />
+
+      <View style={[styles.connectedPlatforms, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
+        <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm }}>Connected Platforms</ThemedText>
+        <View style={styles.platformRow}>
+          <View style={[styles.platformBadge, { backgroundColor: "#E1306C15" }]}>
+            <Feather name="instagram" size={20} color="#E1306C" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="small">Instagram</ThemedText>
+            <ThemedText type="caption" style={{ color: theme.textSecondary }}>Dev Mode</ThemedText>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: `${theme.accent}20` }]}>
+            <ThemedText type="caption" style={{ color: theme.accent }}>Active</ThemedText>
+          </View>
+        </View>
+        <View style={styles.platformRow}>
+          <View style={[styles.platformBadge, { backgroundColor: `${theme.text}10` }]}>
+            <Feather name="video" size={20} color={theme.text} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="small">TikTok</ThemedText>
+            <ThemedText type="caption" style={{ color: theme.textSecondary }}>Manual Capture</ThemedText>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: `${theme.accent}20` }]}>
+            <ThemedText type="caption" style={{ color: theme.accent }}>Active</ThemedText>
+          </View>
+        </View>
+      </View>
 
       <View style={styles.statsRow}>
         <StatCard
@@ -575,6 +611,25 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: BorderRadius.md,
   },
+  connectedPlatforms: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  platformRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  platformBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   simulateCard: {
     marginTop: Spacing.md,
   },
@@ -655,6 +710,18 @@ const styles = StyleSheet.create({
   featureRow: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  socialIcons: {
+    flexDirection: "row",
+    gap: Spacing.lg,
+    marginBottom: Spacing.xl,
+  },
+  socialIconBubble: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
   channelCard: {
     flexDirection: "row",

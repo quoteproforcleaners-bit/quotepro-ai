@@ -30,7 +30,7 @@ export function ProBanner({ message }: ProBannerProps) {
           })
         );
       }}
-      style={[styles.container, { backgroundColor: theme.accent }]}
+      style={[styles.container, { backgroundColor: '#009B82' }]}
       testID="pro-banner"
     >
       <View style={styles.icon}>
