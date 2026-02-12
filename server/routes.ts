@@ -1598,6 +1598,10 @@ Respond with JSON: {"reply": string}`
 
   // ─── Quick Quote Public Page ───
 
+  app.get("/q", (_req: Request, res: Response) => {
+    res.send(getQuickQuoteHTML());
+  });
+
   app.post("/api/public/quick-quote", async (req: Request, res: Response) => {
     try {
       const { businessId, channel, conversationId, name, phone, email, zip, beds, baths, sqft, serviceType, frequency } = req.body;
@@ -1742,6 +1746,138 @@ function formatUser(u: any) {
     name: u.name,
     subscriptionTier: u.subscriptionTier || "free",
   };
+}
+
+function getQuickQuoteHTML(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get Your Instant Quote</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;color:#0F172A;min-height:100vh}
+.container{max-width:480px;margin:0 auto;padding:20px}
+.header{text-align:center;padding:32px 0 24px}
+.header h1{font-size:24px;font-weight:700;color:#0D9488;margin-bottom:4px}
+.header p{font-size:14px;color:#64748B}
+.card{background:#fff;border-radius:16px;padding:24px;margin-bottom:16px}
+.card h2{font-size:18px;font-weight:600;margin-bottom:16px}
+label{display:block;font-size:13px;font-weight:500;color:#64748B;margin-bottom:6px}
+input,select{width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:15px;margin-bottom:14px;background:#F8FAFC;color:#0F172A;outline:none;transition:border-color .2s}
+input:focus,select:focus{border-color:#0D9488}
+.row{display:flex;gap:12px}
+.row>div{flex:1}
+.btn{width:100%;padding:14px;background:#0D9488;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.btn:hover{opacity:.9}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.result{display:none;text-align:center;padding:32px 0}
+.result .price{font-size:48px;font-weight:700;color:#0D9488;margin:16px 0 8px}
+.result .label{font-size:14px;color:#64748B}
+.result .biz{font-size:16px;font-weight:600;margin-top:16px}
+.result .contact{font-size:14px;color:#64748B;margin-top:4px}
+.powered{text-align:center;padding:16px 0;font-size:12px;color:#94A3B8}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>Get Your Instant Quote</h1>
+<p>Fill in your details for a quick estimate</p>
+</div>
+<form id="quoteForm">
+<div class="card">
+<h2>Your Info</h2>
+<label>Full Name</label>
+<input type="text" id="name" placeholder="John Smith" required>
+<div class="row">
+<div><label>Phone</label><input type="tel" id="phone" placeholder="(555) 123-4567"></div>
+<div><label>Email</label><input type="email" id="email" placeholder="you@email.com"></div>
+</div>
+<label>ZIP Code</label>
+<input type="text" id="zip" placeholder="12345" maxlength="10">
+</div>
+<div class="card">
+<h2>Property Details</h2>
+<div class="row">
+<div><label>Bedrooms</label><input type="number" id="beds" value="3" min="1" max="10"></div>
+<div><label>Bathrooms</label><input type="number" id="baths" value="2" min="1" max="10"></div>
+</div>
+<label>Square Footage</label>
+<input type="number" id="sqft" value="1500" min="200" max="20000">
+<label>Service Type</label>
+<select id="serviceType">
+<option value="regular">Regular Cleaning</option>
+<option value="deep_clean">Deep Clean</option>
+<option value="move_in_out">Move In/Out</option>
+</select>
+<label>Frequency</label>
+<select id="frequency">
+<option value="one-time">One-Time</option>
+<option value="weekly">Weekly</option>
+<option value="biweekly">Bi-Weekly</option>
+<option value="monthly">Monthly</option>
+</select>
+</div>
+<button type="submit" class="btn" id="submitBtn">Get My Quote</button>
+</form>
+<div class="result" id="result">
+<div style="font-size:48px">&#x2728;</div>
+<div class="price" id="priceDisplay">$0</div>
+<div class="label">Estimated cleaning cost</div>
+<div class="biz" id="bizName"></div>
+<div class="contact" id="bizContact"></div>
+<button class="btn" onclick="location.reload()" style="margin-top:24px">Get Another Quote</button>
+</div>
+<div class="powered">Powered by QuotePro</div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+const businessId = params.get('u') || '';
+const channel = params.get('ch') || '';
+const conversationId = params.get('cid') || '';
+document.getElementById('quoteForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Calculating...';
+  try {
+    const res = await fetch('/api/public/quick-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        businessId, channel, conversationId,
+        name: document.getElementById('name').value,
+        phone: document.getElementById('phone').value,
+        email: document.getElementById('email').value,
+        zip: document.getElementById('zip').value,
+        beds: parseInt(document.getElementById('beds').value),
+        baths: parseInt(document.getElementById('baths').value),
+        sqft: parseInt(document.getElementById('sqft').value),
+        serviceType: document.getElementById('serviceType').value,
+        frequency: document.getElementById('frequency').value,
+      }),
+    });
+    const data = await res.json();
+    if (data.quote) {
+      document.getElementById('priceDisplay').textContent = '$' + data.quote.total.toFixed(0);
+      if (data.business) {
+        document.getElementById('bizName').textContent = data.business.companyName || '';
+        const contact = [data.business.phone, data.business.email].filter(Boolean).join(' | ');
+        document.getElementById('bizContact').textContent = contact;
+      }
+      document.getElementById('quoteForm').style.display = 'none';
+      document.getElementById('result').style.display = 'block';
+    }
+  } catch(err) {
+    btn.disabled = false;
+    btn.textContent = 'Get My Quote';
+  }
+});
+</script>
+</body>
+</html>`;
 }
 
 function formatBusiness(b: any) {
