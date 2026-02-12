@@ -2,22 +2,20 @@
 
 ## Overview
 
-QuotePro is a comprehensive business management SaaS platform for residential cleaning companies. It transforms complex pricing calculations into confident, branded customer quotes and provides full CRM, job scheduling, and communications tracking.
+QuotePro is a comprehensive SaaS platform designed for residential cleaning companies, offering tools for generating accurate, branded customer quotes, and managing customer relationships, job scheduling, and communications. The platform aims to streamline operations, enhance customer engagement, and drive business growth.
 
-Key capabilities:
-- Multi-step quote calculator with customer info, property details, and service add-ons
-- Good/Better/Best pricing options with live preview
-- Quote history management with status tracking (draft, sent, accepted, declined, expired)
-- Customer Relationship Management (CRM) with search, notes, and tags
-- Job scheduling with status tracking (scheduled, in_progress, completed, cancelled)
-- Job checklists for cleaning tasks
-- Communications tracking (email, SMS, phone)
-- Business profile customization including logo and branding
-- Configurable pricing settings (hourly rates, minimum tickets, add-on prices, frequency discounts)
-- Email and SMS draft generation for customer communication
-- Dashboard with revenue analytics, recent quotes, and task management
+Key capabilities include:
+- A multi-step quote calculator supporting detailed property information and service add-ons.
+- Good/Better/Best pricing options with live previews.
+- CRM functionalities for managing customers, notes, and tags.
+- Job scheduling with status tracking and task checklists.
+- Integrated communication tracking for emails, SMS, and phone calls.
+- Customizable business profiles with branding options.
+- Configurable pricing settings, including hourly rates, minimums, and frequency discounts.
+- AI-powered draft generation for customer communications.
+- A dashboard providing revenue analytics and task management.
 
-Multi-user app with authentication (email/password, Apple Sign-In, Google Sign-In). All data stored server-side per user in PostgreSQL.
+A new "Social / AI Sales Assistant" feature integrates with Instagram and TikTok DMs for lead capture, AI-powered intent detection, automated replies with quote links, and comprehensive lead management with attribution tracking. This feature is part of the "QuotePro AI" subscription tier, emphasizing AI-driven value. The platform supports multi-user access with various authentication methods and stores all data server-side in PostgreSQL.
 
 ## User Preferences
 
@@ -25,226 +23,65 @@ Preferred communication style: Simple, everyday language.
 iPhone-only app. No hours/times shown to customers. Customizable service types.
 Future plan: Freemium model where quoting is free, CRM/jobs/automation are paid (RevenueCat for subscriptions).
 
-## Design System
-
-**Brand Colors**: Teal/emerald primary (#0D9488 light / #14B8A6 dark) with indigo accent (#6366F1 / #818CF8)
-**Typography**: h1-h3 use bold (700) weight, h4 uses semibold (600), subtitle type (500 weight) for secondary emphasis
-**Empty States**: Icon-based with decorative concentric circles (no image assets needed) - use `icon` and `iconColor` props on EmptyState component
-**Stat Cards**: Colored accent bar on top with icon container
-**Dashboard**: Branded greeting (uppercase label + h1 company name), Getting Started checklist for new users (auto-hides when user has quotes and customers)
-**Gradient tokens**: gradientSuccess, gradientPrimary, gradientWarning, gradientAccent available in theme for card backgrounds
-
 ## System Architecture
 
 ### Frontend Architecture
 
-**Framework**: React Native with Expo SDK 54
-- React Navigation for native stack and bottom tab navigation
-- React Native Reanimated for animations
-- React Native Gesture Handler for touch interactions
+The frontend is built using **React Native with Expo SDK 54**, leveraging **React Navigation** for a structured native stack and bottom tab navigation. Animations are handled with **React Native Reanimated** and touch interactions with **React Native Gesture Handler**.
 
-**State Management**:
-- React Context (AppContext) for global app state (business profile, pricing settings, onboarding status)
-- React Query (TanStack Query) for server state management
-- Local component state with useState for UI state
+**State Management**: Global application state (business profile, pricing settings, onboarding) is managed via **React Context (AppContext)**. Server state is managed using **React Query (TanStack Query)**, while UI-specific state uses local `useState`.
 
-**Navigation Structure**:
-- Root Stack Navigator with conditional rendering based on auth + onboarding status
-- Auth Stack: LoginScreen (login/register modes)
-- Onboarding Stack: Welcome -> Company Info -> Pricing Setup -> Done
-- Main Tab Navigator with 5 tabs: Home, Customers, Quotes, Jobs, Settings
-- Modal/Stack screens: QuoteCalculator, QuoteDetail, CustomerDetail
+**Navigation**: Features a Root Stack Navigator with conditional rendering based on authentication and onboarding status. It includes distinct stacks for authentication, a multi-step onboarding process, and a Main Tab Navigator with Home, Customers, Quotes, Jobs, Social, and Settings tabs. Various modal and stack screens support detailed functionalities like quote calculation, customer details, and social conversations.
 
-**Screen Inventory**:
-- `DashboardScreen` (Home tab): Stats cards, recent quotes, tasks
-- `CustomersScreen` (Customers tab): Searchable CRM list, add/edit customer modal
-- `CustomerDetailScreen`: Full customer profile with quotes, jobs, communications
-- `QuotesScreen` (Quotes tab): Quote list with status filter (all/draft/sent/accepted)
-- `QuoteCalculatorScreen`: Multi-step quote creation (Customer -> Property -> Services -> Preview)
-- `QuoteDetailScreen`: Quote details with pricing options, status management, copy email/SMS
-- `JobsScreen` (Jobs tab): Job list with status filter (all/scheduled/in_progress/completed)
-- `SettingsScreen` (Settings tab): Business profile, pricing settings, service types
-- `PricingScreen`: Service types configuration with multipliers
-
-**Component Architecture**:
-- Themed components (ThemedText, ThemedView) for consistent styling
-- Reusable UI components (Button, Card, Input, Toggle, FAB, SegmentedControl, etc.)
-- QuoteListItem, QuoteCard for quote display
-- SectionHeader, EmptyState for common patterns
-
-**Styling Approach**:
-- Centralized theme constants in `/constants/theme.ts`
-- Light/dark mode support via useColorScheme hook
-- Consistent spacing and border radius tokens
-- Platform-specific adaptations (blur effects on iOS, solid backgrounds on Android/web)
+**Styling**: Adheres to a centralized theme defined in `/constants/theme.ts`, supporting light/dark modes and platform-specific adaptations. Components are designed for reusability and consistency, utilizing themed components and a robust design system with specific brand colors, typography, and patterns for empty states and stat cards.
 
 ### Backend Architecture
 
-**Server**: Express.js running on Node.js
-- TypeScript with ES modules
-- CORS configured for Replit domains and localhost development
-- Static file serving for production web builds
-- Background job: Auto-expire old quotes runs every hour via setInterval
+The backend runs on **Express.js with Node.js and TypeScript**, configured with CORS and serving static files for production web builds. A background job handles automatic expiration of old quotes.
 
-**API Pattern**:
-- Routes registered in `/server/routes.ts`
-- All API routes prefixed with `/api`
-- JSON body parsing with raw body preservation
-- `requireAuth` middleware gates authenticated endpoints
+**API Pattern**: All API routes are prefixed with `/api` and secured by `requireAuth` middleware for authenticated endpoints.
 
 ### Data Storage
 
-**PostgreSQL Database** (active, Neon-backed):
-- Drizzle ORM with PostgreSQL dialect
-- Schema defined in `/shared/schema.ts`
-- Storage layer in `/server/storage.ts` with CRUD functions
+**PostgreSQL Database (Neon-backed)**: Utilizes **Drizzle ORM** for schema definition (`/shared/schema.ts`) and CRUD operations (`/server/storage.ts`).
 
-**Database Tables**:
-- `users` - User accounts with email/password or SSO
-- `businesses` - Business profiles per user (company name, logo, branding)
-- `pricing_settings` - Per-user pricing configuration (rates, add-ons, service types)
-- `customers` - CRM contacts linked to business (name, email, phone, address, notes, tags)
-- `quotes` - Server-stored quotes with property details, pricing options, status
-- `quote_line_items` - Individual line items on quotes
-- `jobs` - Scheduled cleaning jobs linked to customers/quotes
-- `job_checklist_items` - Task checklists for jobs
-- `communications` - Email/SMS/phone log entries
-- `automation_rules` - Configurable automation triggers (follow-ups, reminders)
-- `tasks` - Business tasks/to-dos
-- `session` - Express session store (auto-created by connect-pg-simple)
+**Key Database Tables**:
+- `users`, `businesses`, `pricing_settings`, `customers`, `quotes`, `quote_line_items`, `jobs`, `job_checklist_items`, `communications`, `automation_rules`, `tasks`.
+- Social features introduce: `social_connections`, `social_conversations`, `social_messages`, `social_leads`, `social_automation_settings`, `social_attribution_events`, `social_onboarding`.
+- Session management is handled by a `session` table using `express-session` and `connect-pg-simple`.
 
-**Authentication**:
-- Session-based auth using `express-session` with `connect-pg-simple` store
-- Auth routes: register, login, Apple SSO, Google SSO, me, logout
-- `AuthContext` (`client/context/AuthContext.tsx`) manages auth state on frontend
-- Navigation gated by auth state: Login -> Onboarding -> Main App
-
-**API Endpoints**:
-
-Auth:
-- `POST /api/auth/register` - Create account with email/password
-- `POST /api/auth/login` - Sign in with email/password
-- `POST /api/auth/apple` - Apple Sign-In
-- `POST /api/auth/google` - Google Sign-In
-- `GET /api/auth/me` - Check current session
-- `POST /api/auth/logout` - Destroy session
-
-Business:
-- `GET /api/business` - Get current user's business profile
-- `PUT /api/business` - Update business profile
-
-Pricing:
-- `GET /api/pricing` - Get pricing settings
-- `PUT /api/pricing` - Update pricing settings
-
-Customers:
-- `GET /api/customers` - List customers (supports ?search= query)
-- `POST /api/customers` - Create customer
-- `GET /api/customers/:id` - Get customer details
-- `PUT /api/customers/:id` - Update customer
-- `DELETE /api/customers/:id` - Delete customer
-
-Quotes:
-- `GET /api/quotes` - List quotes (supports ?status=, ?customerId= filters)
-- `POST /api/quotes` - Create quote
-- `GET /api/quotes/:id` - Get quote details
-- `PUT /api/quotes/:id` - Update quote
-- `POST /api/quotes/:id/send` - Mark quote as sent
-- `DELETE /api/quotes/:id` - Delete quote
-
-Jobs:
-- `GET /api/jobs` - List jobs (supports ?status=, ?customerId= filters)
-- `POST /api/jobs` - Create job
-- `GET /api/jobs/:id` - Get job details
-- `PUT /api/jobs/:id` - Update job
-- `DELETE /api/jobs/:id` - Delete job
-
-Job Checklists:
-- `GET /api/jobs/:jobId/checklist` - Get checklist items
-- `POST /api/jobs/:jobId/checklist` - Add checklist item
-- `PUT /api/jobs/:jobId/checklist/:id` - Update checklist item
-- `DELETE /api/jobs/:jobId/checklist/:id` - Delete checklist item
-
-Communications:
-- `GET /api/communications` - List communications
-- `POST /api/communications` - Log communication
-
-Tasks:
-- `GET /api/tasks` - List tasks
-- `POST /api/tasks` - Create task
-- `PUT /api/tasks/:id` - Update task
-- `DELETE /api/tasks/:id` - Delete task
-
-Reports:
-- `GET /api/reports/stats` - Dashboard statistics (counts, revenue)
-- `GET /api/reports/revenue` - Revenue analytics
-
-AI (OpenAI via Replit AI Integrations, gpt-5-nano):
-- `POST /api/ai/quote-descriptions` - Generate AI-enhanced scope descriptions for Good/Better/Best options
-- `POST /api/ai/communication-draft` - Generate personalized email/SMS drafts (purposes: initial_quote, follow_up, thank_you, booking_confirmation, reschedule)
-
-Public:
-- `GET /api/public/quote/:token` - Public quote acceptance page
+**Authentication**: Session-based authentication using `express-session`, supporting email/password, Apple, and Google SSO. `AuthContext` on the frontend manages authentication state, gating navigation flows.
 
 ### Quote Calculation Engine
 
-Located in `/client/lib/quoteCalculator.ts`:
-- Square footage-based base hours calculation
-- Multipliers for bathrooms, bedrooms, condition, occupants, and pets
-- **Customizable service types** with user-editable names and multipliers:
-  - Default types: Touch Up, Regular Cleaning, Deep Clean, Move In/Out, Post Construction, Airbnb Turnover
-  - Users can add custom service types, rename existing ones, and set price multipliers
-  - Quote package mapping: Configure which service type is used for Good/Better/Best options
-- Frequency discounts (weekly, biweekly, monthly)
-- Add-on pricing with individual toggle prices
-- Good/Better/Best option generation based on configured service types
-- Hours/estimated times are not shown to customers (internal calculation only)
+The core quote calculation logic is in `/client/lib/quoteCalculator.ts`. It calculates base hours based on square footage and applies multipliers for various property attributes. **Customizable service types** allow users to define names and multipliers, mapping them to Good/Better/Best options. Frequency discounts and add-on pricing are also supported. The system internally calculates hours and estimated times, but these are not exposed to customers.
 
 ## External Dependencies
 
 ### Core Framework
-- **Expo SDK 54**: React Native development platform with managed workflow
-- **React 19.1.0**: UI library
-- **React Native 0.81.5**: Native mobile framework
+- **Expo SDK 54**: For React Native development.
+- **React 19.1.0**: UI library.
+- **React Native 0.81.5**: Native mobile framework.
 
 ### Navigation & UI
-- **@react-navigation/native**: Navigation container and core
-- **@react-navigation/native-stack**: Native stack navigator
-- **@react-navigation/bottom-tabs**: Tab-based navigation
-- **react-native-screens**: Native screen containers
-- **react-native-safe-area-context**: Safe area handling
-- **expo-blur**: Blur effects for iOS tab bar
-- **expo-haptics**: Haptic feedback
+- **@react-navigation/native**: Core navigation.
+- **@react-navigation/native-stack**, **@react-navigation/bottom-tabs**: Specific navigators.
+- **react-native-reanimated**, **react-native-gesture-handler**: For animations and touch.
+- **@expo/vector-icons**: Icon library.
+- **expo-blur**, **expo-haptics**: UI enhancements.
 
 ### Data & State
-- **@tanstack/react-query**: Server state management
-- **@react-native-async-storage/async-storage**: Local data persistence
-- **drizzle-orm**: SQL ORM for PostgreSQL
-- **zod**: Schema validation
-
-### UI Components
-- **@expo/vector-icons**: Icon library (Feather icons used)
-- **react-native-reanimated**: Animation library
-- **react-native-gesture-handler**: Touch handling
-- **@react-native-community/slider**: Slider input component
-- **expo-image**: Optimized image component
-- **expo-image-picker**: Image selection from device
-
-### Utilities
-- **uuid**: Unique identifier generation
-- **expo-clipboard**: Clipboard access for copy functionality
-- **expo-web-browser**: External link handling
+- **@tanstack/react-query**: Server state management.
+- **@react-native-async-storage/async-storage**: Local data persistence.
+- **drizzle-orm**: PostgreSQL ORM.
+- **zod**: Schema validation.
 
 ### Server
-- **express**: HTTP server framework
-- **express-session**: Session management
-- **connect-pg-simple**: PostgreSQL session store
-- **bcrypt**: Password hashing
-- **pg**: PostgreSQL client
-- **drizzle-orm**: Database ORM
+- **express**: HTTP server.
+- **express-session**, **connect-pg-simple**: Session management.
+- **bcrypt**: Password hashing.
+- **pg**: PostgreSQL client.
+- **drizzle-orm**: Database ORM.
 
-### Development
-- **typescript**: Type checking
-- **drizzle-kit**: Database migration tooling
-- **tsx**: TypeScript execution for development
-- **esbuild**: Server bundling for production
+### AI Integration
+- **OpenAI via Replit AI Integrations (gpt-5-nano)**: For AI-enhanced descriptions and communication drafts.
