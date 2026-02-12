@@ -76,21 +76,27 @@ export default function QuoteCalculatorScreen() {
   );
 
   const handleNext = () => {
-    if (currentStep < STEPS.length - 1) {
-      if (Platform.OS !== "web") {
-        Haptics.selectionAsync();
+    setCurrentStep((prev) => {
+      if (prev < STEPS.length - 1) {
+        if (Platform.OS !== "web") {
+          Haptics.selectionAsync();
+        }
+        return prev + 1;
       }
-      setCurrentStep(currentStep + 1);
-    }
+      return prev;
+    });
   };
 
   const handleBack = () => {
-    if (currentStep > 0) {
-      if (Platform.OS !== "web") {
-        Haptics.selectionAsync();
+    setCurrentStep((prev) => {
+      if (prev > 0) {
+        if (Platform.OS !== "web") {
+          Haptics.selectionAsync();
+        }
+        return prev - 1;
       }
-      setCurrentStep(currentStep - 1);
-    }
+      return prev;
+    });
   };
 
   const handleCancel = () => {
