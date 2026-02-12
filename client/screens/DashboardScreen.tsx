@@ -217,7 +217,7 @@ export default function DashboardScreen() {
         <View style={{ flex: 1 }}>
           <ThemedText type="subtitle">AI Sales Assistant</ThemedText>
           <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            Capture leads from Instagram and TikTok DMs
+            Capture leads from Instagram DMs
           </ThemedText>
         </View>
         <Feather name="chevron-right" size={16} color={theme.textSecondary} />

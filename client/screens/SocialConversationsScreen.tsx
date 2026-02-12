@@ -97,7 +97,7 @@ export default function SocialConversationsScreen() {
           icon="message-circle"
           iconColor={theme.accent}
           title="No Conversations"
-          description="Conversations from Instagram and TikTok DMs will appear here."
+          description="Conversations from Instagram DMs will appear here."
         />
       }
     />

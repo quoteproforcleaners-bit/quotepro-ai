@@ -100,7 +100,7 @@ export default function SocialLeadsScreen() {
             icon="user-plus"
             iconColor={theme.accent}
             title="No Social Leads"
-            description="Leads from Instagram and TikTok DMs will appear here when the AI detects buying intent."
+            description="Leads from Instagram DMs will appear here when the AI detects buying intent."
           />
         }
       />

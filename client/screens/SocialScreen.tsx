@@ -68,14 +68,11 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
             </View>
             <ThemedText type="h2" style={[styles.wizardTitle, { color: theme.accent }]}>AI Sales Assistant</ThemedText>
             <ThemedText type="body" style={[styles.wizardDesc, { color: theme.text }]}>
-              Automatically capture leads from Instagram and TikTok DMs. Our AI detects buying intent and sends instant quote links.
+              Automatically capture leads from Instagram DMs. Our AI detects buying intent and sends instant quote links.
             </ThemedText>
             <View style={styles.socialIcons}>
               <View style={[styles.socialIconBubble, { backgroundColor: "#E1306C15" }]}>
                 <Feather name="instagram" size={28} color="#E1306C" />
-              </View>
-              <View style={[styles.socialIconBubble, { backgroundColor: `${theme.text}10` }]}>
-                <Feather name="video" size={28} color={theme.text} />
               </View>
             </View>
             <View style={[styles.featureList, { backgroundColor: theme.backgroundSecondary, borderWidth: 1, borderColor: theme.border }]}>
@@ -112,21 +109,6 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
               <View style={{ flex: 1 }}>
                 <ThemedText type="subtitle">Instagram</ThemedText>
                 <ThemedText type="caption" style={{ color: theme.textSecondary }}>Dev Mode (simulated DMs)</ThemedText>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: `${theme.success}20` }]}>
-                <ThemedText type="caption" style={{ color: theme.success }}>Ready</ThemedText>
-              </View>
-            </Pressable>
-            <Pressable
-              onPress={() => connectMutation.mutate("tiktok")}
-              style={[styles.channelCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
-            >
-              <View style={[styles.channelIcon, { backgroundColor: "#00000015" }]}>
-                <Feather name="video" size={24} color={theme.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="subtitle">TikTok</ThemedText>
-                <ThemedText type="caption" style={{ color: theme.textSecondary }}>Manual lead capture</ThemedText>
               </View>
               <View style={[styles.statusBadge, { backgroundColor: `${theme.success}20` }]}>
                 <ThemedText type="caption" style={{ color: theme.success }}>Ready</ThemedText>
@@ -401,18 +383,6 @@ export default function SocialScreen() {
             <ThemedText type="caption" style={{ color: theme.accent }}>Active</ThemedText>
           </View>
         </View>
-        <View style={styles.platformRow}>
-          <View style={[styles.platformBadge, { backgroundColor: `${theme.text}10` }]}>
-            <Feather name="video" size={20} color={theme.text} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="small">TikTok</ThemedText>
-            <ThemedText type="caption" style={{ color: theme.textSecondary }}>Manual Capture</ThemedText>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: `${theme.accent}20` }]}>
-            <ThemedText type="caption" style={{ color: theme.accent }}>Active</ThemedText>
-          </View>
-        </View>
       </View>
 
       <View style={styles.statsRow}>
@@ -549,12 +519,12 @@ export default function SocialScreen() {
           <ThemedText type="small" style={{ marginTop: Spacing.xs }}>Leads</ThemedText>
         </Pressable>
         <Pressable
-          onPress={() => navigation.navigate("TikTokLeadCreate")}
+          onPress={() => navigation.navigate("SocialConversations")}
           style={[styles.actionCard, { backgroundColor: theme.backgroundDefault }]}
-          testID="button-tiktok-lead"
+          testID="button-conversations"
         >
-          <Feather name="plus-circle" size={20} color={theme.success} />
-          <ThemedText type="small" style={{ marginTop: Spacing.xs }}>TikTok Lead</ThemedText>
+          <Feather name="message-circle" size={20} color={theme.primary} />
+          <ThemedText type="small" style={{ marginTop: Spacing.xs }}>Inbox</ThemedText>
         </Pressable>
       </View>
     </ScrollView>

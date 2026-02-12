@@ -11,7 +11,7 @@ import SocialConversationsScreen from "@/screens/SocialConversationsScreen";
 import SocialConversationDetailScreen from "@/screens/SocialConversationDetailScreen";
 import SocialLeadsScreen from "@/screens/SocialLeadsScreen";
 import SocialSettingsScreen from "@/screens/SocialSettingsScreen";
-import TikTokLeadCreateScreen from "@/screens/TikTokLeadCreateScreen";
+
 import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
@@ -30,7 +30,7 @@ export type RootStackParamList = {
   SocialConversationDetail: { conversationId: string };
   SocialLeads: undefined;
   SocialSettings: undefined;
-  TikTokLeadCreate: undefined;
+
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -122,11 +122,6 @@ export default function RootStackNavigator() {
             name="SocialSettings"
             component={SocialSettingsScreen}
             options={{ headerTitle: "Social Settings" }}
-          />
-          <Stack.Screen
-            name="TikTokLeadCreate"
-            component={TikTokLeadCreateScreen}
-            options={{ headerTitle: "Add TikTok Lead" }}
           />
         </>
       )}
