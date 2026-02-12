@@ -112,7 +112,7 @@ export default function QuotePreviewScreen({
   const emailDraft = useMemo(() => {
     return generateEmailDraft(
       customer.name || "Customer",
-      businessProfile.companyName || "Your Cleaning Company",
+      businessProfile.companyName || "Our Cleaning Company",
       businessProfile.senderName || "Team",
       options,
       businessProfile.bookingLink
@@ -122,9 +122,10 @@ export default function QuotePreviewScreen({
   const smsDraft = useMemo(() => {
     return generateSmsDraft(
       customer.name || "Customer",
-      businessProfile.companyName || "Your Cleaning Company",
+      businessProfile.companyName || "our company",
       options.better.price,
-      businessProfile.bookingLink
+      businessProfile.bookingLink,
+      options.better.serviceTypeName
     );
   }, [customer, businessProfile, options]);
 

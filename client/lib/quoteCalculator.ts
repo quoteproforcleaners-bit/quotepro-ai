@@ -263,9 +263,11 @@ export function generateSmsDraft(
   customerName: string,
   businessName: string,
   betterPrice: number,
-  bookingLink?: string
+  bookingLink?: string,
+  betterServiceName?: string
 ): string {
-  let sms = `Hi ${customerName}! Your ${businessName} quote is ready. Our recommended cleaning: $${betterPrice}.`;
+  const serviceName = betterServiceName || "cleaning";
+  let sms = `Hi ${customerName}! Your ${businessName} quote is ready. Our recommended ${serviceName}: $${betterPrice}.`;
 
   if (bookingLink) {
     sms += ` Book now: ${bookingLink}`;
