@@ -30,21 +30,21 @@ export function ProBanner({ message }: ProBannerProps) {
           })
         );
       }}
-      style={[styles.container, { backgroundColor: `${theme.accent}12`, borderColor: theme.accent }]}
+      style={[styles.container, { backgroundColor: theme.accent }]}
       testID="pro-banner"
     >
-      <View style={[styles.icon, { backgroundColor: `${theme.accent}20` }]}>
-        <Feather name="zap" size={16} color={theme.accent} />
+      <View style={styles.icon}>
+        <Feather name="zap" size={16} color="#FFFFFF" />
       </View>
       <View style={{ flex: 1 }}>
-        <ThemedText type="small" style={{ color: theme.text, fontWeight: "600" }}>
+        <ThemedText type="small" style={styles.title}>
           QuotePro AI
         </ThemedText>
-        <ThemedText type="caption" style={{ color: theme.accent, marginTop: 1 }}>
+        <ThemedText type="caption" style={styles.description}>
           {message || "Unlock AI messaging and direct sending"}
         </ThemedText>
       </View>
-      <Feather name="chevron-right" size={16} color={theme.accent} />
+      <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.8)" />
     </Pressable>
   );
 }
@@ -53,18 +53,27 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    padding: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    padding: Spacing.md,
     borderRadius: BorderRadius.sm,
-    borderWidth: 1.5,
     marginBottom: Spacing.md,
     gap: Spacing.sm,
   },
   icon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  title: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  description: {
+    color: "rgba(255,255,255,0.85)",
+    marginTop: 1,
+    fontSize: 12,
   },
 });
