@@ -3,7 +3,7 @@ import { View, StyleSheet, FlatList, RefreshControl, Pressable } from "react-nat
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useNavigation, CommonActions } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -203,25 +203,6 @@ export default function DashboardScreen() {
       </View>
 
       <ProBanner message="Unlock AI-powered messages, direct sending, and smart descriptions" />
-
-      <Pressable
-        onPress={() => navigation.dispatch(
-          CommonActions.navigate({ name: "Main", params: { screen: "SocialTab" } })
-        )}
-        style={[styles.socialCard, { backgroundColor: theme.gradientAccent, borderColor: theme.border }]}
-        testID="social-card"
-      >
-        <View style={[styles.socialIcon, { backgroundColor: `${theme.accent}20` }]}>
-          <Feather name="message-circle" size={20} color={theme.accent} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <ThemedText type="subtitle">AI Sales Assistant</ThemedText>
-          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            Capture leads from Instagram DMs
-          </ThemedText>
-        </View>
-        <Feather name="chevron-right" size={16} color={theme.textSecondary} />
-      </Pressable>
 
       {pendingTasks.length > 0 ? (
         <View style={styles.section}>
@@ -456,21 +437,5 @@ const styles = StyleSheet.create({
   },
   gettingStartedLabel: {
     flex: 1,
-  },
-  socialCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    marginBottom: Spacing.xl,
-    gap: Spacing.md,
-  },
-  socialIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

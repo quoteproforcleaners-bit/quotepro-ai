@@ -7,7 +7,7 @@ import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
 import QuotesScreen from "@/screens/QuotesScreen";
 import JobsScreen from "@/screens/JobsScreen";
-import SocialScreen from "@/screens/SocialScreen";
+
 import SettingsScreen from "@/screens/SettingsScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
@@ -18,7 +18,7 @@ export type MainTabParamList = {
   CustomersTab: undefined;
   QuotesTab: undefined;
   JobsTab: undefined;
-  SocialTab: undefined;
+
   SettingsTab: undefined;
 };
 
@@ -97,17 +97,6 @@ export default function MainTabNavigator() {
           headerTitle: "Jobs",
           tabBarIcon: ({ color, size }) => (
             <Feather name="calendar" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="SocialTab"
-        component={SocialScreen}
-        options={{
-          title: "Social",
-          headerTitle: "Social",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="message-circle" size={size} color={color} />
           ),
         }}
       />

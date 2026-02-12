@@ -7,10 +7,6 @@ import QuoteCalculatorScreen from "@/screens/QuoteCalculatorScreen";
 import QuoteDetailScreen from "@/screens/QuoteDetailScreen";
 import CustomerDetailScreen from "@/screens/CustomerDetailScreen";
 import PricingScreen from "@/screens/PricingScreen";
-import SocialConversationsScreen from "@/screens/SocialConversationsScreen";
-import SocialConversationDetailScreen from "@/screens/SocialConversationDetailScreen";
-import SocialLeadsScreen from "@/screens/SocialLeadsScreen";
-import SocialSettingsScreen from "@/screens/SocialSettingsScreen";
 
 import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -26,10 +22,6 @@ export type RootStackParamList = {
   QuoteDetail: { quoteId: string };
   CustomerDetail: { customerId: string };
   PricingSettings: undefined;
-  SocialConversations: undefined;
-  SocialConversationDetail: { conversationId: string };
-  SocialLeads: undefined;
-  SocialSettings: undefined;
 
 };
 
@@ -102,26 +94,6 @@ export default function RootStackNavigator() {
             options={{
               headerTitle: "Pricing & Services",
             }}
-          />
-          <Stack.Screen
-            name="SocialConversations"
-            component={SocialConversationsScreen}
-            options={{ headerTitle: "Conversations" }}
-          />
-          <Stack.Screen
-            name="SocialConversationDetail"
-            component={SocialConversationDetailScreen}
-            options={{ headerTitle: "Conversation" }}
-          />
-          <Stack.Screen
-            name="SocialLeads"
-            component={SocialLeadsScreen}
-            options={{ headerTitle: "Social Leads" }}
-          />
-          <Stack.Screen
-            name="SocialSettings"
-            component={SocialSettingsScreen}
-            options={{ headerTitle: "Social Settings" }}
           />
         </>
       )}
