@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Image, Pressable, Alert, Platform, ActivityIndicator } from "react-native";
+import React from "react";
+import { View, StyleSheet, Image, Pressable, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -8,8 +8,6 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
-import { useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/query-client";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -18,6 +16,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -27,31 +26,7 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
-  const queryClient = useQueryClient();
-  const [upgrading, setUpgrading] = useState(false);
-
-  const isPro = user?.subscriptionTier === "pro";
-
-  const handleUpgrade = async () => {
-    setUpgrading(true);
-    try {
-      await apiRequest("POST", "/api/subscription/upgrade");
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      Alert.alert("Welcome to QuotePro AI!", "You now have access to AI-powered messaging, direct sending, and more.");
-      setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          window.location.reload();
-        }
-      }, 500);
-    } catch {
-      Alert.alert("Error", "Could not upgrade. Please try again.");
-    } finally {
-      setUpgrading(false);
-    }
-  };
+  const { isPro } = useSubscription();
 
   const updateProfile = async (updates: Partial<typeof profile>) => {
     await updateBusinessProfile(updates);
@@ -148,21 +123,16 @@ export default function SettingsScreen() {
           </View>
 
           <Pressable
-            onPress={handleUpgrade}
-            disabled={upgrading}
+            onPress={() => navigation.navigate("Paywall")}
             style={[
               styles.upgradeBtn,
-              { backgroundColor: theme.accent, opacity: upgrading ? 0.7 : 1 },
+              { backgroundColor: theme.accent },
             ]}
             testID="button-upgrade-pro"
           >
-            {upgrading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Feather name="zap" size={18} color="#FFFFFF" />
-            )}
+            <Feather name="zap" size={18} color="#FFFFFF" />
             <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 8 }}>
-              {upgrading ? "Upgrading..." : "Upgrade to QuotePro AI"}
+              Upgrade to QuotePro AI
             </ThemedText>
           </Pressable>
 

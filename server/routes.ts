@@ -961,6 +961,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/subscription/config", requireAuth, async (_req: Request, res: Response) => {
+    return res.json({
+      apiKey: process.env.REVENUECAT_API_KEY || "",
+      entitlementId: "pro",
+    });
+  });
+
+  app.post("/api/subscription/sync", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { tier } = req.body;
+      if (!tier || !["free", "pro"].includes(tier)) {
+        return res.status(400).json({ message: "Invalid tier" });
+      }
+      const user = await updateUser(req.session.userId!, {
+        subscriptionTier: tier,
+      });
+      return res.json({ tier: user.subscriptionTier });
+    } catch {
+      return res.status(500).json({ message: "Sync failed" });
+    }
+  });
+
   // ─── Send Email / SMS ───
 
   app.post("/api/send/email", requireAuth, requirePro as any, async (req: Request, res: Response) => {

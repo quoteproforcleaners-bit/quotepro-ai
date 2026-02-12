@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, Modal, TextInput } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -16,6 +16,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 
 type RouteParams = {
   QuoteDetail: { quoteId: string };
@@ -55,16 +56,14 @@ export default function QuoteDetailScreen() {
   const { theme } = useTheme();
   const { businessProfile } = useApp();
   const { user } = useAuth();
+  const { isPro } = useSubscription();
   const queryClient = useQueryClient();
-
-  const isPro = user?.subscriptionTier === "pro";
 
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const [aiDraftType, setAiDraftType] = useState<"email" | "sms">("email");
   const [aiDraftPurpose, setAiDraftPurpose] = useState<DraftPurpose>("initial_quote");
   const [aiDraftLoading, setAiDraftLoading] = useState(false);
   const [showAiDraft, setShowAiDraft] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
 
@@ -134,28 +133,11 @@ export default function QuoteDetailScreen() {
     }
   };
 
-  const handleUpgrade = async () => {
-    try {
-      await apiRequest("POST", "/api/subscription/upgrade");
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
-      setShowUpgradeModal(false);
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          window.location.reload();
-        }
-      }, 500);
-    } catch {
-      Alert.alert("Error", "Could not upgrade. Please try again.");
-    }
-  };
 
   const fetchAiDraft = useCallback(async (type: "email" | "sms", purpose: DraftPurpose) => {
     if (!quote) return;
     if (!isPro) {
-      setShowUpgradeModal(true);
+      navigation.navigate("Paywall");
       return;
     }
     setAiDraftType(type);
@@ -187,7 +169,7 @@ export default function QuoteDetailScreen() {
       }
     } catch (err: any) {
       if (err?.message?.includes("403") || err?.status === 403) {
-        setShowUpgradeModal(true);
+        navigation.navigate("Paywall");
         setShowAiDraft(false);
       }
       setAiDraft(null);
@@ -517,12 +499,12 @@ export default function QuoteDetailScreen() {
             Generate and send personalized messages directly to your customer
           </ThemedText>
         ) : (
-          <Pressable onPress={() => setShowUpgradeModal(true)} testID="upgrade-prompt">
+          <Pressable onPress={() => navigation.navigate("Paywall")} testID="upgrade-prompt">
             <View style={[styles.upgradeCard, { backgroundColor: `${theme.accent}10`, borderColor: `${theme.accent}30` }]}>
               <Feather name="lock" size={18} color={theme.accent} />
               <View style={{ flex: 1, marginLeft: Spacing.sm }}>
                 <ThemedText type="body" style={{ fontWeight: "600" }}>
-                  Upgrade to Pro
+                  Upgrade to QuotePro AI
                 </ThemedText>
                 <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
                   Unlock AI-powered emails, SMS, and direct sending to customers
@@ -714,58 +696,6 @@ export default function QuoteDetailScreen() {
         </View>
       </ScrollView>
 
-      <Modal
-        visible={showUpgradeModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowUpgradeModal(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowUpgradeModal(false)}>
-          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
-            <View style={[styles.modalIconCircle, { backgroundColor: `${theme.accent}15` }]}>
-              <Feather name="zap" size={32} color={theme.accent} />
-            </View>
-            <ThemedText type="h3" style={{ textAlign: "center", marginTop: Spacing.md }}>
-              Unlock Pro Features
-            </ThemedText>
-            <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
-              Get access to AI-powered messaging and send emails and texts directly from the app.
-            </ThemedText>
-
-            <View style={styles.proFeatures}>
-              {[
-                "AI-written emails and texts",
-                "Send directly from the app",
-                "Personalized for each customer",
-                "Multiple message types",
-              ].map((feature, i) => (
-                <View key={i} style={styles.proFeatureRow}>
-                  <Feather name="check" size={16} color={theme.success} />
-                  <ThemedText type="small" style={{ marginLeft: Spacing.sm }}>
-                    {feature}
-                  </ThemedText>
-                </View>
-              ))}
-            </View>
-
-            <Pressable
-              onPress={handleUpgrade}
-              style={[styles.upgradeButton, { backgroundColor: theme.accent }]}
-              testID="upgrade-btn"
-            >
-              <Feather name="zap" size={18} color="#FFFFFF" />
-              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 8 }}>
-                Upgrade to Pro
-              </ThemedText>
-            </Pressable>
-            <Pressable onPress={() => setShowUpgradeModal(false)} style={styles.dismissButton}>
-              <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                Maybe later
-              </ThemedText>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
     </View>
   );
 }

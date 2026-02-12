@@ -7,7 +7,7 @@ import QuoteCalculatorScreen from "@/screens/QuoteCalculatorScreen";
 import QuoteDetailScreen from "@/screens/QuoteDetailScreen";
 import CustomerDetailScreen from "@/screens/CustomerDetailScreen";
 import PricingScreen from "@/screens/PricingScreen";
-
+import PaywallScreen from "@/screens/PaywallScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
@@ -22,7 +22,7 @@ export type RootStackParamList = {
   QuoteDetail: { quoteId: string };
   CustomerDetail: { customerId: string };
   PricingSettings: undefined;
-
+  Paywall: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -93,6 +93,14 @@ export default function RootStackNavigator() {
             component={PricingScreen}
             options={{
               headerTitle: "Pricing & Services",
+            }}
+          />
+          <Stack.Screen
+            name="Paywall"
+            component={PaywallScreen}
+            options={{
+              presentation: "modal",
+              headerShown: false,
             }}
           />
         </>

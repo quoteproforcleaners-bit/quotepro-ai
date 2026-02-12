@@ -1,10 +1,11 @@
 import React from "react";
 import { View, StyleSheet, Pressable } from "react-native";
-import { CommonActions, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { useAuth } from "@/context/AuthContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 
 interface ProBannerProps {
@@ -13,23 +14,14 @@ interface ProBannerProps {
 
 export function ProBanner({ message }: ProBannerProps) {
   const { theme } = useTheme();
-  const { user } = useAuth();
-  const navigation = useNavigation();
+  const { isPro } = useSubscription();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
-  if (user?.subscriptionTier === "pro") return null;
+  if (isPro) return null;
 
   return (
     <Pressable
-      onPress={() => {
-        navigation.dispatch(
-          CommonActions.navigate({
-            name: "Main",
-            params: {
-              screen: "SettingsTab",
-            },
-          })
-        );
-      }}
+      onPress={() => navigation.navigate("Paywall")}
       style={[styles.container, { backgroundColor: '#009B82' }]}
       testID="pro-banner"
     >

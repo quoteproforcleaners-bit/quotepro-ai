@@ -11,6 +11,7 @@ import { queryClient } from "@/lib/query-client";
 
 import { AuthProvider } from "@/context/AuthContext";
 import { AppProvider } from "@/context/AppContext";
+import { SubscriptionProvider } from "@/context/SubscriptionContext";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -23,9 +24,11 @@ export default function App() {
             <KeyboardProvider>
               <AuthProvider>
                 <AppProvider>
-                  <NavigationContainer>
-                    <RootStackNavigator />
-                  </NavigationContainer>
+                  <SubscriptionProvider>
+                    <NavigationContainer>
+                      <RootStackNavigator />
+                    </NavigationContainer>
+                  </SubscriptionProvider>
                 </AppProvider>
               </AuthProvider>
               <StatusBar style="auto" />
