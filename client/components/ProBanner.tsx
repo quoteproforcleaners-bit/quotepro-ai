@@ -30,15 +30,20 @@ export function ProBanner({ message }: ProBannerProps) {
           })
         );
       }}
-      style={[styles.container, { backgroundColor: `${theme.accent}08`, borderColor: `${theme.accent}25` }]}
+      style={[styles.container, { backgroundColor: `${theme.accent}12`, borderColor: theme.accent }]}
       testID="pro-banner"
     >
-      <View style={[styles.icon, { backgroundColor: `${theme.accent}15` }]}>
+      <View style={[styles.icon, { backgroundColor: `${theme.accent}20` }]}>
         <Feather name="zap" size={16} color={theme.accent} />
       </View>
-      <ThemedText type="small" style={{ flex: 1, color: theme.textSecondary }}>
-        {message || "Unlock AI messaging and direct sending with QuotePro AI"}
-      </ThemedText>
+      <View style={{ flex: 1 }}>
+        <ThemedText type="small" style={{ color: theme.text, fontWeight: "600" }}>
+          QuotePro AI
+        </ThemedText>
+        <ThemedText type="caption" style={{ color: theme.accent, marginTop: 1 }}>
+          {message || "Unlock AI messaging and direct sending"}
+        </ThemedText>
+      </View>
       <Feather name="chevron-right" size={16} color={theme.accent} />
     </Pressable>
   );
@@ -51,14 +56,14 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.sm,
-    borderWidth: 1,
+    borderWidth: 1.5,
     marginBottom: Spacing.md,
     gap: Spacing.sm,
   },
   icon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },
