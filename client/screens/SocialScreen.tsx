@@ -66,11 +66,11 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
             <View style={[styles.wizardIcon, { backgroundColor: `${theme.accent}15` }]}>
               <Feather name="message-circle" size={48} color={theme.accent} />
             </View>
-            <ThemedText type="h2" style={styles.wizardTitle}>AI Sales Assistant</ThemedText>
-            <ThemedText type="body" style={[styles.wizardDesc, { color: theme.textSecondary }]}>
+            <ThemedText type="h2" style={[styles.wizardTitle, { color: theme.accent }]}>AI Sales Assistant</ThemedText>
+            <ThemedText type="body" style={[styles.wizardDesc, { color: theme.text }]}>
               Automatically capture leads from Instagram and TikTok DMs. Our AI detects buying intent and sends instant quote links.
             </ThemedText>
-            <View style={[styles.featureList, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={[styles.featureList, { backgroundColor: "#1E1B3A" }]}>
               {[
                 { icon: "zap" as const, text: "AI-powered intent detection" },
                 { icon: "send" as const, text: "Auto-reply with quote links" },
@@ -78,8 +78,8 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
                 { icon: "users" as const, text: "Convert DMs to customers" },
               ].map((f, i) => (
                 <View key={i} style={styles.featureRow}>
-                  <Feather name={f.icon} size={16} color={theme.primary} />
-                  <ThemedText type="small" style={{ marginLeft: Spacing.sm }}>{f.text}</ThemedText>
+                  <Feather name={f.icon} size={16} color="#A78BFA" />
+                  <ThemedText type="small" style={{ marginLeft: Spacing.sm, color: "#FFFFFF" }}>{f.text}</ThemedText>
                 </View>
               ))}
             </View>
@@ -201,10 +201,10 @@ function OnboardingWizard({ onComplete }: { onComplete: () => void }) {
       case "done":
         return (
           <View style={styles.wizardContent}>
-            <View style={[styles.wizardIcon, { backgroundColor: `${theme.success}15` }]}>
-              <Feather name="check-circle" size={48} color={theme.success} />
+            <View style={[styles.wizardIcon, { backgroundColor: `${theme.accent}15` }]}>
+              <Feather name="check-circle" size={48} color={theme.accent} />
             </View>
-            <ThemedText type="h2" style={styles.wizardTitle}>All Set!</ThemedText>
+            <ThemedText type="h2" style={[styles.wizardTitle, { color: theme.accent }]}>All Set!</ThemedText>
             <ThemedText type="body" style={[styles.wizardDesc, { color: theme.textSecondary }]}>
               Your AI Sales Assistant is ready. Try sending a test DM to see it in action.
             </ThemedText>
