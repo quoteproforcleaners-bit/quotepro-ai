@@ -15,6 +15,7 @@ import {
   getUserByEmail,
   getUserByProviderId,
   createUser,
+  updateUser,
   getBusinessByOwner,
   createBusiness,
   updateBusiness,
@@ -124,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
 
       return res.json({
-        user: { id: user.id, email: user.email, name: user.name },
+        user: formatUser(user),
         business: formatBusiness(business),
         needsOnboarding: !business.onboardingComplete,
       });
@@ -157,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
 
       return res.json({
-        user: { id: user.id, email: user.email, name: user.name },
+        user: formatUser(user),
         business: business ? formatBusiness(business) : null,
         needsOnboarding: !business?.onboardingComplete,
       });
@@ -222,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.userId = user.id;
 
         return res.json({
-          user: { id: user.id, email: user.email, name: user.name },
+          user: formatUser(user),
           business: formatBusiness(business),
           needsOnboarding: true,
         });
@@ -232,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
 
       return res.json({
-        user: { id: user.id, email: user.email, name: user.name },
+        user: formatUser(user),
         business: business ? formatBusiness(business) : null,
         needsOnboarding: !business?.onboardingComplete,
       });
@@ -293,7 +294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.session.userId = user.id;
 
         return res.json({
-          user: { id: user.id, email: user.email, name: user.name },
+          user: formatUser(user),
           business: formatBusiness(business),
           needsOnboarding: true,
         });
@@ -303,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       req.session.userId = user.id;
 
       return res.json({
-        user: { id: user.id, email: user.email, name: user.name },
+        user: formatUser(user),
         business: business ? formatBusiness(business) : null,
         needsOnboarding: !business?.onboardingComplete,
       });
@@ -328,7 +329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const business = await getBusinessByOwner(user.id);
 
       return res.json({
-        user: { id: user.id, email: user.email, name: user.name },
+        user: formatUser(user),
         business: business ? formatBusiness(business) : null,
         needsOnboarding: !business?.onboardingComplete,
       });
@@ -896,9 +897,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ─── AI Endpoints ───
+  // ─── Subscription ───
 
-  app.post("/api/ai/quote-descriptions", requireAuth, async (req: Request, res: Response) => {
+  const requirePro = async (req: Request, res: Response, next: Function) => {
+    try {
+      const user = await getUserById(req.session.userId!);
+      if (!user || user.subscriptionTier !== "pro") {
+        return res.status(403).json({ 
+          message: "This feature requires a Pro subscription",
+          requiresUpgrade: true,
+        });
+      }
+      next();
+    } catch {
+      return res.status(500).json({ message: "Subscription check failed" });
+    }
+  };
+
+  app.get("/api/subscription", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Not found" });
+      return res.json({
+        tier: user.subscriptionTier || "free",
+        expiresAt: user.subscriptionExpiresAt,
+      });
+    } catch {
+      return res.status(500).json({ message: "Failed to get subscription" });
+    }
+  });
+
+  app.post("/api/subscription/upgrade", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await updateUser(req.session.userId!, {
+        subscriptionTier: "pro",
+        subscriptionExpiresAt: null,
+      });
+      return res.json({ tier: user.subscriptionTier, message: "Upgraded to Pro" });
+    } catch {
+      return res.status(500).json({ message: "Upgrade failed" });
+    }
+  });
+
+  // ─── Send Email / SMS ───
+
+  app.post("/api/send/email", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { to, subject, body, customerId, quoteId } = req.body;
+      if (!to || !body) {
+        return res.status(400).json({ message: "to and body are required" });
+      }
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const sgApiKey = process.env.SENDGRID_API_KEY;
+      if (!sgApiKey) {
+        return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
+      }
+
+      const fromEmail = business.email || "noreply@example.com";
+      const fromName = business.companyName || "QuotePro";
+
+      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${sgApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: to }] }],
+          from: { email: fromEmail, name: fromName },
+          subject: subject || `Message from ${fromName}`,
+          content: [{ type: "text/plain", value: body }],
+        }),
+      });
+
+      if (!sgRes.ok) {
+        const errText = await sgRes.text();
+        console.error("SendGrid error:", errText);
+        return res.status(502).json({ message: "Failed to send email" });
+      }
+
+      await createCommunication({
+        businessId: business.id,
+        customerId: customerId || undefined,
+        quoteId: quoteId || undefined,
+        channel: "email",
+        direction: "outbound",
+        content: body,
+        status: "sent",
+      });
+
+      return res.json({ success: true, message: "Email sent successfully" });
+    } catch (error: any) {
+      console.error("Send email error:", error);
+      return res.status(500).json({ message: "Failed to send email" });
+    }
+  });
+
+  app.post("/api/send/sms", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { to, body, customerId, quoteId } = req.body;
+      if (!to || !body) {
+        return res.status(400).json({ message: "to and body are required" });
+      }
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+      const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+
+      if (!twilioSid || !twilioToken || !twilioFrom) {
+        return res.status(503).json({ message: "SMS service not configured. Please connect Twilio in settings." });
+      }
+
+      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+      const twilioRes = await fetch(twilioUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          To: to,
+          From: twilioFrom,
+          Body: body,
+        }).toString(),
+      });
+
+      if (!twilioRes.ok) {
+        const errText = await twilioRes.text();
+        console.error("Twilio error:", errText);
+        return res.status(502).json({ message: "Failed to send SMS" });
+      }
+
+      const twilioData = await twilioRes.json() as any;
+
+      await createCommunication({
+        businessId: business.id,
+        customerId: customerId || undefined,
+        quoteId: quoteId || undefined,
+        channel: "sms",
+        direction: "outbound",
+        content: body,
+        status: "sent",
+      });
+
+      return res.json({ success: true, message: "SMS sent successfully", sid: twilioData.sid });
+    } catch (error: any) {
+      console.error("Send SMS error:", error);
+      return res.status(500).json({ message: "Failed to send SMS" });
+    }
+  });
+
+  // ─── AI Endpoints (Pro only) ───
+
+  app.post("/api/ai/quote-descriptions", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const { homeDetails, serviceTypes, addOns, companyName } = req.body;
 
@@ -977,7 +1134,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
     }
   });
 
-  app.post("/api/ai/communication-draft", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/ai/communication-draft", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink } = req.body;
 
@@ -1078,6 +1235,15 @@ async function db_getBusinessById(businessId: string) {
   const { eq } = await import("drizzle-orm");
   const [b] = await db.select().from(businesses).where(eq(businesses.id, businessId));
   return b;
+}
+
+function formatUser(u: any) {
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    subscriptionTier: u.subscriptionTier || "free",
+  };
 }
 
 function formatBusiness(b: any) {
