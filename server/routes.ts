@@ -1464,30 +1464,62 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
       const stats = await getQuoteStats(business.id);
       const sentQuotes = await getQuotesByBusiness(business.id, { status: "sent" });
       const customers = await getCustomersByBusiness(business.id);
+      const jobs = await getJobsByBusiness(business.id);
 
-      const contextStr = `Business: ${business.companyName}. Stats: ${stats.totalQuotes} total quotes, ${stats.acceptedQuotes} accepted, ${stats.closeRate}% close rate, $${stats.totalRevenue} revenue, $${stats.avgQuoteValue} avg value. ${sentQuotes.length} open quotes totaling $${sentQuotes.reduce((s, q) => s + q.total, 0).toFixed(0)}. ${customers.length} customers.`;
+      const completedJobs = jobs.filter(j => j.status === "completed");
+      const now = new Date();
+      const thisMonth = completedJobs.filter(j => {
+        const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      });
+      const lastMonth = completedJobs.filter(j => {
+        const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
+        const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+      });
 
-      const messages: any[] = [
+      const jobsByMonth: Record<string, number> = {};
+      completedJobs.forEach(j => {
+        const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
+        const key = `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
+        jobsByMonth[key] = (jobsByMonth[key] || 0) + 1;
+      });
+      const jobBreakdown = Object.entries(jobsByMonth).map(([m, c]) => `${m}: ${c}`).join(", ");
+
+      const contextStr = [
+        `Business: ${business.companyName}.`,
+        `Quotes: ${stats.totalQuotes} total, ${stats.acceptedQuotes} accepted, ${stats.closeRate}% close rate, $${stats.totalRevenue} total revenue, $${stats.avgQuoteValue} avg quote value.`,
+        `${sentQuotes.length} open/sent quotes totaling $${sentQuotes.reduce((s, q) => s + q.total, 0).toFixed(0)}.`,
+        `${customers.length} total customers.`,
+        `Jobs: ${jobs.length} total, ${completedJobs.length} completed, ${jobs.filter(j => j.status === "scheduled").length} scheduled, ${jobs.filter(j => j.status === "in_progress").length} in progress.`,
+        `Completed this month: ${thisMonth.length}. Last month: ${lastMonth.length}.`,
+        jobBreakdown ? `Completed by month: ${jobBreakdown}.` : "",
+      ].filter(Boolean).join(" ");
+
+      const chatMessages: any[] = [
         {
           role: "system",
-          content: `You are an AI sales assistant for "${business.companyName}", a residential cleaning company. Help the owner with sales strategy, follow-up advice, and revenue optimization. Be concise and actionable. ${contextStr}`
+          content: `You are an AI sales assistant for "${business.companyName}", a residential cleaning company. Help the owner with sales strategy, follow-up advice, revenue optimization, and business performance questions. Be concise, friendly, and actionable. Here is the current business data:\n\n${contextStr}`
         },
       ];
 
       if (conversationHistory && Array.isArray(conversationHistory)) {
         for (const msg of conversationHistory.slice(-6)) {
-          messages.push({ role: msg.role, content: msg.content });
+          chatMessages.push({ role: msg.role, content: msg.content });
         }
       }
-      messages.push({ role: "user", content: message });
+      chatMessages.push({ role: "user", content: message });
 
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
-        messages,
-        max_completion_tokens: 500,
+        messages: chatMessages,
       });
 
-      const reply = completion.choices[0]?.message?.content?.trim() || "I couldn't generate a response. Please try again.";
+      const reply = completion.choices[0]?.message?.content?.trim() || "";
+      if (!reply) {
+        console.error("AI sales chat: empty response from model", JSON.stringify(completion.choices[0]));
+        return res.json({ reply: "I'm having trouble generating a response right now. Please try again in a moment." });
+      }
       return res.json({ reply });
     } catch (error: any) {
       console.error("AI sales chat error:", error);

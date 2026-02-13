@@ -61,7 +61,7 @@ export default function AIAssistantScreen() {
 
   useEffect(() => {
     if (!isPro) {
-      navigation.replace("Paywall");
+      navigation.navigate("Paywall");
     }
   }, [isPro]);
 
