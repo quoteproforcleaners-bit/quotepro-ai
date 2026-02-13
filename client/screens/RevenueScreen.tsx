@@ -138,6 +138,26 @@ export default function RevenueScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        <Card
+          style={[styles.aiCard, { borderWidth: 1.5, borderColor: '#9B59B6' }]}
+          onPress={() => navigation.navigate("AIAssistant")}
+        >
+          <View style={styles.aiRow}>
+            <View style={[styles.aiIcon, { backgroundColor: '#9B59B615' }]}>
+              <Feather name="zap" size={20} color="#9B59B6" />
+            </View>
+            <View style={styles.aiContent}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                AI Sales Assistant
+              </ThemedText>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                Get insights to close more deals
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+          </View>
+        </Card>
+
         <View style={styles.statsRow}>
           <StatCard
             title="Pipeline"
@@ -167,26 +187,6 @@ export default function RevenueScreen() {
             color={theme.textSecondary}
           />
         </View>
-
-        <Card
-          style={[styles.aiCard, { borderWidth: 1.5, borderColor: '#9B59B6' }]}
-          onPress={() => navigation.navigate("AIAssistant")}
-        >
-          <View style={styles.aiRow}>
-            <View style={[styles.aiIcon, { backgroundColor: '#9B59B615' }]}>
-              <Feather name="zap" size={20} color="#9B59B6" />
-            </View>
-            <View style={styles.aiContent}>
-              <ThemedText type="body" style={{ fontWeight: "600" }}>
-                AI Sales Assistant
-              </ThemedText>
-              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                Get insights to close more deals
-              </ThemedText>
-            </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-          </View>
-        </Card>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
