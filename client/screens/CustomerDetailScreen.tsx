@@ -155,6 +155,20 @@ export default function CustomerDetailScreen() {
     },
   });
 
+  const parseErrorMessage = (error: any, fallback: string) => {
+    try {
+      const msg = error?.message || "";
+      const jsonStart = msg.indexOf("{");
+      if (jsonStart >= 0) {
+        const parsed = JSON.parse(msg.slice(jsonStart));
+        return parsed.message || fallback;
+      }
+      return msg || fallback;
+    } catch {
+      return error?.message || fallback;
+    }
+  };
+
   const sendEmailMutation = useMutation({
     mutationFn: async (data: { to: string; subject: string; body: string; customerId: string }) => {
       const res = await apiRequest("POST", "/api/send/email", data);
@@ -166,7 +180,7 @@ export default function CustomerDetailScreen() {
       Alert.alert("Sent", "Email sent successfully");
     },
     onError: (error: any) => {
-      Alert.alert("Error", error?.message || "Failed to send email");
+      Alert.alert("Error", parseErrorMessage(error, "Failed to send email"));
     },
   });
 
@@ -181,7 +195,7 @@ export default function CustomerDetailScreen() {
       Alert.alert("Sent", "SMS sent successfully");
     },
     onError: (error: any) => {
-      Alert.alert("Error", error?.message || "Failed to send SMS");
+      Alert.alert("Error", parseErrorMessage(error, "Failed to send SMS"));
     },
   });
 
