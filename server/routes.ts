@@ -1315,9 +1315,18 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
 
       if (!sgRes.ok) {
         const errText = await sgRes.text();
-        console.error("SendGrid error:", errText);
-        return res.status(502).json({ message: "Failed to send email" });
+        console.error("SendGrid error:", sgRes.status, errText);
+        let errorDetail = "Failed to send email";
+        try {
+          const errJson = JSON.parse(errText);
+          if (errJson.errors && errJson.errors.length > 0) {
+            errorDetail = errJson.errors.map((e: any) => e.message).join("; ");
+          }
+        } catch {}
+        return res.status(502).json({ message: errorDetail });
       }
+
+      console.log(`Email sent via SendGrid: from=${brandedFromEmail}, to=${to}, replyTo=${replyToEmail}, status=${sgRes.status}`);
 
       await createCommunication({
         businessId: business.id,
@@ -1492,36 +1501,28 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
 
       const purposeInstruction = purposeDescriptions[purpose] || `purpose: ${purpose}`;
 
-      const formatInstruction = type === "sms"
-        ? "Format as an SMS message. Keep under 160 characters if possible, max 300 characters. No subject line needed."
-        : "Format as a professional email. Include a greeting, body paragraphs, and a sign-off.";
-
-      const systemPrompt = `You are a professional communication writer for ${companyName || "our company"}. Write a ${type === "sms" ? "SMS message" : "professional email"} for ${purposeInstruction}.
-
-Rules:
-- Professional but friendly and warm tone
-- ${formatInstruction}
-- Never mention hours or time estimates
-- Include relevant details from the quote if provided
-- Sign off as "${senderName || "Team"}" from "${companyName || "our company"}"
-- Use actual line breaks between paragraphs, not literal \\n characters
-- Keep messages concise and to the point
-${bookingLink ? `- Include this booking link where appropriate: ${bookingLink}` : ""}
-${type === "email" ? `- Start the email with "Subject: " on the first line, followed by a blank line, then the email body` : ""}`;
-
       const quoteContext = quoteDetails
-        ? `\nQuote details: ${quoteDetails.selectedOption || "Cleaning Service"} at $${quoteDetails.price || ""}. Scope: ${quoteDetails.scope || "Professional cleaning"}. Property: ${quoteDetails.propertyInfo || ""}.`
+        ? ` Quote: ${quoteDetails.selectedOption || "Cleaning"} $${quoteDetails.price || ""}. ${quoteDetails.scope || ""}. ${quoteDetails.propertyInfo || ""}.`
         : "";
 
-      const userPrompt = `Write a ${type} for: ${purposeInstruction}
-Customer name: ${customerName || "Valued Customer"}${quoteContext}`;
+      let systemPrompt: string;
+      let userPrompt: string;
+
+      if (type === "sms") {
+        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}`;
+        userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext} Reply with ONLY the message text, nothing else.`;
+      } else {
+        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""} Start with "Subject: " on line 1, blank line, then body.`;
+        userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext} Reply with ONLY the email, nothing else.`;
+      }
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        max_tokens: type === "sms" ? 100 : 250,
       });
 
       const content = completion.choices[0]?.message?.content;
