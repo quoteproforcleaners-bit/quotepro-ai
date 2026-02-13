@@ -2,7 +2,7 @@
   "expo": {
     "name": "QuotePro",
     "slug": "quotepro",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "quotepro",
@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "requireFullScreen": true
+      "requireFullScreen": true,
+      "buildNumber": "7"
     },
     "android": {
       "adaptiveIcon": {
