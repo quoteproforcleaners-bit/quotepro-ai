@@ -28,10 +28,11 @@ interface Message {
 }
 
 const QUICK_ACTIONS = [
-  "Review my pipeline",
-  "Who needs follow-up?",
-  "How can I improve close rate?",
-  "Draft a follow-up message",
+  { text: "Review my pipeline", icon: "bar-chart-2" },
+  { text: "Who needs follow-up?", icon: "bell" },
+  { text: "How can I improve close rate?", icon: "trending-up" },
+  { text: "Draft a follow-up message", icon: "edit-3" },
+  { text: "What quotes are at risk?", icon: "alert-triangle" },
 ];
 
 function getRelativeTime(date: Date): string {
@@ -224,29 +225,28 @@ export default function AIAssistantScreen() {
       />
 
       {messages.length === 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-          {QUICK_ACTIONS.map((action) => (
+        <View style={[styles.quickList, { borderTopColor: theme.border }]}>
+          {QUICK_ACTIONS.map((action, index) => (
             <Pressable
-              key={action}
-              onPress={() => handleQuickAction(action)}
+              key={action.text}
+              onPress={() => handleQuickAction(action.text)}
               style={[
-                styles.chip,
+                styles.quickItem,
                 {
-                  backgroundColor: theme.backgroundSecondary,
-                  borderColor: theme.border,
+                  borderBottomColor: theme.border,
+                  borderBottomWidth: index < QUICK_ACTIONS.length - 1 ? 1 : 0,
                 },
               ]}
-              testID={`chip-${action.toLowerCase().replace(/\s+/g, "-")}`}
+              testID={`chip-${action.text.toLowerCase().replace(/\s+/g, "-")}`}
             >
-              <ThemedText type="small">{action}</ThemedText>
+              <View style={[styles.quickIconWrap, { backgroundColor: `${theme.primary}15` }]}>
+                <Feather name={action.icon as any} size={16} color={theme.primary} />
+              </View>
+              <ThemedText type="body" style={{ flex: 1 }}>{action.text}</ThemedText>
+              <Feather name="chevron-right" size={16} color={theme.textSecondary} />
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
       ) : null}
 
       <View
@@ -363,17 +363,22 @@ const styles = StyleSheet.create({
   emptyDescription: {
     textAlign: "center",
   },
-  chipsContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    gap: Spacing.sm,
+  quickList: {
+    borderTopWidth: 1,
+    marginHorizontal: Spacing.lg,
   },
-  chip: {
-    paddingHorizontal: Spacing.lg,
+  quickItem: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    minWidth: 140,
+    gap: Spacing.md,
+  },
+  quickIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   inputContainer: {
     flexDirection: "row",
