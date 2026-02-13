@@ -1259,8 +1259,46 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
         return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
       }
 
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || business.email || "noreply@example.com";
+      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
       const fromName = business.companyName || "QuotePro";
+      const replyToEmail = business.email || undefined;
+
+      const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;">
+          <h2 style="color:#ffffff;margin:0;font-size:20px;">${fromName}</h2>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          ${body.split('\n').map((line: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333333;">${line}</p>`).join('')}
+        </td></tr>
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;">
+          <p style="margin:0;font-size:12px;color:#999999;">Sent via QuotePro</p>
+          <p style="margin:4px 0 0;font-size:11px;color:#bbbbbb;">If you no longer wish to receive these emails, please reply with "unsubscribe".</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+      const emailPayload: any = {
+        personalizations: [{ to: [{ email: to }] }],
+        from: { email: brandedFromEmail, name: fromName },
+        subject: subject || `Message from ${fromName}`,
+        content: [
+          { type: "text/plain", value: body },
+          { type: "text/html", value: htmlBody },
+        ],
+      };
+      if (replyToEmail) {
+        emailPayload.reply_to = { email: replyToEmail, name: fromName };
+      }
 
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
@@ -1268,12 +1306,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
           "Authorization": `Bearer ${sgApiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: to }] }],
-          from: { email: fromEmail, name: fromName },
-          subject: subject || `Message from ${fromName}`,
-          content: [{ type: "text/plain", value: body }],
-        }),
+        body: JSON.stringify(emailPayload),
       });
 
       if (!sgRes.ok) {
