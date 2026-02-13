@@ -169,12 +169,12 @@ export default function RevenueScreen() {
         </View>
 
         <Card
-          style={styles.aiCard}
+          style={[styles.aiCard, { borderWidth: 1.5, borderColor: '#9B59B6' }]}
           onPress={() => navigation.navigate("AIAssistant")}
         >
           <View style={styles.aiRow}>
-            <View style={[styles.aiIcon, { backgroundColor: `${theme.primary}15` }]}>
-              <Feather name="zap" size={20} color={theme.primary} />
+            <View style={[styles.aiIcon, { backgroundColor: '#9B59B615' }]}>
+              <Feather name="zap" size={20} color="#9B59B6" />
             </View>
             <View style={styles.aiContent}>
               <ThemedText type="body" style={{ fontWeight: "600" }}>
