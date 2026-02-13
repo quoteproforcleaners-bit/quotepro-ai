@@ -1263,6 +1263,10 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
       const fromName = business.companyName || "QuotePro";
       const replyToEmail = business.email || undefined;
 
+      if (!replyToEmail) {
+        return res.status(400).json({ success: false, message: "Please add your email address in Settings before sending emails. This ensures customer replies go directly to you." });
+      }
+
       const htmlBody = `
 <!DOCTYPE html>
 <html>
@@ -1500,9 +1504,10 @@ Rules:
 - Never mention hours or time estimates
 - Include relevant details from the quote if provided
 - Sign off as "${senderName || "Team"}" from "${companyName || "our company"}"
+- Use actual line breaks between paragraphs, not literal \\n characters
+- Keep messages concise and to the point
 ${bookingLink ? `- Include this booking link where appropriate: ${bookingLink}` : ""}
-
-Respond with a JSON object with a single key "draft" containing the message text.`;
+${type === "email" ? `- Start the email with "Subject: " on the first line, followed by a blank line, then the email body` : ""}`;
 
       const quoteContext = quoteDetails
         ? `\nQuote details: ${quoteDetails.selectedOption || "Cleaning Service"} at $${quoteDetails.price || ""}. Scope: ${quoteDetails.scope || "Professional cleaning"}. Property: ${quoteDetails.propertyInfo || ""}.`
@@ -1517,7 +1522,7 @@ Customer name: ${customerName || "Valued Customer"}${quoteContext}`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        response_format: { type: "json_object" },
+        max_tokens: 500,
       });
 
       const content = completion.choices[0]?.message?.content;
@@ -1525,14 +1530,19 @@ Customer name: ${customerName || "Valued Customer"}${quoteContext}`;
         return res.status(500).json({ message: "No response from AI" });
       }
 
-      let parsed: any;
-      try {
-        parsed = JSON.parse(content);
-      } catch {
-        parsed = { draft: content };
+      let draft = content.trim();
+      if (draft.startsWith('"') && draft.endsWith('"')) {
+        draft = draft.slice(1, -1);
       }
+      if (draft.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(draft);
+          draft = parsed.draft || content;
+        } catch {}
+      }
+      draft = draft.replace(/\\n/g, '\n');
 
-      return res.json({ draft: parsed.draft || content });
+      return res.json({ draft });
     } catch (error: any) {
       console.error("AI communication draft error:", error);
       return res.status(500).json({ message: "Failed to generate communication draft" });
