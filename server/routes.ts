@@ -1462,38 +1462,59 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
       if (!business) return res.status(404).json({ message: "Business not found" });
 
       const stats = await getQuoteStats(business.id);
-      const sentQuotes = await getQuotesByBusiness(business.id, { status: "sent" });
+      const allQuotes = await getQuotesByBusiness(business.id);
+      const sentQuotes = allQuotes.filter(q => q.status === "sent");
       const customers = await getCustomersByBusiness(business.id);
       const jobs = await getJobsByBusiness(business.id);
 
-      const completedJobs = jobs.filter(j => j.status === "completed");
       const now = new Date();
-      const thisMonth = completedJobs.filter(j => {
+      const monthKey = (d: Date) => `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
+
+      const quotesByMonth: Record<string, number> = {};
+      allQuotes.forEach(q => {
+        const key = monthKey(new Date(q.createdAt));
+        quotesByMonth[key] = (quotesByMonth[key] || 0) + 1;
+      });
+      const quoteBreakdown = Object.entries(quotesByMonth).map(([m, c]) => `${m}: ${c}`).join(", ");
+
+      const completedJobs = jobs.filter(j => j.status === "completed");
+      const jobsByMonth: Record<string, number> = {};
+      completedJobs.forEach(j => {
+        const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
+        jobsByMonth[monthKey(d)] = (jobsByMonth[monthKey(d)] || 0) + 1;
+      });
+      const jobBreakdown = Object.entries(jobsByMonth).map(([m, c]) => `${m}: ${c}`).join(", ");
+
+      const quotesThisMonth = allQuotes.filter(q => {
+        const d = new Date(q.createdAt);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      });
+      const quotesLastMonth = allQuotes.filter(q => {
+        const d = new Date(q.createdAt);
+        const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+      });
+      const jobsThisMonth = completedJobs.filter(j => {
         const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       });
-      const lastMonth = completedJobs.filter(j => {
+      const jobsLastMonth = completedJobs.filter(j => {
         const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
         const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
       });
 
-      const jobsByMonth: Record<string, number> = {};
-      completedJobs.forEach(j => {
-        const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
-        const key = `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
-        jobsByMonth[key] = (jobsByMonth[key] || 0) + 1;
-      });
-      const jobBreakdown = Object.entries(jobsByMonth).map(([m, c]) => `${m}: ${c}`).join(", ");
-
       const contextStr = [
+        `Today is ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`,
         `Business: ${business.companyName}.`,
         `Quotes: ${stats.totalQuotes} total, ${stats.acceptedQuotes} accepted, ${stats.closeRate}% close rate, $${stats.totalRevenue} total revenue, $${stats.avgQuoteValue} avg quote value.`,
+        `Quotes created this month: ${quotesThisMonth.length}. Last month: ${quotesLastMonth.length}.`,
+        quoteBreakdown ? `Quotes by month: ${quoteBreakdown}.` : "",
         `${sentQuotes.length} open/sent quotes totaling $${sentQuotes.reduce((s, q) => s + q.total, 0).toFixed(0)}.`,
         `${customers.length} total customers.`,
         `Jobs: ${jobs.length} total, ${completedJobs.length} completed, ${jobs.filter(j => j.status === "scheduled").length} scheduled, ${jobs.filter(j => j.status === "in_progress").length} in progress.`,
-        `Completed this month: ${thisMonth.length}. Last month: ${lastMonth.length}.`,
-        jobBreakdown ? `Completed by month: ${jobBreakdown}.` : "",
+        `Cleans completed this month: ${jobsThisMonth.length}. Last month: ${jobsLastMonth.length}.`,
+        jobBreakdown ? `Cleans completed by month: ${jobBreakdown}.` : "",
       ].filter(Boolean).join(" ");
 
       const chatMessages: any[] = [
