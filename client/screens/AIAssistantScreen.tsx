@@ -370,9 +370,10 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
     borderWidth: 1,
+    minWidth: 140,
   },
   inputContainer: {
     flexDirection: "row",

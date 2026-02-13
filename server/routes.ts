@@ -1442,7 +1442,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
             content: `Generate a follow-up ${msgType} for ${customer ? `${customer.firstName}` : "the customer"}. Reply with ONLY the message text.`
           },
         ],
-        max_tokens: channel === "email" ? 250 : 100,
+        max_completion_tokens: channel === "email" ? 250 : 100,
       });
 
       const draft = completion.choices[0]?.message?.content?.trim() || "";
@@ -1484,7 +1484,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
         messages,
-        max_tokens: 500,
+        max_completion_tokens: 500,
       });
 
       const reply = completion.choices[0]?.message?.content?.trim() || "I couldn't generate a response. Please try again.";
@@ -1775,7 +1775,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: type === "sms" ? 100 : 250,
+        max_completion_tokens: type === "sms" ? 100 : 250,
       });
 
       const content = completion.choices[0]?.message?.content;
