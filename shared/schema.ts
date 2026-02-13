@@ -116,8 +116,30 @@ export const quotes = pgTable("quotes", {
   depositPaid: boolean("deposit_paid").notNull().default(false),
   emailDraft: text("email_draft"),
   smsDraft: text("sms_draft"),
+  lastContactAt: timestamp("last_contact_at"),
+  closeProbability: integer("close_probability"),
+  expectedValue: real("expected_value"),
+  aiNotes: text("ai_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const quoteFollowUps = pgTable("quote_follow_ups", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id")
+    .notNull()
+    .references(() => quotes.id, { onDelete: "cascade" }),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  channel: text("channel").notNull().default("sms"),
+  message: text("message").notNull().default(""),
+  status: text("status").notNull().default("scheduled"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const quoteLineItems = pgTable("quote_line_items", {
@@ -402,6 +424,7 @@ export type Business = typeof businesses.$inferSelect;
 export type PricingSettingsRow = typeof pricingSettings.$inferSelect;
 export type Customer = typeof customers.$inferSelect;
 export type QuoteRow = typeof quotes.$inferSelect;
+export type QuoteFollowUp = typeof quoteFollowUps.$inferSelect;
 export type QuoteLineItem = typeof quoteLineItems.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
 export type JobChecklistItem = typeof jobChecklistItems.$inferSelect;
