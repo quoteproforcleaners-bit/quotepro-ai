@@ -168,6 +168,26 @@ export default function RevenueScreen() {
           />
         </View>
 
+        <Card
+          style={styles.aiCard}
+          onPress={() => navigation.navigate("AIAssistant")}
+        >
+          <View style={styles.aiRow}>
+            <View style={[styles.aiIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="zap" size={20} color={theme.primary} />
+            </View>
+            <View style={styles.aiContent}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                AI Sales Assistant
+              </ThemedText>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                Get insights to close more deals
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+          </View>
+        </Card>
+
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <ThemedText type="h4">Needs Follow-Up</ThemedText>
@@ -226,27 +246,6 @@ export default function RevenueScreen() {
           )}
         </View>
 
-        {isPro ? (
-          <Card
-            style={styles.aiCard}
-            onPress={() => navigation.navigate("AIAssistant")}
-          >
-            <View style={styles.aiRow}>
-              <View style={[styles.aiIcon, { backgroundColor: `${theme.primary}15` }]}>
-                <Feather name="zap" size={20} color={theme.primary} />
-              </View>
-              <View style={styles.aiContent}>
-                <ThemedText type="body" style={{ fontWeight: "600" }}>
-                  AI Sales Assistant
-                </ThemedText>
-                <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                  Get insights to close more deals
-                </ThemedText>
-              </View>
-              <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-            </View>
-          </Card>
-        ) : null}
       </ScrollView>
     </View>
   );
