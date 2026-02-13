@@ -1223,6 +1223,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
   app.get("/api/subscription/config", requireAuth, async (_req: Request, res: Response) => {
     return res.json({
       apiKey: process.env.REVENUECAT_API_KEY || "",
+      googleApiKey: process.env.REVENUECAT_GOOGLE_API_KEY || "",
       entitlementId: "pro",
     });
   });
