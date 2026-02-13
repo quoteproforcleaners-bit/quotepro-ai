@@ -9,6 +9,7 @@ import CustomerDetailScreen from "@/screens/CustomerDetailScreen";
 import PricingScreen from "@/screens/PricingScreen";
 import PaywallScreen from "@/screens/PaywallScreen";
 import JobDetailScreen from "@/screens/JobDetailScreen";
+import AIAssistantScreen from "@/screens/AIAssistantScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
@@ -25,6 +26,7 @@ export type RootStackParamList = {
   JobDetail: { jobId: string };
   PricingSettings: undefined;
   Paywall: undefined;
+  AIAssistant: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -110,6 +112,13 @@ export default function RootStackNavigator() {
             options={{
               presentation: "modal",
               headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="AIAssistant"
+            component={AIAssistantScreen}
+            options={{
+              headerTitle: "AI Sales Assistant",
             }}
           />
         </>

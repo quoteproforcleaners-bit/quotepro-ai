@@ -7,7 +7,7 @@ import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
 import QuotesScreen from "@/screens/QuotesScreen";
 import JobsScreen from "@/screens/JobsScreen";
-
+import RevenueScreen from "@/screens/RevenueScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
@@ -18,7 +18,7 @@ export type MainTabParamList = {
   CustomersTab: undefined;
   QuotesTab: undefined;
   JobsTab: undefined;
-
+  RevenueTab: undefined;
   SettingsTab: undefined;
 };
 
@@ -97,6 +97,17 @@ export default function MainTabNavigator() {
           headerTitle: "Jobs",
           tabBarIcon: ({ color, size }) => (
             <Feather name="calendar" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="RevenueTab"
+        component={RevenueScreen}
+        options={{
+          title: "Revenue",
+          headerTitle: "Revenue",
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="trending-up" size={size} color={color} />
           ),
         }}
       />

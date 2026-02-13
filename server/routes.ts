@@ -1295,6 +1295,73 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
     }
   });
 
+  // ─── Subscription ───
+
+  const requirePro = async (req: Request, res: Response, next: Function) => {
+    try {
+      const user = await getUserById(req.session.userId!);
+      if (!user || user.subscriptionTier !== "pro") {
+        return res.status(403).json({ 
+          message: "This feature requires a Pro subscription",
+          requiresUpgrade: true,
+        });
+      }
+      next();
+    } catch {
+      return res.status(500).json({ message: "Subscription check failed" });
+    }
+  };
+
+  app.get("/api/subscription", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Not found" });
+      return res.json({
+        tier: user.subscriptionTier || "free",
+        expiresAt: user.subscriptionExpiresAt,
+      });
+    } catch {
+      return res.status(500).json({ message: "Failed to get subscription" });
+    }
+  });
+
+  app.post("/api/subscription/upgrade", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await updateUser(req.session.userId!, {
+        subscriptionTier: "pro",
+        subscriptionExpiresAt: null,
+      });
+      return res.json({ tier: user.subscriptionTier, message: "Upgraded to Pro" });
+    } catch {
+      return res.status(500).json({ message: "Upgrade failed" });
+    }
+  });
+
+  app.get("/api/subscription/config", requireAuth, async (_req: Request, res: Response) => {
+    return res.json({
+      apiKey: process.env.REVENUECAT_API_KEY || "",
+      googleApiKey: process.env.REVENUECAT_GOOGLE_API_KEY || "",
+      entitlementId: "pro",
+    });
+  });
+
+  app.post("/api/subscription/sync", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { tier } = req.body;
+      if (!tier || !["free", "pro"].includes(tier)) {
+        return res.status(400).json({ message: "Invalid tier" });
+      }
+      const user = await updateUser(req.session.userId!, {
+        subscriptionTier: tier,
+      });
+      return res.json({ tier: user.subscriptionTier });
+    } catch {
+      return res.status(500).json({ message: "Sync failed" });
+    }
+  });
+
+  // ─── AI Revenue Features ───
+
   app.post("/api/ai/analyze-quote", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const { quoteId } = req.body;
@@ -1423,71 +1490,6 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
     } catch (error: any) {
       console.error("AI sales chat error:", error);
       return res.status(500).json({ message: "Failed to process chat" });
-    }
-  });
-
-  // ─── Subscription ───
-
-  const requirePro = async (req: Request, res: Response, next: Function) => {
-    try {
-      const user = await getUserById(req.session.userId!);
-      if (!user || user.subscriptionTier !== "pro") {
-        return res.status(403).json({ 
-          message: "This feature requires a Pro subscription",
-          requiresUpgrade: true,
-        });
-      }
-      next();
-    } catch {
-      return res.status(500).json({ message: "Subscription check failed" });
-    }
-  };
-
-  app.get("/api/subscription", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = await getUserById(req.session.userId!);
-      if (!user) return res.status(401).json({ message: "Not found" });
-      return res.json({
-        tier: user.subscriptionTier || "free",
-        expiresAt: user.subscriptionExpiresAt,
-      });
-    } catch {
-      return res.status(500).json({ message: "Failed to get subscription" });
-    }
-  });
-
-  app.post("/api/subscription/upgrade", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = await updateUser(req.session.userId!, {
-        subscriptionTier: "pro",
-        subscriptionExpiresAt: null,
-      });
-      return res.json({ tier: user.subscriptionTier, message: "Upgraded to Pro" });
-    } catch {
-      return res.status(500).json({ message: "Upgrade failed" });
-    }
-  });
-
-  app.get("/api/subscription/config", requireAuth, async (_req: Request, res: Response) => {
-    return res.json({
-      apiKey: process.env.REVENUECAT_API_KEY || "",
-      googleApiKey: process.env.REVENUECAT_GOOGLE_API_KEY || "",
-      entitlementId: "pro",
-    });
-  });
-
-  app.post("/api/subscription/sync", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const { tier } = req.body;
-      if (!tier || !["free", "pro"].includes(tier)) {
-        return res.status(400).json({ message: "Invalid tier" });
-      }
-      const user = await updateUser(req.session.userId!, {
-        subscriptionTier: tier,
-      });
-      return res.json({ tier: user.subscriptionTier });
-    } catch {
-      return res.status(500).json({ message: "Sync failed" });
     }
   });
 
