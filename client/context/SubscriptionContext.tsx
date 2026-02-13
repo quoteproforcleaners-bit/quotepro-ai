@@ -69,7 +69,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         }
 
         const config = await configRes.json();
-        const apiKey = config.apiKey;
+        const apiKey = Platform.OS === "android" 
+          ? (config.googleApiKey || config.apiKey) 
+          : config.apiKey;
 
         if (apiKey) {
           try {
