@@ -73,6 +73,57 @@ export default function RevenueScreen() {
     }
   };
 
+  if (!isPro) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: headerHeight + Spacing.xl,
+              paddingBottom: tabBarHeight + Spacing.xl,
+            },
+          ]}
+        >
+          <View style={styles.paywallContainer}>
+            <View style={[styles.paywallIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="trending-up" size={40} color={theme.primary} />
+            </View>
+            <ThemedText type="h3" style={{ textAlign: "center", marginTop: Spacing.lg }}>
+              Revenue Intelligence
+            </ThemedText>
+            <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
+              AI-powered pipeline analytics, follow-up tracking, and a personal sales assistant to help you close more deals.
+            </ThemedText>
+            <View style={styles.featureList}>
+              {[
+                { icon: "dollar-sign", text: "Pipeline value tracking" },
+                { icon: "bell", text: "Smart follow-up alerts" },
+                { icon: "zap", text: "AI Sales Assistant" },
+                { icon: "bar-chart-2", text: "Close rate analytics" },
+              ].map((f, i) => (
+                <View key={i} style={styles.featureRow}>
+                  <Feather name={f.icon as any} size={16} color={theme.primary} />
+                  <ThemedText type="body" style={{ marginLeft: Spacing.sm }}>{f.text}</ThemedText>
+                </View>
+              ))}
+            </View>
+            <Pressable
+              onPress={() => navigation.navigate("Paywall")}
+              style={[styles.upgradeBtn, { backgroundColor: theme.primary }]}
+              testID="revenue-upgrade-btn"
+            >
+              <Feather name="zap" size={18} color="#FFFFFF" />
+              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: Spacing.sm }}>
+                Upgrade to QuotePro AI - $14.99/mo
+              </ThemedText>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
@@ -267,5 +318,36 @@ const styles = StyleSheet.create({
   aiContent: {
     flex: 1,
     gap: 2,
+  },
+  paywallContainer: {
+    alignItems: "center",
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl * 2,
+  },
+  paywallIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  featureList: {
+    width: "100%",
+    marginTop: Spacing.xl,
+    gap: Spacing.md,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  upgradeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.xl,
+    width: "100%",
   },
 });

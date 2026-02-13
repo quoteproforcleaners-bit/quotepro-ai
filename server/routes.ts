@@ -1184,9 +1184,26 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
     }
   });
 
+  // ─── Subscription Middleware ───
+
+  const requirePro = async (req: Request, res: Response, next: Function) => {
+    try {
+      const user = await getUserById(req.session.userId!);
+      if (!user || user.subscriptionTier !== "pro") {
+        return res.status(403).json({ 
+          message: "This feature requires a Pro subscription",
+          requiresUpgrade: true,
+        });
+      }
+      next();
+    } catch {
+      return res.status(500).json({ message: "Subscription check failed" });
+    }
+  };
+
   // ─── Revenue / Follow-Ups ───
 
-  app.get("/api/revenue/unfollowed", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/revenue/unfollowed", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1204,7 +1221,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
     }
   });
 
-  app.get("/api/revenue/pipeline", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/revenue/pipeline", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1232,7 +1249,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
     }
   });
 
-  app.get("/api/follow-ups", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/follow-ups", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1244,7 +1261,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
     }
   });
 
-  app.get("/api/follow-ups/quote/:quoteId", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/follow-ups/quote/:quoteId", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const followUps = await getFollowUpsByQuote(req.params.quoteId);
       return res.json(followUps);
@@ -1253,7 +1270,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
     }
   });
 
-  app.post("/api/follow-ups", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/follow-ups", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1274,7 +1291,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
     }
   });
 
-  app.put("/api/follow-ups/:id", requireAuth, async (req: Request, res: Response) => {
+  app.put("/api/follow-ups/:id", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const data = { ...req.body };
       if (data.scheduledFor) data.scheduledFor = new Date(data.scheduledFor);
@@ -1286,7 +1303,7 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
     }
   });
 
-  app.delete("/api/follow-ups/:id", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/follow-ups/:id", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       await deleteFollowUp(req.params.id);
       return res.json({ message: "Deleted" });
@@ -1296,21 +1313,6 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
   });
 
   // ─── Subscription ───
-
-  const requirePro = async (req: Request, res: Response, next: Function) => {
-    try {
-      const user = await getUserById(req.session.userId!);
-      if (!user || user.subscriptionTier !== "pro") {
-        return res.status(403).json({ 
-          message: "This feature requires a Pro subscription",
-          requiresUpgrade: true,
-        });
-      }
-      next();
-    } catch {
-      return res.status(500).json({ message: "Subscription check failed" });
-    }
-  };
 
   app.get("/api/subscription", requireAuth, async (req: Request, res: Response) => {
     try {
