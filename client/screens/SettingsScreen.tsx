@@ -231,6 +231,28 @@ export default function SettingsScreen() {
         leftIcon="link"
       />
 
+      <SectionHeader title="Signatures" subtitle="Auto-added to outgoing messages" />
+
+      <Input
+        label="Email Signature"
+        value={profile.emailSignature}
+        onChangeText={(v) => updateProfile({ emailSignature: v })}
+        placeholder="e.g., Thanks, Mike - ABC Cleaning Co."
+        multiline
+        numberOfLines={3}
+        leftIcon="edit-3"
+        testID="input-email-signature"
+      />
+
+      <Input
+        label="SMS Signature"
+        value={profile.smsSignature}
+        onChangeText={(v) => updateProfile({ smsSignature: v })}
+        placeholder="e.g., - Mike, ABC Cleaning"
+        leftIcon="message-square"
+        testID="input-sms-signature"
+      />
+
       <SectionHeader title="Pricing & Services" subtitle="Configure your rates and service options" />
 
       <Pressable

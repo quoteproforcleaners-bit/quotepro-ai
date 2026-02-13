@@ -21,6 +21,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { SectionHeader } from "@/components/SectionHeader";
+import { useApp } from "@/context/AppContext";
 
 interface Customer {
   id: string;
@@ -44,6 +45,7 @@ export default function CustomerDetailScreen() {
   const { customerId } = route.params as { customerId: string };
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+  const { businessProfile } = useApp();
 
   const [isEditing, setIsEditing] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -818,13 +820,19 @@ export default function CustomerDetailScreen() {
                   };
 
                   if (commChannel === "email" && customer.email) {
+                    const emailBody = businessProfile.emailSignature
+                      ? `${commContent}\n\n${businessProfile.emailSignature}`
+                      : commContent;
                     sendEmailMutation.mutate(
-                      { to: customer.email, subject: commSubject, body: commContent, customerId },
+                      { to: customer.email, subject: commSubject, body: emailBody, customerId },
                       { onSuccess: resetForm }
                     );
                   } else if (commChannel === "sms" && customer.phone) {
+                    const smsBody = businessProfile.smsSignature
+                      ? `${commContent}\n\n${businessProfile.smsSignature}`
+                      : commContent;
                     sendSmsMutation.mutate(
-                      { to: customer.phone, body: commContent, customerId },
+                      { to: customer.phone, body: smsBody, customerId },
                       { onSuccess: resetForm }
                     );
                   } else {

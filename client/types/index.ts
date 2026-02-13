@@ -9,6 +9,8 @@ export interface BusinessProfile {
   senderName: string;
   senderTitle: string;
   bookingLink: string;
+  emailSignature: string;
+  smsSignature: string;
   onboardingComplete: boolean;
 }
 
@@ -190,5 +192,7 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
   senderName: "",
   senderTitle: "",
   bookingLink: "",
+  emailSignature: "",
+  smsSignature: "",
   onboardingComplete: false,
 };

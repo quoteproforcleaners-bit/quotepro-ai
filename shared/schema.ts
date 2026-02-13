@@ -43,6 +43,8 @@ export const businesses = pgTable("businesses", {
   senderName: text("sender_name").notNull().default(""),
   senderTitle: text("sender_title").notNull().default(""),
   bookingLink: text("booking_link").notNull().default(""),
+  emailSignature: text("email_signature").notNull().default(""),
+  smsSignature: text("sms_signature").notNull().default(""),
   timezone: text("timezone").notNull().default("America/New_York"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
