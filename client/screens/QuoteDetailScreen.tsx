@@ -9,6 +9,7 @@ import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import * as SMS from "expo-sms";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
@@ -207,42 +208,58 @@ export default function QuoteDetailScreen() {
       return;
     }
 
+    if (aiDraftType === "sms") {
+      try {
+        const isAvailable = await SMS.isAvailableAsync();
+        if (!isAvailable) {
+          Alert.alert("SMS Not Available", "Text messaging is not available on this device. You can copy the message and send it manually.");
+          return;
+        }
+        const smsBody = businessProfile?.smsSignature
+          ? `${aiDraft}\n\n${businessProfile.smsSignature}`
+          : aiDraft;
+        const { result } = await SMS.sendSMSAsync([recipientPhone!], smsBody);
+        if (result === "sent") {
+          setSendSuccess("SMS opened!");
+          sendMutation.mutate({ channel: "sms", content: aiDraft });
+          if (Platform.OS !== "web") {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        }
+      } catch (err) {
+        Alert.alert("SMS Error", "Could not open Messages. You can copy the message and send it manually.");
+      }
+      return;
+    }
+
     setSendingDraft(true);
     setSendSuccess(null);
 
     try {
-      const endpoint = aiDraftType === "email" ? "/api/send/email" : "/api/send/sms";
       const subjectMatch = aiDraft.match(/^Subject:\s*(.+?)(?:\n|$)/i);
       const subject = subjectMatch ? subjectMatch[1].trim() : `Quote from ${businessProfile?.companyName || "QuotePro"}`;
       const bodyText = subjectMatch ? aiDraft.replace(/^Subject:\s*.+?\n+/i, "").trim() : aiDraft;
 
-      const payload = aiDraftType === "email"
-        ? { to: recipientEmail, subject, body: bodyText, customerId: quote.customerId, quoteId: quote.id }
-        : { to: recipientPhone, body: aiDraft, customerId: quote.customerId, quoteId: quote.id };
+      const payload = { to: recipientEmail, subject, body: bodyText, customerId: quote.customerId, quoteId: quote.id };
 
-      const res = await apiRequest("POST", endpoint, payload);
+      const res = await apiRequest("POST", "/api/send/email", payload);
       const data = await res.json();
 
       if (data.success) {
-        setSendSuccess(aiDraftType === "email" ? "Email sent!" : "SMS sent!");
-        sendMutation.mutate({ channel: aiDraftType, content: aiDraft });
+        setSendSuccess("Email sent!");
+        sendMutation.mutate({ channel: "email", content: aiDraft });
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
       } else {
-        Alert.alert("Send Failed", data.message || "Could not send message. Please try again.");
+        Alert.alert("Send Failed", data.message || "Could not send email. Please try again.");
       }
     } catch (err: any) {
-      const msg = err?.message || "Could not send message.";
+      const msg = err?.message || "Could not send email.";
       if (msg.includes("503") || msg.includes("not configured")) {
-        Alert.alert(
-          "Service Not Connected",
-          aiDraftType === "email"
-            ? "Email service isn't set up yet. You can still copy the message and send it manually."
-            : "SMS service isn't set up yet. You can still copy the message and send it manually."
-        );
+        Alert.alert("Service Not Connected", "Email service isn't set up yet. You can still copy the message and send it manually.");
       } else {
-        Alert.alert("Send Failed", "Could not send message. You can copy it and send manually.");
+        Alert.alert("Send Failed", "Could not send email. You can copy it and send manually.");
       }
     } finally {
       setSendingDraft(false);
@@ -297,15 +314,33 @@ export default function QuoteDetailScreen() {
     }
   };
 
-  const handleCopySms = async () => {
+  const handleSendNativeSms = async () => {
     if (!quote) return;
+    const phone = quote.propertyDetails?.customerPhone;
     const name = quote.propertyDetails?.customerName || "there";
     const company = businessProfile?.companyName || "us";
     const price = quote.total || 0;
-    const sms = `Hi ${name}! This is ${company}. Your cleaning quote is ready: $${price.toFixed(0)}. Reply YES to book or let us know if you have questions!`;
-    await Clipboard.setStringAsync(sms);
-    if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    let sms = `Hi ${name}! This is ${company}. Your cleaning quote is ready: $${price.toFixed(0)}. Reply YES to book or let us know if you have questions!`;
+    if (businessProfile?.smsSignature) {
+      sms += `\n\n${businessProfile.smsSignature}`;
+    }
+
+    try {
+      const isAvailable = await SMS.isAvailableAsync();
+      if (!isAvailable) {
+        await Clipboard.setStringAsync(sms);
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        Alert.alert("Copied", "SMS is not available on this device. The message has been copied to your clipboard.");
+        return;
+      }
+      await SMS.sendSMSAsync(phone ? [phone] : [], sms);
+    } catch (err) {
+      await Clipboard.setStringAsync(sms);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     }
   };
 
@@ -627,7 +662,7 @@ export default function QuoteDetailScreen() {
                       <Feather name="send" size={14} color="#FFFFFF" />
                     )}
                     <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
-                      {sendingDraft ? "Sending..." : sendSuccess ? "Sent" : `Send ${aiDraftType === "email" ? "Email" : "SMS"}`}
+                      {sendingDraft ? "Sending..." : sendSuccess ? "Sent" : aiDraftType === "email" ? "Send Email" : "Open in Messages"}
                     </ThemedText>
                   </Pressable>
 
@@ -670,12 +705,12 @@ export default function QuoteDetailScreen() {
           </Pressable>
 
           <Pressable
-            onPress={handleCopySms}
+            onPress={handleSendNativeSms}
             style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-            testID="copy-sms-btn"
+            testID="send-sms-btn"
           >
             <Feather name="message-square" size={20} color={theme.primary} />
-            <ThemedText type="small" style={{ marginTop: 4 }}>Copy SMS</ThemedText>
+            <ThemedText type="small" style={{ marginTop: 4 }}>Text</ThemedText>
           </Pressable>
 
           {status === "draft" ? (

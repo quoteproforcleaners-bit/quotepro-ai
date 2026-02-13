@@ -7,6 +7,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
+import * as SMS from "expo-sms";
 import { ThemedText } from "@/components/ThemedText";
 import { QuoteCard } from "@/components/QuoteCard";
 import { Button } from "@/components/Button";
@@ -253,6 +254,31 @@ export default function QuotePreviewScreen({
     }
   };
 
+  const handleSendNativeSms = async () => {
+    const text = aiSmsDraft || smsDraft;
+    const phone = customer.phone;
+    const smsBody = businessProfile?.smsSignature
+      ? `${text}\n\n${businessProfile.smsSignature}`
+      : text;
+    try {
+      const isAvailable = await SMS.isAvailableAsync();
+      if (!isAvailable) {
+        await Clipboard.setStringAsync(smsBody);
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        Alert.alert("Copied", "SMS is not available on this device. The message has been copied to your clipboard.");
+        return;
+      }
+      await SMS.sendSMSAsync(phone ? [phone] : [], smsBody);
+    } catch (err) {
+      await Clipboard.setStringAsync(smsBody);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    }
+  };
+
   const handleShareEmail = async () => {
     const text = aiEmailDraft || emailDraft;
     await Share.share({ message: text });
@@ -278,32 +304,50 @@ export default function QuotePreviewScreen({
       return;
     }
 
+    if (type === "sms") {
+      try {
+        const isAvailable = await SMS.isAvailableAsync();
+        if (!isAvailable) {
+          Alert.alert("SMS Not Available", "Text messaging is not available on this device. You can copy the message and send it manually.");
+          return;
+        }
+        const smsBody = businessProfile?.smsSignature
+          ? `${draft}\n\n${businessProfile.smsSignature}`
+          : draft;
+        const { result } = await SMS.sendSMSAsync([recipientPhone!], smsBody);
+        if (result === "sent") {
+          setSendSuccess("SMS opened!");
+          if (Platform.OS !== "web") {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        }
+      } catch (err) {
+        Alert.alert("SMS Error", "Could not open Messages. You can copy the message and send it manually.");
+      }
+      return;
+    }
+
     setSendingDraft(true);
     setSendSuccess(null);
 
     try {
-      const endpoint = type === "email" ? "/api/send/email" : "/api/send/sms";
       const subjectMatch = draft.match(/^Subject:\s*(.+?)(?:\n|$)/i);
       const subject = subjectMatch ? subjectMatch[1].trim() : `Quote from ${businessProfile?.companyName || "QuotePro"}`;
       const bodyText = subjectMatch ? draft.replace(/^Subject:\s*.+?\n+/i, "").trim() : draft;
 
-      const payload = type === "email"
-        ? { to: recipientEmail, subject, body: bodyText }
-        : { to: recipientPhone, body: draft };
-
-      const res = await apiRequest("POST", endpoint, payload);
+      const res = await apiRequest("POST", "/api/send/email", { to: recipientEmail, subject, body: bodyText });
       const data = await res.json();
 
       if (data.success) {
-        setSendSuccess(type === "email" ? "Email sent!" : "SMS sent!");
+        setSendSuccess("Email sent!");
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
       } else {
-        Alert.alert("Send Failed", data.message || "Could not send message.");
+        Alert.alert("Send Failed", data.message || "Could not send email.");
       }
     } catch (err: any) {
-      Alert.alert("Send Failed", "Could not send message. You can copy it and send manually.");
+      Alert.alert("Send Failed", "Could not send email. You can copy it and send manually.");
     } finally {
       setSendingDraft(false);
     }
@@ -533,10 +577,10 @@ export default function QuotePreviewScreen({
                           {sendingDraft ? (
                             <ActivityIndicator size="small" color="#FFFFFF" />
                           ) : (
-                            <Feather name="send" size={14} color="#FFFFFF" />
+                            <Feather name="message-square" size={14} color="#FFFFFF" />
                           )}
                           <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
-                            {sendingDraft ? "Sending..." : "Send SMS"}
+                            Open in Messages
                           </ThemedText>
                         </Pressable>
                       ) : null}
@@ -654,6 +698,10 @@ export default function QuotePreviewScreen({
           >
             <FormattedDraftText text={smsDraft} />
             <View style={styles.draftActions}>
+              <Pressable onPress={handleSendNativeSms} style={styles.draftAction}>
+                <Feather name="message-square" size={16} color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Open in Messages</ThemedText>
+              </Pressable>
               <Pressable onPress={handleCopySms} style={styles.draftAction}>
                 <Feather name="copy" size={16} color={theme.primary} />
                 <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Copy</ThemedText>

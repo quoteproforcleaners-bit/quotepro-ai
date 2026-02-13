@@ -13,6 +13,7 @@ import { useHeaderHeight, HeaderButton } from "@react-navigation/elements";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
+import * as SMS from "expo-sms";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useTheme } from "@/hooks/useTheme";
@@ -188,16 +189,27 @@ export default function CustomerDetailScreen() {
 
   const sendSmsMutation = useMutation({
     mutationFn: async (data: { to: string; body: string; customerId: string }) => {
-      const res = await apiRequest("POST", "/api/send/sms", data);
-      return res.json();
+      const isAvailable = await SMS.isAvailableAsync();
+      if (!isAvailable) {
+        throw new Error("Text messaging is not available on this device.");
+      }
+      const { result } = await SMS.sendSMSAsync([data.to], data.body);
+      if (result === "sent") {
+        await apiRequest("POST", "/api/communications", {
+          customerId: data.customerId,
+          channel: "sms",
+          content: data.body,
+          direction: "outbound",
+        });
+      }
+      return { success: true, result };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/communications", { customerId }] });
       queryClient.invalidateQueries({ queryKey: ["/api/communications"] });
-      Alert.alert("Sent", "SMS sent successfully");
     },
     onError: (error: any) => {
-      Alert.alert("Error", parseErrorMessage(error, "Failed to send SMS"));
+      Alert.alert("Error", parseErrorMessage(error, "Could not open Messages"));
     },
   });
 
