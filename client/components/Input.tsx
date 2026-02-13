@@ -44,6 +44,7 @@ export function Input({
             backgroundColor: theme.inputBackground,
             borderColor: error ? theme.error : theme.border,
           },
+          props.multiline ? styles.inputContainerMultiline : null,
         ]}
       >
         {leftIcon ? (
@@ -60,6 +61,7 @@ export function Input({
             { color: theme.text },
             leftIcon ? styles.inputWithLeftIcon : null,
             rightIcon ? styles.inputWithRightIcon : null,
+            props.multiline ? styles.inputMultiline : null,
             style,
           ]}
           placeholderTextColor={theme.textSecondary}
@@ -98,11 +100,21 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs,
     height: Spacing.inputHeight,
   },
+  inputContainerMultiline: {
+    height: undefined,
+    minHeight: Spacing.inputHeight,
+    alignItems: "flex-start",
+  },
   input: {
     flex: 1,
     height: "100%",
     paddingHorizontal: Spacing.md,
     fontSize: 16,
+  },
+  inputMultiline: {
+    height: undefined,
+    paddingVertical: Spacing.md,
+    textAlignVertical: "top",
   },
   inputWithLeftIcon: {
     paddingLeft: 0,
