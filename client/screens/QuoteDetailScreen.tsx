@@ -194,6 +194,10 @@ export default function QuoteDetailScreen() {
     const recipientEmail = quote.propertyDetails?.customerEmail;
     const recipientPhone = quote.propertyDetails?.customerPhone;
 
+    if (aiDraftType === "email" && !businessProfile?.email) {
+      Alert.alert("Business Email Required", "Please add your email address in Settings before sending emails. This ensures customer replies go directly to you.");
+      return;
+    }
     if (aiDraftType === "email" && !recipientEmail) {
       Alert.alert("No Email", "This customer doesn't have an email address on file. Please add one first.");
       return;
