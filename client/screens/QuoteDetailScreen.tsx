@@ -482,90 +482,29 @@ export default function QuoteDetailScreen() {
           </ThemedText>
         </View>
 
-        <SectionHeader title="Quick Actions" />
-
-        <View style={styles.actions}>
-          <Pressable
-            onPress={handleCopyEmail}
-            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-            testID="copy-email-btn"
-          >
-            <Feather name="mail" size={20} color={theme.primary} />
-            <ThemedText type="small" style={{ marginTop: 4 }}>Copy Email</ThemedText>
-          </Pressable>
-
-          <Pressable
-            onPress={handleCopySms}
-            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-            testID="copy-sms-btn"
-          >
-            <Feather name="message-square" size={20} color={theme.primary} />
-            <ThemedText type="small" style={{ marginTop: 4 }}>Copy SMS</ThemedText>
-          </Pressable>
-
-          {status === "draft" ? (
-            <Pressable
-              onPress={handleMarkSent}
-              style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-              testID="mark-sent-btn"
-            >
-              <Feather name="send" size={20} color={theme.success} />
-              <ThemedText type="small" style={{ marginTop: 4 }}>Mark Sent</ThemedText>
-            </Pressable>
-          ) : null}
-
-          <Pressable
-            onPress={handleExportPdf}
-            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-            testID="export-pdf-btn"
-          >
-            {pdfLoading ? (
-              <ActivityIndicator size="small" color={theme.primary} />
-            ) : (
-              <Feather name="file-text" size={20} color={theme.primary} />
-            )}
-            <ThemedText type="small" style={{ marginTop: 4 }}>Export PDF</ThemedText>
-          </Pressable>
-
-          <Pressable
-            onPress={handleDelete}
-            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-            testID="delete-quote-btn"
-          >
-            <Feather name="trash-2" size={20} color={theme.error} />
-            <ThemedText type="small" style={{ marginTop: 4, color: theme.error }}>Delete</ThemedText>
-          </Pressable>
-        </View>
-
-        <View style={styles.sectionRow}>
-          <SectionHeader title="AI Message Writer" />
-          <View style={styles.proBadgeRow}>
-            <View style={[styles.aiBadge, { backgroundColor: `${theme.primary}15` }]}>
-              <Feather name="zap" size={12} color={theme.primary} />
-              <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
-                {isPro ? "PRO" : "PRO Feature"}
-              </ThemedText>
-            </View>
-          </View>
-        </View>
+        <SectionHeader title="Send This Quote" />
 
         {isPro ? (
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
-            Generate and send personalized messages directly to your customer
-          </ThemedText>
+          <View style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+              AI writes a personalized message and sends it directly to your customer
+            </ThemedText>
+          </View>
         ) : (
           <Pressable onPress={() => navigation.navigate("Paywall")} testID="upgrade-prompt">
-            <View style={[styles.upgradeCard, { backgroundColor: `${theme.accent}10`, borderColor: `${theme.accent}30` }]}>
-              <Feather name="lock" size={18} color={theme.accent} />
-              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                <ThemedText type="body" style={{ fontWeight: "600" }}>
-                  Upgrade to QuotePro AI
+            <View style={[styles.upgradeCard, { backgroundColor: '#009B82' }]}>
+              <View style={styles.upgradeIconCircle}>
+                <Feather name="zap" size={20} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="body" style={{ fontWeight: "700", color: "#FFFFFF" }}>
+                  Send with QuotePro AI
                 </ThemedText>
-                <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
-                  Unlock AI-powered emails, SMS, and direct sending to customers
+                <ThemedText type="small" style={{ color: "rgba(255,255,255,0.85)", marginTop: 2 }}>
+                  AI writes and sends professional emails and texts in seconds - $14.99/mo
                 </ThemedText>
               </View>
-              <Feather name="chevron-right" size={18} color={theme.accent} />
+              <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.8)" />
             </View>
           </Pressable>
         )}
@@ -718,6 +657,61 @@ export default function QuoteDetailScreen() {
           </View>
         ) : null}
 
+        <SectionHeader title="Quick Actions" />
+
+        <View style={styles.actions}>
+          <Pressable
+            onPress={handleCopyEmail}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="copy-email-btn"
+          >
+            <Feather name="mail" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Copy Email</ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={handleCopySms}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="copy-sms-btn"
+          >
+            <Feather name="message-square" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Copy SMS</ThemedText>
+          </Pressable>
+
+          {status === "draft" ? (
+            <Pressable
+              onPress={handleMarkSent}
+              style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+              testID="mark-sent-btn"
+            >
+              <Feather name="send" size={20} color={theme.success} />
+              <ThemedText type="small" style={{ marginTop: 4 }}>Mark Sent</ThemedText>
+            </Pressable>
+          ) : null}
+
+          <Pressable
+            onPress={handleExportPdf}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="export-pdf-btn"
+          >
+            {pdfLoading ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <Feather name="file-text" size={20} color={theme.primary} />
+            )}
+            <ThemedText type="small" style={{ marginTop: 4 }}>Export PDF</ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={handleDelete}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="delete-quote-btn"
+          >
+            <Feather name="trash-2" size={20} color={theme.error} />
+            <ThemedText type="small" style={{ marginTop: 4, color: theme.error }}>Delete</ThemedText>
+          </Pressable>
+        </View>
+
         <SectionHeader title="Update Status" />
 
         <View style={styles.statusButtons}>
@@ -851,8 +845,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: Spacing.md,
     borderRadius: BorderRadius.sm,
-    borderWidth: 1,
     marginBottom: Spacing.md,
+  },
+  upgradeIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
   },
   purposeRow: {
     flexDirection: "row",
