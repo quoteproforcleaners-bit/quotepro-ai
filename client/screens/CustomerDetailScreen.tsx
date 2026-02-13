@@ -455,27 +455,20 @@ export default function CustomerDetailScreen() {
         ) : null}
 
         <SectionHeader title="Notes" />
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: theme.cardBackground, borderColor: theme.border },
-          ]}
-        >
-          <Input
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={4}
-            placeholder="Add notes about this customer..."
-            style={styles.notesInput}
-            testID="input-notes"
-          />
-          {notes !== (customer.notes || "") ? (
-            <Button onPress={handleSaveNotes}>
-              {"Save Notes"}
-            </Button>
-          ) : null}
-        </View>
+        <Input
+          value={notes}
+          onChangeText={setNotes}
+          multiline
+          numberOfLines={4}
+          placeholder="Add notes about this customer..."
+          style={styles.notesInput}
+          testID="input-notes"
+        />
+        {notes !== (customer.notes || "") ? (
+          <Button onPress={handleSaveNotes}>
+            {"Save Notes"}
+          </Button>
+        ) : null}
 
         <SectionHeader
           title="Quotes"
