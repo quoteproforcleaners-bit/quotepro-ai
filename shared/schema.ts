@@ -410,6 +410,21 @@ export const socialOptOuts = pgTable("social_opt_outs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const googleCalendarTokens = pgTable("google_calendar_tokens", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  calendarId: text("calendar_id").default("primary"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   name: true,
@@ -440,3 +455,4 @@ export type SocialLead = typeof socialLeads.$inferSelect;
 export type AttributionEvent = typeof attributionEvents.$inferSelect;
 export type SocialAutomationSetting = typeof socialAutomationSettings.$inferSelect;
 export type SocialOptOut = typeof socialOptOuts.$inferSelect;
+export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;

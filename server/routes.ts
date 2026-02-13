@@ -5,6 +5,7 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import OpenAI from "openai";
 import { pool } from "./db";
+import { google } from "googleapis";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -70,6 +71,9 @@ import {
   updateFollowUp,
   deleteFollowUp,
   getUnfollowedQuotes,
+  getGoogleCalendarToken,
+  upsertGoogleCalendarToken,
+  deleteGoogleCalendarToken,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -747,6 +751,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      try {
+        let customerName = "Customer";
+        if (j.customerId) {
+          const customer = await getCustomerById(j.customerId);
+          if (customer) customerName = `${customer.firstName} ${customer.lastName}`.trim();
+        }
+        await syncJobToGoogleCalendar(req.session.userId!, j, customerName);
+      } catch (calErr) {
+        console.error("Auto calendar sync error (create):", calErr);
+      }
+
       return res.json(j);
     } catch (error: any) {
       console.error("Create job error:", error);
@@ -760,6 +775,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (data.startDatetime) data.startDatetime = new Date(data.startDatetime);
       if (data.endDatetime) data.endDatetime = new Date(data.endDatetime);
       const j = await updateJob(req.params.id, data);
+
+      try {
+        let customerName = "Customer";
+        if (j.customerId) {
+          const customer = await getCustomerById(j.customerId);
+          if (customer) customerName = `${customer.firstName} ${customer.lastName}`.trim();
+        }
+        await syncJobToGoogleCalendar(req.session.userId!, j, customerName);
+      } catch (calErr) {
+        console.error("Auto calendar sync error (update):", calErr);
+      }
+
       return res.json(j);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to update job" });
@@ -2348,6 +2375,106 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  // ─── Google Calendar ───
+
+  app.get("/api/google-calendar/status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const tokens = await getGoogleCalendarToken(req.session.userId!);
+      if (tokens) {
+        return res.json({ connected: true, calendarId: tokens.calendarId });
+      }
+      return res.json({ connected: false });
+    } catch (error: any) {
+      console.error("Calendar status error:", error);
+      return res.status(500).json({ message: "Failed to check calendar status" });
+    }
+  });
+
+  app.get("/api/google-calendar/connect", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        `https://${req.get("host")}/api/google-calendar/callback`
+      );
+      const url = oauth2Client.generateAuthUrl({
+        access_type: "offline",
+        scope: ["https://www.googleapis.com/auth/calendar.events"],
+        prompt: "consent",
+        state: req.session.userId,
+      });
+      return res.json({ url });
+    } catch (error: any) {
+      console.error("Calendar connect error:", error);
+      return res.status(500).json({ message: "Failed to generate auth URL" });
+    }
+  });
+
+  app.get("/api/google-calendar/callback", async (req: Request, res: Response) => {
+    try {
+      const { code, state } = req.query as { code: string; state: string };
+      if (!code || !state) {
+        return res.status(400).send("Missing code or state");
+      }
+
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        `https://${req.get("host")}/api/google-calendar/callback`
+      );
+
+      const { tokens } = await oauth2Client.getToken(code);
+
+      await upsertGoogleCalendarToken(state, {
+        accessToken: tokens.access_token!,
+        refreshToken: tokens.refresh_token!,
+        expiresAt: new Date(tokens.expiry_date!),
+      });
+
+      return res.send(`<!DOCTYPE html>
+<html><head><title>Calendar Connected</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.check{font-size:48px;margin-bottom:16px;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><div class="check">&#10003;</div><h2>Calendar Connected!</h2><p>You can close this window.</p></div></body></html>`);
+    } catch (error: any) {
+      console.error("Calendar callback error:", error);
+      return res.status(500).send("Failed to connect calendar. Please try again.");
+    }
+  });
+
+  app.delete("/api/google-calendar/disconnect", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteGoogleCalendarToken(req.session.userId!);
+      return res.json({ message: "Disconnected" });
+    } catch (error: any) {
+      console.error("Calendar disconnect error:", error);
+      return res.status(500).json({ message: "Failed to disconnect calendar" });
+    }
+  });
+
+  app.post("/api/google-calendar/sync-job", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.body;
+      if (!jobId) return res.status(400).json({ message: "jobId is required" });
+
+      const job = await getJobById(jobId);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      let customerName = "Customer";
+      if (job.customerId) {
+        const customer = await getCustomerById(job.customerId);
+        if (customer) customerName = `${customer.firstName} ${customer.lastName}`.trim();
+      }
+
+      await syncJobToGoogleCalendar(req.session.userId!, job, customerName);
+      return res.json({ message: "Synced to Google Calendar" });
+    } catch (error: any) {
+      console.error("Calendar sync error:", error);
+      return res.status(500).json({ message: "Failed to sync to calendar" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   setInterval(async () => {
@@ -2508,6 +2635,49 @@ document.getElementById('quoteForm').addEventListener('submit', async function(e
 </script>
 </body>
 </html>`;
+}
+
+async function syncJobToGoogleCalendar(userId: string, job: any, customerName: string) {
+  const tokens = await getGoogleCalendarToken(userId);
+  if (!tokens) return;
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+  oauth2Client.setCredentials({
+    access_token: tokens.accessToken,
+    refresh_token: tokens.refreshToken,
+    expiry_date: new Date(tokens.expiresAt).getTime(),
+  });
+
+  if (new Date(tokens.expiresAt) < new Date()) {
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    await upsertGoogleCalendarToken(userId, {
+      accessToken: credentials.access_token!,
+      refreshToken: credentials.refresh_token || tokens.refreshToken,
+      expiresAt: new Date(credentials.expiry_date!),
+    });
+    oauth2Client.setCredentials(credentials);
+  }
+
+  const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+  const endTime = job.endDatetime || new Date(new Date(job.startDatetime).getTime() + 2 * 60 * 60 * 1000);
+
+  await calendar.events.insert({
+    calendarId: tokens.calendarId || "primary",
+    requestBody: {
+      summary: `Clean - ${customerName}`,
+      location: job.address || undefined,
+      start: { dateTime: new Date(job.startDatetime).toISOString() },
+      end: { dateTime: new Date(endTime).toISOString() },
+      description: [
+        job.jobType ? `Type: ${job.jobType}` : "",
+        job.total ? `Total: $${job.total}` : "",
+        job.internalNotes || "",
+      ].filter(Boolean).join("\n"),
+    },
+  });
 }
 
 function formatBusiness(b: any) {

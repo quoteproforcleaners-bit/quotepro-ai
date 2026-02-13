@@ -8,6 +8,8 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
+import * as WebBrowser from "expo-web-browser";
+import { useQuery } from "@tanstack/react-query";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -17,6 +19,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useSubscription } from "@/context/SubscriptionContext";
+import { getApiUrl } from "@/lib/query-client";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -27,6 +30,38 @@ export default function SettingsScreen() {
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
   const { isPro } = useSubscription();
+
+  const { data: calendarStatus, refetch: refetchCalendar } = useQuery({
+    queryKey: ["/api/google-calendar/status"],
+  });
+
+  const handleConnectCalendar = async () => {
+    try {
+      const res = await fetch(new URL("/api/google-calendar/connect", getApiUrl()).toString(), {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.url) {
+        await WebBrowser.openBrowserAsync(data.url);
+        refetchCalendar();
+      }
+    } catch (e) {
+      console.error("Calendar connect error", e);
+    }
+  };
+
+  const handleDisconnectCalendar = async () => {
+    try {
+      await fetch(new URL("/api/google-calendar/disconnect", getApiUrl()).toString(), {
+        method: "DELETE",
+        credentials: "include",
+      });
+      refetchCalendar();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.error("Calendar disconnect error", e);
+    }
+  };
 
   const updateProfile = async (updates: Partial<typeof profile>) => {
     await updateBusinessProfile(updates);
@@ -302,6 +337,52 @@ export default function SettingsScreen() {
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
         </View>
       </Pressable>
+
+      <SectionHeader title="Integrations" subtitle="Connect external services" />
+
+      {calendarStatus?.connected ? (
+        <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.success}15` }]}>
+              <Feather name="check-circle" size={20} color={theme.success} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                Google Calendar
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.success }}>
+                Connected
+              </ThemedText>
+            </View>
+            <Pressable onPress={handleDisconnectCalendar} testID="button-disconnect-calendar">
+              <ThemedText type="small" style={{ color: theme.error }}>
+                Disconnect
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <Pressable
+          onPress={handleConnectCalendar}
+          style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+          testID="button-connect-calendar"
+        >
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="calendar" size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                Google Calendar
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                Sync your jobs to Google Calendar
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+          </View>
+        </Pressable>
+      )}
 
       <SectionHeader title="Account" />
 

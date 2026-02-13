@@ -29,6 +29,8 @@ import {
   type Communication,
   type AutomationRule,
   type Task,
+  googleCalendarTokens,
+  type GoogleCalendarToken,
 } from "@shared/schema";
 
 export async function getUserById(id: string): Promise<User | undefined> {
@@ -927,6 +929,39 @@ export async function getUnfollowedQuotes(businessId: string): Promise<QuoteRow[
 }
 
 // ─── Background Jobs ───
+
+// ─── Google Calendar Tokens ───
+
+export async function getGoogleCalendarToken(userId: string): Promise<GoogleCalendarToken | undefined> {
+  const [token] = await db.select().from(googleCalendarTokens).where(eq(googleCalendarTokens.userId, userId));
+  return token;
+}
+
+export async function upsertGoogleCalendarToken(userId: string, data: {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: Date;
+  calendarId?: string;
+}): Promise<GoogleCalendarToken> {
+  const existing = await getGoogleCalendarToken(userId);
+  if (existing) {
+    const [token] = await db
+      .update(googleCalendarTokens)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(googleCalendarTokens.userId, userId))
+      .returning();
+    return token;
+  }
+  const [token] = await db
+    .insert(googleCalendarTokens)
+    .values({ userId, ...data })
+    .returning();
+  return token;
+}
+
+export async function deleteGoogleCalendarToken(userId: string): Promise<void> {
+  await db.delete(googleCalendarTokens).where(eq(googleCalendarTokens.userId, userId));
+}
 
 export async function expireOldQuotes(): Promise<number> {
   const now = new Date();
