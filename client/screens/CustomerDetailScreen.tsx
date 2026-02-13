@@ -7,6 +7,7 @@ import {
   Alert,
   Linking,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight, HeaderButton } from "@react-navigation/elements";
@@ -59,6 +60,7 @@ export default function CustomerDetailScreen() {
   const [commChannel, setCommChannel] = useState<string>("phone");
   const [commSubject, setCommSubject] = useState("");
   const [commContent, setCommContent] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const { data: customer, isLoading } = useQuery<Customer>({
     queryKey: ["/api/customers", customerId],
@@ -227,18 +229,12 @@ export default function CustomerDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      "Delete Customer",
-      "Are you sure you want to delete this customer? This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteMutation.mutate(),
-        },
-      ]
-    );
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = () => {
+    setShowDeleteModal(false);
+    deleteMutation.mutate();
   };
 
   const handleCall = () => {
@@ -932,6 +928,46 @@ export default function CustomerDetailScreen() {
           </ThemedText>
         </Pressable>
       </ScrollView>
+
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowDeleteModal(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
+            <View style={[styles.modalIconContainer, { backgroundColor: `${theme.error}15` }]}>
+              <Feather name="alert-triangle" size={28} color={theme.error} />
+            </View>
+            <ThemedText type="h3" style={styles.modalTitle}>
+              Delete Customer?
+            </ThemedText>
+            <ThemedText type="body" style={[styles.modalMessage, { color: theme.textSecondary }]}>
+              This will permanently delete this customer and all their associated data. This cannot be undone.
+            </ThemedText>
+            <View style={styles.modalButtons}>
+              <Pressable
+                onPress={() => setShowDeleteModal(false)}
+                style={[styles.modalButton, { backgroundColor: theme.backgroundSecondary }]}
+                testID="cancel-delete-btn"
+              >
+                <ThemedText type="body" style={{ fontWeight: "600" }}>Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={confirmDelete}
+                style={[styles.modalButton, { backgroundColor: theme.error }]}
+                testID="confirm-delete-btn"
+              >
+                <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>Delete</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1058,5 +1094,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  modalContent: {
+    width: "100%",
+    borderRadius: BorderRadius.md,
+    padding: Spacing.xl,
+    alignItems: "center",
+  },
+  modalIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    textAlign: "center",
+    marginBottom: Spacing.sm,
+  },
+  modalMessage: {
+    textAlign: "center",
+    marginBottom: Spacing.xl,
+    lineHeight: 20,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    width: "100%",
+  },
+  modalButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
   },
 });

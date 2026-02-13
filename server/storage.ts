@@ -246,6 +246,21 @@ export async function updateCustomer(
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
+  const customerQuotes = await db.select({ id: quotes.id }).from(quotes).where(eq(quotes.customerId, id));
+  for (const q of customerQuotes) {
+    await db.delete(quoteLineItems).where(eq(quoteLineItems.quoteId, q.id));
+  }
+  await db.delete(quotes).where(eq(quotes.customerId, id));
+
+  const customerJobs = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.customerId, id));
+  for (const j of customerJobs) {
+    await db.delete(jobChecklistItems).where(eq(jobChecklistItems.jobId, j.id));
+    await db.delete(jobPhotos).where(eq(jobPhotos.jobId, j.id));
+  }
+  await db.delete(jobs).where(eq(jobs.customerId, id));
+
+  await db.delete(communications).where(eq(communications.customerId, id));
+  await db.delete(tasks).where(eq(tasks.customerId, id));
   await db.delete(customers).where(eq(customers.id, id));
 }
 
