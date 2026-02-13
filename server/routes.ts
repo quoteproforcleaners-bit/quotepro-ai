@@ -64,6 +64,12 @@ import {
   deleteJobPhoto,
   upsertPushToken,
   deletePushToken,
+  getFollowUpsByQuote,
+  getFollowUpsByBusiness,
+  createFollowUp,
+  updateFollowUp,
+  deleteFollowUp,
+  getUnfollowedQuotes,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -1175,6 +1181,248 @@ ${quote.tax > 0 ? `<div style="text-align:right;margin-top:8px;font-size:13px;co
       return res.json(data);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get revenue data" });
+    }
+  });
+
+  // ─── Revenue / Follow-Ups ───
+
+  app.get("/api/revenue/unfollowed", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const unfollowed = await getUnfollowedQuotes(business.id);
+      const withCustomers = await Promise.all(
+        unfollowed.map(async (q) => {
+          const customer = q.customerId ? await getCustomerById(q.customerId) : null;
+          return { ...q, customer };
+        })
+      );
+      return res.json(withCustomers);
+    } catch (error: any) {
+      console.error("Get unfollowed quotes error:", error);
+      return res.status(500).json({ message: "Failed to get unfollowed quotes" });
+    }
+  });
+
+  app.get("/api/revenue/pipeline", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const sent = await getQuotesByBusiness(business.id, { status: "sent" });
+      const pipelineValue = sent.reduce((sum, q) => sum + q.total, 0);
+      const expectedValue = sent.reduce((sum, q) => sum + (q.expectedValue || q.total * 0.5), 0);
+      const avgAge = sent.length > 0
+        ? sent.reduce((sum, q) => {
+            const age = (Date.now() - (q.sentAt?.getTime() || q.createdAt.getTime())) / (1000 * 60 * 60 * 24);
+            return sum + age;
+          }, 0) / sent.length
+        : 0;
+      return res.json({
+        totalPipeline: Math.round(pipelineValue * 100) / 100,
+        expectedValue: Math.round(expectedValue * 100) / 100,
+        openQuotes: sent.length,
+        avgAgeDays: Math.round(avgAge * 10) / 10,
+        quotes: sent.map(q => ({
+          ...q,
+          ageDays: Math.round(((Date.now() - (q.sentAt?.getTime() || q.createdAt.getTime())) / (1000 * 60 * 60 * 24)) * 10) / 10,
+        })),
+      });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get pipeline" });
+    }
+  });
+
+  app.get("/api/follow-ups", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { status } = req.query as any;
+      const followUps = await getFollowUpsByBusiness(business.id, { status });
+      return res.json(followUps);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get follow-ups" });
+    }
+  });
+
+  app.get("/api/follow-ups/quote/:quoteId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const followUps = await getFollowUpsByQuote(req.params.quoteId);
+      return res.json(followUps);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get follow-ups" });
+    }
+  });
+
+  app.post("/api/follow-ups", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { quoteId, scheduledFor, channel, message } = req.body;
+      if (!quoteId || !scheduledFor) {
+        return res.status(400).json({ message: "quoteId and scheduledFor are required" });
+      }
+      const fu = await createFollowUp({
+        quoteId,
+        businessId: business.id,
+        scheduledFor: new Date(scheduledFor),
+        channel,
+        message,
+      });
+      return res.json(fu);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to create follow-up" });
+    }
+  });
+
+  app.put("/api/follow-ups/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = { ...req.body };
+      if (data.scheduledFor) data.scheduledFor = new Date(data.scheduledFor);
+      if (data.sentAt) data.sentAt = new Date(data.sentAt);
+      const fu = await updateFollowUp(req.params.id, data);
+      return res.json(fu);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update follow-up" });
+    }
+  });
+
+  app.delete("/api/follow-ups/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteFollowUp(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete follow-up" });
+    }
+  });
+
+  app.post("/api/ai/analyze-quote", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { quoteId } = req.body;
+      if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
+
+      const quote = await getQuoteById(quoteId);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+      const comms = await getCommunicationsByBusiness(quote.businessId, { quoteId });
+
+      const ageDays = Math.round(((Date.now() - (quote.sentAt?.getTime() || quote.createdAt.getTime())) / (1000 * 60 * 60 * 24)) * 10) / 10;
+      const lastComm = comms.length > 0 ? comms[0] : null;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          {
+            role: "system",
+            content: `You are an AI sales assistant for a residential cleaning company. Analyze a quote and provide actionable insights. Respond with JSON: {"closeProbability": number 0-100, "suggestedAction": string, "followUpMessage": string, "notes": string}`
+          },
+          {
+            role: "user",
+            content: `Quote: $${quote.total}, sent ${ageDays} days ago, status: ${quote.status}, ${comms.length} communications sent. Customer: ${customer ? `${customer.firstName} ${customer.lastName}, status: ${customer.status}` : "Unknown"}. Last contact: ${lastComm ? `${lastComm.channel} ${lastComm.createdAt}` : "None"}.`
+          },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      let parsed: any = {};
+      try { parsed = JSON.parse(content || "{}"); } catch {}
+
+      await updateQuote(quoteId, {
+        closeProbability: parsed.closeProbability || null,
+        expectedValue: quote.total * ((parsed.closeProbability || 50) / 100),
+        aiNotes: parsed.notes || null,
+      });
+
+      return res.json({
+        closeProbability: parsed.closeProbability || 50,
+        suggestedAction: parsed.suggestedAction || "Follow up with the customer",
+        followUpMessage: parsed.followUpMessage || "",
+        notes: parsed.notes || "",
+      });
+    } catch (error: any) {
+      console.error("AI analyze quote error:", error);
+      return res.status(500).json({ message: "Failed to analyze quote" });
+    }
+  });
+
+  app.post("/api/ai/generate-followup", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { quoteId, channel, context } = req.body;
+      if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
+
+      const quote = await getQuoteById(quoteId);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+      const business = await db_getBusinessById(quote.businessId);
+      const ageDays = Math.round(((Date.now() - (quote.sentAt?.getTime() || quote.createdAt.getTime())) / (1000 * 60 * 60 * 24)) * 10) / 10;
+
+      const msgType = channel === "email" ? "email" : "SMS";
+      const maxLen = channel === "email" ? 200 : 160;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          {
+            role: "system",
+            content: `Write a ${msgType} follow-up message (under ${maxLen} chars for SMS) for "${business?.companyName || "our company"}". The quote is $${quote.total} sent ${ageDays} days ago. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}".${context ? ` Context: ${context}` : ""}`
+          },
+          {
+            role: "user",
+            content: `Generate a follow-up ${msgType} for ${customer ? `${customer.firstName}` : "the customer"}. Reply with ONLY the message text.`
+          },
+        ],
+        max_tokens: channel === "email" ? 250 : 100,
+      });
+
+      const draft = completion.choices[0]?.message?.content?.trim() || "";
+      return res.json({ draft });
+    } catch (error: any) {
+      console.error("AI generate followup error:", error);
+      return res.status(500).json({ message: "Failed to generate follow-up" });
+    }
+  });
+
+  app.post("/api/ai/sales-chat", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { message, conversationHistory } = req.body;
+      if (!message) return res.status(400).json({ message: "message is required" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const stats = await getQuoteStats(business.id);
+      const sentQuotes = await getQuotesByBusiness(business.id, { status: "sent" });
+      const customers = await getCustomersByBusiness(business.id);
+
+      const contextStr = `Business: ${business.companyName}. Stats: ${stats.totalQuotes} total quotes, ${stats.acceptedQuotes} accepted, ${stats.closeRate}% close rate, $${stats.totalRevenue} revenue, $${stats.avgQuoteValue} avg value. ${sentQuotes.length} open quotes totaling $${sentQuotes.reduce((s, q) => s + q.total, 0).toFixed(0)}. ${customers.length} customers.`;
+
+      const messages: any[] = [
+        {
+          role: "system",
+          content: `You are an AI sales assistant for "${business.companyName}", a residential cleaning company. Help the owner with sales strategy, follow-up advice, and revenue optimization. Be concise and actionable. ${contextStr}`
+        },
+      ];
+
+      if (conversationHistory && Array.isArray(conversationHistory)) {
+        for (const msg of conversationHistory.slice(-6)) {
+          messages.push({ role: msg.role, content: msg.content });
+        }
+      }
+      messages.push({ role: "user", content: message });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages,
+        max_tokens: 500,
+      });
+
+      const reply = completion.choices[0]?.message?.content?.trim() || "I couldn't generate a response. Please try again.";
+      return res.json({ reply });
+    } catch (error: any) {
+      console.error("AI sales chat error:", error);
+      return res.status(500).json({ message: "Failed to process chat" });
     }
   });
 

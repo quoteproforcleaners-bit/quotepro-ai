@@ -6,6 +6,7 @@ import {
   pricingSettings,
   customers,
   quotes,
+  quoteFollowUps,
   quoteLineItems,
   jobs,
   jobChecklistItems,
@@ -19,6 +20,7 @@ import {
   type PricingSettingsRow,
   type Customer,
   type QuoteRow,
+  type QuoteFollowUp,
   type QuoteLineItem,
   type Job,
   type JobChecklistItem,
@@ -361,6 +363,10 @@ export async function updateQuote(
     propertyBeds: number;
     propertyBaths: number;
     propertySqft: number;
+    lastContactAt: Date;
+    closeProbability: number;
+    expectedValue: number;
+    aiNotes: string;
   }>
 ): Promise<QuoteRow> {
   const [q] = await db
@@ -839,6 +845,85 @@ export async function getRevenueByPeriod(
   return Object.entries(byDate)
     .map(([date, revenue]) => ({ date, revenue }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ─── Quote Follow-Ups ───
+
+export async function getFollowUpsByQuote(quoteId: string): Promise<QuoteFollowUp[]> {
+  return db
+    .select()
+    .from(quoteFollowUps)
+    .where(eq(quoteFollowUps.quoteId, quoteId))
+    .orderBy(asc(quoteFollowUps.scheduledFor));
+}
+
+export async function getFollowUpsByBusiness(businessId: string, opts?: { status?: string }): Promise<QuoteFollowUp[]> {
+  const conditions = [eq(quoteFollowUps.businessId, businessId)];
+  if (opts?.status) conditions.push(eq(quoteFollowUps.status, opts.status));
+  return db
+    .select()
+    .from(quoteFollowUps)
+    .where(and(...conditions))
+    .orderBy(asc(quoteFollowUps.scheduledFor));
+}
+
+export async function createFollowUp(data: {
+  quoteId: string;
+  businessId: string;
+  scheduledFor: Date;
+  channel?: string;
+  message?: string;
+}): Promise<QuoteFollowUp> {
+  const [fu] = await db.insert(quoteFollowUps).values({
+    quoteId: data.quoteId,
+    businessId: data.businessId,
+    scheduledFor: data.scheduledFor,
+    channel: data.channel || "sms",
+    message: data.message || "",
+  }).returning();
+  return fu;
+}
+
+export async function updateFollowUp(
+  id: string,
+  data: Partial<{ status: string; sentAt: Date; message: string; scheduledFor: Date; channel: string }>
+): Promise<QuoteFollowUp> {
+  const [fu] = await db.update(quoteFollowUps).set(data).where(eq(quoteFollowUps.id, id)).returning();
+  return fu;
+}
+
+export async function deleteFollowUp(id: string): Promise<void> {
+  await db.delete(quoteFollowUps).where(eq(quoteFollowUps.id, id));
+}
+
+export async function getUnfollowedQuotes(businessId: string): Promise<QuoteRow[]> {
+  const allSent = await db
+    .select()
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.businessId, businessId),
+        eq(quotes.status, "sent")
+      )
+    )
+    .orderBy(asc(quotes.sentAt));
+
+  const results: QuoteRow[] = [];
+  for (const q of allSent) {
+    const comms = await db
+      .select()
+      .from(communications)
+      .where(
+        and(
+          eq(communications.quoteId, q.id),
+          eq(communications.direction, "outbound")
+        )
+      );
+    if (comms.length <= 1) {
+      results.push(q);
+    }
+  }
+  return results;
 }
 
 // ─── Background Jobs ───
