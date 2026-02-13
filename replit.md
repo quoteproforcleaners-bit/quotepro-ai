@@ -20,6 +20,7 @@ Key capabilities include:
 - Push notification support (expo-notifications with token registration).
 - Twilio SMS integration for sending text messages to customers (env: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER).
 - SendGrid email integration for sending emails to customers (env: SENDGRID_API_KEY, SENDGRID_FROM_EMAIL=quoteproforcleaners@gmail.com).
+- Google Calendar integration: OAuth2-based sync that creates calendar events when jobs are scheduled/updated (env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET). Each user connects their own Google account via Settings > Integrations.
 
 A new "Social / AI Sales Assistant" feature integrates with Instagram and TikTok DMs for lead capture, AI-powered intent detection, automated replies with quote links, and comprehensive lead management with attribution tracking. This feature is part of the "QuotePro AI" subscription tier, emphasizing AI-driven value. The platform supports multi-user access with various authentication methods and stores all data server-side in PostgreSQL.
 
