@@ -1522,7 +1522,6 @@ Customer name: ${customerName || "Valued Customer"}${quoteContext}`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_completion_tokens: 500,
       });
 
       const content = completion.choices[0]?.message?.content;
