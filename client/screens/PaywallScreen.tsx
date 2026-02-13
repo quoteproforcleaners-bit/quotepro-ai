@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, StyleSheet, Pressable, ActivityIndicator, Platform, Modal, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
@@ -18,17 +18,44 @@ const FEATURES = [
   { icon: "calendar" as const, title: "Job Scheduling", description: "Schedule jobs with checklists and status tracking" },
 ];
 
+type ModalState = {
+  visible: boolean;
+  type: "success" | "error" | "info";
+  title: string;
+  message: string;
+};
+
 export default function PaywallScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { purchase, restore, currentOffering } = useSubscription();
+  const { purchase, restore, currentOffering, isLoading: subscriptionLoading } = useSubscription();
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [modal, setModal] = useState<ModalState>({ visible: false, type: "info", title: "", message: "" });
 
   const monthlyPrice = currentOffering?.monthly?.product?.priceString || "$14.99";
 
+  const showModal = (type: ModalState["type"], title: string, message: string) => {
+    setModal({ visible: true, type, title, message });
+  };
+
+  const dismissModal = () => {
+    const wasSuccess = modal.type === "success";
+    setModal((m) => ({ ...m, visible: false }));
+    if (wasSuccess) {
+      navigation.goBack();
+    }
+  };
+
   const handlePurchase = async () => {
+    if (subscriptionLoading) return;
+
+    if (!currentOffering?.monthly && Platform.OS !== "web") {
+      showModal("error", "Not Available", "The subscription offering couldn't be loaded. Please check your internet connection and try again.");
+      return;
+    }
+
     setPurchasing(true);
     try {
       const success = await purchase();
@@ -36,14 +63,15 @@ export default function PaywallScreen() {
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-        Alert.alert(
-          "Welcome to QuotePro AI!",
-          "You now have access to all AI features and direct sending.",
-          [{ text: "Let's Go", onPress: () => navigation.goBack() }]
-        );
+        showModal("success", "Welcome to QuotePro AI!", "You now have access to all AI features and direct sending.");
       }
-    } catch {
-      Alert.alert("Purchase Failed", "Something went wrong. Please try again.");
+    } catch (error: any) {
+      const message = error?.message?.includes("cancelled")
+        ? "Purchase was cancelled."
+        : "Something went wrong with the purchase. Please try again.";
+      if (!error?.userCancelled) {
+        showModal("error", "Purchase Failed", message);
+      }
     } finally {
       setPurchasing(false);
     }
@@ -57,24 +85,26 @@ export default function PaywallScreen() {
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-        Alert.alert(
-          "Subscription Restored",
-          "Your QuotePro AI access has been restored.",
-          [{ text: "Great", onPress: () => navigation.goBack() }]
-        );
+        showModal("success", "Subscription Restored", "Your QuotePro AI access has been restored.");
       } else {
-        Alert.alert("No Subscription Found", "We couldn't find an active subscription for this account.");
+        showModal("info", "No Subscription Found", "We couldn't find an active subscription for this account.");
       }
     } catch {
-      Alert.alert("Restore Failed", "Something went wrong. Please try again.");
+      showModal("error", "Restore Failed", "Something went wrong. Please try again.");
     } finally {
       setRestoring(false);
     }
   };
 
+  const modalIcon = modal.type === "success" ? "check-circle" : modal.type === "error" ? "alert-circle" : "info";
+  const modalColor = modal.type === "success" ? theme.success : modal.type === "error" ? theme.error : theme.primary;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.scrollContent, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Pressable
           onPress={() => navigation.goBack()}
           style={[styles.closeBtn, { backgroundColor: theme.backgroundSecondary }]}
@@ -158,7 +188,40 @@ export default function PaywallScreen() {
             </ThemedText>
           )}
         </Pressable>
-      </View>
+      </ScrollView>
+
+      <Modal
+        visible={modal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={dismissModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={dismissModal}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
+            <View style={[styles.modalIconContainer, { backgroundColor: `${modalColor}15` }]}>
+              <Feather name={modalIcon} size={28} color={modalColor} />
+            </View>
+            <ThemedText type="h3" style={styles.modalTitle}>
+              {modal.title}
+            </ThemedText>
+            <ThemedText type="body" style={[styles.modalMessage, { color: theme.textSecondary }]}>
+              {modal.message}
+            </ThemedText>
+            <Pressable
+              onPress={dismissModal}
+              style={[styles.modalDismissBtn, { backgroundColor: modal.type === "success" ? theme.accent : theme.backgroundSecondary }]}
+              testID="button-dismiss-modal"
+            >
+              <ThemedText
+                type="body"
+                style={{ fontWeight: "600", color: modal.type === "success" ? "#FFFFFF" : theme.text }}
+              >
+                {modal.type === "success" ? "Let's Go" : "OK"}
+              </ThemedText>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -168,7 +231,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flex: 1,
     paddingHorizontal: Spacing.xl,
     alignItems: "center",
   },
@@ -246,5 +308,42 @@ const styles = StyleSheet.create({
   restoreBtn: {
     marginTop: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  modalContent: {
+    width: "100%",
+    borderRadius: BorderRadius.md,
+    padding: Spacing.xl,
+    alignItems: "center",
+  },
+  modalIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    textAlign: "center",
+    marginBottom: Spacing.sm,
+  },
+  modalMessage: {
+    textAlign: "center",
+    marginBottom: Spacing.xl,
+    lineHeight: 20,
+  },
+  modalDismissBtn: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
   },
 });
