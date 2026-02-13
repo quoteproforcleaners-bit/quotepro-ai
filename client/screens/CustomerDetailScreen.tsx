@@ -155,6 +155,36 @@ export default function CustomerDetailScreen() {
     },
   });
 
+  const sendEmailMutation = useMutation({
+    mutationFn: async (data: { to: string; subject: string; body: string; customerId: string }) => {
+      const res = await apiRequest("POST", "/api/send/email", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications", { customerId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/communications"] });
+      Alert.alert("Sent", "Email sent successfully");
+    },
+    onError: (error: any) => {
+      Alert.alert("Error", error?.message || "Failed to send email");
+    },
+  });
+
+  const sendSmsMutation = useMutation({
+    mutationFn: async (data: { to: string; body: string; customerId: string }) => {
+      const res = await apiRequest("POST", "/api/send/sms", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/communications", { customerId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/communications"] });
+      Alert.alert("Sent", "SMS sent successfully");
+    },
+    onError: (error: any) => {
+      Alert.alert("Error", error?.message || "Failed to send SMS");
+    },
+  });
+
   const handleSaveEdit = () => {
     updateMutation.mutate({ firstName, lastName, phone, email, address });
     setIsEditing(false);
@@ -375,6 +405,60 @@ export default function CustomerDetailScreen() {
             ) : null}
           </View>
         )}
+
+        <View style={styles.quickActions}>
+          <Pressable
+            onPress={() => {
+              const fullName = `${customer.firstName} ${customer.lastName}`.trim();
+              navigation.navigate("QuoteCalculator", {
+                prefillCustomer: {
+                  name: fullName,
+                  phone: customer.phone || "",
+                  email: customer.email || "",
+                  address: customer.address || "",
+                  customerId,
+                },
+              });
+            }}
+            style={[styles.quickActionButton, { backgroundColor: `${theme.primary}15` }]}
+            testID="quick-new-quote"
+          >
+            <Feather name="file-plus" size={18} color={theme.primary} />
+            <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginTop: 4 }}>
+              {"New Quote"}
+            </ThemedText>
+          </Pressable>
+          {customer.email ? (
+            <Pressable
+              onPress={() => {
+                setShowCommForm(true);
+                setCommChannel("email");
+              }}
+              style={[styles.quickActionButton, { backgroundColor: `${theme.success}15` }]}
+              testID="quick-email"
+            >
+              <Feather name="mail" size={18} color={theme.success} />
+              <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600", marginTop: 4 }}>
+                {"Email"}
+              </ThemedText>
+            </Pressable>
+          ) : null}
+          {customer.phone ? (
+            <Pressable
+              onPress={() => {
+                setShowCommForm(true);
+                setCommChannel("sms");
+              }}
+              style={[styles.quickActionButton, { backgroundColor: `${theme.warning}15` }]}
+              testID="quick-sms"
+            >
+              <Feather name="message-square" size={18} color={theme.warning} />
+              <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "600", marginTop: 4 }}>
+                {"SMS"}
+              </ThemedText>
+            </Pressable>
+          ) : null}
+        </View>
 
         <SectionHeader title="Status" />
         <View style={styles.statusButtons}>
@@ -712,25 +796,33 @@ export default function CustomerDetailScreen() {
             <View testID="submit-comm-btn">
               <Button
                 onPress={() => {
-                  commMutation.mutate(
-                    {
-                      customerId,
-                      channel: commChannel,
-                      subject: commSubject,
-                      content: commContent,
-                    },
-                    {
-                      onSuccess: () => {
-                        setShowCommForm(false);
-                        setCommChannel("phone");
-                        setCommSubject("");
-                        setCommContent("");
-                      },
-                    }
-                  );
+                  const resetForm = () => {
+                    setShowCommForm(false);
+                    setCommChannel("phone");
+                    setCommSubject("");
+                    setCommContent("");
+                  };
+
+                  if (commChannel === "email" && customer.email) {
+                    sendEmailMutation.mutate(
+                      { to: customer.email, subject: commSubject, body: commContent, customerId },
+                      { onSuccess: resetForm }
+                    );
+                  } else if (commChannel === "sms" && customer.phone) {
+                    sendSmsMutation.mutate(
+                      { to: customer.phone, body: commContent, customerId },
+                      { onSuccess: resetForm }
+                    );
+                  } else {
+                    commMutation.mutate(
+                      { customerId, channel: commChannel, subject: commSubject, content: commContent },
+                      { onSuccess: resetForm }
+                    );
+                  }
                 }}
+                disabled={sendEmailMutation.isPending || sendSmsMutation.isPending || commMutation.isPending}
               >
-                {"Submit"}
+                {commChannel === "email" ? "Send Email" : commChannel === "sms" ? "Send SMS" : "Log Call"}
               </Button>
             </View>
           </View>
@@ -833,6 +925,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Spacing.sm,
+  },
+  quickActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  quickActionButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
   },
   statusBadge: {
     paddingHorizontal: Spacing.sm,

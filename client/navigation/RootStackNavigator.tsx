@@ -19,7 +19,7 @@ export type RootStackParamList = {
   Login: undefined;
   Onboarding: undefined;
   Main: undefined;
-  QuoteCalculator: undefined;
+  QuoteCalculator: { prefillCustomer?: { name: string; phone: string; email: string; address: string; customerId: string } } | undefined;
   QuoteDetail: { quoteId: string };
   CustomerDetail: { customerId: string };
   JobDetail: { jobId: string };

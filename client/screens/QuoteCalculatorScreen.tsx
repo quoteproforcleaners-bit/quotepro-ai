@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, StyleSheet, Pressable, Platform } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -32,17 +32,20 @@ const STEPS = ["Customer", "Property", "Services", "Quote"];
 
 export default function QuoteCalculatorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const route = useRoute();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { pricingSettings, businessProfile } = useApp();
   const queryClient = useQueryClient();
+  const routeParams = (route.params as any) || {};
+  const prefill = routeParams.prefillCustomer;
   const [currentStep, setCurrentStep] = useState(0);
 
   const [customer, setCustomer] = useState<CustomerInfo>({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
+    name: prefill?.name || "",
+    phone: prefill?.phone || "",
+    email: prefill?.email || "",
+    address: prefill?.address || "",
     datePreference: "",
   });
 
