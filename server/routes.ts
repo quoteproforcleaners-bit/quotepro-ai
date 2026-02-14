@@ -1546,66 +1546,56 @@ ${paymentHtml}
       if (!message) return res.status(400).json({ message: "message is required" });
 
       const business = await getBusinessByOwner(req.session.userId!);
-      if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const stats = await getQuoteStats(business.id);
-      const allQuotes = await getQuotesByBusiness(business.id);
-      const sentQuotes = allQuotes.filter(q => q.status === "sent");
-      const customers = await getCustomersByBusiness(business.id);
-      const jobs = await getJobsByBusiness(business.id);
-
+      let contextStr = "No business data available yet.";
       const now = new Date();
-      const monthKey = (d: Date) => `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
 
-      const quotesByMonth: Record<string, number> = {};
-      allQuotes.forEach(q => {
-        const key = monthKey(new Date(q.createdAt));
-        quotesByMonth[key] = (quotesByMonth[key] || 0) + 1;
-      });
-      const quoteBreakdown = Object.entries(quotesByMonth).map(([m, c]) => `${m}: ${c}`).join(", ");
+      if (business) {
+        const stats = await getQuoteStats(business.id);
+        const allQuotes = await getQuotesByBusiness(business.id);
+        const sentQuotes = allQuotes.filter(q => q.status === "sent");
+        const customers = await getCustomersByBusiness(business.id);
+        const jobs = await getJobsByBusiness(business.id);
 
-      const completedJobs = jobs.filter(j => j.status === "completed");
-      const jobsByMonth: Record<string, number> = {};
-      completedJobs.forEach(j => {
-        const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
-        jobsByMonth[monthKey(d)] = (jobsByMonth[monthKey(d)] || 0) + 1;
-      });
-      const jobBreakdown = Object.entries(jobsByMonth).map(([m, c]) => `${m}: ${c}`).join(", ");
+        const completedJobs = jobs.filter(j => j.status === "completed");
 
-      const quotesThisMonth = allQuotes.filter(q => {
-        const d = new Date(q.createdAt);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      });
-      const quotesLastMonth = allQuotes.filter(q => {
-        const d = new Date(q.createdAt);
-        const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
-      });
-      const jobsThisMonth = completedJobs.filter(j => {
-        const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      });
-      const jobsLastMonth = completedJobs.filter(j => {
-        const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
-        const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
-      });
+        const quotesThisMonth = allQuotes.filter(q => {
+          const d = new Date(q.createdAt);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        const quotesLastMonth = allQuotes.filter(q => {
+          const d = new Date(q.createdAt);
+          const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+        });
+        const jobsThisMonth = completedJobs.filter(j => {
+          const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        const jobsLastMonth = completedJobs.filter(j => {
+          const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
+          const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+        });
 
-      const contextStr = [
-        `Date: ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`,
-        `Biz: ${business.companyName}.`,
-        `Quotes: ${stats.totalQuotes} total, ${stats.acceptedQuotes} accepted, ${stats.closeRate}% close, $${stats.totalRevenue} rev, $${stats.avgQuoteValue} avg.`,
-        `This mo: ${quotesThisMonth.length} quotes, last mo: ${quotesLastMonth.length}.`,
-        `${sentQuotes.length} open quotes ($${sentQuotes.reduce((s, q) => s + q.total, 0).toFixed(0)}).`,
-        `${customers.length} customers.`,
-        `Jobs: ${completedJobs.length} done, ${jobs.filter(j => j.status === "scheduled").length} scheduled.`,
-        `Cleans this mo: ${jobsThisMonth.length}, last mo: ${jobsLastMonth.length}.`,
-      ].filter(Boolean).join(" ");
+        contextStr = [
+          `Date: ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`,
+          `Biz: ${business.companyName}.`,
+          `Quotes: ${stats.totalQuotes} total, ${stats.acceptedQuotes} accepted, ${stats.closeRate}% close, $${stats.totalRevenue} rev, $${stats.avgQuoteValue} avg.`,
+          `This mo: ${quotesThisMonth.length} quotes, last mo: ${quotesLastMonth.length}.`,
+          `${sentQuotes.length} open quotes ($${sentQuotes.reduce((s, q) => s + q.total, 0).toFixed(0)}).`,
+          `${customers.length} customers.`,
+          `Jobs: ${completedJobs.length} done, ${jobs.filter(j => j.status === "scheduled").length} scheduled.`,
+          `Cleans this mo: ${jobsThisMonth.length}, last mo: ${jobsLastMonth.length}.`,
+        ].filter(Boolean).join(" ");
+      }
+
+      const businessName = business?.companyName || "your cleaning business";
 
       const chatMessages: any[] = [
         {
           role: "system",
-          content: `You are a concise AI sales assistant for "${business.companyName}" (residential cleaning). Give short, actionable answers (2-4 sentences max). Data:\n${contextStr}`
+          content: `You are a concise AI sales assistant for "${businessName}" (residential cleaning). Give short, actionable answers (2-4 sentences max). Data:\n${contextStr}`
         },
       ];
 
@@ -1619,7 +1609,6 @@ ${paymentHtml}
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
         messages: chatMessages,
-        max_tokens: 300,
       });
 
       const reply = completion.choices[0]?.message?.content?.trim() || "";
@@ -1629,7 +1618,7 @@ ${paymentHtml}
       }
       return res.json({ reply });
     } catch (error: any) {
-      console.error("AI sales chat error:", error);
+      console.error("AI sales chat error:", error?.message || error, error?.stack);
       return res.status(500).json({ message: "Failed to process chat" });
     }
   });
