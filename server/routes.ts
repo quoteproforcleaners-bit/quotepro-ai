@@ -1592,22 +1592,20 @@ ${paymentHtml}
       });
 
       const contextStr = [
-        `Today is ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`,
-        `Business: ${business.companyName}.`,
-        `Quotes: ${stats.totalQuotes} total, ${stats.acceptedQuotes} accepted, ${stats.closeRate}% close rate, $${stats.totalRevenue} total revenue, $${stats.avgQuoteValue} avg quote value.`,
-        `Quotes created this month: ${quotesThisMonth.length}. Last month: ${quotesLastMonth.length}.`,
-        quoteBreakdown ? `Quotes by month: ${quoteBreakdown}.` : "",
-        `${sentQuotes.length} open/sent quotes totaling $${sentQuotes.reduce((s, q) => s + q.total, 0).toFixed(0)}.`,
-        `${customers.length} total customers.`,
-        `Jobs: ${jobs.length} total, ${completedJobs.length} completed, ${jobs.filter(j => j.status === "scheduled").length} scheduled, ${jobs.filter(j => j.status === "in_progress").length} in progress.`,
-        `Cleans completed this month: ${jobsThisMonth.length}. Last month: ${jobsLastMonth.length}.`,
-        jobBreakdown ? `Cleans completed by month: ${jobBreakdown}.` : "",
+        `Date: ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`,
+        `Biz: ${business.companyName}.`,
+        `Quotes: ${stats.totalQuotes} total, ${stats.acceptedQuotes} accepted, ${stats.closeRate}% close, $${stats.totalRevenue} rev, $${stats.avgQuoteValue} avg.`,
+        `This mo: ${quotesThisMonth.length} quotes, last mo: ${quotesLastMonth.length}.`,
+        `${sentQuotes.length} open quotes ($${sentQuotes.reduce((s, q) => s + q.total, 0).toFixed(0)}).`,
+        `${customers.length} customers.`,
+        `Jobs: ${completedJobs.length} done, ${jobs.filter(j => j.status === "scheduled").length} scheduled.`,
+        `Cleans this mo: ${jobsThisMonth.length}, last mo: ${jobsLastMonth.length}.`,
       ].filter(Boolean).join(" ");
 
       const chatMessages: any[] = [
         {
           role: "system",
-          content: `You are an AI sales assistant for "${business.companyName}", a residential cleaning company. Help the owner with sales strategy, follow-up advice, revenue optimization, and business performance questions. Be concise, friendly, and actionable. Here is the current business data:\n\n${contextStr}`
+          content: `You are a concise AI sales assistant for "${business.companyName}" (residential cleaning). Give short, actionable answers (2-4 sentences max). Data:\n${contextStr}`
         },
       ];
 
@@ -1621,6 +1619,7 @@ ${paymentHtml}
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
         messages: chatMessages,
+        max_tokens: 300,
       });
 
       const reply = completion.choices[0]?.message?.content?.trim() || "";

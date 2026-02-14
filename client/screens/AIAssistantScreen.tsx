@@ -1,11 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
   FlatList,
   TextInput,
   Pressable,
-  ScrollView,
   ActivityIndicator,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -24,6 +23,8 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  fullContent?: string;
+  isTyping?: boolean;
   timestamp: Date;
 }
 
@@ -34,6 +35,8 @@ const QUICK_ACTIONS = [
   { text: "Draft a follow-up message", icon: "edit-3" },
   { text: "What quotes are at risk?", icon: "alert-triangle" },
 ];
+
+const TYPING_SPEED_MS = 25;
 
 function getRelativeTime(date: Date): string {
   const now = new Date();
@@ -48,6 +51,35 @@ function getRelativeTime(date: Date): string {
   return `${diffDay}d ago`;
 }
 
+function useTypewriter(messageId: string | null, fullText: string, onUpdate: (id: string, text: string, done: boolean) => void) {
+  const indexRef = useRef(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!messageId || !fullText) return;
+
+    indexRef.current = 0;
+    const words = fullText.split(/(\s+)/);
+    let currentWordIndex = 0;
+    let builtText = "";
+
+    intervalRef.current = setInterval(() => {
+      if (currentWordIndex >= words.length) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        onUpdate(messageId, fullText, true);
+        return;
+      }
+      builtText += words[currentWordIndex];
+      currentWordIndex++;
+      onUpdate(messageId, builtText, false);
+    }, TYPING_SPEED_MS);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [messageId, fullText]);
+}
+
 export default function AIAssistantScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -57,6 +89,8 @@ export default function AIAssistantScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [typingId, setTypingId] = useState<string | null>(null);
+  const [typingFullText, setTypingFullText] = useState("");
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -64,6 +98,20 @@ export default function AIAssistantScreen() {
       navigation.navigate("Paywall");
     }
   }, [isPro]);
+
+  const handleTypewriterUpdate = useCallback((id: string, text: string, done: boolean) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === id ? { ...m, content: text, isTyping: !done } : m
+      )
+    );
+    if (done) {
+      setTypingId(null);
+      setTypingFullText("");
+    }
+  }, []);
+
+  useTypewriter(typingId, typingFullText, handleTypewriterUpdate);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -78,7 +126,8 @@ export default function AIAssistantScreen() {
     const loadingMessage: Message = {
       id: "loading",
       role: "assistant",
-      content: "...",
+      content: "",
+      isTyping: true,
       timestamp: new Date(),
     };
 
@@ -90,7 +139,7 @@ export default function AIAssistantScreen() {
     const conversationHistory = allMessages
       .slice(0, 6)
       .reverse()
-      .map((m) => ({ role: m.role, content: m.content }));
+      .map((m) => ({ role: m.role, content: m.fullContent || m.content }));
 
     try {
       const res = await apiRequest("POST", "/api/ai/sales-chat", {
@@ -99,16 +148,25 @@ export default function AIAssistantScreen() {
       });
       const data = await res.json();
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.reply,
-        timestamp: new Date(),
-      };
+      const assistantId = (Date.now() + 1).toString();
 
       setMessages((prev) =>
-        prev.map((m) => (m.id === "loading" ? assistantMessage : m))
+        prev.map((m) =>
+          m.id === "loading"
+            ? {
+                ...m,
+                id: assistantId,
+                content: "",
+                fullContent: data.reply,
+                isTyping: true,
+                timestamp: new Date(),
+              }
+            : m
+        )
       );
+
+      setTypingId(assistantId);
+      setTypingFullText(data.reply);
     } catch {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -150,21 +208,24 @@ export default function AIAssistantScreen() {
           ]}
         >
           {isLoadingMsg ? (
-            <ActivityIndicator
-              size="small"
-              color={theme.textSecondary}
-              style={{ paddingVertical: Spacing.xs }}
-            />
+            <View style={styles.typingIndicator}>
+              <View style={[styles.typingDot, { backgroundColor: theme.textSecondary }]} />
+              <View style={[styles.typingDot, styles.typingDotMid, { backgroundColor: theme.textSecondary }]} />
+              <View style={[styles.typingDot, styles.typingDotEnd, { backgroundColor: theme.textSecondary }]} />
+            </View>
           ) : (
             <ThemedText
               type="body"
               style={isUser ? { color: "#FFFFFF" } : undefined}
             >
               {item.content}
+              {item.isTyping ? (
+                <ThemedText type="body" style={{ color: theme.primary }}>|</ThemedText>
+              ) : null}
             </ThemedText>
           )}
         </View>
-        {!isLoadingMsg ? (
+        {!isLoadingMsg && !item.isTyping ? (
           <ThemedText
             type="caption"
             style={[
@@ -343,6 +404,24 @@ const styles = StyleSheet.create({
   },
   timestampLeft: {
     textAlign: "left",
+  },
+  typingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.xs,
+    gap: 4,
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    opacity: 0.4,
+  },
+  typingDotMid: {
+    opacity: 0.6,
+  },
+  typingDotEnd: {
+    opacity: 0.8,
   },
   emptyState: {
     alignItems: "center",
