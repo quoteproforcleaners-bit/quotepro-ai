@@ -75,7 +75,6 @@ The core quote calculation logic is in `/client/lib/quoteCalculator.ts`. It calc
 - **@react-navigation/native**: Core navigation.
 - **@react-navigation/native-stack**, **@react-navigation/bottom-tabs**: Specific navigators.
 - **react-native-reanimated**, **react-native-gesture-handler**: For animations and touch.
-- **react-native-paper**: Material 3 UI primitives (Button, TextInput) with PaperProvider wrapping the app. Theme defined in `client/theme/paperTheme.ts`, maps existing app colors to MD3 color scheme. Shared `Button` and `Input` components use Paper internally so all screens benefit automatically.
 - **@expo/vector-icons**: Icon library.
 - **expo-blur**, **expo-haptics**: UI enhancements.
 
