@@ -33,7 +33,7 @@ interface SubscriptionContextType {
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
-const ENTITLEMENT_ID = "pro";
+const ENTITLEMENT_IDS = ["Pro", "QuotePro for Cleaners Pro", "pro"];
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -44,7 +44,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [revenueCatReady, setRevenueCatReady] = useState(false);
 
   const checkEntitlements = useCallback((customerInfo: CustomerInfo) => {
-    const hasEntitlement = customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
+    const hasEntitlement = ENTITLEMENT_IDS.some(id => customerInfo.entitlements.active[id] !== undefined);
     setIsPro(hasEntitlement);
     return hasEntitlement;
   }, []);
