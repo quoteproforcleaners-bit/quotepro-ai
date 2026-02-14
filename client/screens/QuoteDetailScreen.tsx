@@ -195,6 +195,11 @@ export default function QuoteDetailScreen() {
           propertyInfo: `${quote.propertyBeds || 0} bed, ${quote.propertyBaths || 0} bath, ${quote.propertySqft || 0} sqft`,
         },
         bookingLink: businessProfile?.bookingLink || "",
+        paymentMethodsText: (() => {
+          const po = getPaymentOptions(businessProfile?.paymentOptions);
+          const enabled = getEnabledPaymentMethods(po);
+          return enabled.length > 0 ? enabled.map(({ label }) => label).join(", ") : "";
+        })(),
       });
       const data = await res.json();
       if (data.draft) {
@@ -337,7 +342,10 @@ export default function QuoteDetailScreen() {
     const name = quote.propertyDetails?.customerName || "Customer";
     const company = businessProfile?.companyName || "Our Company";
     const price = quote.total || 0;
-    const email = `Hi ${name},\n\nThank you for your interest in ${company}!\n\nBased on your property details, we've prepared a cleaning quote for $${price.toFixed(0)}.\n\nPlease let us know if you'd like to proceed or have any questions.\n\nBest regards,\n${businessProfile?.senderName || company}`;
+    const po = getPaymentOptions(businessProfile?.paymentOptions);
+    const enabled = getEnabledPaymentMethods(po);
+    const pmLine = enabled.length > 0 ? `\n\nWe accept: ${enabled.map(({ label }) => label).join(", ")}.` : "";
+    const email = `Hi ${name},\n\nThank you for your interest in ${company}!\n\nBased on your property details, we've prepared a cleaning quote for $${price.toFixed(0)}.${pmLine}\n\nPlease let us know if you'd like to proceed or have any questions.\n\nBest regards,\n${businessProfile?.senderName || company}`;
     await Clipboard.setStringAsync(email);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

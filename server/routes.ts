@@ -1878,7 +1878,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
 
   app.post("/api/ai/communication-draft", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
-      const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink } = req.body;
+      const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, paymentMethodsText } = req.body;
 
       if (!type || !purpose) {
         return res.status(400).json({ message: "type and purpose are required" });
@@ -1901,12 +1901,14 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
       let systemPrompt: string;
       let userPrompt: string;
 
+      const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
+
       if (type === "sms") {
         systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}`;
-        userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext} Reply with ONLY the message text, nothing else.`;
+        userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
       } else {
         systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""} Start with "Subject: " on line 1, blank line, then body.`;
-        userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext} Reply with ONLY the email, nothing else.`;
+        userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
       }
 
       const completion = await openai.chat.completions.create({

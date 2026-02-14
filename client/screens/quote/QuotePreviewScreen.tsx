@@ -118,12 +118,16 @@ export default function QuotePreviewScreen({
   }, [options, aiDescriptions]);
 
   const emailDraft = useMemo(() => {
+    const po = getPaymentOptions(businessProfile.paymentOptions);
+    const enabled = getEnabledPaymentMethods(po);
+    const pmText = enabled.length > 0 ? enabled.map(({ label }) => label).join(", ") : undefined;
     return generateEmailDraft(
       customer.name || "Customer",
       businessProfile.companyName || "Our Cleaning Company",
       businessProfile.senderName || "Team",
       options,
-      businessProfile.bookingLink
+      businessProfile.bookingLink,
+      pmText
     );
   }, [customer, businessProfile, options]);
 
@@ -179,6 +183,13 @@ export default function QuotePreviewScreen({
     }
   }, [homeDetails, options, addOns, businessProfile, isPro]);
 
+  const paymentMethodsText = useMemo(() => {
+    const po = getPaymentOptions(businessProfile.paymentOptions);
+    const enabled = getEnabledPaymentMethods(po);
+    if (enabled.length === 0) return "";
+    return enabled.map(({ label }) => label).join(", ");
+  }, [businessProfile.paymentOptions]);
+
   const fetchAiEmailDraft = useCallback(async () => {
     if (!isPro) return;
     setAiEmailLoading(true);
@@ -197,6 +208,7 @@ export default function QuotePreviewScreen({
           propertyInfo: `${homeDetails.beds} bed, ${homeDetails.baths} bath, ${homeDetails.sqft} sqft`,
         },
         bookingLink: businessProfile.bookingLink || "",
+        paymentMethodsText,
       });
       const data = await res.json();
       if (data.draft) {
@@ -227,6 +239,7 @@ export default function QuotePreviewScreen({
           propertyInfo: `${homeDetails.beds} bed, ${homeDetails.baths} bath, ${homeDetails.sqft} sqft`,
         },
         bookingLink: businessProfile.bookingLink || "",
+        paymentMethodsText,
       });
       const data = await res.json();
       if (data.draft) {

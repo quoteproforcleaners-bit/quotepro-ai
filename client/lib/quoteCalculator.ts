@@ -217,7 +217,8 @@ export function generateEmailDraft(
   businessName: string,
   senderName: string,
   options: { good: QuoteOption; better: QuoteOption; best: QuoteOption },
-  bookingLink?: string
+  bookingLink?: string,
+  paymentMethodsText?: string
 ): string {
   const betterPrice = options.better.price;
   const goodPrice = options.good.price;
@@ -246,6 +247,12 @@ Ready to book? Click here: ${bookingLink}`;
     email += `
 
 Reply to this email or give us a call to confirm your appointment.`;
+  }
+
+  if (paymentMethodsText) {
+    email += `
+
+We accept: ${paymentMethodsText}.`;
   }
 
   email += `
