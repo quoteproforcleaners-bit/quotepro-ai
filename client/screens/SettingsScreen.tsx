@@ -20,6 +20,9 @@ import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { getApiUrl } from "@/lib/query-client";
+import { PaymentOptions, DEFAULT_PAYMENT_OPTIONS } from "@/types";
+import { PAYMENT_METHOD_LABELS, getPaymentOptions } from "@/lib/paymentOptions";
+import { Switch } from "react-native";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -44,6 +47,9 @@ export default function SettingsScreen() {
   const [showCashappModal, setShowCashappModal] = useState(false);
   const [venmoInput, setVenmoInput] = useState(profile.venmoHandle || "");
   const [cashappInput, setCashappInput] = useState(profile.cashappHandle || "");
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  const currentPaymentOptions = getPaymentOptions(profile.paymentOptions);
+  const [paymentNotesInput, setPaymentNotesInput] = useState(profile.paymentNotes || "");
 
   const handleConnectStripe = async () => {
     try {
@@ -652,6 +658,76 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
+      <SectionHeader title="Payment Options" subtitle="Choose which payment methods appear on quotes" />
+
+      <Pressable
+        onPress={() => setShowPaymentOptions(!showPaymentOptions)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-payment-options"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="credit-card" size={20} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              Accepted Payment Methods
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              {(Object.keys(currentPaymentOptions) as (keyof PaymentOptions)[]).filter(k => currentPaymentOptions[k]?.enabled).length} methods enabled
+            </ThemedText>
+          </View>
+          <Feather name={showPaymentOptions ? "chevron-up" : "chevron-down"} size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      {showPaymentOptions ? (
+        <View style={[styles.paymentOptionsContainer, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          {(Object.keys(PAYMENT_METHOD_LABELS) as (keyof PaymentOptions)[]).map((key) => {
+            const config = PAYMENT_METHOD_LABELS[key];
+            const option = currentPaymentOptions[key];
+            return (
+              <View key={key} style={[styles.paymentOptionRow, { borderBottomColor: theme.border }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: Spacing.sm }}>
+                  <Feather name={config.icon as any} size={18} color={option?.enabled ? theme.primary : theme.textSecondary} />
+                  <ThemedText type="body" style={{ color: option?.enabled ? theme.text : theme.textSecondary }}>
+                    {config.label}
+                  </ThemedText>
+                </View>
+                <Switch
+                  value={option?.enabled || false}
+                  onValueChange={(val) => {
+                    const updated = { ...currentPaymentOptions, [key]: { ...option, enabled: val } };
+                    updateBusinessProfile({ paymentOptions: updated });
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                  thumbColor="#FFFFFF"
+                  testID={`switch-payment-${key}`}
+                />
+              </View>
+            );
+          })}
+
+          <View style={{ padding: Spacing.md }}>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs, fontWeight: "600" }}>
+              Payment Notes (optional)
+            </ThemedText>
+            <RNTextInput
+              value={paymentNotesInput}
+              onChangeText={setPaymentNotesInput}
+              onBlur={() => updateBusinessProfile({ paymentNotes: paymentNotesInput || null })}
+              placeholder="e.g., Payment due upon completion of service"
+              placeholderTextColor={theme.textSecondary}
+              style={[styles.paymentNotesInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.backgroundDefault }]}
+              multiline
+              numberOfLines={2}
+              testID="input-payment-notes"
+            />
+          </View>
+        </View>
+      ) : null}
+
       <SectionHeader title="Account" />
 
       {user ? (
@@ -876,5 +952,27 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.sm,
     alignItems: "center",
+  },
+  paymentOptionsContainer: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+    overflow: "hidden",
+  },
+  paymentOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  paymentNotesInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 14,
+    minHeight: 60,
+    textAlignVertical: "top",
   },
 });
