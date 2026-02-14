@@ -2556,7 +2556,10 @@ Respond with JSON: {"reply": string}`
       return res.json({ url: accountLink.url });
     } catch (error: any) {
       console.error("Stripe connect error:", error);
-      return res.status(500).json({ message: "Failed to create Stripe account" });
+      if (error?.type === "StripeInvalidRequestError" && error?.message?.includes("signed up for Connect")) {
+        return res.status(400).json({ message: "Stripe Connect is not enabled on your Stripe account. Please enable Connect at dashboard.stripe.com/connect before accepting payments." });
+      }
+      return res.status(500).json({ message: "Failed to create Stripe account. Please try again." });
     }
   });
 
