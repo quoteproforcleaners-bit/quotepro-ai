@@ -7,11 +7,12 @@
     "icon": "./assets/images/icon.png",
     "scheme": "quotepro",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": false,
       "requireFullScreen": true,
-      "buildNumber": "7"
+      "bundleIdentifier": "app.replit.quotepro",
+      "buildNumber": "10"
     },
     "android": {
       "package": "com.quotepro.app",
@@ -44,7 +45,7 @@
       "expo-web-browser"
     ],
     "experiments": {
-      "reactCompiler": true
+      "reactCompiler": false
     }
   }
 }
