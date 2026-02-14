@@ -125,6 +125,8 @@ export async function updateBusiness(
     stripeOnboardingComplete: boolean;
     emailSignature: string;
     smsSignature: string;
+    venmoHandle: string | null;
+    cashappHandle: string | null;
   }>
 ): Promise<Business> {
   const [business] = await db

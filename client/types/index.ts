@@ -12,6 +12,8 @@ export interface BusinessProfile {
   emailSignature: string;
   smsSignature: string;
   onboardingComplete: boolean;
+  venmoHandle: string | null;
+  cashappHandle: string | null;
 }
 
 export interface ServiceTypeConfig {
@@ -195,4 +197,6 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
   emailSignature: "",
   smsSignature: "",
   onboardingComplete: false,
+  venmoHandle: null,
+  cashappHandle: null,
 };

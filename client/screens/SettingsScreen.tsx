@@ -1,5 +1,5 @@
-import React from "react";
-import { View, StyleSheet, Image, Pressable, Platform } from "react-native";
+import React, { useState } from "react";
+import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -39,8 +39,15 @@ export default function SettingsScreen() {
     queryKey: ["/api/stripe/status"],
   });
 
+  const [stripeError, setStripeError] = useState<string | null>(null);
+  const [showVenmoModal, setShowVenmoModal] = useState(false);
+  const [showCashappModal, setShowCashappModal] = useState(false);
+  const [venmoInput, setVenmoInput] = useState(profile.venmoHandle || "");
+  const [cashappInput, setCashappInput] = useState(profile.cashappHandle || "");
+
   const handleConnectStripe = async () => {
     try {
+      setStripeError(null);
       const res = await fetch(new URL("/api/stripe/connect", getApiUrl()).toString(), {
         method: "POST",
         credentials: "include",
@@ -49,9 +56,13 @@ export default function SettingsScreen() {
       if (data.url) {
         await WebBrowser.openBrowserAsync(data.url);
         refetchStripe();
+      } else if (data.message) {
+        setStripeError(data.message);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (e) {
-      console.error("Stripe connect error", e);
+      setStripeError("Could not connect to Stripe. Please try again.");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -66,6 +77,20 @@ export default function SettingsScreen() {
     } catch (e) {
       console.error("Stripe disconnect error", e);
     }
+  };
+
+  const handleSaveVenmo = async () => {
+    const handle = venmoInput.trim().replace(/^@/, "");
+    await updateBusinessProfile({ venmoHandle: handle || null });
+    setShowVenmoModal(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleSaveCashapp = async () => {
+    const handle = cashappInput.trim().replace(/^\$/, "");
+    await updateBusinessProfile({ cashappHandle: handle || null });
+    setShowCashappModal(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleConnectCalendar = async () => {
@@ -461,6 +486,172 @@ export default function SettingsScreen() {
         </Pressable>
       )}
 
+      {stripeError ? (
+        <View style={{ backgroundColor: `${theme.error}15`, padding: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
+          <ThemedText type="small" style={{ color: theme.error, textAlign: "center" }}>
+            {stripeError}
+          </ThemedText>
+        </View>
+      ) : null}
+
+      <Pressable
+        onPress={() => {
+          setVenmoInput(profile.venmoHandle || "");
+          setShowVenmoModal(true);
+        }}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-venmo"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: profile.venmoHandle ? `${theme.success}15` : "#008CFF15" }]}>
+            {profile.venmoHandle ? (
+              <Feather name="check-circle" size={20} color={theme.success} />
+            ) : (
+              <Feather name="dollar-sign" size={20} color="#008CFF" />
+            )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              Venmo
+            </ThemedText>
+            <ThemedText type="small" style={{ color: profile.venmoHandle ? theme.success : theme.textSecondary }}>
+              {profile.venmoHandle ? `@${profile.venmoHandle}` : "Add your Venmo username"}
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
+        onPress={() => {
+          setCashappInput(profile.cashappHandle || "");
+          setShowCashappModal(true);
+        }}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-cashapp"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: profile.cashappHandle ? `${theme.success}15` : "#00D63215" }]}>
+            {profile.cashappHandle ? (
+              <Feather name="check-circle" size={20} color={theme.success} />
+            ) : (
+              <Feather name="dollar-sign" size={20} color="#00D632" />
+            )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              Cash App
+            </ThemedText>
+            <ThemedText type="small" style={{ color: profile.cashappHandle ? theme.success : theme.textSecondary }}>
+              {profile.cashappHandle ? `$${profile.cashappHandle}` : "Add your Cash App $cashtag"}
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Modal visible={showVenmoModal} transparent animationType="fade" onRequestClose={() => setShowVenmoModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
+            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md }}>Venmo Username</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
+              Enter your Venmo username so customers can pay you directly
+            </ThemedText>
+            <View style={[styles.handleInputRow, { borderColor: theme.border, backgroundColor: theme.background }]}>
+              <ThemedText type="body" style={{ color: theme.textSecondary }}>@</ThemedText>
+              <RNTextInput
+                value={venmoInput}
+                onChangeText={setVenmoInput}
+                placeholder="your-venmo-username"
+                placeholderTextColor={theme.textSecondary}
+                style={[styles.handleInput, { color: theme.text }]}
+                autoCapitalize="none"
+                autoCorrect={false}
+                testID="input-venmo"
+              />
+            </View>
+            <View style={{ flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.lg }}>
+              <Pressable
+                onPress={() => setShowVenmoModal(false)}
+                style={[styles.modalButton, { backgroundColor: theme.background, flex: 1 }]}
+              >
+                <ThemedText type="body" style={{ textAlign: "center" }}>Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={handleSaveVenmo}
+                style={[styles.modalButton, { backgroundColor: "#008CFF", flex: 1 }]}
+                testID="button-save-venmo"
+              >
+                <ThemedText type="body" style={{ color: "#FFFFFF", textAlign: "center", fontWeight: "600" }}>Save</ThemedText>
+              </Pressable>
+            </View>
+            {profile.venmoHandle ? (
+              <Pressable
+                onPress={async () => {
+                  await updateBusinessProfile({ venmoHandle: null });
+                  setShowVenmoModal(false);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }}
+                style={{ marginTop: Spacing.md, alignItems: "center" }}
+              >
+                <ThemedText type="small" style={{ color: theme.error }}>Remove Venmo</ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showCashappModal} transparent animationType="fade" onRequestClose={() => setShowCashappModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
+            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md }}>Cash App $cashtag</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
+              Enter your Cash App $cashtag so customers can pay you directly
+            </ThemedText>
+            <View style={[styles.handleInputRow, { borderColor: theme.border, backgroundColor: theme.background }]}>
+              <ThemedText type="body" style={{ color: theme.textSecondary }}>$</ThemedText>
+              <RNTextInput
+                value={cashappInput}
+                onChangeText={setCashappInput}
+                placeholder="your-cashtag"
+                placeholderTextColor={theme.textSecondary}
+                style={[styles.handleInput, { color: theme.text }]}
+                autoCapitalize="none"
+                autoCorrect={false}
+                testID="input-cashapp"
+              />
+            </View>
+            <View style={{ flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.lg }}>
+              <Pressable
+                onPress={() => setShowCashappModal(false)}
+                style={[styles.modalButton, { backgroundColor: theme.background, flex: 1 }]}
+              >
+                <ThemedText type="body" style={{ textAlign: "center" }}>Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={handleSaveCashapp}
+                style={[styles.modalButton, { backgroundColor: "#00D632", flex: 1 }]}
+                testID="button-save-cashapp"
+              >
+                <ThemedText type="body" style={{ color: "#FFFFFF", textAlign: "center", fontWeight: "600" }}>Save</ThemedText>
+              </Pressable>
+            </View>
+            {profile.cashappHandle ? (
+              <Pressable
+                onPress={async () => {
+                  await updateBusinessProfile({ cashappHandle: null });
+                  setShowCashappModal(false);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }}
+                style={{ marginTop: Spacing.md, alignItems: "center" }}
+              >
+                <ThemedText type="small" style={{ color: theme.error }}>Remove Cash App</ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
       <SectionHeader title="Account" />
 
       {user ? (
@@ -653,5 +844,37 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.sm,
     marginTop: Spacing.lg,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.lg,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.xl,
+  },
+  handleInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: 4,
+  },
+  handleInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 4,
+  },
+  modalButton: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
   },
 });

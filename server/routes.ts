@@ -2961,6 +2961,8 @@ function formatBusiness(b: any) {
     bookingLink: b.bookingLink,
     timezone: b.timezone,
     onboardingComplete: b.onboardingComplete,
+    venmoHandle: b.venmoHandle || null,
+    cashappHandle: b.cashappHandle || null,
   };
 }
 

@@ -49,6 +49,8 @@ export const businesses = pgTable("businesses", {
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   stripeAccountId: text("stripe_account_id"),
   stripeOnboardingComplete: boolean("stripe_onboarding_complete").notNull().default(false),
+  venmoHandle: text("venmo_handle"),
+  cashappHandle: text("cashapp_handle"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
