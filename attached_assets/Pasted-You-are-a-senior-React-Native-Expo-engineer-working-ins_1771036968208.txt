@@ -1,0 +1,76 @@
+You are a senior React Native (Expo) engineer working inside my existing iPhone app “QuotePro” in Replit. Add a new feature: “Payment Options” that the app user can configure in Settings, and those selected payment methods must appear on every generated Quote preview and in the sent quote message templates (email/text). Do NOT create a new app. Keep the current app working and reuse existing patterns/components.
+
+GOALS
+1) In Settings: allow the user to choose which payment methods they accept (Cash, Check, Credit Card, Venmo, Cash App, Zelle, Apple Pay, ACH, Other).
+2) Those selected methods should display on the Quote (preview screen + any PDF/HTML quote output if you have it).
+3) When sending a quote via email/text (templates + AI drafts), include a “Payment Options” line that lists selected methods.
+4) Persist these settings locally (AsyncStorage or whatever the app already uses). No backend. No user accounts.
+
+UX REQUIREMENTS
+- Add a new Settings section/card titled “Payments”.
+- Inside: a list of toggles (switches) for each payment method.
+- Optional: inputs for handles/usernames for Venmo/Cash App/Zelle (e.g., @TwoMaidsMainLine, $TwoMaidsMainLine, phone/email).
+- Optional: a free-text “Payment Notes” field (e.g., “3% fee for credit card payments”).
+- Show a small live preview in Settings:
+  “Payment Options shown on quotes: Cash • Check • Venmo (@handle) …”
+
+DEFAULTS
+- Default enabled: Cash, Check, Credit Card.
+- All others default off.
+
+DATA MODEL
+Create/update a settings object similar to existing settings.
+Example shape:
+paymentOptions: {
+  cash: { enabled: boolean },
+  check: { enabled: boolean },
+  creditCard: { enabled: boolean, feeNote?: string },
+  venmo: { enabled: boolean, handle?: string },
+  cashApp: { enabled: boolean, handle?: string },
+  zelle: { enabled: boolean, handle?: string },
+  applePay: { enabled: boolean },
+  ach: { enabled: boolean },
+  other: { enabled: boolean, label?: string }
+},
+paymentNotes?: string
+
+IMPLEMENTATION DETAILS
+- First, scan the repo and find:
+  - where Settings are stored (AsyncStorage / context / reducer)
+  - where Quote preview is rendered
+  - where email/text templates are generated
+- Implement with minimal refactors and consistent styling.
+- Add helper function:
+  `formatPaymentOptionsForDisplay(paymentOptions): string`
+  Returns something like:
+  “Cash • Check • Credit Card • Venmo (@handle) • Cash App ($handle)”
+- Add another helper:
+  `formatPaymentOptionsForMessage(paymentOptions, paymentNotes): string`
+  Returns something like:
+  “Payment Options: Cash, Check, Credit Card, Venmo (@handle). Notes: 3% fee for credit cards.”
+  (Only include notes if present.)
+
+WHERE TO DISPLAY ON QUOTES
+- On the Quote Preview screen, add a section near the bottom:
+  Title: “Payment Options”
+  Body: formatted list
+  Optional notes displayed below.
+- If you generate a “quote PDF/HTML/email body”, also include the section in the quote body.
+
+WHERE TO INCLUDE IN MESSAGES
+- Update “Send Quote” templates (email + text) to include payment options.
+- Update AI prompt/stub generation so it includes payment options automatically, e.g.:
+  “They accept: {paymentOptionsString}. {paymentNotesIfAny}”
+
+SAFETY / MIGRATIONS
+- If existing settings already exist, merge safely (don’t overwrite).
+- If older installs have no paymentOptions, initialize defaults.
+- Ensure app compiles.
+
+DELIVERABLES
+1) Working Payment Options feature in Settings.
+2) Payment Options visible on Quote preview/output.
+3) Payment Options included in send templates (email/text) + AI drafts/stubs.
+4) Update README with a short note: “How to set payment options.”
+
+Now: inspect the repo, list the exact files you will modify, then implement.

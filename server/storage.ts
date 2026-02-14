@@ -127,6 +127,8 @@ export async function updateBusiness(
     smsSignature: string;
     venmoHandle: string | null;
     cashappHandle: string | null;
+    paymentOptions: unknown;
+    paymentNotes: string | null;
   }>
 ): Promise<Business> {
   const [business] = await db

@@ -2993,6 +2993,8 @@ function formatBusiness(b: any) {
     onboardingComplete: b.onboardingComplete,
     venmoHandle: b.venmoHandle || null,
     cashappHandle: b.cashappHandle || null,
+    paymentOptions: b.paymentOptions || null,
+    paymentNotes: b.paymentNotes || null,
   };
 }
 

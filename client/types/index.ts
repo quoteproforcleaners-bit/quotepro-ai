@@ -1,3 +1,34 @@
+export interface PaymentMethodOption {
+  enabled: boolean;
+  handle?: string;
+  feeNote?: string;
+  label?: string;
+}
+
+export interface PaymentOptions {
+  cash: PaymentMethodOption;
+  check: PaymentMethodOption;
+  creditCard: PaymentMethodOption;
+  venmo: PaymentMethodOption;
+  cashApp: PaymentMethodOption;
+  zelle: PaymentMethodOption;
+  applePay: PaymentMethodOption;
+  ach: PaymentMethodOption;
+  other: PaymentMethodOption;
+}
+
+export const DEFAULT_PAYMENT_OPTIONS: PaymentOptions = {
+  cash: { enabled: true },
+  check: { enabled: true },
+  creditCard: { enabled: true },
+  venmo: { enabled: false },
+  cashApp: { enabled: false },
+  zelle: { enabled: false },
+  applePay: { enabled: false },
+  ach: { enabled: false },
+  other: { enabled: false },
+};
+
 export interface BusinessProfile {
   id: string;
   companyName: string;
@@ -14,6 +45,8 @@ export interface BusinessProfile {
   onboardingComplete: boolean;
   venmoHandle: string | null;
   cashappHandle: string | null;
+  paymentOptions: PaymentOptions | null;
+  paymentNotes: string | null;
 }
 
 export interface ServiceTypeConfig {
@@ -199,4 +232,6 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
   onboardingComplete: false,
   venmoHandle: null,
   cashappHandle: null,
+  paymentOptions: null,
+  paymentNotes: null,
 };
