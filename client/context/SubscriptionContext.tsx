@@ -159,14 +159,28 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return true;
       }
 
-      if (!currentOffering?.monthly) {
+      const RC = getPurchases();
+      if (!RC) throw new Error("RevenueCat not available");
+
+      let offering = currentOffering;
+      if (!offering?.monthly) {
+        try {
+          const offerings = await RC.getOfferings();
+          if (offerings.current) {
+            setCurrentOffering(offerings.current);
+            offering = offerings.current;
+          }
+        } catch (retryError) {
+          console.error("Failed to retry fetching offerings:", retryError);
+        }
+      }
+
+      if (!offering?.monthly) {
         console.error("No monthly package available");
         return false;
       }
 
-      const RC = getPurchases();
-      if (!RC) throw new Error("RevenueCat not available");
-      const { customerInfo } = await RC.purchasePackage(currentOffering.monthly);
+      const { customerInfo } = await RC.purchasePackage(offering.monthly);
       const hasPro = checkEntitlements(customerInfo);
       await syncSubscriptionToServer(hasPro);
       return hasPro;
