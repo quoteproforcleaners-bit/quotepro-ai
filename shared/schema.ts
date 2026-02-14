@@ -47,6 +47,8 @@ export const businesses = pgTable("businesses", {
   smsSignature: text("sms_signature").notNull().default(""),
   timezone: text("timezone").notNull().default("America/New_York"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
+  stripeAccountId: text("stripe_account_id"),
+  stripeOnboardingComplete: boolean("stripe_onboarding_complete").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -120,6 +122,10 @@ export const quotes = pgTable("quotes", {
   closeProbability: integer("close_probability"),
   expectedValue: real("expected_value"),
   aiNotes: text("ai_notes"),
+  paymentStatus: text("payment_status").notNull().default("unpaid"),
+  paymentIntentId: text("payment_intent_id"),
+  paymentAmount: real("payment_amount"),
+  paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
