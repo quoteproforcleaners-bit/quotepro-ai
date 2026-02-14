@@ -16,25 +16,52 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSequence,
-  withDelay,
   Easing,
   runOnJS,
 } from "react-native-reanimated";
 import { ThemedText } from "@/components/ThemedText";
-import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { FeatureFlags } from "@/lib/featureFlags";
 import { runAiCommand, EXAMPLE_PROMPTS, AiCommandResult } from "@/lib/aiCommandRouter";
 
+/*
+ * ─── Design Tokens (Home Screen) ───
+ * Adjust these to tweak the visual polish.
+ * "dt" = design token
+ */
+function useDesignTokens() {
+  const { theme, isDark } = useTheme();
+  return useMemo(() => ({
+    gradientTop: isDark ? "#162034" : "#F0F4F9",
+    gradientBottom: isDark ? "#0B1120" : "#E8ECF2",
+    surfacePrimary: theme.cardBackground,
+    surfaceSecondary: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
+    borderPrimary: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+    borderSecondary: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+    borderAccent: isDark ? `${theme.primary}35` : `${theme.primary}25`,
+    textPrimary: theme.text,
+    textSecondary: theme.textSecondary,
+    textMuted: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.35)",
+    accent: theme.primary,
+    accentMuted: isDark ? "rgba(100,160,255,0.55)" : "rgba(0,100,200,0.5)",
+    accentSoft: isDark ? "rgba(100,160,255,0.12)" : "rgba(0,122,255,0.08)",
+    chipBg: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
+    chipBorder: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+    shadowPrimary: isDark
+      ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12 }
+      : { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
+  }), [theme, isDark]);
+}
+
 function RotatingPrompts({ onTap }: { onTap: (prompt: string) => void }) {
-  const { theme } = useTheme();
+  const dt = useDesignTokens();
   const [currentIndex, setCurrentIndex] = useState(() => Math.floor(Math.random() * EXAMPLE_PROMPTS.length));
   const [displayText, setDisplayText] = useState(EXAMPLE_PROMPTS[currentIndex]);
   const opacity = useSharedValue(1);
@@ -76,8 +103,8 @@ function RotatingPrompts({ onTap }: { onTap: (prompt: string) => void }) {
   return (
     <Pressable onPress={() => onTap(displayText)} testID="rotating-prompt">
       <Animated.View style={[styles.promptContainer, animStyle]}>
-        <Feather name="zap" size={14} color={theme.primary} style={{ marginRight: 6 }} />
-        <ThemedText type="small" style={{ color: theme.primary, flex: 1 }} numberOfLines={1}>
+        <Feather name="zap" size={13} color={dt.accent} style={{ marginRight: 6 }} />
+        <ThemedText type="small" style={{ color: dt.accentMuted, flex: 1, fontSize: 13 }} numberOfLines={1}>
           {displayText}
         </ThemedText>
       </Animated.View>
@@ -95,6 +122,7 @@ const QUICK_ACTIONS = [
 ];
 
 function QuickActionChips({ onAction }: { onAction: (action: string) => void }) {
+  const dt = useDesignTokens();
   const { theme } = useTheme();
   return (
     <FlatList
@@ -103,34 +131,38 @@ function QuickActionChips({ onAction }: { onAction: (action: string) => void }) 
       data={QUICK_ACTIONS}
       keyExtractor={(item) => item.action}
       contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.sm }}
-      renderItem={({ item }) => (
-        <Pressable
-          onPress={() => {
-            if (item.action === "invoices") return;
-            onAction(item.action);
-          }}
-          style={[
-            styles.chip,
-            {
-              backgroundColor: item.action === "invoices" ? theme.backgroundSecondary : theme.cardBackground,
-              borderColor: theme.border,
-              opacity: item.action === "invoices" ? 0.6 : 1,
-            },
-          ]}
-          testID={`chip-${item.action}`}
-        >
-          <Feather name={item.icon} size={14} color={item.action === "invoices" ? theme.textSecondary : theme.primary} />
-          <ThemedText
-            type="caption"
-            style={{
-              color: item.action === "invoices" ? theme.textSecondary : theme.text,
-              marginLeft: 6,
+      renderItem={({ item }) => {
+        const disabled = item.action === "invoices";
+        return (
+          <Pressable
+            onPress={() => {
+              if (disabled) return;
+              onAction(item.action);
             }}
+            style={({ pressed }) => [
+              styles.chip,
+              {
+                backgroundColor: pressed && !disabled ? dt.accentSoft : dt.chipBg,
+                borderColor: dt.chipBorder,
+                opacity: disabled ? 0.5 : 1,
+              },
+            ]}
+            testID={`chip-${item.action}`}
           >
-            {item.action === "invoices" ? "Coming soon" : item.label}
-          </ThemedText>
-        </Pressable>
-      )}
+            <Feather name={item.icon} size={13} color={disabled ? dt.textMuted : theme.textSecondary} />
+            <ThemedText
+              type="caption"
+              style={{
+                color: disabled ? dt.textMuted : dt.textPrimary,
+                marginLeft: 6,
+                fontWeight: "500",
+              }}
+            >
+              {disabled ? "Coming soon" : item.label}
+            </ThemedText>
+          </Pressable>
+        );
+      }}
     />
   );
 }
@@ -140,6 +172,7 @@ function ResponseCard({ result, onDismiss, onAction }: {
   onDismiss: () => void;
   onAction: (action: string) => void;
 }) {
+  const dt = useDesignTokens();
   const { theme } = useTheme();
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(10);
@@ -155,21 +188,21 @@ function ResponseCard({ result, onDismiss, onAction }: {
   }));
 
   return (
-    <Animated.View style={[styles.responseCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }, animStyle]}>
+    <Animated.View style={[styles.responseCard, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderSecondary }, animStyle]}>
       <View style={styles.responseHeader}>
-        <View style={[styles.responseIconBg, { backgroundColor: `${theme.primary}15` }]}>
-          <Feather name="cpu" size={16} color={theme.primary} />
+        <View style={[styles.responseIconBg, { backgroundColor: dt.accentSoft }]}>
+          <Feather name="cpu" size={16} color={dt.accent} />
         </View>
         <ThemedText type="small" style={{ fontWeight: "600", flex: 1 }}>QuotePro</ThemedText>
         <Pressable onPress={onDismiss} hitSlop={12}>
-          <Feather name="x" size={16} color={theme.textSecondary} />
+          <Feather name="x" size={16} color={dt.textMuted} />
         </Pressable>
       </View>
       <ThemedText type="body" style={{ marginTop: Spacing.sm }}>
         {result.responseText}
       </ThemedText>
       {result.metricValue ? (
-        <ThemedText type="h1" style={{ color: theme.primary, marginTop: Spacing.sm }}>
+        <ThemedText type="h1" style={{ color: dt.accent, marginTop: Spacing.sm }}>
           {result.metricValue}
         </ThemedText>
       ) : null}
@@ -178,10 +211,10 @@ function ResponseCard({ result, onDismiss, onAction }: {
           {result.suggestedActions.map((a, i) => (
             <Pressable
               key={i}
-              style={[styles.suggestedChip, { backgroundColor: `${theme.primary}10`, borderColor: `${theme.primary}30` }]}
+              style={[styles.suggestedChip, { backgroundColor: dt.accentSoft, borderColor: "transparent" }]}
               onPress={() => onAction(a)}
             >
-              <ThemedText type="caption" style={{ color: theme.primary }}>{a}</ThemedText>
+              <ThemedText type="caption" style={{ color: dt.accent }}>{a}</ThemedText>
             </Pressable>
           ))}
         </View>
@@ -193,18 +226,18 @@ function ResponseCard({ result, onDismiss, onAction }: {
 function GlanceCard({ title, value, icon, color, onPress }: {
   title: string; value: string; icon: keyof typeof Feather.glyphMap; color: string; onPress?: () => void;
 }) {
-  const { theme } = useTheme();
+  const dt = useDesignTokens();
   return (
     <Pressable
-      style={[styles.glanceCard, { backgroundColor: theme.cardBackground }]}
+      style={[styles.glanceCard, { backgroundColor: dt.surfaceSecondary }]}
       onPress={onPress}
       testID={`glance-${title.toLowerCase().replace(/\s/g, "-")}`}
     >
-      <View style={[styles.glanceIcon, { backgroundColor: `${color}15` }]}>
-        <Feather name={icon} size={16} color={color} />
+      <View style={[styles.glanceIcon, { backgroundColor: `${color}12` }]}>
+        <Feather name={icon} size={15} color={color} />
       </View>
       <ThemedText type="h3" style={{ marginTop: 6 }}>{value}</ThemedText>
-      <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>{title}</ThemedText>
+      <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>{title}</ThemedText>
     </Pressable>
   );
 }
@@ -215,6 +248,7 @@ export default function DashboardScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
+  const dt = useDesignTokens();
   const { businessProfile: profile } = useApp();
   const inputRef = useRef<TextInput>(null);
 
@@ -346,7 +380,10 @@ export default function DashboardScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <LinearGradient
+      colors={[dt.gradientTop, dt.gradientBottom]}
+      style={styles.container}
+    >
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -357,7 +394,7 @@ export default function DashboardScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.greetingRow}>
-          <ThemedText type="caption" style={{ color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 1, fontWeight: "600" }}>
+          <ThemedText type="caption" style={{ color: dt.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: "500", fontSize: 11 }}>
             {getGreeting()}
           </ThemedText>
           <ThemedText type="h4" numberOfLines={1} style={{ marginTop: 2 }}>
@@ -365,16 +402,23 @@ export default function DashboardScreen() {
           </ThemedText>
         </View>
 
-        <View style={[styles.commandCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          <ThemedText type="h4" style={{ marginBottom: Spacing.sm }}>
+        <View style={[
+          styles.commandCard,
+          {
+            backgroundColor: dt.surfacePrimary,
+            borderColor: dt.borderAccent,
+            ...(Platform.OS === "ios" ? dt.shadowPrimary : {}),
+          },
+        ]}>
+          <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm, fontWeight: "600" }}>
             What would you like to do?
           </ThemedText>
-          <View style={[styles.inputRow, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}>
+          <View style={[styles.inputRow, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
             <TextInput
               ref={inputRef}
-              style={[styles.commandInput, { color: theme.text }]}
+              style={[styles.commandInput, { color: dt.textPrimary }]}
               placeholder="Ask QuotePro..."
-              placeholderTextColor={theme.textSecondary}
+              placeholderTextColor={dt.textMuted}
               value={commandText}
               onChangeText={setCommandText}
               onSubmitEditing={handleSubmit}
@@ -383,10 +427,10 @@ export default function DashboardScreen() {
             />
             <Pressable
               onPress={handleSubmit}
-              style={[styles.sendBtn, { backgroundColor: commandText.trim() ? theme.primary : theme.backgroundSecondary }]}
+              style={[styles.sendBtn, { backgroundColor: commandText.trim() ? dt.accent : dt.chipBg }]}
               testID="command-send"
             >
-              <Feather name="send" size={16} color={commandText.trim() ? "#FFF" : theme.textSecondary} />
+              <Feather name="send" size={15} color={commandText.trim() ? "#FFF" : dt.textMuted} />
             </Pressable>
           </View>
           <RotatingPrompts onTap={handlePromptTap} />
@@ -403,24 +447,29 @@ export default function DashboardScreen() {
         ) : null}
 
         {!FeatureFlags.aiEnabled ? (
-          <View style={[styles.aiBanner, { backgroundColor: `${theme.primary}08`, borderColor: `${theme.primary}20` }]}>
+          <View style={[styles.aiBanner, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
             <View style={styles.aiBannerContent}>
-              <Feather name="zap" size={16} color={theme.primary} />
+              <View style={[styles.aiBannerIcon, { backgroundColor: dt.accentSoft }]}>
+                <Feather name="zap" size={14} color={dt.accent} />
+              </View>
               <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                <ThemedText type="small" style={{ fontWeight: "600" }}>
+                <ThemedText type="small" style={{ fontWeight: "600", fontSize: 13 }}>
                   AI features launch in ~1-2 weeks
                 </ThemedText>
-                <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 1, fontSize: 11 }}>
                   Smart replies, auto follow-ups, and more
                 </ThemedText>
               </View>
             </View>
             <Pressable
-              style={[styles.upgradeCta, { backgroundColor: theme.primary }]}
+              style={[styles.upgradeCta, { borderColor: dt.accent }]}
               onPress={() => navigation.navigate("Paywall")}
               testID="upgrade-cta"
             >
-              <ThemedText type="caption" style={{ color: "#FFF", fontWeight: "600" }}>Learn More</ThemedText>
+              <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600", fontSize: 12 }}>
+                See AI Features
+              </ThemedText>
+              <Feather name="arrow-right" size={12} color={dt.accent} style={{ marginLeft: 4 }} />
             </Pressable>
           </View>
         ) : null}
@@ -430,9 +479,9 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <ThemedText type="h4">Today at a glance</ThemedText>
+          <ThemedText type="subtitle" style={{ fontWeight: "600", fontSize: 15 }}>Today at a glance</ThemedText>
           <Pressable onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })} testID="recent-quotes-link">
-            <ThemedText type="caption" style={{ color: theme.primary }}>Recent Quotes</ThemedText>
+            <ThemedText type="caption" style={{ color: dt.accentMuted, fontSize: 12 }}>Recent Quotes</ThemedText>
           </Pressable>
         </View>
 
@@ -460,7 +509,7 @@ export default function DashboardScreen() {
           />
         </View>
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -489,17 +538,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingLeft: Spacing.md,
     paddingRight: 4,
-    height: 48,
+    height: 46,
   },
   commandInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     height: "100%",
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -507,19 +556,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: Spacing.sm,
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   chip: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: 7,
     borderRadius: BorderRadius.full,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   responseCard: {
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.lg,
   },
   responseHeader: {
@@ -544,12 +593,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: 6,
     borderRadius: BorderRadius.full,
-    borderWidth: 1,
   },
   aiBanner: {
     marginHorizontal: Spacing.lg,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.md,
     marginBottom: Spacing.lg,
   },
@@ -557,13 +605,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  aiBannerIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   upgradeCta: {
     alignSelf: "flex-start",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: BorderRadius.full,
+    borderWidth: 1,
     marginTop: Spacing.sm,
-    marginLeft: 28,
+    marginLeft: 40,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -580,13 +638,13 @@ const styles = StyleSheet.create({
   },
   glanceCard: {
     flex: 1,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.md,
     padding: Spacing.md,
   },
   glanceIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },

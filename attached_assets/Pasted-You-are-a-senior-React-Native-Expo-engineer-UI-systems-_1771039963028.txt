@@ -1,0 +1,100 @@
+You are a senior React Native (Expo) engineer + UI systems engineer working inside my existing iPhone app “QuotePro” in Replit. Your task is to “tighten the design system” on the Home (AI Command Center) screen WITHOUT breaking navigation or changing app logic. Do NOT create a new app. Minimal refactors. Reuse existing components/styles wherever possible.
+
+OBJECTIVE
+Make the Home screen feel more premium and intentional by applying:
+1) Subtle page background gradient (top slightly lighter, bottom darker)
+2) Reduce “glow/border” usage everywhere except the primary AI card (create hierarchy)
+3) Typography tightening (clearer hierarchy, consistent sizes/weights, less noisy labels)
+4) CTA refinement (AI Launch banner button + link styles) so it feels product-native, not marketing
+
+SCOPE (IMPORTANT)
+- Only change styling + small UI text labels on the Home screen (and shared style constants if they exist).
+- Do NOT change data models, navigation routes, or business logic.
+- Keep the screen layout and components the same; this is a polish pass.
+- Avoid new heavy deps. Prefer built-in RN features.
+- If a gradient library is already installed, use it; otherwise add `expo-linear-gradient` (Expo-friendly).
+
+STEP 1: INSPECT
+Scan the repo and identify:
+- Home screen file/component (AI Command Center)
+- Any shared theme/style constants (colors, spacing, typography)
+- Common Card/Button components used on Home
+List the exact files you will touch BEFORE making changes.
+
+DESIGN CHANGES (EXACT REQUIREMENTS)
+
+A) PAGE BACKGROUND GRADIENT (subtle)
+- Add a top-to-bottom gradient behind the entire Home screen.
+- Top: slightly lighter navy (or same hue with +10–15% brightness)
+- Bottom: deeper navy.
+- Ensure it respects SafeArea and doesn’t cause performance issues.
+Implementation:
+- Preferred: `expo-linear-gradient` wrapped around the screen container.
+- If already using a background View, replace that with LinearGradient while keeping padding.
+
+B) BORDER/GLOW REDUCTION (hierarchy)
+Right now many elements have similar borders/glows. We want:
+- Primary AI card: KEEP a tasteful border/glow (slightly brighter than others).
+- Secondary cards (AI launch banner, stat cards, chips): REDUCE border intensity by ~40% or remove borders entirely, relying on subtle elevation/background contrast.
+Rules:
+- Primary AI card: border opacity ~0.25–0.35 + subtle shadow
+- Secondary cards: border opacity ~0.10–0.15 OR no border
+- Chips: no glowing border; use a flatter surface with a tiny highlight only on press/focus
+- “Today at a glance” cards: remove strong border; make them flatter and slightly darker/lighter than background for separation
+
+C) TYPOGRAPHY TIGHTENING
+- Establish a clear hierarchy:
+  - Screen title (“Two Maids of Malvern”): strong
+  - Section headers (“What would you like to do?”, “Today at a glance”): slightly smaller than title but bold
+  - Secondary labels (“GOOD EVENING”): reduce letter spacing and opacity a bit
+  - Body text: consistent color and line height
+- Reduce overly bright blue text that competes with CTAs:
+  - The rotating example prompt line should NOT be bright electric blue.
+  - Make it a softer neutral/teal-gray (still clearly tappable), and keep only the ⚡ icon in the accent color.
+
+D) CTA REFINEMENT (AI Launch Banner + Links)
+- AI launch banner:
+  - Keep the banner but make it feel product-native.
+  - Change button style from default “big blue pill” to one of:
+    - “tonal” contained (muted), OR
+    - outline button (preferred for premium).
+  - Button label change:
+    - Replace “Learn More” with “See AI Features” (or “Preview AI” if it fits).
+  - Add a small right-arrow icon on the button if icons are already used in buttons.
+- “Recent Quotes” link:
+  - Reduce brightness; use a slightly muted accent color.
+  - Ensure it still reads as tappable.
+
+E) DESIGN TOKENS (DO THIS CLEANLY)
+Create/extend a simple token object used by Home styles (and optionally shared theme if present):
+- colors: backgroundTop, backgroundBottom, surfacePrimary, surfaceSecondary, borderPrimary, borderSecondary, textPrimary, textSecondary, accent, accentMuted
+- typography: title, sectionTitle, label, body
+- radius: cardRadius, chipRadius
+- shadow/elevation presets
+
+Use these tokens in the Home styles so it’s consistent and easy to tweak.
+
+IMPLEMENTATION DETAILS
+- Use StyleSheet for styles (or existing system if the app uses one).
+- Keep current spacing and layout mostly identical; this is a polish pass.
+- Verify dark mode contrast remains accessible.
+- Ensure iOS rendering looks good (shadows, rounded corners, safe area).
+
+DELIVERABLES
+1) Updated Home screen styling with gradient background, border reduction, refined typography, and refined CTA + links.
+2) A short “Design Tokens” comment in code showing where to adjust colors/typography later.
+3) List of files changed.
+
+ACCEPTANCE CHECKS
+- App compiles/runs.
+- No navigation changes.
+- AI card is visually dominant.
+- Secondary UI feels calmer (less glow everywhere).
+- Example prompt no longer competes with the CTA.
+- Banner button reads “See AI Features” and looks premium (outline or tonal).
+
+Now begin:
+- Scan the repo
+- Identify the Home screen + any theme files
+- List exact files to change
+- Implement the polish pass.
