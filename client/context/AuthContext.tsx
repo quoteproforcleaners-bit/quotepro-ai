@@ -16,6 +16,7 @@ interface AuthContextType {
   register: (email: string, password: string, name?: string) => Promise<void>;
   loginWithApple: (data: { identityToken: string; user: string; fullName?: any; email?: string }) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  refreshAuth: () => Promise<void>;
   logout: () => Promise<void>;
   setNeedsOnboarding: (val: boolean) => void;
 }
@@ -82,6 +83,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNeedsOnboarding(result.needsOnboarding);
   };
 
+  const refreshAuth = async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/auth/me", baseUrl);
+      const res = await fetch(url, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.user);
+        setNeedsOnboarding(data.needsOnboarding);
+      }
+    } catch (error) {
+      console.log("Auth refresh failed");
+    }
+  };
+
   const logout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout");
@@ -100,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         loginWithApple,
         loginWithGoogle,
+        refreshAuth,
         logout,
         setNeedsOnboarding,
       }}

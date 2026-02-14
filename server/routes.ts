@@ -372,6 +372,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/auth/google/start", async (req: Request, res: Response) => {
+    try {
+      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return res.status(500).json({ message: "Google OAuth not configured" });
+      }
+      const redirectUri = `https://${req.get("host")}/api/auth/google/callback`;
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        redirectUri
+      );
+      const url = oauth2Client.generateAuthUrl({
+        access_type: "offline",
+        scope: ["openid", "email", "profile"],
+        prompt: "select_account",
+      });
+      return res.json({ url });
+    } catch (error: any) {
+      console.error("Google auth start error:", error);
+      return res.status(500).json({ message: "Failed to start Google sign-in" });
+    }
+  });
+
+  app.get("/api/auth/google/callback", async (req: Request, res: Response) => {
+    try {
+      const { code } = req.query as { code: string };
+      if (!code) {
+        return res.status(400).send("Missing authorization code");
+      }
+      const redirectUri = `https://${req.get("host")}/api/auth/google/callback`;
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        redirectUri
+      );
+      const { tokens } = await oauth2Client.getToken(code);
+      if (!tokens.id_token) {
+        return res.status(400).send("No ID token received from Google");
+      }
+      const parts = tokens.id_token.split(".");
+      const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf8"));
+      const email = payload.email;
+      const providerId = payload.sub;
+      const name = payload.name;
+      if (!email || !providerId) {
+        return res.status(400).send("Could not extract user info");
+      }
+      let user = await getUserByProviderId("google", providerId);
+      let needsOnboarding = false;
+      if (!user) {
+        user = await getUserByEmail(email);
+        if (user) {
+          return res.send(`<!DOCTYPE html><html><head><title>Sign In Error</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-width:400px;}
+h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><h2>Account Exists</h2><p>An account with this email already exists. Please sign in with your original method.</p></div></body></html>`);
+        }
+        user = await createUser({ email, name, authProvider: "google", providerId });
+        await createBusiness(user.id);
+        needsOnboarding = true;
+      } else {
+        const business = await getBusinessByOwner(user.id);
+        needsOnboarding = !business?.onboardingComplete;
+      }
+      req.session.userId = user.id;
+      req.session.save(() => {
+        return res.send(`<!DOCTYPE html><html><head><title>Signed In</title>
+<meta http-equiv="refresh" content="1;url=quotepro://auth-callback?success=true">
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.check{font-size:48px;margin-bottom:16px;color:#34C759;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><div class="check">&#10003;</div><h2>Signed In!</h2><p>Returning to QuotePro...</p></div>
+<script>setTimeout(function(){window.location.href='quotepro://auth-callback?success=true';},500);</script>
+</body></html>`);
+      });
+    } catch (error: any) {
+      console.error("Google auth callback error:", error);
+      return res.status(500).send("Google sign-in failed. Please try again.");
+    }
+  });
+
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });

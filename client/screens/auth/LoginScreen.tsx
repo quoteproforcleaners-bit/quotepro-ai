@@ -10,12 +10,14 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
+import * as WebBrowser from "expo-web-browser";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Input } from "@/components/Input";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
+import { getApiUrl } from "@/lib/query-client";
 import { Feather } from "@expo/vector-icons";
 
 type Mode = "login" | "register";
@@ -23,7 +25,7 @@ type Mode = "login" | "register";
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { login, register, loginWithApple, loginWithGoogle } = useAuth();
+  const { login, register, loginWithApple, refreshAuth } = useAuth();
 
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
@@ -102,7 +104,28 @@ export default function LoginScreen() {
   };
 
   const handleGoogleSignIn = async () => {
-    setError("Google Sign-In requires additional configuration. Please use Apple or email sign-in for now.");
+    try {
+      setLoading(true);
+      setError("");
+      const baseUrl = getApiUrl();
+      const startRes = await fetch(new URL("/api/auth/google/start", baseUrl), {
+        credentials: "include",
+      });
+      if (!startRes.ok) {
+        const data = await startRes.json().catch(() => ({ message: "Failed to start Google sign-in" }));
+        setError(data.message || "Google sign-in is not available");
+        return;
+      }
+      const { url } = await startRes.json();
+      const result = await WebBrowser.openAuthSessionAsync(url, "quotepro://auth-callback");
+      if (result.type === "success" || result.type === "dismiss") {
+        await refreshAuth();
+      }
+    } catch (err: any) {
+      setError(err.message || "Google sign-in failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
