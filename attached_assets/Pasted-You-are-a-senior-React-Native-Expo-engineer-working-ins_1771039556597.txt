@@ -1,0 +1,81 @@
+You are a senior React Native (Expo) engineer working inside my existing iPhone app “QuotePro” in Replit. Implement “Option 1” for the bottom menu: make the bottom tab bar feel premium and AI-forward WITHOUT changing the app’s navigation structure or removing tabs. Do NOT create a new app. Minimal refactors. Keep everything working.
+
+GOAL
+Upgrade the existing bottom tab bar UI so it no longer feels generic:
+- More modern/premium styling (rounded, elevated, subtle border)
+- Clear active state (pill/indicator + icon emphasis)
+- AI-forward branding (Home tab can remain Home, but make it feel like “AI Command Center” visually)
+- Add subtle micro-interactions (tap animation / haptic if already supported)
+
+IMPORTANT CONSTRAINTS
+- Keep the same tabs and routes: Home, Customers, Quotes, Jobs, Revenue, Settings.
+- Do NOT break deep links or existing navigation.
+- Reuse existing theme/colors if present; match current dark UI.
+- Avoid heavy dependencies. Only add libraries if necessary and Expo-compatible.
+- If react-native-vector-icons is already installed, use it. If not, use @expo/vector-icons.
+- Do NOT redesign all screens—only the tab bar.
+
+IMPLEMENTATION STEPS
+1) Inspect repo and identify:
+   - where bottom tabs are defined (likely React Navigation Bottom Tabs)
+   - any existing theme/constants (colors, spacing, typography)
+   - current icon library usage
+
+2) Update the bottom tab navigator with:
+   - tabBarStyle:
+     - taller height (approx 72–86)
+     - rounded top corners (radius ~20–28)
+     - background color matching current surface
+     - subtle borderTop (low opacity)
+     - subtle shadow/elevation (iOS shadow + Android elevation)
+     - extra padding bottom for iPhone safe area
+   - tabBarLabelStyle:
+     - slightly smaller label
+     - active label stronger weight/opacity
+   - tabBarIcon:
+     - increase size slightly when focused
+     - active icon uses primary accent color
+     - inactive icon uses muted gray
+   - tabBarItemStyle:
+     - add more spacing so it feels less cramped
+
+3) Add an “active indicator” / “active pill” behind the focused tab:
+   - When a tab is focused, show a rounded pill background behind icon+label (or behind icon only).
+   - Implement using:
+     - `tabBarIcon` wrapper with a View that conditionally renders a pill background when focused
+     - Keep it tasteful (subtle opacity, not neon)
+   - If feasible, animate the pill fade/scale using React Native Animated (built-in) for micro delight.
+   - If adding animation is too risky, do a non-animated version first.
+
+4) Make the Home tab feel like “AI Command Center”:
+   - Use a lightning/bolt icon for Home (or keep home icon but add a small bolt badge when focused).
+   - If a bolt badge is used, it must be subtle and not overlap weirdly.
+
+5) Optional (only if easy and already supported):
+   - Add haptic feedback on tab press using `expo-haptics` IF it’s already installed.
+   - If not installed, DO NOT add it unless it’s 1 command and low risk.
+   - If you add it, do:
+     - light impact on tab press
+
+ICONS
+Use a consistent icon set:
+- Home: bolt or home-with-bolt
+- Customers: users/person
+- Quotes: file-text/clipboard
+- Jobs: calendar
+- Revenue: trending-up/chart
+- Settings: gear
+
+If the app already uses a specific icon set, keep it.
+
+DELIVERABLES
+- Updated bottom tab bar with premium styling + active pill indicator + improved icons.
+- No route changes.
+- Provide a list of files changed and where to adjust colors if I want to tweak later.
+
+PROCESS
+Before coding:
+- Scan the repo, show me exactly which file contains the Tab Navigator and any theme/constants you’ll use.
+Then implement the changes with minimal edits and confirm the app still runs.
+
+Start now.

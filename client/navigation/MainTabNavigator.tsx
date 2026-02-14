@@ -1,8 +1,15 @@
-import React from "react";
+import React, { useCallback } from "react";
+import { View, Platform, StyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { Platform, StyleSheet } from "react-native";
+import * as Haptics from "expo-haptics";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  WithSpringConfig,
+} from "react-native-reanimated";
 import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
 import QuotesScreen from "@/screens/QuotesScreen";
@@ -24,30 +31,114 @@ export type MainTabParamList = {
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+const pillSpring: WithSpringConfig = {
+  damping: 18,
+  mass: 0.6,
+  stiffness: 200,
+  overshootClamping: false,
+};
+
+function TabIcon({ name, color, size, focused, isHome }: {
+  name: keyof typeof Feather.glyphMap;
+  color: string;
+  size: number;
+  focused: boolean;
+  isHome?: boolean;
+}) {
+  const { theme } = useTheme();
+  const scale = useSharedValue(focused ? 1 : 0);
+  const iconScale = useSharedValue(focused ? 1.08 : 1);
+
+  React.useEffect(() => {
+    scale.value = withSpring(focused ? 1 : 0, pillSpring);
+    iconScale.value = withSpring(focused ? 1.08 : 1, pillSpring);
+  }, [focused]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    opacity: scale.value * 0.12,
+    transform: [{ scaleX: 0.6 + scale.value * 0.4 }, { scaleY: 0.6 + scale.value * 0.4 }],
+  }));
+
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
+  }));
+
+  return (
+    <View style={styles.tabIconWrapper}>
+      <Animated.View
+        style={[
+          styles.pill,
+          { backgroundColor: theme.primary },
+          pillStyle,
+        ]}
+      />
+      <Animated.View style={iconAnimStyle}>
+        <Feather name={name} size={focused ? size + 2 : size} color={color} />
+      </Animated.View>
+      {isHome && focused ? (
+        <View style={[styles.boltBadge, { backgroundColor: theme.primary }]}>
+          <Feather name="zap" size={8} color="#FFF" />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
   const screenOptions = useScreenOptions();
+
+  const handleTabPress = useCallback(() => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, []);
+
   return (
     <Tab.Navigator
       initialRouteName="HomeTab"
       screenOptions={{
-        tabBarActiveTintColor: theme.tabIconSelected,
+        tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.tabIconDefault,
         tabBarStyle: {
           position: "absolute",
+          height: Platform.select({ ios: 86, android: 72, default: 72 }),
           backgroundColor: Platform.select({
             ios: "transparent",
-            android: theme.backgroundRoot,
+            android: theme.backgroundDefault,
+            default: theme.backgroundDefault,
           }),
-          borderTopWidth: 0,
-          elevation: 0,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          elevation: 12,
+          ...Platform.select({
+            ios: {
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: isDark ? 0.3 : 0.08,
+              shadowRadius: 12,
+            },
+            default: {},
+          }),
+          paddingTop: 4,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 4,
+          gap: 2,
+        },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "500",
+          letterSpacing: 0.2,
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
             <BlurView
-              intensity={100}
+              intensity={isDark ? 80 : 100}
               tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
+              style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }]}
             />
           ) : null,
         headerTitleAlign: screenOptions.headerTitleAlign,
@@ -62,10 +153,11 @@ export default function MainTabNavigator() {
         options={{
           title: "Home",
           headerTitle: () => <HeaderTitle title="QuotePro" />,
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="home" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="home" color={color} size={size} focused={focused} isHome />
           ),
         }}
+        listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
         name="CustomersTab"
@@ -73,10 +165,11 @@ export default function MainTabNavigator() {
         options={{
           title: "Customers",
           headerTitle: "Customers",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="users" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="users" color={color} size={size} focused={focused} />
           ),
         }}
+        listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
         name="QuotesTab"
@@ -84,10 +177,11 @@ export default function MainTabNavigator() {
         options={{
           title: "Quotes",
           headerTitle: "Quotes",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="file-text" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="file-text" color={color} size={size} focused={focused} />
           ),
         }}
+        listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
         name="JobsTab"
@@ -95,10 +189,11 @@ export default function MainTabNavigator() {
         options={{
           title: "Jobs",
           headerTitle: "Jobs",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="calendar" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="calendar" color={color} size={size} focused={focused} />
           ),
         }}
+        listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
         name="RevenueTab"
@@ -106,10 +201,11 @@ export default function MainTabNavigator() {
         options={{
           title: "Revenue",
           headerTitle: "Revenue",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="trending-up" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="trending-up" color={color} size={size} focused={focused} />
           ),
         }}
+        listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
         name="SettingsTab"
@@ -117,11 +213,35 @@ export default function MainTabNavigator() {
         options={{
           title: "Settings",
           headerTitle: "Settings",
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="settings" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="settings" color={color} size={size} focused={focused} />
           ),
         }}
+        listeners={{ tabPress: handleTabPress }}
       />
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabIconWrapper: {
+    width: 48,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pill: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+  },
+  boltBadge: {
+    position: "absolute",
+    top: -2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
