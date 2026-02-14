@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { StyleSheet, LogBox } from "react-native";
+import { StyleSheet, LogBox, Platform } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -22,7 +22,23 @@ LogBox.ignoreLogs([
   "expo-notifications",
 ]);
 
-setupNotificationHandler();
+if (typeof ErrorUtils !== "undefined") {
+  const originalHandler = ErrorUtils.getGlobalHandler();
+  ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+    console.warn("Global JS error caught:", error?.message || error);
+    if (originalHandler) {
+      try {
+        originalHandler(error, isFatal);
+      } catch {}
+    }
+  });
+}
+
+try {
+  setupNotificationHandler();
+} catch (e) {
+  console.warn("Notification handler setup failed:", e);
+}
 
 export default function App() {
   useEffect(() => {

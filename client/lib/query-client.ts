@@ -33,7 +33,7 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const baseUrl = getApiUrl();
-  const url = new URL(route, baseUrl);
+  const url = baseUrl ? new URL(route, baseUrl) : new URL(route, "https://localhost");
 
   const res = await fetch(url, {
     method,
@@ -53,7 +53,7 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const baseUrl = getApiUrl();
-    const url = new URL(queryKey.join("/") as string, baseUrl);
+    const url = baseUrl ? new URL(queryKey.join("/") as string, baseUrl) : new URL(queryKey.join("/") as string, "https://localhost");
 
     const res = await fetch(url, {
       credentials: "include",
