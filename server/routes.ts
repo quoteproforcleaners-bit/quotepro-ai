@@ -141,6 +141,22 @@ function requireAuth(req: Request, res: Response, next: Function) {
 export async function registerRoutes(app: Express): Promise<Server> {
   setupSession(app);
 
+  app.post("/api/crash-report", async (req: Request, res: Response) => {
+    try {
+      const { error, stack, componentStack, source } = req.body;
+      console.error("[CRASH REPORT]", {
+        timestamp: new Date().toISOString(),
+        source,
+        error,
+        stack: stack?.substring(0, 500),
+        componentStack: componentStack?.substring(0, 500),
+      });
+      res.json({ received: true });
+    } catch {
+      res.status(200).json({ received: true });
+    }
+  });
+
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
       const { email, password, name } = req.body;

@@ -1,5 +1,6 @@
 import React, { Component, ComponentType, PropsWithChildren } from "react";
 import { ErrorFallback, ErrorFallbackProps } from "@/components/ErrorFallback";
+import { getApiUrl } from "@/lib/query-client";
 
 export type ErrorBoundaryProps = PropsWithChildren<{
   FallbackComponent?: ComponentType<ErrorFallbackProps>;
@@ -8,10 +9,24 @@ export type ErrorBoundaryProps = PropsWithChildren<{
 
 type ErrorBoundaryState = { error: Error | null };
 
-/**
- * This is a special case for for using the class components. Error boundaries must be class components because React only provides error boundary functionality through lifecycle methods (componentDidCatch and getDerivedStateFromError) which are not available in functional components.
- * https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary
- */
+function sendCrashReport(error: Error, componentStack?: string, source?: string) {
+  try {
+    const baseUrl = getApiUrl();
+    if (!baseUrl) return;
+    fetch(new URL("/api/crash-report", baseUrl).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        error: error.message,
+        stack: error.stack,
+        componentStack,
+        source: source || "ErrorBoundary",
+      }),
+    }).catch(() => {});
+  } catch {}
+}
+
+export { sendCrashReport };
 
 export class ErrorBoundary extends Component<
   ErrorBoundaryProps,
@@ -30,6 +45,7 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }): void {
+    sendCrashReport(error, info.componentStack, "ErrorBoundary");
     if (typeof this.props.onError === "function") {
       this.props.onError(error, info.componentStack);
     }

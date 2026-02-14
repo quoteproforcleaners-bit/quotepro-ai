@@ -133,16 +133,24 @@ export default function MainTabNavigator() {
           fontWeight: "500",
           letterSpacing: 0.2,
         },
-        tabBarBackground: () =>
-          Platform.OS === "ios" ? (
-            <View style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }]}>
-              <BlurView
-                intensity={isDark ? 80 : 100}
-                tint={isDark ? "dark" : "light"}
-                style={StyleSheet.absoluteFill}
-              />
-            </View>
-          ) : null,
+        tabBarBackground: () => {
+          if (Platform.OS !== "ios") return null;
+          try {
+            return (
+              <View style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }]}>
+                <BlurView
+                  intensity={isDark ? 80 : 100}
+                  tint={isDark ? "dark" : "light"}
+                  style={StyleSheet.absoluteFill}
+                />
+              </View>
+            );
+          } catch {
+            return (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.backgroundDefault, borderTopLeftRadius: 24, borderTopRightRadius: 24 }]} />
+            );
+          }
+        },
         headerTitleAlign: screenOptions.headerTitleAlign,
         headerTransparent: screenOptions.headerTransparent,
         headerTintColor: screenOptions.headerTintColor,
