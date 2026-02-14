@@ -68,32 +68,29 @@ function RotatingPrompts({ onTap }: { onTap: (prompt: string) => void }) {
   const translateY = useSharedValue(0);
   const lastIndex = useRef(currentIndex);
 
-  const getNextIndex = useCallback(() => {
+  const rotateToNext = useCallback(() => {
     let next: number;
     do {
       next = Math.floor(Math.random() * EXAMPLE_PROMPTS.length);
     } while (next === lastIndex.current && EXAMPLE_PROMPTS.length > 1);
     lastIndex.current = next;
-    return next;
-  }, []);
-
-  const updateText = useCallback((idx: number) => {
-    setDisplayText(EXAMPLE_PROMPTS[idx]);
-    setCurrentIndex(idx);
+    setDisplayText(EXAMPLE_PROMPTS[next]);
+    setCurrentIndex(next);
+    translateY.value = 8;
+    opacity.value = withTiming(1, { duration: 300, easing: Easing.in(Easing.ease) });
+    translateY.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) });
   }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      opacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) }, () => {
-        const nextIdx = getNextIndex();
-        runOnJS(updateText)(nextIdx);
-        translateY.value = 8;
-        opacity.value = withTiming(1, { duration: 300, easing: Easing.in(Easing.ease) });
-        translateY.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) });
+      opacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) }, (finished) => {
+        if (finished) {
+          runOnJS(rotateToNext)();
+        }
       });
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [rotateToNext]);
 
   const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
