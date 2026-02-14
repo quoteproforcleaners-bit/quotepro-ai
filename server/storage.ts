@@ -121,6 +121,10 @@ export async function updateBusiness(
     bookingLink: string;
     timezone: string;
     onboardingComplete: boolean;
+    stripeAccountId: string | null;
+    stripeOnboardingComplete: boolean;
+    emailSignature: string;
+    smsSignature: string;
   }>
 ): Promise<Business> {
   const [business] = await db
@@ -369,6 +373,10 @@ export async function updateQuote(
     closeProbability: number;
     expectedValue: number;
     aiNotes: string;
+    paymentStatus: string;
+    paymentIntentId: string;
+    paymentAmount: number;
+    paidAt: Date;
   }>
 ): Promise<QuoteRow> {
   const [q] = await db
