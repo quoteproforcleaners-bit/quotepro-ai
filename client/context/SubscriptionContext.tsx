@@ -83,28 +83,37 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           try {
             Purchases.configure({ apiKey, appUserID: user.id });
             setRevenueCatReady(true);
+          } catch (configError: any) {
+            console.warn("RevenueCat configure error:", configError);
+            setIsPro(user.subscriptionTier === "pro");
+            return;
+          }
 
+          try {
             const customerInfo = await Purchases.getCustomerInfo();
             const hasPro = checkEntitlements(customerInfo);
             await syncSubscriptionToServer(hasPro);
+          } catch (infoError: any) {
+            console.warn("RevenueCat getCustomerInfo error:", infoError);
+            setIsPro(user.subscriptionTier === "pro");
+          }
 
+          try {
             const offerings = await Purchases.getOfferings();
             if (offerings.current) {
               setCurrentOffering(offerings.current);
             }
+          } catch (offerError: any) {
+            console.warn("RevenueCat getOfferings error:", offerError);
+          }
 
+          try {
             Purchases.addCustomerInfoUpdateListener((info) => {
               const updatedPro = checkEntitlements(info);
               syncSubscriptionToServer(updatedPro);
             });
-          } catch (rcError: any) {
-            const msg = rcError?.message || "";
-            if (msg.includes("native store") || msg.includes("Expo Go") || msg.includes("Test Store")) {
-              console.log("RevenueCat: Running in Expo Go — using database subscription status.");
-            } else {
-              console.warn("RevenueCat setup error:", rcError);
-            }
-            setIsPro(user.subscriptionTier === "pro");
+          } catch (listenerError: any) {
+            console.warn("RevenueCat listener error:", listenerError);
           }
         } else {
           setIsPro(user.subscriptionTier === "pro");
