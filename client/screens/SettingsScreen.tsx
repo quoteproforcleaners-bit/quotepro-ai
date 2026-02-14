@@ -35,7 +35,7 @@ export default function SettingsScreen() {
     queryKey: ["/api/google-calendar/status"],
   });
 
-  const { data: stripeStatus, refetch: refetchStripe } = useQuery({
+  const { data: stripeStatus, refetch: refetchStripe } = useQuery<{ connected: boolean; accountId: string | null }>({
     queryKey: ["/api/stripe/status"],
   });
 
@@ -241,7 +241,7 @@ export default function SettingsScreen() {
         onPress={handlePickImage}
         style={[
           styles.logoContainer,
-          { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+          { backgroundColor: theme.backgroundDefaultSecondary, borderColor: theme.border },
         ]}
       >
         {profile.logoUri ? (
@@ -557,7 +557,7 @@ export default function SettingsScreen() {
             <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
               Enter your Venmo username so customers can pay you directly
             </ThemedText>
-            <View style={[styles.handleInputRow, { borderColor: theme.border, backgroundColor: theme.background }]}>
+            <View style={[styles.handleInputRow, { borderColor: theme.border, backgroundColor: theme.backgroundDefault }]}>
               <ThemedText type="body" style={{ color: theme.textSecondary }}>@</ThemedText>
               <RNTextInput
                 value={venmoInput}
@@ -573,7 +573,7 @@ export default function SettingsScreen() {
             <View style={{ flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.lg }}>
               <Pressable
                 onPress={() => setShowVenmoModal(false)}
-                style={[styles.modalButton, { backgroundColor: theme.background, flex: 1 }]}
+                style={[styles.modalButton, { backgroundColor: theme.backgroundDefault, flex: 1 }]}
               >
                 <ThemedText type="body" style={{ textAlign: "center" }}>Cancel</ThemedText>
               </Pressable>
@@ -608,7 +608,7 @@ export default function SettingsScreen() {
             <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
               Enter your Cash App $cashtag so customers can pay you directly
             </ThemedText>
-            <View style={[styles.handleInputRow, { borderColor: theme.border, backgroundColor: theme.background }]}>
+            <View style={[styles.handleInputRow, { borderColor: theme.border, backgroundColor: theme.backgroundDefault }]}>
               <ThemedText type="body" style={{ color: theme.textSecondary }}>$</ThemedText>
               <RNTextInput
                 value={cashappInput}
@@ -624,7 +624,7 @@ export default function SettingsScreen() {
             <View style={{ flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.lg }}>
               <Pressable
                 onPress={() => setShowCashappModal(false)}
-                style={[styles.modalButton, { backgroundColor: theme.background, flex: 1 }]}
+                style={[styles.modalButton, { backgroundColor: theme.backgroundDefault, flex: 1 }]}
               >
                 <ThemedText type="body" style={{ textAlign: "center" }}>Cancel</ThemedText>
               </Pressable>

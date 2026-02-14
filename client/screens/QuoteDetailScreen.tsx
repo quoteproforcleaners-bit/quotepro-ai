@@ -586,6 +586,71 @@ export default function QuoteDetailScreen() {
           </Pressable>
         ) : null}
 
+        {(businessProfile.venmoHandle || businessProfile.cashappHandle) && quote.paymentStatus !== "paid" ? (
+          <View style={{ flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.md }}>
+            {businessProfile.venmoHandle ? (
+              <Pressable
+                onPress={async () => {
+                  await Clipboard.setStringAsync(`https://venmo.com/${businessProfile.venmoHandle}?txn=pay&amount=${quote.totalBetter || quote.totalGood || 0}`);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setSendSuccess("Venmo link copied!");
+                  setTimeout(() => setSendSuccess(null), 3000);
+                }}
+                style={[
+                  styles.detailsCard,
+                  {
+                    backgroundColor: "#008CFF",
+                    borderColor: "#008CFF",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: Spacing.sm,
+                    paddingVertical: 14,
+                    flex: 1,
+                    marginBottom: 0,
+                  },
+                ]}
+                testID="button-venmo-link"
+              >
+                <Feather name="dollar-sign" size={18} color="#FFFFFF" />
+                <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                  Venmo
+                </ThemedText>
+              </Pressable>
+            ) : null}
+            {businessProfile.cashappHandle ? (
+              <Pressable
+                onPress={async () => {
+                  await Clipboard.setStringAsync(`https://cash.app/$${businessProfile.cashappHandle}/${quote.totalBetter || quote.totalGood || 0}`);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setSendSuccess("Cash App link copied!");
+                  setTimeout(() => setSendSuccess(null), 3000);
+                }}
+                style={[
+                  styles.detailsCard,
+                  {
+                    backgroundColor: "#00D632",
+                    borderColor: "#00D632",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: Spacing.sm,
+                    paddingVertical: 14,
+                    flex: 1,
+                    marginBottom: 0,
+                  },
+                ]}
+                testID="button-cashapp-link"
+              >
+                <Feather name="dollar-sign" size={18} color="#FFFFFF" />
+                <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                  Cash App
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
         {sendSuccess ? (
           <View style={{ backgroundColor: `${theme.success}15`, padding: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
             <ThemedText type="small" style={{ color: theme.success, textAlign: "center", fontWeight: "600" }}>
