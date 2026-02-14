@@ -2475,6 +2475,14 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  app.get("/privacy", (_req: Request, res: Response) => {
+    res.send(getPrivacyPolicyHTML());
+  });
+
+  app.get("/terms", (_req: Request, res: Response) => {
+    res.send(getTermsOfServiceHTML());
+  });
+
   const httpServer = createServer(app);
 
   setInterval(async () => {
@@ -2695,4 +2703,130 @@ function formatBusiness(b: any) {
     timezone: b.timezone,
     onboardingComplete: b.onboardingComplete,
   };
+}
+
+function getPrivacyPolicyHTML(): string {
+  const styles = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;color:#1E293B;line-height:1.7}.container{max-width:720px;margin:0 auto;padding:40px 24px}h1{font-size:28px;font-weight:700;color:#0F172A;margin-bottom:8px}h2{font-size:20px;font-weight:600;color:#0F172A;margin-top:32px;margin-bottom:12px}.updated{font-size:14px;color:#64748B;margin-bottom:32px}p,li{font-size:15px;margin-bottom:12px;color:#334155}ul{padding-left:20px}a{color:#2563EB;text-decoration:none}.back{display:inline-block;margin-bottom:24px;font-size:14px;color:#64748B}`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Privacy Policy - QuotePro</title><style>${styles}</style></head><body><div class="container">
+<a href="/" class="back">&larr; Back to QuotePro</a>
+<h1>Privacy Policy</h1>
+<p class="updated">Last updated: February 14, 2026</p>
+
+<p>QuotePro ("we," "our," or "us") operates the QuotePro mobile application and web platform. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our service.</p>
+
+<h2>Information We Collect</h2>
+<p>We collect information you provide directly to us, including:</p>
+<ul>
+<li><strong>Account Information:</strong> Name, email address, and password when you create an account.</li>
+<li><strong>Business Information:</strong> Company name, phone number, address, logo, and branding preferences.</li>
+<li><strong>Customer Data:</strong> Names, contact information, property details, and communication history for your customers that you enter into the platform.</li>
+<li><strong>Quote and Job Data:</strong> Pricing, service details, job schedules, checklists, and photos you create within the app.</li>
+<li><strong>Payment Information:</strong> Subscription payment data is processed by RevenueCat and Apple/Google; we do not store your payment card details.</li>
+</ul>
+
+<h2>Third-Party Services</h2>
+<p>We integrate with the following third-party services to provide our features:</p>
+<ul>
+<li><strong>Google Calendar:</strong> With your explicit consent, we access your Google Calendar to create and update events for scheduled jobs. We only request access to create and modify calendar events (calendar.events scope). We do not read your existing calendar data.</li>
+<li><strong>SendGrid:</strong> Used to send emails on your behalf to your customers.</li>
+<li><strong>OpenAI:</strong> Used to generate AI-powered content such as email drafts and business insights. Your business data may be sent to OpenAI for processing but is not used to train their models.</li>
+<li><strong>RevenueCat:</strong> Manages subscription purchases and entitlements.</li>
+</ul>
+
+<h2>How We Use Your Information</h2>
+<ul>
+<li>To provide, maintain, and improve our services.</li>
+<li>To create quotes, manage jobs, and track customer communications on your behalf.</li>
+<li>To sync your job schedule with Google Calendar when you opt in.</li>
+<li>To send emails and notifications related to your account and business.</li>
+<li>To generate AI-powered content and business insights.</li>
+<li>To process your subscription payments.</li>
+</ul>
+
+<h2>Data Storage and Security</h2>
+<p>Your data is stored securely in our PostgreSQL database hosted by Neon. We use industry-standard security measures including encrypted connections (HTTPS/TLS), secure session management, and hashed passwords to protect your information.</p>
+
+<h2>Data Sharing</h2>
+<p>We do not sell, trade, or rent your personal information to third parties. We only share data with the third-party services listed above as necessary to provide our features, and with your explicit consent where required (such as Google Calendar access).</p>
+
+<h2>Your Rights</h2>
+<p>You have the right to:</p>
+<ul>
+<li>Access, update, or delete your account information.</li>
+<li>Disconnect third-party integrations (such as Google Calendar) at any time.</li>
+<li>Export your data upon request.</li>
+<li>Delete your account and all associated data by contacting us.</li>
+</ul>
+
+<h2>Data Retention</h2>
+<p>We retain your data for as long as your account is active. If you delete your account, we will delete your personal data within 30 days, except where we are required to retain it for legal or regulatory purposes.</p>
+
+<h2>Children's Privacy</h2>
+<p>Our service is not directed to children under 13. We do not knowingly collect personal information from children under 13.</p>
+
+<h2>Changes to This Policy</h2>
+<p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.</p>
+
+<h2>Contact Us</h2>
+<p>If you have questions about this Privacy Policy, please contact us at <a href="mailto:quoteproforcleaners@gmail.com">quoteproforcleaners@gmail.com</a>.</p>
+</div></body></html>`;
+}
+
+function getTermsOfServiceHTML(): string {
+  const styles = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;color:#1E293B;line-height:1.7}.container{max-width:720px;margin:0 auto;padding:40px 24px}h1{font-size:28px;font-weight:700;color:#0F172A;margin-bottom:8px}h2{font-size:20px;font-weight:600;color:#0F172A;margin-top:32px;margin-bottom:12px}.updated{font-size:14px;color:#64748B;margin-bottom:32px}p,li{font-size:15px;margin-bottom:12px;color:#334155}ul{padding-left:20px}a{color:#2563EB;text-decoration:none}.back{display:inline-block;margin-bottom:24px;font-size:14px;color:#64748B}`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Terms of Service - QuotePro</title><style>${styles}</style></head><body><div class="container">
+<a href="/" class="back">&larr; Back to QuotePro</a>
+<h1>Terms of Service</h1>
+<p class="updated">Last updated: February 14, 2026</p>
+
+<p>Welcome to QuotePro. By using our mobile application and web platform ("Service"), you agree to these Terms of Service ("Terms"). Please read them carefully.</p>
+
+<h2>1. Acceptance of Terms</h2>
+<p>By creating an account or using QuotePro, you agree to be bound by these Terms. If you do not agree, do not use the Service.</p>
+
+<h2>2. Description of Service</h2>
+<p>QuotePro is a software platform designed for residential cleaning businesses to create quotes, manage customers, schedule jobs, and track communications. The Service includes both free and paid subscription tiers.</p>
+
+<h2>3. Account Registration</h2>
+<p>You must provide accurate and complete information when creating an account. You are responsible for maintaining the confidentiality of your account credentials and for all activity that occurs under your account.</p>
+
+<h2>4. Subscription and Payments</h2>
+<ul>
+<li>QuotePro offers a free tier with basic quoting features and a paid "QuotePro AI" tier with additional features.</li>
+<li>Paid subscriptions are billed through Apple App Store or Google Play Store via RevenueCat.</li>
+<li>Subscription terms, pricing, and refund policies are governed by the respective app store's policies.</li>
+<li>We reserve the right to change subscription pricing with reasonable notice.</li>
+</ul>
+
+<h2>5. Your Data</h2>
+<p>You retain ownership of all data you enter into QuotePro, including customer information, quotes, and business details. You are responsible for ensuring you have the right to store and process your customers' personal information. Please refer to our <a href="/privacy">Privacy Policy</a> for details on how we handle data.</p>
+
+<h2>6. Acceptable Use</h2>
+<p>You agree not to:</p>
+<ul>
+<li>Use the Service for any unlawful purpose.</li>
+<li>Attempt to gain unauthorized access to our systems or other users' accounts.</li>
+<li>Upload malicious content or interfere with the Service's operation.</li>
+<li>Resell or redistribute the Service without our written consent.</li>
+<li>Use the Service to send unsolicited or spam communications.</li>
+</ul>
+
+<h2>7. Third-Party Integrations</h2>
+<p>QuotePro integrates with third-party services including Google Calendar, SendGrid, and OpenAI. Your use of these integrations is subject to the respective third-party terms of service. We are not responsible for the availability or performance of third-party services.</p>
+
+<h2>8. Limitation of Liability</h2>
+<p>QuotePro is provided "as is" without warranties of any kind. To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the Service, including but not limited to lost profits, data loss, or business interruption.</p>
+
+<h2>9. Termination</h2>
+<p>You may cancel your account at any time. We reserve the right to suspend or terminate accounts that violate these Terms. Upon termination, your right to use the Service ceases, and we may delete your data in accordance with our Privacy Policy.</p>
+
+<h2>10. Changes to Terms</h2>
+<p>We may update these Terms from time to time. Continued use of the Service after changes constitutes acceptance of the updated Terms. We will notify you of material changes via email or in-app notification.</p>
+
+<h2>11. Governing Law</h2>
+<p>These Terms shall be governed by and construed in accordance with the laws of the United States, without regard to conflict of law provisions.</p>
+
+<h2>12. Contact</h2>
+<p>For questions about these Terms, please contact us at <a href="mailto:quoteproforcleaners@gmail.com">quoteproforcleaners@gmail.com</a>.</p>
+</div></body></html>`;
 }
