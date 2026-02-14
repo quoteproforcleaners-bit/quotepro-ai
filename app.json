@@ -7,12 +7,12 @@
     "icon": "./assets/images/icon.png",
     "scheme": "quotepro",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": false,
       "requireFullScreen": true,
       "bundleIdentifier": "app.replit.quotepro",
-      "buildNumber": "10"
+      "buildNumber": "13"
     },
     "android": {
       "package": "com.quotepro.app",
