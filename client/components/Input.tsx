@@ -1,11 +1,11 @@
 import React from "react";
 import {
   View,
-  TextInput,
   StyleSheet,
   TextInputProps,
   Pressable,
 } from "react-native";
+import { TextInput as PaperTextInput } from "react-native-paper";
 import { Feather } from "@expo/vector-icons";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
@@ -26,53 +26,60 @@ export function Input({
   rightIcon,
   onRightIconPress,
   style,
+  multiline,
   ...props
 }: InputProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
 
   return (
     <View style={styles.container}>
-      {label ? (
-        <ThemedText type="small" style={styles.label}>
-          {label}
-        </ThemedText>
-      ) : null}
-      <View
+      <PaperTextInput
+        label={label}
+        mode="outlined"
+        error={!!error}
+        multiline={multiline}
+        outlineColor={theme.border}
+        activeOutlineColor={theme.primary}
+        textColor={theme.text}
+        placeholderTextColor={theme.textSecondary}
+        outlineStyle={{ borderRadius: BorderRadius.xs }}
+        contentStyle={[
+          multiline ? styles.inputMultiline : undefined,
+          style,
+        ]}
         style={[
-          styles.inputContainer,
+          styles.input,
           {
             backgroundColor: theme.inputBackground,
-            borderColor: error ? theme.error : theme.border,
           },
-          props.multiline ? styles.inputContainerMultiline : null,
+          multiline ? styles.inputMultilineOuter : undefined,
         ]}
-      >
-        {leftIcon ? (
-          <Feather
-            name={leftIcon}
-            size={20}
-            color={theme.textSecondary}
-            style={styles.leftIcon}
-          />
-        ) : null}
-        <TextInput
-          style={[
-            styles.input,
-            { color: theme.text },
-            leftIcon ? styles.inputWithLeftIcon : null,
-            rightIcon ? styles.inputWithRightIcon : null,
-            props.multiline ? styles.inputMultiline : null,
-            style,
-          ]}
-          placeholderTextColor={theme.textSecondary}
-          {...props}
-        />
-        {rightIcon ? (
-          <Pressable onPress={onRightIconPress} style={styles.rightIcon}>
-            <Feather name={rightIcon} size={20} color={theme.textSecondary} />
-          </Pressable>
-        ) : null}
-      </View>
+        theme={{
+          colors: {
+            onSurfaceVariant: theme.textSecondary,
+          },
+        }}
+        left={
+          leftIcon ? (
+            <PaperTextInput.Icon
+              icon={() => (
+                <Feather name={leftIcon} size={20} color={theme.textSecondary} />
+              )}
+            />
+          ) : undefined
+        }
+        right={
+          rightIcon ? (
+            <PaperTextInput.Icon
+              icon={() => (
+                <Feather name={rightIcon} size={20} color={theme.textSecondary} />
+              )}
+              onPress={onRightIconPress}
+            />
+          ) : undefined
+        }
+        {...props}
+      />
       {error ? (
         <ThemedText
           type="small"
@@ -89,45 +96,15 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: Spacing.lg,
   },
-  label: {
-    marginBottom: Spacing.xs,
-    fontWeight: "500",
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: BorderRadius.xs,
-    height: Spacing.inputHeight,
-  },
-  inputContainerMultiline: {
-    height: undefined,
-    minHeight: Spacing.inputHeight,
-    alignItems: "flex-start",
-  },
   input: {
-    flex: 1,
-    height: "100%",
-    paddingHorizontal: Spacing.md,
     fontSize: 16,
   },
   inputMultiline: {
-    height: undefined,
     paddingVertical: Spacing.md,
     textAlignVertical: "top",
   },
-  inputWithLeftIcon: {
-    paddingLeft: 0,
-  },
-  inputWithRightIcon: {
-    paddingRight: 0,
-  },
-  leftIcon: {
-    marginLeft: Spacing.md,
-    marginRight: Spacing.sm,
-  },
-  rightIcon: {
-    padding: Spacing.md,
+  inputMultilineOuter: {
+    minHeight: Spacing.inputHeight * 2,
   },
   error: {
     marginTop: Spacing.xs,

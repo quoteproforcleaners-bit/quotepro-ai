@@ -1,92 +1,80 @@
 import React, { ReactNode } from "react";
-import { StyleSheet, Pressable, ViewStyle, StyleProp } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  WithSpringConfig,
-} from "react-native-reanimated";
-
-import { ThemedText } from "@/components/ThemedText";
+import { StyleSheet, ViewStyle, StyleProp } from "react-native";
+import { Button as PaperButton } from "react-native-paper";
 import { useTheme } from "@/hooks/useTheme";
-import { BorderRadius, Spacing } from "@/constants/theme";
+import { Spacing, BorderRadius } from "@/constants/theme";
+
+type ButtonMode = "contained" | "outlined" | "text";
 
 interface ButtonProps {
   onPress?: () => void;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
+  mode?: ButtonMode;
+  loading?: boolean;
+  icon?: string;
+  compact?: boolean;
+  testID?: string;
 }
-
-const springConfig: WithSpringConfig = {
-  damping: 15,
-  mass: 0.3,
-  stiffness: 150,
-  overshootClamping: true,
-  energyThreshold: 0.001,
-};
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function Button({
   onPress,
   children,
   style,
   disabled = false,
+  mode = "contained",
+  loading = false,
+  icon,
+  compact = false,
+  testID,
 }: ButtonProps) {
   const { theme } = useTheme();
-  const scale = useSharedValue(1);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    if (!disabled) {
-      scale.value = withSpring(0.98, springConfig);
-    }
-  };
-
-  const handlePressOut = () => {
-    if (!disabled) {
-      scale.value = withSpring(1, springConfig);
-    }
-  };
+  const buttonColors =
+    mode === "contained"
+      ? { buttonColor: theme.primary, textColor: theme.buttonText }
+      : mode === "outlined"
+        ? { buttonColor: "transparent", textColor: theme.primary }
+        : { buttonColor: "transparent", textColor: theme.primary };
 
   return (
-    <AnimatedPressable
+    <PaperButton
+      mode={mode}
       onPress={disabled ? undefined : onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       disabled={disabled}
+      loading={loading}
+      icon={icon}
+      compact={compact}
+      testID={testID}
+      buttonColor={buttonColors.buttonColor}
+      textColor={buttonColors.textColor}
+      contentStyle={[
+        styles.content,
+        compact ? undefined : { height: Spacing.buttonHeight },
+      ]}
       style={[
         styles.button,
-        {
-          backgroundColor: theme.link,
-          opacity: disabled ? 0.5 : 1,
-        },
+        mode === "outlined" ? { borderColor: theme.primary } : undefined,
         style,
-        animatedStyle,
       ]}
+      labelStyle={styles.label}
     >
-      <ThemedText
-        type="body"
-        style={[styles.buttonText, { color: theme.buttonText }]}
-      >
-        {children}
-      </ThemedText>
-    </AnimatedPressable>
+      {children}
+    </PaperButton>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    height: Spacing.buttonHeight,
     borderRadius: BorderRadius.full,
-    alignItems: "center",
-    justifyContent: "center",
   },
-  buttonText: {
+  content: {
+    paddingHorizontal: Spacing.md,
+  },
+  label: {
     fontWeight: "600",
+    fontSize: 16,
+    letterSpacing: 0.2,
   },
 });
