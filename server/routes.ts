@@ -419,6 +419,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/business", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) {
+        return res.status(404).json({ message: "Business not found" });
+      }
+
+      const updated = await updateBusiness(business.id, req.body);
+      return res.json(formatBusiness(updated));
+    } catch (error: any) {
+      console.error("Update business error:", error);
+      return res.status(500).json({ message: "Failed to update business" });
+    }
+  });
+
   app.get("/api/pricing", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
@@ -2959,6 +2974,8 @@ function formatBusiness(b: any) {
     senderName: b.senderName,
     senderTitle: b.senderTitle,
     bookingLink: b.bookingLink,
+    emailSignature: b.emailSignature,
+    smsSignature: b.smsSignature,
     timezone: b.timezone,
     onboardingComplete: b.onboardingComplete,
     venmoHandle: b.venmoHandle || null,
