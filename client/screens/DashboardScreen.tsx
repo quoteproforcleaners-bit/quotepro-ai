@@ -78,15 +78,15 @@ export default function DashboardScreen() {
     queryKey: ['/api/tasks'],
   });
 
-  const { data: communications = [], refetch: refetchComms } = useQuery<any[]>({
-    queryKey: ['/api/communications'],
+  const { data: allJobs = [], refetch: refetchJobs } = useQuery<any[]>({
+    queryKey: ['/api/jobs'],
   });
 
   const [refreshing, setRefreshing] = React.useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchTasks(), refetchComms()]);
+    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchTasks(), refetchJobs()]);
     setRefreshing(false);
   };
 
@@ -103,15 +103,40 @@ export default function DashboardScreen() {
 
   const pendingTasks = (tasks || []).filter((t: any) => !t.completed);
   const recent5Quotes = (recentQuotes || []).slice(0, 5);
-  const recentComms = (communications || []).slice(0, 5);
   const activeLeads = (customers || []).filter((c: any) => c.status === "lead").length;
 
-  const getChannelIcon = (channel: string): "mail" | "message-square" | "phone" => {
-    switch (channel) {
-      case "email": return "mail";
-      case "sms": return "message-square";
-      case "phone": return "phone";
-      default: return "message-square";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const upcomingJobs = (allJobs || [])
+    .filter((j: any) => j.status !== "completed" && j.status !== "cancelled")
+    .slice(0, 4);
+
+  const customerMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    (customers || []).forEach((c: any) => { map[c.id] = c.name; });
+    return map;
+  }, [customers]);
+
+  const getJobStatusColor = (status: string, t: typeof theme) => {
+    switch (status) {
+      case "scheduled": return t.primary;
+      case "in_progress": return t.warning;
+      case "completed": return t.success;
+      case "cancelled": return t.error;
+      default: return t.textSecondary;
+    }
+  };
+
+  const getJobStatusIcon = (status: string): keyof typeof Feather.glyphMap => {
+    switch (status) {
+      case "scheduled": return "calendar";
+      case "in_progress": return "play-circle";
+      case "completed": return "check-circle";
+      case "cancelled": return "x-circle";
+      default: return "calendar";
     }
   };
 
@@ -208,10 +233,9 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <ThemedText type="h4" style={styles.sectionTitle}>Tasks Due</ThemedText>
           {pendingTasks.slice(0, 3).map((task: any) => (
-            <Pressable
+            <View
               key={task.id}
               style={[styles.taskRow, { borderColor: theme.border }]}
-              onPress={() => {}}
               testID={`task-row-${task.id}`}
             >
               <View style={[styles.taskDot, { backgroundColor: theme.warning }]} />
@@ -223,36 +247,38 @@ export default function DashboardScreen() {
                   </ThemedText>
                 ) : null}
               </View>
-            </Pressable>
+            </View>
           ))}
         </View>
       ) : null}
 
-      {recentComms.length > 0 ? (
+      {upcomingJobs.length > 0 ? (
         <View style={styles.section}>
-          <ThemedText type="h4" style={styles.sectionTitle}>Recent Activity</ThemedText>
-          {recentComms.map((comm: any) => (
-            <View
-              key={comm.id}
+          <ThemedText type="h4" style={styles.sectionTitle}>Upcoming Jobs</ThemedText>
+          {upcomingJobs.map((job: any) => (
+            <Pressable
+              key={job.id}
               style={[styles.activityRow, { borderColor: theme.border }]}
+              onPress={() => navigation.navigate("JobDetail", { jobId: job.id })}
+              testID={`job-row-${job.id}`}
             >
-              <View style={[styles.activityIcon, { backgroundColor: `${theme.primary}15` }]}>
-                <Feather name={getChannelIcon(comm.channel)} size={14} color={theme.primary} />
+              <View style={[styles.activityIcon, { backgroundColor: `${getJobStatusColor(job.status, theme)}15` }]}>
+                <Feather name={getJobStatusIcon(job.status)} size={14} color={getJobStatusColor(job.status, theme)} />
               </View>
               <View style={styles.activityContent}>
                 <ThemedText type="small" numberOfLines={1} style={{ fontWeight: "500" }}>
-                  {comm.subject || `${(comm.channel || "").charAt(0).toUpperCase() + (comm.channel || "").slice(1)} communication`}
+                  {job.customerId ? (customerMap[job.customerId] || "Customer") : "Job"}
                 </ThemedText>
-                {comm.content ? (
-                  <ThemedText type="caption" numberOfLines={1} style={{ color: theme.textSecondary }}>
-                    {comm.content}
-                  </ThemedText>
-                ) : null}
+                <ThemedText type="caption" numberOfLines={1} style={{ color: theme.textSecondary }}>
+                  {job.serviceType || "Cleaning"} {job.startDatetime ? `- ${formatDate(job.startDatetime)}` : ""}
+                </ThemedText>
               </View>
-              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                {formatDate(comm.createdAt)}
-              </ThemedText>
-            </View>
+              <View style={[styles.statusBadge, { backgroundColor: `${getJobStatusColor(job.status, theme)}20` }]}>
+                <ThemedText type="caption" style={{ color: getJobStatusColor(job.status, theme), textTransform: "capitalize" }}>
+                  {job.status}
+                </ThemedText>
+              </View>
+            </Pressable>
           ))}
         </View>
       ) : null}
@@ -273,16 +299,16 @@ export default function DashboardScreen() {
       <View style={styles.quoteRow}>
         <View style={styles.quoteInfo}>
           <ThemedText type="body" numberOfLines={1}>
-            {item.customerId ? "Customer Quote" : "Quick Quote"}
+            {item.customerName || (item.customerId ? (customerMap[item.customerId] || "Customer") : "Quick Quote")}
           </ThemedText>
           <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            {formatDate(item.createdAt)}
+            {item.propertySqft > 0 ? `${item.propertyBeds} bed, ${item.propertyBaths} bath` : formatDate(item.createdAt)}
           </ThemedText>
         </View>
         <View style={styles.quoteRight}>
-          <ThemedText type="h4">${item.total.toFixed(0)}</ThemedText>
+          <ThemedText type="h4">${(item.total || 0).toFixed(0)}</ThemedText>
           <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
-            <ThemedText type="caption" style={{ color: getStatusColor(item.status) }}>
+            <ThemedText type="caption" style={{ color: getStatusColor(item.status), textTransform: "capitalize" }}>
               {item.status}
             </ThemedText>
           </View>

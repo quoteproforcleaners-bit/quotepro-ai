@@ -527,7 +527,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!business) return res.status(404).json({ message: "Business not found" });
       const { status, customerId } = req.query as any;
       const list = await getQuotesByBusiness(business.id, { status, customerId });
-      return res.json(list);
+      const customerIds = [...new Set(list.filter(q => q.customerId).map(q => q.customerId!))];
+      const customerMap: Record<string, string> = {};
+      for (const cid of customerIds) {
+        const c = await getCustomerById(cid);
+        if (c) customerMap[cid] = c.name;
+      }
+      const enriched = list.map(q => ({
+        ...q,
+        customerName: q.customerId ? (customerMap[q.customerId] || null) : null,
+      }));
+      return res.json(enriched);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get quotes" });
     }
