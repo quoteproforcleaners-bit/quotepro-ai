@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { Platform } from "react-native";
-import Purchases, { PurchasesOffering, CustomerInfo } from "react-native-purchases";
+import type { PurchasesOffering, CustomerInfo } from "react-native-purchases";
 import Constants from "expo-constants";
 import { useAuth } from "@/context/AuthContext";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
@@ -8,6 +8,19 @@ import { useQueryClient } from "@tanstack/react-query";
 
 function isExpoGo(): boolean {
   return Constants.executionEnvironment === "storeClient";
+}
+
+let PurchasesModule: typeof import("react-native-purchases").default | null = null;
+
+function getPurchases() {
+  if (PurchasesModule) return PurchasesModule;
+  try {
+    PurchasesModule = require("react-native-purchases").default;
+    return PurchasesModule;
+  } catch (e) {
+    console.warn("RevenueCat native module not available:", e);
+    return null;
+  }
 }
 
 interface SubscriptionContextType {
@@ -80,8 +93,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           : config.apiKey;
 
         if (apiKey) {
+          const RC = getPurchases();
+          if (!RC) {
+            console.warn("RevenueCat native module not available, using database status");
+            setIsPro(user.subscriptionTier === "pro");
+            setIsLoading(false);
+            return;
+          }
+
           try {
-            Purchases.configure({ apiKey, appUserID: user.id });
+            RC.configure({ apiKey, appUserID: user.id });
             setRevenueCatReady(true);
           } catch (configError: any) {
             console.warn("RevenueCat configure error:", configError);
@@ -90,7 +111,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           }
 
           try {
-            const customerInfo = await Purchases.getCustomerInfo();
+            const customerInfo = await RC.getCustomerInfo();
             const hasPro = checkEntitlements(customerInfo);
             await syncSubscriptionToServer(hasPro);
           } catch (infoError: any) {
@@ -99,7 +120,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           }
 
           try {
-            const offerings = await Purchases.getOfferings();
+            const offerings = await RC.getOfferings();
             if (offerings.current) {
               setCurrentOffering(offerings.current);
             }
@@ -108,7 +129,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           }
 
           try {
-            Purchases.addCustomerInfoUpdateListener((info) => {
+            RC.addCustomerInfoUpdateListener((info) => {
               const updatedPro = checkEntitlements(info);
               syncSubscriptionToServer(updatedPro);
             });
@@ -143,7 +164,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const { customerInfo } = await Purchases.purchasePackage(currentOffering.monthly);
+      const RC = getPurchases();
+      if (!RC) throw new Error("RevenueCat not available");
+      const { customerInfo } = await RC.purchasePackage(currentOffering.monthly);
       const hasPro = checkEntitlements(customerInfo);
       await syncSubscriptionToServer(hasPro);
       return hasPro;
@@ -162,7 +185,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const customerInfo = await Purchases.restorePurchases();
+      const RC = getPurchases();
+      if (!RC) return false;
+      const customerInfo = await RC.restorePurchases();
       const hasPro = checkEntitlements(customerInfo);
       await syncSubscriptionToServer(hasPro);
       return hasPro;
