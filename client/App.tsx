@@ -22,14 +22,15 @@ LogBox.ignoreLogs([
   "expo-notifications",
 ]);
 
+const _originalGlobalHandler = typeof ErrorUtils !== "undefined" ? ErrorUtils.getGlobalHandler() : null;
 if (typeof ErrorUtils !== "undefined") {
-  const originalHandler = ErrorUtils.getGlobalHandler();
   ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
-    console.warn("Global JS error caught:", error?.message || error);
-    if (originalHandler) {
-      try {
-        originalHandler(error, isFatal);
-      } catch {}
+    console.warn("[QuotePro] JS Error (fatal=" + isFatal + "):", error?.message || String(error));
+    if (isFatal) {
+      return;
+    }
+    if (_originalGlobalHandler) {
+      try { _originalGlobalHandler(error, isFatal); } catch {}
     }
   });
 }
