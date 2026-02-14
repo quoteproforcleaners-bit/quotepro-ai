@@ -35,6 +35,39 @@ export default function SettingsScreen() {
     queryKey: ["/api/google-calendar/status"],
   });
 
+  const { data: stripeStatus, refetch: refetchStripe } = useQuery({
+    queryKey: ["/api/stripe/status"],
+  });
+
+  const handleConnectStripe = async () => {
+    try {
+      const res = await fetch(new URL("/api/stripe/connect", getApiUrl()).toString(), {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.url) {
+        await WebBrowser.openBrowserAsync(data.url);
+        refetchStripe();
+      }
+    } catch (e) {
+      console.error("Stripe connect error", e);
+    }
+  };
+
+  const handleDisconnectStripe = async () => {
+    try {
+      await fetch(new URL("/api/stripe/disconnect", getApiUrl()).toString(), {
+        method: "DELETE",
+        credentials: "include",
+      });
+      refetchStripe();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.error("Stripe disconnect error", e);
+    }
+  };
+
   const handleConnectCalendar = async () => {
     try {
       const res = await fetch(new URL("/api/google-calendar/connect", getApiUrl()).toString(), {
@@ -377,6 +410,50 @@ export default function SettingsScreen() {
               </ThemedText>
               <ThemedText type="small" style={{ color: theme.textSecondary }}>
                 Sync your jobs to Google Calendar
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+          </View>
+        </Pressable>
+      )}
+
+      {stripeStatus?.connected ? (
+        <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.success}15` }]}>
+              <Feather name="check-circle" size={20} color={theme.success} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                Stripe Payments
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.success }}>
+                Connected - Accept online payments
+              </ThemedText>
+            </View>
+            <Pressable onPress={handleDisconnectStripe} testID="button-disconnect-stripe">
+              <ThemedText type="small" style={{ color: theme.error }}>
+                Disconnect
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <Pressable
+          onPress={handleConnectStripe}
+          style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+          testID="button-connect-stripe"
+        >
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: "#635BFF15" }]}>
+              <Feather name="credit-card" size={20} color="#635BFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                Stripe Payments
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                Accept online payments from customers
               </ThemedText>
             </View>
             <Feather name="chevron-right" size={20} color={theme.textSecondary} />
