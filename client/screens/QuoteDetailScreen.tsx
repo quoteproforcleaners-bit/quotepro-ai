@@ -10,8 +10,9 @@ import * as Clipboard from "expo-clipboard";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as SMS from "expo-sms";
+import * as WebBrowser from "expo-web-browser";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -69,9 +70,14 @@ export default function QuoteDetailScreen() {
   const [showAiDraft, setShowAiDraft] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   const { data: quote, isLoading } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
+  });
+
+  const { data: stripeStatus } = useQuery({
+    queryKey: ["/api/stripe/status"],
   });
 
   const updateMutation = useMutation({
@@ -106,6 +112,29 @@ export default function QuoteDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
     },
   });
+
+  const handleRequestPayment = async () => {
+    try {
+      setPaymentLoading(true);
+      const res = await fetch(new URL("/api/stripe/create-payment", getApiUrl()).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ quoteId: route.params.quoteId }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        await Clipboard.setStringAsync(data.url);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setSendSuccess("Payment link copied!");
+        setTimeout(() => setSendSuccess(null), 3000);
+      }
+    } catch (e) {
+      console.error("Payment link error:", e);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
   const handleStatusChange = async (status: string) => {
     updateMutation.mutate({ status });
@@ -511,11 +540,59 @@ export default function QuoteDetailScreen() {
         </View>
 
         <View style={[styles.totalCard, { backgroundColor: theme.primary }]}>
-          <ThemedText type="body" style={{ color: "#FFFFFF" }}>Total</ThemedText>
-          <ThemedText type="h2" style={{ color: "#FFFFFF" }}>
-            ${quote.total?.toFixed(0) || "0"}
-          </ThemedText>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            <View>
+              <ThemedText type="body" style={{ color: "#FFFFFF" }}>Total</ThemedText>
+              <ThemedText type="h2" style={{ color: "#FFFFFF" }}>
+                ${quote.total?.toFixed(0) || "0"}
+              </ThemedText>
+            </View>
+            {quote.paymentStatus === "paid" ? (
+              <View style={{ backgroundColor: "#FFFFFF30", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                  Paid
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
         </View>
+
+        {(stripeStatus as any)?.connected && quote.paymentStatus !== "paid" ? (
+          <Pressable
+            onPress={handleRequestPayment}
+            disabled={paymentLoading}
+            style={[
+              styles.detailsCard,
+              {
+                backgroundColor: "#635BFF",
+                borderColor: "#635BFF",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: Spacing.sm,
+                paddingVertical: 14,
+              },
+            ]}
+            testID="button-request-payment"
+          >
+            {paymentLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Feather name="credit-card" size={18} color="#FFFFFF" />
+            )}
+            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+              Copy Payment Link
+            </ThemedText>
+          </Pressable>
+        ) : null}
+
+        {sendSuccess ? (
+          <View style={{ backgroundColor: `${theme.success}15`, padding: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
+            <ThemedText type="small" style={{ color: theme.success, textAlign: "center", fontWeight: "600" }}>
+              {sendSuccess}
+            </ThemedText>
+          </View>
+        ) : null}
 
         <SectionHeader title="Send This Quote" />
 
