@@ -13,7 +13,7 @@ Key capabilities include:
 - Customizable business profiles with branding options.
 - Configurable pricing settings, including hourly rates, minimums, and frequency discounts.
 - AI-powered draft generation for customer communications.
-- A dashboard providing revenue analytics and task management.
+- AI Command Center home screen with natural language command input, rotating example prompts, quick action chips, and "Today at a glance" stats. Uses a local deterministic intent parser (`client/lib/aiCommandRouter.ts`) with feature flags (`client/lib/featureFlags.ts`) to later swap in real AI.
 - Job photo attachments (before/after photos with captions via image picker).
 - Recurring job automation (weekly/biweekly/monthly/quarterly auto-scheduling on completion).
 - Quote PDF export with branded HTML template (uses expo-print and expo-sharing).
