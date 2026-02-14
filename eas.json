@@ -1,0 +1,26 @@
+{
+  "cli": {
+    "version": ">= 3.0.0"
+  },
+  "build": {
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "asset-manager-1-mquealy01.replit.app"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "asset-manager-1-mquealy01.replit.app"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6758575812",
+        "appleTeamId": "GQUTSU658U"
+      }
+    }
+  }
+}
