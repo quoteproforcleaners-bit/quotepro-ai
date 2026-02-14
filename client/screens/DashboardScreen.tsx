@@ -1,5 +1,14 @@
-import React from "react";
-import { View, StyleSheet, FlatList, RefreshControl, Pressable } from "react-native";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  TextInput,
+  Pressable,
+  FlatList,
+  Platform,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -7,41 +16,195 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { getApiUrl } from "@/lib/query-client";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSequence,
+  withDelay,
+  Easing,
+  runOnJS,
+} from "react-native-reanimated";
 import { ThemedText } from "@/components/ThemedText";
-import { StatCard } from "@/components/StatCard";
-import { EmptyState } from "@/components/EmptyState";
-import { FAB } from "@/components/FAB";
 import { Card } from "@/components/Card";
-import { ProBanner } from "@/components/ProBanner";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
+import { FeatureFlags } from "@/lib/featureFlags";
+import { runAiCommand, EXAMPLE_PROMPTS, AiCommandResult } from "@/lib/aiCommandRouter";
 
-function GettingStartedItem({ icon, label, completed, onPress, theme }: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  completed: boolean;
-  onPress: () => void;
-  theme: any;
-}) {
+function RotatingPrompts({ onTap }: { onTap: (prompt: string) => void }) {
+  const { theme } = useTheme();
+  const [currentIndex, setCurrentIndex] = useState(() => Math.floor(Math.random() * EXAMPLE_PROMPTS.length));
+  const [displayText, setDisplayText] = useState(EXAMPLE_PROMPTS[currentIndex]);
+  const opacity = useSharedValue(1);
+  const translateY = useSharedValue(0);
+  const lastIndex = useRef(currentIndex);
+
+  const getNextIndex = useCallback(() => {
+    let next: number;
+    do {
+      next = Math.floor(Math.random() * EXAMPLE_PROMPTS.length);
+    } while (next === lastIndex.current && EXAMPLE_PROMPTS.length > 1);
+    lastIndex.current = next;
+    return next;
+  }, []);
+
+  const updateText = useCallback((idx: number) => {
+    setDisplayText(EXAMPLE_PROMPTS[idx]);
+    setCurrentIndex(idx);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      opacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) }, () => {
+        const nextIdx = getNextIndex();
+        runOnJS(updateText)(nextIdx);
+        translateY.value = 8;
+        opacity.value = withTiming(1, { duration: 300, easing: Easing.in(Easing.ease) });
+        translateY.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) });
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
   return (
-    <Pressable onPress={onPress} style={styles.gettingStartedItem}>
-      <View style={[
-        styles.gettingStartedCheck,
-        { backgroundColor: completed ? theme.success : theme.backgroundSecondary, borderColor: completed ? theme.success : theme.border }
-      ]}>
-        {completed ? (
-          <Feather name="check" size={14} color="#FFFFFF" />
-        ) : null}
+    <Pressable onPress={() => onTap(displayText)} testID="rotating-prompt">
+      <Animated.View style={[styles.promptContainer, animStyle]}>
+        <Feather name="zap" size={14} color={theme.primary} style={{ marginRight: 6 }} />
+        <ThemedText type="small" style={{ color: theme.primary, flex: 1 }} numberOfLines={1}>
+          {displayText}
+        </ThemedText>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+const QUICK_ACTIONS = [
+  { label: "New Quote", icon: "file-plus" as const, action: "create_quote" },
+  { label: "Follow up quotes", icon: "refresh-cw" as const, action: "follow_up" },
+  { label: "This month booked", icon: "bar-chart-2" as const, action: "metrics" },
+  { label: "Draft a reply", icon: "edit-3" as const, action: "draft" },
+  { label: "Unpaid invoices", icon: "alert-circle" as const, action: "invoices" },
+  { label: "Schedule a job", icon: "calendar" as const, action: "schedule" },
+];
+
+function QuickActionChips({ onAction }: { onAction: (action: string) => void }) {
+  const { theme } = useTheme();
+  return (
+    <FlatList
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      data={QUICK_ACTIONS}
+      keyExtractor={(item) => item.action}
+      contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.sm }}
+      renderItem={({ item }) => (
+        <Pressable
+          onPress={() => {
+            if (item.action === "invoices") return;
+            onAction(item.action);
+          }}
+          style={[
+            styles.chip,
+            {
+              backgroundColor: item.action === "invoices" ? theme.backgroundSecondary : theme.cardBackground,
+              borderColor: theme.border,
+              opacity: item.action === "invoices" ? 0.6 : 1,
+            },
+          ]}
+          testID={`chip-${item.action}`}
+        >
+          <Feather name={item.icon} size={14} color={item.action === "invoices" ? theme.textSecondary : theme.primary} />
+          <ThemedText
+            type="caption"
+            style={{
+              color: item.action === "invoices" ? theme.textSecondary : theme.text,
+              marginLeft: 6,
+            }}
+          >
+            {item.action === "invoices" ? "Coming soon" : item.label}
+          </ThemedText>
+        </Pressable>
+      )}
+    />
+  );
+}
+
+function ResponseCard({ result, onDismiss, onAction }: {
+  result: AiCommandResult;
+  onDismiss: () => void;
+  onAction: (action: string) => void;
+}) {
+  const { theme } = useTheme();
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(10);
+
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 250 });
+    translateY.value = withTiming(0, { duration: 250, easing: Easing.out(Easing.ease) });
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <Animated.View style={[styles.responseCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }, animStyle]}>
+      <View style={styles.responseHeader}>
+        <View style={[styles.responseIconBg, { backgroundColor: `${theme.primary}15` }]}>
+          <Feather name="cpu" size={16} color={theme.primary} />
+        </View>
+        <ThemedText type="small" style={{ fontWeight: "600", flex: 1 }}>QuotePro</ThemedText>
+        <Pressable onPress={onDismiss} hitSlop={12}>
+          <Feather name="x" size={16} color={theme.textSecondary} />
+        </Pressable>
       </View>
-      <ThemedText type="body" style={[
-        styles.gettingStartedLabel,
-        completed ? { color: theme.textSecondary, textDecorationLine: "line-through" } : {}
-      ]}>
-        {label}
+      <ThemedText type="body" style={{ marginTop: Spacing.sm }}>
+        {result.responseText}
       </ThemedText>
-      <Feather name="chevron-right" size={16} color={theme.textSecondary} />
+      {result.metricValue ? (
+        <ThemedText type="h1" style={{ color: theme.primary, marginTop: Spacing.sm }}>
+          {result.metricValue}
+        </ThemedText>
+      ) : null}
+      {result.suggestedActions && result.suggestedActions.length > 0 ? (
+        <View style={styles.suggestedRow}>
+          {result.suggestedActions.map((a, i) => (
+            <Pressable
+              key={i}
+              style={[styles.suggestedChip, { backgroundColor: `${theme.primary}10`, borderColor: `${theme.primary}30` }]}
+              onPress={() => onAction(a)}
+            >
+              <ThemedText type="caption" style={{ color: theme.primary }}>{a}</ThemedText>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </Animated.View>
+  );
+}
+
+function GlanceCard({ title, value, icon, color, onPress }: {
+  title: string; value: string; icon: keyof typeof Feather.glyphMap; color: string; onPress?: () => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <Pressable
+      style={[styles.glanceCard, { backgroundColor: theme.cardBackground }]}
+      onPress={onPress}
+      testID={`glance-${title.toLowerCase().replace(/\s/g, "-")}`}
+    >
+      <View style={[styles.glanceIcon, { backgroundColor: `${color}15` }]}>
+        <Feather name={icon} size={16} color={color} />
+      </View>
+      <ThemedText type="h3" style={{ marginTop: 6 }}>{value}</ThemedText>
+      <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>{title}</ThemedText>
     </Pressable>
   );
 }
@@ -53,6 +216,12 @@ export default function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const { businessProfile: profile } = useApp();
+  const inputRef = useRef<TextInput>(null);
+
+  const [commandText, setCommandText] = useState("");
+  const [commandResult, setCommandResult] = useState<AiCommandResult | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
   const { data: stats, refetch: refetchStats } = useQuery<{
     totalQuotes: number;
     sentQuotes: number;
@@ -62,36 +231,24 @@ export default function DashboardScreen() {
     totalRevenue: number;
     avgQuoteValue: number;
     closeRate: number;
-  }>({
-    queryKey: ['/api/reports/stats'],
-  });
+  }>({ queryKey: ["/api/reports/stats"] });
 
-  const { data: recentQuotes = [], refetch: refetchQuotes } = useQuery<any[]>({
-    queryKey: ['/api/quotes'],
+  const { data: quotes = [], refetch: refetchQuotes } = useQuery<any[]>({
+    queryKey: ["/api/quotes"],
   });
 
   const { data: customers = [], refetch: refetchCustomers } = useQuery<any[]>({
-    queryKey: ['/api/customers'],
-  });
-
-  const { data: tasks = [], refetch: refetchTasks } = useQuery<any[]>({
-    queryKey: ['/api/tasks'],
+    queryKey: ["/api/customers"],
   });
 
   const { data: allJobs = [], refetch: refetchJobs } = useQuery<any[]>({
-    queryKey: ['/api/jobs'],
+    queryKey: ["/api/jobs"],
   });
-
-  const [refreshing, setRefreshing] = React.useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchTasks(), refetchJobs()]);
+    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchJobs()]);
     setRefreshing(false);
-  };
-
-  const handleNewQuote = () => {
-    navigation.navigate("QuoteCalculator");
   };
 
   const getGreeting = () => {
@@ -101,255 +258,208 @@ export default function DashboardScreen() {
     return "Good evening";
   };
 
-  const pendingTasks = (tasks || []).filter((t: any) => !t.completed);
-  const recent5Quotes = (recentQuotes || []).slice(0, 5);
-  const activeLeads = (customers || []).filter((c: any) => c.status === "lead").length;
+  const followUpCount = useMemo(() => {
+    return (quotes || []).filter((q: any) => q.status === "sent" || q.status === "draft").length;
+  }, [quotes]);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayJobCount = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    return (allJobs || []).filter((j: any) => {
+      if (!j.startDatetime) return false;
+      return j.startDatetime.slice(0, 10) === todayStr && j.status !== "cancelled";
+    }).length;
+  }, [allJobs]);
 
-  const upcomingJobs = (allJobs || [])
-    .filter((j: any) => j.status !== "completed" && j.status !== "cancelled")
-    .slice(0, 4);
+  const monthRevenue = stats?.totalRevenue || 0;
 
-  const customerMap = React.useMemo(() => {
-    const map: Record<string, string> = {};
-    (customers || []).forEach((c: any) => { map[c.id] = c.name; });
-    return map;
-  }, [customers]);
+  const appData = useMemo(() => ({
+    stats,
+    quotes,
+    customers,
+    jobs: allJobs,
+  }), [stats, quotes, customers, allJobs]);
 
-  const getJobStatusColor = (status: string, t: typeof theme) => {
-    switch (status) {
-      case "scheduled": return t.primary;
-      case "in_progress": return t.warning;
-      case "completed": return t.success;
-      case "cancelled": return t.error;
-      default: return t.textSecondary;
+  const executeCommand = useCallback((text: string) => {
+    if (!text.trim()) return;
+    const result = runAiCommand(text, appData);
+    setCommandResult(result);
+
+    if (result.navigation) {
+      setTimeout(() => {
+        if (result.navigation!.screen) {
+          navigation.navigate(result.navigation!.screen, result.navigation!.params || {});
+        } else if (result.navigation!.tab) {
+          navigation.navigate("Main", { screen: result.navigation!.tab });
+        }
+      }, 600);
+    }
+  }, [appData, navigation]);
+
+  const handleSubmit = () => {
+    executeCommand(commandText);
+    setCommandText("");
+  };
+
+  const handlePromptTap = (prompt: string) => {
+    setCommandText(prompt);
+    executeCommand(prompt);
+  };
+
+  const handleChipAction = (action: string) => {
+    switch (action) {
+      case "create_quote":
+        navigation.navigate("QuoteCalculator");
+        break;
+      case "follow_up":
+        executeCommand("Show quotes I haven't followed up on");
+        break;
+      case "metrics":
+        executeCommand("How many cleans booked this month?");
+        break;
+      case "draft":
+        navigation.navigate("AIAssistant");
+        break;
+      case "schedule":
+        navigation.navigate("Main", { screen: "JobsTab" });
+        break;
     }
   };
 
-  const getJobStatusIcon = (status: string): keyof typeof Feather.glyphMap => {
-    switch (status) {
-      case "scheduled": return "calendar";
-      case "in_progress": return "play-circle";
-      case "completed": return "check-circle";
-      case "cancelled": return "x-circle";
-      default: return "calendar";
+  const handleSuggestedAction = (action: string) => {
+    const lower = action.toLowerCase();
+    if (lower.includes("quote") && lower.includes("create")) {
+      navigation.navigate("QuoteCalculator");
+    } else if (lower.includes("revenue") || lower.includes("report")) {
+      navigation.navigate("Main", { screen: "RevenueTab" });
+    } else if (lower.includes("follow")) {
+      executeCommand("follow up quotes");
+    } else if (lower.includes("draft") || lower.includes("message")) {
+      navigation.navigate("AIAssistant");
+    } else if (lower.includes("customer") || lower.includes("search")) {
+      navigation.navigate("Main", { screen: "CustomersTab" });
+    } else if (lower.includes("quote")) {
+      navigation.navigate("Main", { screen: "QuotesTab" });
+    } else {
+      executeCommand(action);
     }
   };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "accepted": return theme.success;
-      case "sent": return theme.primary;
-      case "draft": return theme.textSecondary;
-      case "declined": return theme.error;
-      case "expired": return theme.warning;
-      default: return theme.textSecondary;
-    }
-  };
-
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  const renderHeader = () => (
-    <View>
-      <View style={styles.greeting}>
-        <View>
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: 2, textTransform: "uppercase", letterSpacing: 1, fontWeight: "600" }}>
-            {getGreeting()}
-          </ThemedText>
-          <ThemedText type="h1">
-            {profile?.companyName || "QuotePro"}
-          </ThemedText>
-        </View>
-      </View>
-
-      {(stats?.totalQuotes === 0 || !stats) && customers.length === 0 ? (
-        <View style={[styles.gettingStarted, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          <ThemedText type="h4" style={styles.gettingStartedTitle}>Getting Started</ThemedText>
-          <ThemedText type="small" style={[styles.gettingStartedSubtitle, { color: theme.textSecondary }]}>
-            Complete these steps to set up your business
-          </ThemedText>
-          <GettingStartedItem
-            icon="briefcase"
-            label="Set up your business profile"
-            completed={!!profile?.companyName}
-            onPress={() => navigation.navigate("MainTabs", { screen: "Settings" })}
-            theme={theme}
-          />
-          <GettingStartedItem
-            icon="dollar-sign"
-            label="Configure your pricing"
-            completed={false}
-            onPress={() => navigation.navigate("PricingSettings")}
-            theme={theme}
-          />
-          <GettingStartedItem
-            icon="users"
-            label="Add your first customer"
-            completed={customers.length > 0}
-            onPress={() => navigation.navigate("MainTabs", { screen: "Customers" })}
-            theme={theme}
-          />
-          <GettingStartedItem
-            icon="file-text"
-            label="Create your first quote"
-            completed={(stats?.totalQuotes || 0) > 0}
-            onPress={handleNewQuote}
-            theme={theme}
-          />
-        </View>
-      ) : null}
-
-      <View style={styles.stats}>
-        <StatCard
-          title="Revenue"
-          value={`$${(stats?.totalRevenue || 0).toLocaleString()}`}
-          icon="trending-up"
-          color={theme.success}
-        />
-        <StatCard
-          title="Close Rate"
-          value={`${stats?.closeRate || 0}%`}
-          icon="target"
-          color={theme.primary}
-        />
-        <StatCard
-          title="Leads"
-          value={activeLeads.toString()}
-          icon="users"
-          color={theme.warning}
-        />
-      </View>
-
-      <ProBanner message="Unlock AI-powered messages, direct sending, and smart descriptions" />
-
-      {pendingTasks.length > 0 ? (
-        <View style={styles.section}>
-          <ThemedText type="h4" style={styles.sectionTitle}>Tasks Due</ThemedText>
-          {pendingTasks.slice(0, 3).map((task: any) => (
-            <View
-              key={task.id}
-              style={[styles.taskRow, { borderColor: theme.border }]}
-              testID={`task-row-${task.id}`}
-            >
-              <View style={[styles.taskDot, { backgroundColor: theme.warning }]} />
-              <View style={styles.taskContent}>
-                <ThemedText type="small" numberOfLines={1}>{task.title}</ThemedText>
-                {task.dueDate ? (
-                  <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                    {formatDate(task.dueDate)}
-                  </ThemedText>
-                ) : null}
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      {upcomingJobs.length > 0 ? (
-        <View style={styles.section}>
-          <ThemedText type="h4" style={styles.sectionTitle}>Upcoming Jobs</ThemedText>
-          {upcomingJobs.map((job: any) => (
-            <Pressable
-              key={job.id}
-              style={[styles.activityRow, { borderColor: theme.border }]}
-              onPress={() => navigation.navigate("JobDetail", { jobId: job.id })}
-              testID={`job-row-${job.id}`}
-            >
-              <View style={[styles.activityIcon, { backgroundColor: `${getJobStatusColor(job.status, theme)}15` }]}>
-                <Feather name={getJobStatusIcon(job.status)} size={14} color={getJobStatusColor(job.status, theme)} />
-              </View>
-              <View style={styles.activityContent}>
-                <ThemedText type="small" numberOfLines={1} style={{ fontWeight: "500" }}>
-                  {job.customerId ? (customerMap[job.customerId] || "Customer") : "Job"}
-                </ThemedText>
-                <ThemedText type="caption" numberOfLines={1} style={{ color: theme.textSecondary }}>
-                  {job.serviceType || "Cleaning"} {job.startDatetime ? `- ${formatDate(job.startDatetime)}` : ""}
-                </ThemedText>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: `${getJobStatusColor(job.status, theme)}20` }]}>
-                <ThemedText type="caption" style={{ color: getJobStatusColor(job.status, theme), textTransform: "capitalize" }}>
-                  {job.status}
-                </ThemedText>
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
-      {recent5Quotes.length > 0 ? (
-        <View style={styles.section}>
-          <ThemedText type="h4" style={styles.sectionTitle}>Recent Quotes</ThemedText>
-        </View>
-      ) : null}
-    </View>
-  );
-
-  const renderQuoteItem = ({ item }: { item: any }) => (
-    <Card
-      style={styles.quoteCard}
-      onPress={() => navigation.navigate("QuoteDetail", { quoteId: item.id })}
-    >
-      <View style={styles.quoteRow}>
-        <View style={styles.quoteInfo}>
-          <ThemedText type="body" numberOfLines={1}>
-            {item.customerName || (item.customerId ? (customerMap[item.customerId] || "Customer") : "Quick Quote")}
-          </ThemedText>
-          <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            {item.propertySqft > 0 ? `${item.propertyBeds} bed, ${item.propertyBaths} bath` : formatDate(item.createdAt)}
-          </ThemedText>
-        </View>
-        <View style={styles.quoteRight}>
-          <ThemedText type="h4">${(item.total || 0).toFixed(0)}</ThemedText>
-          <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
-            <ThemedText type="caption" style={{ color: getStatusColor(item.status), textTransform: "capitalize" }}>
-              {item.status}
-            </ThemedText>
-          </View>
-        </View>
-      </View>
-    </Card>
-  );
-
-  const renderEmpty = () => (
-    <EmptyState
-      icon="file-text"
-      iconColor={theme.primary}
-      title="Ready to create your first quote?"
-      description="Tap the + button to generate a professional cleaning quote in minutes."
-      actionLabel="Create Quote"
-      onAction={handleNewQuote}
-    />
-  );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <FlatList
-        data={recent5Quotes}
-        keyExtractor={(item) => item.id}
-        renderItem={renderQuoteItem}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmpty}
+      <ScrollView
         contentContainerStyle={[
           styles.content,
-          {
-            paddingTop: headerHeight + Spacing.xl,
-            paddingBottom: tabBarHeight + Spacing.xl + 80,
-          },
-          recent5Quotes.length === 0 && styles.emptyContent,
+          { paddingTop: headerHeight + Spacing.md, paddingBottom: tabBarHeight + Spacing.xl },
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      />
-      <FAB onPress={handleNewQuote} testID="create-quote-fab" />
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.greetingRow}>
+          <ThemedText type="caption" style={{ color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 1, fontWeight: "600" }}>
+            {getGreeting()}
+          </ThemedText>
+          <ThemedText type="h4" numberOfLines={1} style={{ marginTop: 2 }}>
+            {profile?.companyName || "QuotePro"}
+          </ThemedText>
+        </View>
+
+        <View style={[styles.commandCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <ThemedText type="h4" style={{ marginBottom: Spacing.sm }}>
+            What would you like to do?
+          </ThemedText>
+          <View style={[styles.inputRow, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}>
+            <TextInput
+              ref={inputRef}
+              style={[styles.commandInput, { color: theme.text }]}
+              placeholder="Ask QuotePro..."
+              placeholderTextColor={theme.textSecondary}
+              value={commandText}
+              onChangeText={setCommandText}
+              onSubmitEditing={handleSubmit}
+              returnKeyType="send"
+              testID="command-input"
+            />
+            <Pressable
+              onPress={handleSubmit}
+              style={[styles.sendBtn, { backgroundColor: commandText.trim() ? theme.primary : theme.backgroundSecondary }]}
+              testID="command-send"
+            >
+              <Feather name="send" size={16} color={commandText.trim() ? "#FFF" : theme.textSecondary} />
+            </Pressable>
+          </View>
+          <RotatingPrompts onTap={handlePromptTap} />
+        </View>
+
+        {commandResult ? (
+          <View style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
+            <ResponseCard
+              result={commandResult}
+              onDismiss={() => setCommandResult(null)}
+              onAction={handleSuggestedAction}
+            />
+          </View>
+        ) : null}
+
+        {!FeatureFlags.aiEnabled ? (
+          <View style={[styles.aiBanner, { backgroundColor: `${theme.primary}08`, borderColor: `${theme.primary}20` }]}>
+            <View style={styles.aiBannerContent}>
+              <Feather name="zap" size={16} color={theme.primary} />
+              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                <ThemedText type="small" style={{ fontWeight: "600" }}>
+                  AI features launch in ~1-2 weeks
+                </ThemedText>
+                <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                  Smart replies, auto follow-ups, and more
+                </ThemedText>
+              </View>
+            </View>
+            <Pressable
+              style={[styles.upgradeCta, { backgroundColor: theme.primary }]}
+              onPress={() => navigation.navigate("Paywall")}
+              testID="upgrade-cta"
+            >
+              <ThemedText type="caption" style={{ color: "#FFF", fontWeight: "600" }}>Learn More</ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
+
+        <View style={{ marginBottom: Spacing.lg }}>
+          <QuickActionChips onAction={handleChipAction} />
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <ThemedText type="h4">Today at a glance</ThemedText>
+          <Pressable onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })} testID="recent-quotes-link">
+            <ThemedText type="caption" style={{ color: theme.primary }}>Recent Quotes</ThemedText>
+          </Pressable>
+        </View>
+
+        <View style={styles.glanceRow}>
+          <GlanceCard
+            title="Need follow-up"
+            value={followUpCount.toString()}
+            icon="phone-missed"
+            color={theme.warning}
+            onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })}
+          />
+          <GlanceCard
+            title="Jobs today"
+            value={todayJobCount.toString()}
+            icon="calendar"
+            color={theme.primary}
+            onPress={() => navigation.navigate("Main", { screen: "JobsTab" })}
+          />
+          <GlanceCard
+            title="This month"
+            value={`$${monthRevenue.toLocaleString()}`}
+            icon="trending-up"
+            color={theme.success}
+            onPress={() => navigation.navigate("Main", { screen: "RevenueTab" })}
+          />
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -359,109 +469,125 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
-  },
-  emptyContent: {
     flexGrow: 1,
   },
-  greeting: {
-    marginBottom: Spacing.xl,
-  },
-  stats: {
-    flexDirection: "row",
-    gap: Spacing.sm,
-    marginBottom: Spacing.xl,
-  },
-  section: {
-    marginBottom: Spacing.xl,
-  },
-  sectionTitle: {
+  greetingRow: {
+    paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
-    letterSpacing: 0.3,
   },
-  taskRow: {
+  commandCard: {
+    marginHorizontal: Spacing.lg,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  inputRow: {
     flexDirection: "row",
     alignItems: "center",
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    paddingLeft: Spacing.md,
+    paddingRight: 4,
+    height: 48,
+  },
+  commandInput: {
+    flex: 1,
+    fontSize: 15,
+    height: "100%",
+  },
+  sendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  promptContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.sm,
+    paddingVertical: 6,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-  },
-  taskDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: Spacing.md,
-  },
-  taskContent: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  quoteCard: {
-    marginBottom: Spacing.sm,
-  },
-  quoteRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  quoteInfo: {
-    flex: 1,
-  },
-  quoteRight: {
-    alignItems: "flex-end",
-  },
-  statusBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
     borderRadius: BorderRadius.full,
-    marginTop: 4,
+    borderWidth: 1,
   },
-  activityRow: {
+  responseCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    padding: Spacing.lg,
+  },
+  responseHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
     gap: Spacing.sm,
   },
-  activityIcon: {
+  responseIconBg: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  suggestedRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  suggestedChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  aiBanner: {
+    marginHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  aiBannerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  upgradeCta: {
+    alignSelf: "flex-start",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 8,
+    borderRadius: BorderRadius.full,
+    marginTop: Spacing.sm,
+    marginLeft: 28,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  glanceRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xl,
+  },
+  glanceCard: {
+    flex: 1,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+  },
+  glanceIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-  },
-  activityContent: {
-    flex: 1,
-    gap: 2,
-  },
-  gettingStarted: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    padding: Spacing.lg,
-    marginBottom: Spacing.xl,
-  },
-  gettingStartedTitle: {
-    marginBottom: 4,
-  },
-  gettingStartedSubtitle: {
-    marginBottom: Spacing.lg,
-  },
-  gettingStartedItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: Spacing.sm,
-    gap: Spacing.md,
-  },
-  gettingStartedCheck: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  gettingStartedLabel: {
-    flex: 1,
   },
 });
