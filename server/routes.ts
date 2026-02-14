@@ -4,8 +4,13 @@ import session from "express-session";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import OpenAI from "openai";
+import Stripe from "stripe";
 import { pool } from "./db";
 import { google } from "googleapis";
+
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-04-30.basil" as any })
+  : null;
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -650,6 +655,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: q.status,
           expiresAt: q.expiresAt,
           lineItems,
+          paymentStatus: q.paymentStatus,
+          paidAt: q.paidAt,
         },
         business: business
           ? {
@@ -665,6 +672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customer: customer
           ? { firstName: customer.firstName, lastName: customer.lastName }
           : null,
+        paymentEnabled: !!(business?.stripeAccountId && business?.stripeOnboardingComplete),
       });
     } catch (error: any) {
       console.error("Public quote error:", error);
@@ -2473,6 +2481,257 @@ Respond with JSON: {"reply": string}`
       console.error("Calendar sync error:", error);
       return res.status(500).json({ message: "Failed to sync to calendar" });
     }
+  });
+
+  // ─── Stripe Connect ───
+
+  app.get("/api/stripe/status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      if (business.stripeAccountId && business.stripeOnboardingComplete) {
+        return res.json({ connected: true, accountId: business.stripeAccountId });
+      }
+      return res.json({ connected: false, accountId: business.stripeAccountId || null });
+    } catch (error: any) {
+      console.error("Stripe status error:", error);
+      return res.status(500).json({ message: "Failed to check Stripe status" });
+    }
+  });
+
+  app.post("/api/stripe/connect", requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      let accountId = business.stripeAccountId;
+      if (!accountId) {
+        const account = await stripe.accounts.create({
+          type: "express",
+          email: business.email || undefined,
+          business_type: "individual",
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+          metadata: { businessId: business.id },
+        });
+        accountId = account.id;
+        await updateBusiness(business.id, { stripeAccountId: accountId });
+      }
+
+      const accountLink = await stripe.accountLinks.create({
+        account: accountId,
+        refresh_url: `https://${req.get("host")}/api/stripe/connect-refresh?userId=${req.session.userId}`,
+        return_url: `https://${req.get("host")}/api/stripe/connect-callback?userId=${req.session.userId}`,
+        type: "account_onboarding",
+      });
+
+      return res.json({ url: accountLink.url });
+    } catch (error: any) {
+      console.error("Stripe connect error:", error);
+      return res.status(500).json({ message: "Failed to create Stripe account" });
+    }
+  });
+
+  app.get("/api/stripe/connect-callback", async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).send("Stripe not configured");
+      const { userId } = req.query as { userId: string };
+      if (!userId) return res.status(400).send("Missing userId");
+
+      const business = await getBusinessByOwner(userId);
+      if (!business || !business.stripeAccountId) return res.status(400).send("No Stripe account found");
+
+      const account = await stripe.accounts.retrieve(business.stripeAccountId);
+      const isComplete = account.charges_enabled && account.details_submitted;
+
+      if (isComplete) {
+        await updateBusiness(business.id, { stripeOnboardingComplete: true });
+      }
+
+      return res.send(`<!DOCTYPE html>
+<html><head><title>Stripe Connected</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.check{font-size:48px;margin-bottom:16px;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><div class="check">&#10003;</div><h2>${isComplete ? "Stripe Connected!" : "Almost Done"}</h2><p>${isComplete ? "You can now accept payments. Close this window." : "Please complete the remaining steps in Stripe."}</p></div></body></html>`);
+    } catch (error: any) {
+      console.error("Stripe callback error:", error);
+      return res.status(500).send("Failed to verify Stripe connection.");
+    }
+  });
+
+  app.get("/api/stripe/connect-refresh", async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).send("Stripe not configured");
+      const { userId } = req.query as { userId: string };
+      if (!userId) return res.status(400).send("Missing userId");
+
+      const business = await getBusinessByOwner(userId);
+      if (!business || !business.stripeAccountId) return res.status(400).send("No Stripe account");
+
+      const accountLink = await stripe.accountLinks.create({
+        account: business.stripeAccountId,
+        refresh_url: `https://${req.get("host")}/api/stripe/connect-refresh?userId=${userId}`,
+        return_url: `https://${req.get("host")}/api/stripe/connect-callback?userId=${userId}`,
+        type: "account_onboarding",
+      });
+
+      return res.redirect(accountLink.url);
+    } catch (error: any) {
+      console.error("Stripe refresh error:", error);
+      return res.status(500).send("Failed to refresh onboarding");
+    }
+  });
+
+  app.delete("/api/stripe/disconnect", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      await updateBusiness(business.id, { stripeAccountId: null, stripeOnboardingComplete: false });
+      return res.json({ message: "Stripe disconnected" });
+    } catch (error: any) {
+      console.error("Stripe disconnect error:", error);
+      return res.status(500).json({ message: "Failed to disconnect Stripe" });
+    }
+  });
+
+  app.post("/api/stripe/create-payment", requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
+      const { quoteId } = req.body;
+      if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
+
+      const quote = await getQuoteById(quoteId);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const business = await db_getBusinessById(quote.businessId);
+      if (!business || !business.stripeAccountId || !business.stripeOnboardingComplete) {
+        return res.status(400).json({ message: "Stripe is not connected for this business" });
+      }
+
+      const amount = Math.round(quote.total * 100);
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: [{
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Cleaning Service Quote`,
+              description: `${quote.frequencySelected} cleaning - ${quote.selectedOption} option`,
+            },
+            unit_amount: amount,
+          },
+          quantity: 1,
+        }],
+        payment_intent_data: {
+          application_fee_amount: Math.round(amount * 0.03),
+          transfer_data: { destination: business.stripeAccountId },
+        },
+        success_url: `https://${req.get("host")}/api/stripe/payment-success?quoteId=${quoteId}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://${req.get("host")}/api/stripe/payment-cancel?quoteId=${quoteId}`,
+        metadata: { quoteId, businessId: business.id },
+      });
+
+      return res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Create payment error:", error);
+      return res.status(500).json({ message: "Failed to create payment session" });
+    }
+  });
+
+  app.post("/api/public/quote/:token/pay", async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).json({ message: "Payments not available" });
+      const quote = await getQuoteByToken(req.params.token);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      if (quote.paymentStatus === "paid") return res.status(400).json({ message: "Already paid" });
+
+      const business = await db_getBusinessById(quote.businessId);
+      if (!business || !business.stripeAccountId || !business.stripeOnboardingComplete) {
+        return res.status(400).json({ message: "Payments not enabled for this business" });
+      }
+
+      const amount = Math.round(quote.total * 100);
+
+      const checkoutSession = await stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: [{
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Cleaning Service - ${business.companyName || "Quote"}`,
+              description: `${quote.frequencySelected} cleaning - ${quote.selectedOption} option`,
+            },
+            unit_amount: amount,
+          },
+          quantity: 1,
+        }],
+        payment_intent_data: {
+          application_fee_amount: Math.round(amount * 0.03),
+          transfer_data: { destination: business.stripeAccountId },
+        },
+        success_url: `https://${req.get("host")}/api/stripe/payment-success?quoteId=${quote.id}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://${req.get("host")}/api/stripe/payment-cancel?quoteId=${quote.id}`,
+        metadata: { quoteId: quote.id, businessId: business.id },
+      });
+
+      return res.json({ url: checkoutSession.url });
+    } catch (error: any) {
+      console.error("Public payment error:", error);
+      return res.status(500).json({ message: "Failed to create payment" });
+    }
+  });
+
+  app.get("/api/stripe/payment-success", async (req: Request, res: Response) => {
+    try {
+      const { quoteId, session_id } = req.query as { quoteId: string; session_id: string };
+      if (quoteId) {
+        await updateQuote(quoteId, {
+          paymentStatus: "paid",
+          paymentAmount: undefined,
+          paidAt: new Date(),
+          status: "accepted",
+          acceptedAt: new Date(),
+        });
+
+        if (stripe && session_id) {
+          try {
+            const checkoutSession = await stripe.checkout.sessions.retrieve(session_id);
+            if (checkoutSession.payment_intent) {
+              await updateQuote(quoteId, {
+                paymentIntentId: checkoutSession.payment_intent as string,
+                paymentAmount: (checkoutSession.amount_total || 0) / 100,
+              });
+            }
+          } catch (e) {
+            console.error("Error retrieving checkout session:", e);
+          }
+        }
+      }
+
+      return res.send(`<!DOCTYPE html>
+<html><head><title>Payment Successful</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.check{font-size:48px;margin-bottom:16px;color:#22c55e;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><div class="check">&#10003;</div><h2>Payment Successful!</h2><p>Thank you for your payment. You may close this window.</p></div></body></html>`);
+    } catch (error: any) {
+      console.error("Payment success error:", error);
+      return res.status(500).send("An error occurred processing your payment confirmation.");
+    }
+  });
+
+  app.get("/api/stripe/payment-cancel", async (_req: Request, res: Response) => {
+    return res.send(`<!DOCTYPE html>
+<html><head><title>Payment Cancelled</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.icon{font-size:48px;margin-bottom:16px;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><div class="icon">&#10007;</div><h2>Payment Cancelled</h2><p>No charge was made. You can close this window.</p></div></body></html>`);
   });
 
   app.get("/privacy", (_req: Request, res: Response) => {
