@@ -1,9 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { Platform } from "react-native";
 import Purchases, { PurchasesOffering, CustomerInfo } from "react-native-purchases";
+import Constants from "expo-constants";
 import { useAuth } from "@/context/AuthContext";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useQueryClient } from "@tanstack/react-query";
+
+function isExpoGo(): boolean {
+  return Constants.executionEnvironment === "storeClient";
+}
 
 interface SubscriptionContextType {
   isPro: boolean;
@@ -51,7 +56,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        if (Platform.OS === "web") {
+        if (Platform.OS === "web" || isExpoGo()) {
+          console.log(isExpoGo() ? "Expo Go app detected. Using RevenueCat in Browser Mode." : "Web platform detected. Using RevenueCat in Browser Mode.");
           setIsPro(user.subscriptionTier === "pro");
           setIsLoading(false);
           return;

@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, LogBox } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -16,15 +16,23 @@ import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { setupNotificationHandler, registerForPushNotificationsAsync, savePushTokenToServer } from "@/lib/notifications";
 
+LogBox.ignoreLogs([
+  "shadow*",
+  "props.pointerEvents",
+  "expo-notifications",
+]);
+
 setupNotificationHandler();
 
 export default function App() {
   useEffect(() => {
-    registerForPushNotificationsAsync().then((token) => {
-      if (token) {
-        savePushTokenToServer(token);
-      }
-    });
+    registerForPushNotificationsAsync()
+      .then((token) => {
+        if (token) {
+          savePushTokenToServer(token);
+        }
+      })
+      .catch(() => {});
   }, []);
   return (
     <ErrorBoundary>
