@@ -5,15 +5,17 @@ import { Platform } from "react-native";
 import { apiRequest } from "@/lib/query-client";
 
 export function setupNotificationHandler() {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (e) {
+    console.warn("Failed to setup notification handler:", e);
+  }
 }
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {

@@ -135,11 +135,13 @@ export default function MainTabNavigator() {
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
-            <BlurView
-              intensity={isDark ? 80 : 100}
-              tint={isDark ? "dark" : "light"}
-              style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }]}
-            />
+            <View style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" }]}>
+              <BlurView
+                intensity={isDark ? 80 : 100}
+                tint={isDark ? "dark" : "light"}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
           ) : null,
         headerTitleAlign: screenOptions.headerTitleAlign,
         headerTransparent: screenOptions.headerTransparent,
