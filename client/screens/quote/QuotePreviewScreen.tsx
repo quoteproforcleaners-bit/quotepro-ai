@@ -31,6 +31,7 @@ import {
   generateSmsDraft,
 } from "@/lib/quoteCalculator";
 import { apiRequest } from "@/lib/query-client";
+import { getPaymentOptions, getEnabledPaymentMethods, PAYMENT_METHOD_LABELS, formatPaymentOptionsForMessage } from "@/lib/paymentOptions";
 
 function FormattedDraftText({ text, style }: { text: string; style?: any }) {
   const paragraphs = text.split(/\n\n+/);
@@ -438,6 +439,32 @@ export default function QuotePreviewScreen({
           isSelected={selectedOption === "best"}
           onPress={() => onSelectOption("best")}
         />
+
+        {(() => {
+          const po = getPaymentOptions(businessProfile.paymentOptions);
+          const enabled = getEnabledPaymentMethods(po);
+          if (enabled.length === 0) return null;
+          return (
+            <View style={[styles.paymentMethodsCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.sm }}>
+                <Feather name="credit-card" size={16} color={theme.primary} />
+                <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8, color: theme.primary }}>
+                  Payment Methods Accepted
+                </ThemedText>
+              </View>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                {enabled.map(({ key, label }) => (
+                  <View key={key} style={[styles.paymentTag, { backgroundColor: `${theme.primary}10`, borderColor: `${theme.primary}25` }]}>
+                    <Feather name={(PAYMENT_METHOD_LABELS[key]?.icon || "check") as any} size={12} color={theme.primary} />
+                    <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>
+                      {label}
+                    </ThemedText>
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        })()}
 
         <SectionHeader title="Send This Quote" />
 
@@ -859,5 +886,20 @@ const styles = StyleSheet.create({
     right: 0,
     padding: Spacing.lg,
     borderTopWidth: 1,
+  },
+  paymentMethodsCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.sm,
+  },
+  paymentTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
 });
