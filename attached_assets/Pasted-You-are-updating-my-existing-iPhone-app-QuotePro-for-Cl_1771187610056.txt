@@ -1,0 +1,213 @@
+You are updating my existing iPhone app “QuotePro for Cleaners” (React Native / Expo). The app already has: quotes, customers, jobs, revenue dashboard (pipeline/expected/open quotes/avg age), AI sales assistant entry, quote status updates, PDF export, and buttons to draft/send email/SMS. 
+
+GOAL (VERSION 3 — “STICKY PRODUCT” RELEASE)
+Increase retention and sessions per active device by creating daily/weekly habits and making the app proactively pull users back in. Do NOT build ZenMaid/Jobber operations features. Do NOT build full automation engines yet. Focus on lightweight “nudges”, reminders, and an action-driven follow-up workflow.
+
+KEY PROBLEM
+Current acquisition/conversion is strong, but retention is low. Users install, use 1–2 times, then disappear. We need habit formation:
+- Daily reason to open the app
+- Clear “next action” tasks
+- Lightweight reactivation prompts
+
+NON-NEGOTIABLES
+- Keep everything iOS-safe: no auto-sending SMS in the background. If sending messages, it must be user-initiated via compose UI (expo-sms / mail composer) OR an optional “connected send” feature stubbed behind a toggle (server endpoint placeholder).
+- Respect opt-out and quiet hours. No spam.
+- Make changes incremental: add new cards/screens and notifications, don’t rewrite the whole app.
+- Add simple analytics logging in-app (events) so I can measure if these features improve retention.
+
+DELIVERABLES
+1) New data models and local persistence (SQLite) for “tasks”, “nudges”, “streaks”, “reactivation candidates”, “preferences”.
+2) New UI: Follow-Up Queue, Weekly Recap, Opportunities.
+3) Push notification system with scheduling + deep links into the right screen.
+4) Implementation steps (ordered) + code changes with file structure.
+5) Event tracking instrumentation (lightweight) with a local log and a single function to plug into analytics later.
+
+========================================
+FEATURE SET A — DAILY REVENUE PULSE (Push + Home Card)
+========================================
+A1) Daily Push Notification (“Revenue Pulse”)
+- At user-defined time (default 8:00 AM local), send a push notification:
+  “You have {n} quotes needing follow-up — ${amountAtRisk} at risk today.”
+- Tapping the notification deep-links to the Follow-Up Queue screen.
+- Only send if there is at least 1 item needing follow-up.
+- Respect quiet hours and “do not disturb” toggle.
+
+A2) Home Screen “Today’s Focus” Card
+- Add a new card at the top of Home:
+  - “Today’s Focus”
+  - shows:
+    - “Quotes needing follow-up: {n}”
+    - “At-risk value: ${amountAtRisk}”
+    - “Oldest quote: {days} days”
+  - Primary CTA button: “Follow Up Now”
+  - Secondary CTA: “View Weekly Recap”
+
+Define “needs follow-up” rules:
+- Quote status = Sent
+- Quote age > 24 hours
+- Not contacted in last 24 hours (use lastTouchedAt)
+- Not accepted/declined/expired
+
+Compute “amountAtRisk”:
+- Sum of quote totals for quotes matching needs-follow-up.
+
+========================================
+FEATURE SET B — FOLLOW-UP QUEUE (Action Workflow)
+========================================
+B1) New Screen: Follow-Up Queue
+Tabs or filters:
+- Overdue (age > 3 days)
+- Due Today (age 1–3 days)
+- Upcoming (sent < 24 hours)
+
+Each item shows:
+- Customer name
+- Quote total
+- Quote age in days
+- Last touched (e.g., “never”, “2 days ago”)
+- Quick actions:
+  - “Text” (opens SMS composer with templated message)
+  - “Email” (opens email composer)
+  - “Call” (tel: link)
+  - “Mark Contacted” (logs touch + snoozes)
+
+B2) Smart message templates (non-AI default, AI optional)
+Provide 5 built-in follow-up templates:
+1) Friendly check-in (Day 1)
+2) Value reminder (Day 3)
+3) Scarcity / schedule hold (Day 5)
+4) Objection prompt (“Any questions?”)
+5) Last touch (“Should I close this out?”)
+
+Include merge fields:
+{firstName}, {quoteTotal}, {companyName}, {bookingLink}, {senderName}
+
+Add “Improve with AI” button:
+- calls existing AI assistant to rewrite within 240 chars for SMS or ~120 words for email.
+
+B3) Snooze + Guardrails
+- Snooze options: 24h / 48h / 7d
+- Max outbound follow-ups per quote per day: 1 (configurable)
+- If user marks quote “Accepted/Declined/Expired”, remove from queue immediately.
+
+========================================
+FEATURE SET C — WEEKLY REVENUE RECAP (Habit + Progress)
+========================================
+C1) Weekly Push Recap (every Monday 8 AM default)
+“Last week: {quotesSent} quotes, {wins} won, {closeRate}% close rate, ${revenueWon} revenue.”
+
+Tap deep-links to Weekly Recap screen.
+
+C2) Weekly Recap Screen
+Cards:
+- Quotes sent
+- Accepted
+- Declined/Expired
+- Close rate
+- Total booked / won revenue (or “accepted total”)
+- “Biggest win”
+- “Most at-risk still open”
+
+Add a “Next Week Goal” prompt:
+- user can set: “Send 10 quotes” or “Follow up daily”
+- show progress bar
+
+========================================
+FEATURE SET D — STREAKS / MOMENTUM (Simple Gamification)
+========================================
+D1) Follow-Up Streak
+Track consecutive days where the user completes at least 1 follow-up action (Text/Email/Mark Contacted).
+Show on Home:
+- “🔥 Follow-up streak: {n} days”
+- If streak breaks, show gentle nudge: “Restart your streak today.”
+
+D2) Micro badges (optional, minimal)
+- “First follow-up sent”
+- “5 follow-ups completed”
+- “First job won”
+
+No heavy gamification—just small dopamine hits.
+
+========================================
+FEATURE SET E — LIGHTWEIGHT REACTIVATION (No Full Campaign Builder Yet)
+========================================
+E1) Opportunities Card on Home (and/or Revenue tab)
+Show:
+- “Reactivation opportunities: {n}”
+- “Estimated recoverable: ${estimate}”
+CTA: “View Opportunities”
+
+E2) Opportunities Screen
+Two sections:
+1) Dormant Customers:
+- Customers with lastJobAt older than 60/90/120 days (filter)
+- Each row: name, last job date, avg ticket (if available), suggested message
+- Actions: Text / Email / Mark attempted / Do not contact
+
+2) Lost Quotes:
+- Quotes expired/declined in last 180 days
+- Each row: customer, quote total, reason (expired/declined), suggested message
+- Actions: Text / Email / Mark attempted
+
+Estimation:
+- Dormant customer: estimate = (customerAvgTicket OR orgAvgTicket) * 0.25
+- Lost quote expired: quoteTotal * 0.20
+- Lost quote declined: quoteTotal * 0.10
+
+E3) Preferences
+Add settings:
+- Dormant threshold: 60/90/120 days
+- Quiet hours
+- Opt-out compliance note + a per-customer “Do not contact” toggle
+- Notification schedule (daily pulse time, weekly recap on/off)
+
+========================================
+ANALYTICS / MEASUREMENT (MUST IMPLEMENT)
+========================================
+Implement a lightweight event logger:
+trackEvent(name, props)
+Store locally (SQLite table events) and print to console in dev.
+
+Track these events:
+- app_open
+- followup_queue_open
+- followup_text_tap
+- followup_email_tap
+- followup_mark_contacted
+- followup_snooze
+- weekly_recap_open
+- opportunities_open
+- reactivation_text_tap
+- reactivation_mark_attempted
+- notification_daily_sent
+- notification_daily_opened
+- notification_weekly_sent
+- notification_weekly_opened
+
+========================================
+TECH STACK REQUIREMENTS
+========================================
+- React Native / Expo
+- expo-notifications for push
+- expo-linking for deep links
+- expo-sms and expo-mail-composer for user-initiated messaging
+- expo-sqlite for persistence
+- Use existing quote/customer storage patterns (don’t break current data)
+
+OUTPUT FORMAT
+Return:
+1) Updated folder/file structure
+2) SQLite schema + migrations plan
+3) TypeScript models
+4) Complete code for:
+   - Notification scheduler + deep link handling
+   - Follow-Up Queue screen
+   - Weekly Recap screen
+   - Opportunities screen
+   - Streak tracker logic
+   - Preferences UI
+   - Event tracker module
+5) Step-by-step implementation order
+6) Edge cases + test checklist
+
+BUILD THIS NOW, focusing on clean incremental changes and iOS-safe messaging workflows.
