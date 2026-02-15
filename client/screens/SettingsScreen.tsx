@@ -23,6 +23,8 @@ import { getApiUrl } from "@/lib/query-client";
 import { PaymentOptions, DEFAULT_PAYMENT_OPTIONS } from "@/types";
 import { PAYMENT_METHOD_LABELS, getPaymentOptions } from "@/lib/paymentOptions";
 import { Switch } from "react-native";
+import { useLanguage } from "@/context/LanguageContext";
+import { LANGUAGE_LABELS, type Language } from "@/i18n";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -33,6 +35,7 @@ export default function SettingsScreen() {
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
   const { isPro } = useSubscription();
+  const { language, setLanguage, t } = useLanguage();
 
   const { data: calendarStatus, refetch: refetchCalendar } = useQuery({
     queryKey: ["/api/google-calendar/status"],
@@ -728,7 +731,35 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
-      <SectionHeader title="Account" />
+      <SectionHeader title={t.settings.language} subtitle={t.settings.languageSubtitle} />
+
+      <View style={[styles.languageSelector, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        {(["en", "es"] as Language[]).map((lang) => (
+          <Pressable
+            key={lang}
+            onPress={() => setLanguage(lang)}
+            style={[
+              styles.languageOption,
+              {
+                backgroundColor: language === lang ? `${theme.primary}15` : "transparent",
+                borderColor: language === lang ? theme.primary : "transparent",
+              },
+            ]}
+            testID={`settings-lang-${lang}`}
+          >
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: language === lang ? "700" : "500" }}>
+                {LANGUAGE_LABELS[lang]}
+              </ThemedText>
+            </View>
+            {language === lang ? (
+              <Feather name="check" size={20} color={theme.primary} />
+            ) : null}
+          </Pressable>
+        ))}
+      </View>
+
+      <SectionHeader title={t.settings.account} />
 
       {user ? (
         <View
@@ -974,5 +1005,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minHeight: 60,
     textAlignVertical: "top",
+  },
+  languageSelector: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginBottom: Spacing.md,
+  },
+  languageOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderWidth: 1,
   },
 });
