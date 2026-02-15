@@ -451,7 +451,7 @@ export default function DashboardScreen() {
               </View>
               <View style={{ flex: 1, marginLeft: Spacing.sm }}>
                 <ThemedText type="small" style={{ fontWeight: "600", fontSize: 13 }}>
-                  AI features launch in ~1-2 weeks
+                  Unlock AI-powered features
                 </ThemedText>
                 <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 1, fontSize: 11 }}>
                   Smart replies, auto follow-ups, and more
