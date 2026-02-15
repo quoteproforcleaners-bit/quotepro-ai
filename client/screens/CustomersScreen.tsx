@@ -27,6 +27,7 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { ProBanner } from "@/components/ProBanner";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Customer {
   id: string;
@@ -44,13 +45,6 @@ interface Customer {
 
 type StatusFilter = "all" | "lead" | "active" | "inactive";
 
-const filterOptions: { label: string; value: StatusFilter }[] = [
-  { label: "All", value: "all" },
-  { label: "Leads", value: "lead" },
-  { label: "Active", value: "active" },
-  { label: "Inactive", value: "inactive" },
-];
-
 export default function CustomersScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -58,6 +52,14 @@ export default function CustomersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
+
+  const filterOptions: { label: string; value: StatusFilter }[] = [
+    { label: t.common.all, value: "all" },
+    { label: t.customers.leads, value: "lead" },
+    { label: t.customers.active, value: "active" },
+    { label: t.customers.inactive, value: "inactive" },
+  ];
 
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -177,11 +179,11 @@ export default function CustomersScreen() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "lead":
-        return "Lead";
+        return t.customers.lead;
       case "active":
-        return "Active";
+        return t.customers.active;
       case "inactive":
-        return "Inactive";
+        return t.customers.inactive;
       default:
         return status;
     }
@@ -259,10 +261,10 @@ export default function CustomersScreen() {
 
   const renderHeader = () => (
     <View>
-      <ProBanner message="AI-powered follow-ups and automated messaging with QuotePro AI" />
+      <ProBanner message={t.customers.aiFollowUpBanner} />
       <Input
         testID="search-input"
-        placeholder="Search customers..."
+        placeholder={t.customers.searchPlaceholder}
         value={searchText}
         onChangeText={setSearchText}
         leftIcon="search"
@@ -288,9 +290,9 @@ export default function CustomersScreen() {
       <EmptyState
         icon="users"
         iconColor={theme.primary}
-        title="No customers yet"
-        description="Add your first customer to start managing your contacts and growing your business."
-        actionLabel="Add Customer"
+        title={t.customers.noCustomers}
+        description={t.customers.addDescription}
+        actionLabel={t.customers.addCustomer}
         onAction={handleAddCustomer}
       />
     );
@@ -340,10 +342,10 @@ export default function CustomersScreen() {
               }}
             >
               <ThemedText type="body" style={{ color: theme.primary }}>
-                {"Cancel"}
+                {t.common.cancel}
               </ThemedText>
             </Pressable>
-            <ThemedText type="h4">{"New Customer"}</ThemedText>
+            <ThemedText type="h4">{t.customers.newCustomer}</ThemedText>
             <View style={{ width: 60 }} />
           </View>
           <KeyboardAwareScrollViewCompat
@@ -351,24 +353,24 @@ export default function CustomersScreen() {
           >
             <Input
               testID="input-first-name"
-              label="First Name"
-              placeholder="First name"
+              label={t.customers.firstName}
+              placeholder={t.customers.firstNamePlaceholder}
               value={firstName}
               onChangeText={setFirstName}
               autoCapitalize="words"
             />
             <Input
               testID="input-last-name"
-              label="Last Name"
-              placeholder="Last name"
+              label={t.customers.lastName}
+              placeholder={t.customers.lastNamePlaceholder}
               value={lastName}
               onChangeText={setLastName}
               autoCapitalize="words"
             />
             <Input
               testID="input-phone"
-              label="Phone"
-              placeholder="Phone number"
+              label={t.customers.phone}
+              placeholder={t.customers.phonePlaceholder}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
@@ -376,8 +378,8 @@ export default function CustomersScreen() {
             />
             <Input
               testID="input-email"
-              label="Email"
-              placeholder="Email address"
+              label={t.customers.email}
+              placeholder={t.customers.emailPlaceholder}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -386,8 +388,8 @@ export default function CustomersScreen() {
             />
             <Input
               testID="input-address"
-              label="Address"
-              placeholder="Customer address"
+              label={t.customers.address}
+              placeholder={t.customers.addressPlaceholder}
               value={address}
               onChangeText={setAddress}
               leftIcon="map-pin"
@@ -401,7 +403,7 @@ export default function CustomersScreen() {
               }
               style={styles.saveButton}
             >
-              {createMutation.isPending ? "Saving..." : "Save Customer"}
+              {createMutation.isPending ? t.common.saving : t.customers.saveCustomer}
             </Button>
           </KeyboardAwareScrollViewCompat>
         </View>

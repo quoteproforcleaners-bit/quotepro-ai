@@ -13,6 +13,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProBanner } from "@/components/ProBanner";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
+import { useLanguage } from "@/context/LanguageContext";
 
 type FilterType = "all" | "draft" | "sent" | "accepted";
 
@@ -22,6 +23,7 @@ export default function QuotesScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const [filter, setFilter] = useState<FilterType>("all");
 
   const { data: quotes = [], isLoading, refetch } = useQuery<any[]>({
@@ -50,15 +52,15 @@ export default function QuotesScreen() {
   });
 
   const filterOptions = [
-    { label: "All", value: "all" as FilterType },
-    { label: "Draft", value: "draft" as FilterType },
-    { label: "Sent", value: "sent" as FilterType },
-    { label: "Accepted", value: "accepted" as FilterType },
+    { label: t.common.all, value: "all" as FilterType },
+    { label: t.quotes.draft, value: "draft" as FilterType },
+    { label: t.quotes.sent, value: "sent" as FilterType },
+    { label: t.quotes.accepted, value: "accepted" as FilterType },
   ];
 
   const renderHeader = () => (
     <View>
-      <ProBanner message="Send quotes directly to customers with QuotePro AI" />
+      <ProBanner message={t.quotes.sendDirectBanner} />
       <View style={styles.filterContainer}>
         <SegmentedControl
           options={filterOptions}
@@ -73,9 +75,9 @@ export default function QuotesScreen() {
     <EmptyState
       icon="file-text"
       iconColor={theme.primary}
-      title="No quotes yet"
-      description="Create your first quote to start tracking your proposals and close more deals."
-      actionLabel="Create Quote"
+      title={t.quotes.noQuotes}
+      description={t.quotes.noQuotesDesc}
+      actionLabel={t.quotes.createQuote}
       onAction={handleNewQuote}
     />
   );

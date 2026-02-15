@@ -7,6 +7,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface ProBannerProps {
   message?: string;
@@ -16,6 +17,7 @@ export function ProBanner({ message }: ProBannerProps) {
   const { theme } = useTheme();
   const { isPro } = useSubscription();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { t } = useLanguage();
 
   if (isPro) return null;
 
@@ -33,7 +35,7 @@ export function ProBanner({ message }: ProBannerProps) {
           QuotePro AI
         </ThemedText>
         <ThemedText type="caption" style={styles.description}>
-          {message || "Unlock AI messaging and direct sending"}
+          {message || t.revenue.unlockAIBanner}
         </ThemedText>
       </View>
       <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.8)" />

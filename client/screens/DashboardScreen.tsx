@@ -116,8 +116,8 @@ function useQuickActions() {
     { label: t.dashboard.newQuote, icon: "file-plus" as const, action: "create_quote" },
     { label: t.dashboard.followUpQuotes, icon: "refresh-cw" as const, action: "follow_up" },
     { label: t.dashboard.thisMonthBooked, icon: "bar-chart-2" as const, action: "metrics" },
-    { label: "Draft a reply", icon: "edit-3" as const, action: "draft" },
-    { label: "Unpaid invoices", icon: "alert-circle" as const, action: "invoices" },
+    { label: t.dashboard.draftReply, icon: "edit-3" as const, action: "draft" },
+    { label: t.dashboard.unpaidInvoices, icon: "alert-circle" as const, action: "invoices" },
     { label: t.jobs.scheduleJob, icon: "calendar" as const, action: "schedule" },
   ];
 }
@@ -125,6 +125,7 @@ function useQuickActions() {
 function QuickActionChips({ onAction }: { onAction: (action: string) => void }) {
   const dt = useDesignTokens();
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const quickActions = useQuickActions();
   return (
     <FlatList
@@ -160,7 +161,7 @@ function QuickActionChips({ onAction }: { onAction: (action: string) => void }) 
                 fontWeight: "500",
               }}
             >
-              {disabled ? "Coming soon" : item.label}
+              {disabled ? t.common.comingSoon : item.label}
             </ThemedText>
           </Pressable>
         );

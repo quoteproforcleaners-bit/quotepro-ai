@@ -13,6 +13,7 @@ import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useSubscription } from "@/context/SubscriptionContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface PipelineData {
   totalPipeline: number;
@@ -40,6 +41,7 @@ export default function RevenueScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const { isPro } = useSubscription();
+  const { t } = useLanguage();
 
   const { data: pipeline, refetch: refetchPipeline } = useQuery<PipelineData>({
     queryKey: ["/api/revenue/pipeline"],
@@ -90,17 +92,17 @@ export default function RevenueScreen() {
               <Feather name="trending-up" size={40} color={theme.primary} />
             </View>
             <ThemedText type="h3" style={{ textAlign: "center", marginTop: Spacing.lg }}>
-              Revenue Intelligence
+              {t.revenue.revenueIntelligence}
             </ThemedText>
             <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
-              AI-powered pipeline analytics, follow-up tracking, and a personal sales assistant to help you close more deals.
+              {t.revenue.revenueIntelligenceDesc}
             </ThemedText>
             <View style={styles.featureList}>
               {[
-                { icon: "dollar-sign", text: "Pipeline value tracking" },
-                { icon: "bell", text: "Smart follow-up alerts" },
-                { icon: "zap", text: "AI Sales Assistant" },
-                { icon: "bar-chart-2", text: "Close rate analytics" },
+                { icon: "dollar-sign", text: t.revenue.pipelineTracking },
+                { icon: "bell", text: t.revenue.smartAlerts },
+                { icon: "zap", text: t.revenue.aiSalesAssistant },
+                { icon: "bar-chart-2", text: t.revenue.closeRateAnalytics },
               ].map((f, i) => (
                 <View key={i} style={styles.featureRow}>
                   <Feather name={f.icon as any} size={16} color={theme.primary} />
@@ -115,7 +117,7 @@ export default function RevenueScreen() {
             >
               <Feather name="zap" size={18} color="#FFFFFF" />
               <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: Spacing.sm }}>
-                Upgrade to QuotePro AI - $14.99/mo
+                {t.revenue.upgradeToAI}
               </ThemedText>
             </Pressable>
           </View>
@@ -148,10 +150,10 @@ export default function RevenueScreen() {
             </View>
             <View style={styles.aiContent}>
               <ThemedText type="body" style={{ fontWeight: "600" }}>
-                AI Sales Assistant
+                {t.revenue.aiSalesAssistant}
               </ThemedText>
               <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                Get insights to close more deals
+                {t.revenue.getInsights}
               </ThemedText>
             </View>
             <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -160,13 +162,13 @@ export default function RevenueScreen() {
 
         <View style={styles.statsRow}>
           <StatCard
-            title="Pipeline"
+            title={t.revenue.pipeline}
             value={`$${(pipeline?.totalPipeline || 0).toLocaleString()}`}
             icon="dollar-sign"
             color={theme.primary}
           />
           <StatCard
-            title="Open Quotes"
+            title={t.revenue.openQuotes}
             value={(pipeline?.openQuotes || 0).toString()}
             icon="file-text"
             color={theme.warning}
@@ -175,13 +177,13 @@ export default function RevenueScreen() {
 
         <View style={styles.statsRow}>
           <StatCard
-            title="Expected"
+            title={t.revenue.expected}
             value={`$${(pipeline?.expectedValue || 0).toLocaleString()}`}
             icon="trending-up"
             color={theme.success}
           />
           <StatCard
-            title="Avg Age"
+            title={t.revenue.avgAge}
             value={`${pipeline?.avgAgeDays || 0}d`}
             icon="clock"
             color={theme.textSecondary}
@@ -190,7 +192,7 @@ export default function RevenueScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <ThemedText type="h4">Needs Follow-Up</ThemedText>
+            <ThemedText type="h4">{t.revenue.needsFollowUp}</ThemedText>
             {unfollowed.length > 0 ? (
               <View style={[styles.countBadge, { backgroundColor: `${theme.warning}20` }]}>
                 <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "600" }}>
@@ -205,7 +207,7 @@ export default function RevenueScreen() {
               const daysAgo = getDaysAgo(quote.sentAt, quote.createdAt);
               const customerName = quote.customer
                 ? `${quote.customer.firstName} ${quote.customer.lastName}`
-                : "No customer";
+                : t.revenue.noCustomer;
 
               return (
                 <Card
@@ -219,7 +221,7 @@ export default function RevenueScreen() {
                         {customerName}
                       </ThemedText>
                       <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                        Sent {daysAgo} days ago
+                        {t.revenue.sentDaysAgo.replace("{days}", daysAgo.toString())}
                       </ThemedText>
                     </View>
                     <View style={styles.quoteRight}>
@@ -240,8 +242,8 @@ export default function RevenueScreen() {
             <EmptyState
               icon="check-circle"
               iconColor={theme.success}
-              title="All Caught Up"
-              description="No quotes need follow-up right now"
+              title={t.revenue.allCaughtUp}
+              description={t.revenue.allCaughtUpDesc}
             />
           )}
         </View>

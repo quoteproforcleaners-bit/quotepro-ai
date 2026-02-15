@@ -31,6 +31,7 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Job {
   id: string;
@@ -48,33 +49,6 @@ interface Job {
 }
 
 type StatusFilter = "all" | "scheduled" | "in_progress" | "completed";
-
-const filterOptions: { label: string; value: StatusFilter }[] = [
-  { label: "All", value: "all" },
-  { label: "Scheduled", value: "scheduled" },
-  { label: "In Progress", value: "in_progress" },
-  { label: "Completed", value: "completed" },
-];
-
-const RECURRENCE_OPTIONS = [
-  { label: "One-Time", value: "none" },
-  { label: "Weekly", value: "weekly" },
-  { label: "Biweekly", value: "biweekly" },
-  { label: "Monthly", value: "monthly" },
-];
-
-const JOB_TYPES = [
-  { label: "Standard", value: "regular" },
-  { label: "Deep Clean", value: "deep_clean" },
-  { label: "Move In/Out", value: "move_in_out" },
-  { label: "Post Construction", value: "post_construction" },
-  { label: "Airbnb Turnover", value: "airbnb_turnover" },
-];
-
-function formatJobType(jobType: string): string {
-  const found = JOB_TYPES.find((t) => t.value === jobType);
-  return found ? found.label : jobType;
-}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -110,16 +84,16 @@ function getStatusColor(status: string, theme: any): string {
   }
 }
 
-function getStatusLabel(status: string): string {
+function getStatusLabel(status: string, t: any): string {
   switch (status) {
     case "scheduled":
-      return "Scheduled";
+      return t.jobs.scheduled;
     case "in_progress":
-      return "In Progress";
+      return t.jobs.inProgress;
     case "completed":
-      return "Completed";
+      return t.jobs.completed;
     case "canceled":
-      return "Canceled";
+      return t.jobs.canceled;
     default:
       return status;
   }
@@ -132,6 +106,34 @@ export default function JobsScreen() {
   const { theme } = useTheme();
   const queryClient = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { t } = useLanguage();
+
+  const filterOptions: { label: string; value: StatusFilter }[] = [
+    { label: t.common.all, value: "all" },
+    { label: t.jobs.scheduled, value: "scheduled" },
+    { label: t.jobs.inProgress, value: "in_progress" },
+    { label: t.jobs.completed, value: "completed" },
+  ];
+
+  const recurrenceOptions = [
+    { label: t.jobs.oneTime, value: "none" },
+    { label: t.jobs.weekly, value: "weekly" },
+    { label: t.jobs.biweekly, value: "biweekly" },
+    { label: t.jobs.monthly, value: "monthly" },
+  ];
+
+  const jobTypes = [
+    { label: t.jobs.standard, value: "regular" },
+    { label: t.jobs.deepClean, value: "deep_clean" },
+    { label: t.jobs.moveInOut, value: "move_in_out" },
+    { label: t.jobs.postConstruction, value: "post_construction" },
+    { label: t.jobs.airbnbTurnover, value: "airbnb_turnover" },
+  ];
+
+  const formatJobType = (jobType: string): string => {
+    const found = jobTypes.find((jt) => jt.value === jobType);
+    return found ? found.label : jobType;
+  };
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [modalVisible, setModalVisible] = useState(false);
@@ -229,7 +231,7 @@ export default function JobsScreen() {
 
   const renderHeader = () => (
     <View>
-      <ProBanner message="Automate job reminders and confirmations with QuotePro AI" />
+      <ProBanner message={t.jobs.automateReminders} />
       <View style={styles.filterContainer}>
         <SegmentedControl
           options={filterOptions}
@@ -249,9 +251,9 @@ export default function JobsScreen() {
       <EmptyState
         icon="calendar"
         iconColor={theme.primary}
-        title="No jobs scheduled"
-        description="Tap the + button to schedule your first job and start managing your work."
-        actionLabel="Add Job"
+        title={t.jobs.noJobs}
+        description={t.jobs.noJobsDesc}
+        actionLabel={t.jobs.addJob}
         onAction={handleAddJob}
       />
     );
@@ -281,7 +283,7 @@ export default function JobsScreen() {
                   type="caption"
                   style={[styles.statusText, { color: statusColor }]}
                 >
-                  {getStatusLabel(item.status)}
+                  {getStatusLabel(item.status, t)}
                 </ThemedText>
               </View>
             </View>
@@ -416,20 +418,20 @@ export default function JobsScreen() {
               }}
             >
               <ThemedText type="body" style={{ color: theme.primary }}>
-                {"Cancel"}
+                {t.common.cancel}
               </ThemedText>
             </Pressable>
-            <ThemedText type="h4">{"New Job"}</ThemedText>
+            <ThemedText type="h4">{t.jobs.newJob}</ThemedText>
             <View style={{ width: 60 }} />
           </View>
           <KeyboardAwareScrollViewCompat
             contentContainerStyle={styles.modalContent}
           >
             <ThemedText type="small" style={styles.label}>
-              {"Job Type"}
+              {t.jobs.jobType}
             </ThemedText>
             <View style={styles.jobTypeContainer}>
-              {JOB_TYPES.map((type) => {
+              {jobTypes.map((type) => {
                 const isSelected = jobType === type.value;
                 return (
                   <Pressable
@@ -463,10 +465,10 @@ export default function JobsScreen() {
             </View>
 
             <ThemedText type="small" style={styles.label}>
-              {"Recurrence"}
+              {t.jobs.recurrence}
             </ThemedText>
             <View style={styles.jobTypeContainer}>
-              {RECURRENCE_OPTIONS.map((option) => {
+              {recurrenceOptions.map((option) => {
                 const isSelected = recurrence === option.value;
                 return (
                   <Pressable
@@ -501,31 +503,31 @@ export default function JobsScreen() {
 
             <Input
               testID="input-start-date"
-              label="Start Date & Time"
-              placeholder="e.g. 2026-02-15 14:00"
+              label={t.jobs.startDateTime}
+              placeholder={t.jobs.startDatePlaceholder}
               value={startDate}
               onChangeText={setStartDate}
               leftIcon="calendar"
             />
             <Input
               testID="input-address"
-              label="Address"
-              placeholder="Job address"
+              label={t.jobs.address}
+              placeholder={t.jobs.addressPlaceholder}
               value={address}
               onChangeText={setAddress}
               leftIcon="map-pin"
             />
             <Input
               testID="input-notes"
-              label="Internal Notes"
-              placeholder="Any notes for this job"
+              label={t.jobs.internalNotes}
+              placeholder={t.jobs.notesPlaceholder}
               value={notes}
               onChangeText={setNotes}
               multiline
             />
             <Input
               testID="input-total"
-              label="Total Amount (optional)"
+              label={t.jobs.totalAmount}
               placeholder="0.00"
               value={total}
               onChangeText={setTotal}
@@ -541,7 +543,7 @@ export default function JobsScreen() {
               }
               style={styles.saveButton}
             >
-              {createMutation.isPending ? "Saving..." : "Save Job"}
+              {createMutation.isPending ? t.common.saving : t.jobs.saveJob}
             </Button>
           </KeyboardAwareScrollViewCompat>
         </View>

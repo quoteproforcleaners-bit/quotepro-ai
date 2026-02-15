@@ -185,7 +185,7 @@ export default function SettingsScreen() {
             QuotePro AI
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4 }}>
-            You have access to all AI features and direct sending.
+            {t.settings.aiActiveDesc}
           </ThemedText>
         </View>
       ) : (
@@ -279,7 +279,7 @@ export default function SettingsScreen() {
       />
 
       <Input
-        label="Email"
+        label={t.customers.email}
         value={profile.email}
         onChangeText={(v) => updateProfile({ email: v })}
         placeholder="contact@yourcompany.com"
@@ -289,7 +289,7 @@ export default function SettingsScreen() {
       />
 
       <Input
-        label="Phone"
+        label={t.customers.phone}
         value={profile.phone}
         onChangeText={(v) => updateProfile({ phone: v })}
         placeholder="(555) 123-4567"
@@ -298,7 +298,7 @@ export default function SettingsScreen() {
       />
 
       <Input
-        label="Address"
+        label={t.customers.address}
         value={profile.address}
         onChangeText={(v) => updateProfile({ address: v })}
         placeholder="123 Main St, City, State"
@@ -308,26 +308,26 @@ export default function SettingsScreen() {
       <SectionHeader title={t.settings.branding} subtitle={t.settings.brandingSubtitle} />
 
       <Input
-        label="Sender Name"
+        label={t.settings.senderName}
         value={profile.senderName}
         onChangeText={(v) => updateProfile({ senderName: v })}
-        placeholder="e.g., Mike"
+        placeholder={t.settings.senderNamePlaceholder}
         leftIcon="user"
       />
 
       <Input
-        label="Sender Title"
+        label={t.settings.senderTitle}
         value={profile.senderTitle}
         onChangeText={(v) => updateProfile({ senderTitle: v })}
-        placeholder="e.g., Owner"
+        placeholder={t.settings.senderTitlePlaceholder}
         leftIcon="award"
       />
 
       <Input
-        label="Booking Link"
+        label={t.settings.bookingLink}
         value={profile.bookingLink}
         onChangeText={(v) => updateProfile({ bookingLink: v })}
-        placeholder="https://calendly.com/yourcompany"
+        placeholder={t.settings.bookingLinkPlaceholder}
         keyboardType="url"
         autoCapitalize="none"
         leftIcon="link"
@@ -336,10 +336,10 @@ export default function SettingsScreen() {
       <SectionHeader title={t.settings.signatures} subtitle={t.settings.signaturesSubtitle} />
 
       <Input
-        label="Email Signature"
+        label={t.settings.emailSignature}
         value={profile.emailSignature}
         onChangeText={(v) => updateProfile({ emailSignature: v })}
-        placeholder="e.g., Thanks, Mike - ABC Cleaning Co."
+        placeholder={t.settings.emailSigPlaceholder}
         multiline
         numberOfLines={3}
         leftIcon="edit-3"
@@ -347,10 +347,10 @@ export default function SettingsScreen() {
       />
 
       <Input
-        label="SMS Signature"
+        label={t.settings.smsSignature}
         value={profile.smsSignature}
         onChangeText={(v) => updateProfile({ smsSignature: v })}
-        placeholder="e.g., - Mike, ABC Cleaning"
+        placeholder={t.settings.smsSigPlaceholder}
         leftIcon="message-square"
         testID="input-sms-signature"
       />
@@ -371,10 +371,10 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Hourly Rates & Pricing
+              {t.settings.hourlyRates}
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              Base rates, add-ons, and frequency discounts
+              {t.settings.hourlyRatesDesc}
             </ThemedText>
           </View>
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -395,10 +395,10 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Service Types
+              {t.settings.serviceTypes}
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              Customize cleaning services and Good/Better/Best options
+              {t.settings.serviceTypesDesc}
             </ThemedText>
           </View>
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -443,7 +443,7 @@ export default function SettingsScreen() {
                 Google Calendar
               </ThemedText>
               <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                Sync your jobs to Google Calendar
+                {t.settings.syncCalendar}
               </ThemedText>
             </View>
             <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -487,7 +487,7 @@ export default function SettingsScreen() {
                 Stripe Payments
               </ThemedText>
               <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                Accept online payments from customers
+                {t.settings.acceptPayments}
               </ThemedText>
             </View>
             <Feather name="chevron-right" size={20} color={theme.textSecondary} />
