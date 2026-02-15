@@ -8,15 +8,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
-
-const FEATURES = [
-  { icon: "edit-3" as const, title: "AI-Written Messages", description: "Generate personalized emails and texts in seconds" },
-  { icon: "send" as const, title: "Direct Sending", description: "Send quotes via email or SMS right from the app" },
-  { icon: "zap" as const, title: "Smart Descriptions", description: "AI-enhanced service descriptions for your quotes" },
-  { icon: "refresh-cw" as const, title: "One-Tap Regeneration", description: "Regenerate messages until they're perfect" },
-  { icon: "users" as const, title: "Full CRM Access", description: "Notes, tags, and communication history" },
-  { icon: "calendar" as const, title: "Job Scheduling", description: "Schedule jobs with checklists and status tracking" },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 type ModalState = {
   visible: boolean;
@@ -30,6 +22,16 @@ export default function PaywallScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { purchase, restore, currentOffering, isLoading: subscriptionLoading } = useSubscription();
+  const { t } = useLanguage();
+
+  const FEATURES = [
+    { icon: "edit-3" as const, title: t.paywall.aiMessages, description: t.paywall.aiMessagesDesc },
+    { icon: "send" as const, title: t.paywall.directSending, description: t.paywall.directSendingDesc },
+    { icon: "zap" as const, title: t.paywall.smartDescriptions, description: t.paywall.smartDescriptionsDesc },
+    { icon: "refresh-cw" as const, title: t.paywall.regeneration, description: t.paywall.regenerationDesc },
+    { icon: "users" as const, title: t.paywall.crmAccess, description: t.paywall.crmAccessDesc },
+    { icon: "calendar" as const, title: t.paywall.jobScheduling, description: t.paywall.jobSchedulingDesc },
+  ];
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [modal, setModal] = useState<ModalState>({ visible: false, type: "info", title: "", message: "" });
@@ -52,7 +54,7 @@ export default function PaywallScreen() {
     if (subscriptionLoading) return;
 
     if (!currentOffering?.monthly && Platform.OS !== "web") {
-      showModal("error", "Not Available", "The subscription offering couldn't be loaded. Please check your internet connection and try again.");
+      showModal("error", t.paywall.notAvailableTitle, t.paywall.notAvailableMessage);
       return;
     }
 
@@ -63,14 +65,14 @@ export default function PaywallScreen() {
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-        showModal("success", "Welcome to QuotePro AI!", "You now have access to all AI features and direct sending.");
+        showModal("success", t.paywall.welcomeTitle, t.paywall.welcomeMessage);
       }
     } catch (error: any) {
       const message = error?.message?.includes("cancelled")
-        ? "Purchase was cancelled."
-        : "Something went wrong with the purchase. Please try again.";
+        ? t.paywall.purchaseCancelled
+        : t.paywall.purchaseFailedMessage;
       if (!error?.userCancelled) {
-        showModal("error", "Purchase Failed", message);
+        showModal("error", t.paywall.purchaseFailed, message);
       }
     } finally {
       setPurchasing(false);
@@ -85,12 +87,12 @@ export default function PaywallScreen() {
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-        showModal("success", "Subscription Restored", "Your QuotePro AI access has been restored.");
+        showModal("success", t.paywall.restoreSuccess, t.paywall.restoreSuccessMessage);
       } else {
-        showModal("info", "No Subscription Found", "We couldn't find an active subscription for this account.");
+        showModal("info", t.paywall.noSubscription, t.paywall.noSubscriptionMessage);
       }
     } catch {
-      showModal("error", "Restore Failed", "Something went wrong. Please try again.");
+      showModal("error", t.paywall.restoreFailed, t.paywall.restoreFailedMessage);
     } finally {
       setRestoring(false);
     }
@@ -122,7 +124,7 @@ export default function PaywallScreen() {
         </ThemedText>
 
         <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Supercharge your cleaning business with AI
+          {t.paywall.subtitle}
         </ThemedText>
 
         <View style={styles.featuresList}>
@@ -148,7 +150,7 @@ export default function PaywallScreen() {
             {monthlyPrice}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>
-            per month
+            {t.paywall.perMonth}
           </ThemedText>
         </View>
 
@@ -164,14 +166,14 @@ export default function PaywallScreen() {
             <>
               <Feather name="zap" size={20} color="#FFFFFF" />
               <ThemedText type="body" style={styles.purchaseBtnText}>
-                Subscribe Now
+                {t.paywall.subscribeNow}
               </ThemedText>
             </>
           )}
         </Pressable>
 
         <ThemedText type="caption" style={[styles.freeNote, { color: theme.textSecondary }]}>
-          Free plan includes unlimited quoting and customer management
+          {t.paywall.freePlanNote}
         </ThemedText>
 
         <Pressable
@@ -184,7 +186,7 @@ export default function PaywallScreen() {
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (
             <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-              Restore Purchases
+              {t.paywall.restorePurchases}
             </ThemedText>
           )}
         </Pressable>
@@ -216,7 +218,7 @@ export default function PaywallScreen() {
                 type="body"
                 style={{ fontWeight: "600", color: modal.type === "success" ? "#FFFFFF" : theme.text }}
               >
-                {modal.type === "success" ? "Let's Go" : "OK"}
+                {modal.type === "success" ? t.paywall.letsGo : t.common.ok}
               </ThemedText>
             </Pressable>
           </View>

@@ -161,7 +161,7 @@ export default function SettingsScreen() {
       ]}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
     >
-      <SectionHeader title="Subscription" />
+      <SectionHeader title={t.settings.subscription} />
 
       {isPro ? (
         <View
@@ -178,7 +178,7 @@ export default function SettingsScreen() {
               </ThemedText>
             </View>
             <ThemedText type="small" style={{ color: theme.success, fontWeight: "600" }}>
-              Active
+              {t.common.active}
             </ThemedText>
           </View>
           <ThemedText type="body" style={{ fontWeight: "600", marginTop: Spacing.sm }}>
@@ -199,10 +199,10 @@ export default function SettingsScreen() {
             <Feather name="zap" size={28} color={theme.accent} />
           </View>
           <ThemedText type="h4" style={{ marginTop: Spacing.md }}>
-            Upgrade to QuotePro AI
+            {t.settings.upgradeToAI}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4, textAlign: "center" }}>
-            Supercharge your quoting with AI and automation
+            {t.settings.upgradeSubtitle}
           </ThemedText>
 
           <View style={styles.proFeaturesList}>
@@ -234,17 +234,17 @@ export default function SettingsScreen() {
           >
             <Feather name="zap" size={18} color="#FFFFFF" />
             <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 8 }}>
-              Upgrade to QuotePro AI
+              {t.settings.upgradeToAI}
             </ThemedText>
           </Pressable>
 
           <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
-            Free plan includes unlimited quoting and customer management
+            {t.paywall.freePlanNote}
           </ThemedText>
         </View>
       )}
 
-      <SectionHeader title="Business Profile" />
+      <SectionHeader title={t.settings.businessProfile} />
 
       <Pressable
         onPress={handlePickImage}
@@ -305,7 +305,7 @@ export default function SettingsScreen() {
         leftIcon="map-pin"
       />
 
-      <SectionHeader title="Branding" subtitle="Customize your quote appearance" />
+      <SectionHeader title={t.settings.branding} subtitle={t.settings.brandingSubtitle} />
 
       <Input
         label="Sender Name"
@@ -333,7 +333,7 @@ export default function SettingsScreen() {
         leftIcon="link"
       />
 
-      <SectionHeader title="Signatures" subtitle="Auto-added to outgoing messages" />
+      <SectionHeader title={t.settings.signatures} subtitle={t.settings.signaturesSubtitle} />
 
       <Input
         label="Email Signature"
@@ -355,7 +355,7 @@ export default function SettingsScreen() {
         testID="input-sms-signature"
       />
 
-      <SectionHeader title="Pricing & Services" subtitle="Configure your rates and service options" />
+      <SectionHeader title={t.settings.pricingAndServices} />
 
       <Pressable
         onPress={() => navigation.navigate("PricingSettings")}
@@ -405,7 +405,7 @@ export default function SettingsScreen() {
         </View>
       </Pressable>
 
-      <SectionHeader title="Integrations" subtitle="Connect external services" />
+      <SectionHeader title={t.settings.integrations} subtitle={t.settings.integrationsSubtitle} />
 
       {calendarStatus?.connected ? (
         <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
@@ -418,12 +418,12 @@ export default function SettingsScreen() {
                 Google Calendar
               </ThemedText>
               <ThemedText type="small" style={{ color: theme.success }}>
-                Connected
+                {t.common.connected}
               </ThemedText>
             </View>
             <Pressable onPress={handleDisconnectCalendar} testID="button-disconnect-calendar">
               <ThemedText type="small" style={{ color: theme.error }}>
-                Disconnect
+                {t.settings.disconnect}
               </ThemedText>
             </Pressable>
           </View>
@@ -462,12 +462,12 @@ export default function SettingsScreen() {
                 Stripe Payments
               </ThemedText>
               <ThemedText type="small" style={{ color: theme.success }}>
-                Connected - Accept online payments
+                {t.common.connected}
               </ThemedText>
             </View>
             <Pressable onPress={handleDisconnectStripe} testID="button-disconnect-stripe">
               <ThemedText type="small" style={{ color: theme.error }}>
-                Disconnect
+                {t.settings.disconnect}
               </ThemedText>
             </Pressable>
           </View>
@@ -769,7 +769,7 @@ export default function SettingsScreen() {
           ]}
         >
           <ThemedText type="small" style={{ color: theme.textSecondary }}>
-            Signed in as
+            {t.settings.signedInAs}
           </ThemedText>
           <ThemedText type="body" style={{ fontWeight: "600", marginTop: 2 }}>
             {user.email}
@@ -787,11 +787,11 @@ export default function SettingsScreen() {
       >
         <Feather name="log-out" size={18} color={theme.error} />
         <ThemedText type="body" style={{ color: theme.error, fontWeight: "600", marginLeft: Spacing.sm }}>
-          Sign Out
+          {t.settings.signOut}
         </ThemedText>
       </Pressable>
 
-      <SectionHeader title="About" />
+      <SectionHeader title={t.settings.about} />
 
       <View
         style={[

@@ -30,6 +30,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { FeatureFlags } from "@/lib/featureFlags";
 import { runAiCommand, EXAMPLE_PROMPTS, AiCommandResult } from "@/lib/aiCommandRouter";
+import { useLanguage } from "@/context/LanguageContext";
 
 /*
  * ─── Design Tokens (Home Screen) ───
@@ -109,23 +110,27 @@ function RotatingPrompts({ onTap }: { onTap: (prompt: string) => void }) {
   );
 }
 
-const QUICK_ACTIONS = [
-  { label: "New Quote", icon: "file-plus" as const, action: "create_quote" },
-  { label: "Follow up quotes", icon: "refresh-cw" as const, action: "follow_up" },
-  { label: "This month booked", icon: "bar-chart-2" as const, action: "metrics" },
-  { label: "Draft a reply", icon: "edit-3" as const, action: "draft" },
-  { label: "Unpaid invoices", icon: "alert-circle" as const, action: "invoices" },
-  { label: "Schedule a job", icon: "calendar" as const, action: "schedule" },
-];
+function useQuickActions() {
+  const { t } = useLanguage();
+  return [
+    { label: t.dashboard.newQuote, icon: "file-plus" as const, action: "create_quote" },
+    { label: t.dashboard.followUpQuotes, icon: "refresh-cw" as const, action: "follow_up" },
+    { label: t.dashboard.thisMonthBooked, icon: "bar-chart-2" as const, action: "metrics" },
+    { label: "Draft a reply", icon: "edit-3" as const, action: "draft" },
+    { label: "Unpaid invoices", icon: "alert-circle" as const, action: "invoices" },
+    { label: t.jobs.scheduleJob, icon: "calendar" as const, action: "schedule" },
+  ];
+}
 
 function QuickActionChips({ onAction }: { onAction: (action: string) => void }) {
   const dt = useDesignTokens();
   const { theme } = useTheme();
+  const quickActions = useQuickActions();
   return (
     <FlatList
       horizontal
       showsHorizontalScrollIndicator={false}
-      data={QUICK_ACTIONS}
+      data={quickActions}
       keyExtractor={(item) => item.action}
       contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.sm }}
       renderItem={({ item }) => {
@@ -247,6 +252,7 @@ export default function DashboardScreen() {
   const { theme } = useTheme();
   const dt = useDesignTokens();
   const { businessProfile: profile } = useApp();
+  const { t } = useLanguage();
   const inputRef = useRef<TextInput>(null);
 
   const [commandText, setCommandText] = useState("");
@@ -284,9 +290,9 @@ export default function DashboardScreen() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
+    if (hour < 12) return t.dashboard.goodMorning;
+    if (hour < 17) return t.dashboard.goodAfternoon;
+    return t.dashboard.goodEvening;
   };
 
   const followUpCount = useMemo(() => {
@@ -408,13 +414,13 @@ export default function DashboardScreen() {
           },
         ]}>
           <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm, fontWeight: "600" }}>
-            What would you like to do?
+            {t.dashboard.whatToDo}
           </ThemedText>
           <View style={[styles.inputRow, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
             <TextInput
               ref={inputRef}
               style={[styles.commandInput, { color: dt.textPrimary }]}
-              placeholder="Ask QuotePro..."
+              placeholder={t.dashboard.askPlaceholder}
               placeholderTextColor={dt.textMuted}
               value={commandText}
               onChangeText={setCommandText}
@@ -451,10 +457,10 @@ export default function DashboardScreen() {
               </View>
               <View style={{ flex: 1, marginLeft: Spacing.sm }}>
                 <ThemedText type="small" style={{ fontWeight: "600", fontSize: 13 }}>
-                  Unlock AI-powered features
+                  {t.dashboard.unlockAI}
                 </ThemedText>
                 <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 1, fontSize: 11 }}>
-                  Smart replies, auto follow-ups, and more
+                  {t.dashboard.aiSubtitle}
                 </ThemedText>
               </View>
             </View>
@@ -464,7 +470,7 @@ export default function DashboardScreen() {
               testID="upgrade-cta"
             >
               <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600", fontSize: 12 }}>
-                See AI Features
+                {t.dashboard.seeAIFeatures}
               </ThemedText>
               <Feather name="arrow-right" size={12} color={dt.accent} style={{ marginLeft: 4 }} />
             </Pressable>
@@ -476,29 +482,29 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <ThemedText type="subtitle" style={{ fontWeight: "600", fontSize: 15 }}>Today at a glance</ThemedText>
+          <ThemedText type="subtitle" style={{ fontWeight: "600", fontSize: 15 }}>{t.dashboard.todayAtGlance}</ThemedText>
           <Pressable onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })} testID="recent-quotes-link">
-            <ThemedText type="caption" style={{ color: dt.accentMuted, fontSize: 12 }}>Recent Quotes</ThemedText>
+            <ThemedText type="caption" style={{ color: dt.accentMuted, fontSize: 12 }}>{t.dashboard.recentQuotes}</ThemedText>
           </Pressable>
         </View>
 
         <View style={styles.glanceRow}>
           <GlanceCard
-            title="Need follow-up"
+            title={t.dashboard.needFollowUp}
             value={followUpCount.toString()}
             icon="phone-missed"
             color={theme.warning}
             onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })}
           />
           <GlanceCard
-            title="Jobs today"
+            title={t.dashboard.jobsToday}
             value={todayJobCount.toString()}
             icon="calendar"
             color={theme.primary}
             onPress={() => navigation.navigate("Main", { screen: "JobsTab" })}
           />
           <GlanceCard
-            title="This month"
+            title={t.dashboard.thisMonth}
             value={`$${monthRevenue.toLocaleString()}`}
             icon="trending-up"
             color={theme.success}

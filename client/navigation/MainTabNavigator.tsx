@@ -19,6 +19,7 @@ import SettingsScreen from "@/screens/SettingsScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
+import { useLanguage } from "@/context/LanguageContext";
 
 export type MainTabParamList = {
   HomeTab: undefined;
@@ -87,6 +88,7 @@ function TabIcon({ name, color, size, focused, isHome }: {
 export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
   const screenOptions = useScreenOptions();
+  const { t } = useLanguage();
 
   const handleTabPress = useCallback(() => {
     if (Platform.OS !== "web") {
@@ -161,7 +163,7 @@ export default function MainTabNavigator() {
         name="HomeTab"
         component={DashboardScreen}
         options={{
-          title: "Home",
+          title: t.tabs.home,
           headerTitle: () => <HeaderTitle title="QuotePro" />,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="home" color={color} size={size} focused={focused} isHome />
@@ -173,8 +175,8 @@ export default function MainTabNavigator() {
         name="CustomersTab"
         component={CustomersScreen}
         options={{
-          title: "Customers",
-          headerTitle: "Customers",
+          title: t.tabs.customers,
+          headerTitle: t.tabs.customers,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="users" color={color} size={size} focused={focused} />
           ),
@@ -185,8 +187,8 @@ export default function MainTabNavigator() {
         name="QuotesTab"
         component={QuotesScreen}
         options={{
-          title: "Quotes",
-          headerTitle: "Quotes",
+          title: t.tabs.quotes,
+          headerTitle: t.tabs.quotes,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="file-text" color={color} size={size} focused={focused} />
           ),
@@ -197,8 +199,8 @@ export default function MainTabNavigator() {
         name="JobsTab"
         component={JobsScreen}
         options={{
-          title: "Jobs",
-          headerTitle: "Jobs",
+          title: t.tabs.jobs,
+          headerTitle: t.tabs.jobs,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="calendar" color={color} size={size} focused={focused} />
           ),
@@ -209,8 +211,8 @@ export default function MainTabNavigator() {
         name="RevenueTab"
         component={RevenueScreen}
         options={{
-          title: "Revenue",
-          headerTitle: "Revenue",
+          title: t.tabs.revenue,
+          headerTitle: t.tabs.revenue,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="trending-up" color={color} size={size} focused={focused} />
           ),
@@ -221,8 +223,8 @@ export default function MainTabNavigator() {
         name="SettingsTab"
         component={SettingsScreen}
         options={{
-          title: "Settings",
-          headerTitle: "Settings",
+          title: t.tabs.settings,
+          headerTitle: t.tabs.settings,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="settings" color={color} size={size} focused={focused} />
           ),
