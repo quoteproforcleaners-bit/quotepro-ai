@@ -1,0 +1,154 @@
+You are updating my existing React Native / Expo iOS app “QuotePro for Cleaners”.
+
+CONTEXT:
+The app already includes:
+- Daily Follow-Up Reminder toggle
+- Weekly Recap toggle
+- Quiet Hours toggle
+- Follow-Up Queue
+- Streak tracking logic
+- “All caught up!” Home card
+- Revenue dashboard with pipeline + open quotes
+
+We are NOT adding new core systems.
+We are improving behavioral psychology and engagement.
+
+GOAL:
+Increase retention, urgency, and daily engagement through 4 UX upgrades:
+1) Money-first urgency messaging
+2) Visible streak display
+3) Dopamine feedback on follow-up completion
+4) Stronger notification copy framing
+
+IMPORTANT:
+- No auto-sending SMS
+- No background automation
+- No architecture rewrites
+- iOS-safe only
+- Keep changes incremental
+
+----------------------------------------
+UPGRADE #1 — MONEY-FIRST URGENCY COPY
+----------------------------------------
+
+When quotes need follow-up, change Home “Today’s Focus” card from generic:
+
+“You have 3 follow-ups”
+
+To:
+
+“$1,240 at risk — 3 quotes need attention.”
+
+Implementation details:
+- Compute amountAtRisk = sum(quoteTotal for quotes needing follow-up)
+- Format currency cleanly
+- Show bold emphasis on dollar amount
+- Subtitle: “Oldest quote: {n} days old”
+
+If zero follow-ups:
+Keep:
+“All caught up!”
+
+But update subtext to:
+“No revenue at risk. Keep your streak alive.”
+
+----------------------------------------
+UPGRADE #2 — VISIBLE STREAK DISPLAY
+----------------------------------------
+
+On Home screen (top section, under greeting):
+
+Add compact streak badge:
+
+🔥 Follow-Up Streak: {n} days
+
+Rules:
+- Streak increments when at least 1 follow-up action completed in a calendar day
+- If user misses a day, reset streak to 0
+- Store streak state in SQLite
+- Track lastStreakDate
+
+Add small progress hint:
+If streak == 0:
+“Start your streak today”
+If streak >= 3:
+“Momentum building”
+If streak >= 7:
+“Revenue discipline unlocked”
+
+----------------------------------------
+UPGRADE #3 — MICRO DOPAMINE ON ACTION
+----------------------------------------
+
+When user taps:
+- “Mark Contacted”
+- “Text”
+- “Email”
+
+After action completes:
+
+Show small animated toast (bottom of screen):
+
++1 Momentum
+🔥 Streak: {n} days
+
+Use subtle fade/slide animation (React Native Animated API)
+Auto dismiss after 2 seconds
+
+Also log event:
+trackEvent("streak_increment", { streakLength })
+
+----------------------------------------
+UPGRADE #4 — STRONGER NOTIFICATION COPY
+----------------------------------------
+
+Daily reminder push should change from:
+“Time to follow up.”
+
+To dynamic money framing:
+
+If amountAtRisk > 0:
+“You have $1,240 at risk today.”
+
+If only 1 quote:
+“1 quote waiting — don’t lose it.”
+
+If no follow-ups:
+Do NOT send notification.
+
+Weekly recap push:
+
+Change from generic:
+“See how your week went”
+
+To:
+“Last week: 12 quotes sent, 4 won. 33% close rate.”
+
+Deep link into Weekly Recap screen.
+
+----------------------------------------
+ANALYTICS EVENTS TO ADD
+----------------------------------------
+
+trackEvent("home_view")
+trackEvent("followup_action")
+trackEvent("streak_increment")
+trackEvent("daily_notification_sent")
+trackEvent("daily_notification_opened")
+trackEvent("weekly_notification_sent")
+trackEvent("weekly_notification_opened")
+
+----------------------------------------
+OUTPUT REQUIRED
+----------------------------------------
+
+Return:
+1) Updated Home screen component code
+2) Streak SQLite schema + helper functions
+3) Currency formatting helper
+4) Updated notification scheduling logic
+5) Toast animation component
+6) Exact insertion points in current codebase
+
+Keep code clean, incremental, and compatible with existing structure.
+Do not rewrite app architecture.

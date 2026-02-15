@@ -2,11 +2,13 @@ import { apiRequest } from "@/lib/query-client";
 
 type EventName =
   | "app_open"
+  | "home_view"
   | "followup_queue_open"
   | "followup_text_tap"
   | "followup_email_tap"
   | "followup_call_tap"
   | "followup_mark_contacted"
+  | "followup_action"
   | "followup_snooze"
   | "weekly_recap_open"
   | "opportunities_open"
@@ -17,7 +19,12 @@ type EventName =
   | "notification_daily_opened"
   | "notification_weekly_sent"
   | "notification_weekly_opened"
+  | "daily_notification_sent"
+  | "daily_notification_opened"
+  | "weekly_notification_sent"
+  | "weekly_notification_opened"
   | "streak_updated"
+  | "streak_increment"
   | "badge_earned"
   | "preferences_updated";
 

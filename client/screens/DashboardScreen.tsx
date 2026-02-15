@@ -263,6 +263,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     trackEvent("app_open");
+    trackEvent("home_view");
   }, []);
 
   const { data: followUpQueue = [], refetch: refetchFollowUpQueue } = useQuery<any[]>({
@@ -480,65 +481,64 @@ export default function DashboardScreen() {
           >
             <View style={styles.focusCardHeader}>
               <View style={[styles.focusIcon, { backgroundColor: theme.warning + "15" }]}>
-                <Feather name="target" size={16} color={theme.warning} />
+                <Feather name="alert-circle" size={16} color={theme.warning} />
               </View>
-              <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{"Today's Focus"}</ThemedText>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="subtitle" style={{ fontWeight: "700" }}>
+                  {`$${amountAtRisk.toLocaleString()} at risk`}
+                </ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                  {followUpQueueCount === 1 ? "1 quote needs attention" : `${followUpQueueCount} quotes need attention`}
+                </ThemedText>
+              </View>
               <Feather name="chevron-right" size={18} color={dt.textMuted} />
             </View>
-            <View style={styles.focusStats}>
-              <View style={styles.focusStat}>
-                <ThemedText type="h3" style={{ color: theme.warning }}>{followUpQueueCount.toString()}</ThemedText>
-                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{"Need follow-up"}</ThemedText>
-              </View>
-              <View style={[styles.focusDivider, { backgroundColor: dt.borderSecondary }]} />
-              <View style={styles.focusStat}>
-                <ThemedText type="h3" style={{ color: theme.error }}>{`$${amountAtRisk.toLocaleString()}`}</ThemedText>
-                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{"At-risk value"}</ThemedText>
-              </View>
-              <View style={[styles.focusDivider, { backgroundColor: dt.borderSecondary }]} />
-              <View style={styles.focusStat}>
-                <ThemedText type="h3">{oldestQuoteDays.toString()}</ThemedText>
-                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{"Oldest (days)"}</ThemedText>
-              </View>
-            </View>
+            <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm, marginLeft: 44 }}>
+              {`Oldest quote: ${oldestQuoteDays} day${oldestQuoteDays === 1 ? "" : "s"} old`}
+            </ThemedText>
             <View style={[styles.focusCta, { backgroundColor: theme.warning + "12" }]}>
               <Feather name="arrow-right" size={14} color={theme.warning} />
               <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{"Follow Up Now"}</ThemedText>
             </View>
           </Pressable>
-        ) : currentStreak === 0 ? (
+        ) : (
           <View
             style={[
               styles.focusCard,
               {
                 backgroundColor: dt.surfacePrimary,
-                borderColor: dt.borderSecondary,
+                borderColor: theme.success + "30",
               },
             ]}
           >
             <View style={styles.focusCardHeader}>
-              <View style={[styles.focusIcon, { backgroundColor: dt.accentSoft }]}>
+              <View style={[styles.focusIcon, { backgroundColor: theme.success + "15" }]}>
                 <Feather name="check-circle" size={16} color={theme.success} />
               </View>
               <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{"All caught up!"}</ThemedText>
             </View>
             <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>
-              {"No follow-ups needed right now. Start your streak today!"}
+              {"No revenue at risk. Keep your streak alive."}
             </ThemedText>
           </View>
-        ) : null}
+        )}
 
-        {currentStreak === 0 ? (
-          <View style={[styles.streakNudge, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
-            <Feather name="zap" size={14} color={dt.textMuted} />
-            <ThemedText type="small" style={{ color: dt.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
-              {"Start your follow-up streak today!"}
+        <View style={[styles.streakCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
+          <View style={styles.streakCardRow}>
+            <Feather name="zap" size={16} color={currentStreak > 0 ? theme.warning : dt.textMuted} />
+            <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.sm }}>
+              {currentStreak > 0 ? `Follow-Up Streak: ${currentStreak} day${currentStreak === 1 ? "" : "s"}` : "Follow-Up Streak"}
             </ThemedText>
-            <Pressable onPress={() => navigation.navigate("FollowUpQueue")} testID="streak-nudge-cta">
+          </View>
+          <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 4, marginLeft: 28 }}>
+            {currentStreak === 0 ? "Start your streak today" : currentStreak >= 7 ? "Revenue discipline unlocked" : currentStreak >= 3 ? "Momentum building" : `${currentStreak} day${currentStreak === 1 ? "" : "s"} strong`}
+          </ThemedText>
+          {currentStreak === 0 ? (
+            <Pressable onPress={() => navigation.navigate("FollowUpQueue")} style={styles.streakGoBtn} testID="streak-nudge-cta">
               <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>{"Go"}</ThemedText>
             </Pressable>
-          </View>
-        ) : null}
+          ) : null}
+        </View>
 
         <View style={[
           styles.commandCard,
@@ -868,14 +868,21 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     marginTop: Spacing.md,
   },
-  streakNudge: {
-    flexDirection: "row",
-    alignItems: "center",
+  streakCard: {
     marginHorizontal: Spacing.lg,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: Spacing.md,
+  },
+  streakCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  streakGoBtn: {
+    position: "absolute",
+    right: 0,
+    top: Spacing.md,
   },
   opportunityCard: {
     marginHorizontal: Spacing.lg,

@@ -3,6 +3,7 @@ import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { apiRequest } from "@/lib/query-client";
+import { trackEvent } from "@/lib/analytics";
 
 export function setupNotificationHandler() {
   try {
@@ -68,19 +69,82 @@ function parseTime(timeStr: string): { hour: number; minute: number } {
   return { hour: h || 8, minute: m || 0 };
 }
 
-export async function scheduleDailyPulse(enabled: boolean, time: string = "08:00") {
+function getDailyNotificationContent(context?: {
+  amountAtRisk?: number;
+  quoteCount?: number;
+}): { title: string; body: string } | null {
+  const amount = context?.amountAtRisk || 0;
+  const count = context?.quoteCount || 0;
+
+  if (count === 0 && amount === 0) {
+    return null;
+  }
+
+  if (amount > 0) {
+    return {
+      title: `You have $${amount.toLocaleString()} at risk today.`,
+      body: count === 1
+        ? "1 quote waiting - don't lose it."
+        : `${count} quotes need your attention.`,
+    };
+  }
+
+  if (count === 1) {
+    return {
+      title: "1 quote waiting - don't lose it.",
+      body: "Open your follow-up queue to take action.",
+    };
+  }
+
+  return {
+    title: `${count} quotes need follow-up`,
+    body: "Open your follow-up queue to take action.",
+  };
+}
+
+function getWeeklyRecapContent(context?: {
+  quotesSent?: number;
+  quotesWon?: number;
+  closeRate?: number;
+}): { title: string; body: string } {
+  const sent = context?.quotesSent || 0;
+  const won = context?.quotesWon || 0;
+  const rate = context?.closeRate || 0;
+
+  if (sent > 0) {
+    return {
+      title: `Last week: ${sent} quotes sent, ${won} won. ${rate}% close rate.`,
+      body: "Tap to see your full weekly performance breakdown.",
+    };
+  }
+
+  return {
+    title: "Your weekly recap is ready",
+    body: "See how your week went and set goals for the next one.",
+  };
+}
+
+export async function scheduleDailyPulse(
+  enabled: boolean,
+  time: string = "08:00",
+  context?: { amountAtRisk?: number; quoteCount?: number },
+) {
   try {
     await Notifications.cancelScheduledNotificationAsync(DAILY_PULSE_ID).catch(() => {});
     if (!enabled || Platform.OS === "web") return;
+
+    const content = getDailyNotificationContent(context);
+    if (!content) return;
 
     const { hour, minute } = parseTime(time);
 
     await Notifications.scheduleNotificationAsync({
       identifier: DAILY_PULSE_ID,
       content: {
-        title: "Your daily follow-up list is ready",
-        body: "Check your follow-up queue and keep your streak going!",
+        title: content.title,
+        body: content.body,
         sound: true,
+        data: { screen: "FollowUpQueue" },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -88,22 +152,30 @@ export async function scheduleDailyPulse(enabled: boolean, time: string = "08:00
         minute,
       },
     });
+    trackEvent("daily_notification_sent");
   } catch (e) {
     console.warn("Failed to schedule daily pulse:", e);
   }
 }
 
-export async function scheduleWeeklyRecap(enabled: boolean, day: number = 1) {
+export async function scheduleWeeklyRecap(
+  enabled: boolean,
+  day: number = 1,
+  context?: { quotesSent?: number; quotesWon?: number; closeRate?: number },
+) {
   try {
     await Notifications.cancelScheduledNotificationAsync(WEEKLY_RECAP_ID).catch(() => {});
     if (!enabled || Platform.OS === "web") return;
 
+    const content = getWeeklyRecapContent(context);
+
     await Notifications.scheduleNotificationAsync({
       identifier: WEEKLY_RECAP_ID,
       content: {
-        title: "Your weekly recap is ready",
-        body: "See how your week went and plan for the next one.",
+        title: content.title,
+        body: content.body,
         sound: true,
+        data: { screen: "WeeklyRecap" },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
@@ -112,6 +184,7 @@ export async function scheduleWeeklyRecap(enabled: boolean, day: number = 1) {
         minute: 0,
       },
     });
+    trackEvent("weekly_notification_sent");
   } catch (e) {
     console.warn("Failed to schedule weekly recap:", e);
   }
@@ -122,9 +195,11 @@ export async function syncNotificationSchedule(prefs: {
   dailyPulseTime: string;
   weeklyRecapEnabled: boolean;
   weeklyRecapDay: number;
+  dailyContext?: { amountAtRisk?: number; quoteCount?: number };
+  weeklyContext?: { quotesSent?: number; quotesWon?: number; closeRate?: number };
 }) {
-  await scheduleDailyPulse(prefs.dailyPulseEnabled, prefs.dailyPulseTime);
-  await scheduleWeeklyRecap(prefs.weeklyRecapEnabled, prefs.weeklyRecapDay);
+  await scheduleDailyPulse(prefs.dailyPulseEnabled, prefs.dailyPulseTime, prefs.dailyContext);
+  await scheduleWeeklyRecap(prefs.weeklyRecapEnabled, prefs.weeklyRecapDay, prefs.weeklyContext);
 }
 
 export async function cancelAllScheduledNotifications() {

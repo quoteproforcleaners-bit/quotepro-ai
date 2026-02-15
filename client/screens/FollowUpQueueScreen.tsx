@@ -17,9 +17,11 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as SMS from "expo-sms";
 import * as MailComposer from "expo-mail-composer";
+import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
+import { MomentumToast } from "@/components/MomentumToast";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
@@ -115,6 +117,8 @@ export default function FollowUpQueueScreen() {
   const [activeTab, setActiveTab] = useState<FilterTab>("overdue");
   const [snoozeQuoteId, setSnoozeQuoteId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastStreak, setToastStreak] = useState(0);
 
   const senderName = businessProfile.senderName || businessProfile.companyName;
 
@@ -135,11 +139,23 @@ export default function FollowUpQueueScreen() {
     },
   });
 
-  const streakMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/streaks/action", { actionType: "followup" });
-    },
-  });
+  const showMomentumToast = useCallback(async () => {
+    try {
+      const res = await apiRequest("POST", "/api/streaks/action", { actionType: "followup" });
+      const data = await res.json();
+      const streak = data?.currentStreak || 1;
+      setToastStreak(streak);
+      setToastVisible(true);
+      trackEvent("streak_increment", { streakLength: streak });
+      trackEvent("followup_action");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ["/api/streaks"] });
+    } catch {
+      setToastStreak(1);
+      setToastVisible(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  }, [queryClient]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -185,8 +201,9 @@ export default function FollowUpQueueScreen() {
     try {
       await SMS.sendSMSAsync([item.customerPhone], message);
       touchMutation.mutate({ quoteId: item.id, channel: "sms" });
+      showMomentumToast();
     } catch {}
-  }, [senderName, touchMutation]);
+  }, [senderName, touchMutation, showMomentumToast]);
 
   const handleEmail = useCallback(async (item: FollowUpItem) => {
     trackEvent("followup_email_tap");
@@ -199,22 +216,24 @@ export default function FollowUpQueueScreen() {
         body,
       });
       touchMutation.mutate({ quoteId: item.id, channel: "email" });
+      showMomentumToast();
     } catch {}
-  }, [senderName, touchMutation]);
+  }, [senderName, touchMutation, showMomentumToast]);
 
   const handleCall = useCallback(async (item: FollowUpItem) => {
     trackEvent("followup_call_tap");
     try {
       await Linking.openURL(`tel:${item.customerPhone}`);
       touchMutation.mutate({ quoteId: item.id, channel: "call" });
+      showMomentumToast();
     } catch {}
-  }, [touchMutation]);
+  }, [touchMutation, showMomentumToast]);
 
   const handleMarkContacted = useCallback(async (item: FollowUpItem) => {
     trackEvent("followup_mark_contacted");
     touchMutation.mutate({ quoteId: item.id, channel: "manual" });
-    streakMutation.mutate();
-  }, [touchMutation, streakMutation]);
+    showMomentumToast();
+  }, [touchMutation, showMomentumToast]);
 
   const handleSnooze = useCallback((duration: number) => {
     if (snoozeQuoteId === null) return;
@@ -458,6 +477,12 @@ export default function FollowUpQueueScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      <MomentumToast
+        visible={toastVisible}
+        streakCount={toastStreak}
+        onDismiss={() => setToastVisible(false)}
+      />
     </View>
   );
 }
