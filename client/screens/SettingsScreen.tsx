@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -9,7 +9,7 @@ import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -19,12 +19,13 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useSubscription } from "@/context/SubscriptionContext";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, apiRequest } from "@/lib/query-client";
 import { PaymentOptions, DEFAULT_PAYMENT_OPTIONS } from "@/types";
 import { PAYMENT_METHOD_LABELS, getPaymentOptions } from "@/lib/paymentOptions";
 import { Switch } from "react-native";
 import { useLanguage } from "@/context/LanguageContext";
 import { LANGUAGE_LABELS, type Language } from "@/i18n";
+import { syncNotificationSchedule } from "@/lib/notifications";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -36,6 +37,67 @@ export default function SettingsScreen() {
   const { businessProfile: profile, updateBusinessProfile } = useApp();
   const { isPro } = useSubscription();
   const { language, setLanguage, t } = useLanguage();
+
+  const queryClient = useQueryClient();
+
+  const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const TIME_OPTIONS = [
+    { label: "6:00 AM", value: "06:00" },
+    { label: "7:00 AM", value: "07:00" },
+    { label: "8:00 AM", value: "08:00" },
+    { label: "9:00 AM", value: "09:00" },
+    { label: "10:00 AM", value: "10:00" },
+    { label: "12:00 PM", value: "12:00" },
+  ];
+
+  const { data: prefs } = useQuery<{
+    dailyPulseEnabled: boolean;
+    dailyPulseTime: string;
+    weeklyRecapEnabled: boolean;
+    weeklyRecapDay: number;
+    quietHoursEnabled: boolean;
+    quietHoursStart: string;
+    quietHoursEnd: string;
+    dormantThresholdDays: number;
+    maxFollowUpsPerDay: number;
+    weeklyGoal: string | null;
+    weeklyGoalTarget: number | null;
+  }>({ queryKey: ["/api/preferences"] });
+
+  const currentPrefs = prefs || {
+    dailyPulseEnabled: true,
+    dailyPulseTime: "08:00",
+    weeklyRecapEnabled: true,
+    weeklyRecapDay: 1,
+    quietHoursEnabled: false,
+    quietHoursStart: "21:00",
+    quietHoursEnd: "08:00",
+    dormantThresholdDays: 90,
+    maxFollowUpsPerDay: 1,
+    weeklyGoal: null,
+    weeklyGoalTarget: null,
+  };
+
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showDayPicker, setShowDayPicker] = useState(false);
+  const [showDormantPicker, setShowDormantPicker] = useState(false);
+
+  const updatePref = useCallback(async (updates: Record<string, any>) => {
+    try {
+      await apiRequest("PUT", "/api/preferences", { ...currentPrefs, ...updates });
+      queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
+      Haptics.selectionAsync();
+      const merged = { ...currentPrefs, ...updates };
+      syncNotificationSchedule({
+        dailyPulseEnabled: merged.dailyPulseEnabled,
+        dailyPulseTime: merged.dailyPulseTime,
+        weeklyRecapEnabled: merged.weeklyRecapEnabled,
+        weeklyRecapDay: merged.weeklyRecapDay,
+      });
+    } catch (e) {
+      console.warn("Failed to update preference:", e);
+    }
+  }, [currentPrefs, queryClient]);
 
   const { data: calendarStatus, refetch: refetchCalendar } = useQuery({
     queryKey: ["/api/google-calendar/status"],
@@ -731,6 +793,169 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
+      <SectionHeader title="Notifications" subtitle="Control when you get reminders" />
+
+      <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Daily Follow-Up Reminder</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              {"Get reminded each morning to follow up"}
+            </ThemedText>
+          </View>
+          <Switch
+            value={currentPrefs.dailyPulseEnabled}
+            onValueChange={(val) => updatePref({ dailyPulseEnabled: val })}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-daily-pulse"
+          />
+        </View>
+
+        {currentPrefs.dailyPulseEnabled ? (
+          <Pressable
+            onPress={() => setShowTimePicker(!showTimePicker)}
+            style={[styles.prefSubRow, { borderTopColor: theme.border }]}
+            testID="button-pulse-time"
+          >
+            <Feather name="clock" size={16} color={theme.textSecondary} />
+            <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm }}>Reminder time</ThemedText>
+            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
+              {TIME_OPTIONS.find((t) => t.value === currentPrefs.dailyPulseTime)?.label || currentPrefs.dailyPulseTime}
+            </ThemedText>
+            <Feather name="chevron-down" size={16} color={theme.textSecondary} style={{ marginLeft: 4 }} />
+          </Pressable>
+        ) : null}
+
+        {showTimePicker && currentPrefs.dailyPulseEnabled ? (
+          <View style={[styles.pickerContainer, { borderTopColor: theme.border }]}>
+            {TIME_OPTIONS.map((opt) => (
+              <Pressable
+                key={opt.value}
+                onPress={() => { updatePref({ dailyPulseTime: opt.value }); setShowTimePicker(false); }}
+                style={[styles.pickerOption, { backgroundColor: currentPrefs.dailyPulseTime === opt.value ? `${theme.primary}15` : "transparent" }]}
+              >
+                <ThemedText type="small" style={{ fontWeight: currentPrefs.dailyPulseTime === opt.value ? "700" : "400", color: currentPrefs.dailyPulseTime === opt.value ? theme.primary : theme.text }}>
+                  {opt.label}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
+
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Weekly Recap</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              {"See how your week went"}
+            </ThemedText>
+          </View>
+          <Switch
+            value={currentPrefs.weeklyRecapEnabled}
+            onValueChange={(val) => updatePref({ weeklyRecapEnabled: val })}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-weekly-recap"
+          />
+        </View>
+
+        {currentPrefs.weeklyRecapEnabled ? (
+          <Pressable
+            onPress={() => setShowDayPicker(!showDayPicker)}
+            style={[styles.prefSubRow, { borderTopColor: theme.border }]}
+            testID="button-recap-day"
+          >
+            <Feather name="calendar" size={16} color={theme.textSecondary} />
+            <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm }}>Recap day</ThemedText>
+            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
+              {DAY_LABELS[currentPrefs.weeklyRecapDay] || "Monday"}
+            </ThemedText>
+            <Feather name="chevron-down" size={16} color={theme.textSecondary} style={{ marginLeft: 4 }} />
+          </Pressable>
+        ) : null}
+
+        {showDayPicker && currentPrefs.weeklyRecapEnabled ? (
+          <View style={[styles.pickerContainer, { borderTopColor: theme.border }]}>
+            {DAY_LABELS.map((label, idx) => (
+              <Pressable
+                key={idx}
+                onPress={() => { updatePref({ weeklyRecapDay: idx }); setShowDayPicker(false); }}
+                style={[styles.pickerOption, { backgroundColor: currentPrefs.weeklyRecapDay === idx ? `${theme.primary}15` : "transparent" }]}
+              >
+                <ThemedText type="small" style={{ fontWeight: currentPrefs.weeklyRecapDay === idx ? "700" : "400", color: currentPrefs.weeklyRecapDay === idx ? theme.primary : theme.text }}>
+                  {label}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
+
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Quiet Hours</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              {"No notifications during these hours"}
+            </ThemedText>
+          </View>
+          <Switch
+            value={currentPrefs.quietHoursEnabled}
+            onValueChange={(val) => updatePref({ quietHoursEnabled: val })}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-quiet-hours"
+          />
+        </View>
+
+        {currentPrefs.quietHoursEnabled ? (
+          <View style={[styles.prefSubRow, { borderTopColor: theme.border }]}>
+            <Feather name="moon" size={16} color={theme.textSecondary} />
+            <ThemedText type="small" style={{ marginLeft: Spacing.sm, color: theme.textSecondary }}>
+              {`${currentPrefs.quietHoursStart} - ${currentPrefs.quietHoursEnd}`}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+
+      <SectionHeader title="Follow-Up Behavior" subtitle="Customize how follow-ups and opportunities work" />
+
+      <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        <Pressable
+          onPress={() => setShowDormantPicker(!showDormantPicker)}
+          style={styles.prefRow}
+          testID="button-dormant-threshold"
+        >
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Dormant Customer Threshold</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              {"How long before a customer is considered dormant"}
+            </ThemedText>
+          </View>
+          <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
+            {`${currentPrefs.dormantThresholdDays} days`}
+          </ThemedText>
+        </Pressable>
+
+        {showDormantPicker ? (
+          <View style={[styles.pickerContainer, { borderTopColor: theme.border }]}>
+            {[30, 60, 90, 120, 180].map((days) => (
+              <Pressable
+                key={days}
+                onPress={() => { updatePref({ dormantThresholdDays: days }); setShowDormantPicker(false); }}
+                style={[styles.pickerOption, { backgroundColor: currentPrefs.dormantThresholdDays === days ? `${theme.primary}15` : "transparent" }]}
+              >
+                <ThemedText type="small" style={{ fontWeight: currentPrefs.dormantThresholdDays === days ? "700" : "400", color: currentPrefs.dormantThresholdDays === days ? theme.primary : theme.text }}>
+                  {`${days} days`}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+      </View>
+
       <SectionHeader title={t.settings.language} subtitle={t.settings.languageSubtitle} />
 
       <View style={[styles.languageSelector, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
@@ -1018,5 +1243,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderWidth: 1,
+  },
+  prefSection: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+    overflow: "hidden",
+  },
+  prefRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
+  prefSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  prefDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.lg,
+    marginVertical: Spacing.xs,
+  },
+  pickerContainer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+  },
+  pickerOption: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
   },
 });

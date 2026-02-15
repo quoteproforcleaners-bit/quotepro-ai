@@ -59,3 +59,78 @@ export async function savePushTokenToServer(token: string): Promise<void> {
     console.warn("Failed to save push token:", error);
   }
 }
+
+const DAILY_PULSE_ID = "daily-pulse-notification";
+const WEEKLY_RECAP_ID = "weekly-recap-notification";
+
+function parseTime(timeStr: string): { hour: number; minute: number } {
+  const [h, m] = timeStr.split(":").map(Number);
+  return { hour: h || 8, minute: m || 0 };
+}
+
+export async function scheduleDailyPulse(enabled: boolean, time: string = "08:00") {
+  try {
+    await Notifications.cancelScheduledNotificationAsync(DAILY_PULSE_ID).catch(() => {});
+    if (!enabled || Platform.OS === "web") return;
+
+    const { hour, minute } = parseTime(time);
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: DAILY_PULSE_ID,
+      content: {
+        title: "Your daily follow-up list is ready",
+        body: "Check your follow-up queue and keep your streak going!",
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour,
+        minute,
+      },
+    });
+  } catch (e) {
+    console.warn("Failed to schedule daily pulse:", e);
+  }
+}
+
+export async function scheduleWeeklyRecap(enabled: boolean, day: number = 1) {
+  try {
+    await Notifications.cancelScheduledNotificationAsync(WEEKLY_RECAP_ID).catch(() => {});
+    if (!enabled || Platform.OS === "web") return;
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: WEEKLY_RECAP_ID,
+      content: {
+        title: "Your weekly recap is ready",
+        body: "See how your week went and plan for the next one.",
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday: day === 0 ? 1 : day + 1,
+        hour: 9,
+        minute: 0,
+      },
+    });
+  } catch (e) {
+    console.warn("Failed to schedule weekly recap:", e);
+  }
+}
+
+export async function syncNotificationSchedule(prefs: {
+  dailyPulseEnabled: boolean;
+  dailyPulseTime: string;
+  weeklyRecapEnabled: boolean;
+  weeklyRecapDay: number;
+}) {
+  await scheduleDailyPulse(prefs.dailyPulseEnabled, prefs.dailyPulseTime);
+  await scheduleWeeklyRecap(prefs.weeklyRecapEnabled, prefs.weeklyRecapDay);
+}
+
+export async function cancelAllScheduledNotifications() {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch (e) {
+    console.warn("Failed to cancel notifications:", e);
+  }
+}

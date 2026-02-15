@@ -319,10 +319,6 @@ export default function DashboardScreen() {
     return t.dashboard.goodEvening;
   };
 
-  const followUpCount = useMemo(() => {
-    return (quotes || []).filter((q: any) => q.status === "sent" || q.status === "draft").length;
-  }, [quotes]);
-
   const todayJobCount = useMemo(() => {
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
