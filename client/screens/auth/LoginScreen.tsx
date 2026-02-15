@@ -19,6 +19,8 @@ import { Spacing, BorderRadius, Colors } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { getApiUrl } from "@/lib/query-client";
 import { Feather } from "@expo/vector-icons";
+import { useLanguage } from "@/context/LanguageContext";
+import { LANGUAGE_LABELS, type Language } from "@/i18n";
 
 type Mode = "login" | "register";
 
@@ -26,6 +28,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { login, register, loginWithApple, refreshAuth } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
 
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
@@ -142,6 +145,34 @@ export default function LoginScreen() {
           },
         ]}
       >
+
+        <View style={styles.languageRow}>
+          {(["en", "es"] as Language[]).map((lang) => (
+            <Pressable
+              key={lang}
+              onPress={() => setLanguage(lang)}
+              style={[
+                styles.languageChip,
+                {
+                  backgroundColor: language === lang ? theme.primary : "transparent",
+                  borderColor: language === lang ? theme.primary : theme.border,
+                },
+              ]}
+              testID={`button-lang-${lang}`}
+            >
+              <ThemedText
+                type="small"
+                style={{
+                  color: language === lang ? "#FFFFFF" : theme.textSecondary,
+                  fontWeight: language === lang ? "700" : "500",
+                }}
+              >
+                {LANGUAGE_LABELS[lang]}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={styles.branding}>
           <View style={[styles.iconContainer, { backgroundColor: theme.primary }]}>
             <Feather name="file-text" size={32} color="#FFFFFF" />
@@ -153,7 +184,7 @@ export default function LoginScreen() {
             type="body"
             style={[styles.tagline, { color: theme.textSecondary }]}
           >
-            Professional quoting for cleaning businesses
+            {t.login.tagline}
           </ThemedText>
         </View>
 
@@ -181,7 +212,7 @@ export default function LoginScreen() {
           testID="button-google-signin"
         >
           <ThemedText type="body" style={{ fontWeight: "600" }}>
-            Continue with Google
+            {t.login.continueWithGoogle}
           </ThemedText>
         </Pressable>
 
@@ -191,27 +222,27 @@ export default function LoginScreen() {
             type="small"
             style={[styles.dividerText, { color: theme.textSecondary }]}
           >
-            or
+            {t.common.or}
           </ThemedText>
           <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
         </View>
 
         {mode === "register" ? (
           <Input
-            label="Full Name"
+            label={t.login.fullName}
             value={name}
             onChangeText={setName}
-            placeholder="Your name"
+            placeholder={t.login.namePlaceholder}
             leftIcon="user"
             testID="input-name"
           />
         ) : null}
 
         <Input
-          label="Email"
+          label={t.login.email}
           value={email}
           onChangeText={setEmail}
-          placeholder="you@example.com"
+          placeholder={t.login.emailPlaceholder}
           keyboardType="email-address"
           autoCapitalize="none"
           leftIcon="mail"
@@ -219,10 +250,10 @@ export default function LoginScreen() {
         />
 
         <Input
-          label="Password"
+          label={t.login.password}
           value={password}
           onChangeText={setPassword}
-          placeholder="Your password"
+          placeholder={t.login.passwordPlaceholder}
           secureTextEntry
           leftIcon="lock"
           testID="input-password"
@@ -245,7 +276,7 @@ export default function LoginScreen() {
               type="body"
               style={{ color: "#FFFFFF", fontWeight: "600", textAlign: "center" }}
             >
-              {mode === "login" ? "Sign In" : "Create Account"}
+              {mode === "login" ? t.login.signIn : t.login.createAccount}
             </ThemedText>
           )}
         </Pressable>
@@ -259,12 +290,10 @@ export default function LoginScreen() {
           testID="button-switch-mode"
         >
           <ThemedText type="small" style={{ color: theme.textSecondary }}>
-            {mode === "login"
-              ? "Don't have an account? "
-              : "Already have an account? "}
+            {mode === "login" ? t.login.noAccount : t.login.hasAccount}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-            {mode === "login" ? "Sign Up" : "Sign In"}
+            {mode === "login" ? t.login.signUp : t.login.signIn}
           </ThemedText>
         </Pressable>
       </View>
@@ -343,5 +372,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     marginTop: Spacing.lg,
+  },
+  languageRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  languageChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
 });

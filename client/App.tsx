@@ -11,6 +11,7 @@ import { queryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/context/AuthContext";
 import { AppProvider } from "@/context/AppContext";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary, sendCrashReport } from "@/components/ErrorBoundary";
 import { setupNotificationHandler, registerForPushNotificationsAsync, savePushTokenToServer } from "@/lib/notifications";
@@ -79,15 +80,17 @@ export default function App() {
         <SafeAreaProvider>
           <GestureHandlerRootView style={styles.root}>
             <SafeKeyboardProvider>
-              <AuthProvider>
-                <AppProvider>
-                  <SubscriptionProvider>
-                    <NavigationContainer>
-                      <RootStackNavigator />
-                    </NavigationContainer>
-                  </SubscriptionProvider>
-                </AppProvider>
-              </AuthProvider>
+              <LanguageProvider>
+                <AuthProvider>
+                  <AppProvider>
+                    <SubscriptionProvider>
+                      <NavigationContainer>
+                        <RootStackNavigator />
+                      </NavigationContainer>
+                    </SubscriptionProvider>
+                  </AppProvider>
+                </AuthProvider>
+              </LanguageProvider>
               <StatusBar style="auto" />
             </SafeKeyboardProvider>
           </GestureHandlerRootView>
