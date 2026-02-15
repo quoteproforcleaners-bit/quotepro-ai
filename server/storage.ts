@@ -15,6 +15,11 @@ import {
   communications,
   automationRules,
   tasks,
+  followUpTouches,
+  streaks,
+  userPreferences,
+  analyticsEvents,
+  badges,
   type User,
   type Business,
   type PricingSettingsRow,
@@ -31,6 +36,11 @@ import {
   type Task,
   googleCalendarTokens,
   type GoogleCalendarToken,
+  type FollowUpTouch,
+  type Streak,
+  type UserPreference,
+  type AnalyticsEvent,
+  type Badge,
 } from "@shared/schema";
 
 export async function getUserById(id: string): Promise<User | undefined> {
@@ -988,4 +998,430 @@ export async function expireOldQuotes(): Promise<number> {
     )
     .returning();
   return result.length;
+}
+
+// ─── Follow-Up Touches ───
+
+export async function getFollowUpTouchesByQuote(quoteId: string): Promise<FollowUpTouch[]> {
+  return db
+    .select()
+    .from(followUpTouches)
+    .where(eq(followUpTouches.quoteId, quoteId))
+    .orderBy(desc(followUpTouches.createdAt));
+}
+
+export async function getFollowUpTouchesByBusiness(businessId: string): Promise<FollowUpTouch[]> {
+  return db
+    .select()
+    .from(followUpTouches)
+    .where(eq(followUpTouches.businessId, businessId))
+    .orderBy(desc(followUpTouches.createdAt));
+}
+
+export async function createFollowUpTouch(data: {
+  businessId: string;
+  quoteId: string;
+  customerId?: string;
+  channel: string;
+  snoozedUntil?: Date;
+}): Promise<FollowUpTouch> {
+  const [touch] = await db
+    .insert(followUpTouches)
+    .values({
+      businessId: data.businessId,
+      quoteId: data.quoteId,
+      customerId: data.customerId || null,
+      channel: data.channel,
+      snoozedUntil: data.snoozedUntil || null,
+    })
+    .returning();
+  return touch;
+}
+
+export async function getLastTouchForQuote(quoteId: string): Promise<FollowUpTouch | undefined> {
+  const [touch] = await db
+    .select()
+    .from(followUpTouches)
+    .where(eq(followUpTouches.quoteId, quoteId))
+    .orderBy(desc(followUpTouches.createdAt))
+    .limit(1);
+  return touch;
+}
+
+// ─── Streaks ───
+
+export async function getStreakByBusiness(businessId: string): Promise<Streak | undefined> {
+  const [streak] = await db
+    .select()
+    .from(streaks)
+    .where(eq(streaks.businessId, businessId));
+  return streak;
+}
+
+export async function upsertStreak(
+  businessId: string,
+  data: { currentStreak: number; longestStreak: number; lastActionDate: string }
+): Promise<Streak> {
+  const existing = await getStreakByBusiness(businessId);
+  if (existing) {
+    const [streak] = await db
+      .update(streaks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(streaks.businessId, businessId))
+      .returning();
+    return streak;
+  }
+  const [streak] = await db
+    .insert(streaks)
+    .values({ businessId, ...data })
+    .returning();
+  return streak;
+}
+
+// ─── User Preferences ───
+
+export async function getPreferencesByBusiness(businessId: string): Promise<UserPreference | undefined> {
+  const [pref] = await db
+    .select()
+    .from(userPreferences)
+    .where(eq(userPreferences.businessId, businessId));
+  return pref;
+}
+
+export async function upsertPreferences(
+  businessId: string,
+  data: Partial<{
+    dailyPulseEnabled: boolean;
+    dailyPulseTime: string;
+    weeklyRecapEnabled: boolean;
+    weeklyRecapDay: number;
+    quietHoursEnabled: boolean;
+    quietHoursStart: string;
+    quietHoursEnd: string;
+    dormantThresholdDays: number;
+    maxFollowUpsPerDay: number;
+    weeklyGoal: string | null;
+    weeklyGoalTarget: number | null;
+  }>
+): Promise<UserPreference> {
+  const existing = await getPreferencesByBusiness(businessId);
+  if (existing) {
+    const [pref] = await db
+      .update(userPreferences)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(userPreferences.businessId, businessId))
+      .returning();
+    return pref;
+  }
+  const [pref] = await db
+    .insert(userPreferences)
+    .values({ businessId, ...data })
+    .returning();
+  return pref;
+}
+
+// ─── Analytics Events ───
+
+export async function createAnalyticsEvent(data: {
+  businessId: string;
+  eventName: string;
+  properties?: any;
+}): Promise<AnalyticsEvent> {
+  const [event] = await db
+    .insert(analyticsEvents)
+    .values({
+      businessId: data.businessId,
+      eventName: data.eventName,
+      properties: data.properties || {},
+    })
+    .returning();
+  return event;
+}
+
+export async function getAnalyticsEvents(businessId: string, limit: number = 100): Promise<AnalyticsEvent[]> {
+  return db
+    .select()
+    .from(analyticsEvents)
+    .where(eq(analyticsEvents.businessId, businessId))
+    .orderBy(desc(analyticsEvents.createdAt))
+    .limit(limit);
+}
+
+// ─── Badges ───
+
+export async function getBadgesByBusiness(businessId: string): Promise<Badge[]> {
+  return db
+    .select()
+    .from(badges)
+    .where(eq(badges.businessId, businessId))
+    .orderBy(desc(badges.earnedAt));
+}
+
+export async function createBadge(data: { businessId: string; badgeKey: string }): Promise<Badge> {
+  const [badge] = await db
+    .insert(badges)
+    .values({ businessId: data.businessId, badgeKey: data.badgeKey })
+    .returning();
+  return badge;
+}
+
+export async function hasBadge(businessId: string, badgeKey: string): Promise<boolean> {
+  const results = await db
+    .select()
+    .from(badges)
+    .where(
+      and(
+        eq(badges.businessId, businessId),
+        eq(badges.badgeKey, badgeKey)
+      )
+    )
+    .limit(1);
+  return results.length > 0;
+}
+
+// ─── Follow-Up Queue ───
+
+export async function getFollowUpQueueQuotes(businessId: string): Promise<any[]> {
+  const twentyFourHoursAgo = new Date();
+  twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+  const sentQuotes = await db
+    .select({
+      id: quotes.id,
+      businessId: quotes.businessId,
+      customerId: quotes.customerId,
+      total: quotes.total,
+      status: quotes.status,
+      sentAt: quotes.sentAt,
+      createdAt: quotes.createdAt,
+      lastContactAt: quotes.lastContactAt,
+      customerFirstName: customers.firstName,
+      customerLastName: customers.lastName,
+      customerPhone: customers.phone,
+      customerEmail: customers.email,
+    })
+    .from(quotes)
+    .leftJoin(customers, eq(quotes.customerId, customers.id))
+    .where(
+      and(
+        eq(quotes.businessId, businessId),
+        eq(quotes.status, "sent"),
+        lte(quotes.sentAt, twentyFourHoursAgo)
+      )
+    )
+    .orderBy(asc(quotes.sentAt));
+
+  const now = new Date();
+  const results: any[] = [];
+
+  for (const q of sentQuotes) {
+    const snoozedTouches = await db
+      .select()
+      .from(followUpTouches)
+      .where(
+        and(
+          eq(followUpTouches.quoteId, q.id),
+          gte(followUpTouches.snoozedUntil, now)
+        )
+      )
+      .limit(1);
+
+    if (snoozedTouches.length > 0) continue;
+
+    const lastTouch = await getLastTouchForQuote(q.id);
+
+    results.push({
+      ...q,
+      lastTouchedAt: lastTouch?.createdAt || null,
+    });
+  }
+
+  return results;
+}
+
+// ─── Weekly Recap Stats ───
+
+export async function getWeeklyRecapStats(
+  businessId: string,
+  weekStart: Date,
+  weekEnd: Date
+): Promise<{
+  quotesSent: number;
+  quotesAccepted: number;
+  quotesDeclined: number;
+  quotesExpired: number;
+  closeRate: number;
+  revenueWon: number;
+  biggestWin: number;
+  mostAtRiskOpen: any;
+}> {
+  const allQuotesInRange = await db
+    .select()
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.businessId, businessId),
+        gte(quotes.createdAt, weekStart),
+        lte(quotes.createdAt, weekEnd)
+      )
+    );
+
+  const quotesSent = allQuotesInRange.length;
+
+  const acceptedInRange = await db
+    .select()
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.businessId, businessId),
+        eq(quotes.status, "accepted"),
+        gte(quotes.acceptedAt, weekStart),
+        lte(quotes.acceptedAt, weekEnd)
+      )
+    );
+
+  const declinedInRange = await db
+    .select()
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.businessId, businessId),
+        eq(quotes.status, "declined"),
+        gte(quotes.declinedAt, weekStart),
+        lte(quotes.declinedAt, weekEnd)
+      )
+    );
+
+  const expiredInRange = await db
+    .select()
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.businessId, businessId),
+        eq(quotes.status, "expired"),
+        gte(quotes.updatedAt, weekStart),
+        lte(quotes.updatedAt, weekEnd)
+      )
+    );
+
+  const quotesAccepted = acceptedInRange.length;
+  const quotesDeclined = declinedInRange.length;
+  const quotesExpired = expiredInRange.length;
+  const total = quotesAccepted + quotesDeclined + quotesExpired;
+  const closeRate = total > 0 ? Math.round((quotesAccepted / total) * 1000) / 10 : 0;
+  const revenueWon = acceptedInRange.reduce((sum, q) => sum + q.total, 0);
+  const biggestWin = acceptedInRange.length > 0
+    ? Math.max(...acceptedInRange.map(q => q.total))
+    : 0;
+
+  const openQuotes = await db
+    .select()
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.businessId, businessId),
+        eq(quotes.status, "sent")
+      )
+    )
+    .orderBy(asc(quotes.sentAt))
+    .limit(1);
+
+  const mostAtRiskOpen = openQuotes.length > 0 ? openQuotes[0] : null;
+
+  return {
+    quotesSent,
+    quotesAccepted,
+    quotesDeclined,
+    quotesExpired,
+    closeRate,
+    revenueWon: Math.round(revenueWon * 100) / 100,
+    biggestWin: Math.round(biggestWin * 100) / 100,
+    mostAtRiskOpen,
+  };
+}
+
+// ─── Opportunities ───
+
+export async function getDormantCustomers(
+  businessId: string,
+  thresholdDays: number
+): Promise<any[]> {
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() - thresholdDays);
+
+  const allCustomers = await db
+    .select()
+    .from(customers)
+    .where(eq(customers.businessId, businessId));
+
+  const results: any[] = [];
+
+  for (const c of allCustomers) {
+    const customerJobs = await db
+      .select()
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.customerId, c.id),
+          eq(jobs.businessId, businessId)
+        )
+      )
+      .orderBy(desc(jobs.startDatetime));
+
+    if (customerJobs.length === 0) continue;
+
+    const lastJob = customerJobs[0];
+    const lastJobDate = lastJob.endDatetime || lastJob.startDatetime;
+
+    if (lastJobDate && lastJobDate < threshold) {
+      const avgTicket = customerJobs.reduce((sum, j) => sum + (j.total || 0), 0) / customerJobs.length;
+      results.push({
+        ...c,
+        lastJobDate,
+        avgTicket: Math.round(avgTicket * 100) / 100,
+      });
+    }
+  }
+
+  return results;
+}
+
+export async function getLostQuotes(
+  businessId: string,
+  daysSince: number
+): Promise<any[]> {
+  const since = new Date();
+  since.setDate(since.getDate() - daysSince);
+
+  const lostQuotes = await db
+    .select({
+      id: quotes.id,
+      businessId: quotes.businessId,
+      customerId: quotes.customerId,
+      total: quotes.total,
+      status: quotes.status,
+      sentAt: quotes.sentAt,
+      declinedAt: quotes.declinedAt,
+      expiresAt: quotes.expiresAt,
+      createdAt: quotes.createdAt,
+      customerFirstName: customers.firstName,
+      customerLastName: customers.lastName,
+      customerPhone: customers.phone,
+      customerEmail: customers.email,
+    })
+    .from(quotes)
+    .leftJoin(customers, eq(quotes.customerId, customers.id))
+    .where(
+      and(
+        eq(quotes.businessId, businessId),
+        or(
+          eq(quotes.status, "expired"),
+          eq(quotes.status, "declined")
+        ),
+        gte(quotes.updatedAt, since)
+      )
+    )
+    .orderBy(desc(quotes.updatedAt));
+
+  return lostQuotes;
 }

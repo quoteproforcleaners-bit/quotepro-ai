@@ -435,6 +435,58 @@ export const googleCalendarTokens = pgTable("google_calendar_tokens", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const followUpTouches = pgTable("follow_up_touches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  quoteId: varchar("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  customerId: varchar("customer_id").references(() => customers.id),
+  channel: text("channel").notNull(),
+  snoozedUntil: timestamp("snoozed_until"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const streaks = pgTable("streaks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+  currentStreak: integer("current_streak").notNull().default(0),
+  longestStreak: integer("longest_streak").notNull().default(0),
+  lastActionDate: text("last_action_date"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userPreferences = pgTable("user_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+  dailyPulseEnabled: boolean("daily_pulse_enabled").notNull().default(true),
+  dailyPulseTime: text("daily_pulse_time").notNull().default("08:00"),
+  weeklyRecapEnabled: boolean("weekly_recap_enabled").notNull().default(true),
+  weeklyRecapDay: integer("weekly_recap_day").notNull().default(1),
+  quietHoursEnabled: boolean("quiet_hours_enabled").notNull().default(false),
+  quietHoursStart: text("quiet_hours_start").notNull().default("21:00"),
+  quietHoursEnd: text("quiet_hours_end").notNull().default("08:00"),
+  dormantThresholdDays: integer("dormant_threshold_days").notNull().default(90),
+  maxFollowUpsPerDay: integer("max_follow_ups_per_day").notNull().default(1),
+  weeklyGoal: text("weekly_goal"),
+  weeklyGoalTarget: integer("weekly_goal_target"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const analyticsEvents = pgTable("analytics_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  eventName: text("event_name").notNull(),
+  properties: jsonb("properties").notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const badges = pgTable("badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  badgeKey: text("badge_key").notNull(),
+  earnedAt: timestamp("earned_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   name: true,
@@ -466,3 +518,8 @@ export type AttributionEvent = typeof attributionEvents.$inferSelect;
 export type SocialAutomationSetting = typeof socialAutomationSettings.$inferSelect;
 export type SocialOptOut = typeof socialOptOuts.$inferSelect;
 export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
+export type FollowUpTouch = typeof followUpTouches.$inferSelect;
+export type Streak = typeof streaks.$inferSelect;
+export type UserPreference = typeof userPreferences.$inferSelect;
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+export type Badge = typeof badges.$inferSelect;

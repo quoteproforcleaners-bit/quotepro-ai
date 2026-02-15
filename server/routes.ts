@@ -79,6 +79,19 @@ import {
   getGoogleCalendarToken,
   upsertGoogleCalendarToken,
   deleteGoogleCalendarToken,
+  getFollowUpQueueQuotes,
+  createFollowUpTouch,
+  getStreakByBusiness,
+  upsertStreak,
+  getPreferencesByBusiness,
+  upsertPreferences,
+  createAnalyticsEvent,
+  getBadgesByBusiness,
+  createBadge,
+  hasBadge,
+  getWeeklyRecapStats,
+  getDormantCustomers,
+  getLostQuotes,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -2883,6 +2896,237 @@ Respond with JSON: {"reply": string}`
 
   app.get("/terms", (_req: Request, res: Response) => {
     res.send(getTermsOfServiceHTML());
+  });
+
+  // ─── Sticky Product: Follow-Up Queue ───
+
+  app.get("/api/followup-queue", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const queue = await getFollowUpQueueQuotes(business.id);
+      return res.json(queue);
+    } catch (error: any) {
+      console.error("Get follow-up queue error:", error);
+      return res.status(500).json({ message: "Failed to get follow-up queue" });
+    }
+  });
+
+  app.post("/api/followup-touches", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { quoteId, channel, snoozedUntil } = req.body;
+      if (!quoteId || !channel) {
+        return res.status(400).json({ message: "quoteId and channel are required" });
+      }
+      const quote = await getQuoteById(quoteId);
+      const touch = await createFollowUpTouch({
+        businessId: business.id,
+        quoteId,
+        customerId: quote?.customerId || undefined,
+        channel,
+        snoozedUntil: snoozedUntil ? new Date(snoozedUntil) : undefined,
+      });
+      return res.json(touch);
+    } catch (error: any) {
+      console.error("Create follow-up touch error:", error);
+      return res.status(500).json({ message: "Failed to create follow-up touch" });
+    }
+  });
+
+  // ─── Sticky Product: Streaks ───
+
+  app.get("/api/streaks", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const streak = await getStreakByBusiness(business.id);
+      return res.json(streak || { currentStreak: 0, longestStreak: 0, lastActionDate: null });
+    } catch (error: any) {
+      console.error("Get streak error:", error);
+      return res.status(500).json({ message: "Failed to get streak" });
+    }
+  });
+
+  app.post("/api/streaks/action", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const today = new Date().toISOString().split("T")[0];
+      const existing = await getStreakByBusiness(business.id);
+
+      let currentStreak = 1;
+      let longestStreak = 1;
+
+      if (existing) {
+        if (existing.lastActionDate === today) {
+          return res.json(existing);
+        }
+
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+        if (existing.lastActionDate === yesterdayStr) {
+          currentStreak = existing.currentStreak + 1;
+        }
+        longestStreak = Math.max(currentStreak, existing.longestStreak);
+      }
+
+      const streak = await upsertStreak(business.id, {
+        currentStreak,
+        longestStreak,
+        lastActionDate: today,
+      });
+      return res.json(streak);
+    } catch (error: any) {
+      console.error("Streak action error:", error);
+      return res.status(500).json({ message: "Failed to update streak" });
+    }
+  });
+
+  // ─── Sticky Product: Preferences ───
+
+  app.get("/api/preferences", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const prefs = await getPreferencesByBusiness(business.id);
+      return res.json(prefs || {
+        dailyPulseEnabled: true,
+        dailyPulseTime: "08:00",
+        weeklyRecapEnabled: true,
+        weeklyRecapDay: 1,
+        quietHoursEnabled: false,
+        quietHoursStart: "21:00",
+        quietHoursEnd: "08:00",
+        dormantThresholdDays: 90,
+        maxFollowUpsPerDay: 1,
+        weeklyGoal: null,
+        weeklyGoalTarget: null,
+      });
+    } catch (error: any) {
+      console.error("Get preferences error:", error);
+      return res.status(500).json({ message: "Failed to get preferences" });
+    }
+  });
+
+  app.put("/api/preferences", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const prefs = await upsertPreferences(business.id, req.body);
+      return res.json(prefs);
+    } catch (error: any) {
+      console.error("Update preferences error:", error);
+      return res.status(500).json({ message: "Failed to update preferences" });
+    }
+  });
+
+  // ─── Sticky Product: Analytics ───
+
+  app.post("/api/analytics/events", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { eventName, properties } = req.body;
+      if (!eventName) {
+        return res.status(400).json({ message: "eventName is required" });
+      }
+      const event = await createAnalyticsEvent({
+        businessId: business.id,
+        eventName,
+        properties: properties || {},
+      });
+      return res.json(event);
+    } catch (error: any) {
+      console.error("Create analytics event error:", error);
+      return res.status(500).json({ message: "Failed to create analytics event" });
+    }
+  });
+
+  // ─── Sticky Product: Badges ───
+
+  app.get("/api/badges", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const badgeList = await getBadgesByBusiness(business.id);
+      return res.json(badgeList);
+    } catch (error: any) {
+      console.error("Get badges error:", error);
+      return res.status(500).json({ message: "Failed to get badges" });
+    }
+  });
+
+  // ─── Sticky Product: Weekly Recap ───
+
+  app.get("/api/weekly-recap", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const weekOffset = parseInt(req.query.weekOffset as string) || 0;
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - dayOfWeek + (weekOffset * 7));
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 7);
+
+      const stats = await getWeeklyRecapStats(business.id, weekStart, weekEnd);
+      return res.json({ ...stats, weekStart, weekEnd });
+    } catch (error: any) {
+      console.error("Get weekly recap error:", error);
+      return res.status(500).json({ message: "Failed to get weekly recap" });
+    }
+  });
+
+  // ─── Sticky Product: Opportunities ───
+
+  app.get("/api/opportunities/dormant", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const thresholdDays = parseInt(req.query.thresholdDays as string) || 90;
+      const dormant = await getDormantCustomers(business.id, thresholdDays);
+      return res.json(dormant);
+    } catch (error: any) {
+      console.error("Get dormant customers error:", error);
+      return res.status(500).json({ message: "Failed to get dormant customers" });
+    }
+  });
+
+  app.get("/api/opportunities/lost", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const daysSince = parseInt(req.query.daysSince as string) || 180;
+      const lost = await getLostQuotes(business.id, daysSince);
+      return res.json(lost);
+    } catch (error: any) {
+      console.error("Get lost quotes error:", error);
+      return res.status(500).json({ message: "Failed to get lost quotes" });
+    }
+  });
+
+  // ─── Sticky Product: Do Not Contact ───
+
+  app.put("/api/customers/:id/do-not-contact", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const customer = await getCustomerById(req.params.id);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const updated = await updateCustomer(req.params.id, {
+        smsOptOut: !customer.smsOptOut,
+      });
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Toggle do-not-contact error:", error);
+      return res.status(500).json({ message: "Failed to update do-not-contact" });
+    }
   });
 
   const httpServer = createServer(app);
