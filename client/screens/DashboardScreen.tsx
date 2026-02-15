@@ -31,6 +31,7 @@ import { useApp } from "@/context/AppContext";
 import { FeatureFlags } from "@/lib/featureFlags";
 import { runAiCommand, EXAMPLE_PROMPTS, AiCommandResult } from "@/lib/aiCommandRouter";
 import { useLanguage } from "@/context/LanguageContext";
+import { trackEvent } from "@/lib/analytics";
 
 /*
  * ─── Design Tokens (Home Screen) ───
@@ -260,6 +261,28 @@ export default function DashboardScreen() {
   const [commandResult, setCommandResult] = useState<AiCommandResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  useEffect(() => {
+    trackEvent("app_open");
+  }, []);
+
+  const { data: followUpQueue = [], refetch: refetchFollowUpQueue } = useQuery<any[]>({
+    queryKey: ["/api/followup-queue"],
+  });
+
+  const { data: streakData, refetch: refetchStreak } = useQuery<{
+    currentStreak: number;
+    longestStreak: number;
+    lastActionDate: string | null;
+  }>({ queryKey: ["/api/streaks"] });
+
+  const { data: opportunitiesDormant = [], refetch: refetchDormant } = useQuery<any[]>({
+    queryKey: ["/api/opportunities/dormant"],
+  });
+
+  const { data: opportunitiesLost = [], refetch: refetchLost } = useQuery<any[]>({
+    queryKey: ["/api/opportunities/lost"],
+  });
+
   const { data: stats, refetch: refetchStats } = useQuery<{
     totalQuotes: number;
     sentQuotes: number;
@@ -285,7 +308,7 @@ export default function DashboardScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchJobs()]);
+    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchJobs(), refetchFollowUpQueue(), refetchStreak(), refetchDormant(), refetchLost()]);
     setRefreshing(false);
   };
 
@@ -310,6 +333,36 @@ export default function DashboardScreen() {
   }, [allJobs]);
 
   const monthRevenue = stats?.totalRevenue || 0;
+
+  const followUpQueueCount = followUpQueue.length;
+  const amountAtRisk = useMemo(() => {
+    return followUpQueue.reduce((sum: number, q: any) => sum + (q.total || 0), 0);
+  }, [followUpQueue]);
+  const oldestQuoteDays = useMemo(() => {
+    if (followUpQueue.length === 0) return 0;
+    const now = Date.now();
+    let oldest = 0;
+    followUpQueue.forEach((q: any) => {
+      const sent = q.sentAt ? new Date(q.sentAt).getTime() : new Date(q.createdAt).getTime();
+      const days = Math.floor((now - sent) / (1000 * 60 * 60 * 24));
+      if (days > oldest) oldest = days;
+    });
+    return oldest;
+  }, [followUpQueue]);
+
+  const totalOpportunities = opportunitiesDormant.length + opportunitiesLost.length;
+  const estimatedRecoverable = useMemo(() => {
+    let total = 0;
+    opportunitiesDormant.forEach((c: any) => {
+      total += (c.avgTicket || 150) * 0.25;
+    });
+    opportunitiesLost.forEach((q: any) => {
+      total += q.status === "expired" ? (q.total || 0) * 0.2 : (q.total || 0) * 0.1;
+    });
+    return Math.round(total);
+  }, [opportunitiesDormant, opportunitiesLost]);
+
+  const currentStreak = streakData?.currentStreak || 0;
 
   const appData = useMemo(() => ({
     stats,
@@ -350,7 +403,7 @@ export default function DashboardScreen() {
         navigation.navigate("QuoteCalculator");
         break;
       case "follow_up":
-        executeCommand("Show quotes I haven't followed up on");
+        navigation.navigate("FollowUpQueue");
         break;
       case "metrics":
         executeCommand("How many cleans booked this month?");
@@ -401,10 +454,95 @@ export default function DashboardScreen() {
           <ThemedText type="caption" style={{ color: dt.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: "500", fontSize: 11 }}>
             {getGreeting()}
           </ThemedText>
-          <ThemedText type="h4" numberOfLines={1} style={{ marginTop: 2 }}>
-            {profile?.companyName || "QuotePro"}
-          </ThemedText>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <ThemedText type="h4" numberOfLines={1} style={{ marginTop: 2, flex: 1 }}>
+              {profile?.companyName || "QuotePro"}
+            </ThemedText>
+            {currentStreak > 0 ? (
+              <View style={[styles.streakBadge, { backgroundColor: dt.accentSoft }]}>
+                <Feather name="zap" size={12} color={theme.warning} />
+                <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "700", marginLeft: 3 }}>
+                  {currentStreak.toString()}
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
         </View>
+
+        {followUpQueueCount > 0 ? (
+          <Pressable
+            onPress={() => navigation.navigate("FollowUpQueue")}
+            style={[
+              styles.focusCard,
+              {
+                backgroundColor: dt.surfacePrimary,
+                borderColor: theme.warning + "40",
+                ...(Platform.OS === "ios" ? dt.shadowPrimary : {}),
+              },
+            ]}
+            testID="todays-focus-card"
+          >
+            <View style={styles.focusCardHeader}>
+              <View style={[styles.focusIcon, { backgroundColor: theme.warning + "15" }]}>
+                <Feather name="target" size={16} color={theme.warning} />
+              </View>
+              <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{"Today's Focus"}</ThemedText>
+              <Feather name="chevron-right" size={18} color={dt.textMuted} />
+            </View>
+            <View style={styles.focusStats}>
+              <View style={styles.focusStat}>
+                <ThemedText type="h3" style={{ color: theme.warning }}>{followUpQueueCount.toString()}</ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{"Need follow-up"}</ThemedText>
+              </View>
+              <View style={[styles.focusDivider, { backgroundColor: dt.borderSecondary }]} />
+              <View style={styles.focusStat}>
+                <ThemedText type="h3" style={{ color: theme.error }}>{`$${amountAtRisk.toLocaleString()}`}</ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{"At-risk value"}</ThemedText>
+              </View>
+              <View style={[styles.focusDivider, { backgroundColor: dt.borderSecondary }]} />
+              <View style={styles.focusStat}>
+                <ThemedText type="h3">{oldestQuoteDays.toString()}</ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{"Oldest (days)"}</ThemedText>
+              </View>
+            </View>
+            <View style={[styles.focusCta, { backgroundColor: theme.warning + "12" }]}>
+              <Feather name="arrow-right" size={14} color={theme.warning} />
+              <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{"Follow Up Now"}</ThemedText>
+            </View>
+          </Pressable>
+        ) : currentStreak === 0 ? (
+          <View
+            style={[
+              styles.focusCard,
+              {
+                backgroundColor: dt.surfacePrimary,
+                borderColor: dt.borderSecondary,
+              },
+            ]}
+          >
+            <View style={styles.focusCardHeader}>
+              <View style={[styles.focusIcon, { backgroundColor: dt.accentSoft }]}>
+                <Feather name="check-circle" size={16} color={theme.success} />
+              </View>
+              <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{"All caught up!"}</ThemedText>
+            </View>
+            <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>
+              {"No follow-ups needed right now. Start your streak today!"}
+            </ThemedText>
+          </View>
+        ) : null}
+
+        {currentStreak === 0 ? (
+          <View style={[styles.streakNudge, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
+            <Feather name="zap" size={14} color={dt.textMuted} />
+            <ThemedText type="small" style={{ color: dt.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
+              {"Start your follow-up streak today!"}
+            </ThemedText>
+            <Pressable onPress={() => navigation.navigate("FollowUpQueue")} testID="streak-nudge-cta">
+              <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>{"Go"}</ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={[
           styles.commandCard,
@@ -492,10 +630,10 @@ export default function DashboardScreen() {
         <View style={styles.glanceRow}>
           <GlanceCard
             title={t.dashboard.needFollowUp}
-            value={followUpCount.toString()}
+            value={followUpQueueCount.toString()}
             icon="phone-missed"
             color={theme.warning}
-            onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })}
+            onPress={() => navigation.navigate("FollowUpQueue")}
           />
           <GlanceCard
             title={t.dashboard.jobsToday}
@@ -512,6 +650,41 @@ export default function DashboardScreen() {
             onPress={() => navigation.navigate("Main", { screen: "RevenueTab" })}
           />
         </View>
+
+        {totalOpportunities > 0 ? (
+          <Pressable
+            onPress={() => navigation.navigate("Opportunities")}
+            style={[styles.opportunityCard, { backgroundColor: dt.surfacePrimary, borderColor: theme.success + "30" }]}
+            testID="opportunities-card"
+          >
+            <View style={styles.focusCardHeader}>
+              <View style={[styles.focusIcon, { backgroundColor: theme.success + "15" }]}>
+                <Feather name="repeat" size={16} color={theme.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="small" style={{ fontWeight: "600" }}>
+                  {`Reactivation opportunities: ${totalOpportunities}`}
+                </ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                  {`Estimated recoverable: $${estimatedRecoverable.toLocaleString()}`}
+                </ThemedText>
+              </View>
+              <Feather name="chevron-right" size={18} color={dt.textMuted} />
+            </View>
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          onPress={() => navigation.navigate("WeeklyRecap")}
+          style={[styles.recapLink, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}
+          testID="weekly-recap-link"
+        >
+          <Feather name="bar-chart" size={14} color={dt.accent} />
+          <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600", marginLeft: Spacing.sm, flex: 1 }}>
+            {"View Weekly Recap"}
+          </ThemedText>
+          <Feather name="chevron-right" size={16} color={dt.textMuted} />
+        </Pressable>
       </ScrollView>
     </LinearGradient>
   );
@@ -651,5 +824,77 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+  },
+  streakBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  focusCard: {
+    marginHorizontal: Spacing.lg,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  focusCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  focusIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  focusStats: {
+    flexDirection: "row",
+    marginTop: Spacing.md,
+    alignItems: "center",
+  },
+  focusStat: {
+    flex: 1,
+    alignItems: "center",
+  },
+  focusDivider: {
+    width: 1,
+    height: 28,
+  },
+  focusCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+  },
+  streakNudge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.md,
+  },
+  opportunityCard: {
+    marginHorizontal: Spacing.lg,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  recapLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.xl,
   },
 });

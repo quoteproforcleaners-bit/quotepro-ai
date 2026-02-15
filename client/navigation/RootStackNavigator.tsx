@@ -10,6 +10,9 @@ import PricingScreen from "@/screens/PricingScreen";
 import PaywallScreen from "@/screens/PaywallScreen";
 import JobDetailScreen from "@/screens/JobDetailScreen";
 import AIAssistantScreen from "@/screens/AIAssistantScreen";
+import FollowUpQueueScreen from "@/screens/FollowUpQueueScreen";
+import WeeklyRecapScreen from "@/screens/WeeklyRecapScreen";
+import OpportunitiesScreen from "@/screens/OpportunitiesScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
@@ -27,6 +30,9 @@ export type RootStackParamList = {
   PricingSettings: undefined;
   Paywall: undefined;
   AIAssistant: undefined;
+  FollowUpQueue: undefined;
+  WeeklyRecap: undefined;
+  Opportunities: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -119,6 +125,27 @@ export default function RootStackNavigator() {
             component={AIAssistantScreen}
             options={{
               headerTitle: "AI Sales Assistant",
+            }}
+          />
+          <Stack.Screen
+            name="FollowUpQueue"
+            component={FollowUpQueueScreen}
+            options={{
+              headerTitle: "Follow-Up Queue",
+            }}
+          />
+          <Stack.Screen
+            name="WeeklyRecap"
+            component={WeeklyRecapScreen}
+            options={{
+              headerTitle: "Weekly Recap",
+            }}
+          />
+          <Stack.Screen
+            name="Opportunities"
+            component={OpportunitiesScreen}
+            options={{
+              headerTitle: "Opportunities",
             }}
           />
         </>
