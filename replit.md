@@ -25,6 +25,17 @@ Key capabilities include:
 
 A new "Social / AI Sales Assistant" feature integrates with Instagram and TikTok DMs for lead capture, AI-powered intent detection, automated replies with quote links, and comprehensive lead management with attribution tracking. This feature is part of the "QuotePro AI" subscription tier, emphasizing AI-driven value. The platform supports multi-user access with various authentication methods and stores all data server-side in PostgreSQL.
 
+### V3 Sticky Product Features (Feb 2026)
+- **Follow-Up Queue** (`client/screens/FollowUpQueueScreen.tsx`): Smart follow-up management with Overdue/Due Today/Upcoming filter tabs, 5 age-based message templates with merge fields, snooze functionality, and quick actions (SMS/Email/Call/Mark Contacted).
+- **Weekly Recap** (`client/screens/WeeklyRecapScreen.tsx`): Performance dashboard with stats grid, week navigation, at-risk quotes section, and weekly goal setting with progress tracking.
+- **Opportunities** (`client/screens/OpportunitiesScreen.tsx`): Reactivation screen for dormant customers (configurable threshold) and lost/expired quotes with revenue recovery estimates and do-not-contact management.
+- **Dashboard Enhancements**: Today's Focus card (follow-up count, at-risk value, oldest quote), streak badge display, opportunities summary card, and weekly recap link.
+- **Streak Tracking**: Consecutive-day follow-up streaks tracked via `streaks` table, updates on follow-up actions, displayed in dashboard header.
+- **Push Notifications**: Local notification scheduling for daily pulse reminders and weekly recaps via expo-notifications. Configurable time/day in Settings.
+- **User Preferences** (Settings): Notification toggles (daily pulse, weekly recap, quiet hours), reminder time picker, recap day picker, dormant customer threshold (30-180 days).
+- **Analytics Tracking** (`client/lib/analytics.ts`): Event tracking module for app_open, follow_up actions, and engagement metrics.
+- **New DB Tables**: `follow_up_touches`, `streaks`, `user_preferences`, `analytics_events`, `badges` with 16 storage functions and 11 API endpoints.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
