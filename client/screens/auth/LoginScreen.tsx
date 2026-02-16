@@ -206,7 +206,18 @@ export default function LoginScreen() {
             style={styles.appleButton}
             onPress={handleAppleSignIn}
           />
-        ) : null}
+        ) : (
+          <Pressable
+            style={[styles.googleButton, { borderColor: theme.border, marginBottom: Spacing.sm }]}
+            onPress={() => setError("Sign in with Apple is only available on iPhone")}
+            testID="button-apple-signin-web"
+          >
+            <Feather name="smartphone" size={18} color={theme.text} style={{ marginRight: Spacing.sm }} />
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              {t.login.continueWithApple || "Sign in with Apple"}
+            </ThemedText>
+          </Pressable>
+        )}
 
         <Pressable
           style={[styles.googleButton, { borderColor: theme.border }]}
