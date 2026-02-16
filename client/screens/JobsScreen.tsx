@@ -183,6 +183,12 @@ export default function JobsScreen() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [estimatedDuration, setEstimatedDuration] = useState("");
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newCustomerAddress, setNewCustomerAddress] = useState("");
 
   const {
     data: jobs = [],
@@ -253,6 +259,12 @@ export default function JobsScreen() {
     setCustomerSearch("");
     setShowCustomerDropdown(false);
     setEstimatedDuration("");
+    setIsNewCustomer(false);
+    setNewFirstName("");
+    setNewLastName("");
+    setNewPhone("");
+    setNewEmail("");
+    setNewCustomerAddress("");
   };
 
   const onRefresh = async () => {
@@ -278,6 +290,17 @@ export default function JobsScreen() {
     setSelectedCustomerId(null);
     setCustomerSearch("");
     setShowCustomerDropdown(false);
+    setIsNewCustomer(false);
+    setNewFirstName("");
+    setNewLastName("");
+    setNewPhone("");
+    setNewEmail("");
+    setNewCustomerAddress("");
+  };
+
+  const handleAddNewCustomer = () => {
+    setShowCustomerDropdown(false);
+    setIsNewCustomer(true);
   };
 
   const handleDateChange = (_event: any, date?: Date) => {
@@ -315,8 +338,26 @@ export default function JobsScreen() {
     }
   };
 
-  const handleSaveJob = () => {
+  const handleSaveJob = async () => {
     if (!dateSelected || !address.trim()) return;
+    let custId = selectedCustomerId;
+    if (isNewCustomer && newFirstName.trim()) {
+      try {
+        const res = await apiRequest("POST", "/api/customers", {
+          firstName: newFirstName.trim(),
+          lastName: newLastName.trim(),
+          phone: newPhone.trim(),
+          email: newEmail.trim(),
+          address: newCustomerAddress.trim(),
+        });
+        const newCust = await res.json();
+        custId = newCust.id;
+        queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      } catch (err) {
+        Alert.alert("Error", "Could not create customer. Please try again.");
+        return;
+      }
+    }
     createMutation.mutate({
       jobType,
       recurrence,
@@ -324,7 +365,7 @@ export default function JobsScreen() {
       address: address.trim(),
       internalNotes: notes.trim(),
       total: total.trim() ? parseFloat(total.trim()) : null,
-      customerId: selectedCustomerId,
+      customerId: custId,
       estimatedDuration: estimatedDuration.trim() ? parseFloat(estimatedDuration.trim()) : null,
     });
   };
@@ -566,6 +607,71 @@ export default function JobsScreen() {
                   </Pressable>
                 </View>
               </View>
+            ) : isNewCustomer ? (
+              <View style={[styles.newCustomerCard, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}>
+                <View style={styles.newCustomerHeader}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Feather name="user-plus" size={16} color={theme.primary} style={{ marginRight: Spacing.sm }} />
+                    <ThemedText type="subtitle">{t.jobs.newCustomer}</ThemedText>
+                  </View>
+                  <Pressable testID="cancel-new-customer" onPress={handleClearCustomer} hitSlop={8}>
+                    <Feather name="x-circle" size={20} color={theme.textSecondary} />
+                  </Pressable>
+                </View>
+                <View style={styles.newCustomerFields}>
+                  <View style={styles.nameRow2}>
+                    <View style={{ flex: 1, marginRight: Spacing.sm }}>
+                      <Input
+                        testID="input-new-first-name"
+                        label={t.jobs.firstName}
+                        placeholder={t.jobs.firstName}
+                        value={newFirstName}
+                        onChangeText={setNewFirstName}
+                        leftIcon="user"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Input
+                        testID="input-new-last-name"
+                        label={t.jobs.lastName}
+                        placeholder={t.jobs.lastName}
+                        value={newLastName}
+                        onChangeText={setNewLastName}
+                      />
+                    </View>
+                  </View>
+                  <Input
+                    testID="input-new-phone"
+                    label={t.jobs.phone}
+                    placeholder={t.jobs.phonePlaceholder}
+                    value={newPhone}
+                    onChangeText={setNewPhone}
+                    keyboardType="phone-pad"
+                    leftIcon="phone"
+                  />
+                  <Input
+                    testID="input-new-email"
+                    label={t.jobs.email}
+                    placeholder={t.jobs.emailPlaceholder}
+                    value={newEmail}
+                    onChangeText={setNewEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    leftIcon="mail"
+                  />
+                  <Input
+                    testID="input-new-customer-address"
+                    label={t.jobs.address}
+                    placeholder={t.jobs.addressPlaceholder}
+                    value={newCustomerAddress}
+                    onChangeText={(text) => {
+                      setNewCustomerAddress(text);
+                      if (!address.trim()) setAddress(text);
+                    }}
+                    leftIcon="map-pin"
+                  />
+                </View>
+              </View>
             ) : (
               <View style={{ marginBottom: Spacing.lg, zIndex: 10 }}>
                 <View style={[styles.searchInputContainer, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}>
@@ -612,11 +718,18 @@ export default function JobsScreen() {
                 ) : null}
                 {showCustomerDropdown && customerSearch.trim().length > 0 && filteredCustomers.length === 0 ? (
                   <View style={[styles.dropdown, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                    <View style={styles.noResultsItem}>
-                      <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                        {t.common.noResults}
+                    <Pressable
+                      testID="add-new-customer-btn"
+                      style={styles.addNewCustomerItem}
+                      onPress={handleAddNewCustomer}
+                    >
+                      <View style={[styles.customerAvatar, { backgroundColor: `${theme.success}20` }]}>
+                        <Feather name="user-plus" size={14} color={theme.success} />
+                      </View>
+                      <ThemedText type="body" style={{ color: theme.primary, fontWeight: "600" }}>
+                        {t.jobs.addNewCustomer}
                       </ThemedText>
-                    </View>
+                    </Pressable>
                   </View>
                 ) : null}
               </View>
@@ -802,6 +915,7 @@ export default function JobsScreen() {
               disabled={
                 !dateSelected ||
                 !address.trim() ||
+                (isNewCustomer && !newFirstName.trim()) ||
                 createMutation.isPending
               }
               style={styles.saveButton}
@@ -975,6 +1089,29 @@ const styles = StyleSheet.create({
   selectedCustomerInfo: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  newCustomerCard: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  newCustomerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.md,
+  },
+  newCustomerFields: {
+  },
+  nameRow2: {
+    flexDirection: "row",
+  },
+  addNewCustomerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   datePickerContainer: {
     borderWidth: 1,

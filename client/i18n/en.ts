@@ -229,6 +229,14 @@ const en = {
     selectDateTime: "Tap to select date & time",
     estimatedDuration: "Estimated Duration (hours)",
     durationPlaceholder: "e.g. 2.5",
+    newCustomer: "New Customer",
+    addNewCustomer: "Add new customer",
+    firstName: "First Name",
+    lastName: "Last Name",
+    phone: "Phone",
+    phonePlaceholder: "(555) 123-4567",
+    email: "Email",
+    emailPlaceholder: "email@example.com",
   },
 
   settings: {

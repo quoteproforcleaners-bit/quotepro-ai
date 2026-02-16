@@ -231,6 +231,14 @@ const es: Translations = {
     selectDateTime: "Toca para seleccionar fecha y hora",
     estimatedDuration: "Duraci\u00f3n estimada (horas)",
     durationPlaceholder: "ej. 2.5",
+    newCustomer: "Nuevo cliente",
+    addNewCustomer: "Agregar nuevo cliente",
+    firstName: "Nombre",
+    lastName: "Apellido",
+    phone: "Tel\u00e9fono",
+    phonePlaceholder: "(555) 123-4567",
+    email: "Correo",
+    emailPlaceholder: "correo@ejemplo.com",
   },
 
   settings: {
