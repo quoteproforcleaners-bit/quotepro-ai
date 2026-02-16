@@ -224,6 +224,11 @@ const en = {
     noJobsDesc: "Tap the + button to schedule your first job and start managing your work.",
     automateReminders: "Automate job reminders and confirmations with QuotePro AI",
     canceled: "Canceled",
+    customer: "Customer",
+    searchCustomer: "Search customer by name...",
+    selectDateTime: "Tap to select date & time",
+    estimatedDuration: "Estimated Duration (hours)",
+    durationPlaceholder: "e.g. 2.5",
   },
 
   settings: {

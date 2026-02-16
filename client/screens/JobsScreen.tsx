@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -9,7 +9,10 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  TextInput,
+  ScrollView,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -46,6 +49,15 @@ interface Job {
   address: string;
   total: number | null;
   customer?: { firstName: string; lastName: string } | null;
+}
+
+interface Customer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  address: string;
 }
 
 type StatusFilter = "all" | "scheduled" | "in_progress" | "completed";
@@ -99,6 +111,25 @@ function getStatusLabel(status: string, t: any): string {
   }
 }
 
+function formatPickerDate(date: Date): string {
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  const day = days[date.getDay()];
+  const month = months[date.getMonth()];
+  const dayNum = date.getDate();
+  const year = date.getFullYear();
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours === 0 ? 12 : hours;
+  const minuteStr = minutes < 10 ? `0${minutes}` : `${minutes}`;
+  return `${day}, ${month} ${dayNum}, ${year} at ${hours}:${minuteStr} ${ampm}`;
+}
+
 export default function JobsScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -141,10 +172,17 @@ export default function JobsScreen() {
 
   const [jobType, setJobType] = useState("regular");
   const [recurrence, setRecurrence] = useState("none");
-  const [startDate, setStartDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [dateSelected, setDateSelected] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [total, setTotal] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [estimatedDuration, setEstimatedDuration] = useState("");
 
   const {
     data: jobs = [],
@@ -154,6 +192,19 @@ export default function JobsScreen() {
     queryKey: ["/api/jobs"],
   });
 
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ["/api/customers"],
+  });
+
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch.trim()) return [];
+    const q = customerSearch.toLowerCase();
+    return customers.filter((c) => {
+      const fullName = `${c.firstName} ${c.lastName}`.toLowerCase();
+      return fullName.includes(q) || (c.phone && c.phone.includes(q)) || (c.email && c.email.toLowerCase().includes(q));
+    }).slice(0, 5);
+  }, [customerSearch, customers]);
+
   const createMutation = useMutation({
     mutationFn: async (data: {
       jobType: string;
@@ -162,6 +213,8 @@ export default function JobsScreen() {
       address: string;
       internalNotes: string;
       total: number | null;
+      customerId?: string | null;
+      estimatedDuration?: number | null;
     }) => {
       const res = await apiRequest("POST", "/api/jobs", data);
       return res.json();
@@ -189,10 +242,17 @@ export default function JobsScreen() {
   const resetForm = () => {
     setJobType("regular");
     setRecurrence("none");
-    setStartDate("");
+    setSelectedDate(new Date());
+    setDateSelected(false);
+    setShowDatePicker(false);
+    setShowTimePicker(false);
     setAddress("");
     setNotes("");
     setTotal("");
+    setSelectedCustomerId(null);
+    setCustomerSearch("");
+    setShowCustomerDropdown(false);
+    setEstimatedDuration("");
   };
 
   const onRefresh = async () => {
@@ -205,17 +265,67 @@ export default function JobsScreen() {
     setModalVisible(true);
   };
 
+  const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomerId(customer.id);
+    setCustomerSearch(`${customer.firstName} ${customer.lastName}`);
+    setShowCustomerDropdown(false);
+    if (customer.address && !address.trim()) {
+      setAddress(customer.address);
+    }
+  };
+
+  const handleClearCustomer = () => {
+    setSelectedCustomerId(null);
+    setCustomerSearch("");
+    setShowCustomerDropdown(false);
+  };
+
+  const handleDateChange = (_event: any, date?: Date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+      if (date) {
+        const newDate = new Date(selectedDate);
+        newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+        setSelectedDate(newDate);
+        setDateSelected(true);
+        setTimeout(() => setShowTimePicker(true), 300);
+      }
+    } else {
+      if (date) {
+        setSelectedDate(date);
+        setDateSelected(true);
+      }
+    }
+  };
+
+  const handleTimeChange = (_event: any, date?: Date) => {
+    if (Platform.OS === "android") {
+      setShowTimePicker(false);
+      if (date) {
+        const newDate = new Date(selectedDate);
+        newDate.setHours(date.getHours(), date.getMinutes());
+        setSelectedDate(newDate);
+        setDateSelected(true);
+      }
+    } else {
+      if (date) {
+        setSelectedDate(date);
+        setDateSelected(true);
+      }
+    }
+  };
+
   const handleSaveJob = () => {
-    if (!startDate.trim() || !address.trim()) return;
-    const parsedDate = new Date(startDate.trim());
-    if (isNaN(parsedDate.getTime())) return;
+    if (!dateSelected || !address.trim()) return;
     createMutation.mutate({
       jobType,
       recurrence,
-      startDatetime: parsedDate.toISOString(),
+      startDatetime: selectedDate.toISOString(),
       address: address.trim(),
       internalNotes: notes.trim(),
       total: total.trim() ? parseFloat(total.trim()) : null,
+      customerId: selectedCustomerId,
+      estimatedDuration: estimatedDuration.trim() ? parseFloat(estimatedDuration.trim()) : null,
     });
   };
 
@@ -373,6 +483,10 @@ export default function JobsScreen() {
     );
   };
 
+  const selectedCustomer = selectedCustomerId
+    ? customers.find((c) => c.id === selectedCustomerId)
+    : null;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
@@ -427,6 +541,88 @@ export default function JobsScreen() {
           <KeyboardAwareScrollViewCompat
             contentContainerStyle={styles.modalContent}
           >
+            {/* Customer Search */}
+            <ThemedText type="small" style={styles.label}>
+              {t.jobs.customer}
+            </ThemedText>
+            {selectedCustomer ? (
+              <View style={[styles.selectedCustomerCard, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}>
+                <View style={styles.selectedCustomerInfo}>
+                  <View style={[styles.customerAvatar, { backgroundColor: `${theme.primary}20` }]}>
+                    <Feather name="user" size={16} color={theme.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText type="subtitle">
+                      {selectedCustomer.firstName} {selectedCustomer.lastName}
+                    </ThemedText>
+                    {selectedCustomer.phone ? (
+                      <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                        {selectedCustomer.phone}
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                  <Pressable testID="clear-customer" onPress={handleClearCustomer} hitSlop={8}>
+                    <Feather name="x-circle" size={20} color={theme.textSecondary} />
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={{ marginBottom: Spacing.lg, zIndex: 10 }}>
+                <View style={[styles.searchInputContainer, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}>
+                  <Feather name="search" size={18} color={theme.textSecondary} style={{ marginLeft: Spacing.md, marginRight: Spacing.sm }} />
+                  <TextInput
+                    testID="input-customer-search"
+                    style={[styles.searchInput, { color: theme.text }]}
+                    placeholder={t.jobs.searchCustomer}
+                    placeholderTextColor={theme.textSecondary}
+                    value={customerSearch}
+                    onChangeText={(text) => {
+                      setCustomerSearch(text);
+                      setShowCustomerDropdown(text.trim().length > 0);
+                      if (!text.trim()) setSelectedCustomerId(null);
+                    }}
+                    onFocus={() => {
+                      if (customerSearch.trim().length > 0) setShowCustomerDropdown(true);
+                    }}
+                  />
+                </View>
+                {showCustomerDropdown && filteredCustomers.length > 0 ? (
+                  <View style={[styles.dropdown, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+                    {filteredCustomers.map((c) => (
+                      <Pressable
+                        key={c.id}
+                        testID={`customer-option-${c.id}`}
+                        style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
+                        onPress={() => handleSelectCustomer(c)}
+                      >
+                        <View style={[styles.customerAvatar, { backgroundColor: `${theme.primary}20` }]}>
+                          <Feather name="user" size={14} color={theme.primary} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <ThemedText type="body">{c.firstName} {c.lastName}</ThemedText>
+                          {c.address ? (
+                            <ThemedText type="caption" style={{ color: theme.textSecondary }} numberOfLines={1}>
+                              {c.address}
+                            </ThemedText>
+                          ) : null}
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                {showCustomerDropdown && customerSearch.trim().length > 0 && filteredCustomers.length === 0 ? (
+                  <View style={[styles.dropdown, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+                    <View style={styles.noResultsItem}>
+                      <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                        {t.common.noResults}
+                      </ThemedText>
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            )}
+
+            {/* Job Type */}
             <ThemedText type="small" style={styles.label}>
               {t.jobs.jobType}
             </ThemedText>
@@ -464,6 +660,7 @@ export default function JobsScreen() {
               })}
             </View>
 
+            {/* Recurrence */}
             <ThemedText type="small" style={styles.label}>
               {t.jobs.recurrence}
             </ThemedText>
@@ -501,14 +698,64 @@ export default function JobsScreen() {
               })}
             </View>
 
-            <Input
-              testID="input-start-date"
-              label={t.jobs.startDateTime}
-              placeholder={t.jobs.startDatePlaceholder}
-              value={startDate}
-              onChangeText={setStartDate}
-              leftIcon="calendar"
-            />
+            {/* Date & Time Picker */}
+            <ThemedText type="small" style={styles.label}>
+              {t.jobs.startDateTime}
+            </ThemedText>
+            {Platform.OS === "ios" ? (
+              <View style={[styles.datePickerContainer, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}>
+                <DateTimePicker
+                  testID="date-time-picker"
+                  value={selectedDate}
+                  mode="datetime"
+                  display="compact"
+                  onChange={(_e: any, date?: Date) => {
+                    if (date) {
+                      setSelectedDate(date);
+                      setDateSelected(true);
+                    }
+                  }}
+                  minimumDate={new Date()}
+                  themeVariant="dark"
+                  style={styles.iosPicker}
+                />
+              </View>
+            ) : (
+              <View style={{ marginBottom: Spacing.lg }}>
+                <Pressable
+                  testID="open-date-picker"
+                  style={[styles.dateButton, { backgroundColor: theme.inputBackground, borderColor: theme.border }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Feather name="calendar" size={20} color={theme.textSecondary} style={{ marginRight: Spacing.sm }} />
+                  <ThemedText type="body" style={{ color: dateSelected ? theme.text : theme.textSecondary, flex: 1 }}>
+                    {dateSelected ? formatPickerDate(selectedDate) : t.jobs.selectDateTime}
+                  </ThemedText>
+                  <Feather name="chevron-down" size={18} color={theme.textSecondary} />
+                </Pressable>
+                {showDatePicker ? (
+                  <DateTimePicker
+                    testID="android-date-picker"
+                    value={selectedDate}
+                    mode="date"
+                    display="default"
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                  />
+                ) : null}
+                {showTimePicker ? (
+                  <DateTimePicker
+                    testID="android-time-picker"
+                    value={selectedDate}
+                    mode="time"
+                    display="default"
+                    onChange={handleTimeChange}
+                  />
+                ) : null}
+              </View>
+            )}
+
+            {/* Address */}
             <Input
               testID="input-address"
               label={t.jobs.address}
@@ -517,6 +764,19 @@ export default function JobsScreen() {
               onChangeText={setAddress}
               leftIcon="map-pin"
             />
+
+            {/* Estimated Duration */}
+            <Input
+              testID="input-duration"
+              label={t.jobs.estimatedDuration}
+              placeholder={t.jobs.durationPlaceholder}
+              value={estimatedDuration}
+              onChangeText={setEstimatedDuration}
+              keyboardType="decimal-pad"
+              leftIcon="clock"
+            />
+
+            {/* Internal Notes */}
             <Input
               testID="input-notes"
               label={t.jobs.internalNotes}
@@ -525,6 +785,8 @@ export default function JobsScreen() {
               onChangeText={setNotes}
               multiline
             />
+
+            {/* Total Amount */}
             <Input
               testID="input-total"
               label={t.jobs.totalAmount}
@@ -534,10 +796,11 @@ export default function JobsScreen() {
               keyboardType="decimal-pad"
               leftIcon="dollar-sign"
             />
+
             <Button
               onPress={handleSaveJob}
               disabled={
-                !startDate.trim() ||
+                !dateSelected ||
                 !address.trim() ||
                 createMutation.isPending
               }
@@ -658,5 +921,78 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginLeft: Spacing.sm,
+  },
+  searchInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    height: Spacing.inputHeight,
+  },
+  searchInput: {
+    flex: 1,
+    height: "100%",
+    paddingHorizontal: Spacing.sm,
+    fontSize: 16,
+  },
+  dropdown: {
+    position: "absolute",
+    top: Spacing.inputHeight + 2,
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    maxHeight: 220,
+    zIndex: 100,
+    overflow: "hidden",
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  noResultsItem: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    alignItems: "center",
+  },
+  customerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+  selectedCustomerCard: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  selectedCustomerInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  datePickerContainer: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.lg,
+    alignItems: "flex-start",
+  },
+  iosPicker: {
+    marginLeft: -8,
+  },
+  dateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    height: Spacing.inputHeight,
+    paddingHorizontal: Spacing.md,
   },
 });

@@ -226,6 +226,11 @@ const es: Translations = {
     noJobsDesc: "Toca el bot\u00f3n + para programar tu primer trabajo y gestionar tu agenda.",
     automateReminders: "Automatiza recordatorios y confirmaciones con QuotePro AI",
     canceled: "Cancelado",
+    customer: "Cliente",
+    searchCustomer: "Buscar cliente por nombre...",
+    selectDateTime: "Toca para seleccionar fecha y hora",
+    estimatedDuration: "Duraci\u00f3n estimada (horas)",
+    durationPlaceholder: "ej. 2.5",
   },
 
   settings: {
