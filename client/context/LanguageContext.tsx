@@ -5,21 +5,34 @@ import { getTranslations, type Language, type Translations } from "@/i18n";
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => Promise<void>;
+  communicationLanguage: Language;
+  setCommunicationLanguage: (lang: Language) => Promise<void>;
   t: Translations;
+  tc: Translations;
 }
 
 const STORAGE_KEY = "@quotepro_language";
+const COMM_STORAGE_KEY = "@quotepro_comm_language";
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLang] = useState<Language>("en");
+  const [communicationLang, setCommLang] = useState<Language>("en");
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
+    Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY),
+      AsyncStorage.getItem(COMM_STORAGE_KEY),
+    ]).then(([stored, commStored]) => {
       if (stored === "en" || stored === "es") {
         setLang(stored);
+      }
+      if (commStored === "en" || commStored === "es") {
+        setCommLang(commStored);
+      } else if (stored === "en" || stored === "es") {
+        setCommLang(stored);
       }
       setIsLoaded(true);
     }).catch(() => setIsLoaded(true));
@@ -32,12 +45,20 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
+  const setCommunicationLanguage = useCallback(async (lang: Language) => {
+    setCommLang(lang);
+    try {
+      await AsyncStorage.setItem(COMM_STORAGE_KEY, lang);
+    } catch {}
+  }, []);
+
   const t = getTranslations(language);
+  const tc = getTranslations(communicationLang);
 
   if (!isLoaded) return null;
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, communicationLanguage: communicationLang, setCommunicationLanguage, t, tc }}>
       {children}
     </LanguageContext.Provider>
   );

@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
+import { useLanguage } from "@/context/LanguageContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 
@@ -31,28 +32,14 @@ function useDesignTokens() {
 
 type ProfileKey = "professional" | "friendly" | "premium" | "urgent";
 
-interface Profile {
-  key: ProfileKey;
-  label: string;
-  description: string;
-  icon: keyof typeof Feather.glyphMap;
-  color: string;
-  preview: string;
-}
-
-const profiles: Profile[] = [
-  { key: "professional", label: "Professional", description: "Polished, respectful, straight to the point", icon: "briefcase", color: "#007AFF", preview: "Hi [Name], thank you for requesting a cleaning estimate. I have availability this week and would be happy to schedule your service at your convenience. Please let me know a time that works for you." },
-  { key: "friendly", label: "Friendly", description: "Warm, casual, like texting a neighbor", icon: "smile", color: "#10B981", preview: "Hey [Name]! Hope you're having a great week. Just wanted to check in about your cleaning quote - I'd love to help keep your place looking amazing. What day works best for you?" },
-  { key: "premium", label: "Premium", description: "Luxury feel, white-glove, exclusive", icon: "award", color: "#8B5CF6", preview: "Good afternoon [Name]. As part of our commitment to exceptional service, I'd like to personally extend priority scheduling for your home. We ensure meticulous attention to every detail." },
-  { key: "urgent", label: "Urgent", description: "Direct, time-sensitive, creates action", icon: "zap", color: "#F59E0B", preview: "[Name], quick heads up - your quote expires tomorrow and I only have 2 openings left this week. Reply now to lock in your rate before it's gone!" },
+const profileMeta: { key: ProfileKey; icon: keyof typeof Feather.glyphMap; color: string }[] = [
+  { key: "professional", icon: "briefcase", color: "#007AFF" },
+  { key: "friendly", icon: "smile", color: "#10B981" },
+  { key: "premium", icon: "award", color: "#8B5CF6" },
+  { key: "urgent", icon: "zap", color: "#F59E0B" },
 ];
 
-const escalationStages = [
-  { stage: 1, label: "Soft Touch", tone: "Gentle reminder", example: "Just a friendly reminder about your cleaning quote. No rush - let us know if you have any questions!", color: "#10B981" },
-  { stage: 2, label: "Value Add", tone: "Highlight benefits", example: "Did you know? Our deep clean includes baseboards, inside appliances, and window sills at no extra charge.", color: "#007AFF" },
-  { stage: 3, label: "Urgency", tone: "Limited availability", example: "Heads up - our schedule is filling fast for next week. We'd hate for you to miss out on your preferred time.", color: "#F59E0B" },
-  { stage: 4, label: "Final", tone: "Last chance", example: "Last chance! Your custom quote expires tomorrow. After that, we'll need to re-estimate based on current rates.", color: "#EF4444" },
-];
+const stageColors = ["#10B981", "#007AFF", "#F59E0B", "#EF4444"];
 
 interface StrategyData {
   profile: ProfileKey;
@@ -65,6 +52,9 @@ export default function SalesStrategyScreen() {
   const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
   const dt = useDesignTokens();
+  const { t, tc } = useLanguage();
+  const ss = t.salesStrategy;
+  const ssc = tc.salesStrategy;
 
   const { data: serverStrategy, isLoading } = useQuery<StrategyData>({
     queryKey: ["/api/sales-strategy"],
@@ -95,7 +85,18 @@ export default function SalesStrategyScreen() {
     saveStrategy(selectedProfile, val);
   };
 
-  const activeProfile = profiles.find((p) => p.key === selectedProfile) ?? profiles[0];
+  const getProfileLabel = (key: ProfileKey) => ss[key];
+  const getProfileDesc = (key: ProfileKey) => ss[`${key}Desc` as keyof typeof ss];
+  const getProfilePreview = (key: ProfileKey) => ssc[`${key}Preview` as keyof typeof ssc];
+
+  const stageKeys = [
+    { labelKey: "softTouch" as const, toneKey: "softTouchTone" as const, exampleKey: "softTouchExample" as const },
+    { labelKey: "valueAdd" as const, toneKey: "valueAddTone" as const, exampleKey: "valueAddExample" as const },
+    { labelKey: "urgencyStage" as const, toneKey: "urgencyStageTone" as const, exampleKey: "urgencyStageExample" as const },
+    { labelKey: "finalStage" as const, toneKey: "finalStageTone" as const, exampleKey: "finalStageExample" as const },
+  ];
+
+  const activeMeta = profileMeta.find((p) => p.key === selectedProfile) ?? profileMeta[0];
 
   if (isLoading) {
     return (
@@ -111,12 +112,12 @@ export default function SalesStrategyScreen() {
       contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/sales-strategy"] })} tintColor={dt.accent} />}
     >
-      <ThemedText type="h3" style={styles.sectionTitle}>Sales Profile</ThemedText>
+      <ThemedText type="h3" style={styles.sectionTitle}>{ss.salesProfile}</ThemedText>
       <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.lg }}>
-        Choose a communication style for your follow-ups and outreach.
+        {ss.salesProfileDesc}
       </ThemedText>
 
-      {profiles.map((p) => {
+      {profileMeta.map((p) => {
         const isSelected = selectedProfile === p.key;
         return (
           <Card
@@ -129,8 +130,8 @@ export default function SalesStrategyScreen() {
                 <Feather name={p.icon} size={22} color={p.color} />
               </View>
               <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                <ThemedText type="subtitle">{p.label}</ThemedText>
-                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{p.description}</ThemedText>
+                <ThemedText type="subtitle">{getProfileLabel(p.key)}</ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{getProfileDesc(p.key)}</ThemedText>
               </View>
               <View style={[styles.radio, isSelected ? { borderColor: p.color } : { borderColor: dt.border }]}>
                 {isSelected ? <View style={[styles.radioDot, { backgroundColor: p.color }]} /> : null}
@@ -139,7 +140,7 @@ export default function SalesStrategyScreen() {
             {isSelected ? (
               <View style={[styles.previewBox, { backgroundColor: p.color + "0A", borderColor: p.color + "25" }]}>
                 <ThemedText type="caption" style={{ color: dt.textSecondary, fontStyle: "italic" }}>
-                  "{p.preview}"
+                  "{getProfilePreview(p.key)}"
                 </ThemedText>
               </View>
             ) : null}
@@ -147,13 +148,13 @@ export default function SalesStrategyScreen() {
         );
       })}
 
-      <ThemedText type="h3" style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>Escalation Engine</ThemedText>
+      <ThemedText type="h3" style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>{ss.escalationEngine}</ThemedText>
       <Card style={styles.escalationToggleCard}>
         <View style={styles.escalationRow}>
           <View style={{ flex: 1 }}>
-            <ThemedText type="subtitle">Auto-Escalation</ThemedText>
+            <ThemedText type="subtitle">{ss.autoEscalation}</ThemedText>
             <ThemedText type="caption" style={{ color: dt.textSecondary }}>
-              Automatically increase urgency after each follow-up
+              {ss.autoEscalationDesc}
             </ThemedText>
           </View>
           <Switch
@@ -168,45 +169,48 @@ export default function SalesStrategyScreen() {
 
       {escalationEnabled ? (
         <View style={styles.stagesContainer}>
-          {escalationStages.map((stage, index) => (
-            <View key={stage.stage} style={styles.stageRow}>
-              <View style={styles.stageTimeline}>
-                <View style={[styles.stageDot, { backgroundColor: stage.color }]} />
-                {index < escalationStages.length - 1 ? <View style={[styles.stageLine, { backgroundColor: dt.border }]} /> : null}
-              </View>
-              <Card style={{...styles.stageCard, borderLeftWidth: 3, borderLeftColor: stage.color}}>
-                <View style={styles.stageHeader}>
-                  <ThemedText type="subtitle">Stage {stage.stage}: {stage.label}</ThemedText>
-                  <View style={[styles.toneBadge, { backgroundColor: stage.color + "18" }]}>
-                    <ThemedText type="caption" style={{ color: stage.color }}>{stage.tone}</ThemedText>
-                  </View>
+          {stageKeys.map((sk, index) => {
+            const color = stageColors[index];
+            return (
+              <View key={index} style={styles.stageRow}>
+                <View style={styles.stageTimeline}>
+                  <View style={[styles.stageDot, { backgroundColor: color }]} />
+                  {index < stageKeys.length - 1 ? <View style={[styles.stageLine, { backgroundColor: dt.border }]} /> : null}
                 </View>
-                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.xs, fontStyle: "italic" }}>
-                  "{stage.example}"
-                </ThemedText>
-              </Card>
-            </View>
-          ))}
+                <Card style={{...styles.stageCard, borderLeftWidth: 3, borderLeftColor: color}}>
+                  <View style={styles.stageHeader}>
+                    <ThemedText type="subtitle">{ss.stage} {index + 1}: {ss[sk.labelKey]}</ThemedText>
+                    <View style={[styles.toneBadge, { backgroundColor: color + "18" }]}>
+                      <ThemedText type="caption" style={{ color }}>{ss[sk.toneKey]}</ThemedText>
+                    </View>
+                  </View>
+                  <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.xs, fontStyle: "italic" }}>
+                    "{ssc[sk.exampleKey]}"
+                  </ThemedText>
+                </Card>
+              </View>
+            );
+          })}
         </View>
       ) : null}
 
-      <ThemedText type="h3" style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>AI Message Preview</ThemedText>
-      <Card style={{...styles.previewCard, borderColor: activeProfile.color + "30", borderWidth: 1}}>
+      <ThemedText type="h3" style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>{ss.aiMessagePreview}</ThemedText>
+      <Card style={{...styles.previewCard, borderColor: activeMeta.color + "30", borderWidth: 1}}>
         <View style={styles.previewHeader}>
-          <Feather name="message-circle" size={18} color={activeProfile.color} />
-          <ThemedText type="subtitle" style={{ marginLeft: Spacing.sm }}>Preview how your messages will sound</ThemedText>
+          <Feather name="message-circle" size={18} color={activeMeta.color} />
+          <ThemedText type="subtitle" style={{ marginLeft: Spacing.sm }}>{ss.previewDesc}</ThemedText>
         </View>
-        <View style={[styles.messagePreview, { backgroundColor: activeProfile.color + "0A" }]}>
+        <View style={[styles.messagePreview, { backgroundColor: activeMeta.color + "0A" }]}>
           <ThemedText type="small" style={{ color: dt.textPrimary }}>
-            "{activeProfile.preview}"
+            "{getProfilePreview(selectedProfile)}"
           </ThemedText>
         </View>
         <View style={styles.previewMeta}>
-          <View style={[styles.toneBadge, { backgroundColor: activeProfile.color + "18" }]}>
-            <ThemedText type="caption" style={{ color: activeProfile.color }}>{activeProfile.label}</ThemedText>
+          <View style={[styles.toneBadge, { backgroundColor: activeMeta.color + "18" }]}>
+            <ThemedText type="caption" style={{ color: activeMeta.color }}>{getProfileLabel(selectedProfile)}</ThemedText>
           </View>
           <ThemedText type="caption" style={{ color: dt.textSecondary }}>
-            {escalationEnabled ? "Escalation: ON" : "Escalation: OFF"}
+            {escalationEnabled ? ss.escalationOn : ss.escalationOff}
           </ThemedText>
         </View>
       </Card>
