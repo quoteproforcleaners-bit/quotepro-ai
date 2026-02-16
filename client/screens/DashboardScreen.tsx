@@ -884,7 +884,7 @@ const styles = StyleSheet.create({
   },
   streakGoBtn: {
     position: "absolute",
-    right: Spacing.md,
+    right: Spacing.xl,
     top: Spacing.sm,
   },
   streakGoBtnInner: {
