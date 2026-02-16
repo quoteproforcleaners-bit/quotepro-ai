@@ -162,6 +162,11 @@ declare module "express-session" {
 
 function setupSession(app: Express) {
   const PgStore = connectPg(session);
+  const isProduction = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1";
+
+  if (isProduction) {
+    app.set("trust proxy", 1);
+  }
 
   app.use(
     session({
@@ -173,7 +178,7 @@ function setupSession(app: Express) {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: false,
+        secure: isProduction,
         httpOnly: true,
         maxAge: 30 * 24 * 60 * 60 * 1000,
         sameSite: "lax",
