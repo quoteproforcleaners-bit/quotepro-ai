@@ -7,10 +7,21 @@ import OpenAI from "openai";
 import Stripe from "stripe";
 import { pool } from "./db";
 import { google } from "googleapis";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-04-30.basil" as any })
-  : null;
+let stripe: Stripe | null = null;
+
+async function initStripeClient() {
+  try {
+    stripe = await getUncachableStripeClient();
+    console.log("Stripe client initialized via Replit connection");
+  } catch (e) {
+    console.warn("Stripe not available:", (e as Error).message);
+    stripe = null;
+  }
+}
+
+initStripeClient();
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
