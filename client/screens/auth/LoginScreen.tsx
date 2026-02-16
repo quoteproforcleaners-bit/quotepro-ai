@@ -7,6 +7,7 @@ import {
   Platform,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -174,9 +175,10 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.branding}>
-          <View style={[styles.iconContainer, { backgroundColor: theme.primary }]}>
-            <Feather name="file-text" size={32} color="#FFFFFF" />
-          </View>
+          <Image
+            source={require('../../../assets/images/icon.png')}
+            style={styles.appLogo}
+          />
           <ThemedText type="h1" style={styles.appName}>
             QuotePro
           </ThemedText>
@@ -320,6 +322,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  appLogo: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
     marginBottom: Spacing.lg,
   },
   appName: {
