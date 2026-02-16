@@ -485,20 +485,20 @@ export default function DashboardScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <ThemedText type="subtitle" style={{ fontWeight: "700" }}>
-                  {`$${amountAtRisk.toLocaleString()} at risk`}
+                  {`$${amountAtRisk.toLocaleString()} ${t.dashboard.atRisk}`}
                 </ThemedText>
                 <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                  {followUpQueueCount === 1 ? "1 quote needs attention" : `${followUpQueueCount} quotes need attention`}
+                  {followUpQueueCount === 1 ? `1 ${t.dashboard.quoteNeedsAttention}` : `${followUpQueueCount} ${t.dashboard.quotesNeedAttention}`}
                 </ThemedText>
               </View>
               <Feather name="chevron-right" size={18} color={dt.textMuted} />
             </View>
             <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm, marginLeft: 44 }}>
-              {`Oldest quote: ${oldestQuoteDays} day${oldestQuoteDays === 1 ? "" : "s"} old`}
+              {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
             </ThemedText>
             <View style={[styles.focusCta, { backgroundColor: theme.warning + "12" }]}>
               <Feather name="arrow-right" size={14} color={theme.warning} />
-              <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{"Follow Up Now"}</ThemedText>
+              <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{t.dashboard.followUpNow}</ThemedText>
             </View>
           </Pressable>
         ) : (
@@ -515,10 +515,10 @@ export default function DashboardScreen() {
               <View style={[styles.focusIcon, { backgroundColor: theme.success + "15" }]}>
                 <Feather name="check-circle" size={16} color={theme.success} />
               </View>
-              <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{"All caught up!"}</ThemedText>
+              <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{t.growth.allCaughtUp}</ThemedText>
             </View>
             <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>
-              {"No revenue at risk. Keep your streak alive."}
+              {t.dashboard.noRevenueAtRisk}
             </ThemedText>
           </View>
         )}
@@ -527,15 +527,15 @@ export default function DashboardScreen() {
           <View style={styles.streakCardRow}>
             <Feather name="zap" size={16} color={currentStreak > 0 ? theme.warning : dt.textMuted} />
             <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.sm }}>
-              {currentStreak > 0 ? `Follow-Up Streak: ${currentStreak} day${currentStreak === 1 ? "" : "s"}` : "Follow-Up Streak"}
+              {currentStreak > 0 ? `${t.dashboard.followUpStreak}: ${currentStreak} ${currentStreak === 1 ? t.common.day : t.common.days}` : t.dashboard.followUpStreak}
             </ThemedText>
           </View>
           <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 4, marginLeft: 28 }}>
-            {currentStreak === 0 ? "Start your streak today" : currentStreak >= 7 ? "Revenue discipline unlocked" : currentStreak >= 3 ? "Momentum building" : `${currentStreak} day${currentStreak === 1 ? "" : "s"} strong`}
+            {currentStreak === 0 ? t.dashboard.startStreakToday : currentStreak >= 7 ? t.dashboard.revenueDisciplineUnlocked : currentStreak >= 3 ? t.dashboard.momentumBuilding : `${currentStreak} ${currentStreak === 1 ? t.common.day : t.common.days} ${t.dashboard.daysStrong}`}
           </ThemedText>
           {currentStreak === 0 ? (
             <Pressable onPress={() => navigation.navigate("FollowUpQueue")} style={styles.streakGoBtn} testID="streak-nudge-cta">
-              <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>{"Go"}</ThemedText>
+              <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>{t.dashboard.go}</ThemedText>
             </Pressable>
           ) : null}
         </View>
@@ -659,10 +659,10 @@ export default function DashboardScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <ThemedText type="small" style={{ fontWeight: "600" }}>
-                  {`Reactivation opportunities: ${totalOpportunities}`}
+                  {`${t.dashboard.reactivationOpportunities}: ${totalOpportunities}`}
                 </ThemedText>
                 <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                  {`Estimated recoverable: $${estimatedRecoverable.toLocaleString()}`}
+                  {`${t.dashboard.estimatedRecoverable}: $${estimatedRecoverable.toLocaleString()}`}
                 </ThemedText>
               </View>
               <Feather name="chevron-right" size={18} color={dt.textMuted} />
@@ -677,7 +677,7 @@ export default function DashboardScreen() {
         >
           <Feather name="bar-chart" size={14} color={dt.accent} />
           <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600", marginLeft: Spacing.sm, flex: 1 }}>
-            {"View Weekly Recap"}
+            {t.dashboard.viewWeeklyRecap}
           </ThemedText>
           <Feather name="chevron-right" size={16} color={dt.textMuted} />
         </Pressable>

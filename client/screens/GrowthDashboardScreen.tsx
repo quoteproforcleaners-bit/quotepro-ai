@@ -12,6 +12,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { useLanguage } from "@/context/LanguageContext";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -39,16 +40,16 @@ const TASK_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
   reactivation: "user-plus", follow_up: "phone", default: "check-circle",
 };
 
-function getTimeAgo(dateStr: string): string {
+function getTimeAgo(dateStr: string, t: any): string {
   const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t.growth.justNow;
+  if (mins < 60) return `${mins}${t.growth.minutesAgo}`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  if (hrs < 24) return `${hrs}${t.growth.hoursAgo}`;
+  return `${Math.floor(hrs / 24)}${t.growth.daysAgo}`;
 }
 
-function CircularProgress({ score, color, bgColor }: { score: number; color: string; bgColor: string }) {
+function CircularProgress({ score, color, bgColor, label }: { score: number; color: string; bgColor: string; label: string }) {
   const pct = Math.min(Math.max(score, 0), 100) / 100;
   return (
     <View style={{ width: 120, height: 120, alignItems: "center", justifyContent: "center" }}>
@@ -62,7 +63,7 @@ function CircularProgress({ score, color, bgColor }: { score: number; color: str
         borderLeftColor: pct >= 1 ? color : "transparent",
       }} />
       <ThemedText type="h1" style={{ fontWeight: "800" }}>{score}</ThemedText>
-      <ThemedText type="caption" style={{ color, fontWeight: "600", marginTop: -2 }}>{"Growth Score"}</ThemedText>
+      <ThemedText type="caption" style={{ color, fontWeight: "600", marginTop: -2 }}>{label}</ThemedText>
     </View>
   );
 }
@@ -73,6 +74,7 @@ export default function GrowthDashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const dt = useDesignTokens();
+  const { t } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: growthTasks = [], refetch: r1 } = useQuery<any[]>({ queryKey: ["/api/growth-tasks"] });
@@ -107,16 +109,16 @@ export default function GrowthDashboardScreen() {
   }, [pending, completed, forecast]);
 
   const opportunities = [
-    { label: "Reviews", count: reviewRequests.length, icon: "star" as const, color: theme.warning, nav: "ReviewsReferrals" },
-    { label: "Upsells", count: upsellOpps.length, icon: "trending-up" as const, color: theme.success, nav: "UpsellOpportunities" },
-    { label: "Rebook", count: rebookCandidates.length, icon: "repeat" as const, color: theme.primary, nav: "TasksQueue" },
-    { label: "Reactivation", count: dormantOpps.length, icon: "user-plus" as const, color: theme.error, nav: "ReactivationCampaigns" },
+    { label: t.growth.reviews, count: reviewRequests.length, icon: "star" as const, color: theme.warning, nav: "ReviewsReferrals" },
+    { label: t.growth.upsells, count: upsellOpps.length, icon: "trending-up" as const, color: theme.success, nav: "UpsellOpportunities" },
+    { label: t.growth.rebook, count: rebookCandidates.length, icon: "repeat" as const, color: theme.primary, nav: "TasksQueue" },
+    { label: t.growth.reactivation, count: dormantOpps.length, icon: "user-plus" as const, color: theme.error, nav: "ReactivationCampaigns" },
   ];
 
   const quickActions = [
-    { label: "Generate Tasks", icon: "zap" as const, screen: "TasksQueue", color: "#F59E0B" },
-    { label: "Send Campaign", icon: "send" as const, screen: "ReactivationCampaigns", color: "#10B981" },
-    { label: "View Automations", icon: "settings" as const, screen: "AutomationsHub", color: "#8B5CF6" },
+    { label: t.growth.generateTasks, icon: "zap" as const, screen: "TasksQueue", color: "#F59E0B" },
+    { label: t.growth.sendCampaign, icon: "send" as const, screen: "ReactivationCampaigns", color: "#10B981" },
+    { label: t.growth.viewAutomations, icon: "settings" as const, screen: "AutomationsHub", color: "#8B5CF6" },
   ];
 
   const cardStyle = (extra?: any) => [s.card, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderSecondary, ...(Platform.OS === "ios" ? dt.shadow : {}) }, extra];
@@ -152,12 +154,12 @@ export default function GrowthDashboardScreen() {
         </View>
 
         <View style={cardStyle({ flexDirection: "row", gap: Spacing.xl })}>
-          <CircularProgress score={growthScore} color={dt.accent} bgColor={dt.accentSoft} />
+          <CircularProgress score={growthScore} color={dt.accent} bgColor={dt.accentSoft} label={t.growth.growthScore} />
           <View style={{ flex: 1, gap: Spacing.sm }}>
             {[
-              { icon: "check-circle" as const, color: theme.success, text: `${completed.length} completed` },
-              { icon: "clock" as const, color: theme.warning, text: `${pending.length} pending` },
-              { icon: "percent" as const, color: dt.accent, text: `${Math.round((forecast?.closeRate || 0) * 100)}% close rate` },
+              { icon: "check-circle" as const, color: theme.success, text: `${completed.length} ${t.growth.completed}` },
+              { icon: "clock" as const, color: theme.warning, text: `${pending.length} ${t.growth.pending}` },
+              { icon: "percent" as const, color: dt.accent, text: `${Math.round((forecast?.closeRate || 0) * 100)}% ${t.growth.closeRate}` },
             ].map((r) => (
               <View key={r.text} style={s.row}>
                 <Feather name={r.icon} size={14} color={r.color} />
@@ -170,13 +172,13 @@ export default function GrowthDashboardScreen() {
         <Pressable onPress={() => navigation.navigate("TasksQueue")} style={cardStyle()} testID="todays-focus-card">
           <View style={s.sectionHeader}>
             <View style={{ flex: 1 }}>
-              <ThemedText type="subtitle" style={{ fontWeight: "700" }}>{"Today's Focus"}</ThemedText>
+              <ThemedText type="subtitle" style={{ fontWeight: "700" }}>{t.growth.todaysFocus}</ThemedText>
               <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                {pending.length > 0 ? `${pending.length} task${pending.length === 1 ? "" : "s"} pending` : "No pending tasks"}
+                {pending.length > 0 ? `${pending.length} ${pending.length === 1 ? t.growth.taskPending : t.growth.tasksPending}` : t.growth.noPendingTasks}
               </ThemedText>
             </View>
             <View style={[s.viewAll, { backgroundColor: dt.accentSoft }]}>
-              <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>{"View All"}</ThemedText>
+              <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>{t.growth.viewAll}</ThemedText>
               <Feather name="chevron-right" size={14} color={dt.accent} />
             </View>
           </View>
@@ -197,19 +199,19 @@ export default function GrowthDashboardScreen() {
           ) : (
             <View style={s.empty}>
               <Feather name="check-circle" size={20} color={theme.success} />
-              <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>{"All caught up!"}</ThemedText>
+              <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>{t.growth.allCaughtUp}</ThemedText>
             </View>
           )}
         </Pressable>
 
         <View style={cardStyle()}>
-          <ThemedText type="subtitle" style={{ fontWeight: "700", marginBottom: Spacing.md }}>{"Pipeline Snapshot"}</ThemedText>
+          <ThemedText type="subtitle" style={{ fontWeight: "700", marginBottom: Spacing.md }}>{t.growth.pipelineSnapshot}</ThemedText>
           <View style={s.grid}>
             {[
-              { label: "Open Quotes", value: `$${(forecast?.openQuoteValue || 0).toLocaleString()}` },
-              { label: "Forecasted", value: `$${(forecast?.forecastedRevenue || 0).toLocaleString()}` },
-              { label: "Close Rate", value: `${Math.round((forecast?.closeRate || 0) * 100)}%` },
-              { label: "Confidence", value: forecast?.confidenceBand || "---" },
+              { label: t.growth.openQuotes, value: `$${(forecast?.openQuoteValue || 0).toLocaleString()}` },
+              { label: t.growth.forecasted, value: `$${(forecast?.forecastedRevenue || 0).toLocaleString()}` },
+              { label: t.growth.closeRate, value: `${Math.round((forecast?.closeRate || 0) * 100)}%` },
+              { label: t.growth.confidence, value: forecast?.confidenceBand || "---" },
             ].map((stat) => (
               <View key={stat.label} style={[s.statCell, { backgroundColor: dt.surfaceSecondary }]}>
                 <ThemedText type="caption" style={{ color: dt.textSecondary }}>{stat.label}</ThemedText>
@@ -219,7 +221,7 @@ export default function GrowthDashboardScreen() {
           </View>
         </View>
 
-        <ThemedText type="subtitle" style={{ fontWeight: "700", paddingTop: Spacing.xs }}>{"Growth Opportunities"}</ThemedText>
+        <ThemedText type="subtitle" style={{ fontWeight: "700", paddingTop: Spacing.xs }}>{t.growth.growthOpportunities}</ThemedText>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.sm }}>
           {opportunities.map((c) => (
             <Pressable
@@ -239,7 +241,7 @@ export default function GrowthDashboardScreen() {
 
         {recentActivity.length > 0 ? (
           <View style={cardStyle()}>
-            <ThemedText type="subtitle" style={{ fontWeight: "700", marginBottom: Spacing.md }}>{"Recent Activity"}</ThemedText>
+            <ThemedText type="subtitle" style={{ fontWeight: "700", marginBottom: Spacing.md }}>{t.growth.recentActivity}</ThemedText>
             {recentActivity.map((item: any, i: number) => (
               <View key={item.id || i} style={[s.actRow, i > 0 ? { borderTopWidth: 1, borderTopColor: dt.borderSecondary } : {}]}>
                 <View style={[s.dot, { backgroundColor: dt.accent }]} />
@@ -247,7 +249,7 @@ export default function GrowthDashboardScreen() {
                   <ThemedText type="small" numberOfLines={1}>{item.title || item.taskType || "Activity"}</ThemedText>
                   <ThemedText type="caption" style={{ color: dt.textSecondary }}>{item.customerName || ""}</ThemedText>
                 </View>
-                <ThemedText type="caption" style={{ color: dt.textMuted }}>{getTimeAgo(item.completedAt || item.createdAt)}</ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textMuted }}>{getTimeAgo(item.completedAt || item.createdAt, t)}</ThemedText>
               </View>
             ))}
           </View>

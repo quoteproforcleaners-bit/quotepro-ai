@@ -40,7 +40,7 @@ export default function SettingsScreen() {
 
   const queryClient = useQueryClient();
 
-  const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const DAY_LABELS = [t.common.sunday, t.common.monday, t.common.tuesday, t.common.wednesday, t.common.thursday, t.common.friday, t.common.saturday];
   const TIME_OPTIONS = [
     { label: "6:00 AM", value: "06:00" },
     { label: "7:00 AM", value: "07:00" },
@@ -276,11 +276,11 @@ export default function SettingsScreen() {
 
           <View style={styles.proFeaturesList}>
             {[
-              { icon: "edit-3" as const, text: "AI-written emails and text messages" },
-              { icon: "send" as const, text: "Send quotes directly via email or SMS" },
-              { icon: "zap" as const, text: "AI-enhanced quote descriptions" },
-              { icon: "refresh-cw" as const, text: "Regenerate messages with one tap" },
-              { icon: "user" as const, text: "Personalized for each customer" },
+              { icon: "edit-3" as const, text: t.settings.aiWrittenMessages },
+              { icon: "send" as const, text: t.settings.sendQuotesDirect },
+              { icon: "zap" as const, text: t.settings.aiEnhancedDescriptions },
+              { icon: "refresh-cw" as const, text: t.settings.regenerateMessages },
+              { icon: "user" as const, text: t.settings.personalizedForCustomer },
             ].map((feature, i) => (
               <View key={i} style={styles.proFeatureItem}>
                 <View style={[styles.proFeatureCheck, { backgroundColor: `${theme.success}15` }]}>
@@ -340,10 +340,10 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Input
-        label="Company Name"
+        label={t.settings.companyName}
         value={profile.companyName}
         onChangeText={(v) => updateProfile({ companyName: v })}
-        placeholder="Your cleaning company"
+        placeholder={t.settings.companyNamePlaceholder}
         leftIcon="briefcase"
       />
 
@@ -598,10 +598,10 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Venmo
+              {t.settings.venmo}
             </ThemedText>
             <ThemedText type="small" style={{ color: profile.venmoHandle ? theme.success : theme.textSecondary }}>
-              {profile.venmoHandle ? `@${profile.venmoHandle}` : "Add your Venmo username"}
+              {profile.venmoHandle ? `@${profile.venmoHandle}` : t.settings.addVenmoUsername}
             </ThemedText>
           </View>
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -626,10 +626,10 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Cash App
+              {t.settings.cashApp}
             </ThemedText>
             <ThemedText type="small" style={{ color: profile.cashappHandle ? theme.success : theme.textSecondary }}>
-              {profile.cashappHandle ? `$${profile.cashappHandle}` : "Add your Cash App $cashtag"}
+              {profile.cashappHandle ? `$${profile.cashappHandle}` : t.settings.addCashAppTag}
             </ThemedText>
           </View>
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -639,9 +639,9 @@ export default function SettingsScreen() {
       <Modal visible={showVenmoModal} transparent animationType="fade" onRequestClose={() => setShowVenmoModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md }}>Venmo Username</ThemedText>
+            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md }}>{t.settings.venmoUsername}</ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
-              Enter your Venmo username so customers can pay you directly
+              {t.settings.venmoUsernameDesc}
             </ThemedText>
             <View style={[styles.handleInputRow, { borderColor: theme.border, backgroundColor: theme.backgroundDefault }]}>
               <ThemedText type="body" style={{ color: theme.textSecondary }}>@</ThemedText>
@@ -661,14 +661,14 @@ export default function SettingsScreen() {
                 onPress={() => setShowVenmoModal(false)}
                 style={[styles.modalButton, { backgroundColor: theme.backgroundDefault, flex: 1 }]}
               >
-                <ThemedText type="body" style={{ textAlign: "center" }}>Cancel</ThemedText>
+                <ThemedText type="body" style={{ textAlign: "center" }}>{t.common.cancel}</ThemedText>
               </Pressable>
               <Pressable
                 onPress={handleSaveVenmo}
                 style={[styles.modalButton, { backgroundColor: "#008CFF", flex: 1 }]}
                 testID="button-save-venmo"
               >
-                <ThemedText type="body" style={{ color: "#FFFFFF", textAlign: "center", fontWeight: "600" }}>Save</ThemedText>
+                <ThemedText type="body" style={{ color: "#FFFFFF", textAlign: "center", fontWeight: "600" }}>{t.common.save}</ThemedText>
               </Pressable>
             </View>
             {profile.venmoHandle ? (
@@ -680,7 +680,7 @@ export default function SettingsScreen() {
                 }}
                 style={{ marginTop: Spacing.md, alignItems: "center" }}
               >
-                <ThemedText type="small" style={{ color: theme.error }}>Remove Venmo</ThemedText>
+                <ThemedText type="small" style={{ color: theme.error }}>{t.settings.removeVenmo}</ThemedText>
               </Pressable>
             ) : null}
           </View>
@@ -690,9 +690,9 @@ export default function SettingsScreen() {
       <Modal visible={showCashappModal} transparent animationType="fade" onRequestClose={() => setShowCashappModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md }}>Cash App $cashtag</ThemedText>
+            <ThemedText type="subtitle" style={{ marginBottom: Spacing.md }}>{t.settings.cashAppCashtag}</ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
-              Enter your Cash App $cashtag so customers can pay you directly
+              {t.settings.cashAppCashtagDesc}
             </ThemedText>
             <View style={[styles.handleInputRow, { borderColor: theme.border, backgroundColor: theme.backgroundDefault }]}>
               <ThemedText type="body" style={{ color: theme.textSecondary }}>$</ThemedText>
@@ -712,14 +712,14 @@ export default function SettingsScreen() {
                 onPress={() => setShowCashappModal(false)}
                 style={[styles.modalButton, { backgroundColor: theme.backgroundDefault, flex: 1 }]}
               >
-                <ThemedText type="body" style={{ textAlign: "center" }}>Cancel</ThemedText>
+                <ThemedText type="body" style={{ textAlign: "center" }}>{t.common.cancel}</ThemedText>
               </Pressable>
               <Pressable
                 onPress={handleSaveCashapp}
                 style={[styles.modalButton, { backgroundColor: "#00D632", flex: 1 }]}
                 testID="button-save-cashapp"
               >
-                <ThemedText type="body" style={{ color: "#FFFFFF", textAlign: "center", fontWeight: "600" }}>Save</ThemedText>
+                <ThemedText type="body" style={{ color: "#FFFFFF", textAlign: "center", fontWeight: "600" }}>{t.common.save}</ThemedText>
               </Pressable>
             </View>
             {profile.cashappHandle ? (
@@ -731,14 +731,14 @@ export default function SettingsScreen() {
                 }}
                 style={{ marginTop: Spacing.md, alignItems: "center" }}
               >
-                <ThemedText type="small" style={{ color: theme.error }}>Remove Cash App</ThemedText>
+                <ThemedText type="small" style={{ color: theme.error }}>{t.settings.removeCashApp}</ThemedText>
               </Pressable>
             ) : null}
           </View>
         </View>
       </Modal>
 
-      <SectionHeader title="Payment Options" subtitle="Choose which payment methods appear on quotes" />
+      <SectionHeader title={t.settings.paymentOptions} subtitle={t.settings.paymentOptionsSubtitle} />
 
       <Pressable
         onPress={() => setShowPaymentOptions(!showPaymentOptions)}
@@ -751,10 +751,10 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Accepted Payment Methods
+              {t.settings.acceptedPaymentMethods}
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              {(Object.keys(currentPaymentOptions) as (keyof PaymentOptions)[]).filter(k => currentPaymentOptions[k]?.enabled).length} methods enabled
+              {(Object.keys(currentPaymentOptions) as (keyof PaymentOptions)[]).filter(k => currentPaymentOptions[k]?.enabled).length} {t.settings.methodsEnabled}
             </ThemedText>
           </View>
           <Feather name={showPaymentOptions ? "chevron-up" : "chevron-down"} size={20} color={theme.textSecondary} />
@@ -791,13 +791,13 @@ export default function SettingsScreen() {
 
           <View style={{ padding: Spacing.md }}>
             <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs, fontWeight: "600" }}>
-              Payment Notes (optional)
+              {t.settings.paymentNotesLabel}
             </ThemedText>
             <RNTextInput
               value={paymentNotesInput}
               onChangeText={setPaymentNotesInput}
               onBlur={() => updateBusinessProfile({ paymentNotes: paymentNotesInput || null })}
-              placeholder="e.g., Payment due upon completion of service"
+              placeholder={t.settings.paymentNotesPlaceholder}
               placeholderTextColor={theme.textSecondary}
               style={[styles.paymentNotesInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.backgroundDefault }]}
               multiline
@@ -808,14 +808,14 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
-      <SectionHeader title="Notifications" subtitle="Control when you get reminders" />
+      <SectionHeader title={t.notifications.title} subtitle={t.settings.notificationsSubtitle} />
 
       <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
         <View style={styles.prefRow}>
           <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>Daily Follow-Up Reminder</ThemedText>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.settings.dailyFollowUpReminder}</ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
-              {"Get reminded each morning to follow up"}
+              {t.settings.dailyFollowUpReminderDesc}
             </ThemedText>
           </View>
           <Switch
@@ -834,9 +834,9 @@ export default function SettingsScreen() {
             testID="button-pulse-time"
           >
             <Feather name="clock" size={16} color={theme.textSecondary} />
-            <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm }}>Reminder time</ThemedText>
+            <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm }}>{t.notifications.reminderTime}</ThemedText>
             <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-              {TIME_OPTIONS.find((t) => t.value === currentPrefs.dailyPulseTime)?.label || currentPrefs.dailyPulseTime}
+              {TIME_OPTIONS.find((opt) => opt.value === currentPrefs.dailyPulseTime)?.label || currentPrefs.dailyPulseTime}
             </ThemedText>
             <Feather name="chevron-down" size={16} color={theme.textSecondary} style={{ marginLeft: 4 }} />
           </Pressable>
@@ -862,9 +862,9 @@ export default function SettingsScreen() {
 
         <View style={styles.prefRow}>
           <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>Weekly Recap</ThemedText>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.settings.weeklyRecapLabel}</ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
-              {"See how your week went"}
+              {t.settings.weeklyRecapDesc}
             </ThemedText>
           </View>
           <Switch
@@ -883,9 +883,9 @@ export default function SettingsScreen() {
             testID="button-recap-day"
           >
             <Feather name="calendar" size={16} color={theme.textSecondary} />
-            <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm }}>Recap day</ThemedText>
+            <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm }}>{t.notifications.recapDay}</ThemedText>
             <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-              {DAY_LABELS[currentPrefs.weeklyRecapDay] || "Monday"}
+              {DAY_LABELS[currentPrefs.weeklyRecapDay] || t.common.monday}
             </ThemedText>
             <Feather name="chevron-down" size={16} color={theme.textSecondary} style={{ marginLeft: 4 }} />
           </Pressable>
@@ -911,9 +911,9 @@ export default function SettingsScreen() {
 
         <View style={styles.prefRow}>
           <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>Quiet Hours</ThemedText>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.settings.quietHoursLabel}</ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
-              {"No notifications during these hours"}
+              {t.settings.quietHoursDesc}
             </ThemedText>
           </View>
           <Switch
@@ -935,7 +935,7 @@ export default function SettingsScreen() {
         ) : null}
       </View>
 
-      <SectionHeader title="Follow-Up Behavior" subtitle="Customize how follow-ups and opportunities work" />
+      <SectionHeader title={t.settings.followUpBehavior} subtitle={t.settings.followUpBehaviorSubtitle} />
 
       <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
         <Pressable
@@ -944,13 +944,13 @@ export default function SettingsScreen() {
           testID="button-dormant-threshold"
         >
           <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>Dormant Customer Threshold</ThemedText>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.settings.dormantCustomerThreshold}</ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
-              {"How long before a customer is considered dormant"}
+              {t.settings.dormantCustomerThresholdDesc}
             </ThemedText>
           </View>
           <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-            {`${currentPrefs.dormantThresholdDays} days`}
+            {`${currentPrefs.dormantThresholdDays} ${t.common.days}`}
           </ThemedText>
         </Pressable>
 
@@ -963,7 +963,7 @@ export default function SettingsScreen() {
                 style={[styles.pickerOption, { backgroundColor: currentPrefs.dormantThresholdDays === days ? `${theme.primary}15` : "transparent" }]}
               >
                 <ThemedText type="small" style={{ fontWeight: currentPrefs.dormantThresholdDays === days ? "700" : "400", color: currentPrefs.dormantThresholdDays === days ? theme.primary : theme.text }}>
-                  {`${days} days`}
+                  {`${days} ${t.common.days}`}
                 </ThemedText>
               </Pressable>
             ))}
@@ -971,7 +971,7 @@ export default function SettingsScreen() {
         ) : null}
       </View>
 
-      <SectionHeader title="Growth & Automations" subtitle="Configure your growth engine" />
+      <SectionHeader title={t.settings.growthAndAutomations} subtitle={t.settings.growthAndAutomationsSubtitle} />
 
       <Pressable
         onPress={() => navigation.navigate("AutomationsHub" as any)}
@@ -984,10 +984,10 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Automations Hub
+              {t.settings.automationsHubLabel}
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              Marketing mode, workflows, guardrails
+              {t.settings.automationsHubDesc}
             </ThemedText>
           </View>
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -1005,10 +1005,10 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Sales Strategy
+              {t.settings.salesStrategyLabel}
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              Message tone, escalation engine
+              {t.settings.salesStrategyDesc}
             </ThemedText>
           </View>
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -1128,13 +1128,13 @@ export default function SettingsScreen() {
           type="small"
           style={[styles.version, { color: theme.textSecondary }]}
         >
-          Version 1.0.0
+          {t.settings.version} 1.0.0
         </ThemedText>
         <ThemedText
           type="small"
           style={{ color: theme.textSecondary, marginTop: Spacing.md }}
         >
-          Professional quoting for residential cleaning businesses.
+          {t.settings.appDescription}
         </ThemedText>
       </View>
     </KeyboardAwareScrollViewCompat>
