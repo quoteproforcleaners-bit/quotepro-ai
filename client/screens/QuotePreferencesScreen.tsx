@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { View, StyleSheet, Switch, TextInput, RefreshControl, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Switch, TextInput, RefreshControl, ActivityIndicator, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -38,6 +38,13 @@ interface QuotePreferences {
   termsText: string;
   brandColor: string;
 }
+
+const BRAND_COLORS = [
+  "#2563EB", "#3B82F6", "#0EA5E9", "#06B6D4", "#14B8A6", "#10B981",
+  "#22C55E", "#84CC16", "#EAB308", "#F59E0B", "#F97316", "#EF4444",
+  "#DC2626", "#E11D48", "#EC4899", "#D946EF", "#A855F7", "#8B5CF6",
+  "#6366F1", "#4F46E5", "#1E3A5F", "#1E293B", "#374151", "#6B7280",
+];
 
 const defaultPreferences: QuotePreferences = {
   showLogo: true,
@@ -149,14 +156,38 @@ export default function QuotePreferencesScreen() {
         <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>
           Set a brand color that appears on your customer-facing quotes.
         </ThemedText>
-        <View style={styles.colorRow}>
+        <View style={styles.colorPalette}>
+          {BRAND_COLORS.map((color) => {
+            const isSelected = prefs.brandColor.toUpperCase() === color.toUpperCase();
+            return (
+              <Pressable
+                key={color}
+                testID={`color-${color}`}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updatePref("brandColor", color);
+                }}
+                style={[
+                  styles.colorSwatch,
+                  { backgroundColor: color },
+                  isSelected ? styles.colorSwatchSelected : undefined,
+                ]}
+              >
+                {isSelected ? (
+                  <Feather name="check" size={18} color="#FFFFFF" />
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={[styles.colorRow, { marginTop: Spacing.md }]}>
           <TextInput
             testID="input-brand-color"
             value={prefs.brandColor}
             onChangeText={(t) => updatePref("brandColor", t)}
             placeholder="#2563EB"
             placeholderTextColor={dt.textSecondary}
-            autoCapitalize="none"
+            autoCapitalize="characters"
             style={[styles.colorInput, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
           />
           <View style={[styles.colorPreview, { backgroundColor: prefs.brandColor || "#2563EB", borderColor: dt.border }]} />
@@ -215,6 +246,9 @@ const styles = StyleSheet.create({
   sectionTitle: { marginBottom: Spacing.md, marginTop: Spacing.lg },
   sectionCard: { marginBottom: Spacing.sm },
   toggleRow: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.md },
+  colorPalette: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
+  colorSwatch: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  colorSwatchSelected: { borderWidth: 3, borderColor: "#FFFFFF" },
   colorRow: { flexDirection: "row", alignItems: "center", gap: Spacing.md },
   colorInput: { flex: 1, borderWidth: 1, borderRadius: BorderRadius.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: 14 },
   colorPreview: { width: 44, height: 44, borderRadius: BorderRadius.xs, borderWidth: 1 },
