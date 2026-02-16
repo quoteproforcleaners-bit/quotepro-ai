@@ -114,9 +114,9 @@ export default function GrowthDashboardScreen() {
   ];
 
   const quickActions = [
-    { label: "Generate Tasks", icon: "zap" as const, screen: "TasksQueue" },
-    { label: "Send Campaign", icon: "send" as const, screen: "ReactivationCampaigns" },
-    { label: "View Automations", icon: "settings" as const, screen: "AutomationsHub" },
+    { label: "Generate Tasks", icon: "zap" as const, screen: "TasksQueue", color: "#F59E0B" },
+    { label: "Send Campaign", icon: "send" as const, screen: "ReactivationCampaigns", color: "#10B981" },
+    { label: "View Automations", icon: "settings" as const, screen: "AutomationsHub", color: "#8B5CF6" },
   ];
 
   const cardStyle = (extra?: any) => [s.card, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderSecondary, ...(Platform.OS === "ios" ? dt.shadow : {}) }, extra];
@@ -128,6 +128,22 @@ export default function GrowthDashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
+        <View style={{ flexDirection: "row", gap: Spacing.sm }}>
+          {quickActions.map((a) => (
+            <Pressable
+              key={a.label}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigation.navigate(a.screen); }}
+              style={({ pressed }) => [s.quickAction, { backgroundColor: pressed ? `${a.color}25` : `${a.color}12`, borderColor: `${a.color}30` }]}
+              testID={`quick-${a.label.toLowerCase().replace(/\s/g, "-")}`}
+            >
+              <View style={[s.quickActionIcon, { backgroundColor: `${a.color}20` }]}>
+                <Feather name={a.icon} size={18} color={a.color} />
+              </View>
+              <ThemedText type="caption" style={{ color: dt.textPrimary, fontWeight: "700", marginTop: Spacing.xs }} numberOfLines={1}>{a.label}</ThemedText>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={cardStyle({ flexDirection: "row", gap: Spacing.xl })}>
           <CircularProgress score={growthScore} color={dt.accent} bgColor={dt.accentSoft} />
           <View style={{ flex: 1, gap: Spacing.sm }}>
@@ -230,20 +246,7 @@ export default function GrowthDashboardScreen() {
           </View>
         ) : null}
 
-        <ThemedText type="subtitle" style={{ fontWeight: "700", paddingTop: Spacing.xs }}>{"Quick Actions"}</ThemedText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.sm, paddingBottom: Spacing.sm }}>
-          {quickActions.map((a) => (
-            <Pressable
-              key={a.label}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigation.navigate(a.screen); }}
-              style={({ pressed }) => [s.chip, { backgroundColor: pressed ? dt.accentSoft : dt.chipBg, borderColor: dt.chipBorder }]}
-              testID={`quick-${a.label.toLowerCase().replace(/\s/g, "-")}`}
-            >
-              <Feather name={a.icon} size={14} color={dt.accent} />
-              <ThemedText type="caption" style={{ color: dt.textPrimary, fontWeight: "500", marginLeft: 6 }}>{a.label}</ThemedText>
-            </Pressable>
-          ))}
-        </ScrollView>
+        
       </ScrollView>
     </LinearGradient>
   );
@@ -263,5 +266,6 @@ const s = StyleSheet.create({
   oppCard: { width: 110, padding: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1, alignItems: "center" },
   actRow: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.sm, gap: Spacing.sm },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  chip: { flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.full, borderWidth: 1 },
+  quickAction: { flex: 1, alignItems: "center", paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.xl, borderWidth: 1.5 },
+  quickActionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
 });
