@@ -202,16 +202,10 @@ export default function MainTabNavigator() {
           title: t.tabs.growth,
           headerTitle: t.tabs.growth,
           tabBarIcon: ({ color, size, focused }) => (
-            <View style={[styles.growthButton, { backgroundColor: focused ? theme.primary : `${theme.primary}18` }]}>
-              <Feather name="trending-up" size={22} color={focused ? "#FFF" : theme.primary} />
+            <View style={[styles.growthButton, { backgroundColor: focused ? theme.primary : `${theme.primary}15` }]}>
+              <Feather name="trending-up" size={20} color={focused ? "#FFF" : theme.primary} />
             </View>
           ),
-          tabBarLabel: () => null,
-          tabBarItemStyle: {
-            paddingVertical: 4,
-            gap: 2,
-            top: -8,
-          },
         }}
         listeners={{ tabPress: handleTabPress }}
       />
@@ -265,9 +259,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   growthButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
   },
