@@ -19,6 +19,7 @@ import UpsellOpportunitiesScreen from "@/screens/UpsellOpportunitiesScreen";
 import ReactivationScreen from "@/screens/ReactivationScreen";
 import AutomationsHubScreen from "@/screens/AutomationsHubScreen";
 import SalesStrategyScreen from "@/screens/SalesStrategyScreen";
+import QuotePreferencesScreen from "@/screens/QuotePreferencesScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
@@ -45,6 +46,7 @@ export type RootStackParamList = {
   ReactivationCampaigns: undefined;
   AutomationsHub: undefined;
   SalesStrategy: undefined;
+  QuotePreferences: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -200,6 +202,13 @@ export default function RootStackNavigator() {
             component={SalesStrategyScreen}
             options={{
               headerTitle: "Sales Strategy",
+            }}
+          />
+          <Stack.Screen
+            name="QuotePreferences"
+            component={QuotePreferencesScreen}
+            options={{
+              headerTitle: "Quote Preferences",
             }}
           />
         </>

@@ -2579,6 +2579,9 @@ Respond with JSON: {"reply": string}`
 
   app.get("/api/google-calendar/connect", requireAuth, async (req: Request, res: Response) => {
     try {
+      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return res.status(503).json({ message: "Google Calendar is not set up yet. Add your Google API credentials in Settings to sync your calendar." });
+      }
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
@@ -2680,7 +2683,7 @@ Respond with JSON: {"reply": string}`
 
   app.post("/api/stripe/connect", requireAuth, async (req: Request, res: Response) => {
     try {
-      if (!stripe) return res.status(503).json({ message: "Stripe is not set up yet. Go to Settings > Integrations and add your Stripe API keys to start accepting payments." });
+      if (!stripe) return res.status(503).json({ message: "Stripe is not configured. Please add your Stripe API keys to enable payments." });
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
@@ -3071,6 +3074,43 @@ Respond with JSON: {"reply": string}`
     } catch (error: any) {
       console.error("Create analytics event error:", error);
       return res.status(500).json({ message: "Failed to create analytics event" });
+    }
+  });
+
+  // ─── Quote Preferences ───
+
+  app.get("/api/quote-preferences", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const stored = (business as any).quotePreferences;
+      return res.json(stored || {
+        showLogo: true,
+        showCompanyName: true,
+        showAddress: true,
+        showPhone: true,
+        showEmail: true,
+        showSignatureLine: false,
+        showEstimatedTime: false,
+        showPaymentOptions: true,
+        showBookingLink: false,
+        showTerms: false,
+        termsText: "",
+        brandColor: "#2563EB",
+      });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get quote preferences" });
+    }
+  });
+
+  app.put("/api/quote-preferences", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      await updateBusiness(business.id, { quotePreferences: req.body });
+      return res.json(req.body);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update quote preferences" });
     }
   });
 

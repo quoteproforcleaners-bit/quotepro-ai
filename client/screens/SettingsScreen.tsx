@@ -109,6 +109,7 @@ export default function SettingsScreen() {
   });
 
   const [stripeError, setStripeError] = useState<string | null>(null);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
   const [showVenmoModal, setShowVenmoModal] = useState(false);
   const [showCashappModal, setShowCashappModal] = useState(false);
   const [venmoInput, setVenmoInput] = useState(profile.venmoHandle || "");
@@ -167,6 +168,7 @@ export default function SettingsScreen() {
 
   const handleConnectCalendar = async () => {
     try {
+      setCalendarError(null);
       const res = await fetch(new URL("/api/google-calendar/connect", getApiUrl()).toString(), {
         credentials: "include",
       });
@@ -174,9 +176,13 @@ export default function SettingsScreen() {
       if (data.url) {
         await WebBrowser.openBrowserAsync(data.url);
         refetchCalendar();
+      } else if (data.message) {
+        setCalendarError(data.message);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } catch (e) {
-      console.error("Calendar connect error", e);
+      setCalendarError("Could not connect to Google Calendar. Please try again.");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -513,6 +519,14 @@ export default function SettingsScreen() {
           </View>
         </Pressable>
       )}
+
+      {calendarError ? (
+        <View style={{ backgroundColor: `${theme.error}15`, padding: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
+          <ThemedText type="small" style={{ color: theme.error, textAlign: "center" }}>
+            {calendarError}
+          </ThemedText>
+        </View>
+      ) : null}
 
       {stripeStatus?.connected ? (
         <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>

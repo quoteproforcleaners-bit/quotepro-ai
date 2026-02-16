@@ -1,7 +1,10 @@
 import React, { useCallback, useMemo } from "react";
 import { View, Platform, StyleSheet, Text } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
+import { HeaderButton } from "@react-navigation/elements";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import Animated, {
@@ -93,6 +96,16 @@ function TabIcon({ name, color, size, focused, isHome, badgeCount }: {
         </View>
       ) : null}
     </View>
+  );
+}
+
+function QuotesHeaderRight() {
+  const { theme } = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  return (
+    <HeaderButton onPress={() => navigation.navigate("QuotePreferences")}>
+      <Feather name="settings" size={22} color={theme.primary} />
+    </HeaderButton>
   );
 }
 
@@ -205,6 +218,7 @@ export default function MainTabNavigator() {
         options={{
           title: t.tabs.quotes,
           headerTitle: t.tabs.quotes,
+          headerRight: () => <QuotesHeaderRight />,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="file-text" color={color} size={size} focused={focused} />
           ),

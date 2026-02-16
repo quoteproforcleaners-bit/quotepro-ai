@@ -53,6 +53,7 @@ export const businesses = pgTable("businesses", {
   cashappHandle: text("cashapp_handle"),
   paymentOptions: jsonb("payment_options"),
   paymentNotes: text("payment_notes"),
+  quotePreferences: jsonb("quote_preferences"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

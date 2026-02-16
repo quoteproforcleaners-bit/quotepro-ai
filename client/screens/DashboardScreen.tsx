@@ -406,7 +406,7 @@ export default function DashboardScreen() {
         executeCommand("How many cleans booked this month?");
         break;
       case "draft":
-        navigation.navigate("AIAssistant");
+        navigation.navigate("Main", { screen: "CustomersTab" });
         break;
       case "schedule":
         navigation.navigate("Main", { screen: "JobsTab" });
