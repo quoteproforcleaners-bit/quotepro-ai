@@ -680,7 +680,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const customerMap: Record<string, string> = {};
       for (const cid of customerIds) {
         const c = await getCustomerById(cid);
-        if (c) customerMap[cid] = c.name;
+        if (c) customerMap[cid] = `${c.firstName} ${c.lastName}`.trim();
       }
       const enriched = list.map(q => ({
         ...q,
@@ -1719,11 +1719,11 @@ ${paymentHtml}
           return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
         });
         const jobsThisMonth = completedJobs.filter(j => {
-          const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
+          const d = j.endDatetime ? new Date(j.endDatetime) : new Date(j.updatedAt);
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
         const jobsLastMonth = completedJobs.filter(j => {
-          const d = j.completedAt ? new Date(j.completedAt) : new Date(j.updatedAt);
+          const d = j.endDatetime ? new Date(j.endDatetime) : new Date(j.updatedAt);
           const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
           return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
         });
