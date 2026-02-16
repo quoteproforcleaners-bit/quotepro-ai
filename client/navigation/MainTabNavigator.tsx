@@ -1,5 +1,5 @@
-import React, { useCallback } from "react";
-import { View, Platform, StyleSheet } from "react-native";
+import React, { useCallback, useMemo } from "react";
+import { View, Platform, StyleSheet, Text } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
@@ -10,6 +10,7 @@ import Animated, {
   withSpring,
   WithSpringConfig,
 } from "react-native-reanimated";
+import { useQuery } from "@tanstack/react-query";
 import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
 import QuotesScreen from "@/screens/QuotesScreen";
@@ -39,12 +40,13 @@ const pillSpring: WithSpringConfig = {
   overshootClamping: false,
 };
 
-function TabIcon({ name, color, size, focused, isHome }: {
+function TabIcon({ name, color, size, focused, isHome, badgeCount }: {
   name: keyof typeof Feather.glyphMap;
   color: string;
   size: number;
   focused: boolean;
   isHome?: boolean;
+  badgeCount?: number;
 }) {
   const { theme } = useTheme();
   const scale = useSharedValue(focused ? 1 : 0);
@@ -64,6 +66,8 @@ function TabIcon({ name, color, size, focused, isHome }: {
     transform: [{ scale: iconScale.value }],
   }));
 
+  const showBadge = badgeCount != null && badgeCount > 0;
+
   return (
     <View style={styles.tabIconWrapper}>
       <Animated.View
@@ -81,6 +85,13 @@ function TabIcon({ name, color, size, focused, isHome }: {
           <Feather name="zap" size={8} color="#FFF" />
         </View>
       ) : null}
+      {showBadge ? (
+        <View style={styles.notifBadge}>
+          <Text style={styles.notifBadgeText}>
+            {badgeCount > 99 ? "99+" : String(badgeCount)}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -89,6 +100,11 @@ export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
   const screenOptions = useScreenOptions();
   const { t } = useLanguage();
+
+  const { data: growthTasks = [] } = useQuery<any[]>({ queryKey: ["/api/growth-tasks"] });
+  const pendingTaskCount = useMemo(() =>
+    (growthTasks || []).filter((t: any) => t.status === "pending").length,
+  [growthTasks]);
 
   const handleTabPress = useCallback(() => {
     if (Platform.OS !== "web") {
@@ -214,7 +230,7 @@ export default function MainTabNavigator() {
           title: t.tabs.growth,
           headerTitle: t.tabs.growth,
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="trending-up" color={color} size={size} focused={focused} />
+            <TabIcon name="trending-up" color={color} size={size} focused={focused} badgeCount={pendingTaskCount} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
@@ -255,5 +271,25 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     alignItems: "center",
     justifyContent: "center",
+  },
+  notifBadge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#FF3B30",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  notifBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 12,
   },
 });

@@ -140,6 +140,13 @@ export default function GrowthDashboardScreen() {
                 <Feather name={a.icon} size={18} color={a.color} />
               </View>
               <ThemedText type="caption" style={{ color: dt.textPrimary, fontWeight: "700", marginTop: Spacing.xs }} numberOfLines={1}>{a.label}</ThemedText>
+              {a.screen === "TasksQueue" && pending.length > 0 ? (
+                <View style={s.redBadge}>
+                  <ThemedText type="caption" style={s.redBadgeText}>
+                    {pending.length > 99 ? "99+" : String(pending.length)}
+                  </ThemedText>
+                </View>
+              ) : null}
             </Pressable>
           ))}
         </View>
@@ -266,6 +273,8 @@ const s = StyleSheet.create({
   oppCard: { width: 110, padding: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1, alignItems: "center" },
   actRow: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.sm, gap: Spacing.sm },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  quickAction: { flex: 1, alignItems: "center", paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.xl, borderWidth: 1.5 },
+  quickAction: { flex: 1, alignItems: "center", paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.xl, borderWidth: 1.5, position: "relative" as const },
   quickActionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  redBadge: { position: "absolute" as const, top: -6, right: -4, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#FF3B30", alignItems: "center" as const, justifyContent: "center" as const, paddingHorizontal: 5, borderWidth: 2, borderColor: "#FFFFFF" },
+  redBadgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" as const, lineHeight: 13 },
 });
