@@ -487,6 +487,113 @@ export const badges = pgTable("badges", {
   earnedAt: timestamp("earned_at").defaultNow().notNull(),
 });
 
+export const growthTasks = pgTable("growth_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  customerId: varchar("customer_id").references(() => customers.id),
+  quoteId: varchar("quote_id").references(() => quotes.id),
+  jobId: varchar("job_id").references(() => jobs.id),
+  type: text("type").notNull(),
+  status: text("status").notNull().default("pending"),
+  channel: text("channel").notNull().default("sms"),
+  dueAt: timestamp("due_at"),
+  priority: integer("priority").notNull().default(50),
+  escalationStage: integer("escalation_stage").notNull().default(1),
+  maxEscalation: integer("max_escalation").notNull().default(4),
+  templateKey: text("template_key"),
+  message: text("message").notNull().default(""),
+  estimatedValue: real("estimated_value").notNull().default(0),
+  snoozedUntil: timestamp("snoozed_until"),
+  completedAt: timestamp("completed_at"),
+  lastActionAt: timestamp("last_action_at"),
+  metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const growthTaskEvents = pgTable("growth_task_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull().references(() => growthTasks.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  channel: text("channel"),
+  metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const reviewRequests = pgTable("review_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  customerId: varchar("customer_id").references(() => customers.id),
+  jobId: varchar("job_id").references(() => jobs.id),
+  status: text("status").notNull().default("pending"),
+  rating: integer("rating"),
+  feedbackText: text("feedback_text"),
+  reviewClicked: boolean("review_clicked").notNull().default(false),
+  reviewClickedAt: timestamp("review_clicked_at"),
+  referralSent: boolean("referral_sent").notNull().default(false),
+  referralSentAt: timestamp("referral_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const customerMarketingPrefs = pgTable("customer_marketing_prefs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  customerId: varchar("customer_id").notNull().references(() => customers.id),
+  doNotContact: boolean("do_not_contact").notNull().default(false),
+  preferredChannel: text("preferred_channel").notNull().default("sms"),
+  lastReviewRequestAt: timestamp("last_review_request_at"),
+  reviewRequestCooldownDays: integer("review_request_cooldown_days").notNull().default(90),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const growthAutomationSettings = pgTable("growth_automation_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+  marketingModeEnabled: boolean("marketing_mode_enabled").notNull().default(false),
+  abandonedQuoteRecovery: boolean("abandoned_quote_recovery").notNull().default(true),
+  weeklyReactivation: boolean("weekly_reactivation").notNull().default(true),
+  reviewRequestWorkflow: boolean("review_request_workflow").notNull().default(true),
+  referralAskWorkflow: boolean("referral_ask_workflow").notNull().default(true),
+  rebookNudges: boolean("rebook_nudges").notNull().default(true),
+  upsellTriggers: boolean("upsell_triggers").notNull().default(true),
+  quietHoursStart: text("quiet_hours_start").notNull().default("21:00"),
+  quietHoursEnd: text("quiet_hours_end").notNull().default("08:00"),
+  maxSendsPerDay: integer("max_sends_per_day").notNull().default(5),
+  maxFollowUpsPerQuote: integer("max_follow_ups_per_quote").notNull().default(3),
+  rebookNudgeDaysMin: integer("rebook_nudge_days_min").notNull().default(21),
+  rebookNudgeDaysMax: integer("rebook_nudge_days_max").notNull().default(35),
+  deepCleanIntervalMonths: integer("deep_clean_interval_months").notNull().default(6),
+  googleReviewLink: text("google_review_link").notNull().default(""),
+  connectedSendingEnabled: boolean("connected_sending_enabled").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const salesStrategySettings = pgTable("sales_strategy_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+  selectedProfile: text("selected_profile").notNull().default("professional"),
+  escalationEnabled: boolean("escalation_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const campaigns = pgTable("campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  name: text("name").notNull(),
+  segment: text("segment").notNull(),
+  channel: text("channel").notNull().default("sms"),
+  templateKey: text("template_key"),
+  status: text("status").notNull().default("draft"),
+  taskCount: integer("task_count").notNull().default(0),
+  completedCount: integer("completed_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   name: true,
@@ -523,3 +630,10 @@ export type Streak = typeof streaks.$inferSelect;
 export type UserPreference = typeof userPreferences.$inferSelect;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type Badge = typeof badges.$inferSelect;
+export type GrowthTask = typeof growthTasks.$inferSelect;
+export type GrowthTaskEvent = typeof growthTaskEvents.$inferSelect;
+export type ReviewRequest = typeof reviewRequests.$inferSelect;
+export type CustomerMarketingPref = typeof customerMarketingPrefs.$inferSelect;
+export type GrowthAutomationSetting = typeof growthAutomationSettings.$inferSelect;
+export type SalesStrategySetting = typeof salesStrategySettings.$inferSelect;
+export type Campaign = typeof campaigns.$inferSelect;

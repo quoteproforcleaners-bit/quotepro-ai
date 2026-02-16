@@ -1,0 +1,210 @@
+You are enhancing my existing React Native / Expo iOS app “QuotePro for Cleaners”.
+
+CONTEXT:
+The app already supports:
+- Quotes
+- Customers
+- Revenue dashboard
+- AI message drafting
+- Follow-up queue
+- Growth automations (review, rebook, upsell, reactivation, abandoned quote recovery)
+- Task engine
+- Notifications
+- Streak tracking
+
+We are adding a structured Sales Strategy Profile system that controls tone AND escalation logic across all automations.
+
+GOAL:
+Help users:
+- Feel more confident
+- Close more deals
+- Raise prices
+- Avoid feeling pushy
+
+We will implement:
+Sales Strategy Profiles + Controlled Escalation Engine (Apple-safe, no auto-send SMS).
+
+----------------------------------------
+PART 1 — SALES STRATEGY PROFILE SYSTEM
+----------------------------------------
+
+Add new setting under:
+Settings → Growth → Sales Strategy
+
+User selects one profile:
+
+1) Relationship Builder
+   - Warm, friendly tone
+   - Longer spacing between follow-ups
+   - No hard scarcity
+   - Emphasis on service and relationship
+
+2) Professional & Confident (DEFAULT)
+   - Direct but respectful
+   - Moderate follow-up cadence
+   - Light urgency by day 5
+   - Clear next-step language
+
+3) Premium Authority
+   - High-value positioning
+   - Fewer follow-ups
+   - Minimal discount language
+   - Emphasis on quality & demand
+
+4) Fast Close / Urgency
+   - Short follow-up intervals
+   - Clear expiration framing
+   - Strong “should I close this out?” messaging
+   - More assertive CTA
+
+Persist selection in SQLite:
+Table: sales_strategy_settings
+Fields:
+- id
+- selected_profile
+- escalation_enabled (boolean, default true)
+
+----------------------------------------
+PART 2 — CONTROLLED ESCALATION ENGINE
+----------------------------------------
+
+Implement logic that escalates tone automatically over time,
+while respecting selected Sales Strategy profile.
+
+Example (Professional & Confident):
+
+Day 1 → Friendly reminder
+Day 3 → Confident clarification
+Day 5 → Value reinforcement
+Day 7 → Soft urgency
+Day 10 → Close-out message
+
+Example (Premium Authority):
+
+Day 1 → Confident reminder
+Day 5 → “Limited availability”
+Day 8 → Close-out
+
+Escalation must:
+- Increase clarity and directness
+- Never become rude
+- Never violate platform rules
+- Always allow user override
+
+----------------------------------------
+PART 3 — MESSAGE GENERATION LOGIC
+----------------------------------------
+
+When generating any automated message (follow-up, reactivation, upsell, review request):
+
+Use:
+generateMessage({
+  strategyProfile,
+  escalationStage,
+  messageType,
+  customerContext
+})
+
+Where:
+- strategyProfile = selected Sales Strategy
+- escalationStage = 1,2,3,4
+- messageType = QUOTE_FOLLOWUP | REACTIVATION | REBOOK | UPSELL | REVIEW | REFERRAL
+- customerContext includes:
+   firstName
+   quoteTotal
+   serviceType
+   lastServiceDate
+   homeSize (if available)
+
+AI should:
+- Adjust tone and wording based on profile
+- Escalate firmness based on stage
+- Keep SMS <= 240 chars
+- Keep email <= 120 words
+- Avoid sounding robotic
+
+----------------------------------------
+PART 4 — USER OVERRIDE
+----------------------------------------
+
+On every generated message screen:
+
+Show:
+
+Sales Strategy: Professional & Confident
+Escalation Stage: 2 of 4
+
+Add:
+[Change Tone] button
+
+If tapped:
+Allow user to temporarily switch tone for this message only.
+
+Do not change global setting unless saved.
+
+----------------------------------------
+PART 5 — UI POLISH
+----------------------------------------
+
+On Settings screen:
+
+Add clean card:
+
+---------------------------------
+Sales Strategy
+Professional & Confident ▼
+---------------------------------
+
+Under it:
+Small explanation text:
+
+“Choose how your business positions itself when following up with customers.”
+
+Make UI modern:
+- Card with rounded corners
+- Subtle shadow
+- Clear typography
+- Professional look (better than Jobber)
+
+----------------------------------------
+PART 6 — MONETIZATION FLAG
+----------------------------------------
+
+Add feature flag:
+
+ENABLE_ADVANCED_STRATEGY_PROFILES
+
+If false:
+Only Professional & Confident available.
+
+If true:
+All profiles unlocked.
+
+----------------------------------------
+PART 7 — ANALYTICS
+----------------------------------------
+
+Track:
+
+trackEvent("sales_strategy_changed", { profile })
+trackEvent("message_escalation_stage", { stage })
+trackEvent("message_override_used")
+trackEvent("strategy_profile_used", { profile, messageType })
+
+----------------------------------------
+OUTPUT REQUIRED
+----------------------------------------
+
+Return:
+1) Updated SQLite schema
+2) Strategy engine logic
+3) Message generator function
+4) Settings screen component
+5) Override modal component
+6) Example generated messages for each profile + stage
+7) Integration points with existing task engine
+
+Keep everything incremental.
+No architecture rewrite.
+iOS-safe messaging only.
+Professional UI improvements.

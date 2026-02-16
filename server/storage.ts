@@ -41,6 +41,20 @@ import {
   type UserPreference,
   type AnalyticsEvent,
   type Badge,
+  growthTasks,
+  growthTaskEvents,
+  reviewRequests,
+  customerMarketingPrefs,
+  growthAutomationSettings,
+  salesStrategySettings,
+  campaigns,
+  type GrowthTask,
+  type GrowthTaskEvent,
+  type ReviewRequest,
+  type CustomerMarketingPref,
+  type GrowthAutomationSetting,
+  type SalesStrategySetting,
+  type Campaign,
 } from "@shared/schema";
 
 export async function getUserById(id: string): Promise<User | undefined> {
@@ -1424,4 +1438,557 @@ export async function getLostQuotes(
     .orderBy(desc(quotes.updatedAt));
 
   return lostQuotes;
+}
+
+// ─── Growth Tasks ───
+
+export async function getGrowthTasksByBusiness(
+  businessId: string,
+  opts?: { type?: string; status?: string; customerId?: string }
+): Promise<GrowthTask[]> {
+  const conditions = [eq(growthTasks.businessId, businessId)];
+  if (opts?.type) conditions.push(eq(growthTasks.type, opts.type));
+  if (opts?.status) conditions.push(eq(growthTasks.status, opts.status));
+  if (opts?.customerId) conditions.push(eq(growthTasks.customerId, opts.customerId));
+
+  return db
+    .select()
+    .from(growthTasks)
+    .where(and(...conditions))
+    .orderBy(desc(growthTasks.priority), asc(growthTasks.dueAt));
+}
+
+export async function getGrowthTaskById(id: string): Promise<GrowthTask | undefined> {
+  const [t] = await db.select().from(growthTasks).where(eq(growthTasks.id, id));
+  return t;
+}
+
+export async function createGrowthTask(data: {
+  businessId: string;
+  customerId?: string;
+  quoteId?: string;
+  jobId?: string;
+  type: string;
+  channel?: string;
+  dueAt?: Date;
+  priority?: number;
+  escalationStage?: number;
+  maxEscalation?: number;
+  templateKey?: string;
+  message?: string;
+  estimatedValue?: number;
+  metadata?: any;
+}): Promise<GrowthTask> {
+  const [t] = await db
+    .insert(growthTasks)
+    .values({
+      businessId: data.businessId,
+      customerId: data.customerId || null,
+      quoteId: data.quoteId || null,
+      jobId: data.jobId || null,
+      type: data.type,
+      channel: data.channel || "sms",
+      dueAt: data.dueAt || null,
+      priority: data.priority || 50,
+      escalationStage: data.escalationStage || 1,
+      maxEscalation: data.maxEscalation || 4,
+      templateKey: data.templateKey || null,
+      message: data.message || "",
+      estimatedValue: data.estimatedValue || 0,
+      metadata: data.metadata || {},
+    })
+    .returning();
+  return t;
+}
+
+export async function updateGrowthTask(
+  id: string,
+  data: Partial<{
+    status: string;
+    channel: string;
+    priority: number;
+    escalationStage: number;
+    message: string;
+    snoozedUntil: Date | null;
+    completedAt: Date | null;
+    lastActionAt: Date | null;
+    metadata: any;
+  }>
+): Promise<GrowthTask> {
+  const [t] = await db
+    .update(growthTasks)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(growthTasks.id, id))
+    .returning();
+  return t;
+}
+
+export async function deleteGrowthTask(id: string): Promise<void> {
+  await db.delete(growthTasks).where(eq(growthTasks.id, id));
+}
+
+export async function getActiveGrowthTasksForQuote(quoteId: string): Promise<GrowthTask[]> {
+  return db
+    .select()
+    .from(growthTasks)
+    .where(
+      and(
+        eq(growthTasks.quoteId, quoteId),
+        eq(growthTasks.status, "pending")
+      )
+    );
+}
+
+export async function getActiveGrowthTasksForCustomer(customerId: string): Promise<GrowthTask[]> {
+  return db
+    .select()
+    .from(growthTasks)
+    .where(
+      and(
+        eq(growthTasks.customerId, customerId),
+        or(
+          eq(growthTasks.status, "pending"),
+          eq(growthTasks.status, "snoozed")
+        )
+      )
+    );
+}
+
+export async function countTodayTasksForCustomer(businessId: string, customerId: string): Promise<number> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const results = await db
+    .select()
+    .from(growthTasks)
+    .where(
+      and(
+        eq(growthTasks.businessId, businessId),
+        eq(growthTasks.customerId, customerId),
+        gte(growthTasks.lastActionAt, today),
+        lte(growthTasks.lastActionAt, tomorrow)
+      )
+    );
+  return results.length;
+}
+
+// ─── Growth Task Events ───
+
+export async function createGrowthTaskEvent(data: {
+  taskId: string;
+  action: string;
+  channel?: string;
+  metadata?: any;
+}): Promise<GrowthTaskEvent> {
+  const [e] = await db
+    .insert(growthTaskEvents)
+    .values({
+      taskId: data.taskId,
+      action: data.action,
+      channel: data.channel || null,
+      metadata: data.metadata || {},
+    })
+    .returning();
+  return e;
+}
+
+export async function getEventsByTask(taskId: string): Promise<GrowthTaskEvent[]> {
+  return db
+    .select()
+    .from(growthTaskEvents)
+    .where(eq(growthTaskEvents.taskId, taskId))
+    .orderBy(desc(growthTaskEvents.createdAt));
+}
+
+// ─── Review Requests ───
+
+export async function getReviewRequestsByBusiness(businessId: string): Promise<ReviewRequest[]> {
+  return db
+    .select()
+    .from(reviewRequests)
+    .where(eq(reviewRequests.businessId, businessId))
+    .orderBy(desc(reviewRequests.createdAt));
+}
+
+export async function getReviewRequestByJob(jobId: string): Promise<ReviewRequest | undefined> {
+  const [r] = await db
+    .select()
+    .from(reviewRequests)
+    .where(eq(reviewRequests.jobId, jobId));
+  return r;
+}
+
+export async function createReviewRequest(data: {
+  businessId: string;
+  customerId?: string;
+  jobId?: string;
+  status?: string;
+}): Promise<ReviewRequest> {
+  const [r] = await db
+    .insert(reviewRequests)
+    .values({
+      businessId: data.businessId,
+      customerId: data.customerId || null,
+      jobId: data.jobId || null,
+      status: data.status || "pending",
+    })
+    .returning();
+  return r;
+}
+
+export async function updateReviewRequest(
+  id: string,
+  data: Partial<{
+    status: string;
+    rating: number;
+    feedbackText: string;
+    reviewClicked: boolean;
+    reviewClickedAt: Date;
+    referralSent: boolean;
+    referralSentAt: Date;
+  }>
+): Promise<ReviewRequest> {
+  const [r] = await db
+    .update(reviewRequests)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(reviewRequests.id, id))
+    .returning();
+  return r;
+}
+
+// ─── Customer Marketing Prefs ───
+
+export async function getMarketingPrefsByCustomer(customerId: string): Promise<CustomerMarketingPref | undefined> {
+  const [p] = await db
+    .select()
+    .from(customerMarketingPrefs)
+    .where(eq(customerMarketingPrefs.customerId, customerId));
+  return p;
+}
+
+export async function upsertMarketingPrefs(
+  businessId: string,
+  customerId: string,
+  data: Partial<{
+    doNotContact: boolean;
+    preferredChannel: string;
+    lastReviewRequestAt: Date;
+    reviewRequestCooldownDays: number;
+  }>
+): Promise<CustomerMarketingPref> {
+  const existing = await getMarketingPrefsByCustomer(customerId);
+  if (existing) {
+    const [p] = await db
+      .update(customerMarketingPrefs)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(customerMarketingPrefs.id, existing.id))
+      .returning();
+    return p;
+  }
+  const [p] = await db
+    .insert(customerMarketingPrefs)
+    .values({ businessId, customerId, ...data })
+    .returning();
+  return p;
+}
+
+// ─── Growth Automation Settings ───
+
+export async function getGrowthAutomationSettings(businessId: string): Promise<GrowthAutomationSetting | undefined> {
+  const [s] = await db
+    .select()
+    .from(growthAutomationSettings)
+    .where(eq(growthAutomationSettings.businessId, businessId));
+  return s;
+}
+
+export async function upsertGrowthAutomationSettings(
+  businessId: string,
+  data: Partial<{
+    marketingModeEnabled: boolean;
+    abandonedQuoteRecovery: boolean;
+    weeklyReactivation: boolean;
+    reviewRequestWorkflow: boolean;
+    referralAskWorkflow: boolean;
+    rebookNudges: boolean;
+    upsellTriggers: boolean;
+    quietHoursStart: string;
+    quietHoursEnd: string;
+    maxSendsPerDay: number;
+    maxFollowUpsPerQuote: number;
+    rebookNudgeDaysMin: number;
+    rebookNudgeDaysMax: number;
+    deepCleanIntervalMonths: number;
+    googleReviewLink: string;
+    connectedSendingEnabled: boolean;
+  }>
+): Promise<GrowthAutomationSetting> {
+  const existing = await getGrowthAutomationSettings(businessId);
+  if (existing) {
+    const [s] = await db
+      .update(growthAutomationSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(growthAutomationSettings.businessId, businessId))
+      .returning();
+    return s;
+  }
+  const [s] = await db
+    .insert(growthAutomationSettings)
+    .values({ businessId, ...data })
+    .returning();
+  return s;
+}
+
+// ─── Sales Strategy Settings ───
+
+export async function getSalesStrategy(businessId: string): Promise<SalesStrategySetting | undefined> {
+  const [s] = await db
+    .select()
+    .from(salesStrategySettings)
+    .where(eq(salesStrategySettings.businessId, businessId));
+  return s;
+}
+
+export async function upsertSalesStrategy(
+  businessId: string,
+  data: Partial<{
+    selectedProfile: string;
+    escalationEnabled: boolean;
+  }>
+): Promise<SalesStrategySetting> {
+  const existing = await getSalesStrategy(businessId);
+  if (existing) {
+    const [s] = await db
+      .update(salesStrategySettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(salesStrategySettings.businessId, businessId))
+      .returning();
+    return s;
+  }
+  const [s] = await db
+    .insert(salesStrategySettings)
+    .values({ businessId, ...data })
+    .returning();
+  return s;
+}
+
+// ─── Campaigns ───
+
+export async function getCampaignsByBusiness(businessId: string): Promise<Campaign[]> {
+  return db
+    .select()
+    .from(campaigns)
+    .where(eq(campaigns.businessId, businessId))
+    .orderBy(desc(campaigns.createdAt));
+}
+
+export async function getCampaignById(id: string): Promise<Campaign | undefined> {
+  const [c] = await db.select().from(campaigns).where(eq(campaigns.id, id));
+  return c;
+}
+
+export async function createCampaign(data: {
+  businessId: string;
+  name: string;
+  segment: string;
+  channel?: string;
+  templateKey?: string;
+  taskCount?: number;
+}): Promise<Campaign> {
+  const [c] = await db
+    .insert(campaigns)
+    .values({
+      businessId: data.businessId,
+      name: data.name,
+      segment: data.segment,
+      channel: data.channel || "sms",
+      templateKey: data.templateKey || null,
+      taskCount: data.taskCount || 0,
+    })
+    .returning();
+  return c;
+}
+
+export async function updateCampaign(
+  id: string,
+  data: Partial<{
+    name: string;
+    status: string;
+    completedCount: number;
+  }>
+): Promise<Campaign> {
+  const [c] = await db
+    .update(campaigns)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(campaigns.id, id))
+    .returning();
+  return c;
+}
+
+// ─── Growth Utility Functions ───
+
+export async function getUpsellOpportunities(businessId: string): Promise<any[]> {
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  const allCustomers = await db
+    .select()
+    .from(customers)
+    .where(eq(customers.businessId, businessId));
+
+  const results: any[] = [];
+
+  for (const c of allCustomers) {
+    const customerJobs = await db
+      .select()
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.customerId, c.id),
+          eq(jobs.businessId, businessId)
+        )
+      )
+      .orderBy(desc(jobs.startDatetime));
+
+    if (customerJobs.length === 0) continue;
+
+    const deepCleanJobs = customerJobs.filter(j => j.jobType === "deep_clean");
+    const lastDeepClean = deepCleanJobs.length > 0 ? deepCleanJobs[0] : null;
+
+    if (!lastDeepClean || lastDeepClean.startDatetime < sixMonthsAgo) {
+      const avgTicket = customerJobs.reduce((sum, j) => sum + (j.total || 0), 0) / customerJobs.length;
+      const lastDeepCleanDate = lastDeepClean?.startDatetime || null;
+      const daysSince = lastDeepCleanDate
+        ? Math.floor((Date.now() - lastDeepCleanDate.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+
+      results.push({
+        customer: c,
+        lastDeepClean: lastDeepCleanDate,
+        daysSince,
+        avgTicket: Math.round(avgTicket * 100) / 100,
+      });
+    }
+  }
+
+  return results;
+}
+
+export async function getAutoRebookCandidates(
+  businessId: string,
+  minDays: number,
+  maxDays: number
+): Promise<any[]> {
+  const minDate = new Date();
+  minDate.setDate(minDate.getDate() - maxDays);
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() - minDays);
+
+  const allCustomers = await db
+    .select()
+    .from(customers)
+    .where(eq(customers.businessId, businessId));
+
+  const results: any[] = [];
+
+  for (const c of allCustomers) {
+    const customerJobs = await db
+      .select()
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.customerId, c.id),
+          eq(jobs.businessId, businessId)
+        )
+      )
+      .orderBy(desc(jobs.startDatetime));
+
+    if (customerJobs.length === 0) continue;
+
+    const lastJob = customerJobs[0];
+    const lastJobDate = lastJob.endDatetime || lastJob.startDatetime;
+
+    if (lastJobDate && lastJobDate >= minDate && lastJobDate <= maxDate) {
+      const hasRecurrence = customerJobs.some(j => j.recurrence && j.recurrence !== "none");
+      if (hasRecurrence) continue;
+
+      const pendingRebookTasks = await db
+        .select()
+        .from(growthTasks)
+        .where(
+          and(
+            eq(growthTasks.customerId, c.id),
+            eq(growthTasks.type, "REBOOK_NUDGE"),
+            eq(growthTasks.status, "pending")
+          )
+        );
+
+      if (pendingRebookTasks.length > 0) continue;
+
+      results.push({
+        customer: c,
+        lastJobDate,
+        lastJobTotal: lastJob.total || 0,
+      });
+    }
+  }
+
+  return results;
+}
+
+export async function getForecastData(businessId: string): Promise<{
+  openQuoteValue: number;
+  closeRate: number;
+  forecastedRevenue: number;
+  confidenceLow: number;
+  confidenceHigh: number;
+  scheduledJobsValue: number;
+}> {
+  const openQuotes = await db
+    .select()
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.businessId, businessId),
+        eq(quotes.status, "sent")
+      )
+    );
+
+  const openQuoteValue = openQuotes.reduce((sum, q) => sum + q.total, 0);
+
+  const allQuotes = await db
+    .select()
+    .from(quotes)
+    .where(eq(quotes.businessId, businessId));
+
+  const accepted = allQuotes.filter(q => q.status === "accepted").length;
+  const responded = allQuotes.filter(q => q.status === "accepted" || q.status === "declined").length;
+  const closeRate = responded > 0 ? (accepted / responded) * 100 : 0;
+
+  const forecastedRevenue = openQuoteValue * (closeRate / 100);
+  const confidenceLow = forecastedRevenue * 0.8;
+  const confidenceHigh = forecastedRevenue * 1.2;
+
+  const scheduledJobs = await db
+    .select()
+    .from(jobs)
+    .where(
+      and(
+        eq(jobs.businessId, businessId),
+        eq(jobs.status, "scheduled")
+      )
+    );
+
+  const scheduledJobsValue = scheduledJobs.reduce((sum, j) => sum + (j.total || 0), 0);
+
+  return {
+    openQuoteValue: Math.round(openQuoteValue * 100) / 100,
+    closeRate: Math.round(closeRate * 10) / 10,
+    forecastedRevenue: Math.round(forecastedRevenue * 100) / 100,
+    confidenceLow: Math.round(confidenceLow * 100) / 100,
+    confidenceHigh: Math.round(confidenceHigh * 100) / 100,
+    scheduledJobsValue: Math.round(scheduledJobsValue * 100) / 100,
+  };
 }

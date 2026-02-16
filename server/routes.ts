@@ -92,6 +92,32 @@ import {
   getWeeklyRecapStats,
   getDormantCustomers,
   getLostQuotes,
+  getGrowthTasksByBusiness,
+  getGrowthTaskById,
+  createGrowthTask,
+  updateGrowthTask,
+  deleteGrowthTask,
+  getActiveGrowthTasksForQuote,
+  countTodayTasksForCustomer,
+  createGrowthTaskEvent,
+  getEventsByTask,
+  getReviewRequestsByBusiness,
+  getReviewRequestByJob,
+  createReviewRequest,
+  updateReviewRequest,
+  getMarketingPrefsByCustomer,
+  upsertMarketingPrefs,
+  getGrowthAutomationSettings,
+  upsertGrowthAutomationSettings,
+  getSalesStrategy,
+  upsertSalesStrategy,
+  getCampaignsByBusiness,
+  getCampaignById,
+  createCampaign,
+  updateCampaign,
+  getUpsellOpportunities,
+  getAutoRebookCandidates,
+  getForecastData,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -3126,6 +3152,381 @@ Respond with JSON: {"reply": string}`
     } catch (error: any) {
       console.error("Toggle do-not-contact error:", error);
       return res.status(500).json({ message: "Failed to update do-not-contact" });
+    }
+  });
+
+  // ─── Growth Tasks API ───
+
+  app.get("/api/growth-tasks", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { type, status } = req.query as any;
+      const list = await getGrowthTasksByBusiness(business.id, { type, status });
+      return res.json(list);
+    } catch (error: any) {
+      console.error("Get growth tasks error:", error);
+      return res.status(500).json({ message: "Failed to get growth tasks" });
+    }
+  });
+
+  app.get("/api/growth-tasks/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const task = await getGrowthTaskById(req.params.id);
+      if (!task) return res.status(404).json({ message: "Growth task not found" });
+      return res.json(task);
+    } catch (error: any) {
+      console.error("Get growth task error:", error);
+      return res.status(500).json({ message: "Failed to get growth task" });
+    }
+  });
+
+  app.post("/api/growth-tasks", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { type, customerId, quoteId, jobId, channel, dueAt, priority, escalationStage, message, estimatedValue, metadata } = req.body;
+      const task = await createGrowthTask({
+        businessId: business.id,
+        type,
+        customerId,
+        quoteId,
+        jobId,
+        channel,
+        dueAt: dueAt ? new Date(dueAt) : undefined,
+        priority,
+        escalationStage,
+        message,
+        estimatedValue,
+        metadata,
+      });
+      return res.json(task);
+    } catch (error: any) {
+      console.error("Create growth task error:", error);
+      return res.status(500).json({ message: "Failed to create growth task" });
+    }
+  });
+
+  app.put("/api/growth-tasks/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const existing = await getGrowthTaskById(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Growth task not found" });
+      const { status, channel, priority, escalationStage, message, snoozedUntil, completedAt, lastActionAt } = req.body;
+      const updated = await updateGrowthTask(req.params.id, {
+        status,
+        channel,
+        priority,
+        escalationStage,
+        message,
+        snoozedUntil: snoozedUntil ? new Date(snoozedUntil) : undefined,
+        completedAt: completedAt ? new Date(completedAt) : undefined,
+        lastActionAt: lastActionAt ? new Date(lastActionAt) : undefined,
+      });
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Update growth task error:", error);
+      return res.status(500).json({ message: "Failed to update growth task" });
+    }
+  });
+
+  app.delete("/api/growth-tasks/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const existing = await getGrowthTaskById(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Growth task not found" });
+      await deleteGrowthTask(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      console.error("Delete growth task error:", error);
+      return res.status(500).json({ message: "Failed to delete growth task" });
+    }
+  });
+
+  app.post("/api/growth-tasks/:id/action", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const task = await getGrowthTaskById(req.params.id);
+      if (!task) return res.status(404).json({ message: "Growth task not found" });
+      const { action, channel } = req.body;
+      await createGrowthTaskEvent({ taskId: task.id, action, channel });
+      const updateData: any = { lastActionAt: new Date() };
+      if (action === "completed") {
+        updateData.status = "completed";
+        updateData.completedAt = new Date();
+      }
+      const updated = await updateGrowthTask(task.id, updateData);
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Record growth task action error:", error);
+      return res.status(500).json({ message: "Failed to record action" });
+    }
+  });
+
+  app.post("/api/growth-tasks/:id/snooze", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const task = await getGrowthTaskById(req.params.id);
+      if (!task) return res.status(404).json({ message: "Growth task not found" });
+      const { hours } = req.body;
+      const snoozedUntil = new Date();
+      snoozedUntil.setHours(snoozedUntil.getHours() + (hours || 1));
+      const updated = await updateGrowthTask(task.id, { status: "snoozed", snoozedUntil });
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Snooze growth task error:", error);
+      return res.status(500).json({ message: "Failed to snooze task" });
+    }
+  });
+
+  // ─── Review Requests API ───
+
+  app.get("/api/review-requests", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const list = await getReviewRequestsByBusiness(business.id);
+      return res.json(list);
+    } catch (error: any) {
+      console.error("Get review requests error:", error);
+      return res.status(500).json({ message: "Failed to get review requests" });
+    }
+  });
+
+  app.post("/api/review-requests", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { customerId, jobId } = req.body;
+      const request = await createReviewRequest({ businessId: business.id, customerId, jobId });
+      return res.json(request);
+    } catch (error: any) {
+      console.error("Create review request error:", error);
+      return res.status(500).json({ message: "Failed to create review request" });
+    }
+  });
+
+  app.put("/api/review-requests/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { rating, feedbackText, reviewClicked, referralSent } = req.body;
+      const updateData: any = {};
+      if (rating !== undefined) updateData.rating = rating;
+      if (feedbackText !== undefined) updateData.feedbackText = feedbackText;
+      if (reviewClicked) {
+        updateData.reviewClicked = true;
+        updateData.reviewClickedAt = new Date();
+      }
+      if (referralSent) {
+        updateData.referralSent = true;
+        updateData.referralSentAt = new Date();
+      }
+      const updated = await updateReviewRequest(req.params.id, updateData);
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Update review request error:", error);
+      return res.status(500).json({ message: "Failed to update review request" });
+    }
+  });
+
+  // ─── Customer Marketing Prefs API ───
+
+  app.get("/api/customers/:id/marketing-prefs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const prefs = await getMarketingPrefsByCustomer(req.params.id);
+      return res.json(prefs || null);
+    } catch (error: any) {
+      console.error("Get marketing prefs error:", error);
+      return res.status(500).json({ message: "Failed to get marketing prefs" });
+    }
+  });
+
+  app.put("/api/customers/:id/marketing-prefs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { doNotContact, preferredChannel, reviewRequestCooldownDays } = req.body;
+      const prefs = await upsertMarketingPrefs(business.id, req.params.id, { doNotContact, preferredChannel, reviewRequestCooldownDays });
+      return res.json(prefs);
+    } catch (error: any) {
+      console.error("Update marketing prefs error:", error);
+      return res.status(500).json({ message: "Failed to update marketing prefs" });
+    }
+  });
+
+  // ─── Growth Automation Settings API ───
+
+  app.get("/api/growth-automation-settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const settings = await getGrowthAutomationSettings(business.id);
+      return res.json(settings || null);
+    } catch (error: any) {
+      console.error("Get growth automation settings error:", error);
+      return res.status(500).json({ message: "Failed to get growth automation settings" });
+    }
+  });
+
+  app.put("/api/growth-automation-settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const existing = await getGrowthAutomationSettings(business.id);
+      const wasMarketingModeEnabled = existing?.marketingModeEnabled || false;
+      const settings = await upsertGrowthAutomationSettings(business.id, req.body);
+      if (req.body.marketingModeEnabled === true && !wasMarketingModeEnabled) {
+        console.log(`[Growth] Marketing mode enabled for business ${business.id} - batch default growth tasks creation pending`);
+      }
+      return res.json(settings);
+    } catch (error: any) {
+      console.error("Update growth automation settings error:", error);
+      return res.status(500).json({ message: "Failed to update growth automation settings" });
+    }
+  });
+
+  // ─── Sales Strategy API ───
+
+  app.get("/api/sales-strategy", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const strategy = await getSalesStrategy(business.id);
+      return res.json(strategy || null);
+    } catch (error: any) {
+      console.error("Get sales strategy error:", error);
+      return res.status(500).json({ message: "Failed to get sales strategy" });
+    }
+  });
+
+  app.put("/api/sales-strategy", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { selectedProfile, escalationEnabled } = req.body;
+      const strategy = await upsertSalesStrategy(business.id, { selectedProfile, escalationEnabled });
+      return res.json(strategy);
+    } catch (error: any) {
+      console.error("Update sales strategy error:", error);
+      return res.status(500).json({ message: "Failed to update sales strategy" });
+    }
+  });
+
+  // ─── Campaigns API ───
+
+  app.get("/api/campaigns", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const list = await getCampaignsByBusiness(business.id);
+      return res.json(list);
+    } catch (error: any) {
+      console.error("Get campaigns error:", error);
+      return res.status(500).json({ message: "Failed to get campaigns" });
+    }
+  });
+
+  app.post("/api/campaigns", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { name, segment, channel, templateKey } = req.body;
+      const campaign = await createCampaign({ businessId: business.id, name, segment, channel, templateKey });
+      return res.json(campaign);
+    } catch (error: any) {
+      console.error("Create campaign error:", error);
+      return res.status(500).json({ message: "Failed to create campaign" });
+    }
+  });
+
+  app.put("/api/campaigns/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const existing = await getCampaignById(req.params.id);
+      if (!existing) return res.status(404).json({ message: "Campaign not found" });
+      const { name, status, completedCount } = req.body;
+      const updated = await updateCampaign(req.params.id, { name, status, completedCount });
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Update campaign error:", error);
+      return res.status(500).json({ message: "Failed to update campaign" });
+    }
+  });
+
+  // ─── Utility APIs ───
+
+  app.get("/api/upsell-opportunities", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const opportunities = await getUpsellOpportunities(business.id);
+      return res.json(opportunities);
+    } catch (error: any) {
+      console.error("Get upsell opportunities error:", error);
+      return res.status(500).json({ message: "Failed to get upsell opportunities" });
+    }
+  });
+
+  app.get("/api/rebook-candidates", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const minDays = parseInt(req.query.minDays as string) || 21;
+      const maxDays = parseInt(req.query.maxDays as string) || 35;
+      const candidates = await getAutoRebookCandidates(business.id, minDays, maxDays);
+      return res.json(candidates);
+    } catch (error: any) {
+      console.error("Get rebook candidates error:", error);
+      return res.status(500).json({ message: "Failed to get rebook candidates" });
+    }
+  });
+
+  app.get("/api/forecast", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const forecast = await getForecastData(business.id);
+      return res.json(forecast);
+    } catch (error: any) {
+      console.error("Get forecast error:", error);
+      return res.status(500).json({ message: "Failed to get forecast data" });
+    }
+  });
+
+  // ─── AI Message Generation ───
+
+  app.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { messageType, customerContext, strategyProfile, escalationStage, channel } = req.body;
+      const msgChannel = channel || "sms";
+      const profile = strategyProfile || "warm";
+      const stage = escalationStage || 1;
+
+      const toneMap: Record<string, string> = {
+        warm: "warm",
+        direct: "direct",
+        premium: "premium",
+        urgent: "urgent",
+      };
+      const tone = toneMap[profile] || "warm";
+
+      const lengthInstruction = msgChannel === "sms"
+        ? "Keep under 240 characters."
+        : "Keep under 120 words.";
+
+      const systemPrompt = `You are a professional message writer for a residential cleaning business. Generate a ${msgChannel} message. Strategy: ${profile}. Escalation stage: ${stage} of 4. Message type: ${messageType}. Keep it ${tone} based on profile. ${lengthInstruction} Never be rude. Use the customer's first name.`;
+
+      const userPrompt = `Customer first name: ${customerContext?.firstName || "there"}. ${customerContext?.quoteTotal ? `Quote total: $${customerContext.quoteTotal}.` : ""} ${customerContext?.serviceType ? `Service type: ${customerContext.serviceType}.` : ""} ${customerContext?.lastServiceDate ? `Last service date: ${customerContext.lastServiceDate}.` : ""} ${customerContext?.homeSize ? `Home size: ${customerContext.homeSize}.` : ""}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "openai/gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 300,
+        temperature: 0.7,
+      });
+
+      const generatedMessage = completion.choices[0]?.message?.content?.trim() || "";
+      return res.json({ message: generatedMessage, channel: msgChannel });
+    } catch (error: any) {
+      console.error("AI generate message error:", error);
+      return res.status(500).json({ message: "Failed to generate message" });
     }
   });
 
