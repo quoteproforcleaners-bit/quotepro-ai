@@ -1653,7 +1653,7 @@ ${paymentHtml}
 
   app.post("/api/ai/generate-followup", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
-      const { quoteId, channel, context } = req.body;
+      const { quoteId, channel, context, language: commLang } = req.body;
       if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
 
       const quote = await getQuoteById(quoteId);
@@ -1665,13 +1665,14 @@ ${paymentHtml}
 
       const msgType = channel === "email" ? "email" : "SMS";
       const maxLen = channel === "email" ? 200 : 160;
+      const langInstruction = commLang === "es" ? " Write the message entirely in Spanish." : " Write the message entirely in English.";
 
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
         messages: [
           {
             role: "system",
-            content: `Write a ${msgType} follow-up message (under ${maxLen} chars for SMS) for "${business?.companyName || "our company"}". The quote is $${quote.total} sent ${ageDays} days ago. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}".${context ? ` Context: ${context}` : ""}`
+            content: `Write a ${msgType} follow-up message (under ${maxLen} chars for SMS) for "${business?.companyName || "our company"}". The quote is $${quote.total} sent ${ageDays} days ago. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}".${context ? ` Context: ${context}` : ""}${langInstruction}`
           },
           {
             role: "user",
@@ -2015,7 +2016,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
 
   app.post("/api/ai/communication-draft", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
-      const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, paymentMethodsText } = req.body;
+      const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, paymentMethodsText, language: commLang } = req.body;
 
       if (!type || !purpose) {
         return res.status(400).json({ message: "type and purpose are required" });
@@ -2040,11 +2041,13 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
 
       const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
 
+      const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
+
       if (type === "sms") {
-        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}`;
+        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${langInstruction}`;
         userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
       } else {
-        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""} Start with "Subject: " on line 1, blank line, then body.`;
+        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
         userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
       }
 
@@ -3551,7 +3554,7 @@ Respond with JSON: {"reply": string}`
 
   app.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { messageType, customerContext, strategyProfile, escalationStage, channel } = req.body;
+      const { messageType, customerContext, strategyProfile, escalationStage, channel, language: commLang } = req.body;
       const msgChannel = channel || "sms";
       const profile = strategyProfile || "warm";
       const stage = escalationStage || 1;
@@ -3568,7 +3571,8 @@ Respond with JSON: {"reply": string}`
         ? "Keep under 240 characters."
         : "Keep under 120 words.";
 
-      const systemPrompt = `You are a professional message writer for a residential cleaning business. Generate a ${msgChannel} message. Strategy: ${profile}. Escalation stage: ${stage} of 4. Message type: ${messageType}. Keep it ${tone} based on profile. ${lengthInstruction} Never be rude. Use the customer's first name.`;
+      const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
+      const systemPrompt = `You are a professional message writer for a residential cleaning business. Generate a ${msgChannel} message. Strategy: ${profile}. Escalation stage: ${stage} of 4. Message type: ${messageType}. Keep it ${tone} based on profile. ${lengthInstruction} Never be rude. Use the customer's first name.${langInstruction}`;
 
       const userPrompt = `Customer first name: ${customerContext?.firstName || "there"}. ${customerContext?.quoteTotal ? `Quote total: $${customerContext.quoteTotal}.` : ""} ${customerContext?.serviceType ? `Service type: ${customerContext.serviceType}.` : ""} ${customerContext?.lastServiceDate ? `Last service date: ${customerContext.lastServiceDate}.` : ""} ${customerContext?.homeSize ? `Home size: ${customerContext.homeSize}.` : ""}`;
 

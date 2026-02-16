@@ -22,6 +22,7 @@ import { getPaymentOptions, getEnabledPaymentMethods, PAYMENT_METHOD_LABELS } fr
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 type RouteParams = {
   QuoteDetail: { quoteId: string };
@@ -62,6 +63,7 @@ export default function QuoteDetailScreen() {
   const { businessProfile } = useApp();
   const { user } = useAuth();
   const { isPro } = useSubscription();
+  const { communicationLanguage } = useLanguage();
   const queryClient = useQueryClient();
 
   const [aiDraft, setAiDraft] = useState<string | null>(null);
@@ -200,6 +202,7 @@ export default function QuoteDetailScreen() {
           const enabled = getEnabledPaymentMethods(po);
           return enabled.length > 0 ? enabled.map(({ label }) => label).join(", ") : "";
         })(),
+        language: communicationLanguage,
       });
       const data = await res.json();
       if (data.draft) {

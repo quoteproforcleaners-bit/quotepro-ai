@@ -16,6 +16,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   CustomerInfo,
   HomeDetails,
@@ -85,6 +86,7 @@ export default function QuotePreviewScreen({
   const { theme } = useTheme();
   const { user } = useAuth();
   const { isPro } = useSubscription();
+  const { communicationLanguage } = useLanguage();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
   const [showEmail, setShowEmail] = useState(false);
@@ -209,6 +211,7 @@ export default function QuotePreviewScreen({
         },
         bookingLink: businessProfile.bookingLink || "",
         paymentMethodsText,
+        language: communicationLanguage,
       });
       const data = await res.json();
       if (data.draft) {
@@ -240,6 +243,7 @@ export default function QuotePreviewScreen({
         },
         bookingLink: businessProfile.bookingLink || "",
         paymentMethodsText,
+        language: communicationLanguage,
       });
       const data = await res.json();
       if (data.draft) {
