@@ -196,6 +196,26 @@ export default function MainTabNavigator() {
         listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
+        name="GrowthTab"
+        component={GrowthDashboardScreen}
+        options={{
+          title: t.tabs.growth,
+          headerTitle: t.tabs.growth,
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.growthButton, { backgroundColor: focused ? theme.primary : `${theme.primary}18` }]}>
+              <Feather name="trending-up" size={22} color={focused ? "#FFF" : theme.primary} />
+            </View>
+          ),
+          tabBarLabel: () => null,
+          tabBarItemStyle: {
+            paddingVertical: 4,
+            gap: 2,
+            top: -8,
+          },
+        }}
+        listeners={{ tabPress: handleTabPress }}
+      />
+      <Tab.Screen
         name="JobsTab"
         component={JobsScreen}
         options={{
@@ -203,18 +223,6 @@ export default function MainTabNavigator() {
           headerTitle: t.tabs.jobs,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="calendar" color={color} size={size} focused={focused} />
-          ),
-        }}
-        listeners={{ tabPress: handleTabPress }}
-      />
-      <Tab.Screen
-        name="GrowthTab"
-        component={GrowthDashboardScreen}
-        options={{
-          title: t.tabs.growth,
-          headerTitle: t.tabs.growth,
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="trending-up" color={color} size={size} focused={focused} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
@@ -253,6 +261,13 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  growthButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
   },
