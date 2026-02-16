@@ -104,7 +104,10 @@ function QuotesHeaderRight() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   return (
     <HeaderButton onPress={() => navigation.navigate("QuotePreferences")}>
-      <Feather name="settings" size={22} color={theme.primary} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+        <Text style={{ fontSize: 14, color: theme.primary, fontWeight: "600" }}>Quote Detail Settings</Text>
+        <Feather name="settings" size={18} color={theme.primary} />
+      </View>
     </HeaderButton>
   );
 }
