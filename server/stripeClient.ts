@@ -45,9 +45,7 @@ async function getCredentials() {
 
 export async function getUncachableStripeClient() {
   const { secretKey } = await getCredentials();
-  return new Stripe(secretKey, {
-    apiVersion: '2025-04-30.basil' as any,
-  });
+  return new Stripe(secretKey);
 }
 
 export async function getStripePublishableKey() {

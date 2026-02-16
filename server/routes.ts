@@ -2701,25 +2701,44 @@ Respond with JSON: {"reply": string}`
 
       let accountId = business.stripeAccountId;
       if (!accountId) {
-        const account = await stripe.accounts.create({
-          type: "express",
-          email: business.email || undefined,
-          business_type: "individual",
-          capabilities: {
-            card_payments: { requested: true },
-            transfers: { requested: true },
+        const account = await (stripe as any).v2.core.accounts.create({
+          display_name: business.companyName || "Cleaning Business",
+          contact_email: business.email || undefined,
+          identity: {
+            country: "us",
           },
-          metadata: { businessId: business.id },
+          dashboard: "full",
+          defaults: {
+            responsibilities: {
+              fees_collector: "stripe",
+              losses_collector: "stripe",
+            },
+          },
+          configuration: {
+            customer: {},
+            merchant: {
+              capabilities: {
+                card_payments: {
+                  requested: true,
+                },
+              },
+            },
+          },
         });
         accountId = account.id;
         await updateBusiness(business.id, { stripeAccountId: accountId });
       }
 
-      const accountLink = await stripe.accountLinks.create({
+      const accountLink = await (stripe as any).v2.core.accountLinks.create({
         account: accountId,
-        refresh_url: `https://${req.get("host")}/api/stripe/connect-refresh?userId=${req.session.userId}`,
-        return_url: `https://${req.get("host")}/api/stripe/connect-callback?userId=${req.session.userId}`,
-        type: "account_onboarding",
+        use_case: {
+          type: "account_onboarding",
+          account_onboarding: {
+            configurations: ["merchant", "customer"],
+            refresh_url: `https://${req.get("host")}/api/stripe/connect-refresh?userId=${req.session.userId}`,
+            return_url: `https://${req.get("host")}/api/stripe/connect-callback?userId=${req.session.userId}`,
+          },
+        },
       });
 
       return res.json({ url: accountLink.url });
@@ -2749,8 +2768,18 @@ Respond with JSON: {"reply": string}`
       const business = await getBusinessByOwner(userId);
       if (!business || !business.stripeAccountId) return res.status(400).send("No Stripe account found");
 
-      const account = await stripe.accounts.retrieve(business.stripeAccountId);
-      const isComplete = account.charges_enabled && account.details_submitted;
+      let isComplete = false;
+      try {
+        const account = await (stripe as any).v2.core.accounts.retrieve(business.stripeAccountId, {
+          include: ["configuration.merchant", "requirements"],
+        });
+        const cardPaymentsStatus = account?.configuration?.merchant?.capabilities?.card_payments?.status;
+        const requirementsStatus = account?.requirements?.summary?.minimum_deadline?.status;
+        isComplete = cardPaymentsStatus === "active" || (requirementsStatus !== "currently_due" && requirementsStatus !== "past_due");
+      } catch (e: any) {
+        const account = await stripe.accounts.retrieve(business.stripeAccountId);
+        isComplete = !!(account.charges_enabled && account.details_submitted);
+      }
 
       if (isComplete) {
         await updateBusiness(business.id, { stripeOnboardingComplete: true });
@@ -2777,11 +2806,16 @@ Respond with JSON: {"reply": string}`
       const business = await getBusinessByOwner(userId);
       if (!business || !business.stripeAccountId) return res.status(400).send("No Stripe account");
 
-      const accountLink = await stripe.accountLinks.create({
+      const accountLink = await (stripe as any).v2.core.accountLinks.create({
         account: business.stripeAccountId,
-        refresh_url: `https://${req.get("host")}/api/stripe/connect-refresh?userId=${userId}`,
-        return_url: `https://${req.get("host")}/api/stripe/connect-callback?userId=${userId}`,
-        type: "account_onboarding",
+        use_case: {
+          type: "account_onboarding",
+          account_onboarding: {
+            configurations: ["merchant", "customer"],
+            refresh_url: `https://${req.get("host")}/api/stripe/connect-refresh?userId=${userId}`,
+            return_url: `https://${req.get("host")}/api/stripe/connect-callback?userId=${userId}`,
+          },
+        },
       });
 
       return res.redirect(accountLink.url);
@@ -2832,13 +2866,11 @@ Respond with JSON: {"reply": string}`
           },
           quantity: 1,
         }],
-        payment_intent_data: {
-          application_fee_amount: Math.round(amount * 0.03),
-          transfer_data: { destination: business.stripeAccountId },
-        },
         success_url: `https://${req.get("host")}/api/stripe/payment-success?quoteId=${quoteId}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `https://${req.get("host")}/api/stripe/payment-cancel?quoteId=${quoteId}`,
         metadata: { quoteId, businessId: business.id },
+      }, {
+        stripeAccount: business.stripeAccountId,
       });
 
       return res.json({ url: session.url });
@@ -2875,13 +2907,11 @@ Respond with JSON: {"reply": string}`
           },
           quantity: 1,
         }],
-        payment_intent_data: {
-          application_fee_amount: Math.round(amount * 0.03),
-          transfer_data: { destination: business.stripeAccountId },
-        },
         success_url: `https://${req.get("host")}/api/stripe/payment-success?quoteId=${quote.id}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `https://${req.get("host")}/api/stripe/payment-cancel?quoteId=${quote.id}`,
         metadata: { quoteId: quote.id, businessId: business.id },
+      }, {
+        stripeAccount: business.stripeAccountId,
       });
 
       return res.json({ url: checkoutSession.url });
