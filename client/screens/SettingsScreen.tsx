@@ -36,7 +36,7 @@ export default function SettingsScreen() {
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
   const { isPro } = useSubscription();
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
 
   const queryClient = useQueryClient();
 
@@ -1017,6 +1017,12 @@ export default function SettingsScreen() {
 
       <SectionHeader title={t.settings.language} subtitle={t.settings.languageSubtitle} />
 
+      <ThemedText type="subtitle" style={{ marginBottom: Spacing.xs, marginTop: Spacing.xs }}>
+        {t.settings.appLanguage}
+      </ThemedText>
+      <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+        {t.settings.appLanguageDesc}
+      </ThemedText>
       <View style={[styles.languageSelector, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
         {(["en", "es"] as Language[]).map((lang) => (
           <Pressable
@@ -1037,6 +1043,38 @@ export default function SettingsScreen() {
               </ThemedText>
             </View>
             {language === lang ? (
+              <Feather name="check" size={20} color={theme.primary} />
+            ) : null}
+          </Pressable>
+        ))}
+      </View>
+
+      <ThemedText type="subtitle" style={{ marginBottom: Spacing.xs, marginTop: Spacing.lg }}>
+        {t.settings.commLanguage}
+      </ThemedText>
+      <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+        {t.settings.commLanguageDesc}
+      </ThemedText>
+      <View style={[styles.languageSelector, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        {(["en", "es"] as Language[]).map((lang) => (
+          <Pressable
+            key={`comm-${lang}`}
+            onPress={() => setCommunicationLanguage(lang)}
+            style={[
+              styles.languageOption,
+              {
+                backgroundColor: communicationLanguage === lang ? `${theme.primary}15` : "transparent",
+                borderColor: communicationLanguage === lang ? theme.primary : "transparent",
+              },
+            ]}
+            testID={`settings-comm-lang-${lang}`}
+          >
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: communicationLanguage === lang ? "700" : "500" }}>
+                {LANGUAGE_LABELS[lang]}
+              </ThemedText>
+            </View>
+            {communicationLanguage === lang ? (
               <Feather name="check" size={20} color={theme.primary} />
             ) : null}
           </Pressable>
