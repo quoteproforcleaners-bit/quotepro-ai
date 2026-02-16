@@ -30,8 +30,8 @@ function useDesignTokens() {
     chipBg: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
     chipBorder: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
     shadow: isDark
-      ? { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12 }
-      : { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
+      ? { boxShadow: "0px 4px 12px rgba(0,0,0,0.25)" }
+      : { boxShadow: "0px 2px 8px rgba(0,0,0,0.06)" },
   }), [theme, isDark]);
 }
 

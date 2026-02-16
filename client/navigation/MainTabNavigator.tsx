@@ -150,15 +150,9 @@ export default function MainTabNavigator() {
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
           elevation: 12,
-          ...Platform.select({
-            ios: {
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: -4 },
-              shadowOpacity: isDark ? 0.3 : 0.08,
-              shadowRadius: 12,
-            },
-            default: {},
-          }),
+          boxShadow: isDark
+            ? "0px -4px 12px rgba(0,0,0,0.3)"
+            : "0px -4px 12px rgba(0,0,0,0.08)",
           paddingTop: 4,
         },
         tabBarItemStyle: {
