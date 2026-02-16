@@ -5,7 +5,6 @@ import {
   ScrollView,
   RefreshControl,
   Switch,
-  Pressable,
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,10 +41,10 @@ interface Profile {
 }
 
 const profiles: Profile[] = [
-  { key: "professional", label: "Professional", description: "Clear, concise, business-focused", icon: "briefcase", color: "#007AFF", preview: "Hi [Name], I wanted to follow up on your cleaning estimate. We have availability this week and would love to get you scheduled." },
-  { key: "friendly", label: "Friendly", description: "Warm, personal, relationship-building", icon: "smile", color: "#10B981", preview: "Hey [Name]! Just checking in - we'd love to help keep your home sparkling clean. When works best for you?" },
-  { key: "premium", label: "Premium", description: "High-end, exclusive, value-focused", icon: "award", color: "#8B5CF6", preview: "Dear [Name], as a valued client, we'd like to offer you priority scheduling for our premium cleaning service." },
-  { key: "urgent", label: "Urgent", description: "Time-sensitive, action-oriented", icon: "zap", color: "#F59E0B", preview: "Hi [Name], your quote expires soon! Book now to lock in your rate - we only have 2 slots left this week." },
+  { key: "professional", label: "Professional", description: "Polished, respectful, straight to the point", icon: "briefcase", color: "#007AFF", preview: "Hi [Name], thank you for requesting a cleaning estimate. I have availability this week and would be happy to schedule your service at your convenience. Please let me know a time that works for you." },
+  { key: "friendly", label: "Friendly", description: "Warm, casual, like texting a neighbor", icon: "smile", color: "#10B981", preview: "Hey [Name]! Hope you're having a great week. Just wanted to check in about your cleaning quote - I'd love to help keep your place looking amazing. What day works best for you?" },
+  { key: "premium", label: "Premium", description: "Luxury feel, white-glove, exclusive", icon: "award", color: "#8B5CF6", preview: "Good afternoon [Name]. As part of our commitment to exceptional service, I'd like to personally extend priority scheduling for your home. We ensure meticulous attention to every detail." },
+  { key: "urgent", label: "Urgent", description: "Direct, time-sensitive, creates action", icon: "zap", color: "#F59E0B", preview: "[Name], quick heads up - your quote expires tomorrow and I only have 2 openings left this week. Reply now to lock in your rate before it's gone!" },
 ];
 
 const escalationStages = [
@@ -120,29 +119,31 @@ export default function SalesStrategyScreen() {
       {profiles.map((p) => {
         const isSelected = selectedProfile === p.key;
         return (
-          <Pressable key={p.key} testID={`card-profile-${p.key}`} onPress={() => handleSelectProfile(p.key)}>
-            <Card style={{...styles.profileCard, ...(isSelected ? { borderColor: p.color, borderWidth: 2 } : { borderColor: dt.border, borderWidth: 1 })}}>
-              <View style={styles.profileRow}>
-                <View style={[styles.profileIcon, { backgroundColor: p.color + "18" }]}>
-                  <Feather name={p.icon} size={22} color={p.color} />
-                </View>
-                <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                  <ThemedText type="subtitle">{p.label}</ThemedText>
-                  <ThemedText type="caption" style={{ color: dt.textSecondary }}>{p.description}</ThemedText>
-                </View>
-                <View style={[styles.radio, isSelected ? { borderColor: p.color } : { borderColor: dt.border }]}>
-                  {isSelected ? <View style={[styles.radioDot, { backgroundColor: p.color }]} /> : null}
-                </View>
+          <Card
+            key={p.key}
+            onPress={() => handleSelectProfile(p.key)}
+            style={{...styles.profileCard, ...(isSelected ? { borderColor: p.color, borderWidth: 2 } : { borderColor: dt.border, borderWidth: 1 })}}
+          >
+            <View style={styles.profileRow} testID={`card-profile-${p.key}`}>
+              <View style={[styles.profileIcon, { backgroundColor: p.color + "18" }]}>
+                <Feather name={p.icon} size={22} color={p.color} />
               </View>
-              {isSelected ? (
-                <View style={[styles.previewBox, { backgroundColor: p.color + "0A", borderColor: p.color + "25" }]}>
-                  <ThemedText type="caption" style={{ color: dt.textSecondary, fontStyle: "italic" }}>
-                    "{p.preview}"
-                  </ThemedText>
-                </View>
-              ) : null}
-            </Card>
-          </Pressable>
+              <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                <ThemedText type="subtitle">{p.label}</ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{p.description}</ThemedText>
+              </View>
+              <View style={[styles.radio, isSelected ? { borderColor: p.color } : { borderColor: dt.border }]}>
+                {isSelected ? <View style={[styles.radioDot, { backgroundColor: p.color }]} /> : null}
+              </View>
+            </View>
+            {isSelected ? (
+              <View style={[styles.previewBox, { backgroundColor: p.color + "0A", borderColor: p.color + "25" }]}>
+                <ThemedText type="caption" style={{ color: dt.textSecondary, fontStyle: "italic" }}>
+                  "{p.preview}"
+                </ThemedText>
+              </View>
+            ) : null}
+          </Card>
         );
       })}
 
