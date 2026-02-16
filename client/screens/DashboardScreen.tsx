@@ -883,6 +883,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     top: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
   },
   opportunityCard: {
     marginHorizontal: Spacing.lg,

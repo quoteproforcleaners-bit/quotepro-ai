@@ -2680,7 +2680,7 @@ Respond with JSON: {"reply": string}`
 
   app.post("/api/stripe/connect", requireAuth, async (req: Request, res: Response) => {
     try {
-      if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
+      if (!stripe) return res.status(503).json({ message: "Stripe is not set up yet. Go to Settings > Integrations and add your Stripe API keys to start accepting payments." });
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
@@ -3043,7 +3043,8 @@ Respond with JSON: {"reply": string}`
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const prefs = await upsertPreferences(business.id, req.body);
+      const { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget } = req.body;
+      const prefs = await upsertPreferences(business.id, { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget });
       return res.json(prefs);
     } catch (error: any) {
       console.error("Update preferences error:", error);
@@ -3369,7 +3370,8 @@ Respond with JSON: {"reply": string}`
       if (!business) return res.status(404).json({ message: "Business not found" });
       const existing = await getGrowthAutomationSettings(business.id);
       const wasMarketingModeEnabled = existing?.marketingModeEnabled || false;
-      const settings = await upsertGrowthAutomationSettings(business.id, req.body);
+      const { marketingModeEnabled, abandonedQuoteRecovery, weeklyReactivation, reviewRequestWorkflow, referralAskWorkflow, rebookNudges, upsellTriggers, quietHoursStart, quietHoursEnd, maxSendsPerDay, maxFollowUpsPerQuote, rebookNudgeDaysMin, rebookNudgeDaysMax, deepCleanIntervalMonths, googleReviewLink, connectedSendingEnabled } = req.body;
+      const settings = await upsertGrowthAutomationSettings(business.id, { marketingModeEnabled, abandonedQuoteRecovery, weeklyReactivation, reviewRequestWorkflow, referralAskWorkflow, rebookNudges, upsellTriggers, quietHoursStart, quietHoursEnd, maxSendsPerDay, maxFollowUpsPerQuote, rebookNudgeDaysMin, rebookNudgeDaysMax, deepCleanIntervalMonths, googleReviewLink, connectedSendingEnabled });
       if (req.body.marketingModeEnabled === true && !wasMarketingModeEnabled) {
         console.log(`[Growth] Marketing mode enabled for business ${business.id} - batch default growth tasks creation pending`);
       }

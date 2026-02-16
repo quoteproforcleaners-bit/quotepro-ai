@@ -9,6 +9,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -169,7 +170,10 @@ export default function ReactivationScreen() {
         contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
         ListHeaderComponent={
           <>
-            <Card style={[styles.summaryCard, { borderColor: dt.border }]}>
+            <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.md, lineHeight: 20 }}>
+              Dormant customers haven't booked in a while. Lost quotes were sent but never accepted. Reach out to win them back and recover potential revenue.
+            </ThemedText>
+            <Card style={{...styles.summaryCard, borderColor: dt.border}}>
               <View style={styles.summaryRow}>
                 <View style={styles.summaryItem}>
                   <ThemedText type="h2" testID="text-dormant-count">{totalDormant}</ThemedText>
@@ -207,71 +211,74 @@ export default function ReactivationScreen() {
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setModalVisible(true); }}
         style={[styles.fab, { backgroundColor: dt.accent, bottom: insets.bottom + Spacing.xl }]}
       >
-        <Feather name="send" size={24} color="#FFFFFF" />
+        <Feather name="send" size={18} color="#FFFFFF" />
+        <ThemedText type="caption" style={{ color: "#FFFFFF", marginTop: 2, fontSize: 10 }}>Campaign</ThemedText>
       </Pressable>
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <View style={[styles.modalOverlay, { backgroundColor: dt.overlay }]}>
-          <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault }]}>
-            <View style={styles.modalHeader}>
-              <ThemedText type="h3">Create Campaign</ThemedText>
-              <Pressable testID="button-close-modal" onPress={() => setModalVisible(false)}>
-                <Feather name="x" size={24} color={dt.textPrimary} />
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+          <View style={[styles.modalOverlay, { backgroundColor: dt.overlay, justifyContent: "flex-start", paddingTop: 100 }]}>
+            <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault }]}>
+              <View style={styles.modalHeader}>
+                <ThemedText type="h3">Create Campaign</ThemedText>
+                <Pressable testID="button-close-modal" onPress={() => setModalVisible(false)}>
+                  <Feather name="x" size={24} color={dt.textPrimary} />
+                </Pressable>
+              </View>
+
+              <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Campaign Name</ThemedText>
+              <TextInput
+                testID="input-campaign-name"
+                value={campaignName}
+                onChangeText={setCampaignName}
+                placeholder="e.g. Spring Reactivation"
+                placeholderTextColor={dt.textSecondary}
+                style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
+              />
+
+              <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Segment</ThemedText>
+              <View style={styles.pickerRow}>
+                {(["dormant", "lost"] as Segment[]).map((s) => (
+                  <Pressable
+                    key={s}
+                    testID={`picker-segment-${s}`}
+                    onPress={() => setCampaignSegment(s)}
+                    style={[styles.pickerOption, campaignSegment === s ? { backgroundColor: dt.accentSoft, borderColor: dt.accent } : { borderColor: dt.border }]}
+                  >
+                    <ThemedText type="small" style={{ color: campaignSegment === s ? dt.accent : dt.textPrimary }}>
+                      {s === "dormant" ? "Dormant" : "Lost Quotes"}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+
+              <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Channel</ThemedText>
+              <View style={styles.pickerRow}>
+                {(["sms", "email"] as Channel[]).map((ch) => (
+                  <Pressable
+                    key={ch}
+                    testID={`picker-channel-${ch}`}
+                    onPress={() => setCampaignChannel(ch)}
+                    style={[styles.pickerOption, campaignChannel === ch ? { backgroundColor: dt.accentSoft, borderColor: dt.accent } : { borderColor: dt.border }]}
+                  >
+                    <Feather name={ch === "sms" ? "message-square" : "mail"} size={14} color={campaignChannel === ch ? dt.accent : dt.textSecondary} />
+                    <ThemedText type="small" style={{ color: campaignChannel === ch ? dt.accent : dt.textPrimary, marginLeft: 6 }}>
+                      {ch.toUpperCase()}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+
+              <Pressable
+                testID="button-create-campaign"
+                onPress={handleCreateCampaign}
+                style={[styles.createBtn, { backgroundColor: dt.accent }]}
+              >
+                <ThemedText type="subtitle" style={{ color: "#FFFFFF" }}>Create Campaign</ThemedText>
               </Pressable>
             </View>
-
-            <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Campaign Name</ThemedText>
-            <TextInput
-              testID="input-campaign-name"
-              value={campaignName}
-              onChangeText={setCampaignName}
-              placeholder="e.g. Spring Reactivation"
-              placeholderTextColor={dt.textSecondary}
-              style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
-            />
-
-            <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Segment</ThemedText>
-            <View style={styles.pickerRow}>
-              {(["dormant", "lost"] as Segment[]).map((s) => (
-                <Pressable
-                  key={s}
-                  testID={`picker-segment-${s}`}
-                  onPress={() => setCampaignSegment(s)}
-                  style={[styles.pickerOption, campaignSegment === s ? { backgroundColor: dt.accentSoft, borderColor: dt.accent } : { borderColor: dt.border }]}
-                >
-                  <ThemedText type="small" style={{ color: campaignSegment === s ? dt.accent : dt.textPrimary }}>
-                    {s === "dormant" ? "Dormant" : "Lost Quotes"}
-                  </ThemedText>
-                </Pressable>
-              ))}
-            </View>
-
-            <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Channel</ThemedText>
-            <View style={styles.pickerRow}>
-              {(["sms", "email"] as Channel[]).map((ch) => (
-                <Pressable
-                  key={ch}
-                  testID={`picker-channel-${ch}`}
-                  onPress={() => setCampaignChannel(ch)}
-                  style={[styles.pickerOption, campaignChannel === ch ? { backgroundColor: dt.accentSoft, borderColor: dt.accent } : { borderColor: dt.border }]}
-                >
-                  <Feather name={ch === "sms" ? "message-square" : "mail"} size={14} color={campaignChannel === ch ? dt.accent : dt.textSecondary} />
-                  <ThemedText type="small" style={{ color: campaignChannel === ch ? dt.accent : dt.textPrimary, marginLeft: 6 }}>
-                    {ch.toUpperCase()}
-                  </ThemedText>
-                </Pressable>
-              ))}
-            </View>
-
-            <Pressable
-              testID="button-create-campaign"
-              onPress={handleCreateCampaign}
-              style={[styles.createBtn, { backgroundColor: dt.accent }]}
-            >
-              <ThemedText type="subtitle" style={{ color: "#FFFFFF" }}>Create Campaign</ThemedText>
-            </Pressable>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -291,8 +298,8 @@ const styles = StyleSheet.create({
   statusBadge: { alignSelf: "flex-start", paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.xs, marginTop: 4 },
   emptyState: { alignItems: "center", justifyContent: "center", paddingTop: Spacing["5xl"] },
   fab: { position: "absolute", right: Spacing.lg, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
-  modalOverlay: { flex: 1, justifyContent: "flex-end" },
-  modalContent: { borderTopLeftRadius: BorderRadius.xl, borderTopRightRadius: BorderRadius.xl, padding: Spacing.xl },
+  modalOverlay: { flex: 1 },
+  modalContent: { borderRadius: BorderRadius.xl, padding: Spacing.xl, marginHorizontal: Spacing.lg },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.xl },
   input: { borderWidth: 1, borderRadius: BorderRadius.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: 16, marginBottom: Spacing.lg },
   pickerRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg },

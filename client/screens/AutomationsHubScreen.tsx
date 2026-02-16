@@ -31,7 +31,7 @@ function useDesignTokens() {
 }
 
 interface AutomationSettings {
-  marketingMode: boolean;
+  marketingModeEnabled: boolean;
   abandonedQuoteRecovery: boolean;
   weeklyReactivation: boolean;
   reviewRequestWorkflow: boolean;
@@ -42,14 +42,14 @@ interface AutomationSettings {
   quietHoursStart: string;
   quietHoursEnd: string;
   maxFollowUpsPerQuote: number;
-  rebookNudgeMinDays: number;
-  rebookNudgeMaxDays: number;
+  rebookNudgeDaysMin: number;
+  rebookNudgeDaysMax: number;
   deepCleanIntervalMonths: number;
   googleReviewLink: string;
 }
 
 const defaultSettings: AutomationSettings = {
-  marketingMode: false,
+  marketingModeEnabled: false,
   abandonedQuoteRecovery: true,
   weeklyReactivation: true,
   reviewRequestWorkflow: true,
@@ -60,8 +60,8 @@ const defaultSettings: AutomationSettings = {
   quietHoursStart: "20:00",
   quietHoursEnd: "08:00",
   maxFollowUpsPerQuote: 3,
-  rebookNudgeMinDays: 14,
-  rebookNudgeMaxDays: 45,
+  rebookNudgeDaysMin: 14,
+  rebookNudgeDaysMax: 45,
   deepCleanIntervalMonths: 6,
   googleReviewLink: "",
 };
@@ -95,8 +95,11 @@ export default function AutomationsHubScreen() {
   const updateSetting = async (key: keyof AutomationSettings, value: any) => {
     const updated = { ...settings, [key]: value };
     setSettings(updated);
-    await apiRequest("PUT", "/api/growth-automation-settings", updated);
-    queryClient.invalidateQueries({ queryKey: ["/api/growth-automation-settings"] });
+    try {
+      await apiRequest("PUT", "/api/growth-automation-settings", updated);
+    } catch (e) {
+      setSettings(settings);
+    }
   };
 
   const updateNumber = (key: keyof AutomationSettings, text: string) => {
@@ -118,7 +121,7 @@ export default function AutomationsHubScreen() {
       contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/growth-automation-settings"] })} tintColor={dt.accent} />}
     >
-      <Card style={[styles.masterCard, { borderColor: dt.accent + "40" }]}>
+      <Card style={{...styles.masterCard, borderColor: dt.accent + "40"}}>
         <View style={styles.masterRow}>
           <View style={{ flex: 1 }}>
             <View style={styles.masterLabel}>
@@ -131,10 +134,10 @@ export default function AutomationsHubScreen() {
           </View>
           <Switch
             testID="switch-marketing-mode"
-            value={settings.marketingMode}
-            onValueChange={(v) => updateSetting("marketingMode", v)}
+            value={settings.marketingModeEnabled}
+            onValueChange={(v) => updateSetting("marketingModeEnabled", v)}
             trackColor={{ false: dt.border, true: dt.accent + "80" }}
-            thumbColor={settings.marketingMode ? dt.accent : "#ccc"}
+            thumbColor={settings.marketingModeEnabled ? dt.accent : "#ccc"}
           />
         </View>
       </Card>
@@ -167,8 +170,8 @@ export default function AutomationsHubScreen() {
         <GuardrailRow label="Quiet hours start" value={settings.quietHoursStart} onChangeText={(t) => updateSetting("quietHoursStart", t)} dt={dt} theme={theme} testID="input-quiet-start" />
         <GuardrailRow label="Quiet hours end" value={settings.quietHoursEnd} onChangeText={(t) => updateSetting("quietHoursEnd", t)} dt={dt} theme={theme} testID="input-quiet-end" />
         <GuardrailRow label="Max follow-ups per quote" value={String(settings.maxFollowUpsPerQuote)} onChangeText={(t) => updateNumber("maxFollowUpsPerQuote", t)} dt={dt} theme={theme} testID="input-max-followups" />
-        <GuardrailRow label="Rebook nudge min (days)" value={String(settings.rebookNudgeMinDays)} onChangeText={(t) => updateNumber("rebookNudgeMinDays", t)} dt={dt} theme={theme} testID="input-rebook-min" />
-        <GuardrailRow label="Rebook nudge max (days)" value={String(settings.rebookNudgeMaxDays)} onChangeText={(t) => updateNumber("rebookNudgeMaxDays", t)} dt={dt} theme={theme} testID="input-rebook-max" />
+        <GuardrailRow label="Rebook nudge min (days)" value={String(settings.rebookNudgeDaysMin)} onChangeText={(t) => updateNumber("rebookNudgeDaysMin", t)} dt={dt} theme={theme} testID="input-rebook-min" />
+        <GuardrailRow label="Rebook nudge max (days)" value={String(settings.rebookNudgeDaysMax)} onChangeText={(t) => updateNumber("rebookNudgeDaysMax", t)} dt={dt} theme={theme} testID="input-rebook-max" />
         <GuardrailRow label="Deep clean interval (months)" value={String(settings.deepCleanIntervalMonths)} onChangeText={(t) => updateNumber("deepCleanIntervalMonths", t)} dt={dt} theme={theme} testID="input-deep-clean" last />
       </Card>
 

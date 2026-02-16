@@ -76,13 +76,13 @@ export default function SalesStrategyScreen() {
 
   useEffect(() => {
     if (serverStrategy) {
-      setSelectedProfile(serverStrategy.profile ?? "professional");
-      setEscalationEnabled(serverStrategy.escalationEnabled ?? false);
+      setSelectedProfile((serverStrategy as any).selectedProfile ?? "professional");
+      setEscalationEnabled((serverStrategy as any).escalationEnabled ?? false);
     }
   }, [serverStrategy]);
 
   const saveStrategy = async (profile: ProfileKey, escalation: boolean) => {
-    await apiRequest("PUT", "/api/sales-strategy", { profile, escalationEnabled: escalation });
+    await apiRequest("PUT", "/api/sales-strategy", { selectedProfile: profile, escalationEnabled: escalation });
     queryClient.invalidateQueries({ queryKey: ["/api/sales-strategy"] });
   };
 
@@ -121,7 +121,7 @@ export default function SalesStrategyScreen() {
         const isSelected = selectedProfile === p.key;
         return (
           <Pressable key={p.key} testID={`card-profile-${p.key}`} onPress={() => handleSelectProfile(p.key)}>
-            <Card style={[styles.profileCard, isSelected ? { borderColor: p.color, borderWidth: 2 } : { borderColor: dt.border, borderWidth: 1 }]}>
+            <Card style={{...styles.profileCard, ...(isSelected ? { borderColor: p.color, borderWidth: 2 } : { borderColor: dt.border, borderWidth: 1 })}}>
               <View style={styles.profileRow}>
                 <View style={[styles.profileIcon, { backgroundColor: p.color + "18" }]}>
                   <Feather name={p.icon} size={22} color={p.color} />
@@ -173,7 +173,7 @@ export default function SalesStrategyScreen() {
                 <View style={[styles.stageDot, { backgroundColor: stage.color }]} />
                 {index < escalationStages.length - 1 ? <View style={[styles.stageLine, { backgroundColor: dt.border }]} /> : null}
               </View>
-              <Card style={[styles.stageCard, { borderLeftWidth: 3, borderLeftColor: stage.color }]}>
+              <Card style={{...styles.stageCard, borderLeftWidth: 3, borderLeftColor: stage.color}}>
                 <View style={styles.stageHeader}>
                   <ThemedText type="subtitle">Stage {stage.stage}: {stage.label}</ThemedText>
                   <View style={[styles.toneBadge, { backgroundColor: stage.color + "18" }]}>
@@ -190,7 +190,7 @@ export default function SalesStrategyScreen() {
       ) : null}
 
       <ThemedText type="h3" style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>AI Message Preview</ThemedText>
-      <Card style={[styles.previewCard, { borderColor: activeProfile.color + "30", borderWidth: 1 }]}>
+      <Card style={{...styles.previewCard, borderColor: activeProfile.color + "30", borderWidth: 1}}>
         <View style={styles.previewHeader}>
           <Feather name="message-circle" size={18} color={activeProfile.color} />
           <ThemedText type="subtitle" style={{ marginLeft: Spacing.sm }}>Preview how your messages will sound</ThemedText>

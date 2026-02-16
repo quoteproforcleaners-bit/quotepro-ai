@@ -84,7 +84,8 @@ export default function SettingsScreen() {
 
   const updatePref = useCallback(async (updates: Record<string, any>) => {
     try {
-      await apiRequest("PUT", "/api/preferences", { ...currentPrefs, ...updates });
+      const { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget } = { ...currentPrefs, ...updates };
+      await apiRequest("PUT", "/api/preferences", { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget });
       queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
       Haptics.selectionAsync();
       const merged = { ...currentPrefs, ...updates };
