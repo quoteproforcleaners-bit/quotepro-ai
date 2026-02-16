@@ -164,17 +164,6 @@ export default function AutomationsHubScreen() {
         </Card>
       ))}
 
-      <ThemedText type="h4" style={styles.sectionTitle}>Guardrails</ThemedText>
-      <Card style={styles.guardrailCard}>
-        <GuardrailRow label="Max sends per day" value={String(settings.maxSendsPerDay)} onChangeText={(t) => updateNumber("maxSendsPerDay", t)} dt={dt} theme={theme} testID="input-max-sends" />
-        <GuardrailRow label="Quiet hours start" value={settings.quietHoursStart} onChangeText={(t) => updateSetting("quietHoursStart", t)} dt={dt} theme={theme} testID="input-quiet-start" />
-        <GuardrailRow label="Quiet hours end" value={settings.quietHoursEnd} onChangeText={(t) => updateSetting("quietHoursEnd", t)} dt={dt} theme={theme} testID="input-quiet-end" />
-        <GuardrailRow label="Max follow-ups per quote" value={String(settings.maxFollowUpsPerQuote)} onChangeText={(t) => updateNumber("maxFollowUpsPerQuote", t)} dt={dt} theme={theme} testID="input-max-followups" />
-        <GuardrailRow label="Rebook nudge min (days)" value={String(settings.rebookNudgeDaysMin)} onChangeText={(t) => updateNumber("rebookNudgeDaysMin", t)} dt={dt} theme={theme} testID="input-rebook-min" />
-        <GuardrailRow label="Rebook nudge max (days)" value={String(settings.rebookNudgeDaysMax)} onChangeText={(t) => updateNumber("rebookNudgeDaysMax", t)} dt={dt} theme={theme} testID="input-rebook-max" />
-        <GuardrailRow label="Deep clean interval (months)" value={String(settings.deepCleanIntervalMonths)} onChangeText={(t) => updateNumber("deepCleanIntervalMonths", t)} dt={dt} theme={theme} testID="input-deep-clean" last />
-      </Card>
-
       <ThemedText type="h4" style={styles.sectionTitle}>Google Review Link</ThemedText>
       <Card>
         <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>
@@ -195,24 +184,6 @@ export default function AutomationsHubScreen() {
   );
 }
 
-function GuardrailRow({ label, value, onChangeText, dt, theme, testID, last }: {
-  label: string; value: string; onChangeText: (t: string) => void;
-  dt: any; theme: any; testID: string; last?: boolean;
-}) {
-  return (
-    <View style={[styles.guardrailRow, !last ? { borderBottomWidth: 1, borderBottomColor: dt.border } : undefined]}>
-      <ThemedText type="small" style={{ flex: 1, color: dt.textPrimary }}>{label}</ThemedText>
-      <TextInput
-        testID={testID}
-        value={value}
-        onChangeText={onChangeText}
-        style={[styles.guardrailInput, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
-        keyboardType="default"
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   masterCard: { marginBottom: Spacing.xl, borderWidth: 1 },
@@ -222,8 +193,5 @@ const styles = StyleSheet.create({
   automationCard: { marginBottom: Spacing.sm },
   automationRow: { flexDirection: "row", alignItems: "center" },
   iconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  guardrailCard: {},
-  guardrailRow: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.md },
-  guardrailInput: { width: 80, borderWidth: 1, borderRadius: BorderRadius.xs, paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, textAlign: "center", fontSize: 14 },
   input: { borderWidth: 1, borderRadius: BorderRadius.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: 14 },
 });
