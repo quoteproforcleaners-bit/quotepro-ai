@@ -36,6 +36,19 @@ A new "Social / AI Sales Assistant" feature integrates with Instagram and TikTok
 - **Analytics Tracking** (`client/lib/analytics.ts`): Event tracking module for app_open, follow_up actions, and engagement metrics.
 - **New DB Tables**: `follow_up_touches`, `streaks`, `user_preferences`, `analytics_events`, `badges` with 16 storage functions and 11 API endpoints.
 
+### Growth Automation Suite (Feb 2026)
+- **Growth Dashboard** (`client/screens/GrowthDashboardScreen.tsx`): Growth score (0-100), pipeline snapshot with revenue forecasting, growth opportunities carousel (Reviews/Upsells/Rebook/Reactivation), today's focus tasks, recent activity feed, quick actions.
+- **Growth Task Engine**: 7 task types (QUOTE_FOLLOWUP, ABANDONED_RECOVERY, REBOOK_NUDGE, REVIEW_REQUEST, REFERRAL_ASK, UPSELL_DEEP_CLEAN, REACTIVATION) with priority scoring 0-100, 4-stage escalation, guardrails (max sends/day, quiet hours, cooldowns).
+- **Tasks Queue** (`client/screens/TasksQueueScreen.tsx`): Unified task queue with type filters, priority badges (High/Med/Low), escalation dots, due date tracking, complete/skip/escalate actions.
+- **Reviews & Referrals** (`client/screens/ReviewsReferralsScreen.tsx`): Review request management with platform selection, referral tracking.
+- **Upsell Opportunities** (`client/screens/UpsellOpportunitiesScreen.tsx`): Deep clean upsell detection based on customer history, revenue estimates, AI message generation.
+- **Reactivation Campaigns** (`client/screens/ReactivationScreen.tsx`): Dormant customer reactivation with lite campaign builder modal, audience targeting, message templates.
+- **Automations Hub** (`client/screens/AutomationsHubScreen.tsx`): Marketing Mode toggle, workflow controls for each automation type, guardrail settings (max daily sends, quiet hours, cooldown periods).
+- **Sales Strategy Profiles** (`client/screens/SalesStrategyScreen.tsx`): 4 profiles (Professional/Friendly/Premium/Urgent) with AI-powered escalation engine, dynamic message generation via OpenAI, escalation stage previews.
+- **Revenue Forecasting**: Pipeline value, close rate, confidence bands via `/api/forecast` endpoint.
+- **New DB Tables**: `growth_tasks`, `growth_task_events`, `review_requests`, `customer_marketing_prefs`, `growth_automation_settings`, `sales_strategy_settings`, `campaigns` with 25+ storage functions and 23 API endpoints.
+- **Navigation**: Growth tab replaces Revenue tab in MainTabNavigator. Settings includes "Growth & Automations" section with links to Automations Hub and Sales Strategy.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -50,7 +63,7 @@ The frontend is built using **React Native with Expo SDK 54**, leveraging **Reac
 
 **State Management**: Global application state (business profile, pricing settings, onboarding) is managed via **React Context (AppContext)**. Server state is managed using **React Query (TanStack Query)**, while UI-specific state uses local `useState`.
 
-**Navigation**: Features a Root Stack Navigator with conditional rendering based on authentication and onboarding status. It includes distinct stacks for authentication, a multi-step onboarding process, and a Main Tab Navigator with Home, Customers, Quotes, Jobs, Social, and Settings tabs. Various modal and stack screens support detailed functionalities like quote calculation, customer details, and social conversations.
+**Navigation**: Features a Root Stack Navigator with conditional rendering based on authentication and onboarding status. It includes distinct stacks for authentication, a multi-step onboarding process, and a Main Tab Navigator with Home, Customers, Quotes, Jobs, Growth, and Settings tabs. Various modal and stack screens support detailed functionalities like quote calculation, customer details, social conversations, and growth automation screens (TasksQueue, ReviewsReferrals, UpsellOpportunities, ReactivationCampaigns, AutomationsHub, SalesStrategy).
 
 **Styling**: Adheres to a centralized theme defined in `/constants/theme.ts`, supporting light/dark modes and platform-specific adaptations. Components are designed for reusability and consistency, utilizing themed components and a robust design system with specific brand colors, typography, and patterns for empty states and stat cards.
 
@@ -67,6 +80,7 @@ The backend runs on **Express.js with Node.js and TypeScript**, configured with 
 **Key Database Tables**:
 - `users`, `businesses`, `pricing_settings`, `customers`, `quotes`, `quote_line_items`, `jobs`, `job_checklist_items`, `communications`, `automation_rules`, `tasks`.
 - Social features introduce: `social_connections`, `social_conversations`, `social_messages`, `social_leads`, `social_automation_settings`, `social_attribution_events`, `social_onboarding`.
+- Growth Automation Suite: `growth_tasks`, `growth_task_events`, `review_requests`, `customer_marketing_prefs`, `growth_automation_settings`, `sales_strategy_settings`, `campaigns`.
 - Session management is handled by a `session` table using `express-session` and `connect-pg-simple`.
 
 **Authentication**: Session-based authentication using `express-session`, supporting email/password, Apple, and Google SSO. `AuthContext` on the frontend manages authentication state, gating navigation flows.
