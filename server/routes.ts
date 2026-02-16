@@ -2724,11 +2724,19 @@ Respond with JSON: {"reply": string}`
 
       return res.json({ url: accountLink.url });
     } catch (error: any) {
-      console.error("Stripe connect error:", error);
-      if (error?.type === "StripeInvalidRequestError" && error?.message?.includes("signed up for Connect")) {
-        return res.status(400).json({ message: "Stripe Connect is not enabled on your Stripe account. Please enable Connect at dashboard.stripe.com/connect before accepting payments." });
+      console.error("Stripe connect error:", error?.message || error);
+      const msg = error?.message || "";
+      if (error?.type === "StripeInvalidRequestError" && (msg.includes("signed up for Connect") || msg.includes("platform profile"))) {
+        return res.status(400).json({ message: "Stripe Connect setup is incomplete. Please visit dashboard.stripe.com/connect to finish platform setup, then try again." });
       }
-      return res.status(500).json({ message: "Failed to create Stripe account. Please try again." });
+      if (error?.type === "StripeInvalidRequestError" && msg.includes("No such account")) {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (business) {
+          await updateBusiness(business.id, { stripeAccountId: null, stripeOnboardingComplete: false });
+        }
+        return res.status(400).json({ message: "Previous Stripe account was invalid. Please try connecting again." });
+      }
+      return res.status(500).json({ message: "Failed to connect Stripe. Please try again." });
     }
   });
 
