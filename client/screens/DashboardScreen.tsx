@@ -535,7 +535,10 @@ export default function DashboardScreen() {
           </ThemedText>
           {currentStreak === 0 ? (
             <Pressable onPress={() => navigation.navigate("FollowUpQueue")} style={styles.streakGoBtn} testID="streak-nudge-cta">
-              <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>{t.dashboard.go}</ThemedText>
+              <View style={styles.streakGoBtnInner}>
+                <ThemedText type="body" style={styles.streakGoText}>{t.dashboard.go}</ThemedText>
+                <Feather name="arrow-right" size={18} color="#FFFFFF" style={{ marginLeft: 4 }} />
+              </View>
             </Pressable>
           ) : null}
         </View>
@@ -882,9 +885,22 @@ const styles = StyleSheet.create({
   streakGoBtn: {
     position: "absolute",
     right: 0,
-    top: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    top: Spacing.sm,
+  },
+  streakGoBtnInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#0088FF",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    boxShadow: "0 0 12px rgba(0,136,255,0.6), 0 0 24px rgba(0,136,255,0.3)",
+  },
+  streakGoText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 16,
+    letterSpacing: 1,
   },
   opportunityCard: {
     marginHorizontal: Spacing.lg,
