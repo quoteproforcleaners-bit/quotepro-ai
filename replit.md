@@ -12,7 +12,8 @@ Key capabilities include:
 - Integrated communication tracking for emails, SMS, and phone calls.
 - Customizable business profiles with branding options.
 - Configurable pricing settings, including hourly rates, minimums, and frequency discounts.
-- AI-powered draft generation for customer communications.
+- AI-powered draft generation for customer communications (respects communication language preference).
+- Dual language system: separate App Language and Customer Communication Language preferences. Stored in AsyncStorage (`@quotepro_language`, `@quotepro_comm_language`). `useLanguage()` exposes `t` (app translations) and `tc` (communication translations). AI endpoints accept `language` param for message generation.
 - AI Command Center home screen with natural language command input, rotating example prompts, quick action chips, and "Today at a glance" stats. Uses a local deterministic intent parser (`client/lib/aiCommandRouter.ts`) with feature flags (`client/lib/featureFlags.ts`) to later swap in real AI.
 - Job photo attachments (before/after photos with captions via image picker).
 - Recurring job automation (weekly/biweekly/monthly/quarterly auto-scheduling on completion).
