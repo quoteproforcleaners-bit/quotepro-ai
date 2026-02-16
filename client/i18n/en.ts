@@ -51,6 +51,7 @@ const en = {
     customers: "Customers",
     quotes: "Quotes",
     jobs: "Jobs",
+    growth: "Growth",
     revenue: "Revenue",
     settings: "Settings",
   },

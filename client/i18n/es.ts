@@ -53,6 +53,7 @@ const es: Translations = {
     customers: "Clientes",
     quotes: "Cotizaciones",
     jobs: "Trabajos",
+    growth: "Crecimiento",
     revenue: "Ingresos",
     settings: "Ajustes",
   },

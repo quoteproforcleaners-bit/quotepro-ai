@@ -14,7 +14,7 @@ import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
 import QuotesScreen from "@/screens/QuotesScreen";
 import JobsScreen from "@/screens/JobsScreen";
-import RevenueScreen from "@/screens/RevenueScreen";
+import GrowthDashboardScreen from "@/screens/GrowthDashboardScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
@@ -26,7 +26,7 @@ export type MainTabParamList = {
   CustomersTab: undefined;
   QuotesTab: undefined;
   JobsTab: undefined;
-  RevenueTab: undefined;
+  GrowthTab: undefined;
   SettingsTab: undefined;
 };
 
@@ -208,11 +208,11 @@ export default function MainTabNavigator() {
         listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
-        name="RevenueTab"
-        component={RevenueScreen}
+        name="GrowthTab"
+        component={GrowthDashboardScreen}
         options={{
-          title: t.tabs.revenue,
-          headerTitle: t.tabs.revenue,
+          title: t.tabs.growth,
+          headerTitle: t.tabs.growth,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="trending-up" color={color} size={size} focused={focused} />
           ),

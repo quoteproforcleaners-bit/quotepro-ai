@@ -956,6 +956,50 @@ export default function SettingsScreen() {
         ) : null}
       </View>
 
+      <SectionHeader title="Growth & Automations" subtitle="Configure your growth engine" />
+
+      <Pressable
+        onPress={() => navigation.navigate("AutomationsHub" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-automations-hub"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="zap" size={20} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              Automations Hub
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Marketing mode, workflows, guardrails
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
+        onPress={() => navigation.navigate("SalesStrategy" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-sales-strategy"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: "#8B5CF615" }]}>
+            <Feather name="target" size={20} color="#8B5CF6" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              Sales Strategy
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Message tone, escalation engine
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
       <SectionHeader title={t.settings.language} subtitle={t.settings.languageSubtitle} />
 
       <View style={[styles.languageSelector, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>

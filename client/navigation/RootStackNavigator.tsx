@@ -13,6 +13,12 @@ import AIAssistantScreen from "@/screens/AIAssistantScreen";
 import FollowUpQueueScreen from "@/screens/FollowUpQueueScreen";
 import WeeklyRecapScreen from "@/screens/WeeklyRecapScreen";
 import OpportunitiesScreen from "@/screens/OpportunitiesScreen";
+import TasksQueueScreen from "@/screens/TasksQueueScreen";
+import ReviewsReferralsScreen from "@/screens/ReviewsReferralsScreen";
+import UpsellOpportunitiesScreen from "@/screens/UpsellOpportunitiesScreen";
+import ReactivationScreen from "@/screens/ReactivationScreen";
+import AutomationsHubScreen from "@/screens/AutomationsHubScreen";
+import SalesStrategyScreen from "@/screens/SalesStrategyScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
@@ -33,6 +39,12 @@ export type RootStackParamList = {
   FollowUpQueue: undefined;
   WeeklyRecap: undefined;
   Opportunities: undefined;
+  TasksQueue: undefined;
+  ReviewsReferrals: undefined;
+  UpsellOpportunities: undefined;
+  ReactivationCampaigns: undefined;
+  AutomationsHub: undefined;
+  SalesStrategy: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -146,6 +158,48 @@ export default function RootStackNavigator() {
             component={OpportunitiesScreen}
             options={{
               headerTitle: "Opportunities",
+            }}
+          />
+          <Stack.Screen
+            name="TasksQueue"
+            component={TasksQueueScreen}
+            options={{
+              headerTitle: "Growth Tasks",
+            }}
+          />
+          <Stack.Screen
+            name="ReviewsReferrals"
+            component={ReviewsReferralsScreen}
+            options={{
+              headerTitle: "Reviews & Referrals",
+            }}
+          />
+          <Stack.Screen
+            name="UpsellOpportunities"
+            component={UpsellOpportunitiesScreen}
+            options={{
+              headerTitle: "Upsell Opportunities",
+            }}
+          />
+          <Stack.Screen
+            name="ReactivationCampaigns"
+            component={ReactivationScreen}
+            options={{
+              headerTitle: "Reactivation",
+            }}
+          />
+          <Stack.Screen
+            name="AutomationsHub"
+            component={AutomationsHubScreen}
+            options={{
+              headerTitle: "Automations",
+            }}
+          />
+          <Stack.Screen
+            name="SalesStrategy"
+            component={SalesStrategyScreen}
+            options={{
+              headerTitle: "Sales Strategy",
             }}
           />
         </>
