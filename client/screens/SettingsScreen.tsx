@@ -1113,6 +1113,28 @@ export default function SettingsScreen() {
         </ThemedText>
       </Pressable>
 
+      <Pressable
+        onPress={() => navigation.navigate("HelpGuide")}
+        style={[
+          styles.aboutCard,
+          { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.md, flexDirection: "row", alignItems: "center" },
+        ]}
+        testID="button-help-guide"
+      >
+        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: `${theme.primary}15`, alignItems: "center", justifyContent: "center", marginRight: Spacing.sm }}>
+          <Feather name="book-open" size={18} color={theme.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <ThemedText type="body" style={{ fontWeight: "600" }}>
+            {language === "en" ? "Help & User Guide" : "Ayuda y Guia del Usuario"}
+          </ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+            {language === "en" ? "Learn how to use all features" : "Aprende a usar todas las funciones"}
+          </ThemedText>
+        </View>
+        <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+      </Pressable>
+
       <SectionHeader title={t.settings.about} />
 
       <View
