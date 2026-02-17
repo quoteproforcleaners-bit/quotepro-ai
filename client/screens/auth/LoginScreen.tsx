@@ -122,8 +122,25 @@ export default function LoginScreen() {
       }
       const { url } = await startRes.json();
       const result = await WebBrowser.openAuthSessionAsync(url, "quotepro://auth-callback");
-      if (result.type === "success" || result.type === "dismiss") {
-        await refreshAuth();
+      if (result.type === "success" && result.url) {
+        const urlObj = new URL(result.url);
+        const token = urlObj.searchParams.get("token");
+        if (token) {
+          const exchangeRes = await fetch(new URL("/api/auth/exchange-token", baseUrl), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ token }),
+          });
+          if (exchangeRes.ok) {
+            const data = await exchangeRes.json();
+            await refreshAuth();
+          } else {
+            setError("Google sign-in failed. Please try again.");
+          }
+        } else {
+          await refreshAuth();
+        }
       }
     } catch (err: any) {
       setError(err.message || "Google sign-in failed");

@@ -160,6 +160,14 @@ declare module "express-session" {
   }
 }
 
+const pendingAuthTokens = new Map<string, { userId: string; needsOnboarding: boolean; expiresAt: number }>();
+
+function generateAuthToken(userId: string, needsOnboarding: boolean): string {
+  const token = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  pendingAuthTokens.set(token, { userId, needsOnboarding, expiresAt: Date.now() + 60000 });
+  return token;
+}
+
 function setupSession(app: Express) {
   const PgStore = connectPg(session);
   const isProduction = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1";
@@ -493,20 +501,44 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         const business = await getBusinessByOwner(user.id);
         needsOnboarding = !business?.onboardingComplete;
       }
-      req.session.userId = user.id;
-      req.session.save(() => {
-        return res.send(`<!DOCTYPE html><html><head><title>Signed In</title>
-<meta http-equiv="refresh" content="1;url=quotepro://auth-callback?success=true">
+      const authToken = generateAuthToken(user.id, needsOnboarding);
+      const callbackUrl = `quotepro://auth-callback?token=${authToken}`;
+      return res.send(`<!DOCTYPE html><html><head><title>Signed In</title>
+<meta http-equiv="refresh" content="1;url=${callbackUrl}">
 <style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
 .card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
 .check{font-size:48px;margin-bottom:16px;color:#34C759;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
 </head><body><div class="card"><div class="check">&#10003;</div><h2>Signed In!</h2><p>Returning to QuotePro...</p></div>
-<script>setTimeout(function(){window.location.href='quotepro://auth-callback?success=true';},500);</script>
+<script>setTimeout(function(){window.location.href='${callbackUrl}';},500);</script>
 </body></html>`);
-      });
     } catch (error: any) {
       console.error("Google auth callback error:", error);
       return res.status(500).send("Google sign-in failed. Please try again.");
+    }
+  });
+
+  app.post("/api/auth/exchange-token", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.body;
+      if (!token) return res.status(400).json({ message: "Missing token" });
+      const pending = pendingAuthTokens.get(token);
+      if (!pending) return res.status(401).json({ message: "Invalid or expired token" });
+      if (Date.now() > pending.expiresAt) {
+        pendingAuthTokens.delete(token);
+        return res.status(401).json({ message: "Token expired" });
+      }
+      pendingAuthTokens.delete(token);
+      const user = await getUserById(pending.userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      req.session.userId = user.id;
+      req.session.save(() => {
+        return res.json({
+          user: { id: user.id, email: user.email, name: user.name, subscriptionTier: user.subscriptionTier || "free" },
+          needsOnboarding: pending.needsOnboarding,
+        });
+      });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Token exchange failed" });
     }
   });
 
