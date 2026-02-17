@@ -16,6 +16,7 @@ interface AuthContextType {
   register: (email: string, password: string, name?: string) => Promise<void>;
   loginWithApple: (data: { identityToken: string; user: string; fullName?: any; email?: string }) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  setAuthData: (user: AuthUser, needsOnboarding: boolean) => void;
   refreshAuth: () => Promise<void>;
   logout: () => Promise<void>;
   setNeedsOnboarding: (val: boolean) => void;
@@ -83,6 +84,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNeedsOnboarding(result.needsOnboarding);
   };
 
+  const setAuthData = (authUser: AuthUser, onboarding: boolean) => {
+    setUser(authUser);
+    setNeedsOnboarding(onboarding);
+  };
+
   const refreshAuth = async () => {
     try {
       const baseUrl = getApiUrl();
@@ -116,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         loginWithApple,
         loginWithGoogle,
+        setAuthData,
         refreshAuth,
         logout,
         setNeedsOnboarding,

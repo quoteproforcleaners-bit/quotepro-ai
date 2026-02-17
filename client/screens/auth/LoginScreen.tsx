@@ -28,7 +28,7 @@ type Mode = "login" | "register";
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { login, register, loginWithApple, refreshAuth } = useAuth();
+  const { login, register, loginWithApple, setAuthData, refreshAuth } = useAuth();
   const { language, setLanguage, t } = useLanguage();
 
   const [mode, setMode] = useState<Mode>("login");
@@ -134,12 +134,10 @@ export default function LoginScreen() {
           });
           if (exchangeRes.ok) {
             const data = await exchangeRes.json();
-            await refreshAuth();
+            setAuthData(data.user, data.needsOnboarding);
           } else {
             setError("Google sign-in failed. Please try again.");
           }
-        } else {
-          await refreshAuth();
         }
       }
     } catch (err: any) {
