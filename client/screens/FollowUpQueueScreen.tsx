@@ -8,6 +8,7 @@ import {
   Linking,
   Modal,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -35,11 +36,11 @@ interface FollowUpItem {
   sentAt: string | null;
   createdAt: string;
   lastContactAt: string | null;
-  customerId: number;
-  customerFirstName: string;
-  customerLastName: string;
-  customerPhone: string;
-  customerEmail: string;
+  customerId: number | null;
+  customerFirstName: string | null;
+  customerLastName: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
   lastTouchedAt: string | null;
   snoozedUntil: string | null;
 }
@@ -59,50 +60,61 @@ function getRelativeTime(dateStr: string | null): string {
   return `${days} days ago`;
 }
 
+function getCustomerDisplayName(item: FollowUpItem): string {
+  const first = item.customerFirstName?.trim();
+  const last = item.customerLastName?.trim();
+  if (first && last) return `${first} ${last}`;
+  if (first) return first;
+  if (last) return last;
+  return "Unlinked Quote";
+}
+
 function getSmsTemplate(age: number, firstName: string, quoteTotal: string, senderName: string): string {
+  const name = firstName || "there";
   if (age >= 10) {
-    return `Hi ${firstName}, just following up one last time on your cleaning quote for $${quoteTotal}. Should I keep this open or close it out? - ${senderName}`;
+    return `Hi ${name}, just following up one last time on your cleaning quote for $${quoteTotal}. Should I keep this open or close it out? - ${senderName}`;
   }
   if (age >= 7) {
-    return `Hi ${firstName}, any questions about the cleaning quote? Happy to adjust anything to make it work for you. - ${senderName}`;
+    return `Hi ${name}, any questions about the cleaning quote? Happy to adjust anything to make it work for you. - ${senderName}`;
   }
   if (age >= 5) {
-    return `Hi ${firstName}! Just a heads up - our schedule is filling up. Want to lock in your spot for the $${quoteTotal} cleaning? - ${senderName}`;
+    return `Hi ${name}! Just a heads up - our schedule is filling up. Want to lock in your spot for the $${quoteTotal} cleaning? - ${senderName}`;
   }
   if (age >= 3) {
-    return `Hi ${firstName}, wanted to make sure you saw the quote for $${quoteTotal}. We'd love to take care of your home! - ${senderName}`;
+    return `Hi ${name}, wanted to make sure you saw the quote for $${quoteTotal}. We'd love to take care of your home! - ${senderName}`;
   }
-  return `Hi ${firstName}! Just checking in on the cleaning quote I sent over for $${quoteTotal}. Would love to get you on the schedule! - ${senderName}`;
+  return `Hi ${name}! Just checking in on the cleaning quote I sent over for $${quoteTotal}. Would love to get you on the schedule! - ${senderName}`;
 }
 
 function getEmailTemplate(age: number, firstName: string, quoteTotal: string, senderName: string): { subject: string; body: string } {
+  const name = firstName || "there";
   if (age >= 10) {
     return {
       subject: `Following up on your cleaning quote`,
-      body: `Hi ${firstName},\n\nI wanted to follow up one last time on the cleaning quote for $${quoteTotal} that I sent over. I completely understand if the timing isn't right.\n\nShould I keep this quote open for you, or would you prefer I close it out? Either way, no pressure at all.\n\nBest,\n${senderName}`,
+      body: `Hi ${name},\n\nI wanted to follow up one last time on the cleaning quote for $${quoteTotal} that I sent over. I completely understand if the timing isn't right.\n\nShould I keep this quote open for you, or would you prefer I close it out? Either way, no pressure at all.\n\nBest,\n${senderName}`,
     };
   }
   if (age >= 7) {
     return {
       subject: `Any questions about your cleaning quote?`,
-      body: `Hi ${firstName},\n\nI wanted to check in about the cleaning quote I sent over. If you have any questions or if there's anything I can adjust to make it work better for you, I'm happy to help.\n\nFeel free to reach out anytime - I'd love to get you taken care of.\n\nBest,\n${senderName}`,
+      body: `Hi ${name},\n\nI wanted to check in about the cleaning quote I sent over. If you have any questions or if there's anything I can adjust to make it work better for you, I'm happy to help.\n\nFeel free to reach out anytime - I'd love to get you taken care of.\n\nBest,\n${senderName}`,
     };
   }
   if (age >= 5) {
     return {
       subject: `Our schedule is filling up!`,
-      body: `Hi ${firstName}!\n\nJust a heads up that our schedule is starting to fill up. I wanted to reach out before your preferred time slot gets taken.\n\nWant to lock in your spot for the $${quoteTotal} cleaning? Just reply to this email and we'll get you on the calendar.\n\nBest,\n${senderName}`,
+      body: `Hi ${name}!\n\nJust a heads up that our schedule is starting to fill up. I wanted to reach out before your preferred time slot gets taken.\n\nWant to lock in your spot for the $${quoteTotal} cleaning? Just reply to this email and we'll get you on the calendar.\n\nBest,\n${senderName}`,
     };
   }
   if (age >= 3) {
     return {
       subject: `Your cleaning quote for $${quoteTotal}`,
-      body: `Hi ${firstName},\n\nI wanted to make sure you received the cleaning quote I sent over for $${quoteTotal}. We'd love the opportunity to take care of your home.\n\nLet me know if you have any questions or if you're ready to get started!\n\nBest,\n${senderName}`,
+      body: `Hi ${name},\n\nI wanted to make sure you received the cleaning quote I sent over for $${quoteTotal}. We'd love the opportunity to take care of your home.\n\nLet me know if you have any questions or if you're ready to get started!\n\nBest,\n${senderName}`,
     };
   }
   return {
     subject: `Checking in on your cleaning quote`,
-    body: `Hi ${firstName}!\n\nJust checking in on the cleaning quote I sent over for $${quoteTotal}. I'd love to get you on the schedule whenever works best for you.\n\nFeel free to reach out if you have any questions at all!\n\nBest,\n${senderName}`,
+    body: `Hi ${name}!\n\nJust checking in on the cleaning quote I sent over for $${quoteTotal}. I'd love to get you on the schedule whenever works best for you.\n\nFeel free to reach out if you have any questions at all!\n\nBest,\n${senderName}`,
   };
 }
 
@@ -114,17 +126,25 @@ export default function FollowUpQueueScreen() {
   const { businessProfile } = useApp();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<FilterTab>("overdue");
+  const [activeTab, setActiveTab] = useState<FilterTab>("due_today");
   const [snoozeQuoteId, setSnoozeQuoteId] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastStreak, setToastStreak] = useState(0);
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   const senderName = businessProfile.senderName || businessProfile.companyName;
 
   useEffect(() => {
     trackEvent("followup_queue_open");
   }, []);
+
+  useEffect(() => {
+    if (feedbackMsg) {
+      const t = setTimeout(() => setFeedbackMsg(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [feedbackMsg]);
 
   const { data: queue = [], refetch, isLoading } = useQuery<FollowUpItem[]>({
     queryKey: ["/api/followup-queue"],
@@ -194,22 +214,47 @@ export default function FollowUpQueueScreen() {
     return queue.reduce((sum, item) => sum + (item.total || 0), 0);
   }, [queue]);
 
+  const showNoContactInfo = useCallback((type: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setFeedbackMsg(`No ${type} on file. Open the quote to add a customer first.`);
+  }, []);
+
   const handleText = useCallback(async (item: FollowUpItem) => {
     trackEvent("followup_text_tap");
+    if (!item.customerPhone) {
+      showNoContactInfo("phone number");
+      return;
+    }
     const age = getDaysSince(item.sentAt, item.createdAt);
-    const message = getSmsTemplate(age, item.customerFirstName, item.total.toLocaleString(), senderName);
+    const message = getSmsTemplate(age, item.customerFirstName || "", item.total.toLocaleString(), senderName);
     try {
+      const isAvailable = await SMS.isAvailableAsync();
+      if (!isAvailable) {
+        setFeedbackMsg("SMS is not available on this device");
+        return;
+      }
       await SMS.sendSMSAsync([item.customerPhone], message);
       touchMutation.mutate({ quoteId: item.id, channel: "sms" });
       showMomentumToast();
-    } catch {}
-  }, [senderName, touchMutation, showMomentumToast]);
+    } catch (e: any) {
+      setFeedbackMsg("Could not open messaging app");
+    }
+  }, [senderName, touchMutation, showMomentumToast, showNoContactInfo]);
 
   const handleEmail = useCallback(async (item: FollowUpItem) => {
     trackEvent("followup_email_tap");
+    if (!item.customerEmail) {
+      showNoContactInfo("email address");
+      return;
+    }
     const age = getDaysSince(item.sentAt, item.createdAt);
-    const { subject, body } = getEmailTemplate(age, item.customerFirstName, item.total.toLocaleString(), senderName);
+    const { subject, body } = getEmailTemplate(age, item.customerFirstName || "", item.total.toLocaleString(), senderName);
     try {
+      const isAvailable = await MailComposer.isAvailableAsync();
+      if (!isAvailable) {
+        setFeedbackMsg("Email is not available on this device");
+        return;
+      }
       await MailComposer.composeAsync({
         recipients: [item.customerEmail],
         subject,
@@ -217,17 +262,31 @@ export default function FollowUpQueueScreen() {
       });
       touchMutation.mutate({ quoteId: item.id, channel: "email" });
       showMomentumToast();
-    } catch {}
-  }, [senderName, touchMutation, showMomentumToast]);
+    } catch (e: any) {
+      setFeedbackMsg("Could not open email app");
+    }
+  }, [senderName, touchMutation, showMomentumToast, showNoContactInfo]);
 
   const handleCall = useCallback(async (item: FollowUpItem) => {
     trackEvent("followup_call_tap");
+    if (!item.customerPhone) {
+      showNoContactInfo("phone number");
+      return;
+    }
     try {
-      await Linking.openURL(`tel:${item.customerPhone}`);
+      const url = `tel:${item.customerPhone}`;
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        setFeedbackMsg("Phone calls are not supported on this device");
+        return;
+      }
+      await Linking.openURL(url);
       touchMutation.mutate({ quoteId: item.id, channel: "call" });
       showMomentumToast();
-    } catch {}
-  }, [touchMutation, showMomentumToast]);
+    } catch {
+      setFeedbackMsg("Could not open phone app");
+    }
+  }, [touchMutation, showMomentumToast, showNoContactInfo]);
 
   const handleMarkContacted = useCallback(async (item: FollowUpItem) => {
     trackEvent("followup_mark_contacted");
@@ -244,6 +303,10 @@ export default function FollowUpQueueScreen() {
     setSnoozeQuoteId(null);
   }, [snoozeQuoteId, touchMutation]);
 
+  const handleViewQuote = useCallback((item: FollowUpItem) => {
+    navigation.navigate("QuoteDetail", { quoteId: item.id });
+  }, [navigation]);
+
   const tabs: { key: FilterTab; label: string; count: number }[] = [
     { key: "overdue", label: "Overdue", count: categorized.overdue.length },
     { key: "due_today", label: "Due Today", count: categorized.dueToday.length },
@@ -256,88 +319,98 @@ export default function FollowUpQueueScreen() {
   const renderItem = useCallback(({ item }: { item: FollowUpItem }) => {
     const age = getDaysSince(item.sentAt, item.createdAt);
     const lastTouched = getRelativeTime(item.lastTouchedAt);
-    const customerName = `${item.customerFirstName} ${item.customerLastName}`;
+    const customerName = getCustomerDisplayName(item);
     const ageColor = age > 3 ? theme.error : age >= 1 ? theme.warning : theme.success;
+    const hasPhone = !!item.customerPhone;
+    const hasEmail = !!item.customerEmail;
+    const hasCustomer = !!item.customerId;
 
     return (
-      <Card style={styles.itemCard}>
-        <View style={styles.itemTop}>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="subtitle" numberOfLines={1}>{customerName}</ThemedText>
-            <View style={styles.itemMeta}>
-              <View style={[styles.ageBadge, { backgroundColor: `${ageColor}15` }]}>
-                <ThemedText type="caption" style={{ color: ageColor, fontWeight: "600" }}>
-                  {age === 0 ? "Today" : `${age}d`}
+      <Pressable onPress={() => handleViewQuote(item)}>
+        <Card style={styles.itemCard}>
+          <View style={styles.itemTop}>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="subtitle" numberOfLines={1}>{customerName}</ThemedText>
+              {!hasCustomer ? (
+                <ThemedText type="caption" style={{ color: theme.warning, marginTop: 2 }}>
+                  {"No customer linked - tap to view quote"}
+                </ThemedText>
+              ) : null}
+              <View style={styles.itemMeta}>
+                <View style={[styles.ageBadge, { backgroundColor: `${ageColor}15` }]}>
+                  <ThemedText type="caption" style={{ color: ageColor, fontWeight: "600" }}>
+                    {age === 0 ? "Today" : `${age}d`}
+                  </ThemedText>
+                </View>
+                <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                  {"Last: "}
+                  {lastTouched}
                 </ThemedText>
               </View>
-              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                {"Last: "}
-                {lastTouched}
-              </ThemedText>
             </View>
+            <ThemedText type="h4" style={{ color: theme.text }}>
+              {"$"}
+              {item.total.toLocaleString()}
+            </ThemedText>
           </View>
-          <ThemedText type="h4" style={{ color: theme.text }}>
-            {"$"}
-            {item.total.toLocaleString()}
-          </ThemedText>
-        </View>
 
-        <View style={[styles.actionRow, { borderTopColor: borderColor }]}>
-          <Pressable
-            style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
-            onPress={() => handleText(item)}
-            testID={`action-text-${item.id}`}
-          >
-            <Feather name="message-square" size={18} color={theme.primary} />
-            <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>{"Text"}</ThemedText>
-          </Pressable>
+          <View style={[styles.actionRow, { borderTopColor: borderColor }]}>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
+              onPress={() => handleText(item)}
+              testID={`action-text-${item.id}`}
+            >
+              <Feather name="message-square" size={18} color={hasPhone ? theme.primary : theme.textSecondary + "60"} />
+              <ThemedText type="caption" style={{ color: hasPhone ? theme.primary : theme.textSecondary + "60", marginLeft: 4 }}>{"Text"}</ThemedText>
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
-            onPress={() => handleEmail(item)}
-            testID={`action-email-${item.id}`}
-          >
-            <Feather name="mail" size={18} color={theme.primary} />
-            <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>{"Email"}</ThemedText>
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
+              onPress={() => handleEmail(item)}
+              testID={`action-email-${item.id}`}
+            >
+              <Feather name="mail" size={18} color={hasEmail ? theme.primary : theme.textSecondary + "60"} />
+              <ThemedText type="caption" style={{ color: hasEmail ? theme.primary : theme.textSecondary + "60", marginLeft: 4 }}>{"Email"}</ThemedText>
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
-            onPress={() => handleCall(item)}
-            testID={`action-call-${item.id}`}
-          >
-            <Feather name="phone" size={18} color={theme.primary} />
-            <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 4 }}>{"Call"}</ThemedText>
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
+              onPress={() => handleCall(item)}
+              testID={`action-call-${item.id}`}
+            >
+              <Feather name="phone" size={18} color={hasPhone ? theme.primary : theme.textSecondary + "60"} />
+              <ThemedText type="caption" style={{ color: hasPhone ? theme.primary : theme.textSecondary + "60", marginLeft: 4 }}>{"Call"}</ThemedText>
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
-            onPress={() => handleMarkContacted(item)}
-            testID={`action-mark-${item.id}`}
-          >
-            <Feather name="check-circle" size={18} color={theme.success} />
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
+              onPress={() => handleMarkContacted(item)}
+              testID={`action-mark-${item.id}`}
+            >
+              <Feather name="check-circle" size={18} color={theme.success} />
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
-            onPress={() => setSnoozeQuoteId(item.id)}
-            testID={`action-snooze-${item.id}`}
-          >
-            <Feather name="clock" size={18} color={theme.textSecondary} />
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
+              onPress={() => setSnoozeQuoteId(item.id)}
+              testID={`action-snooze-${item.id}`}
+            >
+              <Feather name="clock" size={18} color={theme.textSecondary} />
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
-            onPress={() => navigation.navigate("AIAssistant")}
-            testID={`action-ai-${item.id}`}
-          >
-            <Feather name="zap" size={16} color="#9B59B6" />
-            <ThemedText type="caption" style={{ color: "#9B59B6", marginLeft: 2, fontSize: 10 }}>{"AI"}</ThemedText>
-          </Pressable>
-        </View>
-      </Card>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed ? { opacity: 0.6 } : null]}
+              onPress={() => handleViewQuote(item)}
+              testID={`action-view-${item.id}`}
+            >
+              <Feather name="eye" size={16} color={theme.primary} />
+              <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 2, fontSize: 10 }}>{"View"}</ThemedText>
+            </Pressable>
+          </View>
+        </Card>
+      </Pressable>
     );
-  }, [theme, borderColor, handleText, handleEmail, handleCall, handleMarkContacted, navigation]);
+  }, [theme, borderColor, handleText, handleEmail, handleCall, handleMarkContacted, handleViewQuote, navigation]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -429,6 +502,13 @@ export default function FollowUpQueueScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {feedbackMsg ? (
+        <View style={[styles.feedbackBanner, { backgroundColor: isDark ? "#2D2D2D" : "#333333" }]}>
+          <Feather name="info" size={16} color="#FFFFFF" style={{ marginRight: Spacing.sm }} />
+          <ThemedText type="caption" style={{ color: "#FFFFFF", flex: 1 }}>{feedbackMsg}</ThemedText>
+        </View>
+      ) : null}
 
       <Modal
         visible={snoozeQuoteId !== null}
@@ -562,6 +642,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  feedbackBanner: {
+    position: "absolute",
+    bottom: 100,
+    left: Spacing.lg,
+    right: Spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   modalOverlay: {
     flex: 1,
