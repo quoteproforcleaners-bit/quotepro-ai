@@ -153,6 +153,7 @@ export async function updateBusiness(
     cashappHandle: string | null;
     paymentOptions: unknown;
     paymentNotes: string | null;
+    quotePreferences: unknown;
   }>
 ): Promise<Business> {
   const [business] = await db
