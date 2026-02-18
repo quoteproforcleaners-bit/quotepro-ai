@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { View, StyleSheet, Switch, TextInput, RefreshControl, ActivityIndicator, Pressable } from "react-native";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { View, StyleSheet, Switch, TextInput, RefreshControl, ActivityIndicator, Pressable, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -89,21 +89,35 @@ export default function QuotePreferencesScreen() {
   });
 
   const [prefs, setPrefs] = useState<QuotePreferences>(defaultPreferences);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (serverPrefs) setPrefs({ ...defaultPreferences, ...serverPrefs });
+    if (serverPrefs) {
+      setPrefs({ ...defaultPreferences, ...serverPrefs });
+      setHasChanges(false);
+    }
   }, [serverPrefs]);
 
-  const updatePref = async (key: keyof QuotePreferences, value: any) => {
-    const updated = { ...prefs, [key]: value };
-    setPrefs(updated);
+  const updatePref = useCallback((key: keyof QuotePreferences, value: any) => {
+    setPrefs(prev => ({ ...prev, [key]: value }));
+    setHasChanges(true);
     Haptics.selectionAsync();
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
     try {
-      await apiRequest("PUT", "/api/quote-preferences", updated);
+      await apiRequest("PUT", "/api/quote-preferences", prefs);
+      queryClient.invalidateQueries({ queryKey: ["/api/quote-preferences"] });
+      setHasChanges(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      setPrefs(prefs);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setSaving(false);
     }
-  };
+  }, [prefs, queryClient]);
 
   if (isLoading) {
     return (
@@ -114,104 +128,128 @@ export default function QuotePreferencesScreen() {
   }
 
   return (
-    <KeyboardAwareScrollViewCompat
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/quote-preferences"] })} tintColor={dt.accent} />}
-    >
-      <ThemedText type="h4" style={styles.sectionTitle}>Business Info on Quote</ThemedText>
-      <Card style={styles.sectionCard}>
-        {businessInfoToggles.map((toggle, index) => (
-          <ToggleRow
-            key={toggle.key}
-            label={toggle.label}
-            description={toggle.description}
-            value={prefs[toggle.key] as boolean}
-            onValueChange={(v) => updatePref(toggle.key, v)}
-            dt={dt}
-            last={index === businessInfoToggles.length - 1}
-            testID={`switch-${toggle.key}`}
-          />
-        ))}
-      </Card>
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <KeyboardAwareScrollViewCompat
+        style={styles.container}
+        contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + 80, paddingHorizontal: Spacing.lg }}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/quote-preferences"] })} tintColor={dt.accent} />}
+      >
+        <ThemedText type="h4" style={styles.sectionTitle}>Business Info on Quote</ThemedText>
+        <Card style={styles.sectionCard}>
+          {businessInfoToggles.map((toggle, index) => (
+            <ToggleRow
+              key={toggle.key}
+              label={toggle.label}
+              description={toggle.description}
+              value={prefs[toggle.key] as boolean}
+              onValueChange={(v) => updatePref(toggle.key, v)}
+              dt={dt}
+              last={index === businessInfoToggles.length - 1}
+              testID={`switch-${toggle.key}`}
+            />
+          ))}
+        </Card>
 
-      <ThemedText type="h4" style={styles.sectionTitle}>Quote Details</ThemedText>
-      <Card style={styles.sectionCard}>
-        {quoteDetailToggles.map((toggle, index) => (
-          <ToggleRow
-            key={toggle.key}
-            label={toggle.label}
-            description={toggle.description}
-            value={prefs[toggle.key] as boolean}
-            onValueChange={(v) => updatePref(toggle.key, v)}
-            dt={dt}
-            last={index === quoteDetailToggles.length - 1}
-            testID={`switch-${toggle.key}`}
-          />
-        ))}
-      </Card>
+        <ThemedText type="h4" style={styles.sectionTitle}>Quote Details</ThemedText>
+        <Card style={styles.sectionCard}>
+          {quoteDetailToggles.map((toggle, index) => (
+            <ToggleRow
+              key={toggle.key}
+              label={toggle.label}
+              description={toggle.description}
+              value={prefs[toggle.key] as boolean}
+              onValueChange={(v) => updatePref(toggle.key, v)}
+              dt={dt}
+              last={index === quoteDetailToggles.length - 1}
+              testID={`switch-${toggle.key}`}
+            />
+          ))}
+        </Card>
 
-      <ThemedText type="h4" style={styles.sectionTitle}>Branding</ThemedText>
-      <Card style={styles.sectionCard}>
-        <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>
-          Set a brand color that appears on your customer-facing quotes.
-        </ThemedText>
-        <View style={styles.colorPalette}>
-          {BRAND_COLORS.map((color) => {
-            const isSelected = prefs.brandColor.toUpperCase() === color.toUpperCase();
-            return (
-              <Pressable
-                key={color}
-                testID={`color-${color}`}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  updatePref("brandColor", color);
-                }}
-                style={[
-                  styles.colorSwatch,
-                  { backgroundColor: color },
-                  isSelected ? styles.colorSwatchSelected : undefined,
-                ]}
-              >
-                {isSelected ? (
-                  <Feather name="check" size={18} color="#FFFFFF" />
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-        <View style={[styles.colorRow, { marginTop: Spacing.md }]}>
+        <ThemedText type="h4" style={styles.sectionTitle}>Branding</ThemedText>
+        <Card style={styles.sectionCard}>
+          <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>
+            Set a brand color that appears on your customer-facing quotes.
+          </ThemedText>
+          <View style={styles.colorPalette}>
+            {BRAND_COLORS.map((color) => {
+              const isSelected = prefs.brandColor.toUpperCase() === color.toUpperCase();
+              return (
+                <Pressable
+                  key={color}
+                  testID={`color-${color}`}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    updatePref("brandColor", color);
+                  }}
+                  style={[
+                    styles.colorSwatch,
+                    { backgroundColor: color },
+                    isSelected ? styles.colorSwatchSelected : undefined,
+                  ]}
+                >
+                  {isSelected ? (
+                    <Feather name="check" size={18} color="#FFFFFF" />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={[styles.colorRow, { marginTop: Spacing.md }]}>
+            <TextInput
+              testID="input-brand-color"
+              value={prefs.brandColor}
+              onChangeText={(t) => updatePref("brandColor", t)}
+              placeholder="#2563EB"
+              placeholderTextColor={dt.textSecondary}
+              autoCapitalize="characters"
+              style={[styles.colorInput, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
+            />
+            <View style={[styles.colorPreview, { backgroundColor: prefs.brandColor || "#2563EB", borderColor: dt.border }]} />
+          </View>
+        </Card>
+
+        <ThemedText type="h4" style={styles.sectionTitle}>Default Terms</ThemedText>
+        <Card>
+          <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>
+            Custom terms and conditions text that appears on your quotes when enabled.
+          </ThemedText>
           <TextInput
-            testID="input-brand-color"
-            value={prefs.brandColor}
-            onChangeText={(t) => updatePref("brandColor", t)}
-            placeholder="#2563EB"
+            testID="input-terms-text"
+            value={prefs.termsText}
+            onChangeText={(t) => updatePref("termsText", t)}
+            placeholder="Enter your terms and conditions..."
             placeholderTextColor={dt.textSecondary}
-            autoCapitalize="characters"
-            style={[styles.colorInput, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+            style={[styles.termsInput, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
           />
-          <View style={[styles.colorPreview, { backgroundColor: prefs.brandColor || "#2563EB", borderColor: dt.border }]} />
-        </View>
-      </Card>
+        </Card>
+      </KeyboardAwareScrollViewCompat>
 
-      <ThemedText type="h4" style={styles.sectionTitle}>Default Terms</ThemedText>
-      <Card>
-        <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>
-          Custom terms and conditions text that appears on your quotes when enabled.
-        </ThemedText>
-        <TextInput
-          testID="input-terms-text"
-          value={prefs.termsText}
-          onChangeText={(t) => updatePref("termsText", t)}
-          placeholder="Enter your terms and conditions..."
-          placeholderTextColor={dt.textSecondary}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-          style={[styles.termsInput, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
-        />
-      </Card>
-    </KeyboardAwareScrollViewCompat>
+      {hasChanges ? (
+        <View style={[styles.saveButtonContainer, { paddingBottom: insets.bottom + Spacing.md }]}>
+          <Pressable
+            testID="button-save-preferences"
+            onPress={handleSave}
+            disabled={saving}
+            style={[styles.saveButton, { backgroundColor: dt.accent, opacity: saving ? 0.7 : 1 }]}
+          >
+            {saving ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Feather name="check" size={20} color="#FFFFFF" style={{ marginRight: Spacing.sm }} />
+                <ThemedText type="subtitle" style={{ color: "#FFFFFF", fontWeight: "700" }}>
+                  Save Changes
+                </ThemedText>
+              </>
+            )}
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -253,4 +291,25 @@ const styles = StyleSheet.create({
   colorInput: { flex: 1, borderWidth: 1, borderRadius: BorderRadius.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: 14 },
   colorPreview: { width: 44, height: 44, borderRadius: BorderRadius.xs, borderWidth: 1 },
   termsInput: { borderWidth: 1, borderRadius: BorderRadius.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: 14, minHeight: 100 },
+  saveButtonContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    backgroundColor: "transparent",
+  },
+  saveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
 });
