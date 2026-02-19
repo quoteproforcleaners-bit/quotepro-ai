@@ -278,7 +278,7 @@ export default function QuoteDetailScreen() {
       const subject = subjectMatch ? subjectMatch[1].trim() : `Quote from ${businessProfile?.companyName || "QuotePro"}`;
       const bodyText = subjectMatch ? aiDraft.replace(/^Subject:\s*.+?\n+/i, "").trim() : aiDraft;
 
-      const payload = { to: recipientEmail, subject, body: bodyText, customerId: quote.customerId, quoteId: quote.id };
+      const payload = { to: recipientEmail, subject, body: bodyText, customerId: quote.customerId, quoteId: quote.id, includeQuoteLink: true };
 
       const res = await apiRequest("POST", "/api/send/email", payload);
       const data = await res.json();
@@ -918,6 +918,23 @@ export default function QuoteDetailScreen() {
           </Pressable>
 
           <Pressable
+            onPress={async () => {
+              const link = `${getApiUrl()}/q/${quote.publicToken}`;
+              await Clipboard.setStringAsync(link);
+              if (Platform.OS !== "web") {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+              setSendSuccess("Quote link copied!");
+              setTimeout(() => setSendSuccess(null), 3000);
+            }}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="copy-link-btn"
+          >
+            <Feather name="link" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Copy Link</ThemedText>
+          </Pressable>
+
+          <Pressable
             onPress={handleDelete}
             style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
             testID="delete-quote-btn"
@@ -957,6 +974,88 @@ export default function QuoteDetailScreen() {
               </ThemedText>
             </Pressable>
           ))}
+        </View>
+
+        <SectionHeader title="Activity Timeline" />
+
+        <View style={[styles.timelineCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          {(() => {
+            const events: { icon: string; title: string; date: string; color: string; subtitle?: string }[] = [];
+
+            events.push({
+              icon: "plus-circle",
+              title: "Created",
+              date: new Date(quote.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
+              color: theme.primary,
+            });
+
+            if (quote.sentAt) {
+              events.push({
+                icon: "send",
+                title: "Sent",
+                date: new Date(quote.sentAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
+                color: theme.primary,
+                subtitle: quote.sentVia ? `via ${quote.sentVia}` : undefined,
+              });
+            }
+
+            if (quote.aiNotes && typeof quote.aiNotes === "string" && quote.aiNotes.includes("viewed_at:")) {
+              const viewMatch = quote.aiNotes.match(/viewed_at:\s*(.+?)(?:\n|$)/);
+              events.push({
+                icon: "eye",
+                title: "Viewed",
+                date: viewMatch ? new Date(viewMatch[1].trim()).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "Viewed",
+                color: theme.success,
+              });
+            }
+
+            if (quote.acceptedAt) {
+              events.push({
+                icon: "check-circle",
+                title: "Accepted",
+                date: new Date(quote.acceptedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
+                color: theme.success,
+              });
+            }
+
+            if (quote.declinedAt) {
+              events.push({
+                icon: "x-circle",
+                title: "Declined",
+                date: new Date(quote.declinedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
+                color: theme.error,
+              });
+            }
+
+            if (quote.expiresAt && new Date(quote.expiresAt) < new Date() && status !== "accepted") {
+              events.push({
+                icon: "clock",
+                title: "Expired",
+                date: new Date(quote.expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
+                color: theme.textSecondary,
+              });
+            }
+
+            return events.map((event, index) => (
+              <View key={index} style={styles.timelineItem}>
+                <View style={styles.timelineDotColumn}>
+                  <View style={[styles.timelineDot, { backgroundColor: event.color }]}>
+                    <Feather name={event.icon as any} size={12} color="#FFFFFF" />
+                  </View>
+                  {index < events.length - 1 ? (
+                    <View style={[styles.timelineLine, { backgroundColor: theme.border }]} />
+                  ) : null}
+                </View>
+                <View style={styles.timelineContent}>
+                  <ThemedText type="body" style={{ fontWeight: "600" }}>{event.title}</ThemedText>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                    {event.date}
+                    {event.subtitle ? ` \u2022 ${event.subtitle}` : ""}
+                  </ThemedText>
+                </View>
+              </View>
+            ));
+          })()}
         </View>
       </ScrollView>
 
@@ -1214,5 +1313,36 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+  },
+  timelineCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  timelineItem: {
+    flexDirection: "row",
+    minHeight: 48,
+  },
+  timelineDotColumn: {
+    alignItems: "center",
+    width: 28,
+    marginRight: Spacing.sm,
+  },
+  timelineDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    marginVertical: 4,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingBottom: Spacing.md,
   },
 });

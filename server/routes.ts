@@ -202,6 +202,21 @@ function requireAuth(req: Request, res: Response, next: Function) {
   next();
 }
 
+async function requirePro(req: Request, res: Response, next: Function) {
+  try {
+    const user = await getUserById(req.session.userId!);
+    if (!user || user.subscriptionTier !== "pro") {
+      return res.status(403).json({ 
+        message: "This feature requires a Pro subscription",
+        requiresUpgrade: true,
+      });
+    }
+    next();
+  } catch {
+    return res.status(500).json({ message: "Subscription check failed" });
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   setupSession(app);
 
@@ -1206,77 +1221,70 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
 
   // ─── Quote PDF ───
 
-  app.get("/api/quotes/:id/pdf", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const quote = await getQuoteById(req.params.id);
-      if (!quote) return res.status(404).json({ message: "Quote not found" });
+  // Helper function to generate quote PDF HTML
+  async function generateQuotePdfHtml(quote: any, business: any): Promise<string> {
+    const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
+    const customerEmail = (quote.propertyDetails as any)?.customerEmail || "";
+    const customerPhone = (quote.propertyDetails as any)?.customerPhone || "";
+    const customerAddress = (quote.propertyDetails as any)?.customerAddress || "";
+    const options = quote.options as any;
 
-      const business = await getBusinessByOwner(req.session.userId!);
-      if (!business) return res.status(404).json({ message: "Business not found" });
+    const addOnLabels: Record<string, string> = {
+      insideFridge: "Inside Fridge",
+      insideOven: "Inside Oven",
+      insideCabinets: "Inside Cabinets",
+      interiorWindows: "Interior Windows",
+      blindsDetail: "Blinds Detail",
+      baseboardsDetail: "Baseboards Detail",
+      laundryFoldOnly: "Laundry (Fold Only)",
+      dishes: "Dishes",
+      organizationTidy: "Organization/Tidy",
+    };
 
-      const selectedOpt = (quote.options as any)?.[quote.selectedOption || "better"];
-      const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
-      const customerEmail = (quote.propertyDetails as any)?.customerEmail || "";
-      const customerPhone = (quote.propertyDetails as any)?.customerPhone || "";
-      const customerAddress = (quote.propertyDetails as any)?.customerAddress || "";
-      const options = quote.options as any;
+    const activeAddOns = Object.entries(quote.addOns as any || {})
+      .filter(([_, v]) => v)
+      .map(([k]) => addOnLabels[k] || k);
 
-      const addOnLabels: Record<string, string> = {
-        insideFridge: "Inside Fridge",
-        insideOven: "Inside Oven",
-        insideCabinets: "Inside Cabinets",
-        interiorWindows: "Interior Windows",
-        blindsDetail: "Blinds Detail",
-        baseboardsDetail: "Baseboards Detail",
-        laundryFoldOnly: "Laundry (Fold Only)",
-        dishes: "Dishes",
-        organizationTidy: "Organization/Tidy",
-      };
+    const optionRows = ["good", "better", "best"]
+      .map((key) => {
+        const opt = options?.[key];
+        if (!opt) return "";
+        const isSelected = quote.selectedOption === key;
+        return `<tr style="${isSelected ? "background:#EBF5FF;font-weight:600;" : ""}">
+          <td style="padding:12px;border-bottom:1px solid #eee;">${opt.serviceTypeName || opt.name || key}${isSelected ? " *" : ""}</td>
+          <td style="padding:12px;border-bottom:1px solid #eee;text-align:right;">$${(opt.price || 0).toFixed(2)}</td>
+        </tr>`;
+      })
+      .join("");
 
-      const activeAddOns = Object.entries(quote.addOns as any || {})
-        .filter(([_, v]) => v)
-        .map(([k]) => addOnLabels[k] || k);
+    const primaryColor = business.primaryColor || "#2563EB";
 
-      const optionRows = ["good", "better", "best"]
-        .map((key) => {
-          const opt = options?.[key];
-          if (!opt) return "";
-          const isSelected = quote.selectedOption === key;
-          return `<tr style="${isSelected ? "background:#EBF5FF;font-weight:600;" : ""}">
-            <td style="padding:12px;border-bottom:1px solid #eee;">${opt.serviceTypeName || opt.name || key}${isSelected ? " *" : ""}</td>
-            <td style="padding:12px;border-bottom:1px solid #eee;text-align:right;">$${(opt.price || 0).toFixed(2)}</td>
-          </tr>`;
-        })
-        .join("");
-
-      const primaryColor = business.primaryColor || "#2563EB";
-
-      let paymentHtml = "";
-      const po = business.paymentOptions as any;
-      if (po) {
-        const methodLabels: Record<string, string> = { cash: "Cash", check: "Check", creditCard: "Credit Card", venmo: "Venmo", cashApp: "Cash App", zelle: "Zelle", applePay: "Apple Pay", ach: "ACH / Bank Transfer", other: "Other" };
-        const pMethods: string[] = [];
-        for (const [key, label] of Object.entries(methodLabels)) {
-          const opt = po[key];
-          if (opt?.enabled) {
-            let line = opt.label || label;
-            if (key === "venmo" && business.venmoHandle) line += ` (@${business.venmoHandle})`;
-            if (key === "cashApp" && business.cashappHandle) line += ` ($${business.cashappHandle})`;
-            if (opt.handle && key !== "venmo" && key !== "cashApp") line += ` (${opt.handle})`;
-            if (opt.feeNote) line += ` - ${opt.feeNote}`;
-            pMethods.push(line);
-          }
-        }
-        if (pMethods.length > 0) {
-          paymentHtml = `<div style="margin-top:24px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;"><div style="font-size:14px;font-weight:600;color:${primaryColor};margin-bottom:8px;">Payment Methods Accepted</div><ul style="margin:0;padding:0 0 0 18px;font-size:13px;color:#334155;">`;
-          for (const m of pMethods) paymentHtml += `<li style="margin-bottom:4px;">${m}</li>`;
-          paymentHtml += `</ul>`;
-          if (business.paymentNotes) paymentHtml += `<p style="margin:12px 0 0;font-size:12px;color:#64748b;font-style:italic;">${business.paymentNotes}</p>`;
-          paymentHtml += `</div>`;
+    let paymentHtml = "";
+    const po = business.paymentOptions as any;
+    if (po) {
+      const methodLabels: Record<string, string> = { cash: "Cash", check: "Check", creditCard: "Credit Card", venmo: "Venmo", cashApp: "Cash App", zelle: "Zelle", applePay: "Apple Pay", ach: "ACH / Bank Transfer", other: "Other" };
+      const pMethods: string[] = [];
+      for (const [key, label] of Object.entries(methodLabels)) {
+        const opt = po[key];
+        if (opt?.enabled) {
+          let line = opt.label || label;
+          if (key === "venmo" && business.venmoHandle) line += ` (@${business.venmoHandle})`;
+          if (key === "cashApp" && business.cashappHandle) line += ` ($${business.cashappHandle})`;
+          if (opt.handle && key !== "venmo" && key !== "cashApp") line += ` (${opt.handle})`;
+          if (opt.feeNote) line += ` - ${opt.feeNote}`;
+          pMethods.push(line);
         }
       }
+      if (pMethods.length > 0) {
+        paymentHtml = `<div style="margin-top:24px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;"><div style="font-size:14px;font-weight:600;color:${primaryColor};margin-bottom:8px;">Payment Methods Accepted</div><ul style="margin:0;padding:0 0 0 18px;font-size:13px;color:#334155;">`;
+        for (const m of pMethods) paymentHtml += `<li style="margin-bottom:4px;">${m}</li>`;
+        paymentHtml += `</ul>`;
+        if (business.paymentNotes) paymentHtml += `<p style="margin:12px 0 0;font-size:12px;color:#64748b;font-style:italic;">${business.paymentNotes}</p>`;
+        paymentHtml += `</div>`;
+      }
+    }
 
-      const html = `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;padding:40px;color:#1a1a1a;font-size:14px;}
 .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;border-bottom:3px solid ${primaryColor};padding-bottom:20px;}
@@ -1324,10 +1332,138 @@ ${paymentHtml}
 <div class="footer">Quote generated by ${business.companyName || "QuotePro"} | ${new Date().toLocaleDateString()}</div>
 </body></html>`;
 
+    return html;
+  }
+
+  app.get("/api/quotes/:id/pdf", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const quote = await getQuoteById(req.params.id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
+      const html = await generateQuotePdfHtml(quote, business);
+
       return res.json({ html, customerName, total: quote.total });
     } catch (error: any) {
       console.error("PDF generation error:", error);
       return res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
+  app.post("/api/quotes/:id/send-with-pdf", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const quote = await getQuoteById(req.params.id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { to, subject } = req.body;
+      if (!to) {
+        return res.status(400).json({ message: "to (recipient email) is required" });
+      }
+
+      const sgApiKey = process.env.SENDGRID_API_KEY;
+      if (!sgApiKey) {
+        return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
+      }
+
+      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+      const fromName = business.companyName || "QuotePro";
+      const replyToEmail = business.email || undefined;
+
+      if (!replyToEmail) {
+        return res.status(400).json({ success: false, message: "Please add your email address in Settings before sending emails." });
+      }
+
+      const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
+      const quoteHtml = await generateQuotePdfHtml(quote, business);
+      const primaryColor = business.primaryColor || "#2563EB";
+
+      // Build quote URL for the "View & Accept Quote" button
+      const domain = process.env.EXPO_PUBLIC_DOMAIN || req.get("host");
+      const quoteUrl = `https://${domain}/q/${quote.publicToken}`;
+
+      // Create a branded wrapper email with the quote HTML embedded and a CTA button
+      const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;">
+        <!-- Quote HTML Embedded -->
+        <tr><td>
+          ${quoteHtml}
+        </td></tr>
+        <!-- CTA Button Section -->
+        <tr><td align="center" style="padding:32px 20px;background-color:#ffffff;">
+          <a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:16px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;margin-bottom:16px;">View & Accept Your Quote Online</a>
+          <p style="margin:16px 0 0;font-size:12px;color:#999999;">
+            Can't click? Copy and paste this link: <a href="${quoteUrl}" style="color:${primaryColor};text-decoration:none;">${quoteUrl}</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+      const emailPayload: any = {
+        personalizations: [{ to: [{ email: to }] }],
+        from: { email: brandedFromEmail, name: fromName },
+        subject: subject || `Your ${business.companyName || "QuotePro"} Quote`,
+        content: [
+          { type: "text/plain", value: `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}` },
+          { type: "text/html", value: emailHtml },
+        ],
+      };
+      if (replyToEmail) {
+        emailPayload.reply_to = { email: replyToEmail, name: fromName };
+      }
+
+      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${sgApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emailPayload),
+      });
+
+      if (!sgRes.ok) {
+        const errText = await sgRes.text();
+        console.error("SendGrid error:", sgRes.status, errText);
+        let errorDetail = "Failed to send email";
+        try {
+          const errJson = JSON.parse(errText);
+          if (errJson.errors && errJson.errors.length > 0) {
+            errorDetail = errJson.errors.map((e: any) => e.message).join("; ");
+          }
+        } catch {}
+        return res.status(502).json({ message: errorDetail });
+      }
+
+      console.log(`Quote email sent via SendGrid: from=${brandedFromEmail}, to=${to}, quoteId=${quote.id}, status=${sgRes.status}`);
+
+      await createCommunication({
+        businessId: business.id,
+        quoteId: quote.id,
+        customerId: quote.customerId || undefined,
+        channel: "email",
+        direction: "outbound",
+        content: `Quote email sent to ${to}`,
+        status: "sent",
+      });
+
+      return res.json({ success: true, message: "Quote email sent successfully" });
+    } catch (error: any) {
+      console.error("Send quote email error:", error);
+      return res.status(500).json({ message: "Failed to send quote email" });
     }
   });
 
@@ -1456,23 +1592,6 @@ ${paymentHtml}
       return res.status(500).json({ message: "Failed to get revenue data" });
     }
   });
-
-  // ─── Subscription Middleware ───
-
-  const requirePro = async (req: Request, res: Response, next: Function) => {
-    try {
-      const user = await getUserById(req.session.userId!);
-      if (!user || user.subscriptionTier !== "pro") {
-        return res.status(403).json({ 
-          message: "This feature requires a Pro subscription",
-          requiresUpgrade: true,
-        });
-      }
-      next();
-    } catch {
-      return res.status(500).json({ message: "Subscription check failed" });
-    }
-  };
 
   // ─── Revenue / Follow-Ups ───
 
@@ -1814,7 +1933,7 @@ ${paymentHtml}
 
   app.post("/api/send/email", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
-      const { to, subject, body, customerId, quoteId } = req.body;
+      const { to, subject, body, customerId, quoteId, includeQuoteLink } = req.body;
       if (!to || !body) {
         return res.status(400).json({ message: "to and body are required" });
       }
@@ -1835,6 +1954,23 @@ ${paymentHtml}
         return res.status(400).json({ success: false, message: "Please add your email address in Settings before sending emails. This ensures customer replies go directly to you." });
       }
 
+      let bodyContent = body;
+      let quoteButtonHtml = "";
+
+      // Add quote link button if requested
+      if (includeQuoteLink && quoteId) {
+        const quote = await getQuoteById(quoteId);
+        if (quote && quote.publicToken) {
+          const domain = process.env.EXPO_PUBLIC_DOMAIN || req.get("host");
+          const quoteUrl = `https://${domain}/q/${quote.publicToken}`;
+          const primaryColor = business.primaryColor || "#2563EB";
+          quoteButtonHtml = `
+<div style="margin-top:24px;text-align:center;">
+  <a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Accept Your Quote</a>
+</div>`;
+        }
+      }
+
       const htmlBody = `
 <!DOCTYPE html>
 <html>
@@ -1847,7 +1983,8 @@ ${paymentHtml}
           <h2 style="color:#ffffff;margin:0;font-size:20px;">${fromName}</h2>
         </td></tr>
         <tr><td style="padding:32px;">
-          ${body.split('\n').map((line: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333333;">${line}</p>`).join('')}
+          ${bodyContent.split('\n').map((line: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333333;">${line}</p>`).join('')}
+          ${quoteButtonHtml}
         </td></tr>
         <tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;">
           <p style="margin:0;font-size:12px;color:#999999;">Sent via QuotePro</p>
@@ -1864,7 +2001,7 @@ ${paymentHtml}
         from: { email: brandedFromEmail, name: fromName },
         subject: subject || `Message from ${fromName}`,
         content: [
-          { type: "text/plain", value: body },
+          { type: "text/plain", value: bodyContent },
           { type: "text/html", value: htmlBody },
         ],
       };
@@ -1902,7 +2039,7 @@ ${paymentHtml}
         quoteId: quoteId || undefined,
         channel: "email",
         direction: "outbound",
-        content: body,
+        content: bodyContent,
         status: "sent",
       });
 
