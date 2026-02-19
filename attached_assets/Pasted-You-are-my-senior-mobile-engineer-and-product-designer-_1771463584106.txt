@@ -1,0 +1,78 @@
+You are my senior mobile engineer and product designer. I have an existing iOS app called QuotePro built in Replit (React Native / Expo style). There is a “Quote Details” screen with actions like Send Quote, Follow Up, Thank You, Confirm Booking, Reschedule, and buttons for “Write Email” and “Write SMS”.
+
+GOAL:
+Make the Quote experience feel world-class like Jobber:
+1) When the app generates an AI email/SMS to send the quote, it should automatically include the quote PDF as an attachment by default.
+2) The user must be able to remove the attachment via a simple checkbox toggle: “Attach Quote PDF (recommended)” that is ON by default.
+3) Add a mechanism for the customer to accept the quote (Approve / Accept), and when they do, the quote status updates inside the app and triggers next steps.
+
+REQUIREMENTS:
+A) PDF Quote Attachment
+- Create a branded PDF generator for quotes.
+- PDF should include: company logo (uploaded by user), company name + contact info, customer name + address, quote number, created date, expiration date, service type, home details (beds/baths/sqft), line items / add-ons, frequency, subtotal, discounts, total, notes, and “Terms”.
+- PDF layout should look clean and modern (simple spacing, sections, totals box), similar to Jobber style.
+- PDF should be generated/stored and then attached to the outbound email from the app if the checkbox is enabled.
+- The checkbox exists in the “Email – Send Quote” composer UI and defaults to ON. If unchecked, email sends without attachment.
+
+Implementation details:
+- Store PDF file reference in the Quote record (pdfUrl or localPath + upload storage).
+- If email is sent via backend: send email with attachment (base64 or file URL).
+- If email is sent via device mail composer: generate PDF locally and attach, or provide share sheet attachment.
+
+B) Customer Quote Acceptance (Approve Flow)
+- Add “Customer Acceptance” to each quote:
+  - Status values: Draft, Sent, Viewed (optional), Accepted, Declined, Expired.
+- When sending the quote, include a secure “View & Accept Quote” link for the customer (in email and SMS).
+- Build a simple mobile-friendly public web page (hosted endpoint) that shows:
+  - Quote summary, total, included services, add-ons, notes, terms
+  - Buttons: “Accept Quote” and “Request Changes”
+  - Optional: “Decline”
+- Use a secure tokenized link (unique signed token) so the customer does NOT need an account.
+- When customer clicks Accept:
+  - Record acceptance timestamp, IP/user agent (basic audit trail), and acceptedByName + optional signature (typed name is fine for v1).
+  - Update quote status in the app to Accepted.
+  - Trigger an in-app banner and/or push/local notification: “Quote Accepted 🎉”
+  - Optional next step: show “Confirm Booking” CTA automatically.
+
+C) “Make it feel premium” UX improvements
+- On the Quote Details screen, show a status pill (Draft/Sent/Accepted/etc).
+- Show an activity timeline:
+  - Quote created
+  - Sent via Email/SMS
+  - Viewed (if tracked)
+  - Accepted/Declined
+- Add quick actions:
+  - Resend Quote
+  - Copy acceptance link
+  - Export PDF
+- Add “Quote expiration” default (e.g., 7 or 14 days) editable in settings.
+
+D) Data model / storage
+- Quote table fields:
+  - id, quoteNumber, customerId, serviceType, beds, baths, sqft, frequency, lineItems[], subtotal, discounts, total, notes, terms, status, createdAt, sentAt, viewedAt, acceptedAt, declinedAt, expiresAt
+  - pdfUrl
+  - acceptance: { acceptedName, acceptedAt, audit: { ip, userAgent } }
+  - publicToken (hashed stored token) and tokenExpiresAt
+- Ensure migrations are included if needed.
+
+E) Backend endpoints (if backend exists; if not, create a minimal one in the Replit project)
+- POST /quotes/:id/generate-pdf  -> returns pdfUrl
+- POST /quotes/:id/send-email     -> includes option attachPdf: true/false
+- POST /quotes/:id/send-sms       -> includes acceptance link
+- GET  /q/:token                  -> public quote page
+- POST /q/:token/accept           -> marks accepted
+- POST /q/:token/request-changes  -> captures message and notifies business owner
+
+F) Edge cases
+- If PDF generation fails, show “Couldn’t generate PDF” and allow sending without attachment.
+- If quote expired, public page shows “This quote has expired” with “Contact us” message.
+- If quote already accepted, public page shows “Already accepted” and details.
+
+DELIVERABLES:
+1) Implement the checkbox in the Email composer UI and wire it to attachment logic.
+2) Implement PDF generation and storage.
+3) Implement customer acceptance link + public page + accept endpoint.
+4) Update Quote Details UI with status pill + activity log.
+5) Provide clean, commented code and explain where to configure email/SMS providers (SendGrid/Twilio/etc) if used.
+
+Do not remove existing features. Keep the UI consistent with current dark theme but make the quote flow feel polished and modern.

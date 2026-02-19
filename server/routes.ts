@@ -3631,6 +3631,384 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  // ─── Public Quote Pages ───
+
+  app.get("/q/:token", async (req: Request, res: Response) => {
+    try {
+      const q = await getQuoteByToken(req.params.token);
+      if (!q) {
+        return res.status(404).send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Not Found</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 1px 3px rgba(0,0,0,0.08)}.icon{font-size:48px;margin-bottom:16px}h1{font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}</style></head><body><div class="card"><div class="icon">&#128269;</div><h1>Quote Not Found</h1><p>This quote link is invalid or has been removed. Please contact the business for a new quote.</p></div></body></html>`);
+      }
+
+      const business = await db_getBusinessById(q.businessId);
+      const customer = q.customerId ? await getCustomerById(q.customerId) : null;
+      const lineItems = await getLineItemsByQuote(q.id);
+      const brandColor = business?.primaryColor || "#2563EB";
+      const companyName = business?.companyName || "Our Company";
+      const logoUri = business?.logoUri || "";
+
+      try {
+        await pool.query(`UPDATE quotes SET updated_at = NOW() WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM quotes WHERE id = $1 AND ai_notes LIKE '%viewed_at%')`, [q.id]);
+        if (!q.aiNotes || !q.aiNotes.includes("viewed_at")) {
+          const existingNotes = q.aiNotes || "";
+          const viewedNote = `viewed_at:${new Date().toISOString()}`;
+          const newNotes = existingNotes ? `${existingNotes}\n${viewedNote}` : viewedNote;
+          await updateQuote(q.id, { aiNotes: newNotes });
+        }
+      } catch (_e) {}
+
+      if (q.expiresAt && new Date(q.expiresAt) < new Date()) {
+        return res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Expired</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 1px 3px rgba(0,0,0,0.08)}.icon{font-size:48px;margin-bottom:16px}h1{font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}.brand{color:${brandColor};font-weight:600}</style></head><body><div class="card"><div class="icon">&#9203;</div><h1>Quote Expired</h1><p>This quote from <span class="brand">${companyName}</span> has expired. Please contact us for an updated quote.</p>${business?.phone ? `<p style="margin-top:16px"><a href="tel:${business.phone}" style="color:${brandColor}">${business.phone}</a></p>` : ""}</div></body></html>`);
+      }
+
+      if (q.status === "accepted") {
+        const acceptedDate = q.acceptedAt ? new Date(q.acceptedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
+        return res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Accepted</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 1px 3px rgba(0,0,0,0.08)}.check{width:64px;height:64px;border-radius:50%;background:#DCFCE7;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px}h1{font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}.brand{color:${brandColor};font-weight:600}.total{font-size:28px;font-weight:700;color:#16A34A;margin:16px 0}</style></head><body><div class="card"><div class="check">&#10003;</div><h1>Quote Accepted</h1><p>You accepted this quote from <span class="brand">${companyName}</span>${acceptedDate ? ` on ${acceptedDate}` : ""}.</p><div class="total">$${Number(q.total).toFixed(2)}</div><p>We'll be in touch to schedule your service.</p>${business?.phone ? `<p style="margin-top:16px"><a href="tel:${business.phone}" style="color:${brandColor}">${business.phone}</a></p>` : ""}</div></body></html>`);
+      }
+
+      const opts = (q.options || {}) as any;
+      const addOns = (q.addOns || {}) as any;
+      const details = (q.propertyDetails || {}) as any;
+      const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : "";
+      const customerAddress = customer?.address || details?.address || "";
+
+      const optionLabels: Record<string, string> = { good: "Good", better: "Better", best: "Best" };
+      const optionDescriptions: Record<string, string> = {
+        good: "Essential cleaning for a tidy home",
+        better: "Thorough cleaning with extra attention to detail",
+        best: "Premium deep clean with all the extras"
+      };
+
+      let optionsHtml = "";
+      for (const key of ["good", "better", "best"]) {
+        const price = opts[key];
+        if (price === undefined && price !== 0) continue;
+        const isSelected = q.selectedOption === key;
+        optionsHtml += `<div style="border:2px solid ${isSelected ? brandColor : "#E2E8F0"};border-radius:12px;padding:20px;margin-bottom:12px;background:${isSelected ? brandColor + "08" : "#fff"};position:relative;transition:all 0.2s">
+          ${isSelected ? `<div style="position:absolute;top:-10px;right:16px;background:${brandColor};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px">SELECTED</div>` : ""}
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><div style="font-size:16px;font-weight:700;color:#1E293B">${optionLabels[key] || key}</div><div style="font-size:13px;color:#64748B;margin-top:2px">${optionDescriptions[key] || ""}</div></div>
+            <div style="font-size:22px;font-weight:700;color:${isSelected ? brandColor : "#1E293B"}">$${Number(price).toFixed(2)}</div>
+          </div>
+        </div>`;
+      }
+
+      let addOnsHtml = "";
+      const addOnEntries = Object.entries(addOns).filter(([_, v]: any) => v && (typeof v === "object" ? v.selected : v));
+      if (addOnEntries.length > 0) {
+        addOnsHtml = `<div style="margin-top:24px"><h3 style="font-size:15px;font-weight:600;color:#475569;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Add-Ons Included</h3>`;
+        for (const [name, val] of addOnEntries) {
+          const price = typeof val === "object" ? (val as any).price || 0 : 0;
+          const label = name.replace(/([A-Z])/g, " $1").replace(/^./, (s: string) => s.toUpperCase()).replace(/_/g, " ");
+          addOnsHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F1F5F9"><span style="font-size:14px;color:#334155">${label}</span>${price ? `<span style="font-size:14px;font-weight:600;color:#1E293B">+$${Number(price).toFixed(2)}</span>` : `<span style="font-size:13px;color:#16A34A;font-weight:500">Included</span>`}</div>`;
+        }
+        addOnsHtml += `</div>`;
+      }
+
+      let lineItemsHtml = "";
+      if (lineItems.length > 0) {
+        lineItemsHtml = `<div style="margin-top:24px"><h3 style="font-size:15px;font-weight:600;color:#475569;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Service Details</h3>`;
+        for (const li of lineItems) {
+          lineItemsHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F1F5F9"><span style="font-size:14px;color:#334155">${li.name}${li.quantity > 1 ? ` x${li.quantity}` : ""}</span><span style="font-size:14px;font-weight:600;color:#1E293B">$${Number(li.totalPrice).toFixed(2)}</span></div>`;
+        }
+        lineItemsHtml += `</div>`;
+      }
+
+      const propertyInfo = [];
+      if (q.propertyBeds) propertyInfo.push(`${q.propertyBeds} Bed`);
+      if (q.propertyBaths) propertyInfo.push(`${q.propertyBaths} Bath`);
+      if (q.propertySqft) propertyInfo.push(`${q.propertySqft.toLocaleString()} sq ft`);
+
+      const expiresText = q.expiresAt ? `Valid until ${new Date(q.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : "";
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Quote from ${companyName}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#F1F5F9;color:#1E293B;-webkit-font-smoothing:antialiased}
+.top-bar{background:${brandColor};padding:16px 20px;text-align:center}
+.top-bar img{max-height:40px;margin-bottom:4px}
+.top-bar .co-name{color:#fff;font-size:18px;font-weight:700}
+.container{max-width:520px;margin:0 auto;padding:0 16px 40px}
+.quote-card{background:#fff;border-radius:16px;margin-top:-8px;padding:28px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04)}
+.greeting{font-size:20px;font-weight:700;color:#1E293B;margin-bottom:4px}
+.sub{font-size:14px;color:#64748B;margin-bottom:20px}
+.prop-info{display:flex;gap:16px;flex-wrap:wrap;padding:14px 16px;background:#F8FAFC;border-radius:10px;margin-bottom:24px}
+.prop-chip{font-size:13px;color:#475569;font-weight:500}
+.section-title{font-size:15px;font-weight:600;color:#475569;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px}
+.total-row{display:flex;justify-content:space-between;align-items:center;padding:20px 0;border-top:2px solid #E2E8F0;margin-top:24px}
+.total-label{font-size:18px;font-weight:600;color:#475569}
+.total-price{font-size:32px;font-weight:800;color:${brandColor}}
+.freq{display:inline-block;background:${brandColor}12;color:${brandColor};font-size:13px;font-weight:600;padding:4px 12px;border-radius:20px;margin-top:4px}
+.actions{margin-top:24px;display:flex;flex-direction:column;gap:10px}
+.btn-accept{display:block;width:100%;padding:16px;background:#16A34A;color:#fff;font-size:16px;font-weight:700;border:none;border-radius:12px;cursor:pointer;text-align:center;transition:background 0.2s}
+.btn-accept:hover{background:#15803D}
+.btn-changes{display:block;width:100%;padding:14px;background:transparent;color:${brandColor};font-size:15px;font-weight:600;border:2px solid ${brandColor};border-radius:12px;cursor:pointer;text-align:center;transition:all 0.2s}
+.btn-changes:hover{background:${brandColor}08}
+.btn-decline{display:block;text-align:center;margin-top:8px;color:#94A3B8;font-size:13px;cursor:pointer;text-decoration:none;transition:color 0.2s}
+.btn-decline:hover{color:#64748B}
+.expires{text-align:center;margin-top:16px;font-size:12px;color:#94A3B8}
+.footer{text-align:center;padding:24px;font-size:12px;color:#94A3B8}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.active{display:flex}
+.modal{background:#fff;border-radius:16px;padding:32px 24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.15)}
+.modal h2{font-size:20px;font-weight:700;color:#1E293B;margin-bottom:4px}
+.modal p{font-size:14px;color:#64748B;margin-bottom:20px}
+.modal input{width:100%;padding:14px 16px;border:2px solid #E2E8F0;border-radius:10px;font-size:16px;outline:none;transition:border-color 0.2s}
+.modal input:focus{border-color:${brandColor}}
+.modal .modal-actions{display:flex;gap:10px;margin-top:16px}
+.modal .modal-actions button{flex:1;padding:12px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;border:none}
+.modal .btn-confirm{background:#16A34A;color:#fff}
+.modal .btn-cancel{background:#F1F5F9;color:#475569}
+.changes-modal textarea{width:100%;padding:14px 16px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;outline:none;resize:vertical;min-height:100px;font-family:inherit;transition:border-color 0.2s}
+.changes-modal textarea:focus{border-color:${brandColor}}
+.success-state{display:none;text-align:center;padding:40px 20px}
+.success-state.active{display:block}
+.success-icon{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px}
+.main-content{}
+.main-content.hidden{display:none}
+@media(max-width:480px){.quote-card{padding:20px 16px}.total-price{font-size:28px}}
+</style>
+</head>
+<body>
+<div class="top-bar">
+  ${logoUri ? `<img src="${logoUri}" alt="${companyName}" onerror="this.style.display='none'"><br>` : ""}
+  <span class="co-name">${companyName}</span>
+</div>
+<div class="container">
+  <div class="quote-card">
+    <div class="main-content" id="mainContent">
+      <div class="greeting">${customerName ? `Hi ${customerName.split(" ")[0]},` : "Your Quote"}</div>
+      <div class="sub">${customerName ? "Here's your personalized quote." : "Review the details below."}</div>
+
+      ${propertyInfo.length > 0 || customerAddress ? `<div class="prop-info">
+        ${propertyInfo.map(p => `<span class="prop-chip">${p}</span>`).join("")}
+        ${customerAddress ? `<span class="prop-chip">${customerAddress}</span>` : ""}
+      </div>` : ""}
+
+      ${optionsHtml ? `<div><h3 class="section-title">Service Options</h3>${optionsHtml}</div>` : ""}
+
+      ${addOnsHtml}
+      ${lineItemsHtml}
+
+      <div class="total-row">
+        <div>
+          <div class="total-label">Total</div>
+          ${q.frequencySelected && q.frequencySelected !== "one-time" ? `<span class="freq">${q.frequencySelected}</span>` : ""}
+        </div>
+        <div class="total-price">$${Number(q.total).toFixed(2)}</div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-accept" onclick="showAcceptModal()">Accept Quote</button>
+        <button class="btn-changes" onclick="showChangesModal()">Request Changes</button>
+        <a class="btn-decline" onclick="handleDecline()">No thanks, decline this quote</a>
+      </div>
+
+      ${expiresText ? `<div class="expires">${expiresText}</div>` : ""}
+    </div>
+
+    <div class="success-state" id="acceptedState">
+      <div class="success-icon" style="background:#DCFCE7;color:#16A34A">&#10003;</div>
+      <h2 style="font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px">Quote Accepted!</h2>
+      <p style="font-size:15px;color:#64748B">Thank you! We'll reach out shortly to schedule your service.</p>
+      <div style="font-size:28px;font-weight:700;color:#16A34A;margin:16px 0">$${Number(q.total).toFixed(2)}</div>
+    </div>
+
+    <div class="success-state" id="declinedState">
+      <div class="success-icon" style="background:#FEF2F2;color:#EF4444">&#10005;</div>
+      <h2 style="font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px">Quote Declined</h2>
+      <p style="font-size:15px;color:#64748B">We understand. Feel free to reach out if you change your mind or need a new quote.</p>
+    </div>
+
+    <div class="success-state" id="changesState">
+      <div class="success-icon" style="background:#FEF3C7;color:#F59E0B">&#9998;</div>
+      <h2 style="font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px">Changes Requested</h2>
+      <p style="font-size:15px;color:#64748B">We've received your message and will get back to you with an updated quote.</p>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  ${business?.phone ? `<a href="tel:${business.phone}" style="color:${brandColor};text-decoration:none">${business.phone}</a> &middot; ` : ""}
+  ${business?.email ? `<a href="mailto:${business.email}" style="color:${brandColor};text-decoration:none">${business.email}</a><br>` : ""}
+  Powered by QuotePro
+</div>
+
+<div class="modal-overlay" id="acceptModal">
+  <div class="modal">
+    <h2>Accept Quote</h2>
+    <p>Type your full name below as your digital signature to accept this quote for <strong>$${Number(q.total).toFixed(2)}</strong>.</p>
+    <input type="text" id="signatureName" placeholder="Your full name" autocomplete="name">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModals()">Cancel</button>
+      <button class="btn-confirm" onclick="handleAccept()">Confirm</button>
+    </div>
+    <div id="acceptError" style="color:#EF4444;font-size:13px;margin-top:8px;display:none"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="changesModal">
+  <div class="modal changes-modal">
+    <h2>Request Changes</h2>
+    <p>Let us know what you'd like adjusted and we'll send an updated quote.</p>
+    <textarea id="changesMessage" placeholder="Tell us what changes you'd like..."></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModals()">Cancel</button>
+      <button class="btn-confirm" style="background:${brandColor}" onclick="handleChanges()">Send Request</button>
+    </div>
+    <div id="changesError" style="color:#EF4444;font-size:13px;margin-top:8px;display:none"></div>
+  </div>
+</div>
+
+<script>
+function showAcceptModal(){document.getElementById("acceptModal").classList.add("active");document.getElementById("signatureName").focus()}
+function showChangesModal(){document.getElementById("changesModal").classList.add("active");document.getElementById("changesMessage").focus()}
+function closeModals(){document.querySelectorAll(".modal-overlay").forEach(function(m){m.classList.remove("active")})}
+function showState(id){document.getElementById("mainContent").classList.add("hidden");document.getElementById(id).classList.add("active")}
+
+async function handleAccept(){
+  var name=document.getElementById("signatureName").value.trim();
+  if(!name){document.getElementById("acceptError").textContent="Please enter your name.";document.getElementById("acceptError").style.display="block";return}
+  try{
+    var r=await fetch("/q/${q.publicToken}/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({acceptedName:name})});
+    var d=await r.json();
+    if(d.success){closeModals();showState("acceptedState")}
+    else{document.getElementById("acceptError").textContent=d.message||"Something went wrong.";document.getElementById("acceptError").style.display="block"}
+  }catch(e){document.getElementById("acceptError").textContent="Network error. Please try again.";document.getElementById("acceptError").style.display="block"}
+}
+
+async function handleDecline(){
+  if(!confirm("Are you sure you want to decline this quote?"))return;
+  try{
+    var r=await fetch("/q/${q.publicToken}/decline",{method:"POST",headers:{"Content-Type":"application/json"}});
+    var d=await r.json();
+    if(d.success){showState("declinedState")}
+  }catch(e){alert("Something went wrong. Please try again.")}
+}
+
+async function handleChanges(){
+  var msg=document.getElementById("changesMessage").value.trim();
+  if(!msg){document.getElementById("changesError").textContent="Please describe the changes you'd like.";document.getElementById("changesError").style.display="block";return}
+  try{
+    var r=await fetch("/q/${q.publicToken}/request-changes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg})});
+    var d=await r.json();
+    if(d.success){closeModals();showState("changesState")}
+    else{document.getElementById("changesError").textContent=d.message||"Something went wrong.";document.getElementById("changesError").style.display="block"}
+  }catch(e){document.getElementById("changesError").textContent="Network error. Please try again.";document.getElementById("changesError").style.display="block"}
+}
+
+document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListener("click",function(e){if(e.target===m)closeModals()})});
+</script>
+</body>
+</html>`;
+
+      return res.send(html);
+    } catch (error: any) {
+      console.error("Public quote page error:", error);
+      return res.status(500).send(`<!DOCTYPE html><html><head><title>Error</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F8FAFC}.card{text-align:center;padding:40px;background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}h1{color:#1E293B;margin-bottom:8px}p{color:#64748B}</style></head><body><div class="card"><h1>Something went wrong</h1><p>Please try again or contact the business directly.</p></div></body></html>`);
+    }
+  });
+
+  app.post("/q/:token/accept", async (req: Request, res: Response) => {
+    try {
+      const q = await getQuoteByToken(req.params.token);
+      if (!q) return res.status(404).json({ success: false, message: "Quote not found" });
+
+      if (q.expiresAt && new Date(q.expiresAt) < new Date()) {
+        return res.status(400).json({ success: false, message: "This quote has expired" });
+      }
+
+      if (q.status === "accepted") {
+        return res.status(400).json({ success: false, message: "This quote has already been accepted" });
+      }
+
+      if (q.status === "declined") {
+        return res.status(400).json({ success: false, message: "This quote has been declined" });
+      }
+
+      const { acceptedName } = req.body;
+      if (!acceptedName || typeof acceptedName !== "string" || !acceptedName.trim()) {
+        return res.status(400).json({ success: false, message: "Please provide your name" });
+      }
+
+      const existingDetails = (q.propertyDetails || {}) as any;
+      const updatedDetails = {
+        ...existingDetails,
+        acceptanceSignature: acceptedName.trim(),
+        acceptedVia: "web",
+        acceptedIp: req.ip || req.headers["x-forwarded-for"] || "unknown",
+      };
+
+      await updateQuote(q.id, {
+        status: "accepted",
+        acceptedAt: new Date(),
+        propertyDetails: updatedDetails,
+      });
+
+      await cancelPendingCommunicationsForQuote(q.id);
+
+      if (q.customerId) {
+        try { await updateCustomer(q.customerId, { status: "active" }); } catch (_e) {}
+      }
+
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error("Accept quote error:", error);
+      return res.status(500).json({ success: false, message: "Failed to accept quote" });
+    }
+  });
+
+  app.post("/q/:token/decline", async (req: Request, res: Response) => {
+    try {
+      const q = await getQuoteByToken(req.params.token);
+      if (!q) return res.status(404).json({ success: false, message: "Quote not found" });
+
+      if (q.status === "accepted") {
+        return res.status(400).json({ success: false, message: "This quote has already been accepted" });
+      }
+
+      await updateQuote(q.id, {
+        status: "declined",
+        declinedAt: new Date(),
+      });
+
+      await cancelPendingCommunicationsForQuote(q.id);
+
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error("Decline quote error:", error);
+      return res.status(500).json({ success: false, message: "Failed to decline quote" });
+    }
+  });
+
+  app.post("/q/:token/request-changes", async (req: Request, res: Response) => {
+    try {
+      const q = await getQuoteByToken(req.params.token);
+      if (!q) return res.status(404).json({ success: false, message: "Quote not found" });
+
+      const { message } = req.body;
+      if (!message || typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({ success: false, message: "Please provide a message" });
+      }
+
+      const existingNotes = q.aiNotes || "";
+      const changeRequest = `[Change Request ${new Date().toISOString()}]: ${message.trim()}`;
+      const newNotes = existingNotes ? `${existingNotes}\n${changeRequest}` : changeRequest;
+
+      await updateQuote(q.id, { aiNotes: newNotes });
+
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error("Request changes error:", error);
+      return res.status(500).json({ success: false, message: "Failed to submit change request" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   setInterval(async () => {
