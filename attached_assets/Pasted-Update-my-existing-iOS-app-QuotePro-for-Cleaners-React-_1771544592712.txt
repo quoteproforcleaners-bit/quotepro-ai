@@ -1,0 +1,76 @@
+Update my existing iOS app “QuotePro for Cleaners” (React Native / Expo project) to be fully compliant with Apple App Store Guideline 3.1.2 for auto-renewable subscriptions.
+
+IMPORTANT:
+This is a compliance update only. Do NOT redesign the app, change branding, or modify core functionality. Keep the UI clean, minimal, and consistent with the current design.
+
+--------------------------------------------------
+PART 1 — PAYWALL / UPGRADE / SUBSCRIPTION SCREEN (REQUIRED)
+--------------------------------------------------
+
+On the screen where users see pricing or tap “Upgrade” or purchase a subscription:
+
+1. Display Subscription Information clearly:
+   - Subscription title (example: “QuotePro Pro”)
+   - Billing period (example: “Monthly Auto-Renewing Subscription”)
+   - Price format (example: “$9.99 / month”)
+
+2. Add a small legal compliance footer at the bottom of the screen (centered, small grey text, professional SaaS style) that includes:
+
+   Clickable links:
+   - Privacy Policy: https://www.freeprivacypolicy.com/live/9ac71f0a-aa27-477d-98b2-5f8c103f766a
+   - Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+
+   These links must:
+   - Be tappable
+   - Open using Linking.openURL (or in-app browser)
+   - Work on both iPhone and iPad layouts
+   - Always be visible without requiring excessive scrolling
+
+3. Add Apple-required subscription disclosure text directly under the pricing section in small readable font:
+
+   “Payment will be charged to your Apple ID at confirmation of purchase. Subscription automatically renews unless canceled at least 24 hours before the end of the billing period. You can manage or cancel your subscription in your Apple Account Settings.”
+
+--------------------------------------------------
+PART 2 — RESTORE PURCHASES BUTTON (APPLE BEST PRACTICE)
+--------------------------------------------------
+
+On the same subscription/paywall screen:
+- Add a visible “Restore Purchases” button below the subscribe/upgrade button
+- Connect it to the existing in-app purchase restore function
+- Style it as a subtle secondary button (not primary CTA)
+
+--------------------------------------------------
+PART 3 — SETTINGS → LEGAL & COMPLIANCE SECTION (BACKUP REQUIREMENT)
+--------------------------------------------------
+
+Inside the app Settings screen:
+1. Create a new section titled: “Legal & Compliance”
+2. Add two clickable rows:
+   - Privacy Policy → https://www.freeprivacypolicy.com/live/9ac71f0a-aa27-477d-98b2-5f8c103f766a
+   - Terms of Use (EULA) → https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+3. Ensure links open correctly on iOS devices
+
+--------------------------------------------------
+PART 4 — TECHNICAL IMPLEMENTATION DETAILS
+--------------------------------------------------
+
+- Use React Native Linking.openURL() for external links
+- Ensure compatibility with iPhone and iPad screen sizes (responsive layout)
+- Do NOT hide legal links behind multiple menus
+- Do NOT break existing navigation or subscription logic
+- Keep styling modern, minimal, and consistent with the QuotePro UI
+- Do not remove any existing features or screens
+
+--------------------------------------------------
+PART 5 — GOAL
+--------------------------------------------------
+
+Ensure the app visibly shows ALL Apple-required subscription elements:
+- Subscription title
+- Subscription duration
+- Price clarity
+- Privacy Policy link (functional)
+- Terms of Use (EULA) link (functional)
+- Restore Purchases button
+
+This update is specifically to pass Apple App Review Guideline 3.1.2 without requiring a full UI redesign.

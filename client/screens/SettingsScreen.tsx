@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput } from "react-native";
+import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -1133,6 +1133,44 @@ export default function SettingsScreen() {
           </ThemedText>
         </View>
         <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+      </Pressable>
+
+      <SectionHeader title={language === "en" ? "Legal & Compliance" : "Legal y Cumplimiento"} />
+
+      <Pressable
+        onPress={() => Linking.openURL("https://www.freeprivacypolicy.com/live/9ac71f0a-aa27-477d-98b2-5f8c103f766a")}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-privacy-policy"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="shield" size={20} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              {language === "en" ? "Privacy Policy" : "Politica de Privacidad"}
+            </ThemedText>
+          </View>
+          <Feather name="external-link" size={18} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
+        onPress={() => Linking.openURL("https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-terms-of-use"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="file-text" size={20} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              {language === "en" ? "Terms of Use (EULA)" : "Terminos de Uso (EULA)"}
+            </ThemedText>
+          </View>
+          <Feather name="external-link" size={18} color={theme.textSecondary} />
+        </View>
       </Pressable>
 
       <SectionHeader title={t.settings.about} />

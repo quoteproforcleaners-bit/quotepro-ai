@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, ActivityIndicator, Platform, Modal, ScrollView } from "react-native";
+import { View, StyleSheet, Pressable, ActivityIndicator, Platform, Modal, ScrollView, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
@@ -9,6 +9,9 @@ import { useTheme } from "@/hooks/useTheme";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
+
+const PRIVACY_POLICY_URL = "https://www.freeprivacypolicy.com/live/9ac71f0a-aa27-477d-98b2-5f8c103f766a";
+const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 
 type ModalState = {
   visible: boolean;
@@ -146,13 +149,20 @@ export default function PaywallScreen() {
         </View>
 
         <View style={styles.pricingContainer}>
+          <ThemedText type="body" style={{ color: theme.textSecondary, fontWeight: "600", marginBottom: 2 }}>
+            QuotePro Pro
+          </ThemedText>
           <ThemedText type="h3" style={styles.price}>
             {monthlyPrice}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>
-            {t.paywall.perMonth}
+            Monthly Auto-Renewing Subscription
           </ThemedText>
         </View>
+
+        <ThemedText type="caption" style={[styles.disclosureText, { color: theme.textSecondary }]}>
+          Payment will be charged to your Apple ID at confirmation of purchase. Subscription automatically renews unless canceled at least 24 hours before the end of the billing period. You can manage or cancel your subscription in your Apple Account Settings.
+        </ThemedText>
 
         <Pressable
           onPress={handlePurchase}
@@ -172,10 +182,6 @@ export default function PaywallScreen() {
           )}
         </Pressable>
 
-        <ThemedText type="caption" style={[styles.freeNote, { color: theme.textSecondary }]}>
-          {t.paywall.freePlanNote}
-        </ThemedText>
-
         <Pressable
           onPress={handleRestore}
           disabled={purchasing || restoring}
@@ -190,6 +196,24 @@ export default function PaywallScreen() {
             </ThemedText>
           )}
         </Pressable>
+
+        <ThemedText type="caption" style={[styles.freeNote, { color: theme.textSecondary }]}>
+          {t.paywall.freePlanNote}
+        </ThemedText>
+
+        <View style={styles.legalFooter}>
+          <Pressable onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} testID="link-privacy-policy">
+            <ThemedText type="caption" style={[styles.legalLink, { color: theme.primary }]}>
+              Privacy Policy
+            </ThemedText>
+          </Pressable>
+          <ThemedText type="caption" style={{ color: theme.textSecondary }}>  |  </ThemedText>
+          <Pressable onPress={() => Linking.openURL(TERMS_URL)} testID="link-terms">
+            <ThemedText type="caption" style={[styles.legalLink, { color: theme.primary }]}>
+              Terms of Use (EULA)
+            </ThemedText>
+          </Pressable>
+        </View>
       </ScrollView>
 
       <Modal
@@ -310,6 +334,23 @@ const styles = StyleSheet.create({
   restoreBtn: {
     marginTop: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  disclosureText: {
+    textAlign: "center",
+    marginBottom: Spacing.lg,
+    lineHeight: 16,
+    paddingHorizontal: Spacing.sm,
+  },
+  legalFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: Spacing.xl,
+    paddingTop: Spacing.md,
+  },
+  legalLink: {
+    fontWeight: "500",
+    textDecorationLine: "underline",
   },
   modalOverlay: {
     flex: 1,
