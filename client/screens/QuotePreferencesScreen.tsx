@@ -37,6 +37,7 @@ interface QuotePreferences {
   showTerms: boolean;
   termsText: string;
   brandColor: string;
+  defaultExpirationDays: number;
 }
 
 const BRAND_COLORS = [
@@ -59,6 +60,7 @@ const defaultPreferences: QuotePreferences = {
   showTerms: false,
   termsText: "",
   brandColor: "#2563EB",
+  defaultExpirationDays: 14,
 };
 
 const businessInfoToggles: { key: keyof QuotePreferences; label: string; description: string }[] = [
@@ -226,6 +228,36 @@ export default function QuotePreferencesScreen() {
             style={[styles.termsInput, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
           />
         </Card>
+
+        <ThemedText type="h4" style={styles.sectionTitle}>Quote Expiration</ThemedText>
+        <Card style={styles.sectionCard}>
+          <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.md }}>
+            Set a default expiration period for new quotes. Expired quotes are automatically marked and shown to customers.
+          </ThemedText>
+          {[7, 14, 30, 0].map((days) => {
+            const isSelected = prefs.defaultExpirationDays === days;
+            const label = days === 0 ? "No expiration" : `${days} days`;
+            return (
+              <Pressable
+                key={days}
+                testID={`expiration-${days}`}
+                onPress={() => updatePref("defaultExpirationDays", days)}
+                style={[
+                  styles.expirationOption,
+                  {
+                    backgroundColor: isSelected ? dt.accentSoft : "transparent",
+                    borderColor: isSelected ? dt.accent : dt.border,
+                  },
+                ]}
+              >
+                <ThemedText type="subtitle" style={isSelected ? { color: dt.accent, fontWeight: "600" } : undefined}>
+                  {label}
+                </ThemedText>
+                {isSelected ? <Feather name="check" size={18} color={dt.accent} /> : null}
+              </Pressable>
+            );
+          })}
+        </Card>
       </KeyboardAwareScrollViewCompat>
 
       {hasChanges ? (
@@ -291,6 +323,16 @@ const styles = StyleSheet.create({
   colorInput: { flex: 1, borderWidth: 1, borderRadius: BorderRadius.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: 14 },
   colorPreview: { width: 44, height: 44, borderRadius: BorderRadius.xs, borderWidth: 1 },
   termsInput: { borderWidth: 1, borderRadius: BorderRadius.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: 14, minHeight: 100 },
+  expirationOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    marginBottom: Spacing.sm,
+  },
   saveButtonContainer: {
     position: "absolute",
     bottom: 0,

@@ -2190,7 +2190,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
 
   app.post("/api/ai/communication-draft", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
-      const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, paymentMethodsText, language: commLang } = req.body;
+      const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;
 
       if (!type || !purpose) {
         return res.status(400).json({ message: "type and purpose are required" });
@@ -2218,10 +2218,10 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
       const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
 
       if (type === "sms") {
-        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${langInstruction}`;
+        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
         userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
       } else {
-        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this link so the customer can view and accept their quote online: ${quoteLink}` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
         userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
       }
 
