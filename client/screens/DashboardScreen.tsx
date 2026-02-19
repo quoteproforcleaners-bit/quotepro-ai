@@ -419,7 +419,7 @@ export default function DashboardScreen() {
     if (lower.includes("quote") && lower.includes("create")) {
       navigation.navigate("QuoteCalculator");
     } else if (lower.includes("revenue") || lower.includes("report")) {
-      navigation.navigate("Main", { screen: "RevenueTab" });
+      navigation.navigate("WeeklyRecap");
     } else if (lower.includes("follow")) {
       executeCommand("follow up quotes");
     } else if (lower.includes("draft") || lower.includes("message")) {
