@@ -24,6 +24,8 @@ import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
 import { SectionHeader } from "@/components/SectionHeader";
 import { useApp } from "@/context/AppContext";
+import { useSubscription } from "@/context/SubscriptionContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Customer {
   id: string;
@@ -56,11 +58,14 @@ export default function CustomerDetailScreen() {
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
+  const { isPro } = useSubscription();
+  const { communicationLanguage } = useLanguage();
   const [showCommForm, setShowCommForm] = useState(false);
   const [commChannel, setCommChannel] = useState<string>("phone");
   const [commSubject, setCommSubject] = useState("");
   const [commContent, setCommContent] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [aiDrafting, setAiDrafting] = useState(false);
 
   const { data: customer, isLoading } = useQuery<Customer>({
     queryKey: ["/api/customers", customerId],
@@ -226,6 +231,37 @@ export default function CustomerDetailScreen() {
 
   const handleStatusChange = (status: string) => {
     updateMutation.mutate({ status });
+  };
+
+  const handleAiDraft = async () => {
+    if (!customer || aiDrafting) return;
+    setAiDrafting(true);
+    try {
+      const res = await apiRequest("POST", "/api/ai/communication-draft", {
+        type: commChannel,
+        purpose: "initial_quote",
+        customerName: `${customer.firstName} ${customer.lastName}`.trim(),
+        companyName: businessProfile.companyName,
+        senderName: businessProfile.senderName || businessProfile.companyName,
+        bookingLink: businessProfile.bookingLink || undefined,
+        language: communicationLanguage,
+      });
+      const data = await res.json();
+      if (data.draft) {
+        let draft = data.draft;
+        if (commChannel === "email" && draft.startsWith("Subject:")) {
+          const lines = draft.split("\n");
+          const subjectLine = lines[0].replace("Subject:", "").trim();
+          setCommSubject(subjectLine);
+          draft = lines.slice(1).join("\n").trim();
+        }
+        setCommContent(draft);
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e?.message || "Could not generate draft");
+    } finally {
+      setAiDrafting(false);
+    }
   };
 
   const handleDelete = () => {
@@ -817,6 +853,43 @@ export default function CustomerDetailScreen() {
               numberOfLines={3}
               testID="input-comm-content"
             />
+            {(commChannel === "email" || commChannel === "sms") && isPro ? (
+              <Pressable
+                onPress={handleAiDraft}
+                disabled={aiDrafting}
+                style={[
+                  styles.aiDraftBtn,
+                  { backgroundColor: `${theme.accent}15`, borderColor: `${theme.accent}30` },
+                ]}
+                testID="button-ai-draft"
+              >
+                {aiDrafting ? (
+                  <ActivityIndicator size="small" color={theme.accent} />
+                ) : (
+                  <>
+                    <Feather name="zap" size={14} color={theme.accent} />
+                    <ThemedText type="small" style={{ color: theme.accent, fontWeight: "600", marginLeft: 6 }}>
+                      AI Draft
+                    </ThemedText>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+            {(commChannel === "email" || commChannel === "sms") && !isPro ? (
+              <Pressable
+                onPress={() => navigation.navigate("Paywall")}
+                style={[
+                  styles.aiDraftBtn,
+                  { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+                ]}
+                testID="button-ai-draft-locked"
+              >
+                <Feather name="lock" size={14} color={theme.textSecondary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, fontWeight: "600", marginLeft: 6 }}>
+                  AI Draft (Pro)
+                </ThemedText>
+              </Pressable>
+            ) : null}
             <View testID="submit-comm-btn">
               <Button
                 onPress={() => {
@@ -1087,6 +1160,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: Spacing.sm,
     marginBottom: Spacing.md,
+  },
+  aiDraftBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
   },
   commChannelButton: {
     flexDirection: "row",
