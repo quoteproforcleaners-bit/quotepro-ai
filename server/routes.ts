@@ -3822,13 +3822,15 @@ Respond with JSON: {"reply": string}`
 
       let optionsHtml = "";
       for (const key of ["good", "better", "best"]) {
-        const price = opts[key];
-        if (price === undefined && price !== 0) continue;
+        const optVal = opts[key];
+        if (optVal === undefined) continue;
+        const price = typeof optVal === "object" ? optVal.price : optVal;
+        if (price === undefined) continue;
         const isSelected = q.selectedOption === key;
         optionsHtml += `<div style="border:2px solid ${isSelected ? brandColor : "#E2E8F0"};border-radius:12px;padding:20px;margin-bottom:12px;background:${isSelected ? brandColor + "08" : "#fff"};position:relative;transition:all 0.2s">
           ${isSelected ? `<div style="position:absolute;top:-10px;right:16px;background:${brandColor};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px">SELECTED</div>` : ""}
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><div style="font-size:16px;font-weight:700;color:#1E293B">${optionLabels[key] || key}</div><div style="font-size:13px;color:#64748B;margin-top:2px">${optionDescriptions[key] || ""}</div></div>
+            <div><div style="font-size:16px;font-weight:700;color:#1E293B">${(typeof optVal === "object" && optVal.name) ? optVal.name : (optionLabels[key] || key)}</div><div style="font-size:13px;color:#64748B;margin-top:2px">${(typeof optVal === "object" && optVal.scope) ? optVal.scope : (optionDescriptions[key] || "")}</div></div>
             <div style="font-size:22px;font-weight:700;color:${isSelected ? brandColor : "#1E293B"}">$${Number(price).toFixed(2)}</div>
           </div>
         </div>`;
