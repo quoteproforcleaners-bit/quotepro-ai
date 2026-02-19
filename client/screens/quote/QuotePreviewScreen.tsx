@@ -153,6 +153,17 @@ export default function QuotePreviewScreen({
     }
   }, [isPro]);
 
+  useEffect(() => {
+    if (isPro && aiEmailDraft) {
+      setAiEmailDraft(null);
+      fetchAiEmailDraft();
+    }
+    if (isPro && aiSmsDraft) {
+      setAiSmsDraft(null);
+      fetchAiSmsDraft();
+    }
+  }, [includeQuoteLink]);
+
   const fetchAiDescriptions = useCallback(async () => {
     if (!isPro) return;
     setAiDescLoading(true);
@@ -201,6 +212,10 @@ export default function QuotePreviewScreen({
     setAiEmailLoading(true);
     try {
       const selectedOpt = options[selectedOption];
+      const baseUrl = getPublicBaseUrl();
+      const linkPlaceholder = includeQuoteLink && baseUrl
+        ? `${baseUrl}/q/VIEW_QUOTE_LINK`
+        : "";
       const res = await apiRequest("POST", "/api/ai/communication-draft", {
         type: "email",
         purpose: "initial_quote",
@@ -214,6 +229,7 @@ export default function QuotePreviewScreen({
           propertyInfo: `${homeDetails.beds} bed, ${homeDetails.baths} bath, ${homeDetails.sqft} sqft`,
         },
         bookingLink: businessProfile.bookingLink || "",
+        quoteLink: linkPlaceholder,
         paymentMethodsText,
         language: communicationLanguage,
       });
@@ -226,13 +242,17 @@ export default function QuotePreviewScreen({
     } finally {
       setAiEmailLoading(false);
     }
-  }, [customer, businessProfile, homeDetails, options, selectedOption, aiDescriptions, isPro]);
+  }, [customer, businessProfile, homeDetails, options, selectedOption, aiDescriptions, isPro, includeQuoteLink]);
 
   const fetchAiSmsDraft = useCallback(async () => {
     if (!isPro) return;
     setAiSmsLoading(true);
     try {
       const selectedOpt = options[selectedOption];
+      const baseUrl = getPublicBaseUrl();
+      const linkPlaceholder = includeQuoteLink && baseUrl
+        ? `${baseUrl}/q/VIEW_QUOTE_LINK`
+        : "";
       const res = await apiRequest("POST", "/api/ai/communication-draft", {
         type: "sms",
         purpose: "initial_quote",
@@ -246,6 +266,7 @@ export default function QuotePreviewScreen({
           propertyInfo: `${homeDetails.beds} bed, ${homeDetails.baths} bath, ${homeDetails.sqft} sqft`,
         },
         bookingLink: businessProfile.bookingLink || "",
+        quoteLink: linkPlaceholder,
         paymentMethodsText,
         language: communicationLanguage,
       });
@@ -258,7 +279,7 @@ export default function QuotePreviewScreen({
     } finally {
       setAiSmsLoading(false);
     }
-  }, [customer, businessProfile, homeDetails, options, selectedOption, isPro]);
+  }, [customer, businessProfile, homeDetails, options, selectedOption, isPro, includeQuoteLink]);
 
   const handleCopyEmail = async () => {
     const text = aiEmailDraft || emailDraft;
@@ -277,17 +298,11 @@ export default function QuotePreviewScreen({
   };
 
   const handleCopyQuoteLink = async () => {
-    const baseUrl = getPublicBaseUrl();
-    if (!baseUrl) {
-      Alert.alert("Unavailable", "Quote link is not available in this environment.");
-      return;
-    }
-    const link = `${baseUrl}/q/preview`;
-    await Clipboard.setStringAsync(link);
-    if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    Alert.alert("Copied", "Quote link copied to clipboard. The actual link will be generated when the quote is saved.");
+    Alert.alert(
+      "Quote Link",
+      "The shareable quote link will be available after you save this quote. You can copy and share it from the quote details screen.",
+      [{ text: "OK" }]
+    );
   };
 
   const handleSendNativeSms = async () => {
@@ -589,7 +604,7 @@ export default function QuotePreviewScreen({
                 <View style={[styles.deliveryExpanded, { borderTopColor: theme.border }]}>
                   <Toggle
                     label="Include Quote Link"
-                    description="Attach a shareable link to the quote"
+                    description="AI will include a link where the customer can view and accept the quote online"
                     value={includeQuoteLink}
                     onChange={setIncludeQuoteLink}
                   />
