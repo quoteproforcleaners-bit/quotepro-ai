@@ -195,6 +195,14 @@ function setupSession(app: Express) {
   );
 }
 
+function getPublicBaseUrl(req: Request): string {
+  const deployedDomain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
+  const devDomain = process.env.REPLIT_DEV_DOMAIN;
+  const host = req.get("host")?.replace(/:5000$/, "");
+  const domain = deployedDomain || devDomain || host || "localhost";
+  return `https://${domain}`;
+}
+
 function requireAuth(req: Request, res: Response, next: Function) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Not authenticated" });
@@ -1387,9 +1395,7 @@ ${paymentHtml}
       const quoteHtml = await generateQuotePdfHtml(quote, business);
       const primaryColor = business.primaryColor || "#2563EB";
 
-      // Build quote URL for the "View & Accept Quote" button
-      const domain = process.env.EXPO_PUBLIC_DOMAIN || req.get("host");
-      const quoteUrl = `https://${domain}/q/${quote.publicToken}`;
+      const quoteUrl = `${getPublicBaseUrl(req)}/q/${quote.publicToken}`;
 
       // Create a branded wrapper email with the quote HTML embedded and a CTA button
       const emailHtml = `
@@ -1965,8 +1971,7 @@ ${paymentHtml}
       if (includeQuoteLink && quoteId) {
         const quote = await getQuoteById(quoteId);
         if (quote && quote.publicToken) {
-          const domain = process.env.EXPO_PUBLIC_DOMAIN || req.get("host");
-          const quoteUrl = `https://${domain}/q/${quote.publicToken}`;
+          const quoteUrl = `${getPublicBaseUrl(req)}/q/${quote.publicToken}`;
           const primaryColor = business.primaryColor || "#2563EB";
           quoteButtonHtml = `
 <div style="margin-top:24px;text-align:center;">
@@ -2225,7 +2230,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
         systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
         userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
       } else {
-        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this link so the customer can view and accept their quote online: ${quoteLink}` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Do NOT include the raw URL in the email body. Instead, write a sentence like "You can view and accept your quote by clicking the link below." A styled button with the link will be automatically added after your email.` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
         userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
       }
 

@@ -23,7 +23,8 @@ export function getApiUrl(): string {
 export function getPublicBaseUrl(): string {
   const host = process.env.EXPO_PUBLIC_DOMAIN || "";
   if (!host) return "";
-  return `https://${host}`;
+  const cleanHost = host.replace(/:5000$/, "");
+  return `https://${cleanHost}`;
 }
 
 async function throwIfResNotOk(res: Response) {
