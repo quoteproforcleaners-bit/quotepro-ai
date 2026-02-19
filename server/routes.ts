@@ -885,6 +885,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const business = await db_getBusinessById(q.businessId);
       const customer = q.customerId ? await getCustomerById(q.customerId) : null;
       const lineItems = await getLineItemsByQuote(q.id);
+      const qpPreview = (business as any)?.quotePreferences;
 
       return res.json({
         quote: {
@@ -908,7 +909,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
               email: business.email,
               phone: business.phone,
               logoUri: business.logoUri,
-              primaryColor: business.primaryColor,
+              primaryColor: qpPreview?.brandColor || business.primaryColor,
               senderName: business.senderName,
               senderTitle: business.senderTitle,
             }
@@ -1275,7 +1276,8 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       })
       .join("");
 
-    const primaryColor = business.primaryColor || "#2563EB";
+    const qp = (business as any).quotePreferences;
+    const primaryColor = qp?.brandColor || business.primaryColor || "#2563EB";
 
     let paymentHtml = "";
     const po = business.paymentOptions as any;
@@ -1399,7 +1401,8 @@ ${paymentHtml}
 
       const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
       const quoteHtml = await generateQuotePdfHtml(quote, business);
-      const primaryColor = business.primaryColor || "#2563EB";
+      const qpSend = (business as any).quotePreferences;
+      const primaryColor = qpSend?.brandColor || business.primaryColor || "#2563EB";
 
       const quoteUrl = `${getPublicBaseUrl(req)}/q/${quote.publicToken}`;
 
@@ -1978,7 +1981,8 @@ ${paymentHtml}
         const quote = await getQuoteById(quoteId);
         if (quote && quote.publicToken) {
           const quoteUrl = `${getPublicBaseUrl(req)}/q/${quote.publicToken}`;
-          const primaryColor = business.primaryColor || "#2563EB";
+          const qpEmail = (business as any).quotePreferences;
+          const primaryColor = qpEmail?.brandColor || business.primaryColor || "#2563EB";
           quoteButtonHtml = `
 <div style="margin-top:24px;text-align:center;">
   <a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Accept Your Quote</a>
@@ -3795,7 +3799,8 @@ Respond with JSON: {"reply": string}`
       const business = await db_getBusinessById(q.businessId);
       const customer = q.customerId ? await getCustomerById(q.customerId) : null;
       const lineItems = await getLineItemsByQuote(q.id);
-      const brandColor = business?.primaryColor || "#2563EB";
+      const qpPublic = (business as any)?.quotePreferences;
+      const brandColor = qpPublic?.brandColor || business?.primaryColor || "#2563EB";
       const companyName = business?.companyName || "Our Company";
       const logoUri = business?.logoUri || "";
 
