@@ -213,9 +213,18 @@ export default function QuoteCalculatorScreen() {
           { borderBottomColor: theme.border, paddingTop: insets.top },
         ]}
       >
-        <Pressable onPress={handleCancel} style={styles.headerButton} testID="button-cancel">
-          <ThemedText type="link">Cancel</ThemedText>
-        </Pressable>
+        {currentStep > 0 ? (
+          <Pressable onPress={handleBack} style={styles.headerButton} testID="button-back-step-header">
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Feather name="chevron-left" size={20} color={theme.primary} />
+              <ThemedText type="link">Back</ThemedText>
+            </View>
+          </Pressable>
+        ) : (
+          <Pressable onPress={handleCancel} style={styles.headerButton} testID="button-cancel">
+            <ThemedText type="link">Cancel</ThemedText>
+          </Pressable>
+        )}
         <View style={styles.headerCenter}>
           <ThemedText type="body" style={{ fontWeight: "600" }}>
             {STEPS[currentStep]}
@@ -251,18 +260,6 @@ export default function QuoteCalculatorScreen() {
 
       <View style={styles.content}>{renderCurrentStep()}</View>
 
-      {currentStep > 0 && currentStep < STEPS.length - 1 ? (
-        <Pressable
-          onPress={handleBack}
-          style={[
-            styles.backButton,
-            { backgroundColor: theme.backgroundSecondary, bottom: insets.bottom + 20 },
-          ]}
-          testID="button-back-step"
-        >
-          <Feather name="arrow-left" size={20} color={theme.text} />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -280,7 +277,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerButton: {
-    width: 60,
+    minWidth: 60,
   },
   headerCenter: {
     flex: 1,
@@ -298,14 +295,5 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  backButton: {
-    position: "absolute",
-    left: Spacing.lg,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });
