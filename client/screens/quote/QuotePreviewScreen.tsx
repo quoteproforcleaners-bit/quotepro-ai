@@ -12,6 +12,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { QuoteCard } from "@/components/QuoteCard";
 import { Button } from "@/components/Button";
 import { SectionHeader } from "@/components/SectionHeader";
+import { Toggle } from "@/components/Toggle";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
@@ -31,7 +32,7 @@ import {
   generateEmailDraft,
   generateSmsDraft,
 } from "@/lib/quoteCalculator";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getPublicBaseUrl } from "@/lib/query-client";
 import { getPaymentOptions, getEnabledPaymentMethods, PAYMENT_METHOD_LABELS, formatPaymentOptionsForMessage } from "@/lib/paymentOptions";
 
 function FormattedDraftText({ text, style }: { text: string; style?: any }) {
@@ -99,6 +100,7 @@ export default function QuotePreviewScreen({
   const [aiEmailLoading, setAiEmailLoading] = useState(false);
   const [aiSmsDraft, setAiSmsDraft] = useState<string | null>(null);
   const [aiSmsLoading, setAiSmsLoading] = useState(false);
+  const [includeQuoteLink, setIncludeQuoteLink] = useState(true);
 
   const options = useMemo(() => {
     return calculateAllOptions(
@@ -118,6 +120,8 @@ export default function QuotePreviewScreen({
       best: { ...options.best, scope: aiDescriptions.best },
     };
   }, [options, aiDescriptions]);
+
+  const selectedOpt = useMemo(() => options[selectedOption], [options, selectedOption]);
 
   const emailDraft = useMemo(() => {
     const po = getPaymentOptions(businessProfile.paymentOptions);
@@ -272,6 +276,20 @@ export default function QuotePreviewScreen({
     }
   };
 
+  const handleCopyQuoteLink = async () => {
+    const baseUrl = getPublicBaseUrl();
+    if (!baseUrl) {
+      Alert.alert("Unavailable", "Quote link is not available in this environment.");
+      return;
+    }
+    const link = `${baseUrl}/q/preview`;
+    await Clipboard.setStringAsync(link);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    Alert.alert("Copied", "Quote link copied to clipboard. The actual link will be generated when the quote is saved.");
+  };
+
   const handleSendNativeSms = async () => {
     const text = aiSmsDraft || smsDraft;
     const phone = customer.phone;
@@ -378,6 +396,22 @@ export default function QuotePreviewScreen({
     onSave();
   };
 
+  const handleSaveAndSend = async () => {
+    if (!isPro) {
+      handleSave();
+      return;
+    }
+    if (!aiEmailDraft && !aiEmailLoading) {
+      await fetchAiEmailDraft();
+    }
+    handleSave();
+  };
+
+  const taxRate = pricingSettings.taxRate || 0;
+  const subtotal = selectedOpt.price;
+  const taxAmount = taxRate > 0 ? Math.round(subtotal * (taxRate / 100) * 100) / 100 : 0;
+  const total = subtotal + taxAmount;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
@@ -385,37 +419,58 @@ export default function QuotePreviewScreen({
           styles.content,
           {
             paddingTop: headerHeight + Spacing.xl,
-            paddingBottom: insets.bottom + Spacing.xl + 80,
+            paddingBottom: insets.bottom + Spacing.xl + 120,
           },
         ]}
       >
-        <View style={styles.header}>
-          <ThemedText type="h3">Quote Preview</ThemedText>
-          <ThemedText
-            type="small"
-            style={[styles.subtitle, { color: theme.textSecondary }]}
-          >
-            Select an option and save your quote.
-          </ThemedText>
+        <View style={[styles.summaryCard, { backgroundColor: theme.gradientPrimary, borderColor: `${theme.primary}20` }]}>
+          <View style={styles.summaryTop}>
+            <View style={styles.summaryLeft}>
+              <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", textTransform: "uppercase", letterSpacing: 1 }}>
+                Selected Quote
+              </ThemedText>
+              <ThemedText type="hero" style={{ color: theme.primary, marginTop: 4 }}>
+                {"$"}{total.toFixed(2)}
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2, textTransform: "capitalize" }}>
+                {selectedOpt.serviceTypeName}
+              </ThemedText>
+            </View>
+            <View style={[styles.summaryIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="file-text" size={24} color={theme.primary} />
+            </View>
+          </View>
         </View>
 
         <View
           style={[
-            styles.customerSummary,
+            styles.customerCard,
             { backgroundColor: theme.cardBackground, borderColor: theme.border },
           ]}
         >
-          <ThemedText type="body" style={{ fontWeight: "600" }}>
-            {customer.name || "Customer"}
-          </ThemedText>
-          <ThemedText
-            type="small"
-            style={{ color: theme.textSecondary, marginTop: 2 }}
-          >
-            {homeDetails.beds} bed, {homeDetails.baths} bath - {homeDetails.sqft}{" "}
-            sqft | {frequency}
-          </ThemedText>
+          <View style={[styles.customerIconWrap, { backgroundColor: `${theme.primary}10` }]}>
+            <Feather name="user" size={18} color={theme.primary} />
+          </View>
+          <View style={styles.customerInfo}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              {customer.name || "Customer"}
+            </ThemedText>
+            <ThemedText
+              type="small"
+              style={{ color: theme.textSecondary, marginTop: 2 }}
+            >
+              {homeDetails.beds} bed, {homeDetails.baths} bath  -  {homeDetails.sqft}{" "}
+              sqft  |  {frequency}
+            </ThemedText>
+            {customer.email ? (
+              <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 4 }}>
+                {customer.email}
+              </ThemedText>
+            ) : null}
+          </View>
         </View>
+
+        <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
 
         <View style={styles.sectionRow}>
           <SectionHeader title="Quote Options" />
@@ -457,6 +512,26 @@ export default function QuotePreviewScreen({
           onPress={() => onSelectOption("best")}
         />
 
+        <View style={[styles.breakdownCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <View style={styles.breakdownRow}>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>Subtotal</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>{"$"}{subtotal.toFixed(2)}</ThemedText>
+          </View>
+          {taxRate > 0 ? (
+            <View style={styles.breakdownRow}>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                {"Tax ("}{taxRate}{"%)"}
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>{"$"}{taxAmount.toFixed(2)}</ThemedText>
+            </View>
+          ) : null}
+          <View style={[styles.breakdownDivider, { backgroundColor: theme.border }]} />
+          <View style={styles.breakdownRow}>
+            <ThemedText type="body" style={{ fontWeight: "700" }}>Total</ThemedText>
+            <ThemedText type="body" style={{ fontWeight: "700", color: theme.primary }}>{"$"}{total.toFixed(2)}</ThemedText>
+          </View>
+        </View>
+
         {(() => {
           const po = getPaymentOptions(businessProfile.paymentOptions);
           const enabled = getEnabledPaymentMethods(po);
@@ -483,56 +558,85 @@ export default function QuotePreviewScreen({
           );
         })()}
 
-        <SectionHeader title="Send This Quote" />
+        <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
+
+        <SectionHeader title="Deliver This Quote" subtitle="Choose how to send your quote to the customer" />
 
         {isPro ? (
-          <View style={{ gap: Spacing.sm }}>
-            <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
-              AI writes a personalized message and sends it directly
-            </ThemedText>
-            <View style={styles.aiButtonRow}>
+          <View style={{ gap: Spacing.md }}>
+            <View style={[styles.deliveryCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
               <Pressable
                 onPress={() => {
                   if (!aiEmailDraft && !aiEmailLoading) fetchAiEmailDraft();
-                  setShowEmail(true);
+                  setShowEmail(!showEmail);
                   setShowSms(false);
                   setSendSuccess(null);
                 }}
-                style={[styles.aiGenerateBtn, { backgroundColor: theme.primary }]}
+                style={styles.deliveryRow}
                 testID="ai-write-email-btn"
               >
-                <Feather name="mail" size={16} color="#FFFFFF" />
-                <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
-                  Write Email
-                </ThemedText>
+                <View style={[styles.deliveryIconWrap, { backgroundColor: `${theme.primary}10` }]}>
+                  <Feather name="mail" size={18} color={theme.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="body" style={{ fontWeight: "600" }}>Send via Email</ThemedText>
+                  <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 1 }}>AI-powered personalized email</ThemedText>
+                </View>
+                <Feather name={showEmail ? "chevron-up" : "chevron-right"} size={20} color={theme.textSecondary} />
               </Pressable>
 
+              {showEmail ? (
+                <View style={[styles.deliveryExpanded, { borderTopColor: theme.border }]}>
+                  <Toggle
+                    label="Include Quote Link"
+                    description="Attach a shareable link to the quote"
+                    value={includeQuoteLink}
+                    onChange={setIncludeQuoteLink}
+                  />
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.quickActionsRow}>
               <Pressable
                 onPress={() => {
                   if (!aiSmsDraft && !aiSmsLoading) fetchAiSmsDraft();
-                  setShowSms(true);
+                  setShowSms(!showSms);
                   setShowEmail(false);
                   setSendSuccess(null);
                 }}
-                style={[styles.aiGenerateBtn, { backgroundColor: theme.primary }]}
+                style={[styles.quickActionCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
                 testID="ai-write-sms-btn"
               >
-                <Feather name="message-square" size={16} color="#FFFFFF" />
-                <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
-                  Write SMS
-                </ThemedText>
+                <View style={[styles.quickActionIcon, { backgroundColor: `${theme.success}12` }]}>
+                  <Feather name="message-square" size={16} color={theme.success} />
+                </View>
+                <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.xs }}>Send via SMS</ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={handleCopyQuoteLink}
+                style={[styles.quickActionCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+                testID="copy-quote-link-btn"
+              >
+                <View style={[styles.quickActionIcon, { backgroundColor: `${theme.accent}15` }]}>
+                  <Feather name="link" size={16} color={theme.accent} />
+                </View>
+                <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.xs }}>Copy Quote Link</ThemedText>
               </Pressable>
             </View>
 
             {showEmail ? (
-              <View style={[styles.draftContent, { backgroundColor: theme.cardBackground, borderColor: theme.border, borderWidth: 1, borderRadius: BorderRadius.sm }]}>
+              <View style={[styles.draftCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                 <View style={styles.draftTitleRow}>
-                  <Feather name="mail" size={16} color={theme.primary} />
+                  <View style={[styles.draftIconWrap, { backgroundColor: `${theme.primary}10` }]}>
+                    <Feather name="mail" size={14} color={theme.primary} />
+                  </View>
                   <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>Email Draft</ThemedText>
                   {aiEmailDraft ? (
-                    <View style={[styles.aiSmallBadge, { backgroundColor: `${theme.primary}15` }]}>
+                    <View style={[styles.aiSmallBadge, { backgroundColor: `${theme.primary}12` }]}>
                       <Feather name="zap" size={10} color={theme.primary} />
-                      <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 2 }}>AI</ThemedText>
+                      <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 2, fontWeight: "500" }}>AI</ThemedText>
                     </View>
                   ) : null}
                 </View>
@@ -543,14 +647,16 @@ export default function QuotePreviewScreen({
                   </View>
                 ) : (
                   <>
-                    <FormattedDraftText text={aiEmailDraft || emailDraft} />
+                    <View style={[styles.draftPreview, { backgroundColor: theme.backgroundSecondary }]}>
+                      <FormattedDraftText text={aiEmailDraft || emailDraft} />
+                    </View>
                     {sendSuccess ? (
-                      <View style={[styles.sendSuccessBanner, { backgroundColor: `${theme.success}15` }]}>
+                      <View style={[styles.sendSuccessBanner, { backgroundColor: `${theme.success}12` }]}>
                         <Feather name="check-circle" size={16} color={theme.success} />
                         <ThemedText type="small" style={{ color: theme.success, marginLeft: 6, fontWeight: "600" }}>{sendSuccess}</ThemedText>
                       </View>
                     ) : null}
-                    <View style={styles.draftActions}>
+                    <View style={[styles.draftActions, { borderTopColor: theme.border }]}>
                       {aiEmailDraft && !sendSuccess ? (
                         <Pressable
                           onPress={() => handleSendAiDraft("email")}
@@ -585,14 +691,16 @@ export default function QuotePreviewScreen({
             ) : null}
 
             {showSms ? (
-              <View style={[styles.draftContent, { backgroundColor: theme.cardBackground, borderColor: theme.border, borderWidth: 1, borderRadius: BorderRadius.sm }]}>
+              <View style={[styles.draftCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                 <View style={styles.draftTitleRow}>
-                  <Feather name="message-square" size={16} color={theme.primary} />
+                  <View style={[styles.draftIconWrap, { backgroundColor: `${theme.success}12` }]}>
+                    <Feather name="message-square" size={14} color={theme.success} />
+                  </View>
                   <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>SMS Draft</ThemedText>
                   {aiSmsDraft ? (
-                    <View style={[styles.aiSmallBadge, { backgroundColor: `${theme.primary}15` }]}>
+                    <View style={[styles.aiSmallBadge, { backgroundColor: `${theme.primary}12` }]}>
                       <Feather name="zap" size={10} color={theme.primary} />
-                      <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 2 }}>AI</ThemedText>
+                      <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 2, fontWeight: "500" }}>AI</ThemedText>
                     </View>
                   ) : null}
                 </View>
@@ -603,14 +711,16 @@ export default function QuotePreviewScreen({
                   </View>
                 ) : (
                   <>
-                    <FormattedDraftText text={aiSmsDraft || smsDraft} />
+                    <View style={[styles.draftPreview, { backgroundColor: theme.backgroundSecondary }]}>
+                      <FormattedDraftText text={aiSmsDraft || smsDraft} />
+                    </View>
                     {sendSuccess ? (
-                      <View style={[styles.sendSuccessBanner, { backgroundColor: `${theme.success}15` }]}>
+                      <View style={[styles.sendSuccessBanner, { backgroundColor: `${theme.success}12` }]}>
                         <Feather name="check-circle" size={16} color={theme.success} />
                         <ThemedText type="small" style={{ color: theme.success, marginLeft: 6, fontWeight: "600" }}>{sendSuccess}</ThemedText>
                       </View>
                     ) : null}
-                    <View style={styles.draftActions}>
+                    <View style={[styles.draftActions, { borderTopColor: theme.border }]}>
                       {aiSmsDraft && !sendSuccess ? (
                         <Pressable
                           onPress={() => handleSendAiDraft("sms")}
@@ -663,6 +773,8 @@ export default function QuotePreviewScreen({
           </Pressable>
         )}
 
+        <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
+
         <SectionHeader title="Manual Drafts" subtitle="Copy and paste these drafts" />
 
         <Pressable
@@ -696,7 +808,7 @@ export default function QuotePreviewScreen({
             ]}
           >
             <FormattedDraftText text={emailDraft} />
-            <View style={styles.draftActions}>
+            <View style={[styles.draftActions, { borderTopColor: theme.border }]}>
               <Pressable onPress={handleCopyEmail} style={styles.draftAction}>
                 <Feather name="copy" size={16} color={theme.primary} />
                 <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Copy</ThemedText>
@@ -741,7 +853,7 @@ export default function QuotePreviewScreen({
             ]}
           >
             <FormattedDraftText text={smsDraft} />
-            <View style={styles.draftActions}>
+            <View style={[styles.draftActions, { borderTopColor: theme.border }]}>
               <Pressable onPress={handleSendNativeSms} style={styles.draftAction}>
                 <Feather name="message-square" size={16} color={theme.primary} />
                 <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Open in Messages</ThemedText>
@@ -765,7 +877,18 @@ export default function QuotePreviewScreen({
           },
         ]}
       >
-        <Button onPress={handleSave}>Save Quote</Button>
+        <View style={styles.footerButtons}>
+          <Pressable
+            onPress={handleSave}
+            style={[styles.secondaryFooterBtn, { borderColor: theme.border }]}
+          >
+            <Feather name="bookmark" size={16} color={theme.textSecondary} />
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 6, fontWeight: "600" }}>Save & Send Later</ThemedText>
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <Button onPress={handleSaveAndSend}>Save & Send</Button>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -776,19 +899,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
-  header: {
+  summaryCard: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
     marginBottom: Spacing.lg,
   },
-  subtitle: {
-    marginTop: Spacing.xs,
+  summaryTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  customerSummary: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xs,
+  summaryLeft: {
+    flex: 1,
+  },
+  summaryIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  customerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  customerIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.md,
+  },
+  customerInfo: {
+    flex: 1,
+  },
+  sectionDivider: {
+    height: 1,
+    marginVertical: Spacing.sm,
   },
   sectionRow: {
     flexDirection: "row",
@@ -811,38 +966,93 @@ const styles = StyleSheet.create({
   aiSmallBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: BorderRadius.full,
     marginLeft: 8,
   },
-  aiButtonRow: {
-    flexDirection: "row",
-    gap: Spacing.sm,
+  breakdownCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
   },
-  aiGenerateBtn: {
-    flex: 1,
+  breakdownRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.xs,
+  },
+  breakdownDivider: {
+    height: 1,
+    marginVertical: Spacing.sm,
+  },
+  deliveryCard: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  deliveryRow: {
     flexDirection: "row",
     alignItems: "center",
+    padding: Spacing.lg,
+  },
+  deliveryIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
     justifyContent: "center",
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.xs,
+    marginRight: Spacing.md,
+  },
+  deliveryExpanded: {
+    paddingHorizontal: Spacing.lg,
+    borderTopWidth: 1,
+  },
+  quickActionsRow: {
+    flexDirection: "row",
+    gap: Spacing.md,
+  },
+  quickActionCard: {
+    flex: 1,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  quickActionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  draftCard: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    padding: Spacing.lg,
+    overflow: "hidden",
+  },
+  draftPreview: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.md,
   },
   upgradeCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
     marginBottom: Spacing.md,
   },
   upgradeIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: Spacing.sm,
+    marginRight: Spacing.md,
   },
   sendSuccessBanner: {
     flexDirection: "row",
@@ -850,38 +1060,45 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.xs,
+    borderRadius: BorderRadius.sm,
     marginTop: Spacing.md,
   },
   sendButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: BorderRadius.sm,
   },
   draftHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xs,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
     borderWidth: 1,
   },
   draftTitleRow: {
     flexDirection: "row",
     alignItems: "center",
   },
+  draftIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   draftContent: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xs,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
     marginTop: Spacing.xs,
   },
   draftLoading: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.xl,
   },
   draftActions: {
     flexDirection: "row",
@@ -890,7 +1107,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.05)",
   },
   draftAction: {
     flexDirection: "row",
@@ -902,14 +1118,28 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     borderTopWidth: 1,
   },
+  footerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  secondaryFooterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.lg,
+    height: Spacing.buttonHeight,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
   paymentMethodsCard: {
-    padding: Spacing.md,
+    padding: Spacing.lg,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     marginBottom: Spacing.lg,
-    marginTop: Spacing.sm,
   },
   paymentTag: {
     flexDirection: "row",
