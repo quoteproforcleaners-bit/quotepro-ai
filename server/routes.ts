@@ -196,11 +196,8 @@ function setupSession(app: Express) {
 }
 
 function getPublicBaseUrl(req: Request): string {
-  const deployedDomain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
-  const devDomain = process.env.REPLIT_DEV_DOMAIN;
-  const host = req.get("host")?.replace(/:5000$/, "");
-  const domain = deployedDomain || devDomain || host || "localhost";
-  return `https://${domain}`;
+  const host = req.get("host") || "localhost";
+  return `https://${host}`;
 }
 
 function requireAuth(req: Request, res: Response, next: Function) {
