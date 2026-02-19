@@ -196,6 +196,7 @@ export default function QuoteDetailScreen() {
           scope: selectedOpt?.scope || "Professional cleaning service",
           propertyInfo: `${quote.propertyBeds || 0} bed, ${quote.propertyBaths || 0} bath, ${quote.propertySqft || 0} sqft`,
         },
+        quoteLink: quote.publicToken ? `${getApiUrl()}/q/${quote.publicToken}` : "",
         bookingLink: businessProfile?.bookingLink || "",
         paymentMethodsText: (() => {
           const po = getPaymentOptions(businessProfile?.paymentOptions);

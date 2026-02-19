@@ -761,9 +761,13 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       if (!business) return res.status(404).json({ message: "Business not found" });
 
       const rules = await getAutomationRules(business.id);
-      const expirationDays = rules?.quoteExpirationDays || 7;
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + expirationDays);
+      const qPrefs = (business as any).quotePreferences as any;
+      const expirationDays = qPrefs?.defaultExpirationDays ?? rules?.quoteExpirationDays ?? 14;
+      let expiresAt: Date | undefined;
+      if (expirationDays > 0) {
+        expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + expirationDays);
+      }
 
       const q = await createQuote({ ...req.body, businessId: business.id, expiresAt });
 
