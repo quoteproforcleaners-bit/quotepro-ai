@@ -21,7 +21,7 @@ export function getApiUrl(): string {
 }
 
 export function getPublicBaseUrl(): string {
-  const host = (process.env.EXPO_PUBLIC_DOMAIN || "").replace(/:5000$/, "");
+  const host = process.env.EXPO_PUBLIC_DOMAIN || "";
   if (!host) return "";
   return `https://${host}`;
 }

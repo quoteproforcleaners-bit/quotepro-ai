@@ -1388,7 +1388,7 @@ ${paymentHtml}
       const primaryColor = business.primaryColor || "#2563EB";
 
       // Build quote URL for the "View & Accept Quote" button
-      const domain = (process.env.REPLIT_DOMAINS || process.env.EXPO_PUBLIC_DOMAIN || req.get("host") || "").replace(/:5000$/, "");
+      const domain = process.env.EXPO_PUBLIC_DOMAIN || req.get("host");
       const quoteUrl = `https://${domain}/q/${quote.publicToken}`;
 
       // Create a branded wrapper email with the quote HTML embedded and a CTA button
@@ -1965,7 +1965,7 @@ ${paymentHtml}
       if (includeQuoteLink && quoteId) {
         const quote = await getQuoteById(quoteId);
         if (quote && quote.publicToken) {
-          const domain = (process.env.REPLIT_DOMAINS || process.env.EXPO_PUBLIC_DOMAIN || req.get("host") || "").replace(/:5000$/, "");
+          const domain = process.env.EXPO_PUBLIC_DOMAIN || req.get("host");
           const quoteUrl = `https://${domain}/q/${quote.publicToken}`;
           const primaryColor = business.primaryColor || "#2563EB";
           quoteButtonHtml = `
