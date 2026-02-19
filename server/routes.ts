@@ -196,10 +196,17 @@ function setupSession(app: Express) {
 }
 
 function getPublicBaseUrl(req: Request): string {
-  const forwardedProto = req.header("x-forwarded-proto") || "https";
-  const forwardedHost = req.header("x-forwarded-host");
-  const host = forwardedHost || req.get("host") || "localhost";
-  return `${forwardedProto}://${host}`;
+  if (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT) {
+    const forwardedHost = req.header("x-forwarded-host");
+    const host = forwardedHost || req.get("host") || "localhost";
+    return `https://${host}`;
+  }
+  const devDomain = process.env.REPLIT_DEV_DOMAIN;
+  if (devDomain) {
+    return `https://${devDomain}:5000`;
+  }
+  const host = req.get("host") || "localhost:5000";
+  return `https://${host}`;
 }
 
 function requireAuth(req: Request, res: Response, next: Function) {
