@@ -20,6 +20,12 @@ export function getApiUrl(): string {
   }
 }
 
+export function getPublicBaseUrl(): string {
+  const host = (process.env.EXPO_PUBLIC_DOMAIN || "").replace(/:5000$/, "");
+  if (!host) return "";
+  return `https://${host}`;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

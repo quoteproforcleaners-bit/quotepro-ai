@@ -12,7 +12,7 @@ import * as Sharing from "expo-sharing";
 import * as SMS from "expo-sms";
 import * as WebBrowser from "expo-web-browser";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getApiUrl, getPublicBaseUrl } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -196,7 +196,7 @@ export default function QuoteDetailScreen() {
           scope: selectedOpt?.scope || "Professional cleaning service",
           propertyInfo: `${quote.propertyBeds || 0} bed, ${quote.propertyBaths || 0} bath, ${quote.propertySqft || 0} sqft`,
         },
-        quoteLink: quote.publicToken ? `${getApiUrl()}/q/${quote.publicToken}` : "",
+        quoteLink: quote.publicToken ? `${getPublicBaseUrl()}/q/${quote.publicToken}` : "",
         bookingLink: businessProfile?.bookingLink || "",
         paymentMethodsText: (() => {
           const po = getPaymentOptions(businessProfile?.paymentOptions);
@@ -920,7 +920,7 @@ export default function QuoteDetailScreen() {
 
           <Pressable
             onPress={async () => {
-              const link = `${getApiUrl()}/q/${quote.publicToken}`;
+              const link = `${getPublicBaseUrl()}/q/${quote.publicToken}`;
               await Clipboard.setStringAsync(link);
               if (Platform.OS !== "web") {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
