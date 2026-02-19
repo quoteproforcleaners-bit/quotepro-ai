@@ -196,8 +196,10 @@ function setupSession(app: Express) {
 }
 
 function getPublicBaseUrl(req: Request): string {
-  const host = req.get("host") || "localhost";
-  return `https://${host}`;
+  const forwardedProto = req.header("x-forwarded-proto") || "https";
+  const forwardedHost = req.header("x-forwarded-host");
+  const host = forwardedHost || req.get("host") || "localhost";
+  return `${forwardedProto}://${host}`;
 }
 
 function requireAuth(req: Request, res: Response, next: Function) {
