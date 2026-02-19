@@ -3820,18 +3820,30 @@ Respond with JSON: {"reply": string}`
         best: "Premium deep clean with all the extras"
       };
 
+      const optionDataItems: { key: string; price: number; name: string; scope: string }[] = [];
       let optionsHtml = "";
       for (const key of ["good", "better", "best"]) {
         const optVal = opts[key];
         if (optVal === undefined) continue;
         const price = typeof optVal === "object" ? optVal.price : optVal;
         if (price === undefined) continue;
+        const name = (typeof optVal === "object" && optVal.name) ? optVal.name : (optionLabels[key] || key);
+        const scope = (typeof optVal === "object" && optVal.scope) ? optVal.scope : (optionDescriptions[key] || "");
+        optionDataItems.push({ key, price: Number(price), name, scope });
         const isSelected = q.selectedOption === key;
-        optionsHtml += `<div style="border:2px solid ${isSelected ? brandColor : "#E2E8F0"};border-radius:12px;padding:20px;margin-bottom:12px;background:${isSelected ? brandColor + "08" : "#fff"};position:relative;transition:all 0.2s">
-          ${isSelected ? `<div style="position:absolute;top:-10px;right:16px;background:${brandColor};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px">SELECTED</div>` : ""}
+        optionsHtml += `<div class="option-card${isSelected ? " selected" : ""}" data-key="${key}" data-price="${Number(price).toFixed(2)}" onclick="selectOption('${key}')" style="cursor:pointer">
+          <div class="option-badge" style="display:${isSelected ? "block" : "none"}">SELECTED</div>
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><div style="font-size:16px;font-weight:700;color:#1E293B">${(typeof optVal === "object" && optVal.name) ? optVal.name : (optionLabels[key] || key)}</div><div style="font-size:13px;color:#64748B;margin-top:2px">${(typeof optVal === "object" && optVal.scope) ? optVal.scope : (optionDescriptions[key] || "")}</div></div>
-            <div style="font-size:22px;font-weight:700;color:${isSelected ? brandColor : "#1E293B"}">$${Number(price).toFixed(2)}</div>
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="option-radio${isSelected ? " checked" : ""}" id="radio-${key}"><div class="option-radio-dot"></div></div>
+                <div>
+                  <div style="font-size:16px;font-weight:700;color:#1E293B">${name}</div>
+                  <div style="font-size:13px;color:#64748B;margin-top:2px">${scope}</div>
+                </div>
+              </div>
+            </div>
+            <div class="option-price" style="color:${isSelected ? brandColor : "#1E293B"}">$${Number(price).toFixed(2)}</div>
           </div>
         </div>`;
       }
@@ -3894,6 +3906,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .btn-changes:hover{background:${brandColor}08}
 .btn-decline{display:block;text-align:center;margin-top:8px;color:#94A3B8;font-size:13px;cursor:pointer;text-decoration:none;transition:color 0.2s}
 .btn-decline:hover{color:#64748B}
+.option-card{border:2px solid #E2E8F0;border-radius:12px;padding:20px;margin-bottom:12px;background:#fff;position:relative;transition:all 0.2s}
+.option-card:hover{border-color:${brandColor}80;background:${brandColor}04}
+.option-card.selected{border-color:${brandColor};background:${brandColor}08}
+.option-badge{position:absolute;top:-10px;right:16px;background:${brandColor};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px}
+.option-radio{width:22px;height:22px;border-radius:50%;border:2px solid #CBD5E1;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
+.option-radio.checked{border-color:${brandColor};background:${brandColor}}
+.option-radio-dot{width:8px;height:8px;border-radius:50%;background:#fff;opacity:0;transition:opacity 0.2s}
+.option-radio.checked .option-radio-dot{opacity:1}
+.option-price{font-size:22px;font-weight:700;margin-left:12px;white-space:nowrap}
+.select-hint{text-align:center;font-size:13px;color:#94A3B8;margin-bottom:16px;font-style:italic}
 .expires{text-align:center;margin-top:16px;font-size:12px;color:#94A3B8}
 .footer{text-align:center;padding:24px;font-size:12px;color:#94A3B8}
 .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px}
@@ -3933,7 +3955,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
         ${customerAddress ? `<span class="prop-chip">${customerAddress}</span>` : ""}
       </div>` : ""}
 
-      ${optionsHtml ? `<div><h3 class="section-title">Service Options</h3>${optionsHtml}</div>` : ""}
+      ${optionsHtml ? `<div><h3 class="section-title">Choose Your Service</h3><p class="select-hint">Tap an option to select it</p>${optionsHtml}</div>` : ""}
 
       ${addOnsHtml}
       ${lineItemsHtml}
@@ -3947,9 +3969,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
       </div>
 
       <div class="actions">
-        <button class="btn-accept" onclick="showAcceptModal()">Accept Quote</button>
-        <button class="btn-changes" onclick="showChangesModal()">Request Changes</button>
-        <a class="btn-decline" onclick="handleDecline()">No thanks, decline this quote</a>
+        <button type="button" class="btn-accept" onclick="showAcceptModal()">Accept Quote &mdash; <span id="acceptTotal">$${Number(q.total).toFixed(2)}</span></button>
+        <button type="button" class="btn-changes" onclick="showChangesModal()">Request Changes</button>
+        <a class="btn-decline" onclick="handleDecline();return false" href="javascript:void(0)">No thanks, decline this quote</a>
       </div>
 
       ${expiresText ? `<div class="expires">${expiresText}</div>` : ""}
@@ -3959,7 +3981,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
       <div class="success-icon" style="background:#DCFCE7;color:#16A34A">&#10003;</div>
       <h2 style="font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px">Quote Accepted!</h2>
       <p style="font-size:15px;color:#64748B">Thank you! We'll reach out shortly to schedule your service.</p>
-      <div style="font-size:28px;font-weight:700;color:#16A34A;margin:16px 0">$${Number(q.total).toFixed(2)}</div>
+      <div id="acceptedTotal" style="font-size:28px;font-weight:700;color:#16A34A;margin:16px 0">$${Number(q.total).toFixed(2)}</div>
     </div>
 
     <div class="success-state" id="declinedState">
@@ -3985,11 +4007,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 <div class="modal-overlay" id="acceptModal">
   <div class="modal">
     <h2>Accept Quote</h2>
-    <p>Type your full name below as your digital signature to accept this quote for <strong>$${Number(q.total).toFixed(2)}</strong>.</p>
+    <p>Type your full name below as your digital signature to accept this quote for <strong id="modalTotal">$${Number(q.total).toFixed(2)}</strong>.</p>
+    <div id="modalSelectedOption" style="background:#F8FAFC;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:14px;color:#475569"></div>
     <input type="text" id="signatureName" placeholder="Your full name" autocomplete="name">
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModals()">Cancel</button>
-      <button class="btn-confirm" onclick="handleAccept()">Confirm</button>
+      <button type="button" class="btn-cancel" onclick="closeModals()">Cancel</button>
+      <button type="button" class="btn-confirm" onclick="handleAccept()">Confirm</button>
     </div>
     <div id="acceptError" style="color:#EF4444;font-size:13px;margin-top:8px;display:none"></div>
   </div>
@@ -4001,15 +4024,62 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
     <p>Let us know what you'd like adjusted and we'll send an updated quote.</p>
     <textarea id="changesMessage" placeholder="Tell us what changes you'd like..."></textarea>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModals()">Cancel</button>
-      <button class="btn-confirm" style="background:${brandColor}" onclick="handleChanges()">Send Request</button>
+      <button type="button" class="btn-cancel" onclick="closeModals()">Cancel</button>
+      <button type="button" class="btn-confirm" style="background:${brandColor}" onclick="handleChanges()">Send Request</button>
     </div>
     <div id="changesError" style="color:#EF4444;font-size:13px;margin-top:8px;display:none"></div>
   </div>
 </div>
 
 <script>
-function showAcceptModal(){document.getElementById("acceptModal").classList.add("active");document.getElementById("signatureName").focus()}
+var selectedOption="${q.selectedOption || ""}";
+var optionData=${JSON.stringify(optionDataItems)};
+var brandColor="${brandColor}";
+var token="${q.publicToken}";
+
+function selectOption(key){
+  selectedOption=key;
+  var cards=document.querySelectorAll(".option-card");
+  cards.forEach(function(c){
+    var k=c.getAttribute("data-key");
+    var badge=c.querySelector(".option-badge");
+    var radio=c.querySelector(".option-radio");
+    var price=c.querySelector(".option-price");
+    if(k===key){
+      c.classList.add("selected");
+      badge.style.display="block";
+      radio.classList.add("checked");
+      price.style.color=brandColor;
+    }else{
+      c.classList.remove("selected");
+      badge.style.display="none";
+      radio.classList.remove("checked");
+      price.style.color="#1E293B";
+    }
+  });
+  var opt=optionData.find(function(o){return o.key===key});
+  if(opt){
+    var total="$"+parseFloat(opt.price).toFixed(2);
+    document.getElementById("acceptTotal").textContent=total;
+    document.querySelector(".total-price").textContent=total;
+    document.getElementById("modalTotal").textContent=total;
+    var info=document.getElementById("modalSelectedOption");
+    info.textContent="Selected: "+opt.name+" ("+opt.scope+")";
+    info.style.display="block";
+    var acceptedTotal=document.getElementById("acceptedTotal");
+    if(acceptedTotal)acceptedTotal.textContent=total;
+  }
+}
+
+function showAcceptModal(){
+  if(!selectedOption && optionData.length>1){alert("Please select a service option first.");return}
+  var info=document.getElementById("modalSelectedOption");
+  var opt=optionData.find(function(o){return o.key===selectedOption});
+  if(opt){info.textContent="Selected: "+opt.name+" ("+opt.scope+")";info.style.display="block"}
+  else{info.style.display="none"}
+  document.getElementById("acceptModal").classList.add("active");
+  document.getElementById("signatureName").focus();
+}
 function showChangesModal(){document.getElementById("changesModal").classList.add("active");document.getElementById("changesMessage").focus()}
 function closeModals(){document.querySelectorAll(".modal-overlay").forEach(function(m){m.classList.remove("active")})}
 function showState(id){document.getElementById("mainContent").classList.add("hidden");document.getElementById(id).classList.add("active")}
@@ -4018,7 +4088,9 @@ async function handleAccept(){
   var name=document.getElementById("signatureName").value.trim();
   if(!name){document.getElementById("acceptError").textContent="Please enter your name.";document.getElementById("acceptError").style.display="block";return}
   try{
-    var r=await fetch("/q/${q.publicToken}/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({acceptedName:name})});
+    var body={acceptedName:name};
+    if(selectedOption)body.selectedOption=selectedOption;
+    var r=await fetch("/q/"+token+"/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     var d=await r.json();
     if(d.success){closeModals();showState("acceptedState")}
     else{document.getElementById("acceptError").textContent=d.message||"Something went wrong.";document.getElementById("acceptError").style.display="block"}
@@ -4028,7 +4100,7 @@ async function handleAccept(){
 async function handleDecline(){
   if(!confirm("Are you sure you want to decline this quote?"))return;
   try{
-    var r=await fetch("/q/${q.publicToken}/decline",{method:"POST",headers:{"Content-Type":"application/json"}});
+    var r=await fetch("/q/"+token+"/decline",{method:"POST",headers:{"Content-Type":"application/json"}});
     var d=await r.json();
     if(d.success){showState("declinedState")}
   }catch(e){alert("Something went wrong. Please try again.")}
@@ -4038,7 +4110,7 @@ async function handleChanges(){
   var msg=document.getElementById("changesMessage").value.trim();
   if(!msg){document.getElementById("changesError").textContent="Please describe the changes you'd like.";document.getElementById("changesError").style.display="block";return}
   try{
-    var r=await fetch("/q/${q.publicToken}/request-changes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg})});
+    var r=await fetch("/q/"+token+"/request-changes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg})});
     var d=await r.json();
     if(d.success){closeModals();showState("changesState")}
     else{document.getElementById("changesError").textContent=d.message||"Something went wrong.";document.getElementById("changesError").style.display="block"}
@@ -4074,7 +4146,7 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
         return res.status(400).json({ success: false, message: "This quote has been declined" });
       }
 
-      const { acceptedName } = req.body;
+      const { acceptedName, selectedOption } = req.body;
       if (!acceptedName || typeof acceptedName !== "string" || !acceptedName.trim()) {
         return res.status(400).json({ success: false, message: "Please provide your name" });
       }
@@ -4087,11 +4159,25 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
         acceptedIp: req.ip || req.headers["x-forwarded-for"] || "unknown",
       };
 
-      await updateQuote(q.id, {
+      const updateData: any = {
         status: "accepted",
         acceptedAt: new Date(),
         propertyDetails: updatedDetails,
-      });
+      };
+
+      if (selectedOption && ["good", "better", "best"].includes(selectedOption)) {
+        updateData.selectedOption = selectedOption;
+        const opts = (q.options || {}) as any;
+        const optVal = opts[selectedOption];
+        if (optVal !== undefined) {
+          const price = typeof optVal === "object" ? optVal.price : optVal;
+          if (price !== undefined) {
+            updateData.total = Number(price);
+          }
+        }
+      }
+
+      await updateQuote(q.id, updateData);
 
       await cancelPendingCommunicationsForQuote(q.id);
 
