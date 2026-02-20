@@ -2028,10 +2028,3 @@ export async function updateRecommendation(id: string, data: { status?: string; 
     .returning();
   return rec;
 }
-
-export async function getPushTokensByUser(userId: string) {
-  return db
-    .select()
-    .from(pushTokens)
-    .where(eq(pushTokens.userId, userId));
-}

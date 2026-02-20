@@ -130,6 +130,10 @@ import {
   getUpsellOpportunities,
   getAutoRebookCandidates,
   getForecastData,
+  getRecommendationsByQuote,
+  createRecommendation,
+  updateRecommendation,
+  getPushTokensByUser,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -1406,7 +1410,71 @@ ${paymentHtml}
 
       const quoteUrl = `${getPublicBaseUrl(req)}/q/${quote.publicToken}`;
 
-      // Create a branded wrapper email with the quote HTML embedded and a CTA button
+      // Extract property details and options
+      const propertyDetails = (quote.propertyDetails as any) || {};
+      const beds = propertyDetails.beds;
+      const baths = propertyDetails.baths;
+      const sqft = propertyDetails.sqft;
+      
+      const options = (quote.options as any) || {};
+      const optionsArray = [
+        {
+          key: 'good',
+          label: 'Good',
+          name: options.good?.name || 'Good',
+          scope: options.good?.scope || '',
+          price: options.good?.price || 0,
+        },
+        {
+          key: 'better',
+          label: 'Better',
+          name: options.better?.name || 'Better',
+          scope: options.better?.scope || '',
+          price: options.better?.price || 0,
+        },
+        {
+          key: 'best',
+          label: 'Best',
+          name: options.best?.name || 'Best',
+          scope: options.best?.scope || '',
+          price: options.best?.price || 0,
+        },
+      ];
+
+      // Property info section
+      const propertyInfoHtml = (beds || baths || sqft) ? `
+      <tr><td align="center" style="padding:24px 20px;background-color:#ffffff;border-bottom:1px solid #eeeeee;">
+        <table width="100%" cellpadding="0" cellspacing="0" align="center">
+          <tr>
+            ${beds ? `<td align="center" style="padding:0 16px;font-size:14px;"><div style="font-weight:600;color:#333333;">${beds}</div><div style="color:#666666;font-size:12px;">Beds</div></td>` : ''}
+            ${baths ? `<td align="center" style="padding:0 16px;font-size:14px;"><div style="font-weight:600;color:#333333;">${baths}</div><div style="color:#666666;font-size:12px;">Baths</div></td>` : ''}
+            ${sqft ? `<td align="center" style="padding:0 16px;font-size:14px;"><div style="font-weight:600;color:#333333;">${sqft}</div><div style="color:#666666;font-size:12px;">Sq Ft</div></td>` : ''}
+          </tr>
+        </table>
+      </td></tr>` : '';
+
+      // Options cards HTML
+      const optionsCardsHtml = optionsArray.map((option, index) => {
+        const isRecommended = index === 1; // Better is the middle/recommended option
+        const borderColor = isRecommended ? primaryColor : '#eeeeee';
+        const backgroundColor = isRecommended ? '#f9f9ff' : '#ffffff';
+        const badgeHtml = isRecommended ? `<div style="display:inline-block;background:${primaryColor};color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;margin-bottom:12px;">RECOMMENDED</div><br/>` : '';
+        
+        return `
+      <tr><td style="padding:16px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="border:2px solid ${borderColor};border-radius:8px;background-color:${backgroundColor};">
+          <tr><td style="padding:20px;">
+            ${badgeHtml}
+            <div style="font-size:18px;font-weight:700;color:#333333;margin-bottom:4px;">${option.name}</div>
+            ${option.scope ? `<div style="font-size:14px;color:#666666;margin-bottom:16px;line-height:1.4;">${option.scope}</div>` : ''}
+            <div style="font-size:28px;font-weight:700;color:${primaryColor};margin-bottom:20px;">$${option.price.toFixed(2)}</div>
+            <a href="${quoteUrl}?option=${option.key}" style="display:block;background:${primaryColor};color:white;padding:14px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">Accept ${option.name}</a>
+          </td></tr>
+        </table>
+      </td></tr>`;
+      }).join('');
+
+      // Create a branded wrapper email with option cards
       const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -1414,17 +1482,36 @@ ${paymentHtml}
 <body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
     <tr><td align="center">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;">
-        <!-- Quote HTML Embedded -->
-        <tr><td>
-          ${quoteHtml}
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;background-color:#ffffff;">
+        <!-- Header with company info -->
+        <tr><td style="padding:32px 20px;text-align:center;border-bottom:1px solid #eeeeee;">
+          ${business.logoUri ? `<div style="margin-bottom:16px;"><img src="${business.logoUri}" alt="${business.companyName}" style="max-height:50px;max-width:200px;"></div>` : ''}
+          <h1 style="margin:0;font-size:24px;font-weight:700;color:#333333;">Your Quote Options</h1>
+          <p style="margin:8px 0 0;font-size:14px;color:#666666;">Hi ${customerName}, please select the option that works best for you.</p>
         </td></tr>
-        <!-- CTA Button Section -->
-        <tr><td align="center" style="padding:32px 20px;background-color:#ffffff;">
-          <a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:16px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:16px;margin-bottom:16px;">View & Accept Your Quote Online</a>
-          <p style="margin:16px 0 0;font-size:12px;color:#999999;">
-            Can't click? Copy and paste this link: <a href="${quoteUrl}" style="color:${primaryColor};text-decoration:none;">${quoteUrl}</a>
+        
+        <!-- Property Info (if available) -->
+        ${propertyInfoHtml}
+        
+        <!-- Options Cards -->
+        <tr><td style="padding:24px 0;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;">
+            ${optionsCardsHtml}
+          </table>
+        </td></tr>
+        
+        <!-- Fallback Text -->
+        <tr><td style="padding:20px;text-align:center;background-color:#f9f9f9;border-top:1px solid #eeeeee;">
+          <p style="margin:0;font-size:12px;color:#666666;line-height:1.5;">
+            If buttons don't work, reply with <strong>1</strong> (Good), <strong>2</strong> (Better), or <strong>3</strong> (Best) to select your option.
           </p>
+        </td></tr>
+        
+        <!-- Footer with Business Info -->
+        <tr><td style="padding:24px 20px;text-align:center;border-top:1px solid #eeeeee;background-color:#ffffff;">
+          <div style="font-weight:600;color:#333333;margin-bottom:8px;">${business.companyName || 'QuotePro'}</div>
+          ${business.phone ? `<div style="font-size:13px;color:#666666;margin-bottom:4px;">Phone: <a href="tel:${business.phone}" style="color:${primaryColor};text-decoration:none;">${business.phone}</a></div>` : ''}
+          ${replyToEmail ? `<div style="font-size:13px;color:#666666;">Email: <a href="mailto:${replyToEmail}" style="color:${primaryColor};text-decoration:none;">${replyToEmail}</a></div>` : ''}
         </td></tr>
       </table>
     </td></tr>
