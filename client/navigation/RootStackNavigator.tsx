@@ -22,13 +22,16 @@ import SalesStrategyScreen from "@/screens/SalesStrategyScreen";
 import QuotePreferencesScreen from "@/screens/QuotePreferencesScreen";
 import HelpGuideScreen from "@/screens/HelpGuideScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
+import LandingScreen from "@/screens/LandingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
 
 export type RootStackParamList = {
+  Landing: undefined;
   Login: undefined;
+  GuestQuoteCalculator: undefined;
   Onboarding: undefined;
   Main: undefined;
   QuoteCalculator: { prefillCustomer?: { name: string; phone: string; email: string; address: string; customerId: string } } | undefined;
@@ -55,7 +58,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootStackNavigator() {
   const screenOptions = useScreenOptions();
-  const { isLoading: authLoading, user, needsOnboarding: authNeedsOnboarding } = useAuth();
+  const { isLoading: authLoading, user, isGuest, needsOnboarding: authNeedsOnboarding } = useAuth();
   const { isLoading: appLoading, needsOnboarding: appNeedsOnboarding } = useApp();
   const { theme } = useTheme();
 
@@ -74,11 +77,26 @@ export default function RootStackNavigator() {
   return (
     <Stack.Navigator screenOptions={screenOptions}>
       {!user ? (
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
+        <>
+          <Stack.Screen
+            name="Landing"
+            component={LandingScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GuestQuoteCalculator"
+            component={QuoteCalculatorScreen}
+            options={{
+              presentation: "modal",
+              headerShown: false,
+            }}
+          />
+        </>
       ) : showOnboarding ? (
         <Stack.Screen
           name="Onboarding"
