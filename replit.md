@@ -24,6 +24,14 @@ Key capabilities include:
 - Google Calendar integration: OAuth2-based sync that creates calendar events when jobs are scheduled/updated (env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET). Each user connects their own Google account via Settings > Integrations.
 - Stripe Connect integration: Each cleaner connects their own Stripe Express account via Settings > Integrations. Supports online payments on quotes with a 3% platform fee. Payment links can be copied from quote details. Uses Stripe Checkout for payment collection (env: STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY).
 
+### Delayed Authentication / Guest Mode (Feb 2026)
+- **LandingScreen** (`client/screens/LandingScreen.tsx`): First screen for unauthenticated users with "Create a Free Quote" CTA and "Sign In" button. Includes language switcher, feature grid, and "Why create an account?" benefits modal.
+- **Guest Quote Flow**: Users can build a complete quote (Customer > Property > Services > Quote Preview) without signing up. Uses default pricing settings. Draft auto-saved to AsyncStorage via `client/lib/guestDraft.ts`.
+- **AuthGateModal** (`client/components/AuthGateModal.tsx`): Bottom-sheet auth modal triggered when guest users try to save/send a quote. Supports Apple, Google, and email auth. On success, draft migrates to server.
+- **AuthContext** (`client/context/AuthContext.tsx`): Added `isGuest`, `enterGuestMode()`, `exitGuestMode()`. Guest mode auto-exits on any successful auth.
+- **Navigation**: `RootStackNavigator` shows Landing > Login | GuestQuoteCalculator when no user. QuoteCalculatorScreen detects guest mode and shows AuthGateModal on save.
+- **i18n**: `landing` and `authGate` translation keys in `en.ts`/`es.ts`.
+
 A new "Social / AI Sales Assistant" feature integrates with Instagram and TikTok DMs for lead capture, AI-powered intent detection, automated replies with quote links, and comprehensive lead management with attribution tracking. This feature is part of the "QuotePro AI" subscription tier, emphasizing AI-driven value. The platform supports multi-user access with various authentication methods and stores all data server-side in PostgreSQL.
 
 ### V3 Sticky Product Features (Feb 2026)
