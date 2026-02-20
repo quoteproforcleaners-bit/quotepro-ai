@@ -2,7 +2,7 @@ import React, { useState, useCallback } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -75,9 +75,15 @@ export default function QuoteDetailScreen() {
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
 
-  const { data: quote, isLoading } = useQuery<any>({
+  const { data: quote, isLoading, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchQuote();
+    }, [refetchQuote])
+  );
 
   const { data: stripeStatus } = useQuery({
     queryKey: ["/api/stripe/status"],
@@ -156,8 +162,13 @@ export default function QuoteDetailScreen() {
     }
   };
 
-  const handleStatusChange = async (status: string) => {
-    updateMutation.mutate({ status });
+  const handleStatusChange = async (newStatus: string) => {
+    const data: any = { status: newStatus };
+    if (newStatus === "accepted" && !quote?.acceptedAt) {
+      data.acceptedAt = new Date().toISOString();
+      data.acceptedSource = "manual";
+    }
+    updateMutation.mutate(data);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }

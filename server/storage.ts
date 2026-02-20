@@ -407,6 +407,10 @@ export async function updateQuote(
     paymentIntentId: string;
     paymentAmount: number;
     paidAt: Date;
+    acceptedFrequency: string;
+    acceptedSource: string;
+    acceptedNotes: string;
+    acceptedPreferences: any;
   }>
 ): Promise<QuoteRow> {
   const [q] = await db
