@@ -39,7 +39,7 @@ const en = {
   },
 
   login: {
-    tagline: "Professional quoting for cleaning businesses",
+    tagline: "Professional Quoting For Cleaning Businesses",
     continueWithGoogle: "Continue with Google",
     fullName: "Full Name",
     namePlaceholder: "Your name",
@@ -613,7 +613,7 @@ const en = {
   },
 
   landing: {
-    tagline: "Professional quoting for cleaning businesses",
+    tagline: "Professional Quoting For Cleaning Businesses",
     createFreeQuote: "Create a Free Quote",
     noAccountNeeded: "No account needed to get started",
     signIn: "Sign In to Your Account",
