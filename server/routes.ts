@@ -235,6 +235,83 @@ async function requirePro(req: Request, res: Response, next: Function) {
   }
 }
 
+async function generateRevenuePlaybook(quote: any, business: any, customer: any) {
+  const recs: Array<{ type: string; title: string; rationale: string; suggestedDate?: Date }> = [];
+  const total = Number(quote.total) || 0;
+  const freq = quote.acceptedFrequency || quote.frequencySelected;
+  const now = new Date();
+
+  const followUpDate = new Date(now);
+  followUpDate.setDate(followUpDate.getDate() + 2);
+  recs.push({
+    type: "follow_up",
+    title: "Send a thank-you message",
+    rationale: `A quick thank-you after acceptance builds trust and sets expectations. Reach out within 48 hours to confirm scheduling details.`,
+    suggestedDate: followUpDate,
+  });
+
+  if (!freq || freq === "one-time") {
+    recs.push({
+      type: "frequency_upgrade",
+      title: "Suggest recurring service",
+      rationale: `This is a one-time booking at $${total.toFixed(2)}. After the first clean, suggest a recurring plan. Bi-weekly clients average 24x/year revenue vs 1x. Potential annual value: $${(total * 24).toFixed(0)}.`,
+    });
+  }
+
+  recs.push({
+    type: "addon_suggestion",
+    title: "Offer a deep clean add-on",
+    rationale: `After completing the initial service, offer a deep clean upgrade or add-on services like window cleaning, oven cleaning, or organization. This typically adds 30-50% to the base price.`,
+  });
+
+  const referralDate = new Date(now);
+  referralDate.setDate(referralDate.getDate() + 7);
+  recs.push({
+    type: "referral_ask",
+    title: "Ask for a referral",
+    rationale: `Happy customers are your best marketing channel. After a successful first clean, ask if they know anyone who might need cleaning services. Offer a referral discount to incentivize.`,
+    suggestedDate: referralDate,
+  });
+
+  const reviewDate = new Date(now);
+  reviewDate.setDate(reviewDate.getDate() + 3);
+  recs.push({
+    type: "review_request",
+    title: "Request a review",
+    rationale: `Online reviews are critical for new customer acquisition. After service completion, send a friendly review request with a direct link to your Google Business page.`,
+    suggestedDate: reviewDate,
+  });
+
+  const month = now.getMonth();
+  if (month >= 2 && month <= 4) {
+    recs.push({
+      type: "seasonal_offer",
+      title: "Promote spring deep cleaning",
+      rationale: `Spring is prime time for deep cleaning. Offer a seasonal deep clean package at a special rate to capitalize on the momentum of this booking.`,
+    });
+  } else if (month >= 9 && month <= 11) {
+    recs.push({
+      type: "seasonal_offer",
+      title: "Holiday prep cleaning package",
+      rationale: `The holiday season is approaching. Offer a pre-holiday deep clean package to help customers prepare for gatherings and guests.`,
+    });
+  }
+
+  for (const rec of recs) {
+    try {
+      await createRecommendation({
+        businessId: quote.businessId,
+        quoteId: quote.id,
+        customerId: quote.customerId || undefined,
+        type: rec.type,
+        title: rec.title,
+        rationale: rec.rationale,
+        suggestedDate: rec.suggestedDate,
+      });
+    } catch (_e) {}
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   setupSession(app);
 
@@ -3830,6 +3907,32 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  // ─── Revenue Playbook - Sales Recommendations ───
+
+  app.get("/api/quotes/:id/recommendations", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const recommendations = await getRecommendationsByQuote(req.params.id);
+      return res.json(recommendations);
+    } catch (error: any) {
+      console.error("Get recommendations error:", error);
+      return res.status(500).json({ message: "Failed to get recommendations" });
+    }
+  });
+
+  app.patch("/api/recommendations/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { status } = req.body;
+      const updateData: any = { status };
+      if (status === "completed") updateData.completedAt = new Date();
+      const rec = await updateRecommendation(req.params.id, updateData);
+      if (!rec) return res.status(404).json({ message: "Recommendation not found" });
+      return res.json(rec);
+    } catch (error: any) {
+      console.error("Update recommendation error:", error);
+      return res.status(500).json({ message: "Failed to update recommendation" });
+    }
+  });
+
   // ─── AI Message Generation ───
 
   app.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
@@ -4331,6 +4434,14 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
 
       await updateQuote(q.id, updateData);
       await cancelPendingCommunicationsForQuote(q.id);
+
+      // Generate Revenue Playbook recommendations
+      try {
+        const business = await db_getBusinessById(q.businessId);
+        const customer = q.customerId ? await getCustomerById(q.customerId) : null;
+        const updatedQuote = { ...q, ...updateData };
+        generateRevenuePlaybook(updatedQuote, business, customer).catch(() => {});
+      } catch (_e) {}
 
       if (q.customerId) {
         try {
