@@ -538,16 +538,6 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        <View style={[styles.quoteCard, { backgroundColor: dt.accentSoft, borderColor: dt.borderAccent }]}>
-          <Feather name="sunrise" size={16} color={dt.accent} style={{ marginBottom: 6 }} />
-          <ThemedText type="small" style={{ color: dt.textPrimary, fontStyle: "italic", lineHeight: 20, textAlign: "center" }}>
-            {`"${getDailyQuote().text}"`}
-          </ThemedText>
-          <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 4, fontWeight: "600" }}>
-            {`- ${getDailyQuote().author}`}
-          </ThemedText>
-        </View>
-
         {followUpQueueCount > 0 ? (
           <Pressable
             onPress={() => navigation.navigate("FollowUpQueue")}
