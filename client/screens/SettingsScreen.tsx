@@ -429,48 +429,34 @@ export default function SettingsScreen() {
       <Pressable
         onPress={() => navigation.navigate("PricingSettings")}
         style={[
-          styles.settingsLink,
-          { backgroundColor: theme.cardBackground, borderColor: theme.border },
+          styles.quoteSettingsCard,
+          { backgroundColor: theme.gradientPrimary, borderColor: `${theme.primary}25` },
         ]}
         testID="button-pricing-settings"
       >
         <View style={styles.settingsLinkContent}>
-          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
-            <Feather name="dollar-sign" size={20} color={theme.primary} />
+          <View style={[styles.quoteSettingsIcon, { backgroundColor: `${theme.primary}20` }]}>
+            <Feather name="sliders" size={22} color={theme.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>
-              {t.settings.hourlyRates}
-            </ThemedText>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              {t.settings.hourlyRatesDesc}
-            </ThemedText>
-          </View>
-          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-        </View>
-      </Pressable>
-
-      <Pressable
-        onPress={() => navigation.navigate("PricingSettings")}
-        style={[
-          styles.settingsLink,
-          { backgroundColor: theme.cardBackground, borderColor: theme.border },
-        ]}
-        testID="button-service-types"
-      >
-        <View style={styles.settingsLinkContent}>
-          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.success}15` }]}>
-            <Feather name="list" size={20} color={theme.success} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>
-              {t.settings.serviceTypes}
-            </ThemedText>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              {t.settings.serviceTypesDesc}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <ThemedText type="body" style={{ fontWeight: "700", fontSize: 16 }}>
+                Quote Settings
+              </ThemedText>
+              <View style={[styles.quoteSettingsBadge, { backgroundColor: `${theme.primary}15` }]}>
+                <Feather name="zap" size={10} color={theme.primary} />
+                <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginLeft: 3, fontSize: 10 }}>
+                  CUSTOMIZE
+                </ThemedText>
+              </View>
+            </View>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              Rates, service types, add-ons & pricing
             </ThemedText>
           </View>
-          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+          <View style={[styles.quoteSettingsArrow, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="arrow-right" size={18} color={theme.primary} />
+          </View>
         </View>
       </Pressable>
 
@@ -1263,6 +1249,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
+  },
+  quoteSettingsCard: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1.5,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  quoteSettingsIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  quoteSettingsBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  quoteSettingsArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
   },
   settingsLinkContent: {
     flexDirection: "row",
