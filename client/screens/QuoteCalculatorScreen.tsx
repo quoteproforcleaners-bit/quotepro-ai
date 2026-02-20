@@ -22,7 +22,10 @@ import {
 } from "@/types";
 import { apiRequest } from "@/lib/query-client";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 import { calculateAllOptions } from "@/lib/quoteCalculator";
+import { saveGuestDraft, loadGuestDraft, clearGuestDraft } from "@/lib/guestDraft";
+import AuthGateModal from "@/components/AuthGateModal";
 import CustomerInfoScreen from "@/screens/quote/CustomerInfoScreen";
 import HomeDetailsScreen from "@/screens/quote/HomeDetailsScreen";
 import ServiceAddOnsScreen from "@/screens/quote/ServiceAddOnsScreen";
@@ -36,10 +39,15 @@ export default function QuoteCalculatorScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { pricingSettings, businessProfile } = useApp();
+  const { user, isGuest } = useAuth();
   const queryClient = useQueryClient();
   const routeParams = (route.params as any) || {};
   const prefill = routeParams.prefillCustomer;
   const [currentStep, setCurrentStep] = useState(0);
+  const [showAuthGate, setShowAuthGate] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"save" | "saveAndSend" | null>(null);
+
+  const isGuestMode = !user;
 
   const [customer, setCustomer] = useState<CustomerInfo>({
     name: prefill?.name || "",
@@ -78,6 +86,26 @@ export default function QuoteCalculatorScreen() {
     "better"
   );
 
+  useEffect(() => {
+    if (isGuestMode) {
+      loadGuestDraft().then((draft) => {
+        if (draft) {
+          setCustomer(draft.customer);
+          setHomeDetails(draft.homeDetails);
+          setAddOns(draft.addOns);
+          setFrequency(draft.frequency);
+          setSelectedOption(draft.selectedOption);
+        }
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isGuestMode && currentStep > 0) {
+      saveGuestDraft({ customer, homeDetails, addOns, frequency, selectedOption });
+    }
+  }, [currentStep, customer, homeDetails, addOns, frequency, selectedOption]);
+
   const handleNext = () => {
     setCurrentStep((prev) => {
       if (prev < STEPS.length - 1) {
@@ -107,6 +135,17 @@ export default function QuoteCalculatorScreen() {
   };
 
   const handleSave = async () => {
+    if (isGuestMode) {
+      await saveGuestDraft({ customer, homeDetails, addOns, frequency, selectedOption });
+      setPendingAction("save");
+      setShowAuthGate(true);
+      return;
+    }
+
+    await performSave();
+  };
+
+  const performSave = async () => {
     const options = calculateAllOptions(
       homeDetails,
       addOns,
@@ -149,10 +188,15 @@ export default function QuoteCalculatorScreen() {
 
       queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
+      await clearGuestDraft();
       navigation.goBack();
     } catch (error) {
       console.error("Failed to save quote:", error);
     }
+  };
+
+  const handleAuthGateAuthenticated = () => {
+    setShowAuthGate(false);
   };
 
   const canProceed = () => {
@@ -198,6 +242,7 @@ export default function QuoteCalculatorScreen() {
             selectedOption={selectedOption}
             onSelectOption={setSelectedOption}
             onSave={handleSave}
+            isGuestMode={isGuestMode}
           />
         );
       default:
@@ -260,6 +305,12 @@ export default function QuoteCalculatorScreen() {
 
       <View style={styles.content}>{renderCurrentStep()}</View>
 
+      <AuthGateModal
+        visible={showAuthGate}
+        onClose={() => { setShowAuthGate(false); setPendingAction(null); }}
+        onAuthenticated={handleAuthGateAuthenticated}
+        message={undefined}
+      />
     </View>
   );
 }

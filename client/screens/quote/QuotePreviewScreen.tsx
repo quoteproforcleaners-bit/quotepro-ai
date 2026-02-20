@@ -69,6 +69,7 @@ interface Props {
   selectedOption: "good" | "better" | "best";
   onSelectOption: (option: "good" | "better" | "best") => void;
   onSave: () => void;
+  isGuestMode?: boolean;
 }
 
 export default function QuotePreviewScreen({
@@ -81,6 +82,7 @@ export default function QuotePreviewScreen({
   selectedOption,
   onSelectOption,
   onSave,
+  isGuestMode = false,
 }: Props) {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -893,16 +895,24 @@ export default function QuotePreviewScreen({
         ]}
       >
         <View style={styles.footerButtons}>
-          <Pressable
-            onPress={handleSave}
-            style={[styles.secondaryFooterBtn, { borderColor: theme.border }]}
-          >
-            <Feather name="bookmark" size={16} color={theme.textSecondary} />
-            <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 6, fontWeight: "600" }}>Save & Send Later</ThemedText>
-          </Pressable>
-          <View style={{ flex: 1 }}>
-            <Button onPress={handleSaveAndSend}>Save & Send</Button>
-          </View>
+          {isGuestMode ? (
+            <View style={{ flex: 1 }}>
+              <Button onPress={handleSave}>Sign Up to Save Quote</Button>
+            </View>
+          ) : (
+            <>
+              <Pressable
+                onPress={handleSave}
+                style={[styles.secondaryFooterBtn, { borderColor: theme.border }]}
+              >
+                <Feather name="bookmark" size={16} color={theme.textSecondary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 6, fontWeight: "600" }}>Save & Send Later</ThemedText>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Button onPress={handleSaveAndSend}>Save & Send</Button>
+              </View>
+            </>
+          )}
         </View>
       </View>
     </View>
