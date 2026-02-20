@@ -1,0 +1,117 @@
+You are Replit AI working inside my existing iOS app “QuotePro” (Expo / React Native). Right now the app opens to an AUTH-FIRST flow (users must create an account or sign in with Apple/Google before they can do anything). I want you to refactor the app to a “Delayed Authentication Funnel” with Guest Mode to increase App Store activation and organic growth.
+
+PRIMARY OBJECTIVE
+Replace the initial login wall with a high-converting landing screen + guest quote experience, and only require authentication at the moment the user tries to SAVE / SEND / EXPORT / ACCEPT.
+
+ASSUMPTIONS (if you find something different in the code, adapt)
+- There is an existing auth provider/context and Apple/Google sign-in already implemented.
+- There is an existing navigation setup (React Navigation or Expo Router).
+- There is a Quote Builder flow (inputs → preview) and actions like Generate Quote / Send Quote / Export PDF / Save Quote.
+- There is a logged-in Dashboard/Home experience.
+
+WHAT TO BUILD
+
+A) New First Screen: LandingScreen (NO LOGIN WALL)
+1) Make the app open to a new LandingScreen as the initial route.
+2) LandingScreen UI (modern, clean, B2B-professional):
+   - Headline: “Create Your First Cleaning Quote in 30 Seconds”
+   - Subheadline: “Built for cleaning businesses. Quote faster. Look more professional. Close more jobs.”
+   - Primary CTA button: “Create Free Quote” → starts Guest Mode quote flow immediately
+   - Secondary CTA button: “Sign in” → goes to existing Auth screen (Apple/Google)
+   - Small text link: “Why create an account?” → modal explaining:
+        • Save clients + quotes
+        • Send branded PDFs
+        • Access on any device
+        • Sync + history
+   - Add a simple icon/illustration (can be a placeholder).
+
+B) Guest Mode Quote Flow (VALUE FIRST)
+1) When user taps “Create Free Quote”, route them straight to the QuoteBuilder WITHOUT requiring login.
+2) Guest users can:
+   - Enter: square footage, bedrooms, bathrooms, frequency (optional), add-ons
+   - Use AI pricing suggestion (if this is part of app)
+   - See professional Quote Preview
+3) Guest users should NOT lose their draft if they back out or open the auth gate later.
+
+C) Auth Gate (LOGIN ONLY WHEN IT MATTERS)
+1) Create a reusable AuthGateModal and a utility function/hook:
+   - requireAuth(actionName, callback)
+2) Gated actions:
+   - Save Quote
+   - Send Quote (email/text)
+   - Export PDF
+   - Generate Quote IF it persists/sends/saves
+   - Any “Accept Quote” mechanism if present
+3) Behavior:
+   - If authenticated → run callback immediately.
+   - If NOT authenticated → show AuthGateModal:
+        Title: “Create a free account to save and send your quote”
+        Bullets:
+          • Save clients + quotes
+          • Send branded PDF instantly
+          • Access on any device
+        Buttons:
+          - Continue with Apple
+          - Continue with Google
+          - Not now (returns to preview; keep draft)
+   - After successful login, automatically resume the exact action the user attempted (no extra taps).
+
+D) Draft Persistence + Migration
+1) Add guest draft storage:
+   - Store the current quote draft locally using AsyncStorage or SecureStore.
+2) If user signs in mid-flow:
+   - Migrate the local guest draft into the user’s saved quotes under their userId (via existing backend/store mechanism).
+   - After migration, clear the guest draft local storage.
+3) If user cancels login:
+   - Draft remains locally and they can still view/edit preview.
+
+E) Auth State + Routing Rules
+1) Introduce/confirm auth state includes:
+   - isAuthenticated
+   - userId
+   - isGuest (true when in guest mode, false when logged in)
+2) Navigation rules:
+   - App starts at LandingScreen always.
+   - If user taps “Sign in” and completes sign in → route to Dashboard.
+   - If user is prompted by AuthGateModal and signs in → route back to the previous screen and resume action.
+
+IMPLEMENTATION STEPS (DO THESE IN ORDER)
+1) Scan the repo and identify:
+   - Navigation entry point / initial route
+   - Auth context/provider + Apple/Google sign in components
+   - Quote Builder + Quote Preview screens
+   - Existing “Save/Send/Export” functions
+2) Add LandingScreen and wire it as the initial route.
+3) Add Guest Mode flag/state and enable QuoteBuilder access without auth.
+4) Add AuthGateModal + requireAuth hook.
+5) Wrap all gated actions in QuotePreview/QuoteBuilder with requireAuth.
+6) Add local draft persistence and migration logic.
+7) Test flows:
+   - Fresh install → Create Free Quote → build quote → preview (no login) ✅
+   - Tap Save/Send/Export → AuthGate shows ✅
+   - Sign in → action resumes automatically ✅
+   - “Not now” → returns to preview, draft preserved ✅
+   - Sign in from LandingScreen → Dashboard ✅
+8) Ensure minimal code churn and preserve existing architecture.
+
+NON-NEGOTIABLES
+- Do NOT remove Apple/Google sign-in.
+- Do NOT force login at launch anymore.
+- Do NOT lose user’s draft quote at any point.
+- Keep the UI polished and consistent with current design system.
+- Do not rewrite the app; refactor surgically.
+
+DELIVERABLE
+Implement the full working feature set in code:
+- New LandingScreen
+- Guest Mode routing
+- AuthGateModal + requireAuth
+- Draft storage + migration
+- Updated navigation
+Provide a short summary of what files you changed/added and where.
+
+Now start by scanning the codebase and telling me:
+- What navigation system this app uses (React Navigation or Expo Router)
+- What the current initial route is
+- Where the auth provider lives
+Then implement the changes.

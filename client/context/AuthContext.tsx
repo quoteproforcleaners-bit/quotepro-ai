@@ -11,6 +11,7 @@ interface AuthUser {
 interface AuthContextType {
   isLoading: boolean;
   user: AuthUser | null;
+  isGuest: boolean;
   needsOnboarding: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
@@ -20,6 +21,8 @@ interface AuthContextType {
   refreshAuth: () => Promise<void>;
   logout: () => Promise<void>;
   setNeedsOnboarding: (val: boolean) => void;
+  enterGuestMode: () => void;
+  exitGuestMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +31,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
+
+  const enterGuestMode = () => setIsGuest(true);
+  const exitGuestMode = () => setIsGuest(false);
 
   useEffect(() => {
     checkAuth();
@@ -56,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     setUser(data.user);
     setNeedsOnboarding(data.needsOnboarding);
+    setIsGuest(false);
   };
 
   const register = async (email: string, password: string, name?: string) => {
@@ -63,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     setUser(data.user);
     setNeedsOnboarding(data.needsOnboarding);
+    setIsGuest(false);
   };
 
   const loginWithApple = async (data: {
@@ -75,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await res.json();
     setUser(result.user);
     setNeedsOnboarding(result.needsOnboarding);
+    setIsGuest(false);
   };
 
   const loginWithGoogle = async (idToken: string) => {
@@ -82,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await res.json();
     setUser(result.user);
     setNeedsOnboarding(result.needsOnboarding);
+    setIsGuest(false);
   };
 
   const setAuthData = (authUser: AuthUser, onboarding: boolean) => {
@@ -117,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         isLoading,
         user,
+        isGuest,
         needsOnboarding,
         login,
         register,
@@ -126,6 +138,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshAuth,
         logout,
         setNeedsOnboarding,
+        enterGuestMode,
+        exitGuestMode,
       }}
     >
       {children}
