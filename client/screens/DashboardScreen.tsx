@@ -38,6 +38,78 @@ import { trackEvent } from "@/lib/analytics";
  * Adjust these to tweak the visual polish.
  * "dt" = design token
  */
+const DAILY_QUOTES = [
+  { text: "Success is the sum of small efforts repeated day in and day out.", author: "Robert Collier" },
+  { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+  { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+  { text: "Every expert was once a beginner.", author: "Helen Hayes" },
+  { text: "Your most unhappy customers are your greatest source of learning.", author: "Bill Gates" },
+  { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese Proverb" },
+  { text: "Quality means doing it right when no one is looking.", author: "Henry Ford" },
+  { text: "Go the extra mile. It's never crowded there.", author: "Wayne Dyer" },
+  { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
+  { text: "Opportunities don't happen. You create them.", author: "Chris Grosser" },
+  { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
+  { text: "Hustle beats talent when talent doesn't hustle.", author: "Ross Simmonds" },
+  { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+  { text: "Small business is the backbone of our economy.", author: "Tina Fey" },
+  { text: "People don't buy what you do; they buy why you do it.", author: "Simon Sinek" },
+  { text: "A satisfied customer is the best business strategy of all.", author: "Michael LeBoeuf" },
+  { text: "Customer service is not a department, it's everyone's job.", author: "Anonymous" },
+  { text: "The goal is not to be busy, it's to be productive.", author: "Tim Ferriss" },
+  { text: "Success usually comes to those who are too busy to be looking for it.", author: "Henry David Thoreau" },
+  { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney" },
+  { text: "Work hard in silence. Let success make the noise.", author: "Frank Ocean" },
+  { text: "Your reputation is built one clean at a time.", author: "QuotePro" },
+  { text: "Consistency is what transforms average into excellence.", author: "Anonymous" },
+  { text: "Make every detail perfect, and limit the number of details.", author: "Jack Dorsey" },
+  { text: "In the middle of difficulty lies opportunity.", author: "Albert Einstein" },
+  { text: "Revenue is vanity, profit is sanity, but cash is king.", author: "Anonymous" },
+  { text: "If you're not taking care of your customer, your competitor will.", author: "Bob Hooey" },
+  { text: "Do what you do so well that they want to see it again and bring their friends.", author: "Walt Disney" },
+  { text: "There are no traffic jams along the extra mile.", author: "Roger Staubach" },
+  { text: "The harder you work, the luckier you get.", author: "Gary Player" },
+  { text: "Dream big. Start small. Act now.", author: "Robin Sharma" },
+  { text: "What you do today can improve all your tomorrows.", author: "Ralph Marston" },
+  { text: "Strive not to be a success, but rather to be of value.", author: "Albert Einstein" },
+  { text: "The best marketing strategy ever: care.", author: "Gary Vaynerchuk" },
+  { text: "Don't be afraid to give up the good to go for the great.", author: "John D. Rockefeller" },
+  { text: "A clean home is a happy home, and you make that happen.", author: "QuotePro" },
+  { text: "Action is the foundational key to all success.", author: "Pablo Picasso" },
+  { text: "Winners are not people who never fail but people who never quit.", author: "Edwin Louis Cole" },
+  { text: "The difference between ordinary and extraordinary is that little extra.", author: "Jimmy Johnson" },
+  { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+  { text: "Price is what you pay. Value is what you get.", author: "Warren Buffett" },
+  { text: "Business opportunities are like buses, there's always another one coming.", author: "Richard Branson" },
+  { text: "Be so good they can't ignore you.", author: "Steve Martin" },
+  { text: "It's not about ideas. It's about making ideas happen.", author: "Scott Belsky" },
+  { text: "You don't build a business. You build people, and people build the business.", author: "Zig Ziglar" },
+  { text: "The customer's perception is your reality.", author: "Kate Zabriskie" },
+  { text: "Profit in business comes from repeat customers.", author: "W. Edwards Deming" },
+  { text: "Take care of your employees and they'll take care of your business.", author: "Richard Branson" },
+  { text: "Focus on being productive instead of busy.", author: "Tim Ferriss" },
+  { text: "Chase the vision, not the money; the money will end up following you.", author: "Tony Hsieh" },
+  { text: "Don't find customers for your products, find products for your customers.", author: "Seth Godin" },
+  { text: "Every day is a new opportunity to grow your business.", author: "QuotePro" },
+  { text: "Your limitation is only your imagination.", author: "Anonymous" },
+  { text: "Push yourself, because no one else is going to do it for you.", author: "Anonymous" },
+  { text: "Great things never come from comfort zones.", author: "Anonymous" },
+  { text: "The only limit to our realization of tomorrow is our doubts of today.", author: "Franklin D. Roosevelt" },
+  { text: "Stop selling. Start helping.", author: "Zig Ziglar" },
+  { text: "Make your product easier to buy than your competition, or you will lose.", author: "Mark Cuban" },
+  { text: "The biggest risk is not taking any risk.", author: "Mark Zuckerberg" },
+  { text: "Every accomplishment starts with the decision to try.", author: "John F. Kennedy" },
+  { text: "Success doesn't come from what you do occasionally, it comes from what you do consistently.", author: "Marie Forleo" },
+];
+
+function getDailyQuote() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - start.getTime();
+  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+  return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
+}
+
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(() => ({
@@ -466,6 +538,16 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        <View style={[styles.quoteCard, { backgroundColor: dt.accentSoft, borderColor: dt.borderAccent }]}>
+          <Feather name="sunrise" size={16} color={dt.accent} style={{ marginBottom: 6 }} />
+          <ThemedText type="small" style={{ color: dt.textPrimary, fontStyle: "italic", lineHeight: 20, textAlign: "center" }}>
+            {`"${getDailyQuote().text}"`}
+          </ThemedText>
+          <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 4, fontWeight: "600" }}>
+            {`- ${getDailyQuote().author}`}
+          </ThemedText>
+        </View>
+
         {followUpQueueCount > 0 ? (
           <Pressable
             onPress={() => navigation.navigate("FollowUpQueue")}
@@ -706,6 +788,13 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
     marginBottom: Spacing.md,
+  },
+  quoteCard: {
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
   },
   inputRow: {
     flexDirection: "row",
