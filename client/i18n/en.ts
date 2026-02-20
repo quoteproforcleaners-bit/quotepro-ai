@@ -611,6 +611,31 @@ const en = {
     defaultTerms: "Default Terms",
     termsPlaceholder: "Enter your terms and conditions...",
   },
+
+  landing: {
+    tagline: "Professional quoting for cleaning businesses",
+    createFreeQuote: "Create a Free Quote",
+    noAccountNeeded: "No account needed to get started",
+    signIn: "Sign In to Your Account",
+    whyCreateAccount: "Why create an account?",
+    benefitsTitle: "Why Sign Up?",
+    signUpNow: "Sign Up Now",
+    instantQuotes: "Instant Quotes",
+    instantQuotesDesc: "Create professional quotes in under a minute with our smart calculator",
+    customerManagement: "Customer Management",
+    customerManagementDesc: "Keep track of all your customers, notes, and communication history",
+    jobScheduling: "Job Scheduling",
+    jobSchedulingDesc: "Schedule jobs, track status, and manage your team's workload",
+    growthTools: "Growth Tools",
+    growthToolsDesc: "Automate follow-ups, get reviews, and grow your business",
+  },
+
+  authGate: {
+    title: "Create Your Account",
+    subtitle: "Sign up to save your quote and unlock all features",
+    fillAllFields: "Please fill in all fields",
+    saveQuoteMessage: "Create a free account to save and send your quote",
+  },
 };
 
 export default en;

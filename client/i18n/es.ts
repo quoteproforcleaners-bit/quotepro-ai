@@ -613,6 +613,31 @@ const es: Translations = {
     defaultTerms: "T\u00e9rminos predeterminados",
     termsPlaceholder: "Ingresa tus t\u00e9rminos y condiciones...",
   },
+
+  landing: {
+    tagline: "Cotizaciones profesionales para empresas de limpieza",
+    createFreeQuote: "Crear una Cotizaci\u00f3n Gratis",
+    noAccountNeeded: "No necesitas cuenta para empezar",
+    signIn: "Iniciar Sesi\u00f3n",
+    whyCreateAccount: "\u00bfPor qu\u00e9 crear una cuenta?",
+    benefitsTitle: "\u00bfPor qu\u00e9 registrarte?",
+    signUpNow: "Reg\u00edstrate Ahora",
+    instantQuotes: "Cotizaciones Al Instante",
+    instantQuotesDesc: "Crea cotizaciones profesionales en menos de un minuto con nuestra calculadora",
+    customerManagement: "Gesti\u00f3n de Clientes",
+    customerManagementDesc: "Lleva un registro de todos tus clientes, notas e historial de comunicaci\u00f3n",
+    jobScheduling: "Programaci\u00f3n de Trabajos",
+    jobSchedulingDesc: "Programa trabajos, rastrea el estado y administra la carga de trabajo",
+    growthTools: "Herramientas de Crecimiento",
+    growthToolsDesc: "Automatiza seguimientos, obt\u00e9n rese\u00f1as y haz crecer tu negocio",
+  },
+
+  authGate: {
+    title: "Crea Tu Cuenta",
+    subtitle: "Reg\u00edstrate para guardar tu cotizaci\u00f3n y desbloquear todas las funciones",
+    fillAllFields: "Por favor completa todos los campos",
+    saveQuoteMessage: "Crea una cuenta gratis para guardar y enviar tu cotizaci\u00f3n",
+  },
 };
 
 export default es;
