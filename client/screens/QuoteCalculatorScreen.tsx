@@ -149,7 +149,7 @@ export default function QuoteCalculatorScreen() {
     await performSave();
   };
 
-  const performSave = async () => {
+  const buildQuotePayload = () => {
     const options = calculateAllOptions(
       homeDetails,
       addOns,
@@ -157,40 +157,42 @@ export default function QuoteCalculatorScreen() {
       pricingSettings,
       true
     );
-
     const selectedPrice = options[selectedOption]?.price || 0;
     const taxRate = pricingSettings?.taxRate || 0;
     const tax = selectedPrice * (taxRate / 100);
+    return {
+      propertyBeds: homeDetails.beds,
+      propertyBaths: homeDetails.baths + homeDetails.halfBaths * 0.5,
+      propertySqft: homeDetails.sqft,
+      propertyDetails: {
+        conditionScore: homeDetails.conditionScore,
+        peopleCount: homeDetails.peopleCount,
+        petType: homeDetails.petType,
+        petShedding: homeDetails.petShedding,
+        homeType: homeDetails.homeType,
+        kitchensCount: homeDetails.kitchensCount,
+        halfBaths: homeDetails.halfBaths,
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        customerEmail: customer.email,
+        customerAddress: customer.address,
+      },
+      addOns,
+      frequencySelected: frequency,
+      selectedOption,
+      recommendedOption,
+      options,
+      subtotal: selectedPrice,
+      tax,
+      total: selectedPrice + tax,
+      status: "draft",
+    };
+  };
 
+  const performSave = async () => {
     try {
-      const res = await apiRequest("POST", "/api/quotes", {
-        propertyBeds: homeDetails.beds,
-        propertyBaths: homeDetails.baths + homeDetails.halfBaths * 0.5,
-        propertySqft: homeDetails.sqft,
-        propertyDetails: {
-          conditionScore: homeDetails.conditionScore,
-          peopleCount: homeDetails.peopleCount,
-          petType: homeDetails.petType,
-          petShedding: homeDetails.petShedding,
-          homeType: homeDetails.homeType,
-          kitchensCount: homeDetails.kitchensCount,
-          halfBaths: homeDetails.halfBaths,
-          customerName: customer.name,
-          customerPhone: customer.phone,
-          customerEmail: customer.email,
-          customerAddress: customer.address,
-        },
-        addOns,
-        frequencySelected: frequency,
-        selectedOption,
-        recommendedOption,
-        options,
-        subtotal: selectedPrice,
-        tax,
-        total: selectedPrice + tax,
-        status: "draft",
-      });
-
+      const payload = buildQuotePayload();
+      const res = await apiRequest("POST", "/api/quotes", payload);
       const newQuote = await res.json();
       queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
@@ -198,6 +200,25 @@ export default function QuoteCalculatorScreen() {
       navigation.replace("QuoteDetail", { quoteId: newQuote.id });
     } catch (error) {
       console.error("Failed to save quote:", error);
+    }
+  };
+
+  const savedQuoteIdRef = React.useRef<string | null>(null);
+
+  const performSaveForSend = async (): Promise<string | null> => {
+    if (savedQuoteIdRef.current) return savedQuoteIdRef.current;
+    try {
+      const payload = buildQuotePayload();
+      const res = await apiRequest("POST", "/api/quotes", payload);
+      const newQuote = await res.json();
+      savedQuoteIdRef.current = newQuote.id;
+      queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
+      await clearGuestDraft();
+      return newQuote.id;
+    } catch (error) {
+      console.error("Failed to save quote:", error);
+      return null;
     }
   };
 
@@ -250,6 +271,7 @@ export default function QuoteCalculatorScreen() {
             recommendedOption={recommendedOption}
             onSetRecommended={setRecommendedOption}
             onSave={handleSave}
+            onSaveForSend={performSaveForSend}
             isGuestMode={isGuestMode}
           />
         );

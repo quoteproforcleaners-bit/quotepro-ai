@@ -72,6 +72,7 @@ interface Props {
   recommendedOption: "good" | "better" | "best";
   onSetRecommended: (option: "good" | "better" | "best") => void;
   onSave: () => void;
+  onSaveForSend?: () => Promise<string | null>;
   isGuestMode?: boolean;
 }
 
@@ -87,6 +88,7 @@ export default function QuotePreviewScreen({
   recommendedOption,
   onSetRecommended,
   onSave,
+  onSaveForSend,
   isGuestMode = false,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -389,17 +391,32 @@ export default function QuotePreviewScreen({
     setSendSuccess(null);
 
     try {
+      let quoteId: string | null = null;
+      if (onSaveForSend) {
+        quoteId = await onSaveForSend();
+      }
+
       const subjectMatch = draft.match(/^Subject:\s*(.+?)(?:\n|$)/i);
       const subject = subjectMatch ? subjectMatch[1].trim() : `Quote from ${businessProfile?.companyName || "QuotePro"}`;
       const bodyText = subjectMatch ? draft.replace(/^Subject:\s*.+?\n+/i, "").trim() : draft;
 
-      const res = await apiRequest("POST", "/api/send/email", { to: recipientEmail, subject, body: bodyText });
+      const emailPayload: any = { to: recipientEmail, subject, body: bodyText };
+      if (quoteId && includeQuoteLink) {
+        emailPayload.quoteId = quoteId;
+        emailPayload.includeQuoteLink = true;
+      }
+
+      const res = await apiRequest("POST", "/api/send/email", emailPayload);
       const data = await res.json();
 
       if (data.success) {
         setSendSuccess("Email sent!");
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        if (quoteId) {
+          await apiRequest("PATCH", `/api/quotes/${quoteId}`, { status: "sent", sentVia: "email", sentAt: new Date().toISOString() });
+          navigation.replace("QuoteDetail" as any, { quoteId });
         }
       } else {
         Alert.alert("Send Failed", data.message || "Could not send email.");
