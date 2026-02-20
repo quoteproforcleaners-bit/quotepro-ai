@@ -81,6 +81,7 @@ export default function QuoteCalculatorScreen() {
     laundryFoldOnly: false,
     dishes: false,
     organizationTidy: false,
+    biannualDeepClean: false,
   });
   const [selectedOption, setSelectedOption] = useState<"good" | "better" | "best">(
     "better"

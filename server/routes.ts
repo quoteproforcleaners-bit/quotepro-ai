@@ -4063,6 +4063,9 @@ Respond with JSON: {"reply": string}`
           const price = typeof val === "object" ? (val as any).price || 0 : 0;
           const label = name.replace(/([A-Z])/g, " $1").replace(/^./, (s: string) => s.toUpperCase()).replace(/_/g, " ");
           addOnsHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F1F5F9"><span style="font-size:14px;color:#334155">${label}</span>${price ? `<span style="font-size:14px;font-weight:600;color:#1E293B">+$${Number(price).toFixed(2)}</span>` : `<span style="font-size:13px;color:#16A34A;font-weight:500">Included</span>`}</div>`;
+          if (name === "biannualDeepClean") {
+            addOnsHtml += `<div style="padding:8px 12px;background:#F0FDF4;border-radius:8px;margin:6px 0 4px"><span style="font-size:13px;color:#16A34A">A deep clean will be automatically scheduled 6 months from your service start date. You may opt out at any time by contacting us.</span></div>`;
+          }
         }
         addOnsHtml += `</div>`;
       }

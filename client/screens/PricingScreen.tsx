@@ -350,6 +350,12 @@ export default function PricingScreen() {
             onChangeText={(v) => updateAddOnPrice("organizationTidy", v)}
             keyboardType="decimal-pad"
           />
+          <Input
+            label="Biannual Deep Clean"
+            value={(settings.addOnPrices.biannualDeepClean ?? 199).toString()}
+            onChangeText={(v) => updateAddOnPrice("biannualDeepClean", v)}
+            keyboardType="decimal-pad"
+          />
         </View>
 
         <SectionHeader

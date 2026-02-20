@@ -171,6 +171,21 @@ export default function ServiceAddOnsScreen({
           price={`+$${addOnPrices.organizationTidy}`}
         />
       </View>
+
+      <SectionHeader
+        title="Recurring Revenue"
+        subtitle="Auto-scheduled services for ongoing revenue"
+      />
+
+      <View style={styles.toggleList}>
+        <Toggle
+          label="Biannual Deep Clean"
+          description="A deep clean auto-scheduled 6 months from service start. Customer can opt out."
+          value={addOns.biannualDeepClean}
+          onChange={(v) => updateAddOn("biannualDeepClean", v)}
+          price={`+$${addOnPrices.biannualDeepClean}`}
+        />
+      </View>
     </ScrollView>
   );
 }

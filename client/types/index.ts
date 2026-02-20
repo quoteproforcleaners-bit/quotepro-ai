@@ -71,6 +71,7 @@ export interface PricingSettings {
     laundryFoldOnly: number;
     dishes: number;
     organizationTidy: number;
+    biannualDeepClean: number;
   };
   frequencyDiscounts: {
     weekly: number;
@@ -114,6 +115,7 @@ export interface AddOns {
   laundryFoldOnly: boolean;
   dishes: boolean;
   organizationTidy: boolean;
+  biannualDeepClean: boolean;
 }
 
 export type ServiceFrequency = "one-time" | "weekly" | "biweekly" | "monthly";
@@ -204,6 +206,7 @@ export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
     laundryFoldOnly: 35,
     dishes: 35,
     organizationTidy: 75,
+    biannualDeepClean: 199,
   },
   frequencyDiscounts: {
     weekly: 15,

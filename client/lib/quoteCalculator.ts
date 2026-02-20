@@ -63,6 +63,7 @@ function getAddOnHours(addOns: AddOns): number {
   if (addOns.laundryFoldOnly) hours += 0.5;
   if (addOns.dishes) hours += 0.5;
   if (addOns.organizationTidy) hours += 1.0;
+  if (addOns.biannualDeepClean) hours += 0;
   return hours;
 }
 
@@ -77,6 +78,7 @@ function getAddOnPrice(addOns: AddOns, prices: PricingSettings["addOnPrices"]): 
   if (addOns.laundryFoldOnly) total += prices.laundryFoldOnly;
   if (addOns.dishes) total += prices.dishes;
   if (addOns.organizationTidy) total += prices.organizationTidy;
+  if (addOns.biannualDeepClean) total += prices.biannualDeepClean;
   return total;
 }
 
@@ -192,6 +194,7 @@ export function calculateAllOptions(
     laundryFoldOnly: false,
     dishes: false,
     organizationTidy: false,
+    biannualDeepClean: false,
   };
 
   const goodType = getServiceTypeById(settings, settings.goodOptionId) || settings.serviceTypes[0];
