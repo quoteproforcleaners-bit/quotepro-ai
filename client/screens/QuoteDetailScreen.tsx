@@ -83,6 +83,23 @@ export default function QuoteDetailScreen() {
     queryKey: ["/api/stripe/status"],
   });
 
+  const quoteId = route.params.quoteId;
+
+  const { data: recommendations } = useQuery<any[]>({
+    queryKey: ['/api/quotes', quoteId, 'recommendations'],
+    enabled: quote?.status === "accepted",
+  });
+
+  const recommendationMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/recommendations/${id}`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/quotes', quoteId, 'recommendations'] });
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("PUT", `/api/quotes/${route.params.quoteId}`, data);
@@ -689,6 +706,157 @@ export default function QuoteDetailScreen() {
             </View>
           );
         })()}
+
+        {status === "accepted" ? (
+          <View>
+            <SectionHeader title="Acceptance Details" />
+            <View
+              style={[
+                styles.detailsCard,
+                { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.md },
+              ]}
+            >
+              {quote.acceptedFrequency ? (
+                <View style={styles.detailRow}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                    Frequency
+                  </ThemedText>
+                  <ThemedText type="body" style={{ textTransform: "capitalize" }}>
+                    {quote.acceptedFrequency}
+                  </ThemedText>
+                </View>
+              ) : null}
+              {quote.acceptedPreferences?.preferredDays ? (
+                <View style={styles.detailRow}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                    Preferred Days
+                  </ThemedText>
+                  <ThemedText type="body">
+                    {Array.isArray(quote.acceptedPreferences.preferredDays)
+                      ? quote.acceptedPreferences.preferredDays.join(", ")
+                      : quote.acceptedPreferences.preferredDays}
+                  </ThemedText>
+                </View>
+              ) : null}
+              {quote.acceptedSource ? (
+                <View style={styles.detailRow}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                    Source
+                  </ThemedText>
+                  <ThemedText type="body" style={{ textTransform: "capitalize" }}>
+                    {quote.acceptedSource}
+                  </ThemedText>
+                </View>
+              ) : null}
+              {quote.acceptedAt ? (
+                <View style={styles.detailRow}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                    Accepted On
+                  </ThemedText>
+                  <ThemedText type="body">
+                    {new Date(quote.acceptedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                  </ThemedText>
+                </View>
+              ) : null}
+              {quote.acceptedNotes ? (
+                <View style={{ marginTop: Spacing.sm }}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: 4 }}>
+                    Notes
+                  </ThemedText>
+                  <ThemedText type="body">{quote.acceptedNotes}</ThemedText>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
+        {status === "accepted" && recommendations && recommendations.length > 0 ? (
+          <View>
+            <SectionHeader title="Revenue Playbook" />
+            <View style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
+              {recommendations.map((rec: any) => {
+                const typeIcons: Record<string, string> = {
+                  follow_up: "calendar",
+                  frequency_upgrade: "trending-up",
+                  addon_suggestion: "plus-circle",
+                  referral_ask: "users",
+                  review_request: "star",
+                  seasonal_offer: "sun",
+                };
+                const iconName = typeIcons[rec.type] || "zap";
+                const isPending = rec.status === "pending";
+                const isCompleted = rec.status === "completed";
+                const isDismissed = rec.status === "dismissed";
+
+                return (
+                  <View
+                    key={rec.id}
+                    style={[
+                      styles.recommendationCard,
+                      {
+                        backgroundColor: theme.cardBackground,
+                        borderColor: isDismissed ? theme.border : isCompleted ? theme.success : theme.border,
+                        opacity: isDismissed ? 0.6 : 1,
+                      },
+                    ]}
+                  >
+                    <View style={styles.recommendationHeader}>
+                      <View style={[styles.recommendationIcon, { backgroundColor: `${theme.primary}15` }]}>
+                        <Feather name={iconName as any} size={16} color={theme.primary} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs }}>
+                          <ThemedText type="body" style={{ fontWeight: "600", flex: 1 }}>
+                            {rec.title}
+                          </ThemedText>
+                          {isCompleted ? (
+                            <Feather name="check-circle" size={16} color={theme.success} />
+                          ) : isDismissed ? (
+                            <View style={[styles.statusDot, { backgroundColor: theme.textSecondary }]} />
+                          ) : (
+                            <View style={[styles.statusDot, { backgroundColor: theme.warning }]} />
+                          )}
+                        </View>
+                        <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                          {rec.rationale}
+                        </ThemedText>
+                        {rec.suggestedDate ? (
+                          <ThemedText type="caption" style={{ color: theme.primary, marginTop: 4 }}>
+                            Suggested: {new Date(rec.suggestedDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          </ThemedText>
+                        ) : null}
+                      </View>
+                    </View>
+                    {isPending ? (
+                      <View style={styles.recommendationActions}>
+                        <Pressable
+                          onPress={() => recommendationMutation.mutate({ id: rec.id, status: "completed" })}
+                          style={[styles.recActionBtn, { backgroundColor: `${theme.success}15` }]}
+                          testID={`rec-done-${rec.id}`}
+                        >
+                          <Feather name="check" size={14} color={theme.success} />
+                          <ThemedText type="caption" style={{ color: theme.success, marginLeft: 4, fontWeight: "600" }}>
+                            Mark Done
+                          </ThemedText>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => recommendationMutation.mutate({ id: rec.id, status: "dismissed" })}
+                          style={[styles.recActionBtn, { backgroundColor: theme.backgroundSecondary }]}
+                          testID={`rec-dismiss-${rec.id}`}
+                        >
+                          <Feather name="x" size={14} color={theme.textSecondary} />
+                          <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: 4 }}>
+                            Dismiss
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         {sendSuccess ? (
           <View style={{ backgroundColor: `${theme.success}15`, padding: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
@@ -1345,5 +1513,41 @@ const styles = StyleSheet.create({
   timelineContent: {
     flex: 1,
     paddingBottom: Spacing.md,
+  },
+  recommendationCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  recommendationHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  recommendationIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  recommendationActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.05)",
+  },
+  recActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.xs,
   },
 });

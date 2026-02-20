@@ -13,6 +13,7 @@ import { QuoteCard } from "@/components/QuoteCard";
 import { Button } from "@/components/Button";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Toggle } from "@/components/Toggle";
+import { UnderpricingAlert } from "@/components/UnderpricingAlert";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
@@ -458,6 +459,14 @@ export default function QuotePreviewScreen({
             </View>
           </View>
         </View>
+
+        <UnderpricingAlert
+          total={total}
+          sqft={homeDetails.sqft}
+          beds={homeDetails.beds}
+          baths={homeDetails.baths}
+          frequency={frequency}
+        />
 
         <View
           style={[
