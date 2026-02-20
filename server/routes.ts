@@ -4234,13 +4234,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
     </select>
     
     <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:8px">Preferred Days</label>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Mon"> Mon</label>
-      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Tue"> Tue</label>
-      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Wed"> Wed</label>
-      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Thu"> Thu</label>
-      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Fri"> Fri</label>
-      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Sat"> Sat</label>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Mon" style="width:20px;height:20px;margin:0"> Mon</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Tue" style="width:20px;height:20px;margin:0"> Tue</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Wed" style="width:20px;height:20px;margin:0"> Wed</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Thu" style="width:20px;height:20px;margin:0"> Thu</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Fri" style="width:20px;height:20px;margin:0"> Fri</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Sat" style="width:20px;height:20px;margin:0"> Sat</label>
     </div>
     
     <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Notes for Your Cleaner</label>

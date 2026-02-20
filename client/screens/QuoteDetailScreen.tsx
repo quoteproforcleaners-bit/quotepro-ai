@@ -707,68 +707,93 @@ export default function QuoteDetailScreen() {
           );
         })()}
 
-        {status === "accepted" ? (
-          <View>
-            <SectionHeader title="Acceptance Details" />
-            <View
-              style={[
-                styles.detailsCard,
-                { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.md },
-              ]}
-            >
-              {quote.acceptedFrequency ? (
-                <View style={styles.detailRow}>
-                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                    Frequency
-                  </ThemedText>
-                  <ThemedText type="body" style={{ textTransform: "capitalize" }}>
-                    {quote.acceptedFrequency}
-                  </ThemedText>
-                </View>
-              ) : null}
-              {quote.acceptedPreferences?.preferredDays ? (
-                <View style={styles.detailRow}>
-                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                    Preferred Days
-                  </ThemedText>
-                  <ThemedText type="body">
-                    {Array.isArray(quote.acceptedPreferences.preferredDays)
-                      ? quote.acceptedPreferences.preferredDays.join(", ")
-                      : quote.acceptedPreferences.preferredDays}
-                  </ThemedText>
-                </View>
-              ) : null}
-              {quote.acceptedSource ? (
-                <View style={styles.detailRow}>
-                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                    Source
-                  </ThemedText>
-                  <ThemedText type="body" style={{ textTransform: "capitalize" }}>
-                    {quote.acceptedSource}
-                  </ThemedText>
-                </View>
-              ) : null}
-              {quote.acceptedAt ? (
-                <View style={styles.detailRow}>
-                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                    Accepted On
-                  </ThemedText>
-                  <ThemedText type="body">
-                    {new Date(quote.acceptedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                  </ThemedText>
-                </View>
-              ) : null}
-              {quote.acceptedNotes ? (
-                <View style={{ marginTop: Spacing.sm }}>
-                  <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: 4 }}>
-                    Notes
-                  </ThemedText>
-                  <ThemedText type="body">{quote.acceptedNotes}</ThemedText>
-                </View>
-              ) : null}
+        {status === "accepted" ? (() => {
+          const prefs = typeof quote.acceptedPreferences === "string"
+            ? (() => { try { return JSON.parse(quote.acceptedPreferences); } catch { return null; } })()
+            : quote.acceptedPreferences;
+          const days = prefs?.preferredDays;
+          const daysStr = Array.isArray(days) && days.length > 0 ? days.join(", ") : null;
+          const optionLabel = quote.selectedOption
+            ? (() => {
+                const opts = typeof quote.options === "string" ? (() => { try { return JSON.parse(quote.options); } catch { return {}; } })() : (quote.options || {});
+                const optVal = opts[quote.selectedOption];
+                const name = optVal && typeof optVal === "object" && optVal.name ? optVal.name : quote.selectedOption;
+                return name.charAt(0).toUpperCase() + name.slice(1);
+              })()
+            : null;
+          const hasDetails = quote.acceptedFrequency || daysStr || quote.acceptedNotes || quote.acceptedSource || optionLabel;
+          if (!hasDetails && !quote.acceptedAt) return null;
+          return (
+            <View>
+              <SectionHeader title="Acceptance Details" />
+              <View
+                style={[
+                  styles.detailsCard,
+                  { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.md },
+                ]}
+              >
+                {quote.acceptedAt ? (
+                  <View style={styles.detailRow}>
+                    <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                      Accepted On
+                    </ThemedText>
+                    <ThemedText type="body">
+                      {new Date(quote.acceptedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                    </ThemedText>
+                  </View>
+                ) : null}
+                {optionLabel ? (
+                  <View style={styles.detailRow}>
+                    <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                      Package Selected
+                    </ThemedText>
+                    <ThemedText type="body" style={{ fontWeight: "600", color: theme.primary }}>
+                      {optionLabel}
+                    </ThemedText>
+                  </View>
+                ) : null}
+                {quote.acceptedFrequency ? (
+                  <View style={styles.detailRow}>
+                    <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                      Preferred Frequency
+                    </ThemedText>
+                    <ThemedText type="body" style={{ textTransform: "capitalize" }}>
+                      {quote.acceptedFrequency.replace(/-/g, " ")}
+                    </ThemedText>
+                  </View>
+                ) : null}
+                {daysStr ? (
+                  <View style={styles.detailRow}>
+                    <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                      Preferred Days
+                    </ThemedText>
+                    <ThemedText type="body">{daysStr}</ThemedText>
+                  </View>
+                ) : null}
+                {quote.acceptedSource ? (
+                  <View style={styles.detailRow}>
+                    <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                      Source
+                    </ThemedText>
+                    <ThemedText type="body" style={{ textTransform: "capitalize" }}>
+                      {quote.acceptedSource.replace(/_/g, " ")}
+                    </ThemedText>
+                  </View>
+                ) : null}
+                {quote.acceptedNotes ? (
+                  <View style={[styles.detailRow, { flexDirection: "column", alignItems: "flex-start" }]}>
+                    <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: 4 }}>
+                      Customer Notes
+                    </ThemedText>
+                    <ThemedText type="body" style={{ backgroundColor: theme.cardBackground, padding: Spacing.sm, borderRadius: BorderRadius.sm, width: "100%" }}>
+                      {quote.acceptedNotes}
+                    </ThemedText>
+                  </View>
+                ) : null}
+              </View>
             </View>
-          </View>
-        ) : null}
+          );
+        })() : null}
 
         {status === "accepted" && recommendations && recommendations.length > 0 ? (
           <View>
