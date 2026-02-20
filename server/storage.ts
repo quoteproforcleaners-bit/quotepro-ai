@@ -20,6 +20,7 @@ import {
   userPreferences,
   analyticsEvents,
   badges,
+  salesRecommendations,
   type User,
   type Business,
   type PricingSettingsRow,
@@ -1992,4 +1993,45 @@ export async function getForecastData(businessId: string): Promise<{
     confidenceHigh: Math.round(confidenceHigh * 100) / 100,
     scheduledJobsValue: Math.round(scheduledJobsValue * 100) / 100,
   };
+}
+
+export async function getRecommendationsByQuote(quoteId: string) {
+  return db
+    .select()
+    .from(salesRecommendations)
+    .where(eq(salesRecommendations.quoteId, quoteId))
+    .orderBy(asc(salesRecommendations.createdAt));
+}
+
+export async function createRecommendation(data: {
+  businessId: string;
+  quoteId: string;
+  customerId?: string;
+  type: string;
+  title: string;
+  rationale: string;
+  suggestedDate?: Date;
+  actionPayload?: any;
+}) {
+  const [rec] = await db
+    .insert(salesRecommendations)
+    .values(data)
+    .returning();
+  return rec;
+}
+
+export async function updateRecommendation(id: string, data: { status?: string; completedAt?: Date }) {
+  const [rec] = await db
+    .update(salesRecommendations)
+    .set(data)
+    .where(eq(salesRecommendations.id, id))
+    .returning();
+  return rec;
+}
+
+export async function getPushTokensByUser(userId: string) {
+  return db
+    .select()
+    .from(pushTokens)
+    .where(eq(pushTokens.userId, userId));
 }

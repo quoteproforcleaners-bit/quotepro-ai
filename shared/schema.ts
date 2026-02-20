@@ -131,8 +131,27 @@ export const quotes = pgTable("quotes", {
   paymentIntentId: text("payment_intent_id"),
   paymentAmount: real("payment_amount"),
   paidAt: timestamp("paid_at"),
+  acceptedFrequency: text("accepted_frequency"),
+  acceptedSource: text("accepted_source"),
+  acceptedNotes: text("accepted_notes"),
+  acceptedPreferences: jsonb("accepted_preferences").default(sql`'{}'::jsonb`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const salesRecommendations = pgTable("sales_recommendations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  quoteId: varchar("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  customerId: varchar("customer_id").references(() => customers.id),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  rationale: text("rationale").notNull().default(""),
+  suggestedDate: timestamp("suggested_date"),
+  actionPayload: jsonb("action_payload").notNull().default(sql`'{}'::jsonb`),
+  status: text("status").notNull().default("open"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const quoteFollowUps = pgTable("quote_follow_ups", {
@@ -638,3 +657,4 @@ export type CustomerMarketingPref = typeof customerMarketingPrefs.$inferSelect;
 export type GrowthAutomationSetting = typeof growthAutomationSettings.$inferSelect;
 export type SalesStrategySetting = typeof salesStrategySettings.$inferSelect;
 export type Campaign = typeof campaigns.$inferSelect;
+export type SalesRecommendation = typeof salesRecommendations.$inferSelect;
