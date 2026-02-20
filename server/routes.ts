@@ -3915,6 +3915,7 @@ Respond with JSON: {"reply": string}`
       const details = (q.propertyDetails || {}) as any;
       const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : "";
       const customerAddress = customer?.address || details?.address || "";
+      const preselectedOption = (req.query.option as string) || q.selectedOption || "";
 
       const optionLabels: Record<string, string> = { good: "Good", better: "Better", best: "Best" };
       const optionDescriptions: Record<string, string> = {
@@ -3933,7 +3934,7 @@ Respond with JSON: {"reply": string}`
         const name = (typeof optVal === "object" && optVal.name) ? optVal.name : (optionLabels[key] || key);
         const scope = (typeof optVal === "object" && optVal.scope) ? optVal.scope : (optionDescriptions[key] || "");
         optionDataItems.push({ key, price: Number(price), name, scope });
-        const isSelected = q.selectedOption === key;
+        const isSelected = preselectedOption === key;
         optionsHtml += `<div class="option-card${isSelected ? " selected" : ""}" data-key="${key}" data-price="${Number(price).toFixed(2)}" onclick="selectOption('${key}')" style="cursor:pointer">
           <div class="option-badge" style="display:${isSelected ? "block" : "none"}">SELECTED</div>
           <div style="display:flex;justify-content:space-between;align-items:center">
@@ -4108,11 +4109,40 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 </div>
 
 <div class="modal-overlay" id="acceptModal">
-  <div class="modal">
+  <div class="modal" style="max-width:440px;max-height:90vh;overflow-y:auto">
     <h2>Accept Quote</h2>
-    <p>Type your full name below as your digital signature to accept this quote for <strong id="modalTotal">$${Number(q.total).toFixed(2)}</strong>.</p>
+    <p>Confirm your acceptance and share any preferences to help us schedule your service.</p>
     <div id="modalSelectedOption" style="background:#F8FAFC;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:14px;color:#475569"></div>
-    <input type="text" id="signatureName" placeholder="Your full name" autocomplete="name">
+    <div id="modalTotal" style="font-size:24px;font-weight:700;color:#16A34A;text-align:center;margin-bottom:16px">$${Number(q.total).toFixed(2)}</div>
+    
+    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Your Full Name *</label>
+    <input type="text" id="signatureName" placeholder="Your full name" autocomplete="name" style="margin-bottom:12px">
+    
+    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Phone Number</label>
+    <input type="tel" id="acceptPhone" placeholder="(555) 123-4567" autocomplete="tel" style="margin-bottom:12px">
+    
+    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Preferred Frequency</label>
+    <select id="acceptFrequency" style="width:100%;padding:14px 16px;border:2px solid #E2E8F0;border-radius:10px;font-size:16px;outline:none;background:#fff;margin-bottom:12px;appearance:auto">
+      <option value="one-time"${!q.frequencySelected || q.frequencySelected === 'one-time' ? ' selected' : ''}>One-time</option>
+      <option value="weekly"${q.frequencySelected === 'weekly' ? ' selected' : ''}>Weekly</option>
+      <option value="biweekly"${q.frequencySelected === 'biweekly' ? ' selected' : ''}>Bi-weekly</option>
+      <option value="monthly"${q.frequencySelected === 'monthly' ? ' selected' : ''}>Monthly</option>
+      <option value="quarterly"${q.frequencySelected === 'quarterly' ? ' selected' : ''}>Quarterly</option>
+    </select>
+    
+    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:8px">Preferred Days</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Mon"> Mon</label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Tue"> Tue</label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Wed"> Wed</label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Thu"> Thu</label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Fri"> Fri</label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:14px;color:#334155;cursor:pointer"><input type="checkbox" class="pref-day" value="Sat"> Sat</label>
+    </div>
+    
+    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Notes for Your Cleaner</label>
+    <textarea id="acceptNotes" placeholder="Gate codes, parking info, pets, special instructions..." style="width:100%;padding:14px 16px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;outline:none;resize:vertical;min-height:70px;font-family:inherit;margin-bottom:4px"></textarea>
+    
     <div class="modal-actions">
       <button type="button" class="btn-cancel" onclick="closeModals()">Cancel</button>
       <button type="button" class="btn-confirm" onclick="handleAccept()">Confirm</button>
@@ -4190,8 +4220,13 @@ function showState(id){document.getElementById("mainContent").classList.add("hid
 async function handleAccept(){
   var name=document.getElementById("signatureName").value.trim();
   if(!name){document.getElementById("acceptError").textContent="Please enter your name.";document.getElementById("acceptError").style.display="block";return}
+  var phone=document.getElementById("acceptPhone").value.trim();
+  var frequency=document.getElementById("acceptFrequency").value;
+  var days=[];
+  document.querySelectorAll(".pref-day:checked").forEach(function(cb){days.push(cb.value)});
+  var notes=document.getElementById("acceptNotes").value.trim();
   try{
-    var body={acceptedName:name};
+    var body={acceptedName:name,phone:phone,acceptedFrequency:frequency,acceptedNotes:notes,acceptedPreferences:{preferredDays:days}};
     if(selectedOption)body.selectedOption=selectedOption;
     var r=await fetch("/q/"+token+"/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     var d=await r.json();
@@ -4220,6 +4255,14 @@ async function handleChanges(){
   }catch(e){document.getElementById("changesError").textContent="Network error. Please try again.";document.getElementById("changesError").style.display="block"}
 }
 
+(function(){
+  var params=new URLSearchParams(window.location.search);
+  var opt=params.get("option");
+  if(opt && ["good","better","best"].indexOf(opt)!==-1){
+    selectOption(opt);
+  }
+})();
+
 document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListener("click",function(e){if(e.target===m)closeModals()})});
 </script>
 </body>
@@ -4241,15 +4284,16 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
         return res.status(400).json({ success: false, message: "This quote has expired" });
       }
 
+      // Idempotency: if already accepted, return success
       if (q.status === "accepted") {
-        return res.status(400).json({ success: false, message: "This quote has already been accepted" });
+        return res.json({ success: true, already: true });
       }
 
       if (q.status === "declined") {
         return res.status(400).json({ success: false, message: "This quote has been declined" });
       }
 
-      const { acceptedName, selectedOption } = req.body;
+      const { acceptedName, selectedOption, phone, acceptedFrequency, acceptedNotes, acceptedPreferences } = req.body;
       if (!acceptedName || typeof acceptedName !== "string" || !acceptedName.trim()) {
         return res.status(400).json({ success: false, message: "Please provide your name" });
       }
@@ -4266,7 +4310,12 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
         status: "accepted",
         acceptedAt: new Date(),
         propertyDetails: updatedDetails,
+        acceptedSource: "email_link",
       };
+
+      if (acceptedFrequency) updateData.acceptedFrequency = acceptedFrequency;
+      if (acceptedNotes) updateData.acceptedNotes = acceptedNotes;
+      if (acceptedPreferences) updateData.acceptedPreferences = acceptedPreferences;
 
       if (selectedOption && ["good", "better", "best"].includes(selectedOption)) {
         updateData.selectedOption = selectedOption;
@@ -4281,12 +4330,43 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
       }
 
       await updateQuote(q.id, updateData);
-
       await cancelPendingCommunicationsForQuote(q.id);
 
       if (q.customerId) {
-        try { await updateCustomer(q.customerId, { status: "active" }); } catch (_e) {}
+        try {
+          const customerUpdate: any = { status: "active" };
+          if (phone) customerUpdate.phone = phone;
+          await updateCustomer(q.customerId, customerUpdate);
+        } catch (_e) {}
       }
+
+      // Send push notification to business owner
+      try {
+        const business = await db_getBusinessById(q.businessId);
+        if (business?.userId) {
+          const tokens = await getPushTokensByUser(business.userId);
+          const customer = q.customerId ? await getCustomerById(q.customerId) : null;
+          const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : acceptedName.trim();
+          const total = updateData.total || q.total;
+          
+          for (const tokenRow of tokens) {
+            try {
+              await fetch("https://exp.host/--/api/v2/push/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: tokenRow.token,
+                  title: "Quote Accepted!",
+                  body: `${customerName} accepted your quote for $${Number(total).toFixed(2)}`,
+                  data: { type: "quote_accepted", quoteId: q.id },
+                  sound: "default",
+                  badge: 1,
+                }),
+              });
+            } catch (_pushErr) {}
+          }
+        }
+      } catch (_notifErr) {}
 
       return res.json({ success: true });
     } catch (error: any) {
