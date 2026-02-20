@@ -72,7 +72,7 @@ interface Props {
   recommendedOption: "good" | "better" | "best";
   onSetRecommended: (option: "good" | "better" | "best") => void;
   onSave: () => void;
-  onSaveForSend?: () => Promise<string | null>;
+  onSaveForSend?: (priceOverrides?: { good?: number; better?: number; best?: number }) => Promise<string | null>;
   isGuestMode?: boolean;
 }
 
@@ -402,7 +402,7 @@ export default function QuotePreviewScreen({
     try {
       let quoteId: string | null = null;
       if (onSaveForSend) {
-        quoteId = await onSaveForSend();
+        quoteId = await onSaveForSend(priceOverrides);
       }
 
       const subjectMatch = draft.match(/^Subject:\s*(.+?)(?:\n|$)/i);
@@ -424,7 +424,11 @@ export default function QuotePreviewScreen({
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
         if (quoteId) {
-          await apiRequest("PATCH", `/api/quotes/${quoteId}`, { status: "sent", sentVia: "email", sentAt: new Date().toISOString() });
+          try {
+            await apiRequest("PUT", `/api/quotes/${quoteId}`, { status: "sent", sentVia: "email", sentAt: new Date().toISOString() });
+          } catch (updateErr) {
+            console.error("Failed to update quote status:", updateErr);
+          }
           navigation.replace("QuoteDetail" as any, { quoteId });
         }
       } else {

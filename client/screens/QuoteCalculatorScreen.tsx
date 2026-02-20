@@ -149,14 +149,19 @@ export default function QuoteCalculatorScreen() {
     await performSave();
   };
 
-  const buildQuotePayload = () => {
-    const options = calculateAllOptions(
+  const buildQuotePayload = (overrides?: { good?: number; better?: number; best?: number }) => {
+    const baseOptions = calculateAllOptions(
       homeDetails,
       addOns,
       frequency,
       pricingSettings,
       true
     );
+    const options = overrides ? {
+      good: { ...baseOptions.good, price: overrides.good ?? baseOptions.good.price },
+      better: { ...baseOptions.better, price: overrides.better ?? baseOptions.better.price },
+      best: { ...baseOptions.best, price: overrides.best ?? baseOptions.best.price },
+    } : baseOptions;
     const selectedPrice = options[selectedOption]?.price || 0;
     const taxRate = pricingSettings?.taxRate || 0;
     const tax = selectedPrice * (taxRate / 100);
@@ -205,10 +210,10 @@ export default function QuoteCalculatorScreen() {
 
   const savedQuoteIdRef = React.useRef<string | null>(null);
 
-  const performSaveForSend = async (): Promise<string | null> => {
+  const performSaveForSend = async (priceOverrides?: { good?: number; better?: number; best?: number }): Promise<string | null> => {
     if (savedQuoteIdRef.current) return savedQuoteIdRef.current;
     try {
-      const payload = buildQuotePayload();
+      const payload = buildQuotePayload(priceOverrides);
       const res = await apiRequest("POST", "/api/quotes", payload);
       const newQuote = await res.json();
       savedQuoteIdRef.current = newQuote.id;
