@@ -187,10 +187,11 @@ export default function QuoteCalculatorScreen() {
         status: "draft",
       });
 
+      const newQuote = await res.json();
       queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
       await clearGuestDraft();
-      navigation.goBack();
+      navigation.replace("QuoteDetail", { quoteId: newQuote.id });
     } catch (error) {
       console.error("Failed to save quote:", error);
     }

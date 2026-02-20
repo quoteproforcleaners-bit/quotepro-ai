@@ -4020,6 +4020,29 @@ Respond with JSON: {"reply": string}`
       const customerAddress = customer?.address || details?.address || "";
       const preselectedOption = (req.query.option as string) || q.selectedOption || "";
 
+      const oneTimeAddOnKeys = ["insideFridge", "insideOven", "insideCabinets", "interiorWindows", "blindsDetail", "baseboardsDetail", "laundryFoldOnly", "dishes", "organizationTidy"];
+      const builtInServiceTypes = ["deep-clean", "move-in-out", "post-construction"];
+      const isRecurring = q.frequencySelected && q.frequencySelected !== "one-time";
+      const hasOneTimeAddOns = oneTimeAddOnKeys.some(k => {
+        const v = addOns[k];
+        return v && (typeof v === "object" ? v.selected : v);
+      });
+
+      let oneTimeAddOnTotal = 0;
+      if (isRecurring && hasOneTimeAddOns) {
+        let pricingSettings: any = null;
+        try { pricingSettings = await getPricingByBusiness(q.businessId); } catch (_e) {}
+        const addOnPrices = pricingSettings?.addOnPrices || {};
+        for (const k of oneTimeAddOnKeys) {
+          const v = addOns[k];
+          const isEnabled = v && (typeof v === "object" ? v.selected : v);
+          if (isEnabled) {
+            const addonPrice = typeof v === "object" && v.price ? Number(v.price) : (addOnPrices[k] ? Number(addOnPrices[k]) : 0);
+            oneTimeAddOnTotal += addonPrice;
+          }
+        }
+      }
+
       const optionLabels: Record<string, string> = { good: "Good", better: "Better", best: "Best" };
       const optionDescriptions: Record<string, string> = {
         good: "Essential cleaning for a tidy home",
@@ -4027,7 +4050,7 @@ Respond with JSON: {"reply": string}`
         best: "Premium deep clean with all the extras"
       };
 
-      const optionDataItems: { key: string; price: number; name: string; scope: string }[] = [];
+      const optionDataItems: { key: string; price: number; name: string; scope: string; recurringPrice: number | null }[] = [];
       let optionsHtml = "";
       for (const key of ["good", "better", "best"]) {
         const optVal = opts[key];
@@ -4036,8 +4059,13 @@ Respond with JSON: {"reply": string}`
         if (price === undefined) continue;
         const name = (typeof optVal === "object" && optVal.name) ? optVal.name : (optionLabels[key] || key);
         const scope = (typeof optVal === "object" && optVal.scope) ? optVal.scope : (optionDescriptions[key] || "");
-        optionDataItems.push({ key, price: Number(price), name, scope });
+        const serviceTypeId = (typeof optVal === "object" && optVal.serviceTypeId) ? optVal.serviceTypeId : "";
+        const isBuiltIn = builtInServiceTypes.includes(serviceTypeId);
+        const showRecurring = isRecurring && hasOneTimeAddOns && !isBuiltIn && oneTimeAddOnTotal > 0;
+        const recurringPrice = showRecurring ? Math.max(0, Number(price) - oneTimeAddOnTotal) : null;
+        optionDataItems.push({ key, price: Number(price), name, scope, recurringPrice });
         const isSelected = preselectedOption === key;
+        const recurringHtml = recurringPrice !== null ? `<div style="font-size:12px;color:#64748B;margin-top:2px;text-align:right;white-space:nowrap">(then $${recurringPrice.toFixed(2)}/visit)</div>` : "";
         optionsHtml += `<div class="option-card${isSelected ? " selected" : ""}" data-key="${key}" data-price="${Number(price).toFixed(2)}" onclick="selectOption('${key}')" style="cursor:pointer">
           <div class="option-badge" style="display:${isSelected ? "block" : "none"}">SELECTED</div>
           <div style="display:flex;justify-content:space-between;align-items:center">
@@ -4050,7 +4078,10 @@ Respond with JSON: {"reply": string}`
                 </div>
               </div>
             </div>
-            <div class="option-price" style="color:${isSelected ? brandColor : "#1E293B"}">$${Number(price).toFixed(2)}</div>
+            <div>
+              <div class="option-price" style="color:${isSelected ? brandColor : "#1E293B"}">$${Number(price).toFixed(2)}</div>
+              ${recurringHtml}
+            </div>
           </div>
         </div>`;
       }
@@ -4175,11 +4206,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
           <div class="total-label">Total</div>
           ${q.frequencySelected && q.frequencySelected !== "one-time" ? `<span class="freq">${q.frequencySelected}</span>` : ""}
         </div>
-        <div class="total-price">$${Number(q.total).toFixed(2)}</div>
+        <div>
+          <div class="total-price">$${Number(q.total).toFixed(2)}</div>
+          <div id="totalRecurring" style="font-size:13px;color:#64748B;text-align:right;display:none"></div>
+        </div>
       </div>
 
       <div class="actions">
-        <button type="button" class="btn-accept" onclick="showAcceptModal()">Accept Quote &mdash; <span id="acceptTotal">$${Number(q.total).toFixed(2)}</span></button>
+        <button type="button" class="btn-accept" onclick="showAcceptModal()">Accept Quote &mdash; <span id="acceptTotal">$${Number(q.total).toFixed(2)}</span><span id="acceptRecurring" style="font-size:13px;font-weight:400;display:none"></span></button>
         <button type="button" class="btn-changes" onclick="showChangesModal()">Request Changes</button>
         <a class="btn-decline" onclick="handleDecline();return false" href="javascript:void(0)">No thanks, decline this quote</a>
       </div>
@@ -4219,7 +4253,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
     <h2>Accept Quote</h2>
     <p>Confirm your acceptance and share any preferences to help us schedule your service.</p>
     <div id="modalSelectedOption" style="background:#F8FAFC;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:14px;color:#475569"></div>
-    <div id="modalTotal" style="font-size:24px;font-weight:700;color:#16A34A;text-align:center;margin-bottom:16px">$${Number(q.total).toFixed(2)}</div>
+    <div id="modalTotal" style="font-size:24px;font-weight:700;color:#16A34A;text-align:center;margin-bottom:4px">$${Number(q.total).toFixed(2)}</div>
+    <div id="modalRecurring" style="font-size:13px;color:#64748B;text-align:center;margin-bottom:16px;display:none"></div>
     
     <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Your Full Name *</label>
     <input type="text" id="signatureName" placeholder="Your full name" autocomplete="name" style="margin-bottom:12px">
@@ -4307,6 +4342,19 @@ function selectOption(key){
     info.style.display="block";
     var acceptedTotal=document.getElementById("acceptedTotal");
     if(acceptedTotal)acceptedTotal.textContent=total;
+    var totalRecEl=document.getElementById("totalRecurring");
+    var acceptRecEl=document.getElementById("acceptRecurring");
+    var modalRecEl=document.getElementById("modalRecurring");
+    if(opt.recurringPrice!==null&&opt.recurringPrice!==undefined){
+      var recText="(then $"+parseFloat(opt.recurringPrice).toFixed(2)+"/visit)";
+      if(totalRecEl){totalRecEl.textContent=recText;totalRecEl.style.display="block"}
+      if(acceptRecEl){acceptRecEl.textContent=" "+recText;acceptRecEl.style.display="inline"}
+      if(modalRecEl){modalRecEl.textContent=recText;modalRecEl.style.display="block"}
+    }else{
+      if(totalRecEl)totalRecEl.style.display="none";
+      if(acceptRecEl)acceptRecEl.style.display="none";
+      if(modalRecEl)modalRecEl.style.display="none";
+    }
   }
 }
 
@@ -4366,6 +4414,8 @@ async function handleChanges(){
   var opt=params.get("option");
   if(opt && ["good","better","best"].indexOf(opt)!==-1){
     selectOption(opt);
+  } else if(selectedOption){
+    selectOption(selectedOption);
   }
 })();
 
