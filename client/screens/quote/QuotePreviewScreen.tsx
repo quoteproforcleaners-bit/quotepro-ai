@@ -104,8 +104,9 @@ export default function QuotePreviewScreen({
   const [aiSmsDraft, setAiSmsDraft] = useState<string | null>(null);
   const [aiSmsLoading, setAiSmsLoading] = useState(false);
   const [includeQuoteLink, setIncludeQuoteLink] = useState(true);
+  const [priceMultiplier, setPriceMultiplier] = useState(1);
 
-  const options = useMemo(() => {
+  const baseOptions = useMemo(() => {
     return calculateAllOptions(
       homeDetails,
       addOns,
@@ -114,6 +115,15 @@ export default function QuotePreviewScreen({
       true
     );
   }, [homeDetails, addOns, frequency, pricingSettings]);
+
+  const options = useMemo(() => {
+    if (priceMultiplier === 1) return baseOptions;
+    return {
+      good: { ...baseOptions.good, price: Math.round(baseOptions.good.price * priceMultiplier * 100) / 100 },
+      better: { ...baseOptions.better, price: Math.round(baseOptions.better.price * priceMultiplier * 100) / 100 },
+      best: { ...baseOptions.best, price: Math.round(baseOptions.best.price * priceMultiplier * 100) / 100 },
+    };
+  }, [baseOptions, priceMultiplier]);
 
   const enhancedOptions = useMemo(() => {
     if (!aiDescriptions) return options;
@@ -125,6 +135,14 @@ export default function QuotePreviewScreen({
   }, [options, aiDescriptions]);
 
   const selectedOpt = useMemo(() => options[selectedOption], [options, selectedOption]);
+
+  const handleApplyRecommendedPrice = useCallback((recommendedBaseline: number) => {
+    const currentPrice = baseOptions[selectedOption].price;
+    if (currentPrice > 0) {
+      setPriceMultiplier(recommendedBaseline / currentPrice);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  }, [baseOptions, selectedOption]);
 
   const emailDraft = useMemo(() => {
     const po = getPaymentOptions(businessProfile.paymentOptions);
@@ -466,6 +484,7 @@ export default function QuotePreviewScreen({
           beds={homeDetails.beds}
           baths={homeDetails.baths}
           frequency={frequency}
+          onApplyRecommendedPrice={handleApplyRecommendedPrice}
         />
 
         <View

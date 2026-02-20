@@ -11,6 +11,7 @@ interface UnderpricingAlertProps {
   beds: number | null;
   baths: number | null;
   frequency: string | null;
+  onApplyRecommendedPrice?: (baseline: number) => void;
 }
 
 function getFrequencyDiscount(frequency: string | null): number {
@@ -22,7 +23,7 @@ function getFrequencyDiscount(frequency: string | null): number {
   return 0;
 }
 
-function calculateMarketRate(
+export function calculateMarketRate(
   sqft: number | null,
   beds: number | null,
   baths: number | null,
@@ -45,7 +46,7 @@ function calculateMarketRate(
   };
 }
 
-export function UnderpricingAlert({ total, sqft, beds, baths, frequency }: UnderpricingAlertProps) {
+export function UnderpricingAlert({ total, sqft, beds, baths, frequency, onApplyRecommendedPrice }: UnderpricingAlertProps) {
   const { theme } = useTheme();
   const [dismissed, setDismissed] = useState(false);
 
@@ -83,16 +84,34 @@ export function UnderpricingAlert({ total, sqft, beds, baths, frequency }: Under
           </ThemedText>
         </View>
       </View>
-      <Pressable
-        onPress={() => setDismissed(true)}
-        style={[styles.dismissBtn, { backgroundColor: `${theme.warning}15` }]}
-        hitSlop={8}
-        testID="underpricing-dismiss-btn"
-      >
-        <ThemedText type="caption" style={{ color: warningText, fontWeight: "600" }}>
-          Dismiss
-        </ThemedText>
-      </Pressable>
+      <View style={styles.actions}>
+        {onApplyRecommendedPrice ? (
+          <Pressable
+            onPress={() => {
+              onApplyRecommendedPrice(marketRate.baseline);
+              setDismissed(true);
+            }}
+            style={[styles.applyBtn, { backgroundColor: `${theme.warning}25` }]}
+            hitSlop={8}
+            testID="underpricing-apply-btn"
+          >
+            <Feather name="check" size={14} color={warningText} style={{ marginRight: 4 }} />
+            <ThemedText type="caption" style={{ color: warningText, fontWeight: "700" }}>
+              Apply Recommended Price
+            </ThemedText>
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={() => setDismissed(true)}
+          style={[styles.dismissBtn, { backgroundColor: `${theme.warning}15` }]}
+          hitSlop={8}
+          testID="underpricing-dismiss-btn"
+        >
+          <ThemedText type="caption" style={{ color: warningText, fontWeight: "600" }}>
+            Dismiss
+          </ThemedText>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -118,6 +137,19 @@ const styles = StyleSheet.create({
   },
   textWrap: {
     flex: 1,
+  },
+  actions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: Spacing.sm,
+    flexWrap: "wrap",
+  },
+  applyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.xs,
   },
   dismissBtn: {
     alignSelf: "flex-end",
