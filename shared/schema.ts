@@ -131,6 +131,7 @@ export const quotes = pgTable("quotes", {
   paymentIntentId: text("payment_intent_id"),
   paymentAmount: real("payment_amount"),
   paidAt: timestamp("paid_at"),
+  recommendedOption: text("recommended_option").notNull().default("better"),
   acceptedFrequency: text("accepted_frequency"),
   acceptedSource: text("accepted_source"),
   acceptedNotes: text("accepted_notes"),

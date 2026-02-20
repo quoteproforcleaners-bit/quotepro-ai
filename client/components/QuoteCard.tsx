@@ -17,6 +17,7 @@ interface QuoteCardProps {
   isSelected: boolean;
   isRecommended?: boolean;
   onPress: () => void;
+  onSetRecommended?: () => void;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -26,6 +27,7 @@ export function QuoteCard({
   isSelected,
   isRecommended,
   onPress,
+  onSetRecommended,
 }: QuoteCardProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
@@ -63,16 +65,38 @@ export function QuoteCard({
       ]}
     >
       {isRecommended ? (
-        <View
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation?.();
+          }}
           style={[styles.recommendedBadge, { backgroundColor: theme.primary }]}
         >
+          <Feather name="award" size={11} color="#FFFFFF" style={{ marginRight: 4 }} />
           <ThemedText
             type="caption"
             style={{ color: "#FFFFFF", fontWeight: "600" }}
           >
             Recommended
           </ThemedText>
-        </View>
+        </Pressable>
+      ) : onSetRecommended ? (
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation?.();
+            Haptics.selectionAsync();
+            onSetRecommended();
+          }}
+          style={[styles.setRecommendedBadge, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+          hitSlop={8}
+        >
+          <Feather name="award" size={11} color={theme.textSecondary} style={{ marginRight: 4 }} />
+          <ThemedText
+            type="caption"
+            style={{ color: theme.textSecondary, fontWeight: "500" }}
+          >
+            Set as Recommended
+          </ThemedText>
+        </Pressable>
       ) : null}
       <View style={styles.header}>
         <View>
@@ -157,6 +181,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
     borderBottomLeftRadius: BorderRadius.xs,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  setRecommendedBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderBottomLeftRadius: BorderRadius.xs,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
   },
   header: {
     flexDirection: "row",

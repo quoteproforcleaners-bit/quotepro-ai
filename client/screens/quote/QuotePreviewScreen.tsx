@@ -69,6 +69,8 @@ interface Props {
   businessProfile: BusinessProfile;
   selectedOption: "good" | "better" | "best";
   onSelectOption: (option: "good" | "better" | "best") => void;
+  recommendedOption: "good" | "better" | "best";
+  onSetRecommended: (option: "good" | "better" | "best") => void;
   onSave: () => void;
   isGuestMode?: boolean;
 }
@@ -82,6 +84,8 @@ export default function QuotePreviewScreen({
   businessProfile,
   selectedOption,
   onSelectOption,
+  recommendedOption,
+  onSetRecommended,
   onSave,
   isGuestMode = false,
 }: Props) {
@@ -514,20 +518,25 @@ export default function QuotePreviewScreen({
         <QuoteCard
           option={enhancedOptions.good}
           isSelected={selectedOption === "good"}
+          isRecommended={recommendedOption === "good"}
           onPress={() => onSelectOption("good")}
+          onSetRecommended={() => onSetRecommended("good")}
         />
 
         <QuoteCard
           option={enhancedOptions.better}
           isSelected={selectedOption === "better"}
-          isRecommended
+          isRecommended={recommendedOption === "better"}
           onPress={() => onSelectOption("better")}
+          onSetRecommended={() => onSetRecommended("better")}
         />
 
         <QuoteCard
           option={enhancedOptions.best}
           isSelected={selectedOption === "best"}
+          isRecommended={recommendedOption === "best"}
           onPress={() => onSelectOption("best")}
+          onSetRecommended={() => onSetRecommended("best")}
         />
 
         <View style={[styles.breakdownCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>

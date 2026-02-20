@@ -1530,9 +1530,10 @@ ${paymentHtml}
         </table>
       </td></tr>` : '';
 
+      const savedRecommended = (quote as any).recommendedOption || 'better';
       // Options cards HTML
       const optionsCardsHtml = optionsArray.map((option, index) => {
-        const isRecommended = index === 1; // Better is the middle/recommended option
+        const isRecommended = option.key === savedRecommended;
         const borderColor = isRecommended ? primaryColor : '#eeeeee';
         const backgroundColor = isRecommended ? '#f9f9ff' : '#ffffff';
         const badgeHtml = isRecommended ? `<div style="display:inline-block;background:${primaryColor};color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;margin-bottom:12px;">RECOMMENDED</div><br/>` : '';
@@ -4065,8 +4066,12 @@ Respond with JSON: {"reply": string}`
         const recurringPrice = showRecurring ? Math.max(0, Number(price) - oneTimeAddOnTotal) : null;
         optionDataItems.push({ key, price: Number(price), name, scope, recurringPrice });
         const isSelected = preselectedOption === key;
+        const publicRecommended = (q as any).recommendedOption || 'better';
+        const isRecommendedPublic = key === publicRecommended;
         const recurringHtml = recurringPrice !== null ? `<div style="font-size:12px;color:#64748B;margin-top:2px;text-align:right;white-space:nowrap">(then $${recurringPrice.toFixed(2)}/visit)</div>` : "";
-        optionsHtml += `<div class="option-card${isSelected ? " selected" : ""}" data-key="${key}" data-price="${Number(price).toFixed(2)}" onclick="selectOption('${key}')" style="cursor:pointer">
+        const recommendedBadgeHtml = isRecommendedPublic ? `<div style="position:absolute;top:0;right:0;background:${brandColor};color:white;padding:4px 12px;border-radius:0 12px 0 8px;font-size:11px;font-weight:600;letter-spacing:0.5px">RECOMMENDED</div>` : "";
+        optionsHtml += `<div class="option-card${isSelected ? " selected" : ""}${isRecommendedPublic ? " recommended" : ""}" data-key="${key}" data-price="${Number(price).toFixed(2)}" onclick="selectOption('${key}')" style="cursor:pointer;position:relative">
+          ${recommendedBadgeHtml}
           <div class="option-badge" style="display:${isSelected ? "block" : "none"}">SELECTED</div>
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div style="flex:1">
@@ -4150,6 +4155,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Ar
 .option-card{border:2px solid #E2E8F0;border-radius:12px;padding:20px;margin-bottom:12px;background:#fff;position:relative;transition:all 0.2s}
 .option-card:hover{border-color:${brandColor}80;background:${brandColor}04}
 .option-card.selected{border-color:${brandColor};background:${brandColor}08}
+.option-card.recommended{border-color:${brandColor}60;background:${brandColor}04}
 .option-badge{position:absolute;top:-10px;right:16px;background:${brandColor};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px}
 .option-radio{width:22px;height:22px;border-radius:50%;border:2px solid #CBD5E1;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
 .option-radio.checked{border-color:${brandColor};background:${brandColor}}

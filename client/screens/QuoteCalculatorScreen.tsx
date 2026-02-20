@@ -86,6 +86,9 @@ export default function QuoteCalculatorScreen() {
   const [selectedOption, setSelectedOption] = useState<"good" | "better" | "best">(
     "better"
   );
+  const [recommendedOption, setRecommendedOption] = useState<"good" | "better" | "best">(
+    "better"
+  );
 
   useEffect(() => {
     if (isGuestMode) {
@@ -180,6 +183,7 @@ export default function QuoteCalculatorScreen() {
         addOns,
         frequencySelected: frequency,
         selectedOption,
+        recommendedOption,
         options,
         subtotal: selectedPrice,
         tax,
@@ -243,6 +247,8 @@ export default function QuoteCalculatorScreen() {
             businessProfile={businessProfile}
             selectedOption={selectedOption}
             onSelectOption={setSelectedOption}
+            recommendedOption={recommendedOption}
+            onSetRecommended={setRecommendedOption}
             onSave={handleSave}
             isGuestMode={isGuestMode}
           />
