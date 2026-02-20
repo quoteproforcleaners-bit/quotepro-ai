@@ -1,5 +1,5 @@
-import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { View, StyleSheet, Pressable, TextInput, Platform } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -18,6 +18,7 @@ interface QuoteCardProps {
   isRecommended?: boolean;
   onPress: () => void;
   onSetRecommended?: () => void;
+  onPriceChange?: (newPrice: number) => void;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -28,9 +29,17 @@ export function QuoteCard({
   isRecommended,
   onPress,
   onSetRecommended,
+  onPriceChange,
 }: QuoteCardProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [priceText, setPriceText] = useState(String(option.price));
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    setPriceText(String(option.price));
+  }, [option.price]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -47,6 +56,27 @@ export function QuoteCard({
   const handlePress = () => {
     Haptics.selectionAsync();
     onPress();
+  };
+
+  const handlePriceTap = () => {
+    if (!onPriceChange) return;
+    if (Platform.OS !== "web") {
+      Haptics.selectionAsync();
+    }
+    setEditingPrice(true);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const handlePriceSubmit = () => {
+    const parsed = parseFloat(priceText);
+    if (!isNaN(parsed) && parsed >= 0 && onPriceChange) {
+      const rounded = Math.round(parsed * 100) / 100;
+      onPriceChange(rounded);
+      setPriceText(String(rounded));
+    } else {
+      setPriceText(String(option.price));
+    }
+    setEditingPrice(false);
   };
 
   return (
@@ -99,7 +129,7 @@ export function QuoteCard({
         </Pressable>
       ) : null}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <ThemedText type="h4">{option.name}</ThemedText>
           <ThemedText
             type="small"
@@ -108,11 +138,58 @@ export function QuoteCard({
             {option.serviceTypeName}
           </ThemedText>
         </View>
-        <View style={styles.priceContainer}>
-          <ThemedText type="h3" style={{ color: theme.primary }}>
-            ${option.price}
-          </ThemedText>
-        </View>
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation?.();
+            handlePriceTap();
+          }}
+          style={[
+            styles.priceContainer,
+            onPriceChange ? {
+              backgroundColor: editingPrice ? `${theme.primary}20` : `${theme.primary}08`,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: BorderRadius.sm,
+              borderWidth: 1,
+              borderColor: editingPrice ? theme.primary : `${theme.primary}25`,
+              borderStyle: "dashed" as any,
+            } : null,
+          ]}
+          hitSlop={8}
+        >
+          {editingPrice ? (
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <ThemedText type="h3" style={{ color: theme.primary }}>$</ThemedText>
+              <TextInput
+                ref={inputRef}
+                value={priceText}
+                onChangeText={setPriceText}
+                onBlur={handlePriceSubmit}
+                onSubmitEditing={handlePriceSubmit}
+                keyboardType="decimal-pad"
+                returnKeyType="done"
+                selectTextOnFocus
+                style={{
+                  fontSize: 22,
+                  fontWeight: "700",
+                  color: theme.primary,
+                  minWidth: 60,
+                  padding: 0,
+                  margin: 0,
+                }}
+              />
+            </View>
+          ) : (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <ThemedText type="h3" style={{ color: theme.primary }}>
+                ${option.price}
+              </ThemedText>
+              {onPriceChange ? (
+                <Feather name="edit-2" size={13} color={theme.primary} style={{ opacity: 0.6 }} />
+              ) : null}
+            </View>
+          )}
+        </Pressable>
       </View>
       <ThemedText
         type="small"

@@ -110,8 +110,9 @@ export default function QuotePreviewScreen({
   const [aiSmsDraft, setAiSmsDraft] = useState<string | null>(null);
   const [aiSmsLoading, setAiSmsLoading] = useState(false);
   const [includeQuoteLink, setIncludeQuoteLink] = useState(true);
+  const [priceOverrides, setPriceOverrides] = useState<{ good?: number; better?: number; best?: number }>({});
 
-  const options = useMemo(() => {
+  const baseOptions = useMemo(() => {
     return calculateAllOptions(
       homeDetails,
       addOns,
@@ -120,6 +121,14 @@ export default function QuotePreviewScreen({
       true
     );
   }, [homeDetails, addOns, frequency, pricingSettings]);
+
+  const options = useMemo(() => {
+    return {
+      good: { ...baseOptions.good, price: priceOverrides.good ?? baseOptions.good.price },
+      better: { ...baseOptions.better, price: priceOverrides.better ?? baseOptions.better.price },
+      best: { ...baseOptions.best, price: priceOverrides.best ?? baseOptions.best.price },
+    };
+  }, [baseOptions, priceOverrides]);
 
   const enhancedOptions = useMemo(() => {
     if (!aiDescriptions) return options;
@@ -538,6 +547,7 @@ export default function QuotePreviewScreen({
           isRecommended={recommendedOption === "good"}
           onPress={() => onSelectOption("good")}
           onSetRecommended={() => onSetRecommended("good")}
+          onPriceChange={(p) => setPriceOverrides((prev) => ({ ...prev, good: p }))}
         />
 
         <QuoteCard
@@ -546,6 +556,7 @@ export default function QuotePreviewScreen({
           isRecommended={recommendedOption === "better"}
           onPress={() => onSelectOption("better")}
           onSetRecommended={() => onSetRecommended("better")}
+          onPriceChange={(p) => setPriceOverrides((prev) => ({ ...prev, better: p }))}
         />
 
         <QuoteCard
@@ -554,6 +565,7 @@ export default function QuotePreviewScreen({
           isRecommended={recommendedOption === "best"}
           onPress={() => onSelectOption("best")}
           onSetRecommended={() => onSetRecommended("best")}
+          onPriceChange={(p) => setPriceOverrides((prev) => ({ ...prev, best: p }))}
         />
 
         <View style={[styles.breakdownCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
