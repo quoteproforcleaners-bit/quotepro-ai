@@ -13,6 +13,7 @@ import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
+import OnboardingBanner from "@/components/OnboardingBanner";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -130,6 +131,8 @@ export default function GrowthDashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
+        <OnboardingBanner />
+
         <View style={{ flexDirection: "row", gap: Spacing.sm }}>
           {quickActions.map((a) => (
             <Pressable

@@ -32,6 +32,7 @@ import { FeatureFlags } from "@/lib/featureFlags";
 import { runAiCommand, EXAMPLE_PROMPTS, AiCommandResult } from "@/lib/aiCommandRouter";
 import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
+import OnboardingBanner from "@/components/OnboardingBanner";
 
 /*
  * ─── Design Tokens (Home Screen) ───
@@ -537,6 +538,8 @@ export default function DashboardScreen() {
             ) : null}
           </View>
         </View>
+
+        <OnboardingBanner />
 
         {followUpQueueCount > 0 ? (
           <Pressable
