@@ -137,11 +137,9 @@ export default function LandingScreen() {
 
         <View style={[styles.featuresGrid, { marginTop: Spacing["3xl"] }]}>
           {BENEFITS.map((b, i) => (
-            <View key={i} style={[styles.featureCard, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
-              <View style={[styles.featureIcon, { backgroundColor: `${theme.primary}12` }]}>
-                <Feather name={b.icon} size={20} color={theme.primary} />
-              </View>
-              <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.sm, textAlign: "center" }}>
+            <View key={i} style={styles.featureCard}>
+              <Feather name={b.icon} size={22} color={theme.primary} />
+              <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.xs, textAlign: "center", color: theme.textSecondary }}>
                 {landing[b.titleKey as keyof typeof landing]}
               </ThemedText>
             </View>
@@ -269,17 +267,8 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     width: "47%",
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
+    paddingVertical: Spacing.md,
     alignItems: "center",
-  },
-  featureIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
   },
   modalOverlay: {
     flex: 1,
