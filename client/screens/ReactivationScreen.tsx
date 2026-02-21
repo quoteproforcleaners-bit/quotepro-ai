@@ -8,6 +8,7 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,8 +36,25 @@ function useDesignTokens() {
   }), [theme, isDark]);
 }
 
-type Segment = "dormant" | "lost";
+type Segment = "dormant" | "lost" | "custom";
 type Channel = "sms" | "email";
+
+interface CampaignTemplate {
+  name: string;
+  icon: keyof typeof Feather.glyphMap;
+  segment: Segment;
+  channel: Channel;
+  description: string;
+}
+
+const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
+  { name: "Spring Cleaning Special", icon: "sun", segment: "dormant", channel: "sms", description: "Reach out to past customers with a spring refresh offer" },
+  { name: "Holiday Deep Clean", icon: "gift", segment: "dormant", channel: "email", description: "Offer pre-holiday deep cleaning to all past customers" },
+  { name: "New Year Fresh Start", icon: "star", segment: "dormant", channel: "sms", description: "Ring in the new year with a clean home promotion" },
+  { name: "Back to School Clean", icon: "book-open", segment: "dormant", channel: "email", description: "Target families getting ready for the school year" },
+  { name: "Win Back Lost Leads", icon: "refresh-cw", segment: "lost", channel: "email", description: "Follow up on quotes that were never accepted" },
+  { name: "VIP Customer Appreciation", icon: "heart", segment: "custom", channel: "email", description: "Send a thank-you offer to your best customers" },
+];
 
 export default function ReactivationScreen() {
   const { theme } = useTheme();
@@ -45,14 +63,18 @@ export default function ReactivationScreen() {
   const queryClient = useQueryClient();
   const dt = useDesignTokens();
 
-  const [segment, setSegment] = useState<Segment>("dormant");
+  const [segment, setSegment] = useState<"dormant" | "lost">("dormant");
   const [modalVisible, setModalVisible] = useState(false);
+  const [modalStep, setModalStep] = useState<"templates" | "custom">("templates");
   const [campaignName, setCampaignName] = useState("");
   const [campaignSegment, setCampaignSegment] = useState<Segment>("dormant");
   const [campaignChannel, setCampaignChannel] = useState<Channel>("sms");
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
 
   const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"], enabled: segment === "dormant" });
   const lostQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/lost"], enabled: segment === "lost" });
+  const customersQuery = useQuery<any[]>({ queryKey: ["/api/customers"] });
 
   const data = segment === "dormant" ? dormantQuery.data : lostQuery.data;
   const isLoading = segment === "dormant" ? dormantQuery.isLoading : lostQuery.isLoading;
@@ -60,6 +82,21 @@ export default function ReactivationScreen() {
 
   const totalDormant = dormantQuery.data?.length ?? 0;
   const estimatedValue = dormantQuery.data?.reduce((sum: number, c: any) => sum + (c.avgTicket ?? 0), 0) ?? 0;
+
+  const filteredCustomers = useMemo(() => {
+    if (!customersQuery.data) return [];
+    const search = customerSearch.toLowerCase();
+    return customersQuery.data.filter((c: any) => {
+      if (!search) return true;
+      return (c.name || "").toLowerCase().includes(search) || (c.email || "").toLowerCase().includes(search) || (c.phone || "").includes(search);
+    });
+  }, [customersQuery.data, customerSearch]);
+
+  const toggleCustomer = (id: string) => {
+    setSelectedCustomerIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   const handleReachOut = async (item: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -89,10 +126,35 @@ export default function ReactivationScreen() {
       name: campaignName,
       segment: campaignSegment,
       channel: campaignChannel,
+      customerIds: selectedCustomerIds.length > 0 ? selectedCustomerIds : undefined,
     });
     queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+    resetModal();
+  };
+
+  const handleSelectTemplate = (template: CampaignTemplate) => {
+    setCampaignName(template.name);
+    setCampaignSegment(template.segment);
+    setCampaignChannel(template.channel);
+    setModalStep("custom");
+  };
+
+  const openModal = () => {
+    setModalVisible(true);
+    setModalStep("templates");
+    setCampaignName("");
+    setCampaignSegment("dormant");
+    setCampaignChannel("sms");
+    setSelectedCustomerIds([]);
+    setCustomerSearch("");
+  };
+
+  const resetModal = () => {
     setModalVisible(false);
     setCampaignName("");
+    setSelectedCustomerIds([]);
+    setCustomerSearch("");
+    setModalStep("templates");
   };
 
   const refetch = () => {
@@ -150,7 +212,7 @@ export default function ReactivationScreen() {
     </Card>
   );
 
-  const SegmentOption = ({ label, value }: { label: string; value: Segment }) => (
+  const SegmentOption = ({ label, value }: { label: string; value: "dormant" | "lost" }) => (
     <Pressable
       testID={`tab-${value}`}
       onPress={() => setSegment(value)}
@@ -158,6 +220,150 @@ export default function ReactivationScreen() {
     >
       <ThemedText type="small" style={{ color: segment === value ? "#FFFFFF" : dt.textPrimary }}>{label}</ThemedText>
     </Pressable>
+  );
+
+  const renderTemplatesStep = () => (
+    <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+      <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.lg, lineHeight: 20 }}>
+        Choose a ready-made campaign or start from scratch.
+      </ThemedText>
+      {CAMPAIGN_TEMPLATES.map((template, idx) => (
+        <Pressable
+          key={idx}
+          onPress={() => handleSelectTemplate(template)}
+          style={[styles.templateCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.border }]}
+        >
+          <View style={[styles.templateIcon, { backgroundColor: dt.accentSoft }]}>
+            <Feather name={template.icon} size={18} color={dt.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="subtitle" style={{ marginBottom: 2 }}>{template.name}</ThemedText>
+            <ThemedText type="caption" style={{ color: dt.textSecondary }}>{template.description}</ThemedText>
+          </View>
+          <Feather name="chevron-right" size={18} color={dt.textSecondary} />
+        </Pressable>
+      ))}
+      <Pressable
+        onPress={() => { setModalStep("custom"); setCampaignName(""); setCampaignSegment("dormant"); setCampaignChannel("sms"); }}
+        style={[styles.templateCard, { backgroundColor: dt.accentSoft, borderColor: dt.accent, borderStyle: "dashed" as any }]}
+      >
+        <View style={[styles.templateIcon, { backgroundColor: dt.accent }]}>
+          <Feather name="plus" size={18} color="#FFFFFF" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <ThemedText type="subtitle" style={{ color: dt.accent }}>Custom Campaign</ThemedText>
+          <ThemedText type="caption" style={{ color: dt.textSecondary }}>Build your own from scratch</ThemedText>
+        </View>
+        <Feather name="chevron-right" size={18} color={dt.accent} />
+      </Pressable>
+    </ScrollView>
+  );
+
+  const renderCustomStep = () => (
+    <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+      <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Campaign Name</ThemedText>
+      <TextInput
+        testID="input-campaign-name"
+        value={campaignName}
+        onChangeText={setCampaignName}
+        placeholder="e.g. Spring Reactivation"
+        placeholderTextColor={dt.textSecondary}
+        style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
+      />
+
+      <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Target Audience</ThemedText>
+      <View style={styles.pickerRow}>
+        {([
+          { value: "dormant" as Segment, label: "Dormant" },
+          { value: "lost" as Segment, label: "Lost Quotes" },
+          { value: "custom" as Segment, label: "Manual" },
+        ]).map(({ value, label }) => (
+          <Pressable
+            key={value}
+            testID={`picker-segment-${value}`}
+            onPress={() => setCampaignSegment(value)}
+            style={[styles.pickerOption, campaignSegment === value ? { backgroundColor: dt.accentSoft, borderColor: dt.accent } : { borderColor: dt.border }]}
+          >
+            <ThemedText type="small" style={{ color: campaignSegment === value ? dt.accent : dt.textPrimary }}>
+              {label}
+            </ThemedText>
+          </Pressable>
+        ))}
+      </View>
+
+      {campaignSegment === "custom" ? (
+        <View style={{ marginBottom: Spacing.lg }}>
+          <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>
+            Select Customers ({selectedCustomerIds.length} selected)
+          </ThemedText>
+          <TextInput
+            testID="input-customer-search"
+            value={customerSearch}
+            onChangeText={setCustomerSearch}
+            placeholder="Search by name, email, or phone..."
+            placeholderTextColor={dt.textSecondary}
+            style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border, marginBottom: Spacing.sm }]}
+          />
+          <View style={[styles.customerList, { borderColor: dt.border }]}>
+            {customersQuery.isLoading ? (
+              <ActivityIndicator color={dt.accent} style={{ padding: Spacing.lg }} />
+            ) : filteredCustomers.length === 0 ? (
+              <ThemedText type="caption" style={{ color: dt.textSecondary, padding: Spacing.md, textAlign: "center" }}>
+                No customers found
+              </ThemedText>
+            ) : (
+              <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled>
+                {filteredCustomers.map((c: any) => {
+                  const isSelected = selectedCustomerIds.includes(c.id.toString());
+                  return (
+                    <Pressable
+                      key={c.id}
+                      testID={`customer-${c.id}`}
+                      onPress={() => toggleCustomer(c.id.toString())}
+                      style={[styles.customerRow, { backgroundColor: isSelected ? dt.accentSoft : "transparent" }]}
+                    >
+                      <View style={[styles.checkbox, { borderColor: isSelected ? dt.accent : dt.border, backgroundColor: isSelected ? dt.accent : "transparent" }]}>
+                        {isSelected ? <Feather name="check" size={12} color="#FFFFFF" /> : null}
+                      </View>
+                      <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                        <ThemedText type="small">{c.name || "Unnamed"}</ThemedText>
+                        {c.email ? <ThemedText type="caption" style={{ color: dt.textSecondary }}>{c.email}</ThemedText> : null}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      ) : null}
+
+      <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Channel</ThemedText>
+      <View style={styles.pickerRow}>
+        {(["sms", "email"] as Channel[]).map((ch) => (
+          <Pressable
+            key={ch}
+            testID={`picker-channel-${ch}`}
+            onPress={() => setCampaignChannel(ch)}
+            style={[styles.pickerOption, campaignChannel === ch ? { backgroundColor: dt.accentSoft, borderColor: dt.accent } : { borderColor: dt.border }]}
+          >
+            <Feather name={ch === "sms" ? "message-square" : "mail"} size={14} color={campaignChannel === ch ? dt.accent : dt.textSecondary} />
+            <ThemedText type="small" style={{ color: campaignChannel === ch ? dt.accent : dt.textPrimary, marginLeft: 6 }}>
+              {ch.toUpperCase()}
+            </ThemedText>
+          </Pressable>
+        ))}
+      </View>
+
+      <Pressable
+        testID="button-create-campaign"
+        onPress={handleCreateCampaign}
+        style={[styles.createBtn, { backgroundColor: dt.accent, opacity: campaignName.trim() ? 1 : 0.5 }]}
+        disabled={!campaignName.trim()}
+      >
+        <ThemedText type="subtitle" style={{ color: "#FFFFFF" }}>Create Campaign</ThemedText>
+      </Pressable>
+    </ScrollView>
   );
 
   return (
@@ -170,9 +376,22 @@ export default function ReactivationScreen() {
         contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
         ListHeaderComponent={
           <>
-            <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.md, lineHeight: 20 }}>
-              Dormant customers haven't booked in a while. Lost quotes were sent but never accepted. Reach out to win them back and recover potential revenue.
-            </ThemedText>
+            <Card style={{ marginBottom: Spacing.md, padding: Spacing.md }}>
+              <View style={{ flexDirection: "row", alignItems: "flex-start", gap: Spacing.sm }}>
+                <Feather name="info" size={16} color={dt.accent} style={{ marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="small" style={{ color: dt.textSecondary, lineHeight: 20, marginBottom: Spacing.sm }}>
+                    <ThemedText type="small" style={{ fontWeight: "700", color: dt.textPrimary }}>Dormant Customers</ThemedText>
+                    {" "}are customers who had a completed job but haven't booked again in over 60 days. They already know your work and are the easiest to win back.
+                  </ThemedText>
+                  <ThemedText type="small" style={{ color: dt.textSecondary, lineHeight: 20 }}>
+                    <ThemedText type="small" style={{ fontWeight: "700", color: dt.textPrimary }}>Lost Quotes</ThemedText>
+                    {" "}are quotes you sent that were never accepted and have since expired (over 30 days old). A quick follow-up can often recover this revenue.
+                  </ThemedText>
+                </View>
+              </View>
+            </Card>
+
             <Card style={{...styles.summaryCard, borderColor: dt.border}}>
               <View style={styles.summaryRow}>
                 <View style={styles.summaryItem}>
@@ -201,6 +420,11 @@ export default function ReactivationScreen() {
               <ThemedText type="subtitle" style={{ color: dt.textSecondary, marginTop: Spacing.md }}>
                 {segment === "dormant" ? "No dormant customers found" : "No lost quotes found"}
               </ThemedText>
+              <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.xs, textAlign: "center", paddingHorizontal: Spacing.xl }}>
+                {segment === "dormant"
+                  ? "Customers who haven't booked in 60+ days will appear here"
+                  : "Quotes sent but not accepted after 30+ days will show up here"}
+              </ThemedText>
             </View>
           )
         }
@@ -208,74 +432,32 @@ export default function ReactivationScreen() {
 
       <Pressable
         testID="fab-create-campaign"
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setModalVisible(true); }}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openModal(); }}
         style={[styles.fab, { backgroundColor: dt.accent, bottom: insets.bottom + Spacing.xl }]}
       >
         <Feather name="send" size={18} color="#FFFFFF" />
         <ThemedText type="caption" style={{ color: "#FFFFFF", marginTop: 2, fontSize: 10 }}>Campaign</ThemedText>
       </Pressable>
 
-      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={resetModal}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-          <View style={[styles.modalOverlay, { backgroundColor: dt.overlay, justifyContent: "flex-start", paddingTop: 100 }]}>
+          <View style={[styles.modalOverlay, { backgroundColor: dt.overlay, justifyContent: "flex-start", paddingTop: 80 }]}>
             <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault }]}>
               <View style={styles.modalHeader}>
-                <ThemedText type="h3">Create Campaign</ThemedText>
-                <Pressable testID="button-close-modal" onPress={() => setModalVisible(false)}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                  {modalStep === "custom" ? (
+                    <Pressable onPress={() => setModalStep("templates")} hitSlop={8}>
+                      <Feather name="arrow-left" size={20} color={dt.textPrimary} />
+                    </Pressable>
+                  ) : null}
+                  <ThemedText type="h3">{modalStep === "templates" ? "New Campaign" : "Campaign Details"}</ThemedText>
+                </View>
+                <Pressable testID="button-close-modal" onPress={resetModal}>
                   <Feather name="x" size={24} color={dt.textPrimary} />
                 </Pressable>
               </View>
 
-              <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Campaign Name</ThemedText>
-              <TextInput
-                testID="input-campaign-name"
-                value={campaignName}
-                onChangeText={setCampaignName}
-                placeholder="e.g. Spring Reactivation"
-                placeholderTextColor={dt.textSecondary}
-                style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
-              />
-
-              <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Segment</ThemedText>
-              <View style={styles.pickerRow}>
-                {(["dormant", "lost"] as Segment[]).map((s) => (
-                  <Pressable
-                    key={s}
-                    testID={`picker-segment-${s}`}
-                    onPress={() => setCampaignSegment(s)}
-                    style={[styles.pickerOption, campaignSegment === s ? { backgroundColor: dt.accentSoft, borderColor: dt.accent } : { borderColor: dt.border }]}
-                  >
-                    <ThemedText type="small" style={{ color: campaignSegment === s ? dt.accent : dt.textPrimary }}>
-                      {s === "dormant" ? "Dormant" : "Lost Quotes"}
-                    </ThemedText>
-                  </Pressable>
-                ))}
-              </View>
-
-              <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Channel</ThemedText>
-              <View style={styles.pickerRow}>
-                {(["sms", "email"] as Channel[]).map((ch) => (
-                  <Pressable
-                    key={ch}
-                    testID={`picker-channel-${ch}`}
-                    onPress={() => setCampaignChannel(ch)}
-                    style={[styles.pickerOption, campaignChannel === ch ? { backgroundColor: dt.accentSoft, borderColor: dt.accent } : { borderColor: dt.border }]}
-                  >
-                    <Feather name={ch === "sms" ? "message-square" : "mail"} size={14} color={campaignChannel === ch ? dt.accent : dt.textSecondary} />
-                    <ThemedText type="small" style={{ color: campaignChannel === ch ? dt.accent : dt.textPrimary, marginLeft: 6 }}>
-                      {ch.toUpperCase()}
-                    </ThemedText>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Pressable
-                testID="button-create-campaign"
-                onPress={handleCreateCampaign}
-                style={[styles.createBtn, { backgroundColor: dt.accent }]}
-              >
-                <ThemedText type="subtitle" style={{ color: "#FFFFFF" }}>Create Campaign</ThemedText>
-              </Pressable>
+              {modalStep === "templates" ? renderTemplatesStep() : renderCustomStep()}
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -305,4 +487,39 @@ const styles = StyleSheet.create({
   pickerRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg },
   pickerOption: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.sm, borderRadius: BorderRadius.xs, borderWidth: 1 },
   createBtn: { paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, alignItems: "center", marginTop: Spacing.sm },
+  templateCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+    gap: Spacing.md,
+  },
+  templateIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  customerList: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    overflow: "hidden",
+  },
+  customerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

@@ -608,6 +608,7 @@ export const campaigns = pgTable("campaigns", {
   segment: text("segment").notNull(),
   channel: text("channel").notNull().default("sms"),
   templateKey: text("template_key"),
+  customerIds: jsonb("customer_ids"),
   status: text("status").notNull().default("draft"),
   taskCount: integer("task_count").notNull().default(0),
   completedCount: integer("completed_count").notNull().default(0),

@@ -3846,8 +3846,8 @@ Respond with JSON: {"reply": string}`
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const { name, segment, channel, templateKey } = req.body;
-      const campaign = await createCampaign({ businessId: business.id, name, segment, channel, templateKey });
+      const { name, segment, channel, templateKey, customerIds } = req.body;
+      const campaign = await createCampaign({ businessId: business.id, name, segment, channel, templateKey, customerIds: customerIds || null });
       return res.json(campaign);
     } catch (error: any) {
       console.error("Create campaign error:", error);
