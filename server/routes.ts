@@ -3983,40 +3983,6 @@ Respond with JSON: {"reply": string}`
             failCount++;
           }
         }
-      } else {
-        const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-        const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-        const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-        if (!twilioSid || !twilioToken || !twilioFrom) return res.status(503).json({ message: "SMS service not configured. Please connect Twilio in settings." });
-
-        for (const customer of targetCustomers) {
-          const phone = customer.phone;
-          if (!phone) { failCount++; continue; }
-
-          const customerName = `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "Customer";
-          const personalizedContent = campaign.messageContent.replace(/\[Customer\]/gi, customerName);
-
-          try {
-            const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
-            const twilioRes = await fetch(twilioUrl, {
-              method: "POST",
-              headers: {
-                "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: new URLSearchParams({ To: phone, From: twilioFrom, Body: personalizedContent }).toString(),
-            });
-
-            if (twilioRes.ok) {
-              sentCount++;
-              await createCommunication({ businessId: business.id, customerId: customer.id, channel: "sms", direction: "outbound", content: personalizedContent, status: "sent" });
-            } else {
-              failCount++;
-            }
-          } catch (e) {
-            failCount++;
-          }
-        }
       }
 
       await updateCampaign(campaign.id, { status: "sent", completedCount: sentCount, taskCount: targetCustomers.length });
@@ -4101,33 +4067,24 @@ Respond with JSON: {"reply": string}`
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const { campaignName, segment, channel } = req.body;
-      const isEmail = channel === "email";
+      const { campaignName, segment } = req.body;
 
       const businessName = business.companyName || "our cleaning company";
       const ownerName = business.senderName || "";
+      const targetDesc = segment === "dormant" ? "customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired" : "a curated customer list";
       
-      const systemPrompt = `You are writing a marketing message for a residential cleaning business called "${businessName}"${ownerName ? `, owned by ${ownerName}` : ""}.
-Write a compelling ${isEmail ? "email" : "SMS"} campaign message.
-${isEmail ? "Include a subject line on the first line prefixed with 'Subject: ', then a blank line, then the email body. Keep the body under 200 words. Use a professional but friendly tone." : "Keep the SMS under 160 characters. Be concise, warm, and include a clear call to action."}
-The campaign is "${campaignName}" targeting ${segment === "dormant" ? "customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired without booking" : "a curated customer list"}.
-
-CRITICAL RULES:
-- Use the actual business name "${businessName}" directly in the message. NEVER use placeholders like [Company], [Company Name], [Business], etc.
-${ownerName ? `- Use the actual owner name "${ownerName}" directly. NEVER use [Owner] or similar placeholders.` : "- Do not mention the owner's name."}
-- Use "[Customer]" as the ONLY placeholder allowed (it will be replaced with each customer's real name when sent).
-- Do NOT include any links, URLs, or [link] placeholders. Instead, tell the customer to reply to this ${isEmail ? "email" : "text"} to book or get more info.
-- Do not use emojis.`;
+      const systemPrompt = `Write an email for "${businessName}"${ownerName ? ` (${ownerName})` : ""}. Campaign: "${campaignName}" targeting ${targetDesc}. Format: first line "Subject: ...", blank line, then body under 150 words. Use [Customer] for their name. No placeholders for company/owner - use real names. No links/URLs. Tell them to reply to book. No emojis.`;
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 90000);
+      const timeout = setTimeout(() => controller.abort(), 60000);
       
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Generate the ${isEmail ? "email" : "SMS"} content for the "${campaignName}" campaign.` },
+          { role: "user", content: `Generate the email for "${campaignName}".` },
         ],
+        max_completion_tokens: 300,
       }, { signal: controller.signal as any });
       
       clearTimeout(timeout);
@@ -4135,13 +4092,13 @@ ${ownerName ? `- Use the actual owner name "${ownerName}" directly. NEVER use [O
       const raw = completion.choices[0]?.message?.content?.trim() || "";
       let subject = "";
       let content = raw;
-      if (isEmail && raw.startsWith("Subject:")) {
+      if (raw.startsWith("Subject:")) {
         const lines = raw.split("\n");
         subject = lines[0].replace("Subject:", "").trim();
         content = lines.slice(1).join("\n").trim();
       }
 
-      return res.json({ content, subject, channel });
+      return res.json({ content, subject, channel: "email" });
     } catch (error: any) {
       console.error("AI generate campaign content error:", error?.message || error, error?.code, error?.status);
       return res.status(500).json({ message: "Failed to generate campaign content" });

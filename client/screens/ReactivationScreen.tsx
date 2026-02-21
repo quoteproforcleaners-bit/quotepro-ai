@@ -37,23 +37,21 @@ function useDesignTokens() {
 }
 
 type Segment = "dormant" | "lost" | "custom";
-type Channel = "sms" | "email";
 
 interface CampaignTemplate {
   name: string;
   icon: keyof typeof Feather.glyphMap;
   segment: Segment;
-  channel: Channel;
   description: string;
 }
 
 const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
-  { name: "Spring Cleaning Special", icon: "sun", segment: "dormant", channel: "sms", description: "Reach out to past customers with a spring refresh offer" },
-  { name: "Holiday Deep Clean", icon: "gift", segment: "dormant", channel: "email", description: "Offer pre-holiday deep cleaning to all past customers" },
-  { name: "New Year Fresh Start", icon: "star", segment: "dormant", channel: "sms", description: "Ring in the new year with a clean home promotion" },
-  { name: "Back to School Clean", icon: "book-open", segment: "dormant", channel: "email", description: "Target families getting ready for the school year" },
-  { name: "Win Back Lost Leads", icon: "refresh-cw", segment: "lost", channel: "email", description: "Follow up on quotes that were never accepted" },
-  { name: "VIP Customer Appreciation", icon: "heart", segment: "custom", channel: "email", description: "Send a thank-you offer to your best customers" },
+  { name: "Spring Cleaning Special", icon: "sun", segment: "dormant", description: "Reach out to past customers with a spring refresh offer" },
+  { name: "Holiday Deep Clean", icon: "gift", segment: "dormant", description: "Offer pre-holiday deep cleaning to all past customers" },
+  { name: "New Year Fresh Start", icon: "star", segment: "dormant", description: "Ring in the new year with a clean home promotion" },
+  { name: "Back to School Clean", icon: "book-open", segment: "dormant", description: "Target families getting ready for the school year" },
+  { name: "Win Back Lost Leads", icon: "refresh-cw", segment: "lost", description: "Follow up on quotes that were never accepted" },
+  { name: "VIP Customer Appreciation", icon: "heart", segment: "custom", description: "Send a thank-you offer to your best customers" },
 ];
 
 export default function ReactivationScreen() {
@@ -65,11 +63,9 @@ export default function ReactivationScreen() {
 
   const [segment, setSegment] = useState<"dormant" | "lost">("dormant");
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalStep, setModalStep] = useState<"templates" | "channel-pick" | "custom">("templates");
-  const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
+  const [modalStep, setModalStep] = useState<"templates" | "custom">("templates");
   const [campaignName, setCampaignName] = useState("");
   const [campaignSegment, setCampaignSegment] = useState<Segment>("dormant");
-  const [campaignChannel, setCampaignChannel] = useState<Channel>("sms");
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [generatingContent, setGeneratingContent] = useState(false);
@@ -155,7 +151,7 @@ export default function ReactivationScreen() {
       const campaignRes = await apiRequest("POST", "/api/campaigns", {
         name: campaignName,
         segment: campaignSegment,
-        channel: campaignChannel,
+        channel: "email",
         customerIds: selectedCustomerIds.length > 0 ? selectedCustomerIds : undefined,
         messageContent: "",
         messageSubject: "",
@@ -170,21 +166,14 @@ export default function ReactivationScreen() {
     }
   };
 
-  const handleSelectTemplate = (template: CampaignTemplate) => {
-    setSelectedTemplate(template);
-    setCampaignChannel(template.channel);
-    setModalStep("channel-pick");
-  };
-
-  const handleConfirmChannelAndCreate = async (channel: Channel) => {
-    if (!selectedTemplate) return;
+  const handleSelectTemplate = async (template: CampaignTemplate) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const campaignRes = await apiRequest("POST", "/api/campaigns", {
-        name: selectedTemplate.name,
-        segment: selectedTemplate.segment,
-        channel,
-        templateKey: selectedTemplate.name,
+        name: template.name,
+        segment: template.segment,
+        channel: "email",
+        templateKey: template.name,
         messageContent: "",
         messageSubject: "",
       });
@@ -203,7 +192,6 @@ export default function ReactivationScreen() {
     setModalStep("templates");
     setCampaignName("");
     setCampaignSegment("dormant");
-    setCampaignChannel("sms");
     setSelectedCustomerIds([]);
     setCustomerSearch("");
   };
@@ -214,7 +202,6 @@ export default function ReactivationScreen() {
     setSelectedCustomerIds([]);
     setCustomerSearch("");
     setModalStep("templates");
-    setSelectedTemplate(null);
   };
 
   const refetch = () => {
@@ -314,7 +301,7 @@ export default function ReactivationScreen() {
         </Pressable>
       ))}
       <Pressable
-        onPress={() => { setModalStep("custom"); setCampaignName(""); setCampaignSegment("dormant"); setCampaignChannel("sms"); }}
+        onPress={() => { setModalStep("custom"); setCampaignName(""); setCampaignSegment("dormant"); }}
         style={[styles.templateCard, { backgroundColor: dt.accentSoft, borderColor: dt.accent, borderStyle: "dashed" as any }]}
       >
         <View style={[styles.templateIcon, { backgroundColor: dt.accent }]}>
@@ -327,56 +314,6 @@ export default function ReactivationScreen() {
         <Feather name="chevron-right" size={18} color={dt.accent} />
       </Pressable>
     </ScrollView>
-    );
-  };
-
-  const renderChannelPickStep = () => {
-    if (generatingContent) return (
-      <View style={{ alignItems: "center", paddingVertical: 60 }}>
-        <ActivityIndicator size="large" color={dt.accent} />
-        <ThemedText type="subtitle" style={{ color: dt.textPrimary, marginTop: Spacing.lg }}>Creating your campaign...</ThemedText>
-        <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
-          AI is writing a personalized message for your customers
-        </ThemedText>
-      </View>
-    );
-    return (
-      <View style={{ paddingVertical: Spacing.md }}>
-        <ThemedText type="subtitle" style={{ marginBottom: 4 }}>{selectedTemplate?.name}</ThemedText>
-        <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: Spacing.xl }}>
-          {selectedTemplate?.description}
-        </ThemedText>
-
-        <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>How do you want to reach your customers?</ThemedText>
-
-        <Pressable
-          onPress={() => handleConfirmChannelAndCreate("sms")}
-          style={[styles.templateCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.border }]}
-        >
-          <View style={[styles.templateIcon, { backgroundColor: dt.accentSoft }]}>
-            <Feather name="message-square" size={18} color={dt.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="subtitle">Text Message (SMS)</ThemedText>
-            <ThemedText type="caption" style={{ color: dt.textSecondary }}>Short message sent to customer phone numbers</ThemedText>
-          </View>
-          <Feather name="chevron-right" size={18} color={dt.textSecondary} />
-        </Pressable>
-
-        <Pressable
-          onPress={() => handleConfirmChannelAndCreate("email")}
-          style={[styles.templateCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.border }]}
-        >
-          <View style={[styles.templateIcon, { backgroundColor: dt.accentSoft }]}>
-            <Feather name="mail" size={18} color={dt.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="subtitle">Email</ThemedText>
-            <ThemedText type="caption" style={{ color: dt.textSecondary }}>Longer message sent to customer email addresses</ThemedText>
-          </View>
-          <Feather name="chevron-right" size={18} color={dt.textSecondary} />
-        </Pressable>
-      </View>
     );
   };
 
@@ -469,23 +406,6 @@ export default function ReactivationScreen() {
         </View>
       ) : null}
 
-      <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Channel</ThemedText>
-      <View style={styles.pickerRow}>
-        {(["sms", "email"] as Channel[]).map((ch) => (
-          <Pressable
-            key={ch}
-            testID={`picker-channel-${ch}`}
-            onPress={() => setCampaignChannel(ch)}
-            style={[styles.pickerOption, campaignChannel === ch ? { backgroundColor: dt.accentSoft, borderColor: dt.accent } : { borderColor: dt.border }]}
-          >
-            <Feather name={ch === "sms" ? "message-square" : "mail"} size={14} color={campaignChannel === ch ? dt.accent : dt.textSecondary} />
-            <ThemedText type="small" style={{ color: campaignChannel === ch ? dt.accent : dt.textPrimary, marginLeft: 6 }}>
-              {ch.toUpperCase()}
-            </ThemedText>
-          </Pressable>
-        ))}
-      </View>
-
       <Pressable
         testID="button-create-campaign"
         onPress={handleCreateCampaign}
@@ -551,7 +471,7 @@ export default function ReactivationScreen() {
                       <View style={{ flex: 1 }}>
                         <ThemedText type="subtitle">{campaign.name}</ThemedText>
                         <ThemedText type="caption" style={{ color: dt.textSecondary }}>
-                          {campaign.channel?.toUpperCase()}{customerCount > 0 ? ` \u00B7 ${customerCount} customer${customerCount !== 1 ? "s" : ""}` : ""}{` \u00B7 ${campaign.status}`}
+                          Email{customerCount > 0 ? ` \u00B7 ${customerCount} customer${customerCount !== 1 ? "s" : ""}` : ""}{` \u00B7 ${campaign.status}`}
                         </ThemedText>
                       </View>
                       <Feather name="chevron-right" size={18} color={dt.textSecondary} />
@@ -608,14 +528,14 @@ export default function ReactivationScreen() {
                       <Feather name="arrow-left" size={20} color={dt.textPrimary} />
                     </Pressable>
                   ) : null}
-                  <ThemedText type="h3">{modalStep === "templates" ? "New Campaign" : modalStep === "channel-pick" ? "Send Via" : "Campaign Details"}</ThemedText>
+                  <ThemedText type="h3">{modalStep === "templates" ? "New Campaign" : "Campaign Details"}</ThemedText>
                 </View>
                 <Pressable testID="button-close-modal" onPress={resetModal}>
                   <Feather name="x" size={24} color={dt.textPrimary} />
                 </Pressable>
               </View>
 
-              {modalStep === "templates" ? renderTemplatesStep() : modalStep === "channel-pick" ? renderChannelPickStep() : renderCustomStep()}
+              {modalStep === "templates" ? renderTemplatesStep() : renderCustomStep()}
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -634,7 +554,7 @@ export default function ReactivationScreen() {
             <View style={{ flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg }}>
               <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: 16, backgroundColor: dt.accentSoft }}>
                 <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>
-                  {viewingCampaign?.channel?.toUpperCase()}
+                  Email
                 </ThemedText>
               </View>
               <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: 16, backgroundColor: viewingCampaign?.status === "active" || viewingCampaign?.status === "sent" ? theme.success + "20" : dt.surfaceSecondary }}>
@@ -702,7 +622,7 @@ export default function ReactivationScreen() {
                 <View style={{ backgroundColor: theme.warning + "15", borderRadius: BorderRadius.sm, padding: Spacing.md, marginBottom: Spacing.md }}>
                   <ThemedText type="subtitle" style={{ marginBottom: 4 }}>Confirm Send</ThemedText>
                   <ThemedText type="body" style={{ color: dt.textSecondary }}>
-                    This will send the {viewingCampaign?.channel === "email" ? "email" : "SMS"} to all {viewingCampaign?.segment === "dormant" ? "dormant customers" : viewingCampaign?.segment === "lost" ? "lost quote leads" : "targeted customers"}. This cannot be undone.
+                    This will send the email to all {viewingCampaign?.segment === "dormant" ? "past customers" : viewingCampaign?.segment === "lost" ? "quote leads" : "targeted customers"}. This cannot be undone.
                   </ThemedText>
                 </View>
                 <View style={{ flexDirection: "row", gap: Spacing.sm }}>
@@ -750,7 +670,7 @@ export default function ReactivationScreen() {
                       <>
                         <Feather name="send" size={16} color="#FFFFFF" />
                         <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.xs }}>
-                          Send {viewingCampaign?.channel === "email" ? "Emails" : "SMS"}
+                          Send Emails
                         </ThemedText>
                       </>
                     )}
