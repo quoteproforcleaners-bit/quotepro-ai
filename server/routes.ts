@@ -3962,8 +3962,6 @@ Write from the perspective of the cleaning business owner. Use "[Customer]" as a
           { role: "system", content: systemPrompt },
           { role: "user", content: `Generate the ${isEmail ? "email" : "SMS"} content for the "${campaignName}" campaign.` },
         ],
-        max_tokens: 500,
-        temperature: 0.8,
       });
 
       const raw = completion.choices[0]?.message?.content?.trim() || "";
@@ -3977,7 +3975,7 @@ Write from the perspective of the cleaning business owner. Use "[Customer]" as a
 
       return res.json({ content, subject, channel });
     } catch (error: any) {
-      console.error("AI generate campaign content error:", error);
+      console.error("AI generate campaign content error:", error?.message || error, error?.code, error?.status);
       return res.status(500).json({ message: "Failed to generate campaign content" });
     }
   });
@@ -4012,8 +4010,6 @@ Write from the perspective of the cleaning business owner. Use "[Customer]" as a
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 300,
-        temperature: 0.7,
       });
 
       const generatedMessage = completion.choices[0]?.message?.content?.trim() || "";
