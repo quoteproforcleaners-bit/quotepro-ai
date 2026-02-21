@@ -1100,7 +1100,7 @@ export default function CustomerDetailScreen() {
                       <View style={{ flex: 1 }}>
                         <ThemedText type="subtitle">{campaign.name}</ThemedText>
                         <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                          {campaign.channel?.toUpperCase()} {"\u00B7"} {campaign.segment === "custom" ? "Manual" : campaign.segment}
+                          {campaign.channel?.toUpperCase()}
                         </ThemedText>
                       </View>
                       {isAdded ? (

@@ -4104,10 +4104,20 @@ Respond with JSON: {"reply": string}`
       const { campaignName, segment, channel } = req.body;
       const isEmail = channel === "email";
 
-      const systemPrompt = `You are a marketing copywriter for "${business.businessName || "a residential cleaning company"}". Write a compelling ${isEmail ? "email" : "SMS"} campaign message.
+      const businessName = business.companyName || "our cleaning company";
+      const ownerName = business.senderName || "";
+      
+      const systemPrompt = `You are writing a marketing message for a residential cleaning business called "${businessName}"${ownerName ? `, owned by ${ownerName}` : ""}.
+Write a compelling ${isEmail ? "email" : "SMS"} campaign message.
 ${isEmail ? "Include a subject line on the first line prefixed with 'Subject: ', then a blank line, then the email body. Keep the body under 200 words. Use a professional but friendly tone." : "Keep the SMS under 160 characters. Be concise, warm, and include a clear call to action."}
 The campaign is "${campaignName}" targeting ${segment === "dormant" ? "customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired without booking" : "a curated customer list"}.
-Write from the perspective of the cleaning business owner. Use "[Customer]" as a placeholder for the customer's name. Do not use emojis.`;
+
+CRITICAL RULES:
+- Use the actual business name "${businessName}" directly in the message. NEVER use placeholders like [Company], [Company Name], [Business], etc.
+${ownerName ? `- Use the actual owner name "${ownerName}" directly. NEVER use [Owner] or similar placeholders.` : "- Do not mention the owner's name."}
+- Use "[Customer]" as the ONLY placeholder allowed (it will be replaced with each customer's real name when sent).
+- Do NOT include any links, URLs, or [link] placeholders. Instead, tell the customer to reply to this ${isEmail ? "email" : "text"} to book or get more info.
+- Do not use emojis.`;
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 90000);

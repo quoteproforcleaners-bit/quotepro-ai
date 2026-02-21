@@ -578,12 +578,7 @@ export default function ReactivationScreen() {
                   {viewingCampaign?.channel?.toUpperCase()}
                 </ThemedText>
               </View>
-              <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: 16, backgroundColor: dt.surfaceSecondary }}>
-                <ThemedText type="caption" style={{ color: dt.textSecondary }}>
-                  {viewingCampaign?.segment === "dormant" ? "Dormant Customers" : viewingCampaign?.segment === "lost" ? "Lost Quotes" : "Manual List"}
-                </ThemedText>
-              </View>
-              <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: 16, backgroundColor: viewingCampaign?.status === "active" ? theme.success + "20" : dt.surfaceSecondary }}>
+              <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: 16, backgroundColor: viewingCampaign?.status === "active" || viewingCampaign?.status === "sent" ? theme.success + "20" : dt.surfaceSecondary }}>
                 <ThemedText type="caption" style={{ color: viewingCampaign?.status === "active" ? theme.success : dt.textSecondary, fontWeight: "600" }}>
                   {viewingCampaign?.status}
                 </ThemedText>
