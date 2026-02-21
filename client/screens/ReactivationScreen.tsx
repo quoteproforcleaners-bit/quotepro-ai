@@ -73,6 +73,9 @@ export default function ReactivationScreen() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [generatingContent, setGeneratingContent] = useState(false);
   const [viewingCampaign, setViewingCampaign] = useState<any>(null);
+  const [sendingCampaign, setSendingCampaign] = useState(false);
+  const [sendResult, setSendResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
+  const [confirmSend, setConfirmSend] = useState(false);
 
   const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"], enabled: segment === "dormant" });
   const lostQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/lost"], enabled: segment === "lost" });
@@ -559,12 +562,12 @@ export default function ReactivationScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={!!viewingCampaign} transparent animationType="slide" onRequestClose={() => setViewingCampaign(null)}>
+      <Modal visible={!!viewingCampaign} transparent animationType="slide" onRequestClose={() => { setViewingCampaign(null); setConfirmSend(false); setSendResult(null); }}>
         <View style={{ flex: 1, backgroundColor: dt.overlay, justifyContent: "flex-end" }}>
           <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: Spacing.xl, maxHeight: "80%", marginHorizontal: 0 }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="h3" style={{ flex: 1 }}>{viewingCampaign?.name}</ThemedText>
-              <Pressable onPress={() => setViewingCampaign(null)} hitSlop={8}>
+              <Pressable onPress={() => { setViewingCampaign(null); setConfirmSend(false); setSendResult(null); }} hitSlop={8}>
                 <Feather name="x" size={24} color={dt.textPrimary} />
               </Pressable>
             </View>
@@ -621,48 +624,128 @@ export default function ReactivationScreen() {
               ) : null}
             </ScrollView>
 
-            <View style={{ flexDirection: "row", gap: Spacing.sm }}>
-              <Pressable
-                onPress={async () => {
-                  try {
-                    setGeneratingContent(true);
-                    const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
-                      campaignName: viewingCampaign?.name,
-                      segment: viewingCampaign?.segment,
-                      channel: viewingCampaign?.channel,
-                    });
-                    const aiData = await aiRes.json();
-                    await apiRequest("PUT", `/api/campaigns/${viewingCampaign?.id}`, {
-                      messageContent: aiData.content,
-                      messageSubject: aiData.subject || "",
-                    });
-                    queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-                    setViewingCampaign({ ...viewingCampaign, messageContent: aiData.content, messageSubject: aiData.subject || "" });
-                  } catch (e) {
-                    console.error("Regenerate error:", e);
-                  } finally {
-                    setGeneratingContent(false);
-                  }
-                }}
-                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: dt.border }}
-                disabled={generatingContent}
-              >
-                {generatingContent ? (
-                  <ActivityIndicator size="small" color={dt.accent} />
-                ) : (
-                  <>
-                    <Feather name="refresh-cw" size={16} color={dt.accent} />
-                    <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600", marginLeft: Spacing.xs }}>Regenerate</ThemedText>
-                  </>
-                )}
-              </Pressable>
-              <Pressable
-                onPress={() => setViewingCampaign(null)}
-                style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: dt.accent }}
-              >
-                <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600" }}>Done</ThemedText>
-              </Pressable>
-            </View>
+            {sendResult ? (
+              <View style={{ alignItems: "center", paddingVertical: Spacing.md }}>
+                <Feather name="check-circle" size={32} color={theme.success} />
+                <ThemedText type="subtitle" style={{ marginTop: Spacing.sm, color: theme.success }}>Campaign Sent</ThemedText>
+                <ThemedText type="body" style={{ color: dt.textSecondary, marginTop: 4 }}>
+                  {sendResult.sent} of {sendResult.total} messages delivered
+                </ThemedText>
+                {sendResult.failed > 0 ? (
+                  <ThemedText type="caption" style={{ color: theme.error, marginTop: 4 }}>
+                    {sendResult.failed} failed (missing contact info)
+                  </ThemedText>
+                ) : null}
+                <Pressable
+                  onPress={() => { setSendResult(null); setViewingCampaign(null); }}
+                  style={{ marginTop: Spacing.lg, paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl, borderRadius: BorderRadius.sm, backgroundColor: dt.accent }}
+                >
+                  <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600" }}>Done</ThemedText>
+                </Pressable>
+              </View>
+            ) : confirmSend ? (
+              <View>
+                <View style={{ backgroundColor: theme.warning + "15", borderRadius: BorderRadius.sm, padding: Spacing.md, marginBottom: Spacing.md }}>
+                  <ThemedText type="subtitle" style={{ marginBottom: 4 }}>Confirm Send</ThemedText>
+                  <ThemedText type="body" style={{ color: dt.textSecondary }}>
+                    This will send the {viewingCampaign?.channel === "email" ? "email" : "SMS"} to all {viewingCampaign?.segment === "dormant" ? "dormant customers" : viewingCampaign?.segment === "lost" ? "lost quote leads" : "targeted customers"}. This cannot be undone.
+                  </ThemedText>
+                </View>
+                <View style={{ flexDirection: "row", gap: Spacing.sm }}>
+                  <Pressable
+                    onPress={() => setConfirmSend(false)}
+                    style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: dt.border }}
+                  >
+                    <ThemedText type="small" style={{ color: dt.textSecondary, fontWeight: "600" }}>Cancel</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={async () => {
+                      setConfirmSend(false);
+                      setSendingCampaign(true);
+                      try {
+                        const res = await apiRequest("POST", `/api/campaigns/${viewingCampaign?.id}/send`, {});
+                        const data = await res.json();
+                        setSendResult(data);
+                        setViewingCampaign((prev: any) => prev ? { ...prev, status: "sent" } : prev);
+                        queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+                      } catch (e: any) {
+                        let msg = "Failed to send campaign";
+                        try { const errData = await e?.response?.json(); msg = errData?.message || msg; } catch {}
+                        setSendResult({ sent: 0, failed: 1, total: 1 });
+                      } finally {
+                        setSendingCampaign(false);
+                      }
+                    }}
+                    style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: theme.error }}
+                  >
+                    <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600" }}>Send Now</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={{ gap: Spacing.sm }}>
+                {viewingCampaign?.status !== "sent" ? (
+                  <Pressable
+                    onPress={() => setConfirmSend(true)}
+                    disabled={!viewingCampaign?.messageContent || generatingContent || sendingCampaign}
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: !viewingCampaign?.messageContent || generatingContent ? dt.surfaceSecondary : theme.success, opacity: !viewingCampaign?.messageContent || generatingContent ? 0.5 : 1 }}
+                  >
+                    {sendingCampaign ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Feather name="send" size={16} color="#FFFFFF" />
+                        <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.xs }}>
+                          Send {viewingCampaign?.channel === "email" ? "Emails" : "SMS"}
+                        </ThemedText>
+                      </>
+                    )}
+                  </Pressable>
+                ) : null}
+                <View style={{ flexDirection: "row", gap: Spacing.sm }}>
+                  <Pressable
+                    onPress={async () => {
+                      try {
+                        setGeneratingContent(true);
+                        const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
+                          campaignName: viewingCampaign?.name,
+                          segment: viewingCampaign?.segment,
+                          channel: viewingCampaign?.channel,
+                        });
+                        const aiData = await aiRes.json();
+                        await apiRequest("PUT", `/api/campaigns/${viewingCampaign?.id}`, {
+                          messageContent: aiData.content,
+                          messageSubject: aiData.subject || "",
+                        });
+                        queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+                        setViewingCampaign({ ...viewingCampaign, messageContent: aiData.content, messageSubject: aiData.subject || "" });
+                      } catch (e) {
+                        console.error("Regenerate error:", e);
+                      } finally {
+                        setGeneratingContent(false);
+                      }
+                    }}
+                    style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: dt.border }}
+                    disabled={generatingContent || sendingCampaign}
+                  >
+                    {generatingContent ? (
+                      <ActivityIndicator size="small" color={dt.accent} />
+                    ) : (
+                      <>
+                        <Feather name="refresh-cw" size={16} color={dt.accent} />
+                        <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600", marginLeft: Spacing.xs }}>Regenerate</ThemedText>
+                      </>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { setViewingCampaign(null); setConfirmSend(false); setSendResult(null); }}
+                    style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: dt.accent }}
+                  >
+                    <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600" }}>Done</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
