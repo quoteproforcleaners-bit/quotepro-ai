@@ -1,0 +1,117 @@
+import React, { useEffect } from "react";
+import { View, StyleSheet, Pressable } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withDelay, withSequence, withTiming } from "react-native-reanimated";
+import { ThemedText } from "@/components/ThemedText";
+import { useTheme } from "@/hooks/useTheme";
+import { Spacing, BorderRadius } from "@/constants/theme";
+
+interface Props {
+  sentQuote: boolean;
+  followupsEnabled: boolean;
+  businessName: string;
+  onFinish: () => void;
+}
+
+export default function SuccessScreen({ sentQuote, followupsEnabled, businessName, onFinish }: Props) {
+  const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
+  const scale = useSharedValue(0.3);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    scale.value = withSpring(1, { damping: 12, stiffness: 90 });
+    opacity.value = withTiming(1, { duration: 600 });
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  const achievements = [
+    { done: true, label: "Business profile created" },
+    { done: true, label: "First quote generated" },
+    { done: sentQuote, label: sentQuote ? "Quote sent to customer" : "Quote ready to send" },
+    { done: followupsEnabled, label: followupsEnabled ? "Auto follow-ups enabled" : "Follow-ups available" },
+  ];
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <View style={[styles.content, { paddingTop: insets.top + Spacing["5xl"], paddingBottom: insets.bottom + Spacing.xl }]}>
+        <Animated.View style={[styles.heroSection, animStyle]}>
+          <View style={[styles.successCircle, { backgroundColor: theme.success + "15" }]}>
+            <LinearGradient
+              colors={[theme.success, "#059669"]}
+              style={styles.successGradient}
+            >
+              <Feather name="check" size={44} color="#FFFFFF" />
+            </LinearGradient>
+          </View>
+
+          <ThemedText type="hero" style={styles.title}>
+            You're all set!
+          </ThemedText>
+          <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
+            {businessName} is ready to close more jobs
+          </ThemedText>
+        </Animated.View>
+
+        <View style={styles.achievementsList}>
+          {achievements.map((a, i) => (
+            <View
+              key={i}
+              style={[styles.achievementRow, { backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)" }]}
+            >
+              <View style={[styles.achieveIcon, { backgroundColor: a.done ? theme.success + "20" : theme.backgroundSecondary }]}>
+                <Feather name={a.done ? "check-circle" : "circle"} size={18} color={a.done ? theme.success : theme.textSecondary} />
+              </View>
+              <ThemedText type="body" style={{ flex: 1, color: a.done ? theme.text : theme.textSecondary }}>
+                {a.label}
+              </ThemedText>
+            </View>
+          ))}
+        </View>
+
+        <View style={[styles.tipCard, { backgroundColor: isDark ? "#162034" : "#EBF5FF", borderColor: theme.primary + "30" }]}>
+          <View style={styles.tipHeader}>
+            <Feather name="info" size={16} color={theme.primary} />
+            <ThemedText type="subtitle" style={{ color: theme.primary, fontWeight: "600" }}>Pro Tip</ThemedText>
+          </View>
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>
+            Check the Growth tab daily for smart follow-up suggestions and revenue opportunities.
+          </ThemedText>
+        </View>
+
+        <Pressable
+          testID="button-onboarding-finish"
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onFinish(); }}
+          style={[styles.finishBtn, { backgroundColor: theme.primary }]}
+        >
+          <ThemedText type="subtitle" style={{ color: "#FFFFFF", fontWeight: "700" }}>Go to Dashboard</ThemedText>
+          <Feather name="arrow-right" size={18} color="#FFFFFF" />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  content: { flex: 1, paddingHorizontal: Spacing.xl, justifyContent: "space-between" },
+  heroSection: { alignItems: "center" },
+  successCircle: { width: 100, height: 100, borderRadius: 50, alignItems: "center", justifyContent: "center", marginBottom: Spacing["2xl"] },
+  successGradient: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },
+  title: { textAlign: "center", marginBottom: Spacing.sm },
+  subtitle: { textAlign: "center", maxWidth: 280 },
+  achievementsList: { gap: Spacing.sm },
+  achievementRow: { flexDirection: "row", alignItems: "center", padding: Spacing.md, borderRadius: BorderRadius.xs, gap: Spacing.md },
+  achieveIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  tipCard: { padding: Spacing.lg, borderRadius: BorderRadius.sm, borderWidth: 1 },
+  tipHeader: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginBottom: Spacing.sm },
+  finishBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: Spacing.sm, height: 56, borderRadius: BorderRadius.md },
+});
