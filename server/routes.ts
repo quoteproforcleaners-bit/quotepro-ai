@@ -3875,6 +3875,159 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  app.post("/api/campaigns/:id/send", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const campaign = await getCampaignById(req.params.id);
+      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+      if (!campaign.messageContent) return res.status(400).json({ message: "Campaign has no message content. Generate a message first." });
+
+      let targetCustomers: any[] = [];
+
+      if (Array.isArray(campaign.customerIds) && campaign.customerIds.length > 0) {
+        for (const cid of campaign.customerIds as string[]) {
+          const c = await getCustomerById(cid);
+          if (c) targetCustomers.push(c);
+        }
+      } else if (campaign.segment === "dormant") {
+        targetCustomers = await getDormantCustomers(business.id, 90);
+      } else if (campaign.segment === "lost") {
+        const lostQuotes = await getLostQuotes(business.id, 180);
+        const seen = new Set<string>();
+        for (const lq of lostQuotes) {
+          const cid = lq.customerId;
+          if (cid && !seen.has(cid)) {
+            seen.add(cid);
+            const c = await getCustomerById(cid);
+            if (c) targetCustomers.push(c);
+          }
+        }
+      } else {
+        const allCustomers = await getCustomersByBusiness(business.id);
+        targetCustomers = allCustomers;
+      }
+
+      if (targetCustomers.length === 0) {
+        return res.status(400).json({ message: "No customers found to send to." });
+      }
+
+      const isEmail = campaign.channel === "email";
+      let sentCount = 0;
+      let failCount = 0;
+      const errors: string[] = [];
+
+      if (isEmail) {
+        const sgApiKey = process.env.SENDGRID_API_KEY;
+        if (!sgApiKey) return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
+
+        const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+        const fromName = business.companyName || "QuotePro";
+        const replyToEmail = business.email || undefined;
+        if (!replyToEmail) return res.status(400).json({ message: "Please add your email address in Settings before sending emails." });
+
+        for (const customer of targetCustomers) {
+          const email = customer.email;
+          if (!email) { failCount++; continue; }
+
+          const customerName = `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "Customer";
+          const personalizedContent = campaign.messageContent.replace(/\[Customer\]/gi, customerName);
+          const personalizedSubject = (campaign.messageSubject || `Message from ${fromName}`).replace(/\[Customer\]/gi, customerName);
+
+          const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <tr><td style="background:linear-gradient(135deg,${business.primaryColor || "#007AFF"},#5856D6);padding:24px 32px;">
+          <h2 style="color:#ffffff;margin:0;font-size:20px;">${fromName}</h2>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          ${personalizedContent.split('\n').map((line: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333333;">${line}</p>`).join('')}
+        </td></tr>
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;">
+          <p style="margin:0;font-size:12px;color:#999999;">Sent via QuotePro</p>
+          <p style="margin:4px 0 0;font-size:11px;color:#bbbbbb;">If you no longer wish to receive these emails, please reply with "unsubscribe".</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+          try {
+            const emailPayload: any = {
+              personalizations: [{ to: [{ email }] }],
+              from: { email: brandedFromEmail, name: fromName },
+              subject: personalizedSubject,
+              content: [
+                { type: "text/plain", value: personalizedContent },
+                { type: "text/html", value: htmlBody },
+              ],
+            };
+            if (replyToEmail) emailPayload.reply_to = { email: replyToEmail, name: fromName };
+
+            const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify(emailPayload),
+            });
+
+            if (sgRes.ok || sgRes.status === 202) {
+              sentCount++;
+              await createCommunication({ businessId: business.id, customerId: customer.id, channel: "email", direction: "outbound", content: personalizedContent, status: "sent" });
+            } else {
+              failCount++;
+            }
+          } catch (e) {
+            failCount++;
+          }
+        }
+      } else {
+        const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+        const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+        const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+        if (!twilioSid || !twilioToken || !twilioFrom) return res.status(503).json({ message: "SMS service not configured. Please connect Twilio in settings." });
+
+        for (const customer of targetCustomers) {
+          const phone = customer.phone;
+          if (!phone) { failCount++; continue; }
+
+          const customerName = `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "Customer";
+          const personalizedContent = campaign.messageContent.replace(/\[Customer\]/gi, customerName);
+
+          try {
+            const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+            const twilioRes = await fetch(twilioUrl, {
+              method: "POST",
+              headers: {
+                "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: new URLSearchParams({ To: phone, From: twilioFrom, Body: personalizedContent }).toString(),
+            });
+
+            if (twilioRes.ok) {
+              sentCount++;
+              await createCommunication({ businessId: business.id, customerId: customer.id, channel: "sms", direction: "outbound", content: personalizedContent, status: "sent" });
+            } else {
+              failCount++;
+            }
+          } catch (e) {
+            failCount++;
+          }
+        }
+      }
+
+      await updateCampaign(campaign.id, { status: "sent", completedCount: sentCount, taskCount: targetCustomers.length });
+
+      return res.json({ success: true, sent: sentCount, failed: failCount, total: targetCustomers.length });
+    } catch (error: any) {
+      console.error("Send campaign error:", error);
+      return res.status(500).json({ message: "Failed to send campaign" });
+    }
+  });
+
   // ─── Utility APIs ───
 
   app.get("/api/upsell-opportunities", requireAuth, async (req: Request, res: Response) => {
