@@ -21,6 +21,11 @@ import {
 } from "@/lib/quoteCalculator";
 import { apiRequest } from "@/lib/query-client";
 import { HomeDetails, AddOns, DEFAULT_PRICING_SETTINGS } from "@/types";
+import {
+  scheduleOnboardingNudge,
+  cancelOnboardingNudge,
+  scheduleFirstWinCelebration,
+} from "@/lib/notifications";
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
@@ -56,6 +61,7 @@ export default function OnboardingNavigator() {
 
   const handleSkipAll = useCallback(async (navigation: any) => {
     await markSkipped();
+    scheduleOnboardingNudge();
     await completeOnboarding();
   }, [completeOnboarding]);
 
@@ -142,6 +148,8 @@ export default function OnboardingNavigator() {
 
       setSentQuote(true);
       await setOnboardingStatus({ sentQuote: true, ownerContact: { email: contact.email, phone: contact.phone }, currentStep: 5 });
+      cancelOnboardingNudge();
+      scheduleFirstWinCelebration();
     } catch {}
 
     navigation.navigate("FollowUpSetup");
@@ -155,6 +163,7 @@ export default function OnboardingNavigator() {
 
   const handleFinish = useCallback(async () => {
     await markCompleted();
+    cancelOnboardingNudge();
     await completeOnboarding();
   }, [completeOnboarding]);
 

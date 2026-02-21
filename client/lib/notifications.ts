@@ -12,6 +12,8 @@ export function setupNotificationHandler() {
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
       }),
     });
   } catch (e) {
@@ -200,6 +202,61 @@ export async function syncNotificationSchedule(prefs: {
 }) {
   await scheduleDailyPulse(prefs.dailyPulseEnabled, prefs.dailyPulseTime, prefs.dailyContext);
   await scheduleWeeklyRecap(prefs.weeklyRecapEnabled, prefs.weeklyRecapDay, prefs.weeklyContext);
+}
+
+const ONBOARDING_NUDGE_ID = "onboarding-nudge";
+const ONBOARDING_WIN_ID = "onboarding-first-win";
+
+export async function scheduleOnboardingNudge() {
+  try {
+    if (Platform.OS === "web") return;
+    await Notifications.cancelScheduledNotificationAsync(ONBOARDING_NUDGE_ID).catch(() => {});
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: ONBOARDING_NUDGE_ID,
+      content: {
+        title: "Your first quote is 2 minutes away",
+        body: "Finish setup and send a pro quote to your next customer.",
+        sound: true,
+        data: { screen: "Onboarding" },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 24 * 60 * 60,
+      },
+    });
+  } catch (e) {
+    console.warn("Failed to schedule onboarding nudge:", e);
+  }
+}
+
+export async function cancelOnboardingNudge() {
+  try {
+    await Notifications.cancelScheduledNotificationAsync(ONBOARDING_NUDGE_ID).catch(() => {});
+    await Notifications.cancelScheduledNotificationAsync(ONBOARDING_WIN_ID).catch(() => {});
+  } catch {}
+}
+
+export async function scheduleFirstWinCelebration() {
+  try {
+    if (Platform.OS === "web") return;
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: ONBOARDING_WIN_ID,
+      content: {
+        title: "Your quote is working for you",
+        body: "Check the Growth tab for follow-up tips to close the deal.",
+        sound: true,
+        data: { screen: "GrowthTab" },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 2 * 60 * 60,
+      },
+    });
+  } catch (e) {
+    console.warn("Failed to schedule first win celebration:", e);
+  }
 }
 
 export async function cancelAllScheduledNotifications() {
