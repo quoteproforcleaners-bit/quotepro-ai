@@ -122,65 +122,68 @@ export default function ReactivationScreen() {
     queryClient.invalidateQueries({ queryKey: ["/api/opportunities/lost"] });
   };
 
-  const handleCreateCampaign = async () => {
-    if (!campaignName.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setGeneratingContent(true);
+  const generateAndAttachContent = async (campaign: any) => {
     try {
+      setGeneratingContent(true);
       const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
-        campaignName: campaignName,
-        segment: campaignSegment,
-        channel: campaignChannel,
+        campaignName: campaign.name,
+        segment: campaign.segment,
+        channel: campaign.channel,
       });
       const aiData = await aiRes.json();
-      
-      const campaignRes = await apiRequest("POST", "/api/campaigns", {
-        name: campaignName,
-        segment: campaignSegment,
-        channel: campaignChannel,
-        customerIds: selectedCustomerIds.length > 0 ? selectedCustomerIds : undefined,
+      await apiRequest("PUT", `/api/campaigns/${campaign.id}`, {
         messageContent: aiData.content,
         messageSubject: aiData.subject || "",
       });
-      const campaign = await campaignRes.json();
-      
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-      resetModal();
-      setViewingCampaign(campaign);
-    } catch (error) {
-      console.error("Campaign creation error:", error);
+      setViewingCampaign((prev: any) => prev?.id === campaign.id ? { ...prev, messageContent: aiData.content, messageSubject: aiData.subject || "" } : prev);
+    } catch (e) {
+      console.error("AI content generation error:", e);
     } finally {
       setGeneratingContent(false);
     }
   };
 
-  const handleSelectTemplate = async (template: CampaignTemplate) => {
-    setGeneratingContent(true);
+  const handleCreateCampaign = async () => {
+    if (!campaignName.trim()) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
-        campaignName: template.name,
-        segment: template.segment,
-        channel: template.channel,
+      const campaignRes = await apiRequest("POST", "/api/campaigns", {
+        name: campaignName,
+        segment: campaignSegment,
+        channel: campaignChannel,
+        customerIds: selectedCustomerIds.length > 0 ? selectedCustomerIds : undefined,
+        messageContent: "",
+        messageSubject: "",
       });
-      const aiData = await aiRes.json();
-      
+      const campaign = await campaignRes.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      resetModal();
+      setViewingCampaign(campaign);
+      generateAndAttachContent(campaign);
+    } catch (error) {
+      console.error("Campaign creation error:", error);
+    }
+  };
+
+  const handleSelectTemplate = async (template: CampaignTemplate) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
       const campaignRes = await apiRequest("POST", "/api/campaigns", {
         name: template.name,
         segment: template.segment,
         channel: template.channel,
         templateKey: template.name,
-        messageContent: aiData.content,
-        messageSubject: aiData.subject || "",
+        messageContent: "",
+        messageSubject: "",
       });
       const campaign = await campaignRes.json();
-      
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       resetModal();
       setViewingCampaign(campaign);
+      generateAndAttachContent(campaign);
     } catch (error) {
       console.error("Campaign creation error:", error);
-    } finally {
-      setGeneratingContent(false);
     }
   };
 
@@ -596,6 +599,11 @@ export default function ReactivationScreen() {
               {viewingCampaign?.messageContent ? (
                 <View style={{ backgroundColor: dt.surfaceSecondary, borderRadius: BorderRadius.sm, padding: Spacing.md }}>
                   <ThemedText type="body" style={{ lineHeight: 22 }}>{viewingCampaign.messageContent}</ThemedText>
+                </View>
+              ) : generatingContent ? (
+                <View style={{ alignItems: "center", paddingVertical: Spacing.xl }}>
+                  <ActivityIndicator size="large" color={dt.accent} />
+                  <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.sm }}>AI is writing your message...</ThemedText>
                 </View>
               ) : (
                 <View style={{ alignItems: "center", paddingVertical: Spacing.xl }}>

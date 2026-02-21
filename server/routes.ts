@@ -3956,13 +3956,18 @@ ${isEmail ? "Include a subject line on the first line prefixed with 'Subject: ',
 The campaign is "${campaignName}" targeting ${segment === "dormant" ? "customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired without booking" : "a curated customer list"}.
 Write from the perspective of the cleaning business owner. Use "[Customer]" as a placeholder for the customer's name. Do not use emojis.`;
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90000);
+      
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Generate the ${isEmail ? "email" : "SMS"} content for the "${campaignName}" campaign.` },
         ],
-      });
+      }, { signal: controller.signal as any });
+      
+      clearTimeout(timeout);
 
       const raw = completion.choices[0]?.message?.content?.trim() || "";
       let subject = "";
