@@ -26,6 +26,7 @@ import {
   cancelOnboardingNudge,
   scheduleFirstWinCelebration,
 } from "@/lib/notifications";
+import { trackEvent } from "@/lib/analytics";
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
@@ -62,12 +63,14 @@ export default function OnboardingNavigator() {
   const handleSkipAll = useCallback(async (navigation: any) => {
     await markSkipped();
     scheduleOnboardingNudge();
+    trackEvent("onboarding_skipped");
     await completeOnboarding();
   }, [completeOnboarding]);
 
   const handleGoalNext = useCallback(async (selectedGoal: string, navigation: any) => {
     setGoal(selectedGoal);
     await setOnboardingStatus({ primaryGoal: selectedGoal, startedAt: new Date().toISOString(), currentStep: 1 });
+    trackEvent("onboarding_goal_selected", { goal: selectedGoal });
     navigation.navigate("BusinessBasics");
   }, []);
 
@@ -76,6 +79,7 @@ export default function OnboardingNavigator() {
     setLogoUri(data.logoUri);
     await updateBusinessProfile({ companyName: data.businessName, logoUri: data.logoUri });
     await setOnboardingStatus({ businessName: data.businessName, zipCode: data.zipCode, logoUri: data.logoUri, currentStep: 2 });
+    trackEvent("onboarding_business_saved");
     navigation.navigate("QuickQuote");
   }, [updateBusinessProfile]);
 
@@ -102,6 +106,7 @@ export default function OnboardingNavigator() {
     const options = calculateAllOptions(homeDetails, emptyAddOns, input.frequency as any, settings, true);
     setTiers(options);
     await setOnboardingStatus({ quoteDraft: { homeDetails, options }, currentStep: 3 });
+    trackEvent("onboarding_quote_created", { serviceType: input.serviceType, sqft: input.sqft });
     navigation.navigate("QuoteReveal");
   }, [pricingSettings]);
 
@@ -150,6 +155,7 @@ export default function OnboardingNavigator() {
       await setOnboardingStatus({ sentQuote: true, ownerContact: { email: contact.email, phone: contact.phone }, currentStep: 5 });
       cancelOnboardingNudge();
       scheduleFirstWinCelebration();
+      trackEvent("onboarding_quote_sent", { tier: selectedTier });
     } catch {}
 
     navigation.navigate("FollowUpSetup");
@@ -158,12 +164,14 @@ export default function OnboardingNavigator() {
   const handleFollowUpNext = useCallback(async (data: { cadence: string; tone: string }, navigation: any) => {
     setFollowupsEnabled(true);
     await setOnboardingStatus({ followupsEnabled: true, cadencePreset: data.cadence as any, tone: data.tone as any, currentStep: 6 });
+    trackEvent("onboarding_followup_configured", { cadence: data.cadence, tone: data.tone });
     navigation.navigate("Success");
   }, []);
 
   const handleFinish = useCallback(async () => {
     await markCompleted();
     cancelOnboardingNudge();
+    trackEvent("onboarding_completed");
     await completeOnboarding();
   }, [completeOnboarding]);
 
@@ -192,7 +200,7 @@ export default function OnboardingNavigator() {
       <Stack.Screen name="Welcome">
         {({ navigation }) => (
           <WelcomeScreen
-            onStart={() => navigation.navigate("GoalPicker")}
+            onStart={() => { trackEvent("onboarding_started"); navigation.navigate("GoalPicker"); }}
             onSkip={() => handleSkipAll(navigation)}
           />
         )}

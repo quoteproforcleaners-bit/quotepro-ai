@@ -26,7 +26,15 @@ type EventName =
   | "streak_updated"
   | "streak_increment"
   | "badge_earned"
-  | "preferences_updated";
+  | "preferences_updated"
+  | "onboarding_started"
+  | "onboarding_skipped"
+  | "onboarding_goal_selected"
+  | "onboarding_business_saved"
+  | "onboarding_quote_created"
+  | "onboarding_quote_sent"
+  | "onboarding_followup_configured"
+  | "onboarding_completed";
 
 export async function trackEvent(
   name: EventName,
