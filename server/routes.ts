@@ -3846,8 +3846,8 @@ Respond with JSON: {"reply": string}`
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const { name, segment, channel, templateKey, customerIds } = req.body;
-      const campaign = await createCampaign({ businessId: business.id, name, segment, channel, templateKey, customerIds: customerIds || null });
+      const { name, segment, channel, templateKey, customerIds, messageContent, messageSubject } = req.body;
+      const campaign = await createCampaign({ businessId: business.id, name, segment, channel, templateKey, customerIds: customerIds || null, messageContent: messageContent || null, messageSubject: messageSubject || null });
       return res.json(campaign);
     } catch (error: any) {
       console.error("Create campaign error:", error);
@@ -3859,12 +3859,14 @@ Respond with JSON: {"reply": string}`
     try {
       const existing = await getCampaignById(req.params.id);
       if (!existing) return res.status(404).json({ message: "Campaign not found" });
-      const { name, status, completedCount, customerIds } = req.body;
+      const { name, status, completedCount, customerIds, messageContent, messageSubject } = req.body;
       const updateData: any = {};
       if (name !== undefined) updateData.name = name;
       if (status !== undefined) updateData.status = status;
       if (completedCount !== undefined) updateData.completedCount = completedCount;
       if (customerIds !== undefined) updateData.customerIds = customerIds;
+      if (messageContent !== undefined) updateData.messageContent = messageContent;
+      if (messageSubject !== undefined) updateData.messageSubject = messageSubject;
       const updated = await updateCampaign(req.params.id, updateData);
       return res.json(updated);
     } catch (error: any) {
@@ -3940,6 +3942,45 @@ Respond with JSON: {"reply": string}`
   });
 
   // ─── AI Message Generation ───
+
+  app.post("/api/ai/generate-campaign-content", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { campaignName, segment, channel } = req.body;
+      const isEmail = channel === "email";
+
+      const systemPrompt = `You are a marketing copywriter for "${business.businessName || "a residential cleaning company"}". Write a compelling ${isEmail ? "email" : "SMS"} campaign message.
+${isEmail ? "Include a subject line on the first line prefixed with 'Subject: ', then a blank line, then the email body. Keep the body under 200 words. Use a professional but friendly tone." : "Keep the SMS under 160 characters. Be concise, warm, and include a clear call to action."}
+The campaign is "${campaignName}" targeting ${segment === "dormant" ? "customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired without booking" : "a curated customer list"}.
+Write from the perspective of the cleaning business owner. Use "[Customer]" as a placeholder for the customer's name. Do not use emojis.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "openai/gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Generate the ${isEmail ? "email" : "SMS"} content for the "${campaignName}" campaign.` },
+        ],
+        max_tokens: 500,
+        temperature: 0.8,
+      });
+
+      const raw = completion.choices[0]?.message?.content?.trim() || "";
+      let subject = "";
+      let content = raw;
+      if (isEmail && raw.startsWith("Subject:")) {
+        const lines = raw.split("\n");
+        subject = lines[0].replace("Subject:", "").trim();
+        content = lines.slice(1).join("\n").trim();
+      }
+
+      return res.json({ content, subject, channel });
+    } catch (error: any) {
+      console.error("AI generate campaign content error:", error);
+      return res.status(500).json({ message: "Failed to generate campaign content" });
+    }
+  });
 
   app.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
     try {

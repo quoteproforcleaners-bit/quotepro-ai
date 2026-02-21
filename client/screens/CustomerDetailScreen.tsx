@@ -1058,10 +1058,10 @@ export default function CustomerDetailScreen() {
       </Modal>
       <Modal visible={showCampaignModal} transparent animationType="slide" onRequestClose={() => setShowCampaignModal(false)}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
-          <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "60%" }]}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <View style={{ backgroundColor: theme.backgroundDefault, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: Spacing.xl, maxHeight: "60%" }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.lg }}>
               <ThemedText type="h3">Add to Campaign</ThemedText>
-              <Pressable onPress={() => setShowCampaignModal(false)}>
+              <Pressable onPress={() => setShowCampaignModal(false)} hitSlop={8}>
                 <Feather name="x" size={24} color={theme.text} />
               </Pressable>
             </View>
@@ -1092,27 +1092,27 @@ export default function CustomerDetailScreen() {
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        padding: 14,
-                        borderRadius: 12,
-                        marginBottom: 8,
-                        backgroundColor: isAdded ? `${theme.success}15` : theme.backgroundSecondary,
-                        borderWidth: 1,
-                        borderColor: isAdded ? `${theme.success}30` : theme.border,
+                        paddingVertical: Spacing.md,
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.border,
                       }}
                     >
-                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isAdded ? `${theme.success}20` : `${theme.primary}15`, alignItems: "center", justifyContent: "center" }}>
-                        <Feather name={isAdded ? "check" : "send"} size={16} color={isAdded ? theme.success : theme.primary} />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 12 }}>
+                      <View style={{ flex: 1 }}>
                         <ThemedText type="subtitle">{campaign.name}</ThemedText>
                         <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                          {campaign.channel?.toUpperCase()} {campaign.segment === "custom" ? "- Manual" : `- ${campaign.segment}`}
+                          {campaign.channel?.toUpperCase()} {"\u00B7"} {campaign.segment === "custom" ? "Manual" : campaign.segment}
                         </ThemedText>
                       </View>
                       {isAdded ? (
-                        <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600" }}>Added</ThemedText>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Feather name="check-circle" size={16} color={theme.success} />
+                          <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600" }}>Added</ThemedText>
+                        </View>
                       ) : (
-                        <Feather name="plus-circle" size={20} color={theme.primary} />
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Feather name="plus-circle" size={16} color={theme.primary} />
+                          <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>Add</ThemedText>
+                        </View>
                       )}
                     </Pressable>
                   );

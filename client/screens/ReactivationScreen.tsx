@@ -71,6 +71,8 @@ export default function ReactivationScreen() {
   const [campaignChannel, setCampaignChannel] = useState<Channel>("sms");
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [generatingContent, setGeneratingContent] = useState(false);
+  const [viewingCampaign, setViewingCampaign] = useState<any>(null);
 
   const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"], enabled: segment === "dormant" });
   const lostQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/lost"], enabled: segment === "lost" });
@@ -123,21 +125,63 @@ export default function ReactivationScreen() {
   const handleCreateCampaign = async () => {
     if (!campaignName.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await apiRequest("POST", "/api/campaigns", {
-      name: campaignName,
-      segment: campaignSegment,
-      channel: campaignChannel,
-      customerIds: selectedCustomerIds.length > 0 ? selectedCustomerIds : undefined,
-    });
-    queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-    resetModal();
+    setGeneratingContent(true);
+    try {
+      const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
+        campaignName: campaignName,
+        segment: campaignSegment,
+        channel: campaignChannel,
+      });
+      const aiData = await aiRes.json();
+      
+      const campaignRes = await apiRequest("POST", "/api/campaigns", {
+        name: campaignName,
+        segment: campaignSegment,
+        channel: campaignChannel,
+        customerIds: selectedCustomerIds.length > 0 ? selectedCustomerIds : undefined,
+        messageContent: aiData.content,
+        messageSubject: aiData.subject || "",
+      });
+      const campaign = await campaignRes.json();
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      resetModal();
+      setViewingCampaign(campaign);
+    } catch (error) {
+      console.error("Campaign creation error:", error);
+    } finally {
+      setGeneratingContent(false);
+    }
   };
 
-  const handleSelectTemplate = (template: CampaignTemplate) => {
-    setCampaignName(template.name);
-    setCampaignSegment(template.segment);
-    setCampaignChannel(template.channel);
-    setModalStep("custom");
+  const handleSelectTemplate = async (template: CampaignTemplate) => {
+    setGeneratingContent(true);
+    try {
+      const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
+        campaignName: template.name,
+        segment: template.segment,
+        channel: template.channel,
+      });
+      const aiData = await aiRes.json();
+      
+      const campaignRes = await apiRequest("POST", "/api/campaigns", {
+        name: template.name,
+        segment: template.segment,
+        channel: template.channel,
+        templateKey: template.name,
+        messageContent: aiData.content,
+        messageSubject: aiData.subject || "",
+      });
+      const campaign = await campaignRes.json();
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      resetModal();
+      setViewingCampaign(campaign);
+    } catch (error) {
+      console.error("Campaign creation error:", error);
+    } finally {
+      setGeneratingContent(false);
+    }
   };
 
   const openModal = () => {
@@ -223,7 +267,17 @@ export default function ReactivationScreen() {
     </Pressable>
   );
 
-  const renderTemplatesStep = () => (
+  const renderTemplatesStep = () => {
+    if (generatingContent) return (
+      <View style={{ alignItems: "center", paddingVertical: 60 }}>
+        <ActivityIndicator size="large" color={dt.accent} />
+        <ThemedText type="subtitle" style={{ color: dt.textPrimary, marginTop: Spacing.lg }}>Creating your campaign...</ThemedText>
+        <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
+          AI is writing a personalized message for your customers
+        </ThemedText>
+      </View>
+    );
+    return (
     <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
       <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.lg, lineHeight: 20 }}>
         Choose a ready-made campaign or start from scratch.
@@ -258,9 +312,20 @@ export default function ReactivationScreen() {
         <Feather name="chevron-right" size={18} color={dt.accent} />
       </Pressable>
     </ScrollView>
-  );
+    );
+  };
 
-  const renderCustomStep = () => (
+  const renderCustomStep = () => {
+    if (generatingContent) return (
+      <View style={{ alignItems: "center", paddingVertical: 60 }}>
+        <ActivityIndicator size="large" color={dt.accent} />
+        <ThemedText type="subtitle" style={{ color: dt.textPrimary, marginTop: Spacing.lg }}>Creating your campaign...</ThemedText>
+        <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
+          AI is writing a personalized message for your customers
+        </ThemedText>
+      </View>
+    );
+    return (
     <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
       <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Campaign Name</ThemedText>
       <TextInput
@@ -365,7 +430,8 @@ export default function ReactivationScreen() {
         <ThemedText type="subtitle" style={{ color: "#FFFFFF" }}>Create Campaign</ThemedText>
       </Pressable>
     </ScrollView>
-  );
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -408,36 +474,23 @@ export default function ReactivationScreen() {
             </Card>
             {(campaignsQuery.data?.length ?? 0) > 0 ? (
               <View style={{ marginBottom: Spacing.lg }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.sm }}>
-                  <ThemedText type="h4">Your Campaigns</ThemedText>
-                  <ThemedText type="caption" style={{ color: dt.textSecondary }}>{campaignsQuery.data?.length} total</ThemedText>
-                </View>
+                <ThemedText type="h4" style={{ marginBottom: Spacing.sm }}>Your Campaigns</ThemedText>
                 {campaignsQuery.data?.slice(0, 5).map((campaign: any) => {
                   const customerCount = Array.isArray(campaign.customerIds) ? campaign.customerIds.length : 0;
                   return (
-                    <Card key={campaign.id} style={{ marginBottom: Spacing.xs }}>
-                      <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <View style={[styles.templateIcon, { backgroundColor: dt.accentSoft }]}>
-                          <Feather name="send" size={16} color={dt.accent} />
-                        </View>
-                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                          <ThemedText type="subtitle">{campaign.name}</ThemedText>
-                          <ThemedText type="caption" style={{ color: dt.textSecondary }}>
-                            {campaign.channel?.toUpperCase()} {customerCount > 0 ? `- ${customerCount} customer${customerCount !== 1 ? "s" : ""}` : ""} - {campaign.status}
-                          </ThemedText>
-                        </View>
-                        <View style={[styles.statusBadge, {
-                          backgroundColor: campaign.status === "active" ? theme.success + "20" : dt.accentSoft,
-                        }]}>
-                          <ThemedText type="caption" style={{
-                            color: campaign.status === "active" ? theme.success : dt.accent,
-                            fontWeight: "600",
-                          }}>
-                            {campaign.status}
-                          </ThemedText>
-                        </View>
+                    <Pressable
+                      key={campaign.id}
+                      onPress={() => setViewingCampaign(campaign)}
+                      style={{ flexDirection: "row", alignItems: "center", paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: dt.border }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <ThemedText type="subtitle">{campaign.name}</ThemedText>
+                        <ThemedText type="caption" style={{ color: dt.textSecondary }}>
+                          {campaign.channel?.toUpperCase()}{customerCount > 0 ? ` \u00B7 ${customerCount} customer${customerCount !== 1 ? "s" : ""}` : ""}{` \u00B7 ${campaign.status}`}
+                        </ThemedText>
                       </View>
-                    </Card>
+                      <Feather name="chevron-right" size={18} color={dt.textSecondary} />
+                    </Pressable>
                   );
                 })}
               </View>
@@ -501,6 +554,109 @@ export default function ReactivationScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={!!viewingCampaign} transparent animationType="slide" onRequestClose={() => setViewingCampaign(null)}>
+        <View style={{ flex: 1, backgroundColor: dt.overlay, justifyContent: "flex-end" }}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: Spacing.xl, maxHeight: "80%", marginHorizontal: 0 }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="h3" style={{ flex: 1 }}>{viewingCampaign?.name}</ThemedText>
+              <Pressable onPress={() => setViewingCampaign(null)} hitSlop={8}>
+                <Feather name="x" size={24} color={dt.textPrimary} />
+              </Pressable>
+            </View>
+            
+            <View style={{ flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.lg }}>
+              <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: 16, backgroundColor: dt.accentSoft }}>
+                <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>
+                  {viewingCampaign?.channel?.toUpperCase()}
+                </ThemedText>
+              </View>
+              <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: 16, backgroundColor: dt.surfaceSecondary }}>
+                <ThemedText type="caption" style={{ color: dt.textSecondary }}>
+                  {viewingCampaign?.segment === "dormant" ? "Dormant Customers" : viewingCampaign?.segment === "lost" ? "Lost Quotes" : "Manual List"}
+                </ThemedText>
+              </View>
+              <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: 16, backgroundColor: viewingCampaign?.status === "active" ? theme.success + "20" : dt.surfaceSecondary }}>
+                <ThemedText type="caption" style={{ color: viewingCampaign?.status === "active" ? theme.success : dt.textSecondary, fontWeight: "600" }}>
+                  {viewingCampaign?.status}
+                </ThemedText>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: Spacing.lg }}>
+              {viewingCampaign?.messageSubject ? (
+                <View style={{ marginBottom: Spacing.md }}>
+                  <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: 4 }}>Subject</ThemedText>
+                  <ThemedText type="subtitle">{viewingCampaign.messageSubject}</ThemedText>
+                </View>
+              ) : null}
+              
+              <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: 4 }}>Message</ThemedText>
+              {viewingCampaign?.messageContent ? (
+                <View style={{ backgroundColor: dt.surfaceSecondary, borderRadius: BorderRadius.sm, padding: Spacing.md }}>
+                  <ThemedText type="body" style={{ lineHeight: 22 }}>{viewingCampaign.messageContent}</ThemedText>
+                </View>
+              ) : (
+                <View style={{ alignItems: "center", paddingVertical: Spacing.xl }}>
+                  <Feather name="file-text" size={32} color={dt.textSecondary} />
+                  <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.sm }}>No message content yet</ThemedText>
+                </View>
+              )}
+              
+              {Array.isArray(viewingCampaign?.customerIds) && viewingCampaign.customerIds.length > 0 ? (
+                <View style={{ marginTop: Spacing.lg }}>
+                  <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: 4 }}>
+                    {viewingCampaign.customerIds.length} customer{viewingCampaign.customerIds.length !== 1 ? "s" : ""} targeted
+                  </ThemedText>
+                </View>
+              ) : null}
+            </ScrollView>
+
+            <View style={{ flexDirection: "row", gap: Spacing.sm }}>
+              <Pressable
+                onPress={async () => {
+                  try {
+                    setGeneratingContent(true);
+                    const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
+                      campaignName: viewingCampaign?.name,
+                      segment: viewingCampaign?.segment,
+                      channel: viewingCampaign?.channel,
+                    });
+                    const aiData = await aiRes.json();
+                    await apiRequest("PUT", `/api/campaigns/${viewingCampaign?.id}`, {
+                      messageContent: aiData.content,
+                      messageSubject: aiData.subject || "",
+                    });
+                    queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+                    setViewingCampaign({ ...viewingCampaign, messageContent: aiData.content, messageSubject: aiData.subject || "" });
+                  } catch (e) {
+                    console.error("Regenerate error:", e);
+                  } finally {
+                    setGeneratingContent(false);
+                  }
+                }}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: dt.border }}
+                disabled={generatingContent}
+              >
+                {generatingContent ? (
+                  <ActivityIndicator size="small" color={dt.accent} />
+                ) : (
+                  <>
+                    <Feather name="refresh-cw" size={16} color={dt.accent} />
+                    <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600", marginLeft: Spacing.xs }}>Regenerate</ThemedText>
+                  </>
+                )}
+              </Pressable>
+              <Pressable
+                onPress={() => setViewingCampaign(null)}
+                style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: dt.accent }}
+              >
+                <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600" }}>Done</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
