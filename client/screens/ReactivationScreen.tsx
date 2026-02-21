@@ -65,7 +65,8 @@ export default function ReactivationScreen() {
 
   const [segment, setSegment] = useState<"dormant" | "lost">("dormant");
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalStep, setModalStep] = useState<"templates" | "custom">("templates");
+  const [modalStep, setModalStep] = useState<"templates" | "channel-pick" | "custom">("templates");
+  const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
   const [campaignName, setCampaignName] = useState("");
   const [campaignSegment, setCampaignSegment] = useState<Segment>("dormant");
   const [campaignChannel, setCampaignChannel] = useState<Channel>("sms");
@@ -169,14 +170,21 @@ export default function ReactivationScreen() {
     }
   };
 
-  const handleSelectTemplate = async (template: CampaignTemplate) => {
+  const handleSelectTemplate = (template: CampaignTemplate) => {
+    setSelectedTemplate(template);
+    setCampaignChannel(template.channel);
+    setModalStep("channel-pick");
+  };
+
+  const handleConfirmChannelAndCreate = async (channel: Channel) => {
+    if (!selectedTemplate) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const campaignRes = await apiRequest("POST", "/api/campaigns", {
-        name: template.name,
-        segment: template.segment,
-        channel: template.channel,
-        templateKey: template.name,
+        name: selectedTemplate.name,
+        segment: selectedTemplate.segment,
+        channel,
+        templateKey: selectedTemplate.name,
         messageContent: "",
         messageSubject: "",
       });
@@ -206,6 +214,7 @@ export default function ReactivationScreen() {
     setSelectedCustomerIds([]);
     setCustomerSearch("");
     setModalStep("templates");
+    setSelectedTemplate(null);
   };
 
   const refetch = () => {
@@ -318,6 +327,56 @@ export default function ReactivationScreen() {
         <Feather name="chevron-right" size={18} color={dt.accent} />
       </Pressable>
     </ScrollView>
+    );
+  };
+
+  const renderChannelPickStep = () => {
+    if (generatingContent) return (
+      <View style={{ alignItems: "center", paddingVertical: 60 }}>
+        <ActivityIndicator size="large" color={dt.accent} />
+        <ThemedText type="subtitle" style={{ color: dt.textPrimary, marginTop: Spacing.lg }}>Creating your campaign...</ThemedText>
+        <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
+          AI is writing a personalized message for your customers
+        </ThemedText>
+      </View>
+    );
+    return (
+      <View style={{ paddingVertical: Spacing.md }}>
+        <ThemedText type="subtitle" style={{ marginBottom: 4 }}>{selectedTemplate?.name}</ThemedText>
+        <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: Spacing.xl }}>
+          {selectedTemplate?.description}
+        </ThemedText>
+
+        <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>How do you want to reach your customers?</ThemedText>
+
+        <Pressable
+          onPress={() => handleConfirmChannelAndCreate("sms")}
+          style={[styles.templateCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.border }]}
+        >
+          <View style={[styles.templateIcon, { backgroundColor: dt.accentSoft }]}>
+            <Feather name="message-square" size={18} color={dt.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="subtitle">Text Message (SMS)</ThemedText>
+            <ThemedText type="caption" style={{ color: dt.textSecondary }}>Short message sent to customer phone numbers</ThemedText>
+          </View>
+          <Feather name="chevron-right" size={18} color={dt.textSecondary} />
+        </Pressable>
+
+        <Pressable
+          onPress={() => handleConfirmChannelAndCreate("email")}
+          style={[styles.templateCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.border }]}
+        >
+          <View style={[styles.templateIcon, { backgroundColor: dt.accentSoft }]}>
+            <Feather name="mail" size={18} color={dt.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="subtitle">Email</ThemedText>
+            <ThemedText type="caption" style={{ color: dt.textSecondary }}>Longer message sent to customer email addresses</ThemedText>
+          </View>
+          <Feather name="chevron-right" size={18} color={dt.textSecondary} />
+        </Pressable>
+      </View>
     );
   };
 
@@ -544,19 +603,19 @@ export default function ReactivationScreen() {
             <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault }]}>
               <View style={styles.modalHeader}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
-                  {modalStep === "custom" ? (
-                    <Pressable onPress={() => setModalStep("templates")} hitSlop={8}>
+                  {modalStep !== "templates" ? (
+                    <Pressable onPress={() => setModalStep(modalStep === "custom" ? "templates" : "templates")} hitSlop={8}>
                       <Feather name="arrow-left" size={20} color={dt.textPrimary} />
                     </Pressable>
                   ) : null}
-                  <ThemedText type="h3">{modalStep === "templates" ? "New Campaign" : "Campaign Details"}</ThemedText>
+                  <ThemedText type="h3">{modalStep === "templates" ? "New Campaign" : modalStep === "channel-pick" ? "Send Via" : "Campaign Details"}</ThemedText>
                 </View>
                 <Pressable testID="button-close-modal" onPress={resetModal}>
                   <Feather name="x" size={24} color={dt.textPrimary} />
                 </Pressable>
               </View>
 
-              {modalStep === "templates" ? renderTemplatesStep() : renderCustomStep()}
+              {modalStep === "templates" ? renderTemplatesStep() : modalStep === "channel-pick" ? renderChannelPickStep() : renderCustomStep()}
             </View>
           </View>
         </KeyboardAvoidingView>
