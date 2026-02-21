@@ -3957,7 +3957,7 @@ The campaign is "${campaignName}" targeting ${segment === "dormant" ? "customers
 Write from the perspective of the cleaning business owner. Use "[Customer]" as a placeholder for the customer's name. Do not use emojis.`;
 
       const completion = await openai.chat.completions.create({
-        model: "openai/gpt-4o-mini",
+        model: "gpt-5-nano",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Generate the ${isEmail ? "email" : "SMS"} content for the "${campaignName}" campaign.` },
@@ -4007,7 +4007,7 @@ Write from the perspective of the cleaning business owner. Use "[Customer]" as a
       const userPrompt = `Customer first name: ${customerContext?.firstName || "there"}. ${customerContext?.quoteTotal ? `Quote total: $${customerContext.quoteTotal}.` : ""} ${customerContext?.serviceType ? `Service type: ${customerContext.serviceType}.` : ""} ${customerContext?.lastServiceDate ? `Last service date: ${customerContext.lastServiceDate}.` : ""} ${customerContext?.homeSize ? `Home size: ${customerContext.homeSize}.` : ""}`;
 
       const completion = await openai.chat.completions.create({
-        model: "openai/gpt-4o-mini",
+        model: "gpt-5-nano",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
