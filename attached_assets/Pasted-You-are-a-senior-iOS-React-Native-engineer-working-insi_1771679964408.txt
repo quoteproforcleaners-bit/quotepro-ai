@@ -1,0 +1,241 @@
+You are a senior iOS/React Native engineer working inside my existing Replit Expo app “QuotePro”. Your job is to implement a retention-focused onboarding flow that maximizes activation (first quote created + sent) and retention (follow-ups enabled + return usage). This must be implemented end-to-end in one pass.
+
+NON-NEGOTIABLE GOALS
+- Onboarding drives a “5-minute win”: user creates a quote, sees money insights, sends the quote, enables acceptance + follow-ups.
+- Must not break existing app functionality.
+- Must work great on iPhone, dark mode, one-handed use.
+- Onboarding must be skippable, but the app must strongly nudge completion (persistent banner + progress).
+- Persist onboarding progress & preferences locally (AsyncStorage). If backend/user profile exists, also persist there.
+- Track events and add minimal retention triggers (local notifications).
+
+FIRST: DISCOVER EXISTING APP STRUCTURE
+1) Inspect the current project:
+   - Navigation setup (React Navigation stack/tabs).
+   - Existing quote creation/generation logic and data models.
+   - Existing customer database and send email/text functionality.
+   - Existing “Growth” tab screen (the one with tiles like Generate Tasks, Send Campaign, View Automations).
+2) Reuse existing components where possible (quote card UI, tiers display, send modal, customer picker, etc).
+3) If any piece is missing (e.g., quote generator, send function), implement a simple but working placeholder now (no TODO-only) and isolate it so it can be replaced later.
+
+IMPLEMENTATION REQUIREMENTS (BUILD THIS EXACT FLOW)
+
+A) ONBOARDING ENTRY + STATE
+- Create an Onboarding stack navigator (or equivalent) that appears:
+  - On first launch, OR
+  - If onboarding is incomplete (stored in AsyncStorage key: onboarding_status).
+- onboarding_status should track:
+  - startedAt
+  - completed (boolean)
+  - skipped (boolean)
+  - currentStep (0-7)
+  - progressPercent (computed)
+- Create a helper module:
+  - /src/onboarding/onboardingStore.ts (or .js)
+  - Functions: getStatus(), setStatus(), markStepComplete(step), markSkipped(), markCompleted(), resetOnboarding().
+
+B) DASHBOARD NUDGE (PERSISTENT)
+- Add a persistent banner on the main dashboard/home screen AND on the Growth tab until onboarding completed:
+  - Text: “Finish setup (2 min) →”
+  - Subtext: “Unlock Growth tools + auto follow-ups”
+  - Shows progress: “Setup 40%”
+  - CTA navigates back into onboarding at currentStep.
+- If user skipped: banner says “Finish setup to unlock Growth tools.”
+
+C) SCREEN-BY-SCREEN ONBOARDING (0–7)
+
+Screen 0: Welcome Gate
+- Title: “Let’s close your next job faster.”
+- Subtitle: “In 2 minutes, you’ll send a pro quote that wins work.”
+- Primary button: “Start (Recommended)”
+- Secondary small text: “Explore app”
+- If Explore app:
+  - mark skipped = true, completed = false
+  - take user to app dashboard but keep persistent banner
+
+Screen 1: Goal Picker
+- Prompt: “What are you here to do?”
+- Options (large buttons):
+  1) “Send a quote today” (default selected)
+  2) “Convert one-time clients to recurring”
+  3) “Raise prices without losing clients”
+  4) “Get more repeat customers”
+- Save as primaryGoal in onboarding profile.
+
+Screen 2: Business Basics (minimal friction)
+- Fields:
+  - businessName (required)
+  - zipCode (optional)
+  - currency (auto from locale, default USD)
+  - logo upload (optional, allow skip)
+- Save to profile/store.
+- Use native image picker for logo.
+
+Screen 3: Quick Quote Wizard (2-minute win)
+- Header: “Create your first quote (2 min)”
+- Step inputs:
+  - serviceType: Standard, Deep Clean, Move Out/In, Office/Commercial
+  - sqft: numeric OR “Not sure” toggle -> size buckets (Small/Medium/Large)
+  - beds, baths
+  - condition: Maintained / Needs Love
+  - frequency: One-time / Weekly / Biweekly / Monthly
+- Primary CTA: “Generate quote”
+- Use existing quote generation if present. If not, implement:
+  - A simple pricing engine that outputs Good/Better/Best tiers using sqft, beds, baths, condition multiplier, serviceType multiplier, frequency discount.
+  - Return structure:
+    {
+      good: { price, hours },
+      better: { price, hours },
+      best: { price, hours },
+      recommendedTier: "better"
+    }
+- Save this quote draft in state so it flows to next screens.
+
+Screen 4: Quote Reveal + Money Insight (the “holy sh*t” moment)
+- Show Good / Better / Best pricing tiers using existing UI or build a clean card UI:
+  - Each tier shows price + estimated hours
+  - Recommended badge on “Better” by default
+- Money insight module (MUST SHOW):
+  - Compute annual values based on chosen tier price (use recommendedTier’s price by default):
+    weekly = price * 52
+    biweekly = price * 26
+    monthly = price * 12
+  - Display:
+    “If they go biweekly: $X/year”
+    “If monthly: $Y/year”
+    “Recommended plan: Biweekly (most common)”
+- Add-ons module (checkboxes; default OFF):
+  - “Deep Clean Reset in 6 months (+$___)”
+  - “Fridge (+$___)”
+  - “Oven (+$___)”
+- When checkboxes are selected, include them in the quote line items.
+- CTA: “Next: Send quote”
+
+Screen 5: Send Quote (frictionless)
+- Delivery method picker: Text / Email / Both
+- Customer selection:
+  - If customer exists: pick from customer list
+  - If none: show “Send to yourself first?” with one-tap:
+    - “Text me a test quote”
+    - “Email me a test quote”
+  - If phone/email not available: prompt user for one-time entry and store as “ownerContact”.
+- Send behavior:
+  - Use existing send functions. If missing:
+    - Implement Email: open a mail composer or use a serverless endpoint if exists; otherwise use `Linking` mailto with prefilled subject/body (fallback).
+    - Implement Text: use SMS deep link (sms:) with prefilled body (fallback).
+  - Generate a clean quote message + attach/ include PDF if app already supports PDF generation; if not, include a well-formatted summary in body.
+- After send, show modal:
+  - Title: “Want the customer to accept in 1 tap?”
+  - Subtitle: “Turn on quote acceptance links.”
+  - Buttons: “Enable” (default) / “Not now”
+- Save acceptanceEnabled preference.
+
+Screen 6: Acceptance + Follow-up Setup (retention engine)
+- Toggle: “Enable 1-tap quote acceptance” (default ON)
+- Follow-up cadence presets:
+  - Light: Day 1 + Day 3
+  - Standard (default): Day 1 + Day 2 + Day 5
+  - Aggressive: Day 1 + Day 2 + Day 3 + Day 7
+- Tone slider:
+  - Friendly
+  - Confident
+  - Direct
+- CTA: “Turn on auto-follow-ups”
+- Save:
+  - acceptanceEnabled
+  - followupsEnabled (true)
+  - cadencePreset
+  - tone
+- If the app has automations already, connect these settings to that system; otherwise implement a minimal local-scheduled reminder system tied to the quote (see below).
+
+Screen 7: Success / Habit Hook
+- Title: “You’re live.”
+- Show checklist with checkmarks:
+  - Quote sent ✅
+  - Follow-ups enabled ✅
+  - Acceptance enabled ✅ (or show “Not enabled” if off)
+- Next actions:
+  - “Add 3 customers (60 sec)”
+  - “Create another quote”
+- CTA: “Go to Dashboard”
+- Mark onboarding completed.
+
+D) QUOTE ACCEPTANCE (MINIMUM VIABLE IMPLEMENTATION)
+- If you already have quote emails with buttons:
+  - Add an “Accept” option that does NOT require leaving email body unnecessarily.
+- If acceptance system does NOT exist:
+  - Implement a lightweight acceptance link that opens the app to a confirmation screen:
+    - Create a deep link route: quotepro://quote/accept?quoteId=XYZ
+    - When opened, display quote summary + buttons:
+      - “Accept Quote” (turns status to Accepted + green check)
+      - “Decline” (optional)
+  - Store quote status changes locally. If backend exists, persist there.
+- In the app, show quote status as:
+  - Pending / Sent / Accepted (green check) / Declined
+- On acceptance, fire event `quote_accepted`.
+
+E) FOLLOW-UP TEMPLATES (WRITE THEM + IMPLEMENT)
+Implement 3 follow-up message templates (SMS + Email variants) that are short, professional, and increase close rate.
+
+Variables:
+- {customer_name}
+- {business_name}
+- {quote_total}
+- {service_type}
+- {frequency}
+- {accept_link} (if enabled)
+
+Templates must respect “tone” selection:
+- Friendly: warm, casual
+- Confident: professional, assertive
+- Direct: short, straightforward
+
+Provide templates for:
+1) Day 1 follow-up
+2) Day 2 follow-up (Standard/Aggressive)
+3) Day 3 follow-up (Light/Aggressive)
+4) Day 5 follow-up (Standard)
+5) Day 7 follow-up (Aggressive)
+
+Implementation rules:
+- If followupsEnabled = true and quote status is still Pending/Sent (not accepted), schedule local notifications that prompt the owner to send the follow-up (MVP).
+- If your app already has messaging automation, use it to auto-send instead; if not, MVP is a notification + one-tap “Send follow-up” that opens the text/email composer prefilled.
+
+F) RETENTION TRIGGERS (MINIMUM VIABLE)
+Track events (store locally, and backend if exists):
+- onboarding_started
+- onboarding_skipped
+- onboarding_completed
+- first_quote_created
+- first_quote_sent
+- acceptance_enabled
+- followups_enabled
+- quote_accepted
+
+Local notifications (expo-notifications if available; otherwise implement minimal reminders):
+1) If quote created but not sent after 2 hours:
+   - “Your quote is ready — send it now and close the job.”
+2) If quote sent but not accepted after 24 hours:
+   - “Follow up today — most jobs close after 1–2 follow-ups.”
+3) If no app activity for 3 days after install:
+   - “Create a quote in 60 seconds — want to try a quick one?”
+
+G) UPDATE THE GROWTH TAB BUTTONS (OPTIONAL BUT RECOMMENDED)
+Replace the top 3 Growth buttons:
+- Replace “Generate Tasks” with “Recover Revenue”
+- Replace “Send Campaign” with “Convert to Recurring”
+- Keep “View Automations” or rename to “AI Sales Assistant”
+If you can’t implement these full features now, the buttons should open “Coming soon” screens that capture intent + explain value, and they should still be accessible after onboarding.
+
+FILES + OUTPUT
+- Create a clean folder structure:
+  /src/onboarding/*
+  /src/retention/*
+  /src/quotes/acceptance/*
+  /src/notifications/*
+- At the end, output:
+  1) Exact list of files created/modified
+  2) Brief explanation of how onboarding state works
+  3) A 7-step test plan to verify everything on device (iPhone)
+
+DO IT NOW
+Implement everything above in code. Do not just describe it—actually build the flow, wire the navigation, persistence, templates, and notifications. Reuse existing components where possible. If you need to make reasonable assumptions about missing code, do so and implement a working solution.
