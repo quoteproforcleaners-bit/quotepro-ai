@@ -3859,8 +3859,13 @@ Respond with JSON: {"reply": string}`
     try {
       const existing = await getCampaignById(req.params.id);
       if (!existing) return res.status(404).json({ message: "Campaign not found" });
-      const { name, status, completedCount } = req.body;
-      const updated = await updateCampaign(req.params.id, { name, status, completedCount });
+      const { name, status, completedCount, customerIds } = req.body;
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (status !== undefined) updateData.status = status;
+      if (completedCount !== undefined) updateData.completedCount = completedCount;
+      if (customerIds !== undefined) updateData.customerIds = customerIds;
+      const updated = await updateCampaign(req.params.id, updateData);
       return res.json(updated);
     } catch (error: any) {
       console.error("Update campaign error:", error);

@@ -1801,6 +1801,7 @@ export async function createCampaign(data: {
   segment: string;
   channel?: string;
   templateKey?: string;
+  customerIds?: string[] | null;
   taskCount?: number;
 }): Promise<Campaign> {
   const [c] = await db
@@ -1811,6 +1812,7 @@ export async function createCampaign(data: {
       segment: data.segment,
       channel: data.channel || "sms",
       templateKey: data.templateKey || null,
+      customerIds: data.customerIds || null,
       taskCount: data.taskCount || 0,
     })
     .returning();
@@ -1823,6 +1825,7 @@ export async function updateCampaign(
     name: string;
     status: string;
     completedCount: number;
+    customerIds: string[] | null;
   }>
 ): Promise<Campaign> {
   const [c] = await db

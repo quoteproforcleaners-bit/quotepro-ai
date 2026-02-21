@@ -75,6 +75,7 @@ export default function ReactivationScreen() {
   const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"], enabled: segment === "dormant" });
   const lostQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/lost"], enabled: segment === "lost" });
   const customersQuery = useQuery<any[]>({ queryKey: ["/api/customers"] });
+  const campaignsQuery = useQuery<any[]>({ queryKey: ["/api/campaigns"] });
 
   const data = segment === "dormant" ? dormantQuery.data : lostQuery.data;
   const isLoading = segment === "dormant" ? dormantQuery.isLoading : lostQuery.isLoading;
@@ -373,7 +374,7 @@ export default function ReactivationScreen() {
         keyExtractor={(item, i) => item.id?.toString() ?? i.toString()}
         renderItem={segment === "dormant" ? renderDormantItem : renderLostItem}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={dt.accent} />}
-        contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
+        contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + 100, paddingHorizontal: Spacing.lg }}
         ListHeaderComponent={
           <>
             <Card style={{ marginBottom: Spacing.md, padding: Spacing.md }}>
@@ -405,6 +406,43 @@ export default function ReactivationScreen() {
                 </View>
               </View>
             </Card>
+            {(campaignsQuery.data?.length ?? 0) > 0 ? (
+              <View style={{ marginBottom: Spacing.lg }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.sm }}>
+                  <ThemedText type="h4">Your Campaigns</ThemedText>
+                  <ThemedText type="caption" style={{ color: dt.textSecondary }}>{campaignsQuery.data?.length} total</ThemedText>
+                </View>
+                {campaignsQuery.data?.slice(0, 5).map((campaign: any) => {
+                  const customerCount = Array.isArray(campaign.customerIds) ? campaign.customerIds.length : 0;
+                  return (
+                    <Card key={campaign.id} style={{ marginBottom: Spacing.xs }}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <View style={[styles.templateIcon, { backgroundColor: dt.accentSoft }]}>
+                          <Feather name="send" size={16} color={dt.accent} />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                          <ThemedText type="subtitle">{campaign.name}</ThemedText>
+                          <ThemedText type="caption" style={{ color: dt.textSecondary }}>
+                            {campaign.channel?.toUpperCase()} {customerCount > 0 ? `- ${customerCount} customer${customerCount !== 1 ? "s" : ""}` : ""} - {campaign.status}
+                          </ThemedText>
+                        </View>
+                        <View style={[styles.statusBadge, {
+                          backgroundColor: campaign.status === "active" ? theme.success + "20" : dt.accentSoft,
+                        }]}>
+                          <ThemedText type="caption" style={{
+                            color: campaign.status === "active" ? theme.success : dt.accent,
+                            fontWeight: "600",
+                          }}>
+                            {campaign.status}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    </Card>
+                  );
+                })}
+              </View>
+            ) : null}
+
             <View style={styles.segmentRow}>
               <SegmentOption label="Dormant" value="dormant" />
               <SegmentOption label="Lost Quotes" value="lost" />
@@ -430,14 +468,16 @@ export default function ReactivationScreen() {
         }
       />
 
-      <Pressable
-        testID="fab-create-campaign"
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openModal(); }}
-        style={[styles.fab, { backgroundColor: dt.accent, bottom: insets.bottom + Spacing.xl }]}
-      >
-        <Feather name="send" size={18} color="#FFFFFF" />
-        <ThemedText type="caption" style={{ color: "#FFFFFF", marginTop: 2, fontSize: 10 }}>Campaign</ThemedText>
-      </Pressable>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.md, backgroundColor: theme.backgroundRoot, borderTopColor: dt.border }]}>
+        <Pressable
+          testID="fab-create-campaign"
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); openModal(); }}
+          style={[styles.campaignButton, { backgroundColor: dt.accent }]}
+        >
+          <Feather name="plus" size={20} color="#FFFFFF" />
+          <ThemedText type="subtitle" style={{ color: "#FFFFFF", marginLeft: Spacing.sm }}>New Campaign</ThemedText>
+        </Pressable>
+      </View>
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={resetModal}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
@@ -479,7 +519,22 @@ const styles = StyleSheet.create({
   actionBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.xs },
   statusBadge: { alignSelf: "flex-start", paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.xs, marginTop: 4 },
   emptyState: { alignItems: "center", justifyContent: "center", paddingTop: Spacing["5xl"] },
-  fab: { position: "absolute", right: Spacing.lg, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
+  bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+  },
+  campaignButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+  },
   modalOverlay: { flex: 1 },
   modalContent: { borderRadius: BorderRadius.xl, padding: Spacing.xl, marginHorizontal: Spacing.lg },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.xl },

@@ -66,6 +66,7 @@ export default function CustomerDetailScreen() {
   const [commContent, setCommContent] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [aiDrafting, setAiDrafting] = useState(false);
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
 
   const { data: customer, isLoading } = useQuery<Customer>({
     queryKey: ["/api/customers", customerId],
@@ -99,6 +100,10 @@ export default function CustomerDetailScreen() {
       const res = await fetch(url, { credentials: "include" });
       return res.json();
     },
+  });
+
+  const { data: campaignsList = [] } = useQuery<any[]>({
+    queryKey: ["/api/campaigns"],
   });
 
   useEffect(() => {
@@ -518,6 +523,16 @@ export default function CustomerDetailScreen() {
               </ThemedText>
             </Pressable>
           ) : null}
+          <Pressable
+            onPress={() => setShowCampaignModal(true)}
+            style={[styles.quickActionButton, { backgroundColor: `${theme.primary}15` }]}
+            testID="quick-campaign"
+          >
+            <Feather name="send" size={18} color={theme.primary} />
+            <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginTop: 4 }}>
+              {"Campaign"}
+            </ThemedText>
+          </Pressable>
         </View>
 
         <SectionHeader title="Status" />
@@ -1040,6 +1055,72 @@ export default function CustomerDetailScreen() {
             </View>
           </View>
         </Pressable>
+      </Modal>
+      <Modal visible={showCampaignModal} transparent animationType="slide" onRequestClose={() => setShowCampaignModal(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: "60%" }]}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <ThemedText type="h3">Add to Campaign</ThemedText>
+              <Pressable onPress={() => setShowCampaignModal(false)}>
+                <Feather name="x" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            {campaignsList.length === 0 ? (
+              <View style={{ alignItems: "center", paddingVertical: 32 }}>
+                <Feather name="send" size={40} color={theme.textSecondary} />
+                <ThemedText type="subtitle" style={{ color: theme.textSecondary, marginTop: 12 }}>No campaigns yet</ThemedText>
+                <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 4 }}>Create a campaign from the Growth tab first</ThemedText>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {campaignsList.map((campaign: any) => {
+                  const existingIds: string[] = Array.isArray(campaign.customerIds) ? campaign.customerIds : [];
+                  const isAdded = existingIds.includes(customerId.toString());
+                  return (
+                    <Pressable
+                      key={campaign.id}
+                      onPress={async () => {
+                        if (isAdded) return;
+                        try {
+                          const newIds = [...existingIds, customerId.toString()];
+                          await apiRequest("PUT", `/api/campaigns/${campaign.id}`, { customerIds: newIds });
+                          queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+                        } catch (e) {
+                          Alert.alert("Error", "Failed to add to campaign");
+                        }
+                      }}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        padding: 14,
+                        borderRadius: 12,
+                        marginBottom: 8,
+                        backgroundColor: isAdded ? `${theme.success}15` : theme.backgroundSecondary,
+                        borderWidth: 1,
+                        borderColor: isAdded ? `${theme.success}30` : theme.border,
+                      }}
+                    >
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isAdded ? `${theme.success}20` : `${theme.primary}15`, alignItems: "center", justifyContent: "center" }}>
+                        <Feather name={isAdded ? "check" : "send"} size={16} color={isAdded ? theme.success : theme.primary} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <ThemedText type="subtitle">{campaign.name}</ThemedText>
+                        <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                          {campaign.channel?.toUpperCase()} {campaign.segment === "custom" ? "- Manual" : `- ${campaign.segment}`}
+                        </ThemedText>
+                      </View>
+                      {isAdded ? (
+                        <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600" }}>Added</ThemedText>
+                      ) : (
+                        <Feather name="plus-circle" size={20} color={theme.primary} />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
       </Modal>
     </View>
   );
