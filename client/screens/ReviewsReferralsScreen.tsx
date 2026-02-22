@@ -102,11 +102,18 @@ export default function ReviewsReferralsScreen() {
     queryKey: ["/api/customers"],
   });
 
+  const getFullName = (c: any) => {
+    const first = c.firstName || "";
+    const last = c.lastName || "";
+    const full = `${first} ${last}`.trim();
+    return full || c.name || "";
+  };
+
   const filteredCustomers = useMemo(() => {
     if (!customerSearch.trim()) return customers;
     const query = customerSearch.toLowerCase();
     return customers.filter((c: any) => {
-      const name = (c.name || "").toLowerCase();
+      const name = getFullName(c).toLowerCase();
       const email = (c.email || "").toLowerCase();
       return name.includes(query) || email.includes(query);
     });
@@ -173,32 +180,35 @@ export default function ReviewsReferralsScreen() {
 
   const generateEmailContent = useCallback(async () => {
     setGeneratingReview(true);
+    const fallbackSubject = "We would love your feedback";
+    const fallbackBody =
+      "Thank you for choosing our services. We strive to provide the best experience possible and your feedback helps us improve.\n\nWould you take a moment to share your experience? Your review means a lot to us and helps other customers find quality service.\n\nThank you for your time.";
     try {
-      const res = await apiRequest("POST", "/api/ai/generate-campaign-content", {
-        campaignName: "Review Request",
-        segment: "custom",
-        channel: "email",
-      });
+      const res = await apiRequest("POST", "/api/ai/generate-review-email", {});
       const data = await res.json();
       const content = data.content || data.body || "";
       let subject = data.subject || "";
+      if (!content) {
+        setReviewEmailSubject(fallbackSubject);
+        setReviewEmailContent(fallbackBody);
+        setGeneratingReview(false);
+        return;
+      }
       if (!subject && content) {
         const subjectMatch = content.match(/^(?:Subject:\s*)(.+?)(?:\n|$)/i);
         if (subjectMatch) {
           subject = subjectMatch[1].trim();
         } else {
-          subject = "We would love your feedback";
+          subject = fallbackSubject;
         }
       }
       let body = content;
       body = body.replace(/^Subject:\s*.+?\n/i, "").trim();
-      setReviewEmailSubject(subject);
-      setReviewEmailContent(body);
+      setReviewEmailSubject(subject || fallbackSubject);
+      setReviewEmailContent(body || fallbackBody);
     } catch {
-      setReviewEmailSubject("We would love your feedback");
-      setReviewEmailContent(
-        "Thank you for choosing our services. We strive to provide the best experience possible and your feedback helps us improve.\n\nWould you take a moment to share your experience? Your review means a lot to us and helps other customers find quality service.\n\nThank you for your time."
-      );
+      setReviewEmailSubject(fallbackSubject);
+      setReviewEmailContent(fallbackBody);
     }
     setGeneratingReview(false);
   }, []);
@@ -400,7 +410,7 @@ export default function ReviewsReferralsScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <ThemedText type="subtitle" numberOfLines={1}>
-                  {customer.name || `Customer #${customer.id}`}
+                  {getFullName(customer) || `Customer #${customer.id}`}
                 </ThemedText>
                 {customer.email ? (
                   <ThemedText type="caption" style={{ color: dt.textMuted }} numberOfLines={1}>
@@ -441,7 +451,7 @@ export default function ReviewsReferralsScreen() {
           <View style={{ flex: 1, marginLeft: Spacing.sm }}>
             <ThemedText type="caption" style={{ color: dt.textSecondary }}>{"To"}</ThemedText>
             <ThemedText type="subtitle" numberOfLines={1}>
-              {selectedCustomer.name || `Customer #${selectedCustomer.id}`}
+              {getFullName(selectedCustomer) || `Customer #${selectedCustomer.id}`}
             </ThemedText>
           </View>
         </View>

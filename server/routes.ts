@@ -4098,10 +4098,65 @@ Respond with JSON: {"reply": string}`
         content = lines.slice(1).join("\n").trim();
       }
 
+      if (!content) {
+        content = `Dear [Customer],\n\nWe wanted to reach out from ${businessName} with a special offer. We'd love the opportunity to serve you again.\n\nReply to this email to schedule your next cleaning, and we'll make sure to take great care of your home.\n\nBest regards,\n${ownerName || businessName}`;
+        subject = subject || campaignName || "A special offer just for you";
+      }
+
       return res.json({ content, subject, channel: "email" });
     } catch (error: any) {
       console.error("AI generate campaign content error:", error?.message || error, error?.code, error?.status);
       return res.status(500).json({ message: "Failed to generate campaign content" });
+    }
+  });
+
+  app.post("/api/ai/generate-review-email", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const businessName = business.companyName || "our cleaning company";
+      const ownerName = business.senderName || "";
+
+      const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. No links/URLs. Ask them to reply with their feedback or leave a review. No emojis. Keep it personal and genuine.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Generate a review request email." },
+        ],
+        max_completion_tokens: 250,
+      });
+
+      const raw = completion.choices[0]?.message?.content?.trim() || "";
+      let subject = "";
+      let content = raw;
+      if (raw.startsWith("Subject:")) {
+        const lines = raw.split("\n");
+        subject = lines[0].replace("Subject:", "").trim();
+        content = lines.slice(1).join("\n").trim();
+      }
+
+      if (!content) {
+        return res.json({
+          content: `Dear [Customer],\n\nThank you for choosing ${businessName}. We hope you were happy with our service.\n\nWould you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.\n\nSimply reply to this email with your thoughts. We appreciate your time!\n\nBest regards,\n${ownerName || businessName}`,
+          subject: "We would love your feedback",
+          channel: "email",
+        });
+      }
+
+      return res.json({ content, subject, channel: "email" });
+    } catch (error: any) {
+      console.error("AI generate review email error:", error?.message || error);
+      const business = await getBusinessByOwner(req.session.userId!).catch(() => null);
+      const businessName = business?.companyName || "our cleaning company";
+      const ownerName = business?.senderName || businessName;
+      return res.json({
+        content: `Dear [Customer],\n\nThank you for choosing ${businessName}. We hope you were happy with our service.\n\nWould you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.\n\nSimply reply to this email with your thoughts. We appreciate your time!\n\nBest regards,\n${ownerName}`,
+        subject: "We would love your feedback",
+        channel: "email",
+      });
     }
   });
 
