@@ -455,7 +455,7 @@ const en = {
     forecastedRevenue: "Forecasted Revenue",
     avgDaysToClose: "Avg Days to Close",
     recentActivity: "Recent Activity",
-    generateTasks: "Generate Tasks",
+    generateTasks: "Growth Tasks",
     sendCampaign: "Send Campaign",
     viewAutomations: "View Automations",
     reviews: "Reviews",

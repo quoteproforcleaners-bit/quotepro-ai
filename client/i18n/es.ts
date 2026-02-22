@@ -457,7 +457,7 @@ const es: Translations = {
     forecastedRevenue: "Ingresos proyectados",
     avgDaysToClose: "D\u00edas promedio para cerrar",
     recentActivity: "Actividad reciente",
-    generateTasks: "Generar tareas",
+    generateTasks: "Tareas de crecimiento",
     sendCampaign: "Enviar campa\u00f1a",
     viewAutomations: "Ver automatizaciones",
     reviews: "Rese\u00f1as",
