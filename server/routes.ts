@@ -136,6 +136,7 @@ import {
   getPushTokensByUser,
   rateJob,
   getRatingsSummary,
+  getJobByRatingToken,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -1280,9 +1281,15 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         }
       }
 
+      let ratingUrl: string | null = null;
+      if (updatedJob.ratingToken) {
+        ratingUrl = `${getPublicBaseUrl(req)}/rate/${updatedJob.ratingToken}`;
+      }
+
       return res.json({
         completedJob: updatedJob,
         nextJob,
+        ratingUrl,
         message: nextJob
           ? `Job completed! Next ${job.recurrence} job scheduled.`
           : "Job completed!",
@@ -4274,6 +4281,208 @@ Respond with JSON: {"reply": string}`
     } catch (error: any) {
       console.error("AI generate message error:", error);
       return res.status(500).json({ message: "Failed to generate message" });
+    }
+  });
+
+  // ─── Public Rating API ───
+
+  app.post("/api/public/rate/:token", async (req: Request, res: Response) => {
+    try {
+      const job = await getJobByRatingToken(req.params.token);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      const { rating, comment } = req.body;
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      if (job.satisfactionRating) {
+        return res.status(400).json({ message: "This job has already been rated" });
+      }
+
+      const updated = await rateJob(job.id, rating, comment);
+      return res.json({ success: true, rating: updated.satisfactionRating });
+    } catch (error: any) {
+      console.error("Public rate error:", error);
+      return res.status(500).json({ message: "Failed to submit rating" });
+    }
+  });
+
+  // ─── Public Rating Page ───
+
+  app.get("/rate/:token", async (req: Request, res: Response) => {
+    try {
+      const job = await getJobByRatingToken(req.params.token);
+      if (!job) {
+        return res.status(404).send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Not Found</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 1px 3px rgba(0,0,0,0.08)}.icon{width:48px;height:48px;margin:0 auto 16px}h1{font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}</style></head><body><div class="card"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><h1>Not Found</h1><p>This rating link is invalid or has been removed.</p></div></body></html>`);
+      }
+
+      const business = await db_getBusinessById(job.businessId);
+      const brandColor = business?.primaryColor || "#2563EB";
+      const companyName = business?.companyName || "Our Company";
+      const logoUri = business?.logoUri || "";
+      const alreadyRated = job.satisfactionRating !== null && job.satisfactionRating !== undefined;
+
+      const starSvg = `<svg viewBox="0 0 24 24" width="44" height="44"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Rate Your Service - ${companyName}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.card{background:#fff;border-radius:16px;padding:40px 32px;text-align:center;max-width:480px;width:100%;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.logo{width:64px;height:64px;border-radius:50%;object-fit:cover;margin-bottom:12px}
+.logo-placeholder{width:64px;height:64px;border-radius:50%;background:${brandColor};display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;font-weight:700;color:#fff}
+.company{font-size:18px;font-weight:700;color:#1E293B;margin-bottom:24px}
+h1{font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px}
+p{font-size:15px;color:#64748B;line-height:1.5}
+.stars{display:flex;justify-content:center;gap:8px;margin:24px 0}
+.star{cursor:pointer;transition:transform 0.15s}
+.star:hover{transform:scale(1.15)}
+.star svg{fill:#D1D5DB;stroke:none;transition:fill 0.15s}
+.star.active svg{fill:#FBBF24}
+.star.hover-active svg{fill:#FCD34D}
+textarea{width:100%;min-height:80px;border:1px solid #E2E8F0;border-radius:12px;padding:12px 16px;font-family:inherit;font-size:15px;resize:vertical;margin-top:16px;outline:none;transition:border-color 0.15s}
+textarea:focus{border-color:${brandColor}}
+.btn{display:inline-block;width:100%;padding:14px 24px;background:${brandColor};color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;margin-top:20px;transition:opacity 0.15s}
+.btn:hover{opacity:0.9}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.success-check{width:64px;height:64px;border-radius:50%;background:#DCFCE7;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.success-check svg{width:32px;height:32px;stroke:#16A34A;fill:none;stroke-width:3}
+.rated-stars{display:flex;justify-content:center;gap:4px;margin:16px 0}
+.rated-stars svg{width:28px;height:28px;fill:#FBBF24;stroke:none}
+.rated-stars svg.empty{fill:#D1D5DB}
+.error-msg{color:#EF4444;font-size:14px;margin-top:8px;display:none}
+#form-view,#success-view,#rated-view{display:none}
+</style>
+</head>
+<body>
+<div class="card">
+${logoUri ? `<img class="logo" src="${logoUri}" alt="${companyName}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="logo-placeholder" style="display:none">${companyName.charAt(0).toUpperCase()}</div>` : `<div class="logo-placeholder">${companyName.charAt(0).toUpperCase()}</div>`}
+<div class="company">${companyName}</div>
+
+<div id="rated-view">
+<div class="success-check"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>
+<h1>Thank You for Your Feedback!</h1>
+<p>You rated your service:</p>
+<div class="rated-stars" id="rated-stars"></div>
+${job.ratingComment ? `<p style="margin-top:12px;font-style:italic">"${job.ratingComment.replace(/</g, '&lt;').replace(/>/g, '&gt;')}"</p>` : ''}
+</div>
+
+<div id="form-view">
+<h1>How was your cleaning service?</h1>
+<p>We'd love to hear about your experience</p>
+<div class="stars" id="stars">
+<span class="star" data-value="1">${starSvg}</span>
+<span class="star" data-value="2">${starSvg}</span>
+<span class="star" data-value="3">${starSvg}</span>
+<span class="star" data-value="4">${starSvg}</span>
+<span class="star" data-value="5">${starSvg}</span>
+</div>
+<textarea id="comment" placeholder="Any comments? (optional)"></textarea>
+<div class="error-msg" id="error-msg"></div>
+<button class="btn" id="submit-btn" disabled onclick="submitRating()">Submit Rating</button>
+</div>
+
+<div id="success-view">
+<div class="success-check"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></div>
+<h1>Thank You!</h1>
+<p>Your feedback helps us improve our service.</p>
+</div>
+</div>
+
+<script>
+var selectedRating = 0;
+var alreadyRated = ${alreadyRated ? 'true' : 'false'};
+var existingRating = ${job.satisfactionRating || 0};
+
+function init() {
+  if (alreadyRated) {
+    document.getElementById('rated-view').style.display = 'block';
+    var ratedStars = document.getElementById('rated-stars');
+    for (var i = 1; i <= 5; i++) {
+      var svg = document.createElement('span');
+      svg.innerHTML = '${starSvg.replace(/'/g, "\\'")}';
+      var svgEl = svg.querySelector('svg');
+      svgEl.setAttribute('width', '28');
+      svgEl.setAttribute('height', '28');
+      if (i > existingRating) svgEl.classList.add('empty');
+      ratedStars.appendChild(svgEl);
+    }
+  } else {
+    document.getElementById('form-view').style.display = 'block';
+    var stars = document.querySelectorAll('.star');
+    stars.forEach(function(star) {
+      star.addEventListener('click', function() {
+        selectedRating = parseInt(this.getAttribute('data-value'));
+        updateStars();
+        document.getElementById('submit-btn').disabled = false;
+      });
+      star.addEventListener('mouseenter', function() {
+        var val = parseInt(this.getAttribute('data-value'));
+        stars.forEach(function(s) {
+          var sv = parseInt(s.getAttribute('data-value'));
+          if (sv <= val) { s.classList.add('hover-active'); } else { s.classList.remove('hover-active'); }
+        });
+      });
+      star.addEventListener('mouseleave', function() {
+        stars.forEach(function(s) { s.classList.remove('hover-active'); });
+      });
+    });
+  }
+}
+
+function updateStars() {
+  var stars = document.querySelectorAll('.star');
+  stars.forEach(function(s) {
+    var val = parseInt(s.getAttribute('data-value'));
+    if (val <= selectedRating) { s.classList.add('active'); } else { s.classList.remove('active'); }
+  });
+}
+
+function submitRating() {
+  if (selectedRating < 1) return;
+  var btn = document.getElementById('submit-btn');
+  var errEl = document.getElementById('error-msg');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+  errEl.style.display = 'none';
+
+  var comment = document.getElementById('comment').value.trim();
+  var body = { rating: selectedRating };
+  if (comment) body.comment = comment;
+
+  fetch('/api/public/rate/${req.params.token}', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    if (!r.ok) return r.json().then(function(d) { throw new Error(d.message || 'Failed'); });
+    return r.json();
+  }).then(function() {
+    document.getElementById('form-view').style.display = 'none';
+    document.getElementById('success-view').style.display = 'block';
+  }).catch(function(e) {
+    errEl.textContent = e.message || 'Something went wrong. Please try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Submit Rating';
+  });
+}
+
+init();
+</script>
+</body>
+</html>`;
+
+      return res.send(html);
+    } catch (error: any) {
+      console.error("Rating page error:", error);
+      return res.status(500).send("Something went wrong");
     }
   });
 

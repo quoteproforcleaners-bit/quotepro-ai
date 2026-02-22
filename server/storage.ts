@@ -475,6 +475,11 @@ export async function getJobById(id: string): Promise<Job | undefined> {
   return j;
 }
 
+export async function getJobByRatingToken(token: string): Promise<Job | undefined> {
+  const [j] = await db.select().from(jobs).where(eq(jobs.ratingToken, token));
+  return j;
+}
+
 export async function createJob(data: {
   businessId: string;
   customerId?: string;

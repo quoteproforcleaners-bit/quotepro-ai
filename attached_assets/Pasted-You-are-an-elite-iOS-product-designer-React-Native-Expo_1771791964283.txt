@@ -1,0 +1,152 @@
+You are an elite iOS product designer + React Native (Expo) engineer. I already did a visual refinement pass (tokens + subtle gradients), but the UI still “feels the same.” I need a Level 3 visual upgrade that creates obvious hierarchy and a more premium, high-contrast “Revenue Control Center” vibe. This is NOT a redesign. Keep layout, navigation, copy, and logic exactly the same. Only improve visual dominance, depth, and contrast so the screen feels more alive and less dull.
+
+NON-NEGOTIABLES
+- Do not change any text or wording.
+- Do not change layout structure, spacing, or component order.
+- Do not change logic/state/navigation.
+- Only styling (colors, shadows, gradients, borders, radii, glow).
+- Keep it tasteful (no neon), but it must be noticeably more premium.
+
+PRIMARY OBJECTIVE
+Make the Home screen feel 25% more “high-end SaaS” through:
+1) Stronger background-to-card separation
+2) Clear tiered elevation (some cards clearly higher than others)
+3) A truly dominant “$ at risk” card (this must demand attention)
+4) Cleaner CTA styling (remove muddy button fills)
+5) One controlled “hero accent” so it feels alive
+
+INSTALL/DEPENDENCIES
+If not installed, add expo-linear-gradient and use it.
+
+THEME TOKENS (update /src/theme/colors.ts, /src/theme/elevation.ts, /src/theme/radius.ts)
+Use these EXACT values:
+
+BACKGROUND (increase separation)
+- bgTop: #080F1A
+- bgBottom: #121E31
+
+SURFACES (increase contrast)
+- surface0: #0C1524   (base)
+- surface1: #0F1A2A   (cards default)
+- surface2: #131F33   (raised)
+- surface3: #172743   (hero/selected)
+- border: #22314A
+
+TEXT (slightly brighter secondary)
+- textPrimary: #F5F7FF
+- textSecondary: #C0CAE0
+- textMuted: #8E9AB6
+
+BRAND BLUE
+- brand: #2F7BFF
+- brandSoft: rgba(47,123,255,0.14)
+- brandGlow: rgba(47,123,255,0.25)
+
+WARNING/REVENUE AT RISK (stronger, not muddy)
+- warning: #F8B84A
+- warningDeep: #D97706
+- warningSoft: rgba(248,184,74,0.16)
+- warningGlow: rgba(248,184,74,0.28)
+- warningBorder: rgba(248,184,74,0.45)
+
+RADIUS (modernize)
+Create /src/theme/radius.ts:
+- rCard: 22
+- rPill: 999
+- rInput: 18
+
+ELEVATION (more dramatic differences)
+Update /src/theme/elevation.ts:
+- e1: shadowOpacity 0.18, shadowRadius 10, shadowOffset {0,6}, elevation 2
+- e2: shadowOpacity 0.24, shadowRadius 18, shadowOffset {0,10}, elevation 5
+- e3: shadowOpacity 0.30, shadowRadius 28, shadowOffset {0,16}, elevation 8
+
+Create specialized glow helpers:
+- glowBlue: shadowColor brand, shadowOpacity 0.22, shadowRadius 22, shadowOffset {0,10}
+- glowWarning: shadowColor warning, shadowOpacity 0.22, shadowRadius 22, shadowOffset {0,10}
+
+BACKGROUND WRAPPER (must be used on Home)
+Create <ScreenBackground> using LinearGradient:
+- colors: [bgTop, bgBottom]
+- Add a subtle vignette overlay (a semi-transparent radial-ish feel) by placing a top overlay View with:
+  backgroundColor: rgba(0,0,0,0.22)
+  and a second overlay at bottom with rgba(0,0,0,0.10)
+Keep it subtle but noticeable.
+
+CARD HIERARCHY (this is the key)
+We need 3 levels of cards on Home:
+- Level A (Hero): “$ at risk” card
+- Level B (Raised): Follow-Up Streak + Unlock AI-powered features
+- Level C (Base): Ask QuotePro + small pills/buttons
+
+Implement this via variants on your Card component (or create one if missing):
+<Card variant="base" | "raised" | "heroWarning">
+
+Base:
+- background surface1
+- border 1px border
+- elevation e1
+
+Raised:
+- background surface2
+- border 1px border
+- elevation e2
+
+HeroWarning (for $ at risk card ONLY):
+- background = LinearGradient from #1E273A (top) to #121B2B (bottom)
+- border = 1px warningBorder
+- elevation = e3 + glowWarning (subtle warm halo)
+- add an inner highlight overlay:
+  a View absolutely positioned with:
+  backgroundColor rgba(255,255,255,0.04)
+  top: 0, left: 0, right: 0, height: 80
+  borderTopLeftRadius/borderTopRightRadius = rCard
+This creates a premium “glass” highlight.
+
+“FOLLOW UP NOW” CTA INSIDE HERO CARD (fix muddy fill)
+Replace the current brownish/muddy fill with a crisp pill button:
+Option (use this):
+- backgroundColor: rgba(248,184,74,0.18)
+- border: 1px warningBorder
+- text color: warning
+- add a tiny right-arrow accent (keep existing icon if present)
+- apply a very subtle glowWarning but smaller (shadowOpacity 0.16, radius 16)
+Also increase vertical padding slightly if already supported by styles, but do not change layout overall.
+
+PRIMARY BLUE CTA BUTTONS (elsewhere)
+If you have full-width primary CTAs on other screens, ensure:
+- background brand
+- textPrimary
+- radius rCard or rInput depending on component
+- add glowBlue very subtle (shadowOpacity ~0.18)
+
+ONE “HERO ACCENT” (controlled)
+Pick exactly ONE of these (do only one):
+A) Make the lightning bolt icon in Follow-Up Streak glow slightly (brandGlow) OR
+B) Add a tiny animated shimmer on the “$ at risk” card top highlight (optional)
+Prefer A if animations are risky.
+
+TEXT/CONTRAST CLEANUP
+- Increase subtitle contrast: use textSecondary not muted.
+- Avoid opacity whites. Use tokens.
+- Ensure small labels like “GOOD AFTERNOON” remain readable (textMuted ok).
+
+WHAT TO DO IN CODE (step-by-step)
+1) Locate the Home screen component file.
+2) Add ScreenBackground wrapper to Home.
+3) Locate your Card component or create /src/components/SurfaceCard.tsx that supports variants: base, raised, heroWarning.
+4) Replace Home screen card containers with SurfaceCard variants:
+   - $ at risk card -> heroWarning
+   - Follow-Up Streak + Unlock AI -> raised
+   - Ask QuotePro -> base (but slightly more contrast: surface2 background inside input field)
+5) Update the “Follow Up Now” CTA styling to the new crisp warning pill.
+6) Apply radius tokens (rCard/rInput) to cards and inputs so the look modernizes.
+7) Ensure shadows/glows are iOS-correct and Android uses elevation.
+
+OUTPUT REQUIREMENTS
+- Provide the exact files changed/created (full code in code blocks).
+- List files changed.
+- Confirm the card hierarchy is now visually obvious (Hero vs Raised vs Base).
+- Confirm the “Follow Up Now” button no longer looks muddy.
+
+Begin by scanning the codebase to identify how styles are currently done (StyleSheet vs styled-components vs Tailwind) and implement accordingly.
