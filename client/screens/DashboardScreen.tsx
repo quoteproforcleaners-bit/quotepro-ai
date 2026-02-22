@@ -28,7 +28,7 @@ import Animated, {
 import { ThemedText } from "@/components/ThemedText";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius, Elevation } from "@/constants/theme";
+import { Spacing, BorderRadius, Elevation, GlowEffects } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { FeatureFlags } from "@/lib/featureFlags";
 import { runAiCommand, EXAMPLE_PROMPTS, AiCommandResult } from "@/lib/aiCommandRouter";
@@ -132,10 +132,12 @@ function getDailyQuote() {
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(() => ({
-    gradientTop: theme.bg0,
-    gradientBottom: theme.bg1,
+    gradientTop: isDark ? "#080F1A" : theme.bg0,
+    gradientBottom: isDark ? "#121E31" : theme.bg1,
     surfacePrimary: theme.surface0,
     surfaceSecondary: theme.surface1,
+    surfaceRaised: (theme as any).surface2 || theme.surface1,
+    surfaceHero: (theme as any).surface3 || theme.surface1,
     surfaceEmphasis: (theme as any).surface2 || theme.surface1,
     borderPrimary: theme.border,
     borderSecondary: theme.divider,
@@ -146,10 +148,12 @@ function useDesignTokens() {
     accent: theme.primary,
     accentMuted: isDark ? "rgba(47, 123, 255, 0.55)" : "rgba(0,100,200,0.5)",
     accentSoft: theme.primarySoft,
-    brandGlow: (theme as any).brandGlow || "rgba(47,123,255,0.18)",
-    warningSoft: (theme as any).warningSoft || "rgba(245,158,11,0.16)",
-    warningBorder: (theme as any).warningBorder || "rgba(245,158,11,0.35)",
-    warningGradientTop: isDark ? "#1B2436" : "#FFFBEB",
+    brandGlow: (theme as any).brandGlow || "rgba(47,123,255,0.25)",
+    brandSoft: (theme as any).brandSoft || theme.primarySoft,
+    warningSoft: (theme as any).warningSoft || "rgba(248,184,74,0.16)",
+    warningBorder: (theme as any).warningBorder || "rgba(248,184,74,0.45)",
+    warningGlow: (theme as any).warningGlow || "rgba(248,184,74,0.28)",
+    warningGradientTop: isDark ? "#1E273A" : "#FFFBEB",
     warningGradientBottom: isDark ? "#121B2B" : "#FEF3C7",
     chipBg: isDark ? theme.divider : "rgba(0,0,0,0.03)",
     chipBorder: theme.border,
@@ -325,13 +329,14 @@ function GlanceCard({ title, value, icon, color, onPress }: {
   title: string; value: string; icon: keyof typeof Feather.glyphMap; color: string; onPress?: () => void;
 }) {
   const dt = useDesignTokens();
+  const { isDark } = useTheme();
   return (
     <Pressable
-      style={[styles.glanceCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
+      style={[styles.glanceCard, { backgroundColor: isDark ? dt.surfaceSecondary : dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
       onPress={onPress}
       testID={`glance-${title.toLowerCase().replace(/\s/g, "-")}`}
     >
-      <View style={[styles.glanceIcon, { backgroundColor: `${color}18` }]}>
+      <View style={[styles.glanceIcon, { backgroundColor: `${color}20` }]}>
         <Feather name={icon} size={15} color={color} />
       </View>
       <ThemedText type="h3" style={{ marginTop: 6 }}>{value}</ThemedText>
@@ -345,7 +350,7 @@ export default function DashboardScreen() {
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const dt = useDesignTokens();
   const { businessProfile: profile } = useApp();
   const { t } = useLanguage();
@@ -596,15 +601,16 @@ export default function DashboardScreen() {
             {followUpQueueCount > 0 ? (
               <Pressable
                 onPress={() => navigation.navigate("FollowUpQueue")}
-                style={[styles.focusCard, { borderColor: dt.warningBorder }, Elevation.e2]}
+                style={[styles.focusCard, { borderColor: dt.warningBorder }, Elevation.e3, isDark ? GlowEffects.glowWarning : {}]}
                 testID="todays-focus-card"
               >
                 <LinearGradient
                   colors={[dt.warningGradientTop, dt.warningGradientBottom]}
                   style={styles.focusCardGradient}
                 >
+                  {isDark ? <View style={styles.heroCardHighlight} /> : null}
                   <View style={styles.focusCardHeader}>
-                    <View style={[styles.focusIcon, { backgroundColor: dt.warningSoft }]}>
+                    <View style={[styles.focusIcon, { backgroundColor: dt.warningGlow }]}>
                       <Feather name="alert-circle" size={16} color={theme.warning} />
                     </View>
                     <View style={{ flex: 1 }}>
@@ -620,7 +626,7 @@ export default function DashboardScreen() {
                   <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm, marginLeft: 44 }}>
                     {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
                   </ThemedText>
-                  <View style={[styles.focusCta, { backgroundColor: dt.warningSoft, borderWidth: 1, borderColor: dt.warningBorder }]}>
+                  <View style={[styles.focusCta, { backgroundColor: "rgba(248,184,74,0.18)", borderWidth: 1, borderColor: dt.warningBorder }, isDark ? GlowEffects.glowWarningSubtle : {}]}>
                     <Feather name="arrow-right" size={14} color={theme.warning} />
                     <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{t.dashboard.followUpNow}</ThemedText>
                   </View>
@@ -654,9 +660,11 @@ export default function DashboardScreen() {
 
       case "streak":
         return (
-          <View key="streak" style={[styles.streakCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e2]}>
+          <View key="streak" style={[styles.streakCard, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e2]}>
             <View style={styles.streakCardRow}>
-              <Feather name="zap" size={16} color={currentStreak > 0 ? theme.warning : dt.textMuted} />
+              <View style={currentStreak > 0 && isDark ? [styles.zapGlow] : undefined}>
+                <Feather name="zap" size={16} color={currentStreak > 0 ? theme.warning : dt.textMuted} />
+              </View>
               <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.sm }}>
                 {currentStreak > 0 ? `${t.dashboard.followUpStreak}: ${currentStreak} ${currentStreak === 1 ? t.common.day : t.common.days}` : t.dashboard.followUpStreak}
               </ThemedText>
@@ -681,15 +689,16 @@ export default function DashboardScreen() {
             <View style={[
               styles.commandCard,
               {
-                backgroundColor: dt.surfaceEmphasis,
+                backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceEmphasis,
                 borderColor: dt.borderAccent,
               },
               Elevation.e2,
+              isDark ? GlowEffects.glowBlueSubtle : {},
             ]}>
               <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm, fontWeight: "600" }}>
                 {t.dashboard.whatToDo}
               </ThemedText>
-              <View style={[styles.inputRow, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
+              <View style={[styles.inputRow, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
                 <TextInput
                   ref={inputRef}
                   style={[styles.commandInput, { color: dt.textPrimary }]}
@@ -730,7 +739,7 @@ export default function DashboardScreen() {
             ) : null}
 
             {!FeatureFlags.aiEnabled ? (
-              <View style={[styles.aiBanner, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderAccent }, Elevation.e2]}>
+              <View style={[styles.aiBanner, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceSecondary, borderColor: dt.borderAccent }, Elevation.e2]}>
                 <View style={styles.aiBannerContent}>
                   <View style={[styles.aiBannerIcon, { backgroundColor: dt.accentSoft }]}>
                     <Feather name="zap" size={14} color={dt.accent} />
@@ -880,13 +889,19 @@ export default function DashboardScreen() {
       default:
         return null;
     }
-  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, currentStreak, commandText, commandResult, dt, theme, t, navigation, handleSubmit, handlePromptTap, handleChipAction, handleSuggestedAction, todayJobCount, monthRevenue, ratingSummary, totalOpportunities, estimatedRecoverable]);
+  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, currentStreak, commandText, commandResult, dt, theme, isDark, t, navigation, handleSubmit, handlePromptTap, handleChipAction, handleSuggestedAction, todayJobCount, monthRevenue, ratingSummary, totalOpportunities, estimatedRecoverable]);
 
   return (
     <LinearGradient
       colors={[dt.gradientTop, dt.gradientBottom]}
       style={styles.container}
     >
+      {isDark ? (
+        <>
+          <View style={styles.vignetteTop} />
+          <View style={styles.vignetteBottom} />
+        </>
+      ) : null}
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -1019,7 +1034,7 @@ const styles = StyleSheet.create({
   commandCard: {
     marginHorizontal: Spacing.lg,
     padding: Spacing.lg,
-    borderRadius: BorderRadius.xl,
+    borderRadius: 22,
     borderWidth: 1,
     marginBottom: Spacing.md,
   },
@@ -1033,7 +1048,7 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: BorderRadius.md,
+    borderRadius: 18,
     borderWidth: 1,
     paddingLeft: Spacing.md,
     paddingRight: 4,
@@ -1095,7 +1110,7 @@ const styles = StyleSheet.create({
   },
   aiBanner: {
     marginHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.lg,
+    borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.md,
     marginBottom: Spacing.lg,
@@ -1137,7 +1152,7 @@ const styles = StyleSheet.create({
   },
   glanceCard: {
     flex: 1,
-    borderRadius: BorderRadius.md,
+    borderRadius: 18,
     padding: Spacing.md,
     borderWidth: StyleSheet.hairlineWidth,
   },
@@ -1157,14 +1172,15 @@ const styles = StyleSheet.create({
   },
   focusCard: {
     marginHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.xl,
+    borderRadius: 22,
     borderWidth: 1,
     marginBottom: Spacing.md,
     overflow: "hidden",
   },
   focusCardGradient: {
     padding: Spacing.lg,
-    borderRadius: BorderRadius.xl - 1,
+    borderRadius: 21,
+    overflow: "hidden",
   },
   focusCardHeader: {
     flexDirection: "row",
@@ -1202,7 +1218,7 @@ const styles = StyleSheet.create({
   streakCard: {
     marginHorizontal: Spacing.lg,
     padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    borderRadius: 22,
     borderWidth: 1,
     marginBottom: Spacing.md,
   },
@@ -1232,7 +1248,7 @@ const styles = StyleSheet.create({
   opportunityCard: {
     marginHorizontal: Spacing.lg,
     padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
+    borderRadius: 22,
     borderWidth: 1,
     marginBottom: Spacing.md,
   },
@@ -1241,13 +1257,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: Spacing.lg,
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: Spacing.xl,
   },
   ratingsSummaryCard: {
     marginHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    borderRadius: 18,
     padding: Spacing.md,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: Spacing.xl,
@@ -1322,5 +1338,44 @@ const styles = StyleSheet.create({
     height: 30,
     alignItems: "center",
     justifyContent: "center",
+  },
+  vignetteTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: "rgba(0,0,0,0.22)",
+    zIndex: 0,
+  },
+  vignetteBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    backgroundColor: "rgba(0,0,0,0.10)",
+    zIndex: 0,
+  },
+  heroCardHighlight: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderTopLeftRadius: 21,
+    borderTopRightRadius: 21,
+  },
+  zapGlow: {
+    ...Platform.select({
+      web: { filter: "drop-shadow(0px 0px 6px rgba(248,184,74,0.5))" } as any,
+      default: {
+        shadowColor: "#F8B84A",
+        shadowOpacity: 0.5,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 0 },
+      },
+    }),
   },
 });
