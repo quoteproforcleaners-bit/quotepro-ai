@@ -30,7 +30,7 @@ interface WeeklyRecapData {
   quotesExpired: number;
   closeRate: number;
   revenueWon: number;
-  biggestWin: {
+  biggestWin: number | {
     id: string;
     total: number;
     customerFirstName: string;
@@ -305,7 +305,7 @@ export default function WeeklyRecapScreen() {
             ) : null}
 
             {recap?.mostAtRiskOpen ? (
-              <Card style={[styles.atRiskCard, { borderColor: theme.warning, borderWidth: 1.5 }]}>
+              <Card style={{ ...styles.atRiskCard, borderColor: theme.warning, borderWidth: 1.5 }}>
                 <View style={styles.atRiskHeader}>
                   <View
                     style={[
