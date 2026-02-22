@@ -2082,11 +2082,15 @@ ${paymentHtml}
       if (business) {
         const stats = await getQuoteStats(business.id);
         const allQuotes = await getQuotesByBusiness(business.id);
-        const sentQuotes = allQuotes.filter(q => q.status === "sent");
         const customers = await getCustomersByBusiness(business.id);
         const jobs = await getJobsByBusiness(business.id);
+        const comms = await getCommunicationsByBusiness(business.id);
 
+        const sentQuotes = allQuotes.filter(q => q.status === "sent");
+        const acceptedQuotes = allQuotes.filter(q => q.status === "accepted");
+        const declinedQuotes = allQuotes.filter(q => q.status === "declined");
         const completedJobs = jobs.filter(j => j.status === "completed");
+        const scheduledJobs = jobs.filter(j => j.status === "scheduled");
 
         const quotesThisMonth = allQuotes.filter(q => {
           const d = new Date(q.createdAt);
@@ -2101,31 +2105,135 @@ ${paymentHtml}
           const d = j.endDatetime ? new Date(j.endDatetime) : new Date(j.updatedAt);
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
-        const jobsLastMonth = completedJobs.filter(j => {
-          const d = j.endDatetime ? new Date(j.endDatetime) : new Date(j.updatedAt);
-          const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+
+        const customerMap = new Map(customers.map(c => [c.id, c]));
+
+        const openQuoteDetails = sentQuotes
+          .sort((a, b) => (a.sentAt?.getTime() || a.createdAt.getTime()) - (b.sentAt?.getTime() || b.createdAt.getTime()))
+          .slice(0, 10)
+          .map(q => {
+            const cust = q.customerId ? customerMap.get(q.customerId) : null;
+            const name = cust ? `${cust.firstName} ${cust.lastName}`.trim() : "Unknown";
+            const sentDate = q.sentAt || q.createdAt;
+            const ageDays = Math.round((now.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
+            const quoteComms = comms.filter(c => c.quoteId === q.id);
+            const lastFollowUp = quoteComms.length > 0 ? quoteComms[0] : null;
+            const followUpAge = lastFollowUp ? Math.round((now.getTime() - new Date(lastFollowUp.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : null;
+            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected} (${q.selectedOption} tier), ${ageDays}d old${q.propertySqft ? `, ${q.propertySqft}sqft` : ""}${followUpAge !== null ? `, last follow-up ${followUpAge}d ago` : ", no follow-up sent"}`;
+          });
+
+        const recentWins = acceptedQuotes
+          .sort((a, b) => (b.acceptedAt?.getTime() || 0) - (a.acceptedAt?.getTime() || 0))
+          .slice(0, 5)
+          .map(q => {
+            const cust = q.customerId ? customerMap.get(q.customerId) : null;
+            const name = cust ? `${cust.firstName} ${cust.lastName}`.trim() : "Unknown";
+            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected} (${q.selectedOption} tier)`;
+          });
+
+        const recentLosses = declinedQuotes
+          .sort((a, b) => (b.declinedAt?.getTime() || 0) - (a.declinedAt?.getTime() || 0))
+          .slice(0, 5)
+          .map(q => {
+            const cust = q.customerId ? customerMap.get(q.customerId) : null;
+            const name = cust ? `${cust.firstName} ${cust.lastName}`.trim() : "Unknown";
+            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected} (${q.selectedOption} tier)`;
+          });
+
+        const topCustomers = customers
+          .map(c => {
+            const custQuotes = allQuotes.filter(q => q.customerId === c.id && q.status === "accepted");
+            const totalSpent = custQuotes.reduce((s, q) => s + q.total, 0);
+            const custJobs = jobs.filter(j => j.customerId === c.id && j.status === "completed");
+            return { name: `${c.firstName} ${c.lastName}`.trim(), totalSpent, jobCount: custJobs.length, isVip: c.isVip };
+          })
+          .filter(c => c.totalSpent > 0)
+          .sort((a, b) => b.totalSpent - a.totalSpent)
+          .slice(0, 5)
+          .map(c => `  - ${c.name}: $${c.totalSpent.toFixed(0)} revenue, ${c.jobCount} jobs${c.isVip ? " (VIP)" : ""}`);
+
+        const dormantCustomers = customers.filter(c => {
+          const lastJob = jobs.filter(j => j.customerId === c.id && j.status === "completed")
+            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+          if (!lastJob) return false;
+          const daysSince = (now.getTime() - new Date(lastJob.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+          return daysSince > 45;
         });
 
+        const avgAcceptedTotal = acceptedQuotes.length > 0
+          ? acceptedQuotes.reduce((s, q) => s + q.total, 0) / acceptedQuotes.length
+          : 0;
+        const recurringCount = acceptedQuotes.filter(q => q.frequencySelected !== "one-time").length;
+        const oneTimeCount = acceptedQuotes.filter(q => q.frequencySelected === "one-time").length;
+
+        const freqBreakdown = sentQuotes.reduce((acc, q) => {
+          acc[q.frequencySelected] = (acc[q.frequencySelected] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        const tierBreakdown = sentQuotes.reduce((acc, q) => {
+          acc[q.selectedOption] = (acc[q.selectedOption] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const pipelineValue = sentQuotes.reduce((s, q) => s + q.total, 0);
+
         contextStr = [
-          `Date: ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`,
-          `Biz: ${business.companyName}.`,
-          `Quotes: ${stats.totalQuotes} total, ${stats.acceptedQuotes} accepted, ${stats.closeRate}% close, $${stats.totalRevenue} rev, $${stats.avgQuoteValue} avg.`,
-          `This mo: ${quotesThisMonth.length} quotes, last mo: ${quotesLastMonth.length}.`,
-          `${sentQuotes.length} open quotes ($${sentQuotes.reduce((s, q) => s + q.total, 0).toFixed(0)}).`,
-          `${customers.length} customers.`,
-          `Jobs: ${completedJobs.length} done, ${jobs.filter(j => j.status === "scheduled").length} scheduled.`,
-          `Cleans this mo: ${jobsThisMonth.length}, last mo: ${jobsLastMonth.length}.`,
-        ].filter(Boolean).join(" ");
+          `=== BUSINESS SNAPSHOT (${now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}) ===`,
+          `Business: ${business.companyName}`,
+          ``,
+          `--- PIPELINE ---`,
+          `Close rate: ${stats.closeRate}% (${stats.acceptedQuotes} accepted of ${stats.totalQuotes} total)`,
+          `Pipeline: ${sentQuotes.length} open quotes worth $${pipelineValue.toFixed(0)}`,
+          `Avg accepted quote: $${avgAcceptedTotal.toFixed(0)}`,
+          `Recurring vs one-time wins: ${recurringCount} recurring, ${oneTimeCount} one-time`,
+          `Open quote tiers: ${Object.entries(tierBreakdown).map(([k, v]) => `${k}=${v}`).join(", ") || "none"}`,
+          `Open quote frequencies: ${Object.entries(freqBreakdown).map(([k, v]) => `${k}=${v}`).join(", ") || "none"}`,
+          ``,
+          `--- REVENUE ---`,
+          `Total revenue: $${stats.totalRevenue}`,
+          `Quotes this month: ${quotesThisMonth.length} (last month: ${quotesLastMonth.length})`,
+          `Cleans this month: ${jobsThisMonth.length}`,
+          `Scheduled jobs: ${scheduledJobs.length}`,
+          ``,
+          openQuoteDetails.length > 0 ? `--- OPEN QUOTES (oldest first, need attention) ---\n${openQuoteDetails.join("\n")}` : "",
+          ``,
+          recentWins.length > 0 ? `--- RECENT WINS ---\n${recentWins.join("\n")}` : "",
+          recentLosses.length > 0 ? `--- RECENT LOSSES ---\n${recentLosses.join("\n")}` : "",
+          ``,
+          topCustomers.length > 0 ? `--- TOP CUSTOMERS ---\n${topCustomers.join("\n")}` : "",
+          ``,
+          `--- HEALTH ---`,
+          `${customers.length} total customers, ${dormantCustomers.length} dormant (45+ days since last job)`,
+          `${customers.filter(c => c.isVip).length} VIP customers`,
+        ].filter(s => s !== undefined).join("\n");
       }
 
       const businessName = business?.companyName || "your cleaning business";
 
+      const systemPrompt = `You are a senior sales coach and business advisor for "${businessName}", a residential cleaning company. You have deep expertise in the cleaning industry, pricing strategy, customer retention, and sales psychology.
+
+YOUR ROLE: Give specific, data-driven advice using the real business data below. Never be generic. Always reference actual customer names, dollar amounts, and timelines from the data.
+
+RESPONSE RULES:
+- Be direct and actionable. Lead with the most important insight.
+- Use specific numbers, customer names, and dollar amounts from the data.
+- Keep responses to 3-5 sentences. No fluff, no filler.
+- When suggesting follow-ups, give the exact message approach (not just "follow up").
+- When analyzing pipeline, identify the biggest risk and opportunity.
+
+SALES EXPERTISE TO APPLY:
+- Follow-up timing: Quotes over 3 days old without follow-up are at high risk. 48hrs is the sweet spot.
+- Upselling: If a customer chose "good" tier, suggest how to pitch "better" by framing the value gap. One-time customers are upsell targets for recurring plans.
+- Pricing: If close rate is below 40%, prices may be too high or follow-up is weak. Above 70% may mean underpricing. Sweet spot is 45-65%.
+- Retention: Customers who haven't booked in 45+ days need a re-engagement offer (e.g., 10% off next clean).
+- Recurring revenue: Recurring cleans are 3-5x more valuable than one-time. Always highlight opportunities to convert one-time to recurring.
+- Objection handling: Price objection = reframe value per hour saved. "Too busy" = offer flexible scheduling. "Thinking about it" = create urgency with limited availability.
+
+BUSINESS DATA:
+${contextStr}`;
+
       const chatMessages: any[] = [
-        {
-          role: "system",
-          content: `You are a concise AI sales assistant for "${businessName}" (residential cleaning). Give short, actionable answers (2-4 sentences max). Data:\n${contextStr}`
-        },
+        { role: "system", content: systemPrompt },
       ];
 
       if (conversationHistory && Array.isArray(conversationHistory)) {
