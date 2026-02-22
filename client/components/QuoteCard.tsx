@@ -90,6 +90,7 @@ export function QuoteCard({
           backgroundColor: theme.cardBackground,
           borderColor: isSelected ? theme.primary : theme.border,
           borderWidth: isSelected ? 2 : 1,
+          ...(isSelected ? { backgroundColor: theme.surface1 } : {}),
         },
         animatedStyle,
       ]}
@@ -210,7 +211,7 @@ export function QuoteCard({
               <Feather
                 name="check"
                 size={12}
-                color={theme.success}
+                color={theme.primary}
                 style={styles.addOnIcon}
               />
               <ThemedText type="caption">{addOn}</ThemedText>
@@ -310,7 +311,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.05)",
+    borderTopColor: "rgba(255,255,255,0.06)",
   },
   radio: {
     width: 22,

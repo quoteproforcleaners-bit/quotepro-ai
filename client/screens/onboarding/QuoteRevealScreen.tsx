@@ -108,7 +108,7 @@ export default function QuoteRevealScreen({ tiers, frequency, goal, onNext, onBa
               ]}
             >
               {badge ? (
-                <View style={[styles.badge, { backgroundColor: key === "better" ? theme.primary : theme.success }]}>
+                <View style={[styles.badge, { backgroundColor: theme.primary }]}>
                   <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 10 }}>{badge}</ThemedText>
                 </View>
               ) : null}
@@ -120,7 +120,7 @@ export default function QuoteRevealScreen({ tiers, frequency, goal, onNext, onBa
         })}
       </View>
 
-      <View style={[styles.insightCard, { backgroundColor: isDark ? "#0A2E1A" : "#ECFDF5", borderColor: theme.success + "30" }]}>
+      <View style={[styles.insightCard, { backgroundColor: isDark ? theme.successSoft : "#ECFDF5", borderColor: theme.successBorder }]}>
         <View style={styles.insightHeader}>
           <Feather name="trending-up" size={18} color={theme.success} />
           <ThemedText type="subtitle" style={{ color: theme.success, fontWeight: "700" }}>{(GOAL_INSIGHT[goal || "send_quote"] || GOAL_INSIGHT.send_quote).title}</ThemedText>

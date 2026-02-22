@@ -668,8 +668,8 @@ export default function QuotePreviewScreen({
                 style={[styles.quickActionCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
                 testID="ai-write-sms-btn"
               >
-                <View style={[styles.quickActionIcon, { backgroundColor: `${theme.success}12` }]}>
-                  <Feather name="message-square" size={16} color={theme.success} />
+                <View style={[styles.quickActionIcon, { backgroundColor: `${theme.primary}12` }]}>
+                  <Feather name="message-square" size={16} color={theme.primary} />
                 </View>
                 <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.xs }}>Send via SMS</ThemedText>
               </Pressable>
@@ -679,8 +679,8 @@ export default function QuotePreviewScreen({
                 style={[styles.quickActionCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
                 testID="copy-quote-link-btn"
               >
-                <View style={[styles.quickActionIcon, { backgroundColor: `${theme.accent}15` }]}>
-                  <Feather name="link" size={16} color={theme.accent} />
+                <View style={[styles.quickActionIcon, { backgroundColor: `${theme.primary}12` }]}>
+                  <Feather name="link" size={16} color={theme.primary} />
                 </View>
                 <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.xs }}>Copy Quote Link</ThemedText>
               </Pressable>
@@ -753,8 +753,8 @@ export default function QuotePreviewScreen({
             {showSms ? (
               <View style={[styles.draftCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                 <View style={styles.draftTitleRow}>
-                  <View style={[styles.draftIconWrap, { backgroundColor: `${theme.success}12` }]}>
-                    <Feather name="message-square" size={14} color={theme.success} />
+                  <View style={[styles.draftIconWrap, { backgroundColor: `${theme.primary}12` }]}>
+                    <Feather name="message-square" size={14} color={theme.primary} />
                   </View>
                   <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>SMS Draft</ThemedText>
                   {aiSmsDraft ? (
@@ -816,7 +816,7 @@ export default function QuotePreviewScreen({
           </View>
         ) : (
           <Pressable onPress={() => navigation.navigate("Paywall")} testID="upgrade-send-quote">
-            <View style={[styles.upgradeCard, { backgroundColor: '#009B82' }]}>
+            <View style={[styles.upgradeCard, { backgroundColor: theme.primary }]}>
               <View style={styles.upgradeIcon}>
                 <Feather name="zap" size={20} color="#FFFFFF" />
               </View>
