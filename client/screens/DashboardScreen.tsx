@@ -37,9 +37,9 @@ import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
 import { useProGate } from "@/components/ProGate";
 
-type WidgetId = "followUp" | "streak" | "aiCommand" | "quickActions" | "glance" | "opportunities" | "ratings" | "recap";
+type WidgetId = "followUp" | "streak" | "aiCommand" | "quickActions" | "glance" | "opportunities" | "recap";
 
-const DEFAULT_WIDGET_ORDER: WidgetId[] = ["followUp", "streak", "aiCommand", "quickActions", "glance", "opportunities", "ratings", "recap"];
+const DEFAULT_WIDGET_ORDER: WidgetId[] = ["followUp", "streak", "aiCommand", "quickActions", "glance", "opportunities", "recap"];
 
 const WIDGET_LABELS: Record<WidgetId, { en: string; icon: keyof typeof Feather.glyphMap }> = {
   followUp: { en: "Follow-Up Focus", icon: "alert-circle" },
@@ -48,7 +48,7 @@ const WIDGET_LABELS: Record<WidgetId, { en: string; icon: keyof typeof Feather.g
   quickActions: { en: "Quick Actions", icon: "grid" },
   glance: { en: "Today at a Glance", icon: "eye" },
   opportunities: { en: "Opportunities", icon: "repeat" },
-  ratings: { en: "Customer Ratings", icon: "star" },
+
   recap: { en: "Weekly Recap", icon: "bar-chart" },
 };
 
@@ -626,7 +626,7 @@ export default function DashboardScreen() {
                   <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm, marginLeft: 44 }}>
                     {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
                   </ThemedText>
-                  <View style={[styles.focusCta, { backgroundColor: "rgba(248,184,74,0.18)", borderWidth: 1, borderColor: dt.warningBorder }, isDark ? GlowEffects.glowWarningSubtle : {}]}>
+                  <View style={[styles.focusCta, { borderWidth: 1, borderColor: isDark ? "rgba(248,184,74,0.5)" : dt.warningBorder, backgroundColor: isDark ? "transparent" : "rgba(248,184,74,0.10)" }]}>
                     <Feather name="arrow-right" size={14} color={theme.warning} />
                     <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{t.dashboard.followUpNow}</ThemedText>
                   </View>
@@ -810,41 +810,6 @@ export default function DashboardScreen() {
           </View>
         );
 
-      case "ratings":
-        return ratingSummary && ratingSummary.total > 0 ? (
-          <View key="ratings" style={[styles.ratingsSummaryCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}>
-            <View style={styles.ratingsSummaryHeader}>
-              <View style={[styles.glanceIcon, { backgroundColor: `${theme.warning}18` }]}>
-                <Feather name="star" size={16} color={theme.warning} />
-              </View>
-              <ThemedText type="small" style={{ fontWeight: "600", marginLeft: Spacing.sm }}>
-                {t.ratings.customerSatisfaction}
-              </ThemedText>
-            </View>
-            <View style={styles.ratingsSummaryBody}>
-              <View style={styles.ratingsSummaryLeft}>
-                <ThemedText type="h2" style={{ fontWeight: "700" }}>
-                  {ratingSummary.average}
-                </ThemedText>
-                <View style={styles.ratingsSummaryStars}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Feather
-                      key={star}
-                      name="star"
-                      size={14}
-                      color={star <= Math.round(ratingSummary.average) ? "#F59E0B" : theme.textMuted}
-                      style={{ marginRight: 2 }}
-                    />
-                  ))}
-                </View>
-              </View>
-              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                {ratingSummary.total} {t.ratings.totalReviews}
-              </ThemedText>
-            </View>
-          </View>
-        ) : null;
-
       case "opportunities":
         return totalOpportunities > 0 ? (
           <Pressable
@@ -889,7 +854,7 @@ export default function DashboardScreen() {
       default:
         return null;
     }
-  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, currentStreak, commandText, commandResult, dt, theme, isDark, t, navigation, handleSubmit, handlePromptTap, handleChipAction, handleSuggestedAction, todayJobCount, monthRevenue, ratingSummary, totalOpportunities, estimatedRecoverable]);
+  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, currentStreak, commandText, commandResult, dt, theme, isDark, t, navigation, handleSubmit, handlePromptTap, handleChipAction, handleSuggestedAction, todayJobCount, monthRevenue, totalOpportunities, estimatedRecoverable]);
 
   return (
     <LinearGradient
