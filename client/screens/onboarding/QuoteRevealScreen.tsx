@@ -44,23 +44,29 @@ export default function QuoteRevealScreen({ tiers, frequency, goal, onNext, onBa
   const [selectedTier, setSelectedTier] = useState("better");
   const [addOns, setAddOns] = useState<string[]>([]);
 
-  const currentPrice = useMemo(() => {
+  const tierPrice = useMemo(() => {
     const t = selectedTier === "good" ? tiers.good : selectedTier === "best" ? tiers.best : tiers.better;
-    let addOnTotal = 0;
+    return t.price;
+  }, [selectedTier, tiers]);
+
+  const addOnTotal = useMemo(() => {
+    let total = 0;
     addOns.forEach((a) => {
       const found = ADD_ONS.find((ao) => ao.id === a);
-      if (found) addOnTotal += found.price;
+      if (found) total += found.price;
     });
-    return t.price + addOnTotal;
-  }, [selectedTier, tiers, addOns]);
+    return total;
+  }, [addOns]);
+
+  const currentPrice = tierPrice + addOnTotal;
 
   const moneyInsight = useMemo(() => {
     return {
-      weekly: currentPrice * 52,
-      biweekly: currentPrice * 26,
-      monthly: currentPrice * 12,
+      weekly: tierPrice * 52 + addOnTotal,
+      biweekly: tierPrice * 26 + addOnTotal,
+      monthly: tierPrice * 12 + addOnTotal,
     };
-  }, [currentPrice]);
+  }, [tierPrice, addOnTotal]);
 
   const toggleAddOn = (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -157,7 +163,10 @@ export default function QuoteRevealScreen({ tiers, frequency, goal, onNext, onBa
               {sel ? <Feather name="check" size={12} color="#FFFFFF" /> : null}
             </View>
             <ThemedText type="body" style={{ flex: 1 }}>{ao.label}</ThemedText>
-            <ThemedText type="subtitle" style={{ color: theme.primary }}>+${ao.price}</ThemedText>
+            <View style={{ alignItems: "flex-end" }}>
+              <ThemedText type="subtitle" style={{ color: theme.primary }}>+${ao.price}</ThemedText>
+              <ThemedText type="caption" style={{ color: theme.textSecondary, fontSize: 10 }}>one time</ThemedText>
+            </View>
           </Pressable>
         );
       })}
