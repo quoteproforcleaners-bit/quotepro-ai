@@ -8,7 +8,7 @@ QuotePro is a comprehensive SaaS platform for residential cleaning companies, ai
 
 Preferred communication style: Simple, everyday language.
 iPhone-only app. No hours/times shown to customers. Customizable service types.
-Future plan: Freemium model where quoting is free, CRM/jobs/automation are paid (RevenueCat for subscriptions).
+Freemium model: Basic quote creation is free. All premium features (CRM, Jobs, Growth, AI, Automations, Sales Strategy, Social) are paywalled at $14.99/month via RevenueCat. ProGate component (`/client/components/ProGate.tsx`) wraps 21 premium screens, showing inline paywall overlay for non-Pro users. Dashboard AI Command Center also gated via `useProGate` hook. QuoteDetail and QuotePreview have individual AI feature gates. AIAssistantScreen and RevenueScreen have their own isPro redirects.
 
 ## System Architecture
 
