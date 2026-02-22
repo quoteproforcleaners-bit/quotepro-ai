@@ -88,6 +88,7 @@ export const customers = pgTable("customers", {
   leadSource: text("lead_source"),
   status: text("status").notNull().default("lead"),
   smsOptOut: boolean("sms_opt_out").notNull().default(false),
+  isVip: boolean("is_vip").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -208,6 +209,8 @@ export const jobs = pgTable("jobs", {
   internalNotes: text("internal_notes").notNull().default(""),
   address: text("address").notNull().default(""),
   total: real("total"),
+  satisfactionRating: integer("satisfaction_rating"),
+  ratingComment: text("rating_comment"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

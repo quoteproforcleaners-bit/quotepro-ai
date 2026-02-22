@@ -134,6 +134,8 @@ import {
   createRecommendation,
   updateRecommendation,
   getPushTokensByUser,
+  rateJob,
+  getRatingsSummary,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -1288,6 +1290,36 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     } catch (error: any) {
       console.error("Complete job error:", error);
       return res.status(500).json({ message: "Failed to complete job" });
+    }
+  });
+
+  // ─── Job Satisfaction Ratings ───
+
+  app.post("/api/jobs/:id/rate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { rating, comment } = req.body;
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+      const updated = await rateJob(req.params.id, rating, comment);
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Rate job error:", error);
+      return res.status(500).json({ message: "Failed to rate job" });
+    }
+  });
+
+  app.get("/api/ratings/summary", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const summary = await getRatingsSummary(business.id);
+      return res.json(summary);
+    } catch (error: any) {
+      console.error("Ratings summary error:", error);
+      return res.status(500).json({ message: "Failed to get ratings summary" });
     }
   });
 

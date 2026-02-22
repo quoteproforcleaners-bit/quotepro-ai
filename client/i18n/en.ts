@@ -647,6 +647,17 @@ const en = {
     fillAllFields: "Please fill in all fields",
     saveQuoteMessage: "Create a free account to save and send your quote",
   },
+
+  ratings: {
+    rateThisJob: "Rate This Job",
+    howWasTheJob: "How was this job?",
+    addComment: "Add a comment (optional)",
+    submitRating: "Submit Rating",
+    ratingSubmitted: "Rating submitted",
+    averageRating: "Average Rating",
+    totalReviews: "reviews",
+    customerSatisfaction: "Customer Satisfaction",
+  },
 };
 
 export default en;

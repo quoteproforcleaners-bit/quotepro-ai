@@ -25,8 +25,9 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius } from "@/constants/theme";
+import { Spacing, BorderRadius, Elevation } from "@/constants/theme";
 import { ProGate } from "@/components/ProGate";
+import { useLanguage } from "@/context/LanguageContext";
 
 type RouteParams = {
   JobDetail: { jobId: string };
@@ -44,6 +45,8 @@ interface Job {
   internalNotes: string;
   address: string;
   total: number | null;
+  satisfactionRating: number | null;
+  ratingComment: string | null;
   customer?: { firstName: string; lastName: string } | null;
 }
 
@@ -135,6 +138,8 @@ export default function JobDetailScreen() {
   const queryClient = useQueryClient();
   const jobId = route.params.jobId;
 
+  const { t } = useLanguage();
+
   const [selectedPhoto, setSelectedPhoto] = useState<JobPhoto | null>(null);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [addPhotoModalVisible, setAddPhotoModalVisible] = useState(false);
@@ -142,6 +147,10 @@ export default function JobDetailScreen() {
   const [caption, setCaption] = useState("");
   const [selectedBase64, setSelectedBase64] = useState<string | null>(null);
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
+
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState("");
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
   const { data: job, isLoading: jobLoading } = useQuery<Job>({
     queryKey: ["/api/jobs", jobId],
@@ -200,6 +209,33 @@ export default function JobDetailScreen() {
       }
     },
   });
+
+  const rateMutation = useMutation({
+    mutationFn: async (data: { rating: number; comment?: string }) => {
+      const res = await apiRequest("POST", `/api/jobs/${jobId}/rate`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ratings/summary"] });
+      setRatingSubmitted(true);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    },
+  });
+
+  const handleStarPress = (star: number) => {
+    setSelectedRating(star);
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handleSubmitRating = () => {
+    if (selectedRating < 1) return;
+    rateMutation.mutate({ rating: selectedRating, comment: ratingComment.trim() || undefined });
+  };
 
   const resetAddPhotoForm = () => {
     setSelectedBase64(null);
@@ -477,6 +513,102 @@ export default function JobDetailScreen() {
               </>
             )}
           </Pressable>
+        ) : null}
+
+        {isCompleted ? (
+          <>
+            <SectionHeader title={t.ratings.rateThisJob} />
+            <Card style={styles.ratingCard}>
+              {job.satisfactionRating ? (
+                <>
+                  <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+                    {t.ratings.ratingSubmitted}
+                  </ThemedText>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Feather
+                        key={star}
+                        name="star"
+                        size={28}
+                        color={star <= job.satisfactionRating! ? "#F59E0B" : theme.textMuted}
+                        style={{ marginRight: Spacing.xs }}
+                      />
+                    ))}
+                  </View>
+                  {job.ratingComment ? (
+                    <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
+                      {job.ratingComment}
+                    </ThemedText>
+                  ) : null}
+                </>
+              ) : ratingSubmitted ? (
+                <View style={styles.ratingSuccessRow}>
+                  <Feather name="check-circle" size={20} color={theme.success} />
+                  <ThemedText type="body" style={{ color: theme.success, fontWeight: "600", marginLeft: Spacing.sm }}>
+                    {t.ratings.ratingSubmitted}
+                  </ThemedText>
+                </View>
+              ) : (
+                <>
+                  <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
+                    {t.ratings.howWasTheJob}
+                  </ThemedText>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Pressable
+                        key={star}
+                        testID={`rating-star-${star}`}
+                        onPress={() => handleStarPress(star)}
+                      >
+                        <Feather
+                          name="star"
+                          size={36}
+                          color={star <= selectedRating ? "#F59E0B" : theme.textMuted}
+                          style={{ marginRight: Spacing.sm }}
+                        />
+                      </Pressable>
+                    ))}
+                  </View>
+                  <TextInput
+                    testID="input-rating-comment"
+                    value={ratingComment}
+                    onChangeText={setRatingComment}
+                    placeholder={t.ratings.addComment}
+                    placeholderTextColor={theme.textMuted}
+                    style={[
+                      styles.ratingCommentInput,
+                      {
+                        backgroundColor: theme.inputBackground,
+                        borderColor: theme.border,
+                        color: theme.text,
+                      },
+                    ]}
+                    multiline
+                  />
+                  <Pressable
+                    testID="submit-rating-btn"
+                    onPress={handleSubmitRating}
+                    disabled={selectedRating < 1 || rateMutation.isPending}
+                    style={[
+                      styles.submitRatingBtn,
+                      {
+                        backgroundColor: selectedRating > 0 ? theme.primary : theme.backgroundTertiary,
+                        opacity: selectedRating > 0 ? 1 : 0.5,
+                      },
+                    ]}
+                  >
+                    {rateMutation.isPending ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <ThemedText type="body" style={{ color: selectedRating > 0 ? "#FFFFFF" : theme.textMuted, fontWeight: "600" }}>
+                        {t.ratings.submitRating}
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </>
+              )}
+            </Card>
+          </>
         ) : null}
       </ScrollView>
 
@@ -845,5 +977,36 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     marginTop: Spacing.xl,
+  },
+  ratingCard: {
+    padding: Spacing.lg,
+  },
+  starsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  ratingCommentInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    fontSize: 14,
+    minHeight: 60,
+    textAlignVertical: "top",
+    marginTop: Spacing.md,
+  },
+  submitRatingBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+  },
+  ratingSuccessRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
   },
 });

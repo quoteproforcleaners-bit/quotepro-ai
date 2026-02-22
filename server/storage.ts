@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, gte, lte, ilike, or, sql } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, ilike, or, sql, isNotNull } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -2054,4 +2054,43 @@ export async function updateRecommendation(id: string, data: { status?: string; 
     .where(eq(salesRecommendations.id, id))
     .returning();
   return rec;
+}
+
+// ─── Job Satisfaction Ratings ───
+
+export async function rateJob(jobId: string, rating: number, comment?: string): Promise<Job> {
+  const [j] = await db
+    .update(jobs)
+    .set({ satisfactionRating: rating, ratingComment: comment ?? null, updatedAt: new Date() })
+    .where(eq(jobs.id, jobId))
+    .returning();
+  return j;
+}
+
+export async function getRatingsSummary(businessId: string): Promise<{
+  average: number;
+  total: number;
+  distribution: Record<number, number>;
+}> {
+  const ratedJobs = await db
+    .select({ satisfactionRating: jobs.satisfactionRating })
+    .from(jobs)
+    .where(
+      and(
+        eq(jobs.businessId, businessId),
+        isNotNull(jobs.satisfactionRating)
+      )
+    );
+
+  const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let sum = 0;
+  for (const row of ratedJobs) {
+    const r = row.satisfactionRating!;
+    distribution[r] = (distribution[r] || 0) + 1;
+    sum += r;
+  }
+  const total = ratedJobs.length;
+  const average = total > 0 ? Math.round((sum / total) * 10) / 10 : 0;
+
+  return { average, total, distribution };
 }

@@ -386,6 +386,10 @@ export default function DashboardScreen() {
     queryKey: ["/api/jobs"],
   });
 
+  const { data: ratingSummary } = useQuery<{ average: number; total: number; distribution: Record<number, number> }>({
+    queryKey: ["/api/ratings/summary"],
+  });
+
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchJobs(), refetchFollowUpQueue(), refetchStreak(), refetchDormant(), refetchLost()]);
@@ -750,6 +754,40 @@ export default function DashboardScreen() {
           />
         </View>
 
+        {ratingSummary && ratingSummary.total > 0 ? (
+          <View style={[styles.ratingsSummaryCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}>
+            <View style={styles.ratingsSummaryHeader}>
+              <View style={[styles.glanceIcon, { backgroundColor: `${theme.warning}18` }]}>
+                <Feather name="star" size={16} color={theme.warning} />
+              </View>
+              <ThemedText type="small" style={{ fontWeight: "600", marginLeft: Spacing.sm }}>
+                {t.ratings.customerSatisfaction}
+              </ThemedText>
+            </View>
+            <View style={styles.ratingsSummaryBody}>
+              <View style={styles.ratingsSummaryLeft}>
+                <ThemedText type="h2" style={{ fontWeight: "700" }}>
+                  {ratingSummary.average}
+                </ThemedText>
+                <View style={styles.ratingsSummaryStars}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Feather
+                      key={star}
+                      name="star"
+                      size={14}
+                      color={star <= Math.round(ratingSummary.average) ? "#F59E0B" : theme.textMuted}
+                      style={{ marginRight: 2 }}
+                    />
+                  ))}
+                </View>
+              </View>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                {ratingSummary.total} {t.ratings.totalReviews}
+              </ThemedText>
+            </View>
+          </View>
+        ) : null}
+
         {totalOpportunities > 0 ? (
           <Pressable
             onPress={() => navigation.navigate("Opportunities")}
@@ -1028,5 +1066,31 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: Spacing.xl,
+  },
+  ratingsSummaryCard: {
+    marginHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.xl,
+  },
+  ratingsSummaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  ratingsSummaryBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  ratingsSummaryLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  ratingsSummaryStars: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 });

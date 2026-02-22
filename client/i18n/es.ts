@@ -649,6 +649,17 @@ const es: Translations = {
     fillAllFields: "Por favor completa todos los campos",
     saveQuoteMessage: "Crea una cuenta gratis para guardar y enviar tu cotizaci\u00f3n",
   },
+
+  ratings: {
+    rateThisJob: "Califica Este Trabajo",
+    howWasTheJob: "\u00bfC\u00f3mo fue este trabajo?",
+    addComment: "Agregar comentario (opcional)",
+    submitRating: "Enviar Calificaci\u00f3n",
+    ratingSubmitted: "Calificaci\u00f3n enviada",
+    averageRating: "Calificaci\u00f3n Promedio",
+    totalReviews: "rese\u00f1as",
+    customerSatisfaction: "Satisfacci\u00f3n del Cliente",
+  },
 };
 
 export default es;
