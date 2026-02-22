@@ -79,6 +79,9 @@ export default function ReactivationScreen() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [selectedPromptChips, setSelectedPromptChips] = useState<string[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
+  const [editingSubject, setEditingSubject] = useState("");
+  const [editingContent, setEditingContent] = useState("");
+  const [hasUnsavedEdits, setHasUnsavedEdits] = useState(false);
 
   const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"], enabled: segment === "dormant" });
   const lostQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/lost"], enabled: segment === "lost" });
@@ -155,6 +158,9 @@ export default function ReactivationScreen() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       setViewingCampaign((prev: any) => prev?.id === campaign.id ? { ...prev, messageContent: aiData.content, messageSubject: aiData.subject || "" } : prev);
+      setEditingSubject(aiData.subject || "");
+      setEditingContent(aiData.content);
+      setHasUnsavedEdits(false);
     } catch (e) {
       console.error("AI content generation error:", e);
       setAiError(true);
@@ -180,6 +186,9 @@ export default function ReactivationScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       resetModal();
       setViewingCampaign(campaign);
+      setEditingSubject("");
+      setEditingContent("");
+      setHasUnsavedEdits(false);
       generateAndAttachContent(campaign, prompt);
     } catch (error) {
       console.error("Campaign creation error:", error);
@@ -211,6 +220,9 @@ export default function ReactivationScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       resetModal();
       setViewingCampaign(campaign);
+      setEditingSubject("");
+      setEditingContent("");
+      setHasUnsavedEdits(false);
       generateAndAttachContent(campaign, prompt);
     } catch (error) {
       console.error("Campaign creation error:", error);
@@ -589,6 +601,9 @@ export default function ReactivationScreen() {
                       key={campaign.id}
                       onPress={() => {
                         setViewingCampaign(campaign);
+                        setEditingSubject(campaign.messageSubject || "");
+                        setEditingContent(campaign.messageContent || "");
+                        setHasUnsavedEdits(false);
                         if (!campaign.messageContent) {
                           generateAndAttachContent(campaign);
                         }
@@ -691,18 +706,32 @@ export default function ReactivationScreen() {
               </View>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: Spacing.lg }}>
-              {viewingCampaign?.messageSubject ? (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: Spacing.lg }} keyboardShouldPersistTaps="handled">
+              {(viewingCampaign?.messageContent || editingContent) ? (
                 <View style={{ marginBottom: Spacing.md }}>
                   <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: 4 }}>Subject</ThemedText>
-                  <ThemedText type="subtitle">{viewingCampaign.messageSubject}</ThemedText>
+                  <TextInput
+                    value={editingSubject}
+                    onChangeText={(text) => { setEditingSubject(text); setHasUnsavedEdits(true); }}
+                    style={{ fontSize: 16, fontWeight: "600", color: dt.textPrimary, backgroundColor: dt.surfaceSecondary, borderRadius: BorderRadius.sm, padding: Spacing.sm, borderWidth: 1, borderColor: dt.border }}
+                    placeholderTextColor={dt.textSecondary}
+                    placeholder="Enter subject line..."
+                  />
                 </View>
               ) : null}
               
               <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: 4 }}>Message</ThemedText>
-              {viewingCampaign?.messageContent ? (
-                <View style={{ backgroundColor: dt.surfaceSecondary, borderRadius: BorderRadius.sm, padding: Spacing.md }}>
-                  <ThemedText type="body" style={{ lineHeight: 22 }}>{viewingCampaign.messageContent}</ThemedText>
+              {(viewingCampaign?.messageContent || editingContent) ? (
+                <View style={{ backgroundColor: dt.surfaceSecondary, borderRadius: BorderRadius.sm, padding: Spacing.md, borderWidth: 1, borderColor: dt.border }}>
+                  <TextInput
+                    value={editingContent}
+                    onChangeText={(text) => { setEditingContent(text); setHasUnsavedEdits(true); }}
+                    style={{ fontSize: 15, lineHeight: 22, color: dt.textPrimary, minHeight: 200 }}
+                    multiline
+                    textAlignVertical="top"
+                    placeholderTextColor={dt.textSecondary}
+                    placeholder="Enter message content..."
+                  />
                 </View>
               ) : generatingContent ? (
                 <View style={{ alignItems: "center", paddingVertical: Spacing.xl }}>
@@ -796,11 +825,33 @@ export default function ReactivationScreen() {
               </View>
             ) : (
               <View style={{ gap: Spacing.sm }}>
+                {hasUnsavedEdits ? (
+                  <Pressable
+                    onPress={async () => {
+                      try {
+                        await apiRequest("PUT", `/api/campaigns/${viewingCampaign?.id}`, {
+                          messageContent: editingContent,
+                          messageSubject: editingSubject,
+                        });
+                        queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+                        setViewingCampaign({ ...viewingCampaign, messageContent: editingContent, messageSubject: editingSubject });
+                        setHasUnsavedEdits(false);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      } catch (e) {
+                        console.error("Save edit error:", e);
+                      }
+                    }}
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: dt.accent }}
+                  >
+                    <Feather name="check" size={16} color="#FFFFFF" />
+                    <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.xs }}>Save Changes</ThemedText>
+                  </Pressable>
+                ) : null}
                 {viewingCampaign?.status !== "sent" ? (
                   <Pressable
                     onPress={() => setConfirmSend(true)}
-                    disabled={!viewingCampaign?.messageContent || generatingContent || sendingCampaign}
-                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: !viewingCampaign?.messageContent || generatingContent ? dt.surfaceSecondary : theme.success, opacity: !viewingCampaign?.messageContent || generatingContent ? 0.5 : 1 }}
+                    disabled={!editingContent || generatingContent || sendingCampaign || hasUnsavedEdits}
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: !editingContent || generatingContent || hasUnsavedEdits ? dt.surfaceSecondary : theme.success, opacity: !editingContent || generatingContent || hasUnsavedEdits ? 0.5 : 1 }}
                   >
                     {sendingCampaign ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
@@ -838,6 +889,9 @@ export default function ReactivationScreen() {
                         });
                         queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
                         setViewingCampaign({ ...viewingCampaign, messageContent: aiData.content, messageSubject: aiData.subject || "" });
+                        setEditingSubject(aiData.subject || "");
+                        setEditingContent(aiData.content);
+                        setHasUnsavedEdits(false);
                       } catch (e) {
                         console.error("Regenerate error:", e);
                         setAiError(true);
