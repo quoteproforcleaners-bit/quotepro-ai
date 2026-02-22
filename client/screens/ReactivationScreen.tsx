@@ -683,7 +683,7 @@ export default function ReactivationScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={!!viewingCampaign} transparent animationType="slide" onRequestClose={() => { setViewingCampaign(null); setConfirmSend(false); setSendResult(null); }}>
+      <Modal visible={!!viewingCampaign} transparent animationType="slide" onRequestClose={() => { setViewingCampaign(null); setConfirmSend(false); setSendResult(null); setHasUnsavedEdits(false); }}>
         <View style={{ flex: 1, backgroundColor: dt.overlay, justifyContent: "flex-end" }}>
           <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: Spacing.xl, maxHeight: "80%", marginHorizontal: 0 }]}>
             <View style={styles.modalHeader}>
