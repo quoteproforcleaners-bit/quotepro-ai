@@ -4118,7 +4118,14 @@ Respond with JSON: {"reply": string}`
       const businessName = business.companyName || "our cleaning company";
       const ownerName = business.senderName || "";
 
-      const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. No links/URLs. Ask them to reply with their feedback or leave a review. No emojis. Keep it personal and genuine.`;
+      const growthSettings = await getGrowthAutomationSettings(business.id);
+      const googleReviewLink = growthSettings?.googleReviewLink?.trim() || "";
+
+      const linkInstruction = googleReviewLink
+        ? `Include this Google review link in the email naturally: ${googleReviewLink} — encourage them to click it to leave a review.`
+        : `No links/URLs. Ask them to reply with their feedback or leave a review.`;
+
+      const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. ${linkInstruction} No emojis. Keep it personal and genuine.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
@@ -4138,9 +4145,10 @@ Respond with JSON: {"reply": string}`
         content = lines.slice(1).join("\n").trim();
       }
 
+      const fallbackLink = googleReviewLink ? `\n\nLeave us a review here: ${googleReviewLink}` : "";
       if (!content) {
         return res.json({
-          content: `Dear [Customer],\n\nThank you for choosing ${businessName}. We hope you were happy with our service.\n\nWould you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.\n\nSimply reply to this email with your thoughts. We appreciate your time!\n\nBest regards,\n${ownerName || businessName}`,
+          content: `Dear [Customer],\n\nThank you for choosing ${businessName}. We hope you were happy with our service.\n\nWould you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.${fallbackLink}\n\nWe appreciate your time!\n\nBest regards,\n${ownerName || businessName}`,
           subject: "We would love your feedback",
           channel: "email",
         });
@@ -4152,8 +4160,15 @@ Respond with JSON: {"reply": string}`
       const business = await getBusinessByOwner(req.session.userId!).catch(() => null);
       const businessName = business?.companyName || "our cleaning company";
       const ownerName = business?.senderName || businessName;
+      let fallbackLink = "";
+      try {
+        if (business) {
+          const gs = await getGrowthAutomationSettings(business.id);
+          if (gs?.googleReviewLink?.trim()) fallbackLink = `\n\nLeave us a review here: ${gs.googleReviewLink.trim()}`;
+        }
+      } catch {}
       return res.json({
-        content: `Dear [Customer],\n\nThank you for choosing ${businessName}. We hope you were happy with our service.\n\nWould you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.\n\nSimply reply to this email with your thoughts. We appreciate your time!\n\nBest regards,\n${ownerName}`,
+        content: `Dear [Customer],\n\nThank you for choosing ${businessName}. We hope you were happy with our service.\n\nWould you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.${fallbackLink}\n\nWe appreciate your time!\n\nBest regards,\n${ownerName}`,
         subject: "We would love your feedback",
         channel: "email",
       });
