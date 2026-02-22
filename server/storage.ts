@@ -273,6 +273,7 @@ export async function updateCustomer(
     leadSource: string;
     status: string;
     smsOptOut: boolean;
+    isVip: boolean;
   }>
 ): Promise<Customer> {
   const [c] = await db

@@ -27,6 +27,8 @@ export function useScreenOptions({
     gestureEnabled: true,
     gestureDirection: "horizontal",
     fullScreenGestureEnabled: true,
+    animation: "slide_from_right",
+    animationDuration: 300,
     contentStyle: {
       backgroundColor: theme.backgroundRoot,
     },

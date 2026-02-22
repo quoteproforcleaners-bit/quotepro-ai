@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as SMS from "expo-sms";
+import * as Haptics from "expo-haptics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useTheme } from "@/hooks/useTheme";
@@ -39,6 +40,7 @@ interface Customer {
   tags: string[];
   leadSource: string | null;
   status: string;
+  isVip?: boolean;
   createdAt: string;
 }
 
@@ -60,7 +62,7 @@ export default function CustomerDetailScreen() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const { isPro } = useSubscription();
-  const { communicationLanguage } = useLanguage();
+  const { communicationLanguage, t } = useLanguage();
   const [showCommForm, setShowCommForm] = useState(false);
   const [commChannel, setCommChannel] = useState<string>("phone");
   const [commSubject, setCommSubject] = useState("");
@@ -416,6 +418,24 @@ export default function CustomerDetailScreen() {
                     customer.status.slice(1)}
                 </ThemedText>
               </View>
+              {customer.isVip ? (
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: "#F59E0B20", marginLeft: Spacing.xs },
+                  ]}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Feather name="award" size={12} color="#F59E0B" style={{ marginRight: 2 }} />
+                    <ThemedText
+                      type="caption"
+                      style={{ color: "#F59E0B", fontWeight: "600" }}
+                    >
+                      {t.customers.vip}
+                    </ThemedText>
+                  </View>
+                </View>
+              ) : null}
             </View>
 
             {customer.phone ? (
@@ -472,6 +492,30 @@ export default function CustomerDetailScreen() {
             ) : null}
           </View>
         )}
+
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            updateMutation.mutate({ isVip: !customer.isVip });
+          }}
+          style={[
+            styles.vipToggle,
+            { backgroundColor: theme.cardBackground, borderColor: theme.border },
+          ]}
+          testID="toggle-vip-btn"
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+            <Feather name="award" size={18} color="#F59E0B" style={{ marginRight: Spacing.sm }} />
+            <ThemedText type="body" style={{ fontWeight: "500" }}>
+              {t.customers.vipCustomer}
+            </ThemedText>
+          </View>
+          <Feather
+            name={customer.isVip ? "check-circle" : "circle"}
+            size={22}
+            color={customer.isVip ? "#F59E0B" : theme.textSecondary}
+          />
+        </Pressable>
 
         <View style={styles.quickActions}>
           <Pressable
@@ -1152,6 +1196,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Spacing.sm,
+  },
+  vipToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
   },
   quickActions: {
     flexDirection: "row",

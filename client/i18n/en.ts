@@ -139,6 +139,10 @@ const en = {
     leads: "Leads",
     aiFollowUpBanner: "AI-powered follow-ups and automated messaging with QuotePro AI",
     addDescription: "Add your first customer to start managing your contacts and growing your business.",
+    vip: "VIP",
+    vipCustomer: "VIP Customer",
+    markVip: "Mark as VIP",
+    removeVip: "Remove VIP",
   },
 
   quotes: {
@@ -646,6 +650,15 @@ const en = {
     subtitle: "Sign up to save your quote and unlock all features",
     fillAllFields: "Please fill in all fields",
     saveQuoteMessage: "Create a free account to save and send your quote",
+  },
+
+  display: {
+    appearance: "Appearance",
+    system: "System",
+    light: "Light",
+    dark: "Dark",
+    autoEvening: "Auto (Evening)",
+    autoDescription: "Dark mode from 7 PM to 6 AM",
   },
 
   ratings: {

@@ -27,6 +27,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { LANGUAGE_LABELS, type Language } from "@/i18n";
 import { syncNotificationSchedule } from "@/lib/notifications";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { useDarkModePreference } from "@/hooks/useColorScheme";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -38,6 +39,7 @@ export default function SettingsScreen() {
   const { businessProfile: profile, updateBusinessProfile } = useApp();
   const { isPro } = useSubscription();
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
+  const { preference: darkModePref, setPreference: setDarkModePref } = useDarkModePreference();
 
   const queryClient = useQueryClient();
 
@@ -1001,6 +1003,45 @@ export default function SettingsScreen() {
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
         </View>
       </Pressable>
+
+      <SectionHeader title={t.display.appearance} />
+
+      <View style={[styles.languageSelector, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        {([
+          { key: "system" as const, icon: "smartphone" as const, label: t.display.system },
+          { key: "light" as const, icon: "sun" as const, label: t.display.light },
+          { key: "dark" as const, icon: "moon" as const, label: t.display.dark },
+          { key: "auto" as const, icon: "clock" as const, label: t.display.autoEvening },
+        ]).map((option) => (
+          <Pressable
+            key={option.key}
+            onPress={() => setDarkModePref(option.key)}
+            style={[
+              styles.languageOption,
+              {
+                backgroundColor: darkModePref === option.key ? `${theme.primary}15` : "transparent",
+                borderColor: darkModePref === option.key ? theme.primary : "transparent",
+              },
+            ]}
+            testID={`settings-dark-mode-${option.key}`}
+          >
+            <Feather name={option.icon} size={18} color={darkModePref === option.key ? theme.primary : theme.textSecondary} style={{ marginRight: Spacing.sm }} />
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: darkModePref === option.key ? "700" : "500" }}>
+                {option.label}
+              </ThemedText>
+              {option.key === "auto" ? (
+                <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                  {t.display.autoDescription}
+                </ThemedText>
+              ) : null}
+            </View>
+            {darkModePref === option.key ? (
+              <Feather name="check" size={20} color={theme.primary} />
+            ) : null}
+          </Pressable>
+        ))}
+      </View>
 
       <SectionHeader title={t.settings.language} subtitle={t.settings.languageSubtitle} />
 

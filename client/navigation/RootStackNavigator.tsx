@@ -95,6 +95,7 @@ export default function RootStackNavigator() {
             component={QuoteCalculatorScreen}
             options={{
               presentation: "modal",
+              animation: "slide_from_bottom",
               headerShown: false,
             }}
           />
@@ -117,6 +118,7 @@ export default function RootStackNavigator() {
             component={QuoteCalculatorScreen}
             options={{
               presentation: "modal",
+              animation: "slide_from_bottom",
               headerShown: false,
             }}
           />
@@ -153,6 +155,7 @@ export default function RootStackNavigator() {
             component={PaywallScreen}
             options={{
               presentation: "modal",
+              animation: "slide_from_bottom",
               headerShown: false,
             }}
           />

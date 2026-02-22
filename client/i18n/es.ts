@@ -141,6 +141,10 @@ const es: Translations = {
     leads: "Prospectos",
     aiFollowUpBanner: "Seguimientos con IA y mensajes automatizados con QuotePro AI",
     addDescription: "Agrega tu primer cliente para gestionar tus contactos y hacer crecer tu negocio.",
+    vip: "VIP",
+    vipCustomer: "Cliente VIP",
+    markVip: "Marcar como VIP",
+    removeVip: "Quitar VIP",
   },
 
   quotes: {
@@ -648,6 +652,15 @@ const es: Translations = {
     subtitle: "Reg\u00edstrate para guardar tu cotizaci\u00f3n y desbloquear todas las funciones",
     fillAllFields: "Por favor completa todos los campos",
     saveQuoteMessage: "Crea una cuenta gratis para guardar y enviar tu cotizaci\u00f3n",
+  },
+
+  display: {
+    appearance: "Apariencia",
+    system: "Sistema",
+    light: "Claro",
+    dark: "Oscuro",
+    autoEvening: "Auto (Noche)",
+    autoDescription: "Modo oscuro de 7 PM a 6 AM",
   },
 
   ratings: {

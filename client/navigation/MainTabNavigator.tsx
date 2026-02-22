@@ -145,6 +145,7 @@ export default function MainTabNavigator() {
       screenOptions={{
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.tabIconDefault,
+        animationEnabled: true,
         tabBarStyle: {
           position: "absolute",
           height: Platform.select({ ios: 86, android: 72, default: 72 }),

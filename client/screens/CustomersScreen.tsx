@@ -41,10 +41,11 @@ interface Customer {
   tags: string[];
   leadSource: string | null;
   status: string;
+  isVip?: boolean;
   createdAt: string;
 }
 
-type StatusFilter = "all" | "lead" | "active" | "inactive";
+type StatusFilter = "all" | "lead" | "active" | "inactive" | "vip";
 
 export default function CustomersScreen() {
   const insets = useSafeAreaInsets();
@@ -60,6 +61,7 @@ export default function CustomersScreen() {
     { label: t.customers.leads, value: "lead" },
     { label: t.customers.active, value: "active" },
     { label: t.customers.inactive, value: "inactive" },
+    { label: t.customers.vip, value: "vip" },
   ];
 
   const [searchText, setSearchText] = useState("");
@@ -96,7 +98,7 @@ export default function CustomersScreen() {
     if (debouncedSearch) {
       queryParams.push(`search=${encodeURIComponent(debouncedSearch)}`);
     }
-    if (statusFilter !== "all") {
+    if (statusFilter !== "all" && statusFilter !== "vip") {
       queryParams.push(`status=${statusFilter}`);
     }
     if (queryParams.length > 0) {
@@ -106,12 +108,14 @@ export default function CustomersScreen() {
   }, [debouncedSearch, statusFilter]);
 
   const {
-    data: customers = [],
+    data: rawCustomers = [],
     isLoading,
     refetch,
   } = useQuery<Customer[]>({
     queryKey: buildQueryKey(),
   });
+
+  const customers = statusFilter === "vip" ? rawCustomers.filter(c => c.isVip) : rawCustomers;
 
   const createMutation = useMutation({
     mutationFn: async (data: {
@@ -220,6 +224,24 @@ export default function CustomersScreen() {
                   {getStatusLabel(item.status)}
                 </ThemedText>
               </View>
+              {item.isVip ? (
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: "#F59E0B20", marginLeft: Spacing.xs },
+                  ]}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Feather name="award" size={12} color="#F59E0B" style={{ marginRight: 2 }} />
+                    <ThemedText
+                      type="caption"
+                      style={{ color: "#F59E0B", fontWeight: "600" }}
+                    >
+                      {t.customers.vip}
+                    </ThemedText>
+                  </View>
+                </View>
+              ) : null}
             </View>
             {item.phone ? (
               <View style={styles.detailRow}>
