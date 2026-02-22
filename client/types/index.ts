@@ -47,6 +47,14 @@ export interface BusinessProfile {
   cashappHandle: string | null;
   paymentOptions: PaymentOptions | null;
   paymentNotes: string | null;
+  avatarConfig: AvatarConfig | null;
+}
+
+export interface AvatarConfig {
+  style: "initials" | "icon";
+  backgroundColor: string;
+  icon?: string;
+  initials?: string;
 }
 
 export interface ServiceTypeConfig {
@@ -237,4 +245,5 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfile = {
   cashappHandle: null,
   paymentOptions: null,
   paymentNotes: null,
+  avatarConfig: null,
 };
