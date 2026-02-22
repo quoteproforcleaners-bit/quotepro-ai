@@ -4088,32 +4088,29 @@ Respond with JSON: {"reply": string}`
       
       const systemPrompt = `Write a marketing email for "${businessName}"${ownerName ? ` (${ownerName})` : ""} targeting ${targetDesc}.\n\nCAMPAIGN THEME: ${themeGuide}${customInstruction}\n\nRules:\n- Format: first line "Subject: ...", blank line, then body under 150 words\n- The subject line MUST reference the campaign theme ("${campaignName}")\n- The email body MUST be specifically about the "${campaignName}" theme — not generic\n- Use [Customer] for their name\n- No placeholders for company/owner — use real names\n- No links/URLs\n- Tell them to reply to book\n- No emojis`;
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000);
-      
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Generate a themed email for the "${campaignName}" campaign.` },
         ],
-        max_completion_tokens: 300,
-      }, { signal: controller.signal as any });
-      
-      clearTimeout(timeout);
+      });
 
       const raw = completion.choices[0]?.message?.content?.trim() || "";
-      console.log("AI campaign content raw response length:", raw.length, "for campaign:", campaignName);
+      console.log("AI campaign response:", JSON.stringify({ length: raw.length, finishReason: completion.choices[0]?.finish_reason, hasContent: !!raw }));
+      
+      if (!raw) {
+        console.warn("AI returned empty for campaign:", campaignName, "- full response:", JSON.stringify(completion.choices[0]));
+        const fallbackContent = `Dear [Customer],\n\nWe wanted to reach out from ${businessName} about our ${campaignName} offer.\n\nWe'd love the opportunity to serve you${segment === "dormant" ? " again" : ""}. Reply to this email to schedule your next cleaning, and we'll make sure to take great care of your home.\n\nBest regards,\n${ownerName || businessName}`;
+        return res.json({ content: fallbackContent, subject: campaignName, channel: "email" });
+      }
+
       let subject = "";
       let content = raw;
       const subjectMatch = raw.match(/^Subject:\s*(.+)/i);
       if (subjectMatch) {
         subject = subjectMatch[1].trim();
         content = raw.substring(raw.indexOf("\n") + 1).trim();
-      }
-
-      if (!content) {
-        console.warn("AI returned empty content for campaign:", campaignName, "- raw was:", raw.substring(0, 200));
       }
 
       return res.json({ content, subject: subject || campaignName, channel: "email" });
