@@ -137,7 +137,7 @@ export default function ReactivationScreen() {
     return parts.join(". ");
   };
 
-  const generateAndAttachContent = async (campaign: any, prompt?: string) => {
+  const generateAndAttachContent = async (campaign: any, _prompt?: string) => {
     try {
       setGeneratingContent(true);
       setAiError(false);
@@ -145,7 +145,6 @@ export default function ReactivationScreen() {
         campaignName: campaign.name,
         segment: campaign.segment,
         channel: campaign.channel || "email",
-        customPrompt: prompt || undefined,
       });
       const aiData = await aiRes.json();
       if (!aiData.content) {
