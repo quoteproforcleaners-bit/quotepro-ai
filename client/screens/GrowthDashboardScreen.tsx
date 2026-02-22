@@ -13,6 +13,7 @@ import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
+import { ProGate } from "@/components/ProGate";
 import OnboardingBanner from "@/components/OnboardingBanner";
 
 function useDesignTokens() {
@@ -125,6 +126,7 @@ export default function GrowthDashboardScreen() {
   const cardStyle = (extra?: any) => [s.card, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderSecondary, ...(Platform.OS === "ios" ? dt.shadow : {}) }, extra];
 
   return (
+    <ProGate featureName="Growth Dashboard">
     <LinearGradient colors={[dt.gradientTop, dt.gradientBottom]} style={s.flex}>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.lg, paddingTop: headerHeight + Spacing.xl, paddingBottom: tabBarHeight + Spacing.xl }}
@@ -261,6 +263,7 @@ export default function GrowthDashboardScreen() {
         
       </ScrollView>
     </LinearGradient>
+    </ProGate>
   );
 }
 

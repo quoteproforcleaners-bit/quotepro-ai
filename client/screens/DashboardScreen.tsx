@@ -33,6 +33,7 @@ import { runAiCommand, EXAMPLE_PROMPTS, AiCommandResult } from "@/lib/aiCommandR
 import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
+import { useProGate } from "@/components/ProGate";
 
 /*
  * ─── Design Tokens (Home Screen) ───
@@ -329,6 +330,7 @@ export default function DashboardScreen() {
   const { businessProfile: profile } = useApp();
   const { t } = useLanguage();
   const inputRef = useRef<TextInput>(null);
+  const { isPro, requirePro } = useProGate();
 
   const [commandText, setCommandText] = useState("");
   const [commandResult, setCommandResult] = useState<AiCommandResult | null>(null);
@@ -458,11 +460,13 @@ export default function DashboardScreen() {
   }, [appData, navigation]);
 
   const handleSubmit = () => {
+    if (!requirePro()) return;
     executeCommand(commandText);
     setCommandText("");
   };
 
   const handlePromptTap = (prompt: string) => {
+    if (!requirePro()) return;
     setCommandText(prompt);
     executeCommand(prompt);
   };
@@ -473,16 +477,16 @@ export default function DashboardScreen() {
         navigation.navigate("QuoteCalculator");
         break;
       case "follow_up":
-        navigation.navigate("FollowUpQueue");
+        if (requirePro()) navigation.navigate("FollowUpQueue");
         break;
       case "metrics":
-        executeCommand("How many cleans booked this month?");
+        if (requirePro()) executeCommand("How many cleans booked this month?");
         break;
       case "draft":
-        navigation.navigate("Main", { screen: "CustomersTab" });
+        if (requirePro()) navigation.navigate("Main", { screen: "CustomersTab" });
         break;
       case "schedule":
-        navigation.navigate("Main", { screen: "JobsTab" });
+        if (requirePro()) navigation.navigate("Main", { screen: "JobsTab" });
         break;
     }
   };

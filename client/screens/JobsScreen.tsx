@@ -24,6 +24,7 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
 import { ProBanner } from "@/components/ProBanner";
+import { ProGate } from "@/components/ProGate";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
@@ -529,6 +530,7 @@ export default function JobsScreen() {
     : null;
 
   return (
+    <ProGate featureName="Job Scheduling">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
         testID="jobs-list"
@@ -926,6 +928,7 @@ export default function JobsScreen() {
         </View>
       </Modal>
     </View>
+    </ProGate>
   );
 }
 

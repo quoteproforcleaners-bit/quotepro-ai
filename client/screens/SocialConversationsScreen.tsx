@@ -10,6 +10,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { EmptyState } from "@/components/EmptyState";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { ProGate } from "@/components/ProGate";
 
 export default function SocialConversationsScreen() {
   const headerHeight = useHeaderHeight();
@@ -80,27 +81,29 @@ export default function SocialConversationsScreen() {
   );
 
   return (
-    <FlatList
-      data={conversations}
-      keyExtractor={(item) => item.id}
-      renderItem={renderItem}
-      contentContainerStyle={{
-        paddingTop: headerHeight + Spacing.md,
-        paddingBottom: insets.bottom + Spacing.xl,
-        paddingHorizontal: Spacing.lg,
-        flexGrow: 1,
-      }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
-      ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
-      ListEmptyComponent={
-        <EmptyState
-          icon="message-circle"
-          iconColor={theme.accent}
-          title="No Conversations"
-          description="Conversations from Instagram DMs will appear here."
-        />
-      }
-    />
+    <ProGate featureName="Social Conversations">
+      <FlatList
+        data={conversations}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={{
+          paddingTop: headerHeight + Spacing.md,
+          paddingBottom: insets.bottom + Spacing.xl,
+          paddingHorizontal: Spacing.lg,
+          flexGrow: 1,
+        }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
+        ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
+        ListEmptyComponent={
+          <EmptyState
+            icon="message-circle"
+            iconColor={theme.accent}
+            title="No Conversations"
+            description="Conversations from Instagram DMs will appear here."
+          />
+        }
+      />
+    </ProGate>
   );
 }
 

@@ -28,6 +28,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { apiRequest } from "@/lib/query-client";
 import { trackEvent } from "@/lib/analytics";
+import { ProGate } from "@/components/ProGate";
 
 interface FollowUpItem {
   id: number;
@@ -413,6 +414,7 @@ export default function FollowUpQueueScreen() {
   }, [theme, borderColor, handleText, handleEmail, handleCall, handleMarkContacted, handleViewQuote, navigation]);
 
   return (
+    <ProGate featureName="Follow-Up Queue">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={[styles.header, { paddingTop: headerHeight + Spacing.md }]}>
         <View style={[styles.atRiskCard, { backgroundColor: surfaceBg }]}>
@@ -564,6 +566,7 @@ export default function FollowUpQueueScreen() {
         onDismiss={() => setToastVisible(false)}
       />
     </View>
+    </ProGate>
   );
 }
 

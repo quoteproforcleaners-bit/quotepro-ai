@@ -10,6 +10,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { ProGate } from "@/components/ProGate";
 
 export default function SocialSettingsScreen() {
   const headerHeight = useHeaderHeight();
@@ -69,14 +70,15 @@ export default function SocialSettingsScreen() {
   });
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        paddingTop: headerHeight + Spacing.lg,
-        paddingBottom: insets.bottom + Spacing.xl,
-        paddingHorizontal: Spacing.lg,
-      }}
-    >
-      <ThemedText type="h4" style={{ marginBottom: Spacing.md }}>Connected Channels</ThemedText>
+    <ProGate featureName="Social Settings">
+      <ScrollView
+        contentContainerStyle={{
+          paddingTop: headerHeight + Spacing.lg,
+          paddingBottom: insets.bottom + Spacing.xl,
+          paddingHorizontal: Spacing.lg,
+        }}
+      >
+        <ThemedText type="h4" style={{ marginBottom: Spacing.md }}>Connected Channels</ThemedText>
       {connections.length > 0 ? (
         connections.map((conn: any) => (
           <View key={conn.id} style={[styles.connectionRow, { backgroundColor: theme.backgroundDefault }]}>
@@ -193,7 +195,8 @@ export default function SocialSettingsScreen() {
       >
         {saveMutation.isPending ? "Saving..." : "Save Settings"}
       </Button>
-    </ScrollView>
+      </ScrollView>
+    </ProGate>
   );
 }
 

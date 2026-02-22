@@ -16,6 +16,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { ProGate } from "@/components/ProGate";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -181,6 +182,7 @@ export default function UpsellOpportunitiesScreen() {
   ), [dt]);
 
   return (
+    <ProGate featureName="Upsell Opportunities">
     <View style={s.flex}>
       <FlatList
         data={opportunities}
@@ -201,6 +203,7 @@ export default function UpsellOpportunitiesScreen() {
         testID="list-upsell-opportunities"
       />
     </View>
+    </ProGate>
   );
 }
 

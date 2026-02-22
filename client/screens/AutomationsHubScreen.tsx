@@ -17,6 +17,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { ProGate } from "@/components/ProGate";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -116,6 +117,7 @@ export default function AutomationsHubScreen() {
   }
 
   return (
+    <ProGate featureName="Automations">
     <KeyboardAwareScrollViewCompat
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
@@ -181,6 +183,7 @@ export default function AutomationsHubScreen() {
         />
       </Card>
     </KeyboardAwareScrollViewCompat>
+    </ProGate>
   );
 }
 

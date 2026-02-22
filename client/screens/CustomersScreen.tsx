@@ -25,6 +25,7 @@ import { Button } from "@/components/Button";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { ProBanner } from "@/components/ProBanner";
+import { ProGate } from "@/components/ProGate";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
@@ -298,6 +299,7 @@ export default function CustomersScreen() {
     );
 
   return (
+    <ProGate featureName="Customer Management">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
         testID="customers-list"
@@ -409,6 +411,7 @@ export default function CustomersScreen() {
         </View>
       </Modal>
     </View>
+    </ProGate>
   );
 }
 

@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { ProGate } from "@/components/ProGate";
 
 type TaskType =
   | "QUOTE_FOLLOWUP"
@@ -246,6 +247,7 @@ export default function TasksQueueScreen() {
   const keyExtractor = useCallback((item: any) => String(item.id), []);
 
   return (
+    <ProGate featureName="Growth Tasks">
     <View style={[styles.container, { backgroundColor: dt.surfaceSecondary }]}>
       <View style={{ paddingTop: Spacing.xl }}>
         <ScrollView
@@ -304,6 +306,7 @@ export default function TasksQueueScreen() {
         />
       )}
     </View>
+    </ProGate>
   );
 }
 

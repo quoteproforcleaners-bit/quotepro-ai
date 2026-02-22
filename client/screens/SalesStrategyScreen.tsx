@@ -17,6 +17,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useLanguage } from "@/context/LanguageContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import { ProGate } from "@/components/ProGate";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -107,6 +108,7 @@ export default function SalesStrategyScreen() {
   }
 
   return (
+    <ProGate featureName="Sales Strategy">
     <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
@@ -215,6 +217,7 @@ export default function SalesStrategyScreen() {
         </View>
       </Card>
     </ScrollView>
+    </ProGate>
   );
 }
 

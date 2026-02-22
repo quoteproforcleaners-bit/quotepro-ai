@@ -11,6 +11,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { ProGate } from "@/components/ProGate";
 
 export default function TikTokLeadCreateScreen() {
   const headerHeight = useHeaderHeight();
@@ -41,14 +42,15 @@ export default function TikTokLeadCreateScreen() {
   });
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        paddingTop: headerHeight + Spacing.lg,
-        paddingBottom: insets.bottom + Spacing.xl,
-        paddingHorizontal: Spacing.lg,
-      }}
-    >
-      <View style={[styles.infoCard, { backgroundColor: theme.gradientAccent }]}>
+    <ProGate featureName="Social Leads">
+      <ScrollView
+        contentContainerStyle={{
+          paddingTop: headerHeight + Spacing.lg,
+          paddingBottom: insets.bottom + Spacing.xl,
+          paddingHorizontal: Spacing.lg,
+        }}
+      >
+        <View style={[styles.infoCard, { backgroundColor: theme.gradientAccent }]}>
         <Feather name="info" size={16} color={theme.accent} />
         <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
           Paste a TikTok DM and our AI will extract lead details like name, service type, and property info.
@@ -124,7 +126,8 @@ export default function TikTokLeadCreateScreen() {
           </Button>
         </Card>
       ) : null}
-    </ScrollView>
+      </ScrollView>
+    </ProGate>
   );
 }
 

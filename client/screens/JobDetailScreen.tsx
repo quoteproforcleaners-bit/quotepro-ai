@@ -26,6 +26,7 @@ import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { ProGate } from "@/components/ProGate";
 
 type RouteParams = {
   JobDetail: { jobId: string };
@@ -285,18 +286,19 @@ export default function JobDetailScreen() {
   const isCanceled = job.status === "canceled";
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: headerHeight + Spacing.xl,
-            paddingBottom: insets.bottom + Spacing.xl + 80,
-          },
-        ]}
-        scrollIndicatorInsets={{ bottom: insets.bottom }}
-      >
-        <Card style={styles.headerCard}>
+    <ProGate featureName="Job Details">
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: headerHeight + Spacing.xl,
+              paddingBottom: insets.bottom + Spacing.xl + 80,
+            },
+          ]}
+          scrollIndicatorInsets={{ bottom: insets.bottom }}
+        >
+          <Card style={styles.headerCard}>
           <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <ThemedText type="h3">{formatJobType(job.jobType)}</ThemedText>
@@ -638,7 +640,8 @@ export default function JobDetailScreen() {
           </ScrollView>
         </View>
       </Modal>
-    </View>
+      </View>
+    </ProGate>
   );
 }
 

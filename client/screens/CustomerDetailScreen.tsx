@@ -26,6 +26,7 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { useApp } from "@/context/AppContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { ProGate } from "@/components/ProGate";
 
 interface Customer {
   id: string;
@@ -324,10 +325,11 @@ export default function CustomerDetailScreen() {
   const tags: string[] = Array.isArray(customer.tags) ? customer.tags : [];
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      testID="customer-detail"
-    >
+    <ProGate featureName="Customer Details">
+      <View
+        style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+        testID="customer-detail"
+      >
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -1122,7 +1124,8 @@ export default function CustomerDetailScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+      </View>
+    </ProGate>
   );
 }
 

@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { ProGate } from "@/components/ProGate";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -229,6 +230,7 @@ export default function ReviewsReferralsScreen() {
   ), [dt]);
 
   return (
+    <ProGate featureName="Reviews & Referrals">
     <View style={s.flex}>
       <FlatList
         data={reviewRequests}
@@ -257,6 +259,7 @@ export default function ReviewsReferralsScreen() {
         <Feather name="plus" size={24} color="#FFFFFF" />
       </Pressable>
     </View>
+    </ProGate>
   );
 }
 

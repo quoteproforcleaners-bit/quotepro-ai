@@ -21,6 +21,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { trackEvent } from "@/lib/analytics";
+import { ProGate } from "@/components/ProGate";
 
 interface WeeklyRecapData {
   quotesSent: number;
@@ -200,6 +201,7 @@ export default function WeeklyRecapScreen() {
   const isCurrentWeek = weekOffset === 0;
 
   return (
+    <ProGate featureName="Weekly Recap">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
         contentContainerStyle={[
@@ -521,6 +523,7 @@ export default function WeeklyRecapScreen() {
         </Pressable>
       </Modal>
     </View>
+    </ProGate>
   );
 }
 

@@ -15,6 +15,7 @@ import { ProBanner } from "@/components/ProBanner";
 import { StatCard } from "@/components/StatCard";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Typography } from "@/constants/theme";
+import { ProGate } from "@/components/ProGate";
 
 type WizardStep = "welcome" | "connect" | "automation" | "template" | "done";
 
@@ -344,30 +345,33 @@ export default function SocialScreen() {
 
   if (!automation?.socialOnboardingComplete) {
     return (
-      <ScrollView
-        style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
-        contentContainerStyle={{ paddingTop: headerHeight + Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl, paddingHorizontal: Spacing.lg }}
-      >
-        <OnboardingWizard onComplete={() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/social/automation"] });
-        }} />
-      </ScrollView>
+      <ProGate featureName="Social AI Assistant">
+        <ScrollView
+          style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
+          contentContainerStyle={{ paddingTop: headerHeight + Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl, paddingHorizontal: Spacing.lg }}
+        >
+          <OnboardingWizard onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/social/automation"] });
+          }} />
+        </ScrollView>
+      </ProGate>
     );
   }
 
   const recentConversations = conversations.slice(0, 5);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
-      contentContainerStyle={{
-        paddingTop: headerHeight + Spacing.lg,
-        paddingBottom: tabBarHeight + Spacing.xl,
-        paddingHorizontal: Spacing.lg,
-      }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
-    >
-      <ProBanner message="Social AI features require QuotePro AI" />
+    <ProGate featureName="Social AI Assistant">
+      <ScrollView
+        style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
+        contentContainerStyle={{
+          paddingTop: headerHeight + Spacing.lg,
+          paddingBottom: tabBarHeight + Spacing.xl,
+          paddingHorizontal: Spacing.lg,
+        }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
+      >
+        <ProBanner message="Social AI features require QuotePro AI" />
 
       <View style={[styles.connectedPlatforms, { backgroundColor: theme.backgroundDefault, borderColor: theme.border }]}>
         <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm }}>Connected Platforms</ThemedText>
@@ -527,7 +531,8 @@ export default function SocialScreen() {
           <ThemedText type="small" style={{ marginTop: Spacing.xs }}>Inbox</ThemedText>
         </Pressable>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </ProGate>
   );
 }
 

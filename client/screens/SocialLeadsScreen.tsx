@@ -17,6 +17,7 @@ const FILTER_OPTIONS = [
 ];
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { ProGate } from "@/components/ProGate";
 
 export default function SocialLeadsScreen() {
   const headerHeight = useHeaderHeight();
@@ -75,36 +76,38 @@ export default function SocialLeadsScreen() {
   );
 
   return (
-    <View style={{ flex: 1 }}>
-      <View style={{ paddingTop: headerHeight + Spacing.md, paddingHorizontal: Spacing.lg }}>
-        <SegmentedControl
-          options={FILTER_OPTIONS}
-          value={filter}
-          onChange={setFilter}
+    <ProGate featureName="Social Leads">
+      <View style={{ flex: 1 }}>
+        <View style={{ paddingTop: headerHeight + Spacing.md, paddingHorizontal: Spacing.lg }}>
+          <SegmentedControl
+            options={FILTER_OPTIONS}
+            value={filter}
+            onChange={setFilter}
+          />
+        </View>
+        <FlatList
+          data={filteredLeads}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={{
+            paddingTop: Spacing.md,
+            paddingBottom: insets.bottom + Spacing.xl,
+            paddingHorizontal: Spacing.lg,
+            flexGrow: 1,
+          }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
+          ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
+          ListEmptyComponent={
+            <EmptyState
+              icon="user-plus"
+              iconColor={theme.accent}
+              title="No Social Leads"
+              description="Leads from Instagram DMs will appear here when the AI detects buying intent."
+            />
+          }
         />
       </View>
-      <FlatList
-        data={filteredLeads}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={{
-          paddingTop: Spacing.md,
-          paddingBottom: insets.bottom + Spacing.xl,
-          paddingHorizontal: Spacing.lg,
-          flexGrow: 1,
-        }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
-        ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
-        ListEmptyComponent={
-          <EmptyState
-            icon="user-plus"
-            iconColor={theme.accent}
-            title="No Social Leads"
-            description="Leads from Instagram DMs will appear here when the AI detects buying intent."
-          />
-        }
-      />
-    </View>
+    </ProGate>
   );
 }
 

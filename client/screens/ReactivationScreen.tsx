@@ -21,6 +21,7 @@ import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
+import { ProGate } from "@/components/ProGate";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -419,6 +420,7 @@ export default function ReactivationScreen() {
   };
 
   return (
+    <ProGate featureName="Reactivation Campaigns">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
         data={data ?? []}
@@ -724,6 +726,7 @@ export default function ReactivationScreen() {
         </View>
       </Modal>
     </View>
+    </ProGate>
   );
 }
 

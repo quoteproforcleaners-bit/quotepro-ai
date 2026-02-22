@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import { ProGate } from "@/components/ProGate";
 
 export default function SocialConversationDetailScreen() {
   const headerHeight = useHeaderHeight();
@@ -66,26 +67,28 @@ export default function SocialConversationDetailScreen() {
   };
 
   return (
-    <FlatList
-      data={messages}
-      keyExtractor={(item) => item.id}
-      renderItem={renderMessage}
-      contentContainerStyle={{
-        paddingTop: headerHeight + Spacing.md,
-        paddingBottom: insets.bottom + Spacing.xl,
-        paddingHorizontal: Spacing.lg,
-        flexGrow: 1,
-      }}
-      ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
-      ListEmptyComponent={
-        <View style={styles.emptyContainer}>
-          <Feather name="message-circle" size={32} color={theme.textSecondary} />
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
-            No messages in this conversation
-          </ThemedText>
-        </View>
-      }
-    />
+    <ProGate featureName="Social Conversations">
+      <FlatList
+        data={messages}
+        keyExtractor={(item) => item.id}
+        renderItem={renderMessage}
+        contentContainerStyle={{
+          paddingTop: headerHeight + Spacing.md,
+          paddingBottom: insets.bottom + Spacing.xl,
+          paddingHorizontal: Spacing.lg,
+          flexGrow: 1,
+        }}
+        ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Feather name="message-circle" size={32} color={theme.textSecondary} />
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
+              No messages in this conversation
+            </ThemedText>
+          </View>
+        }
+      />
+    </ProGate>
   );
 }
 

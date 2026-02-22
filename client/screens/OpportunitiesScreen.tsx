@@ -22,6 +22,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { apiRequest } from "@/lib/query-client";
 import { trackEvent } from "@/lib/analytics";
+import { ProGate } from "@/components/ProGate";
 
 interface DormantCustomer {
   id: string;
@@ -373,6 +374,7 @@ export default function OpportunitiesScreen() {
   const listData = activeTab === "dormant" ? dormant : lost;
 
   return (
+    <ProGate featureName="Opportunities">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
         data={listData as any[]}
@@ -551,6 +553,7 @@ export default function OpportunitiesScreen() {
         </Pressable>
       </Modal>
     </View>
+    </ProGate>
   );
 }
 
