@@ -115,21 +115,21 @@ function getDailyQuote() {
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(() => ({
-    gradientTop: isDark ? "#162034" : "#F0F4F9",
-    gradientBottom: isDark ? "#0B1120" : "#E8ECF2",
-    surfacePrimary: theme.cardBackground,
-    surfaceSecondary: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
-    borderPrimary: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
-    borderSecondary: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+    gradientTop: theme.bg0,
+    gradientBottom: theme.bg1,
+    surfacePrimary: theme.surface0,
+    surfaceSecondary: theme.surface1,
+    borderPrimary: theme.border,
+    borderSecondary: theme.divider,
     borderAccent: isDark ? `${theme.primary}35` : `${theme.primary}25`,
     textPrimary: theme.text,
     textSecondary: theme.textSecondary,
-    textMuted: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.35)",
+    textMuted: theme.textMuted,
     accent: theme.primary,
-    accentMuted: isDark ? "rgba(100,160,255,0.55)" : "rgba(0,100,200,0.5)",
-    accentSoft: isDark ? "rgba(100,160,255,0.12)" : "rgba(0,122,255,0.08)",
-    chipBg: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-    chipBorder: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+    accentMuted: isDark ? "rgba(47, 123, 255, 0.55)" : "rgba(0,100,200,0.5)",
+    accentSoft: theme.primarySoft,
+    chipBg: isDark ? theme.divider : "rgba(0,0,0,0.03)",
+    chipBorder: theme.border,
     shadowPrimary: isDark
       ? { boxShadow: "0px 4px 12px rgba(0,0,0,0.25)" }
       : { boxShadow: "0px 2px 8px rgba(0,0,0,0.06)" },

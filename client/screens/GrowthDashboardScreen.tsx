@@ -19,18 +19,18 @@ import OnboardingBanner from "@/components/OnboardingBanner";
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(() => ({
-    gradientTop: isDark ? "#162034" : "#F0F4F9",
-    gradientBottom: isDark ? "#0B1120" : "#E8ECF2",
-    surfacePrimary: theme.cardBackground,
-    surfaceSecondary: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
-    borderSecondary: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+    gradientTop: theme.bg0,
+    gradientBottom: theme.bg1,
+    surfacePrimary: theme.surface0,
+    surfaceSecondary: theme.surface1,
+    borderSecondary: theme.divider,
     textPrimary: theme.text,
     textSecondary: theme.textSecondary,
-    textMuted: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.35)",
+    textMuted: theme.textMuted,
     accent: theme.primary,
-    accentSoft: isDark ? "rgba(100,160,255,0.12)" : "rgba(0,122,255,0.08)",
-    chipBg: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-    chipBorder: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+    accentSoft: theme.primarySoft,
+    chipBg: isDark ? theme.divider : "rgba(0,0,0,0.03)",
+    chipBorder: theme.border,
     shadow: isDark
       ? { boxShadow: "0px 4px 12px rgba(0,0,0,0.25)" }
       : { boxShadow: "0px 2px 8px rgba(0,0,0,0.06)" },
@@ -119,7 +119,7 @@ export default function GrowthDashboardScreen() {
 
   const quickActions = [
     { label: t.growth.generateTasks, icon: "zap" as const, screen: "TasksQueue", color: "#F59E0B" },
-    { label: t.growth.sendCampaign, icon: "send" as const, screen: "ReactivationCampaigns", color: "#10B981" },
+    { label: t.growth.sendCampaign, icon: "send" as const, screen: "ReactivationCampaigns", color: "#2F7BFF" },
     { label: t.growth.viewAutomations, icon: "settings" as const, screen: "AutomationsHub", color: "#8B5CF6" },
   ];
 

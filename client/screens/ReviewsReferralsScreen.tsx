@@ -26,21 +26,21 @@ import { ProGate } from "@/components/ProGate";
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(() => ({
-    surfacePrimary: theme.cardBackground,
-    surfaceSecondary: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
-    borderPrimary: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
-    borderSecondary: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+    surfacePrimary: theme.surface0,
+    surfaceSecondary: theme.surface1,
+    borderPrimary: theme.border,
+    borderSecondary: theme.divider,
     textPrimary: theme.text,
     textSecondary: theme.textSecondary,
-    textMuted: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.35)",
+    textMuted: theme.textMuted,
     accent: theme.primary,
-    accentSoft: isDark ? "rgba(100,160,255,0.12)" : "rgba(0,122,255,0.08)",
+    accentSoft: theme.primarySoft,
     success: theme.success,
-    successSoft: isDark ? "rgba(16,185,129,0.12)" : "rgba(16,185,129,0.08)",
+    successSoft: theme.successSoft,
     warning: theme.warning,
     warningSoft: isDark ? "rgba(245,158,11,0.12)" : "rgba(245,158,11,0.08)",
     error: theme.error,
-    overlay: isDark ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.5)",
+    overlay: theme.overlay,
   }), [theme, isDark]);
 }
 
@@ -48,7 +48,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   pending: { label: "Pending", color: "#F59E0B", bg: "rgba(245,158,11,0.12)" },
   sent: { label: "Sent", color: "#007AFF", bg: "rgba(0,122,255,0.12)" },
   clicked: { label: "Clicked", color: "#8B5CF6", bg: "rgba(139,92,246,0.12)" },
-  completed: { label: "Completed", color: "#10B981", bg: "rgba(16,185,129,0.12)" },
+  completed: { label: "Completed", color: "#16A34A", bg: "rgba(22,163,74,0.12)" },
 };
 
 function StatusBadge({ status }: { status: string }) {

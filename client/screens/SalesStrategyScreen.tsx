@@ -22,10 +22,10 @@ import { ProGate } from "@/components/ProGate";
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(() => ({
-    surface: theme.cardBackground,
-    border: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+    surface: theme.surface0,
+    border: theme.border,
     accent: theme.primary,
-    accentSoft: isDark ? "rgba(100,160,255,0.12)" : "rgba(0,122,255,0.08)",
+    accentSoft: theme.primarySoft,
     textPrimary: theme.text,
     textSecondary: theme.textSecondary,
   }), [theme, isDark]);
@@ -35,12 +35,12 @@ type ProfileKey = "professional" | "friendly" | "premium" | "urgent";
 
 const profileMeta: { key: ProfileKey; icon: keyof typeof Feather.glyphMap; color: string }[] = [
   { key: "professional", icon: "briefcase", color: "#007AFF" },
-  { key: "friendly", icon: "smile", color: "#10B981" },
+  { key: "friendly", icon: "smile", color: "#2F7BFF" },
   { key: "premium", icon: "award", color: "#8B5CF6" },
   { key: "urgent", icon: "zap", color: "#F59E0B" },
 ];
 
-const stageColors = ["#10B981", "#007AFF", "#F59E0B", "#EF4444"];
+const stageColors = ["#2F7BFF", "#2467DE", "#F59E0B", "#EF4444"];
 
 interface StrategyData {
   profile: ProfileKey;

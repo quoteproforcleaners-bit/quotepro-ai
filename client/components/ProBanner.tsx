@@ -24,7 +24,7 @@ export function ProBanner({ message }: ProBannerProps) {
   return (
     <Pressable
       onPress={() => navigation.navigate("Paywall")}
-      style={[styles.container, { backgroundColor: '#009B82' }]}
+      style={[styles.container, { backgroundColor: '#2F7BFF' }]}
       testID="pro-banner"
     >
       <View style={styles.icon}>

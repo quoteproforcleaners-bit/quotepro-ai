@@ -15,10 +15,10 @@ import * as Haptics from "expo-haptics";
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(() => ({
-    surface: theme.cardBackground,
-    border: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
+    surface: theme.surface0,
+    border: theme.border,
     accent: theme.primary,
-    accentSoft: isDark ? "rgba(100,160,255,0.12)" : "rgba(0,122,255,0.08)",
+    accentSoft: theme.primarySoft,
     textPrimary: theme.text,
     textSecondary: theme.textSecondary,
   }), [theme, isDark]);

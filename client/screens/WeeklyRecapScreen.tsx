@@ -61,20 +61,14 @@ function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(
     () => ({
-      surfacePrimary: theme.cardBackground,
-      surfaceSecondary: isDark
-        ? "rgba(255,255,255,0.04)"
-        : "rgba(0,0,0,0.02)",
-      borderPrimary: isDark
-        ? "rgba(255,255,255,0.12)"
-        : "rgba(0,0,0,0.08)",
+      surfacePrimary: theme.surface0,
+      surfaceSecondary: theme.surface1,
+      borderPrimary: theme.border,
       textPrimary: theme.text,
       textSecondary: theme.textSecondary,
-      textMuted: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.35)",
+      textMuted: theme.textMuted,
       accent: theme.primary,
-      accentSoft: isDark
-        ? "rgba(100,160,255,0.12)"
-        : "rgba(0,122,255,0.08)",
+      accentSoft: theme.primarySoft,
     }),
     [theme, isDark],
   );

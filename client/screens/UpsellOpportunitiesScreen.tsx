@@ -21,17 +21,17 @@ import { ProGate } from "@/components/ProGate";
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(() => ({
-    surfacePrimary: theme.cardBackground,
-    surfaceSecondary: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
-    borderPrimary: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
-    borderSecondary: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+    surfacePrimary: theme.surface0,
+    surfaceSecondary: theme.surface1,
+    borderPrimary: theme.border,
+    borderSecondary: theme.divider,
     textPrimary: theme.text,
     textSecondary: theme.textSecondary,
-    textMuted: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.35)",
+    textMuted: theme.textMuted,
     accent: theme.primary,
-    accentSoft: isDark ? "rgba(100,160,255,0.12)" : "rgba(0,122,255,0.08)",
+    accentSoft: theme.primarySoft,
     success: theme.success,
-    successSoft: isDark ? "rgba(16,185,129,0.12)" : "rgba(16,185,129,0.08)",
+    successSoft: theme.successSoft,
   }), [theme, isDark]);
 }
 

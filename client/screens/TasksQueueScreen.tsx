@@ -32,8 +32,8 @@ const TASK_META: Record<TaskType, { icon: keyof typeof Feather.glyphMap; color: 
   QUOTE_FOLLOWUP: { icon: "message-circle", color: "#007AFF", label: "Quote Follow-Up" },
   ABANDONED_RECOVERY: { icon: "alert-circle", color: "#EF4444", label: "Quote Recovery" },
   REBOOK_NUDGE: { icon: "repeat", color: "#F97316", label: "Rebook Nudge" },
-  REVIEW_REQUEST: { icon: "star", color: "#10B981", label: "Review Request" },
-  REFERRAL_ASK: { icon: "gift", color: "#00C9A7", label: "Referral Ask" },
+  REVIEW_REQUEST: { icon: "star", color: "#8B5CF6", label: "Review Request" },
+  REFERRAL_ASK: { icon: "gift", color: "#2F7BFF", label: "Referral Ask" },
   UPSELL_DEEP_CLEAN: { icon: "trending-up", color: "#8B5CF6", label: "Deep Clean Upsell" },
   REACTIVATION: { icon: "refresh-cw", color: "#F59E0B", label: "Reactivation" },
 };
@@ -49,27 +49,27 @@ const FILTER_TABS = [
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
   return useMemo(() => ({
-    surfacePrimary: theme.cardBackground,
-    surfaceSecondary: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
-    borderPrimary: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
-    borderSecondary: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+    surfacePrimary: theme.surface0,
+    surfaceSecondary: theme.surface1,
+    borderPrimary: theme.border,
+    borderSecondary: theme.divider,
     textPrimary: theme.text,
     textSecondary: theme.textSecondary,
-    textMuted: isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.35)",
+    textMuted: theme.textMuted,
     accent: theme.primary,
-    accentSoft: isDark ? "rgba(100,160,255,0.12)" : "rgba(0,122,255,0.08)",
-    chipBg: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
-    chipBorder: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-    chipActiveBg: isDark ? "rgba(100,160,255,0.18)" : "rgba(0,122,255,0.1)",
-    chipActiveBorder: isDark ? "rgba(100,160,255,0.35)" : "rgba(0,122,255,0.25)",
-    actionBg: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+    accentSoft: theme.primarySoft,
+    chipBg: isDark ? theme.divider : "rgba(0,0,0,0.03)",
+    chipBorder: theme.border,
+    chipActiveBg: isDark ? "rgba(47, 123, 255, 0.18)" : "rgba(0,122,255,0.1)",
+    chipActiveBorder: isDark ? "rgba(47, 123, 255, 0.35)" : "rgba(0,122,255,0.25)",
+    actionBg: isDark ? theme.divider : "rgba(0,0,0,0.04)",
   }), [theme, isDark]);
 }
 
 function getPriorityBadge(priority: number): { label: string; color: string } {
   if (priority >= 70) return { label: "High", color: "#EF4444" };
   if (priority >= 40) return { label: "Med", color: "#F59E0B" };
-  return { label: "Low", color: "#10B981" };
+  return { label: "Low", color: "#2F7BFF" };
 }
 
 function formatDueDate(dateStr?: string): string {
@@ -177,7 +177,7 @@ function TaskCard({ task, onAction }: { task: any; onAction: (id: number, type: 
           onPress={() => onAction(task.id, "done")}
           testID={`action-done-${task.id}`}
         >
-          <Feather name="check" size={14} color="#10B981" />
+          <Feather name="check" size={14} color="#16A34A" />
           <ThemedText type="caption" style={{ color: dt.textPrimary, marginLeft: 4, fontWeight: "500" }}>Done</ThemedText>
         </Pressable>
       </View>

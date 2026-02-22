@@ -912,7 +912,7 @@ export default function QuoteDetailScreen() {
           </View>
         ) : (
           <Pressable onPress={() => navigation.navigate("Paywall")} testID="upgrade-prompt">
-            <View style={[styles.upgradeCard, { backgroundColor: '#009B82' }]}>
+            <View style={[styles.upgradeCard, { backgroundColor: '#2F7BFF' }]}>
               <View style={styles.upgradeIconCircle}>
                 <Feather name="zap" size={20} color="#FFFFFF" />
               </View>
