@@ -457,7 +457,7 @@ const en = {
     recentActivity: "Recent Activity",
     generateTasks: "Growth Tasks",
     sendCampaign: "Send Campaign",
-    viewAutomations: "View Automations",
+    viewAutomations: "Automations",
     reviews: "Reviews",
     upsells: "Upsells",
     rebook: "Rebook",
