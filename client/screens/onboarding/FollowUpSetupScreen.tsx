@@ -6,6 +6,7 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import OnboardingProgressBar from "@/components/OnboardingProgressBar";
 
 const CADENCE_PRESETS = [
   {
@@ -60,9 +61,7 @@ export default function FollowUpSetupScreen({ onNext, onSkip, onBack }: Props) {
         <Feather name="arrow-left" size={22} color={theme.text} />
       </Pressable>
 
-      <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginBottom: Spacing.xs }}>
-        STEP 6 OF 7
-      </ThemedText>
+      <OnboardingProgressBar currentStep={6} />
       <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>Auto Follow-ups</ThemedText>
       <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.xl }}>
         80% of jobs close after a follow-up. Set yours on autopilot.

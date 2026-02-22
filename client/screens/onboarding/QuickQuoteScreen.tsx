@@ -6,6 +6,7 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import OnboardingProgressBar from "@/components/OnboardingProgressBar";
 
 const SERVICE_TYPES = [
   { id: "regular", label: "Standard", icon: "home" as const },
@@ -71,9 +72,7 @@ export default function QuickQuoteScreen({ goal, onNext, onBack }: Props) {
         <Feather name="arrow-left" size={22} color={theme.text} />
       </Pressable>
 
-      <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginBottom: Spacing.xs }}>
-        STEP 3 OF 7
-      </ThemedText>
+      <OnboardingProgressBar currentStep={3} />
       <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>Create your first quote</ThemedText>
       <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing["2xl"] }}>
         {subtitle}

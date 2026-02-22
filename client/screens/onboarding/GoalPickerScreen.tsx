@@ -6,6 +6,7 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import OnboardingProgressBar from "@/components/OnboardingProgressBar";
 
 const GOALS = [
   { id: "send_quote", label: "Send a quote today", icon: "send" as const, hint: "Most popular" },
@@ -31,10 +32,8 @@ export default function GoalPickerScreen({ onNext, onBack }: Props) {
           <Feather name="arrow-left" size={22} color={theme.text} />
         </Pressable>
 
+        <OnboardingProgressBar currentStep={1} />
         <View style={styles.header}>
-          <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginBottom: Spacing.xs }}>
-            STEP 1 OF 7
-          </ThemedText>
           <ThemedText type="h2">What matters most right now?</ThemedText>
           <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
             We'll highlight tips that match your priority

@@ -8,6 +8,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Input } from "@/components/Input";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import OnboardingProgressBar from "@/components/OnboardingProgressBar";
 
 const GOAL_CTA: Record<string, { heading: string; sub: string }> = {
   send_quote: { heading: "Send It", sub: "Your quote is ready. Who's it for?" },
@@ -44,9 +45,7 @@ export default function SendQuoteScreen({ selectedTierPrice, selectedTierName, b
         <Feather name="arrow-left" size={22} color={theme.text} />
       </Pressable>
 
-      <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginBottom: Spacing.xs }}>
-        STEP 5 OF 7
-      </ThemedText>
+      <OnboardingProgressBar currentStep={5} />
       <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>{(GOAL_CTA[goal || "send_quote"] || GOAL_CTA.send_quote).heading}</ThemedText>
       <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.xl }}>
         {(GOAL_CTA[goal || "send_quote"] || GOAL_CTA.send_quote).sub}

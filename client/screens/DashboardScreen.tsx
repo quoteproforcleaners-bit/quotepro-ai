@@ -622,12 +622,12 @@ export default function DashboardScreen() {
                       <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
                         {followUpQueueCount === 1 ? `1 ${t.dashboard.quoteNeedsAttention}` : `${followUpQueueCount} ${t.dashboard.quotesNeedAttention}`}
                       </ThemedText>
+                      <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 4 }}>
+                        {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
+                      </ThemedText>
                     </View>
                     <Feather name="chevron-right" size={18} color={dt.textMuted} />
                   </View>
-                  <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm, marginLeft: 44 }}>
-                    {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
-                  </ThemedText>
                   <View style={[styles.focusCta, { borderWidth: 1, borderColor: isDark ? "rgba(248,184,74,0.5)" : dt.warningBorder, backgroundColor: isDark ? "transparent" : "rgba(248,184,74,0.10)" }]}>
                     <Feather name="arrow-right" size={14} color={theme.warning} />
                     <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{t.dashboard.followUpNow}</ThemedText>

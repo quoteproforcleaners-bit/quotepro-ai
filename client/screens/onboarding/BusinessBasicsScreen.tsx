@@ -9,6 +9,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Input } from "@/components/Input";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
+import OnboardingProgressBar from "@/components/OnboardingProgressBar";
 
 interface Props {
   initialName?: string;
@@ -45,9 +46,7 @@ export default function BusinessBasicsScreen({ initialName, onNext, onBack }: Pr
         <Feather name="arrow-left" size={22} color={theme.text} />
       </Pressable>
 
-      <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginBottom: Spacing.xs }}>
-        STEP 2 OF 7
-      </ThemedText>
+      <OnboardingProgressBar currentStep={2} />
       <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>Your Business</ThemedText>
       <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing["2xl"] }}>
         This info appears on your quotes
