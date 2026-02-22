@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { View, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, StyleSheet, Pressable, ScrollView, Platform } from "react-native";
+import Slider from "@react-native-community/slider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -12,15 +13,11 @@ const SERVICE_TYPES = [
   { id: "regular", label: "Standard", icon: "home" as const },
   { id: "deep-clean", label: "Deep Clean", icon: "zap" as const },
   { id: "move-in-out", label: "Move Out/In", icon: "truck" as const },
-  { id: "airbnb", label: "Office/Commercial", icon: "briefcase" as const },
 ];
 
-const SIZE_BUCKETS = [
-  { id: "small", label: "Small", sqft: 1000 },
-  { id: "medium", label: "Medium", sqft: 2000 },
-  { id: "large", label: "Large", sqft: 3000 },
-  { id: "xlarge", label: "Extra Large", sqft: 4000 },
-];
+const SQFT_MIN = 1000;
+const SQFT_MAX = 6000;
+const SQFT_STEP = 100;
 
 const FREQUENCIES = [
   { id: "one-time", label: "One-time" },
@@ -53,13 +50,12 @@ export default function QuickQuoteScreen({ goal, onNext, onBack }: Props) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
   const [serviceType, setServiceType] = useState("regular");
-  const [sizeIdx, setSizeIdx] = useState(1);
+  const [sqft, setSqft] = useState(2000);
   const [beds, setBeds] = useState(3);
   const [baths, setBaths] = useState(2);
   const [condition, setCondition] = useState<"maintained" | "needs_love">("maintained");
   const [frequency, setFrequency] = useState(goal === "convert_recurring" ? "biweekly" : goal === "raise_prices" ? "one-time" : "biweekly");
 
-  const selectedSize = SIZE_BUCKETS[sizeIdx];
   const subtitle = GOAL_SUBTITLES[goal || "send_quote"] || GOAL_SUBTITLES.send_quote;
 
   return (
@@ -97,21 +93,23 @@ export default function QuickQuoteScreen({ goal, onNext, onBack }: Props) {
       </View>
 
       <ThemedText type="subtitle" style={{ marginTop: Spacing.xl, marginBottom: Spacing.sm }}>Home Size</ThemedText>
-      <View style={styles.chipRow}>
-        {SIZE_BUCKETS.map((s, i) => {
-          const sel = sizeIdx === i;
-          return (
-            <Pressable
-              key={s.id}
-              onPress={() => { setSizeIdx(i); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-              style={[styles.chip, { backgroundColor: sel ? theme.primary + "12" : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", borderColor: sel ? theme.primary : theme.border }]}
-            >
-              <ThemedText type="small" style={{ color: sel ? theme.primary : theme.text, fontWeight: sel ? "600" : "400" }}>
-                {s.label} ({s.sqft.toLocaleString()} sf)
-              </ThemedText>
-            </Pressable>
-          );
-        })}
+      <ThemedText type="h3" style={{ color: theme.primary, textAlign: "center", marginBottom: Spacing.xs }}>
+        {sqft.toLocaleString()} sq ft
+      </ThemedText>
+      <Slider
+        style={styles.slider}
+        minimumValue={SQFT_MIN}
+        maximumValue={SQFT_MAX}
+        step={SQFT_STEP}
+        value={sqft}
+        onValueChange={(val) => setSqft(Math.round(val / SQFT_STEP) * SQFT_STEP)}
+        minimumTrackTintColor={theme.primary}
+        maximumTrackTintColor={isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)"}
+        thumbTintColor={theme.primary}
+      />
+      <View style={styles.sliderLabels}>
+        <ThemedText type="caption" style={{ color: theme.textSecondary }}>1,000</ThemedText>
+        <ThemedText type="caption" style={{ color: theme.textSecondary }}>6,000</ThemedText>
       </View>
 
       <View style={[styles.countersRow, { marginTop: Spacing.xl }]}>
@@ -192,7 +190,7 @@ export default function QuickQuoteScreen({ goal, onNext, onBack }: Props) {
         testID="button-quote-next"
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          onNext({ serviceType, sqft: selectedSize.sqft, beds, baths, condition, frequency });
+          onNext({ serviceType, sqft, beds, baths, condition, frequency });
         }}
         style={[styles.nextBtn, { backgroundColor: theme.primary }]}
       >
@@ -213,5 +211,7 @@ const styles = StyleSheet.create({
   counterBox: { flex: 1 },
   counter: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
   counterBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  slider: { width: "100%", height: 40 },
+  sliderLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: -Spacing.xs },
   nextBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: Spacing.sm, height: 56, borderRadius: BorderRadius.md, marginTop: Spacing["3xl"] },
 });
