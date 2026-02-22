@@ -356,6 +356,13 @@ const en = {
     aiEnhancedDescriptions: "AI-enhanced quote descriptions",
     regenerateMessages: "Regenerate messages with one tap",
     personalizedForCustomer: "Personalized for each customer",
+    portuguese: "Portuguese",
+    russian: "Russian",
+    helpGuide: "Help & User Guide",
+    helpGuideDesc: "Learn how to use all features",
+    legalCompliance: "Legal & Compliance",
+    privacyPolicy: "Privacy Policy",
+    termsOfUse: "Terms of Use (EULA)",
   },
 
   paywall: {

@@ -1154,16 +1154,16 @@ export default function SettingsScreen() {
         </View>
         <View style={{ flex: 1 }}>
           <ThemedText type="body" style={{ fontWeight: "600" }}>
-            {language === "en" ? "Help & User Guide" : "Ayuda y Guia del Usuario"}
+            {t.settings.helpGuide}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
-            {language === "en" ? "Learn how to use all features" : "Aprende a usar todas las funciones"}
+            {t.settings.helpGuideDesc}
           </ThemedText>
         </View>
         <Feather name="chevron-right" size={20} color={theme.textSecondary} />
       </Pressable>
 
-      <SectionHeader title={language === "en" ? "Legal & Compliance" : "Legal y Cumplimiento"} />
+      <SectionHeader title={t.settings.legalCompliance} />
 
       <Pressable
         onPress={() => Linking.openURL("https://www.freeprivacypolicy.com/live/9ac71f0a-aa27-477d-98b2-5f8c103f766a")}
@@ -1176,7 +1176,7 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
-              {language === "en" ? "Privacy Policy" : "Politica de Privacidad"}
+              {t.settings.privacyPolicy}
             </ThemedText>
           </View>
           <Feather name="external-link" size={18} color={theme.textSecondary} />
@@ -1194,7 +1194,7 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
-              {language === "en" ? "Terms of Use (EULA)" : "Terminos de Uso (EULA)"}
+              {t.settings.termsOfUse}
             </ThemedText>
           </View>
           <Feather name="external-link" size={18} color={theme.textSecondary} />

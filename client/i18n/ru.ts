@@ -358,6 +358,13 @@ const ru: Translations = {
     aiEnhancedDescriptions: "Описания, улучшенные ИИ",
     regenerateMessages: "Перегенерируйте сообщения одним нажатием",
     personalizedForCustomer: "Персонализировано для каждого клиента",
+    portuguese: "Португальский",
+    russian: "Русский",
+    helpGuide: "Помощь и Руководство",
+    helpGuideDesc: "Узнайте, как использовать все функции",
+    legalCompliance: "Юридическая Информация",
+    privacyPolicy: "Политика Конфиденциальности",
+    termsOfUse: "Условия Использования (EULA)",
   },
 
   paywall: {

@@ -358,6 +358,13 @@ const es: Translations = {
     aiEnhancedDescriptions: "Descripciones mejoradas con IA",
     regenerateMessages: "Regenera mensajes con un toque",
     personalizedForCustomer: "Personalizado para cada cliente",
+    portuguese: "Portugués",
+    russian: "Ruso",
+    helpGuide: "Ayuda y Guía del Usuario",
+    helpGuideDesc: "Aprende a usar todas las funciones",
+    legalCompliance: "Legal y Cumplimiento",
+    privacyPolicy: "Política de Privacidad",
+    termsOfUse: "Términos de Uso (EULA)",
   },
 
   paywall: {
