@@ -17,6 +17,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -35,6 +36,21 @@ import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
 import { useProGate } from "@/components/ProGate";
+
+type WidgetId = "followUp" | "streak" | "aiCommand" | "quickActions" | "glance" | "opportunities" | "ratings" | "recap";
+
+const DEFAULT_WIDGET_ORDER: WidgetId[] = ["followUp", "streak", "aiCommand", "quickActions", "glance", "opportunities", "ratings", "recap"];
+
+const WIDGET_LABELS: Record<WidgetId, { en: string; icon: keyof typeof Feather.glyphMap }> = {
+  followUp: { en: "Follow-Up Focus", icon: "alert-circle" },
+  streak: { en: "Follow-Up Streak", icon: "zap" },
+  aiCommand: { en: "AI Command Center", icon: "cpu" },
+  quickActions: { en: "Quick Actions", icon: "grid" },
+  glance: { en: "Today at a Glance", icon: "eye" },
+  opportunities: { en: "Opportunities", icon: "repeat" },
+  ratings: { en: "Customer Ratings", icon: "star" },
+  recap: { en: "Weekly Recap", icon: "bar-chart" },
+};
 
 /*
  * ─── Design Tokens (Home Screen) ───
@@ -339,10 +355,31 @@ export default function DashboardScreen() {
   const [commandText, setCommandText] = useState("");
   const [commandResult, setCommandResult] = useState<AiCommandResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(DEFAULT_WIDGET_ORDER);
+  const [hiddenWidgets, setHiddenWidgets] = useState<Set<WidgetId>>(new Set());
+  const [isEditingWidgets, setIsEditingWidgets] = useState(false);
 
   useEffect(() => {
     trackEvent("app_open");
     trackEvent("home_view");
+    (async () => {
+      try {
+        const savedOrder = await AsyncStorage.getItem("dashboardWidgetOrder");
+        const savedHidden = await AsyncStorage.getItem("dashboardHiddenWidgets");
+        if (savedOrder) {
+          const parsed = JSON.parse(savedOrder) as WidgetId[];
+          const validIds = new Set<string>(DEFAULT_WIDGET_ORDER);
+          const filtered = parsed.filter((id) => validIds.has(id));
+          DEFAULT_WIDGET_ORDER.forEach((id) => {
+            if (!filtered.includes(id)) filtered.push(id);
+          });
+          setWidgetOrder(filtered);
+        }
+        if (savedHidden) {
+          setHiddenWidgets(new Set(JSON.parse(savedHidden) as WidgetId[]));
+        }
+      } catch {}
+    })();
   }, []);
 
   const { data: followUpQueue = [], refetch: refetchFollowUpQueue } = useQuery<any[]>({
@@ -518,6 +555,333 @@ export default function DashboardScreen() {
     }
   };
 
+  const saveWidgetConfig = useCallback(async (order: WidgetId[], hidden: Set<WidgetId>) => {
+    try {
+      await AsyncStorage.setItem("dashboardWidgetOrder", JSON.stringify(order));
+      await AsyncStorage.setItem("dashboardHiddenWidgets", JSON.stringify([...hidden]));
+    } catch {}
+  }, []);
+
+  const moveWidget = useCallback((widgetId: WidgetId, direction: "up" | "down") => {
+    setWidgetOrder((prev) => {
+      const idx = prev.indexOf(widgetId);
+      if (idx < 0) return prev;
+      const newIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (newIdx < 0 || newIdx >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+      saveWidgetConfig(next, hiddenWidgets);
+      return next;
+    });
+  }, [hiddenWidgets, saveWidgetConfig]);
+
+  const toggleWidgetVisibility = useCallback((widgetId: WidgetId) => {
+    setHiddenWidgets((prev) => {
+      const next = new Set(prev);
+      if (next.has(widgetId)) {
+        next.delete(widgetId);
+      } else {
+        next.add(widgetId);
+      }
+      saveWidgetConfig(widgetOrder, next);
+      return next;
+    });
+  }, [widgetOrder, saveWidgetConfig]);
+
+  const renderWidget = useCallback((widgetId: WidgetId) => {
+    switch (widgetId) {
+      case "followUp":
+        return (
+          <View key="followUp">
+            {followUpQueueCount > 0 ? (
+              <Pressable
+                onPress={() => navigation.navigate("FollowUpQueue")}
+                style={[styles.focusCard, { borderColor: dt.warningBorder }, Elevation.e2]}
+                testID="todays-focus-card"
+              >
+                <LinearGradient
+                  colors={[dt.warningGradientTop, dt.warningGradientBottom]}
+                  style={styles.focusCardGradient}
+                >
+                  <View style={styles.focusCardHeader}>
+                    <View style={[styles.focusIcon, { backgroundColor: dt.warningSoft }]}>
+                      <Feather name="alert-circle" size={16} color={theme.warning} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText type="subtitle" style={{ fontWeight: "700" }}>
+                        {`$${amountAtRisk.toLocaleString()} ${t.dashboard.atRisk}`}
+                      </ThemedText>
+                      <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                        {followUpQueueCount === 1 ? `1 ${t.dashboard.quoteNeedsAttention}` : `${followUpQueueCount} ${t.dashboard.quotesNeedAttention}`}
+                      </ThemedText>
+                    </View>
+                    <Feather name="chevron-right" size={18} color={dt.textMuted} />
+                  </View>
+                  <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm, marginLeft: 44 }}>
+                    {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
+                  </ThemedText>
+                  <View style={[styles.focusCta, { backgroundColor: dt.warningSoft, borderWidth: 1, borderColor: dt.warningBorder }]}>
+                    <Feather name="arrow-right" size={14} color={theme.warning} />
+                    <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{t.dashboard.followUpNow}</ThemedText>
+                  </View>
+                </LinearGradient>
+              </Pressable>
+            ) : (
+              <View
+                style={[
+                  styles.focusCard,
+                  {
+                    backgroundColor: dt.surfacePrimary,
+                    borderColor: theme.successBorder,
+                    padding: Spacing.lg,
+                  },
+                  Elevation.e1,
+                ]}
+              >
+                <View style={styles.focusCardHeader}>
+                  <View style={[styles.focusIcon, { backgroundColor: theme.successSoft }]}>
+                    <Feather name="check-circle" size={16} color={theme.success} />
+                  </View>
+                  <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{t.growth.allCaughtUp}</ThemedText>
+                </View>
+                <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>
+                  {t.dashboard.noRevenueAtRisk}
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        );
+
+      case "streak":
+        return (
+          <View key="streak" style={[styles.streakCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e2]}>
+            <View style={styles.streakCardRow}>
+              <Feather name="zap" size={16} color={currentStreak > 0 ? theme.warning : dt.textMuted} />
+              <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.sm }}>
+                {currentStreak > 0 ? `${t.dashboard.followUpStreak}: ${currentStreak} ${currentStreak === 1 ? t.common.day : t.common.days}` : t.dashboard.followUpStreak}
+              </ThemedText>
+            </View>
+            <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 4, marginLeft: 28 }}>
+              {currentStreak === 0 ? t.dashboard.startStreakToday : currentStreak >= 7 ? t.dashboard.revenueDisciplineUnlocked : currentStreak >= 3 ? t.dashboard.momentumBuilding : `${currentStreak} ${currentStreak === 1 ? t.common.day : t.common.days} ${t.dashboard.daysStrong}`}
+            </ThemedText>
+            {currentStreak === 0 ? (
+              <Pressable onPress={() => navigation.navigate("FollowUpQueue")} style={styles.streakGoBtn} testID="streak-nudge-cta">
+                <View style={[styles.streakGoBtnInner, Elevation.e3]}>
+                  <ThemedText type="body" style={styles.streakGoText}>{t.dashboard.go}</ThemedText>
+                  <Feather name="arrow-right" size={18} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                </View>
+              </Pressable>
+            ) : null}
+          </View>
+        );
+
+      case "aiCommand":
+        return (
+          <View key="aiCommand">
+            <View style={[
+              styles.commandCard,
+              {
+                backgroundColor: dt.surfaceEmphasis,
+                borderColor: dt.borderAccent,
+              },
+              Elevation.e2,
+            ]}>
+              <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm, fontWeight: "600" }}>
+                {t.dashboard.whatToDo}
+              </ThemedText>
+              <View style={[styles.inputRow, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
+                <TextInput
+                  ref={inputRef}
+                  style={[styles.commandInput, { color: dt.textPrimary }]}
+                  placeholder={t.dashboard.askPlaceholder}
+                  placeholderTextColor={dt.textMuted}
+                  value={commandText}
+                  onChangeText={setCommandText}
+                  onSubmitEditing={handleSubmit}
+                  returnKeyType="send"
+                  testID="command-input"
+                />
+                <Pressable
+                  onPress={handleSubmit}
+                  style={[
+                    styles.sendBtn,
+                    { backgroundColor: commandText.trim() ? dt.accent : dt.chipBg },
+                    commandText.trim() ? Platform.select({
+                      web: { boxShadow: `0px 2px 8px ${dt.brandGlow}` } as any,
+                      default: { shadowColor: dt.accent, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+                    }) : {},
+                  ]}
+                  testID="command-send"
+                >
+                  <Feather name="send" size={15} color={commandText.trim() ? "#FFF" : dt.textMuted} />
+                </Pressable>
+              </View>
+              <RotatingPrompts onTap={handlePromptTap} />
+            </View>
+
+            {commandResult ? (
+              <View style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
+                <ResponseCard
+                  result={commandResult}
+                  onDismiss={() => setCommandResult(null)}
+                  onAction={handleSuggestedAction}
+                />
+              </View>
+            ) : null}
+
+            {!FeatureFlags.aiEnabled ? (
+              <View style={[styles.aiBanner, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderAccent }, Elevation.e2]}>
+                <View style={styles.aiBannerContent}>
+                  <View style={[styles.aiBannerIcon, { backgroundColor: dt.accentSoft }]}>
+                    <Feather name="zap" size={14} color={dt.accent} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <ThemedText type="small" style={{ fontWeight: "600", fontSize: 13 }}>
+                      {t.dashboard.unlockAI}
+                    </ThemedText>
+                    <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 1, fontSize: 11 }}>
+                      {t.dashboard.aiSubtitle}
+                    </ThemedText>
+                  </View>
+                </View>
+                <Pressable
+                  style={[styles.upgradeCta, { borderColor: dt.accent, backgroundColor: dt.accentSoft }]}
+                  onPress={() => navigation.navigate("Paywall")}
+                  testID="upgrade-cta"
+                >
+                  <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600", fontSize: 12 }}>
+                    {t.dashboard.seeAIFeatures}
+                  </ThemedText>
+                  <Feather name="arrow-right" size={12} color={dt.accent} style={{ marginLeft: 4 }} />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        );
+
+      case "quickActions":
+        return (
+          <View key="quickActions" style={{ marginBottom: Spacing.lg }}>
+            <QuickActionChips onAction={handleChipAction} />
+          </View>
+        );
+
+      case "glance":
+        return (
+          <View key="glance">
+            <View style={styles.sectionHeader}>
+              <ThemedText type="subtitle" style={{ fontWeight: "600", fontSize: 15 }}>{t.dashboard.todayAtGlance}</ThemedText>
+              <Pressable onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })} testID="recent-quotes-link">
+                <ThemedText type="caption" style={{ color: dt.accentMuted, fontSize: 12 }}>{t.dashboard.recentQuotes}</ThemedText>
+              </Pressable>
+            </View>
+            <View style={styles.glanceRow}>
+              <GlanceCard
+                title={t.dashboard.needFollowUp}
+                value={followUpQueueCount.toString()}
+                icon="phone-missed"
+                color={theme.warning}
+                onPress={() => navigation.navigate("FollowUpQueue")}
+              />
+              <GlanceCard
+                title={t.dashboard.jobsToday}
+                value={todayJobCount.toString()}
+                icon="calendar"
+                color={theme.primary}
+                onPress={() => navigation.navigate("Main", { screen: "JobsTab" })}
+              />
+              <GlanceCard
+                title={t.dashboard.thisMonth}
+                value={`$${monthRevenue.toLocaleString()}`}
+                icon="trending-up"
+                color={theme.success}
+                onPress={() => navigation.navigate("Main", { screen: "RevenueTab" })}
+              />
+            </View>
+          </View>
+        );
+
+      case "ratings":
+        return ratingSummary && ratingSummary.total > 0 ? (
+          <View key="ratings" style={[styles.ratingsSummaryCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}>
+            <View style={styles.ratingsSummaryHeader}>
+              <View style={[styles.glanceIcon, { backgroundColor: `${theme.warning}18` }]}>
+                <Feather name="star" size={16} color={theme.warning} />
+              </View>
+              <ThemedText type="small" style={{ fontWeight: "600", marginLeft: Spacing.sm }}>
+                {t.ratings.customerSatisfaction}
+              </ThemedText>
+            </View>
+            <View style={styles.ratingsSummaryBody}>
+              <View style={styles.ratingsSummaryLeft}>
+                <ThemedText type="h2" style={{ fontWeight: "700" }}>
+                  {ratingSummary.average}
+                </ThemedText>
+                <View style={styles.ratingsSummaryStars}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Feather
+                      key={star}
+                      name="star"
+                      size={14}
+                      color={star <= Math.round(ratingSummary.average) ? "#F59E0B" : theme.textMuted}
+                      style={{ marginRight: 2 }}
+                    />
+                  ))}
+                </View>
+              </View>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                {ratingSummary.total} {t.ratings.totalReviews}
+              </ThemedText>
+            </View>
+          </View>
+        ) : null;
+
+      case "opportunities":
+        return totalOpportunities > 0 ? (
+          <Pressable
+            key="opportunities"
+            onPress={() => navigation.navigate("Opportunities")}
+            style={[styles.opportunityCard, { backgroundColor: dt.surfacePrimary, borderColor: theme.successBorder }, Elevation.e1]}
+            testID="opportunities-card"
+          >
+            <View style={styles.focusCardHeader}>
+              <View style={[styles.focusIcon, { backgroundColor: theme.successSoft }]}>
+                <Feather name="repeat" size={16} color={theme.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="small" style={{ fontWeight: "600" }}>
+                  {`${t.dashboard.reactivationOpportunities}: ${totalOpportunities}`}
+                </ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                  {`${t.dashboard.estimatedRecoverable}: $${estimatedRecoverable.toLocaleString()}`}
+                </ThemedText>
+              </View>
+              <Feather name="chevron-right" size={18} color={dt.textMuted} />
+            </View>
+          </Pressable>
+        ) : null;
+
+      case "recap":
+        return (
+          <Pressable
+            key="recap"
+            onPress={() => navigation.navigate("WeeklyRecap")}
+            style={[styles.recapLink, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
+            testID="weekly-recap-link"
+          >
+            <Feather name="bar-chart" size={14} color={dt.accent} />
+            <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600", marginLeft: Spacing.sm, flex: 1 }}>
+              {t.dashboard.viewWeeklyRecap}
+            </ThemedText>
+            <Feather name="chevron-right" size={16} color={dt.textMuted} />
+          </Pressable>
+        );
+
+      default:
+        return null;
+    }
+  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, currentStreak, commandText, commandResult, dt, theme, t, navigation, handleSubmit, handlePromptTap, handleChipAction, handleSuggestedAction, todayJobCount, monthRevenue, ratingSummary, totalOpportunities, estimatedRecoverable]);
+
   return (
     <LinearGradient
       colors={[dt.gradientTop, dt.gradientBottom]}
@@ -563,265 +927,79 @@ export default function DashboardScreen() {
 
         <OnboardingBanner />
 
-        {followUpQueueCount > 0 ? (
+        <View style={styles.customizeRow}>
+          <View style={{ flex: 1 }} />
           <Pressable
-            onPress={() => navigation.navigate("FollowUpQueue")}
-            style={[styles.focusCard, { borderColor: dt.warningBorder }, Elevation.e2]}
-            testID="todays-focus-card"
+            onPress={() => setIsEditingWidgets(!isEditingWidgets)}
+            style={[styles.customizeBtn, { backgroundColor: isEditingWidgets ? dt.accentSoft : dt.chipBg, borderColor: isEditingWidgets ? dt.accent : dt.chipBorder }]}
+            testID="customize-widgets-btn"
           >
-            <LinearGradient
-              colors={[dt.warningGradientTop, dt.warningGradientBottom]}
-              style={styles.focusCardGradient}
-            >
-              <View style={styles.focusCardHeader}>
-                <View style={[styles.focusIcon, { backgroundColor: dt.warningSoft }]}>
-                  <Feather name="alert-circle" size={16} color={theme.warning} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <ThemedText type="subtitle" style={{ fontWeight: "700" }}>
-                    {`$${amountAtRisk.toLocaleString()} ${t.dashboard.atRisk}`}
-                  </ThemedText>
-                  <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                    {followUpQueueCount === 1 ? `1 ${t.dashboard.quoteNeedsAttention}` : `${followUpQueueCount} ${t.dashboard.quotesNeedAttention}`}
-                  </ThemedText>
-                </View>
-                <Feather name="chevron-right" size={18} color={dt.textMuted} />
-              </View>
-              <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm, marginLeft: 44 }}>
-                {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
-              </ThemedText>
-              <View style={[styles.focusCta, { backgroundColor: dt.warningSoft, borderWidth: 1, borderColor: dt.warningBorder }]}>
-                <Feather name="arrow-right" size={14} color={theme.warning} />
-                <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{t.dashboard.followUpNow}</ThemedText>
-              </View>
-            </LinearGradient>
-          </Pressable>
-        ) : (
-          <View
-            style={[
-              styles.focusCard,
-              {
-                backgroundColor: dt.surfacePrimary,
-                borderColor: theme.successBorder,
-                padding: Spacing.lg,
-              },
-              Elevation.e1,
-            ]}
-          >
-            <View style={styles.focusCardHeader}>
-              <View style={[styles.focusIcon, { backgroundColor: theme.successSoft }]}>
-                <Feather name="check-circle" size={16} color={theme.success} />
-              </View>
-              <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{t.growth.allCaughtUp}</ThemedText>
-            </View>
-            <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>
-              {t.dashboard.noRevenueAtRisk}
+            <Feather name={isEditingWidgets ? "check" : "sliders"} size={13} color={isEditingWidgets ? dt.accent : dt.textSecondary} />
+            <ThemedText type="caption" style={{ color: isEditingWidgets ? dt.accent : dt.textSecondary, fontWeight: "600", marginLeft: 5 }}>
+              {isEditingWidgets ? t.common.done : t.dashboard.customizeWidgets}
             </ThemedText>
-          </View>
-        )}
-
-        <View style={[styles.streakCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e2]}>
-          <View style={styles.streakCardRow}>
-            <Feather name="zap" size={16} color={currentStreak > 0 ? theme.warning : dt.textMuted} />
-            <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.sm }}>
-              {currentStreak > 0 ? `${t.dashboard.followUpStreak}: ${currentStreak} ${currentStreak === 1 ? t.common.day : t.common.days}` : t.dashboard.followUpStreak}
-            </ThemedText>
-          </View>
-          <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 4, marginLeft: 28 }}>
-            {currentStreak === 0 ? t.dashboard.startStreakToday : currentStreak >= 7 ? t.dashboard.revenueDisciplineUnlocked : currentStreak >= 3 ? t.dashboard.momentumBuilding : `${currentStreak} ${currentStreak === 1 ? t.common.day : t.common.days} ${t.dashboard.daysStrong}`}
-          </ThemedText>
-          {currentStreak === 0 ? (
-            <Pressable onPress={() => navigation.navigate("FollowUpQueue")} style={styles.streakGoBtn} testID="streak-nudge-cta">
-              <View style={[styles.streakGoBtnInner, Elevation.e3]}>
-                <ThemedText type="body" style={styles.streakGoText}>{t.dashboard.go}</ThemedText>
-                <Feather name="arrow-right" size={18} color="#FFFFFF" style={{ marginLeft: 4 }} />
-              </View>
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View style={[
-          styles.commandCard,
-          {
-            backgroundColor: dt.surfaceEmphasis,
-            borderColor: dt.borderAccent,
-          },
-          Elevation.e2,
-        ]}>
-          <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm, fontWeight: "600" }}>
-            {t.dashboard.whatToDo}
-          </ThemedText>
-          <View style={[styles.inputRow, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
-            <TextInput
-              ref={inputRef}
-              style={[styles.commandInput, { color: dt.textPrimary }]}
-              placeholder={t.dashboard.askPlaceholder}
-              placeholderTextColor={dt.textMuted}
-              value={commandText}
-              onChangeText={setCommandText}
-              onSubmitEditing={handleSubmit}
-              returnKeyType="send"
-              testID="command-input"
-            />
-            <Pressable
-              onPress={handleSubmit}
-              style={[
-                styles.sendBtn,
-                { backgroundColor: commandText.trim() ? dt.accent : dt.chipBg },
-                commandText.trim() ? Platform.select({
-                  web: { boxShadow: `0px 2px 8px ${dt.brandGlow}` } as any,
-                  default: { shadowColor: dt.accent, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-                }) : {},
-              ]}
-              testID="command-send"
-            >
-              <Feather name="send" size={15} color={commandText.trim() ? "#FFF" : dt.textMuted} />
-            </Pressable>
-          </View>
-          <RotatingPrompts onTap={handlePromptTap} />
-        </View>
-
-        {commandResult ? (
-          <View style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
-            <ResponseCard
-              result={commandResult}
-              onDismiss={() => setCommandResult(null)}
-              onAction={handleSuggestedAction}
-            />
-          </View>
-        ) : null}
-
-        {!FeatureFlags.aiEnabled ? (
-          <View style={[styles.aiBanner, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderAccent }, Elevation.e2]}>
-            <View style={styles.aiBannerContent}>
-              <View style={[styles.aiBannerIcon, { backgroundColor: dt.accentSoft }]}>
-                <Feather name="zap" size={14} color={dt.accent} />
-              </View>
-              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                <ThemedText type="small" style={{ fontWeight: "600", fontSize: 13 }}>
-                  {t.dashboard.unlockAI}
-                </ThemedText>
-                <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 1, fontSize: 11 }}>
-                  {t.dashboard.aiSubtitle}
-                </ThemedText>
-              </View>
-            </View>
-            <Pressable
-              style={[styles.upgradeCta, { borderColor: dt.accent, backgroundColor: dt.accentSoft }]}
-              onPress={() => navigation.navigate("Paywall")}
-              testID="upgrade-cta"
-            >
-              <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600", fontSize: 12 }}>
-                {t.dashboard.seeAIFeatures}
-              </ThemedText>
-              <Feather name="arrow-right" size={12} color={dt.accent} style={{ marginLeft: 4 }} />
-            </Pressable>
-          </View>
-        ) : null}
-
-        <View style={{ marginBottom: Spacing.lg }}>
-          <QuickActionChips onAction={handleChipAction} />
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <ThemedText type="subtitle" style={{ fontWeight: "600", fontSize: 15 }}>{t.dashboard.todayAtGlance}</ThemedText>
-          <Pressable onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })} testID="recent-quotes-link">
-            <ThemedText type="caption" style={{ color: dt.accentMuted, fontSize: 12 }}>{t.dashboard.recentQuotes}</ThemedText>
           </Pressable>
         </View>
 
-        <View style={styles.glanceRow}>
-          <GlanceCard
-            title={t.dashboard.needFollowUp}
-            value={followUpQueueCount.toString()}
-            icon="phone-missed"
-            color={theme.warning}
-            onPress={() => navigation.navigate("FollowUpQueue")}
-          />
-          <GlanceCard
-            title={t.dashboard.jobsToday}
-            value={todayJobCount.toString()}
-            icon="calendar"
-            color={theme.primary}
-            onPress={() => navigation.navigate("Main", { screen: "JobsTab" })}
-          />
-          <GlanceCard
-            title={t.dashboard.thisMonth}
-            value={`$${monthRevenue.toLocaleString()}`}
-            icon="trending-up"
-            color={theme.success}
-            onPress={() => navigation.navigate("Main", { screen: "RevenueTab" })}
-          />
-        </View>
-
-        {ratingSummary && ratingSummary.total > 0 ? (
-          <View style={[styles.ratingsSummaryCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}>
-            <View style={styles.ratingsSummaryHeader}>
-              <View style={[styles.glanceIcon, { backgroundColor: `${theme.warning}18` }]}>
-                <Feather name="star" size={16} color={theme.warning} />
-              </View>
-              <ThemedText type="small" style={{ fontWeight: "600", marginLeft: Spacing.sm }}>
-                {t.ratings.customerSatisfaction}
+        {isEditingWidgets ? (
+          <View style={[styles.editorCard, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderPrimary }, Elevation.e2]}>
+            <View style={styles.editorHeader}>
+              <Feather name="layout" size={16} color={dt.accent} />
+              <ThemedText type="subtitle" style={{ fontWeight: "700", marginLeft: Spacing.sm, flex: 1 }}>
+                {t.dashboard.editWidgets}
               </ThemedText>
+              <Pressable onPress={() => setIsEditingWidgets(false)} hitSlop={12} testID="editor-done-btn">
+                <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600" }}>{t.common.done}</ThemedText>
+              </Pressable>
             </View>
-            <View style={styles.ratingsSummaryBody}>
-              <View style={styles.ratingsSummaryLeft}>
-                <ThemedText type="h2" style={{ fontWeight: "700" }}>
-                  {ratingSummary.average}
-                </ThemedText>
-                <View style={styles.ratingsSummaryStars}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Feather
-                      key={star}
-                      name="star"
-                      size={14}
-                      color={star <= Math.round(ratingSummary.average) ? "#F59E0B" : theme.textMuted}
-                      style={{ marginRight: 2 }}
-                    />
-                  ))}
+            {widgetOrder.map((widgetId, index) => {
+              const isHidden = hiddenWidgets.has(widgetId);
+              const label = WIDGET_LABELS[widgetId];
+              return (
+                <View key={widgetId} style={[styles.editorRow, { borderTopColor: dt.borderSecondary }]}>
+                  <Pressable
+                    onPress={() => toggleWidgetVisibility(widgetId)}
+                    style={[styles.editorVisibilityBtn, { backgroundColor: isHidden ? "transparent" : dt.accentSoft }]}
+                    testID={`toggle-${widgetId}`}
+                  >
+                    <Feather name={isHidden ? "eye-off" : "eye"} size={14} color={isHidden ? dt.textMuted : dt.accent} />
+                  </Pressable>
+                  <Feather name={label.icon} size={14} color={isHidden ? dt.textMuted : dt.textSecondary} style={{ marginLeft: Spacing.sm }} />
+                  <ThemedText
+                    type="small"
+                    style={{ flex: 1, marginLeft: Spacing.sm, color: isHidden ? dt.textMuted : dt.textPrimary, fontWeight: "500" }}
+                    numberOfLines={1}
+                  >
+                    {label.en}
+                  </ThemedText>
+                  <View style={styles.editorArrows}>
+                    <Pressable
+                      onPress={() => moveWidget(widgetId, "up")}
+                      style={[styles.editorArrowBtn, { opacity: index === 0 ? 0.3 : 1 }]}
+                      disabled={index === 0}
+                      testID={`move-up-${widgetId}`}
+                    >
+                      <Feather name="chevron-up" size={16} color={dt.textSecondary} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => moveWidget(widgetId, "down")}
+                      style={[styles.editorArrowBtn, { opacity: index === widgetOrder.length - 1 ? 0.3 : 1 }]}
+                      disabled={index === widgetOrder.length - 1}
+                      testID={`move-down-${widgetId}`}
+                    >
+                      <Feather name="chevron-down" size={16} color={dt.textSecondary} />
+                    </Pressable>
+                  </View>
                 </View>
-              </View>
-              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                {ratingSummary.total} {t.ratings.totalReviews}
-              </ThemedText>
-            </View>
+              );
+            })}
           </View>
         ) : null}
 
-        {totalOpportunities > 0 ? (
-          <Pressable
-            onPress={() => navigation.navigate("Opportunities")}
-            style={[styles.opportunityCard, { backgroundColor: dt.surfacePrimary, borderColor: theme.successBorder }, Elevation.e1]}
-            testID="opportunities-card"
-          >
-            <View style={styles.focusCardHeader}>
-              <View style={[styles.focusIcon, { backgroundColor: theme.successSoft }]}>
-                <Feather name="repeat" size={16} color={theme.success} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="small" style={{ fontWeight: "600" }}>
-                  {`${t.dashboard.reactivationOpportunities}: ${totalOpportunities}`}
-                </ThemedText>
-                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                  {`${t.dashboard.estimatedRecoverable}: $${estimatedRecoverable.toLocaleString()}`}
-                </ThemedText>
-              </View>
-              <Feather name="chevron-right" size={18} color={dt.textMuted} />
-            </View>
-          </Pressable>
-        ) : null}
-
-        <Pressable
-          onPress={() => navigation.navigate("WeeklyRecap")}
-          style={[styles.recapLink, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
-          testID="weekly-recap-link"
-        >
-          <Feather name="bar-chart" size={14} color={dt.accent} />
-          <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600", marginLeft: Spacing.sm, flex: 1 }}>
-            {t.dashboard.viewWeeklyRecap}
-          </ThemedText>
-          <Feather name="chevron-right" size={16} color={dt.textMuted} />
-        </Pressable>
+        {widgetOrder.map((widgetId) => {
+          if (hiddenWidgets.has(widgetId)) return null;
+          return renderWidget(widgetId);
+        })}
       </ScrollView>
     </LinearGradient>
   );
@@ -1092,5 +1270,57 @@ const styles = StyleSheet.create({
   ratingsSummaryStars: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  customizeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+  },
+  customizeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  editorCard: {
+    marginHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+    overflow: "hidden",
+  },
+  editorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  editorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  editorVisibilityBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editorArrows: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  editorArrowBtn: {
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

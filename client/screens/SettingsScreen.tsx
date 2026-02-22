@@ -103,7 +103,7 @@ export default function SettingsScreen() {
     }
   }, [currentPrefs, queryClient]);
 
-  const { data: calendarStatus, refetch: refetchCalendar } = useQuery({
+  const { data: calendarStatus, refetch: refetchCalendar } = useQuery<{ connected: boolean }>({
     queryKey: ["/api/google-calendar/status"],
   });
 
@@ -323,7 +323,7 @@ export default function SettingsScreen() {
           onPress={() => navigation.navigate("AvatarBuilder" as any)}
           style={[
             styles.avatarContainer,
-            { backgroundColor: theme.backgroundDefaultSecondary, borderColor: theme.border },
+            { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
           ]}
           testID="button-customize-avatar"
         >

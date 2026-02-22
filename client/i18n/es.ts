@@ -105,6 +105,13 @@ const es: Translations = {
     reactivationOpportunities: "Oportunidades de reactivaci\u00f3n",
     estimatedRecoverable: "Recuperable estimado",
     viewWeeklyRecap: "Ver resumen semanal",
+    customizeWidgets: "Personalizar",
+    editWidgets: "Editar Panel",
+    showWidget: "Mostrar",
+    hideWidget: "Ocultar",
+    moveUp: "Mover Arriba",
+    moveDown: "Mover Abajo",
+    widgetsCustomized: "Panel personalizado",
   },
 
   customers: {

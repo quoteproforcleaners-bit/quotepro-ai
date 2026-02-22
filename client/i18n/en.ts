@@ -103,6 +103,13 @@ const en = {
     reactivationOpportunities: "Reactivation opportunities",
     estimatedRecoverable: "Estimated recoverable",
     viewWeeklyRecap: "View Weekly Recap",
+    customizeWidgets: "Customize",
+    editWidgets: "Edit Dashboard",
+    showWidget: "Show",
+    hideWidget: "Hide",
+    moveUp: "Move Up",
+    moveDown: "Move Down",
+    widgetsCustomized: "Dashboard customized",
   },
 
   customers: {
