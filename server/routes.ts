@@ -4086,7 +4086,7 @@ Respond with JSON: {"reply": string}`
 
       const customInstruction = customPrompt?.trim() ? `\n\nAdditional instructions from the business owner: ${customPrompt.trim()}` : "";
       
-      const systemPrompt = `Write a marketing email for "${businessName}"${ownerName ? ` (${ownerName})` : ""} targeting ${targetDesc}.\n\nCAMPAIGN THEME: ${themeGuide}${customInstruction}\n\nRules:\n- Format: first line "Subject: ...", blank line, then body under 150 words\n- The subject line MUST reference the campaign theme ("${campaignName}")\n- The email body MUST be specifically about the "${campaignName}" theme — not generic\n- Use [Customer] for their name\n- No placeholders for company/owner — use real names\n- No links/URLs\n- Tell them to reply to book\n- No emojis`;
+      const systemPrompt = `Write a short marketing email for "${businessName}"${ownerName ? ` (${ownerName})` : ""} to ${targetDesc}.\n\nTheme: ${themeGuide}${customInstruction}\n\nFormat rules:\n- First line: "Subject: ..." then blank line then body\n- Body MUST be under 80 words, broken into 3-4 short paragraphs separated by blank lines\n- Use [Customer] as greeting name\n- Sign off with real name (${ownerName || businessName})\n- No links, no emojis, no placeholders\n- End with "Reply to book"`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
