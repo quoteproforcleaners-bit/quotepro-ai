@@ -1052,7 +1052,7 @@ export default function SettingsScreen() {
         {t.settings.appLanguageDesc}
       </ThemedText>
       <View style={[styles.languageSelector, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-        {(["en", "es"] as Language[]).map((lang) => (
+        {(["en", "es", "pt", "ru"] as Language[]).map((lang) => (
           <Pressable
             key={lang}
             onPress={() => setLanguage(lang)}
@@ -1084,7 +1084,7 @@ export default function SettingsScreen() {
         {t.settings.commLanguageDesc}
       </ThemedText>
       <View style={[styles.languageSelector, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-        {(["en", "es"] as Language[]).map((lang) => (
+        {(["en", "es", "pt", "ru"] as Language[]).map((lang) => (
           <Pressable
             key={`comm-${lang}`}
             onPress={() => setCommunicationLanguage(lang)}
