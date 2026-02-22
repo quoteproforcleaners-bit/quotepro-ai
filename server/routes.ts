@@ -4067,42 +4067,62 @@ Respond with JSON: {"reply": string}`
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const { campaignName, segment, customPrompt } = req.body;
+      const { campaignName, segment, customPrompt, useAI } = req.body;
 
       const businessName = business.companyName || "our cleaning company";
-      const ownerName = business.senderName || "";
-      const targetDesc = segment === "dormant" ? "customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired" : "a curated customer list";
+      const ownerName = business.senderName || business.companyName || "Your cleaning team";
+      const signOff = ownerName;
 
-      const campaignThemeGuides: Record<string, string> = {
-        "Spring Cleaning Special": "Focus on spring themes: fresh starts, deep cleaning after winter, spring refresh, decluttering, allergen removal, and getting the home ready for the warmer months ahead. Mention spring-specific language.",
-        "Holiday Deep Clean": "Focus on holiday preparation: getting the home guest-ready, pre-holiday deep cleaning, making spaces sparkle for gatherings, creating a welcoming environment for family and friends visiting during the holidays.",
-        "New Year Fresh Start": "Focus on new year themes: starting the year with a clean slate, fresh beginnings, new year resolutions for a cleaner home, kicking off the year right with a spotless home.",
-        "Back to School Clean": "Focus on back-to-school themes: getting the house in order as kids return to school, post-summer deep clean, establishing a clean routine for the school year, refreshing the home after a busy summer.",
-        "Win Back Lost Leads": "Focus on re-engaging: acknowledge it's been a while, offer a warm invitation to reconnect, mention you'd love the chance to earn their business, and make rebooking easy.",
-        "VIP Customer Appreciation": "Focus on gratitude and loyalty: thank them for being a valued customer, express genuine appreciation for their continued trust, offer them something special as a loyal client.",
+      const instantTemplates: Record<string, { subject: string; content: string }> = {
+        "Holiday Deep Clean": {
+          subject: `Holiday Deep Clean - ${businessName}`,
+          content: `Hi [Customer],\n\nThe holidays are almost here! Let ${businessName} get your home guest-ready with a thorough deep clean.\n\nWe'll tackle kitchens, bathrooms, and living spaces so every room sparkles for your gatherings.\n\nReply to book and we'll schedule at your convenience.\n\nBest regards,\n${signOff}`,
+        },
+        "Spring Cleaning Special": {
+          subject: `Spring Cleaning Special - ${businessName}`,
+          content: `Hi [Customer],\n\nSpring is here! Time to refresh your home after winter with a deep clean from ${businessName}.\n\nWe'll dust, scrub, and polish every corner so your space feels brand new for the warmer months.\n\nReply to book your spring cleaning today.\n\nBest regards,\n${signOff}`,
+        },
+        "New Year Fresh Start": {
+          subject: `Start the New Year Fresh - ${businessName}`,
+          content: `Hi [Customer],\n\nHappy New Year! Start fresh with a spotless home from ${businessName}.\n\nA clean home sets the tone for a great year ahead. Let us handle the deep clean so you can focus on your goals.\n\nReply to book and kick off the year right.\n\nBest regards,\n${signOff}`,
+        },
+        "Back to School Clean": {
+          subject: `Back to School Clean - ${businessName}`,
+          content: `Hi [Customer],\n\nSchool is starting! Get your home refreshed after a busy summer with ${businessName}.\n\nWe'll deep clean every room so your family can settle into a clean, organized routine.\n\nReply to book your back-to-school cleaning.\n\nBest regards,\n${signOff}`,
+        },
+        "Win Back Lost Leads": {
+          subject: `We'd Love to Hear from You - ${businessName}`,
+          content: `Hi [Customer],\n\nIt's been a while since we connected. We'd love the chance to earn your business at ${businessName}.\n\nWhether your needs have changed or you're ready for a fresh quote, we're here to help.\n\nReply to this email and we'll get you taken care of.\n\nBest regards,\n${signOff}`,
+        },
+        "VIP Customer Appreciation": {
+          subject: `Thank You from ${businessName}`,
+          content: `Hi [Customer],\n\nThank you for being a valued customer of ${businessName}. We truly appreciate your continued trust.\n\nAs a loyal client, we'd love to offer you priority booking for your next cleaning.\n\nReply to book and we'll schedule you at your preferred time.\n\nWarm regards,\n${signOff}`,
+        },
       };
 
-      const themeGuide = campaignThemeGuides[campaignName] || `The campaign is called "${campaignName}" — make sure the email content is specifically relevant to this theme and topic. The subject line and message body should clearly reflect the "${campaignName}" theme.`;
+      if (!useAI && !customPrompt?.trim() && instantTemplates[campaignName]) {
+        const template = instantTemplates[campaignName];
+        return res.json({ content: template.content, subject: template.subject, channel: "email" });
+      }
 
-      const customInstruction = customPrompt?.trim() ? `\n\nAdditional instructions from the business owner: ${customPrompt.trim()}` : "";
+      const targetDesc = segment === "dormant" ? "past customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired" : "customers";
+      const customInstruction = customPrompt?.trim() ? ` Focus: ${customPrompt.trim()}.` : "";
       
-      const systemPrompt = `Write a short marketing email for "${businessName}"${ownerName ? ` (${ownerName})` : ""} to ${targetDesc}.\n\nTheme: ${themeGuide}${customInstruction}\n\nFormat rules:\n- First line: "Subject: ..." then blank line then body\n- Body MUST be under 80 words, broken into 3-4 short paragraphs separated by blank lines\n- Use [Customer] as greeting name\n- Sign off with real name (${ownerName || businessName})\n- No links, no emojis, no placeholders\n- End with "Reply to book"`;
+      const systemPrompt = `Write a short marketing email for "${businessName}" (${ownerName}) to ${targetDesc}. Theme: "${campaignName}".${customInstruction} Rules: first line "Subject: ..." then blank line then body under 60 words in 3 short paragraphs. Use [Customer] as name. Sign off as ${signOff}. No links, no emojis. End with "Reply to book".`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-5-nano",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Generate a themed email for the "${campaignName}" campaign.` },
+          { role: "user", content: "Write the email." },
         ],
       });
 
       const raw = completion.choices[0]?.message?.content?.trim() || "";
-      console.log("AI campaign response:", JSON.stringify({ length: raw.length, finishReason: completion.choices[0]?.finish_reason, hasContent: !!raw }));
       
       if (!raw) {
-        console.warn("AI returned empty for campaign:", campaignName, "- full response:", JSON.stringify(completion.choices[0]));
-        const fallbackContent = `Dear [Customer],\n\nWe wanted to reach out from ${businessName} about our ${campaignName} offer.\n\nWe'd love the opportunity to serve you${segment === "dormant" ? " again" : ""}. Reply to this email to schedule your next cleaning, and we'll make sure to take great care of your home.\n\nBest regards,\n${ownerName || businessName}`;
-        return res.json({ content: fallbackContent, subject: campaignName, channel: "email" });
+        const fallback = instantTemplates[campaignName] || { content: `Hi [Customer],\n\nWe wanted to reach out from ${businessName} about our ${campaignName} offer.\n\nWe'd love to serve you${segment === "dormant" ? " again" : ""}. Reply to schedule your next cleaning.\n\nBest regards,\n${signOff}`, subject: campaignName };
+        return res.json({ content: fallback.content, subject: fallback.subject, channel: "email" });
       }
 
       let subject = "";

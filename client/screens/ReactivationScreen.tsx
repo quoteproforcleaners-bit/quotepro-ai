@@ -876,7 +876,7 @@ export default function ReactivationScreen() {
                           campaignName: viewingCampaign?.name || viewingCampaign?.templateKey,
                           segment: viewingCampaign?.segment,
                           channel: viewingCampaign?.channel || "email",
-                          customPrompt: templateMatch ? templateMatch.promptSuggestions[0] : undefined,
+                          useAI: true,
                         });
                         const aiData = await aiRes.json();
                         if (!aiData.content) {
