@@ -284,8 +284,8 @@ export default function WeeklyRecapScreen() {
               <StatCard
                 title="Biggest Win"
                 value={
-                  recap?.biggestWin
-                    ? `$${recap.biggestWin.total.toLocaleString()}`
+                  recap?.biggestWin != null && recap.biggestWin !== 0
+                    ? `$${(typeof recap.biggestWin === "number" ? recap.biggestWin : recap.biggestWin?.total ?? 0).toLocaleString()}`
                     : "--"
                 }
                 icon="award"
@@ -293,13 +293,13 @@ export default function WeeklyRecapScreen() {
               />
             </View>
 
-            {recap?.biggestWin ? (
+            {recap?.biggestWin != null && typeof recap.biggestWin === "object" && recap.biggestWin.customerFirstName ? (
               <View style={styles.biggestWinSubtext}>
                 <ThemedText
                   type="caption"
                   style={{ color: theme.textSecondary, textAlign: "center" }}
                 >
-                  {`Biggest win: ${recap.biggestWin.customerFirstName} ${recap.biggestWin.customerLastName}`}
+                  {`Biggest win: ${recap.biggestWin.customerFirstName || ""} ${recap.biggestWin.customerLastName || ""}`}
                 </ThemedText>
               </View>
             ) : null}
@@ -327,7 +327,7 @@ export default function WeeklyRecapScreen() {
                       type="small"
                       style={{ color: theme.textSecondary, marginTop: 2 }}
                     >
-                      {`${recap.mostAtRiskOpen.customerFirstName} ${recap.mostAtRiskOpen.customerLastName} - $${recap.mostAtRiskOpen.total.toLocaleString()} (sent ${getDaysAgo(recap.mostAtRiskOpen.sentAt)} days ago)`}
+                      {`${recap.mostAtRiskOpen.customerFirstName || ""} ${recap.mostAtRiskOpen.customerLastName || ""} - $${(recap.mostAtRiskOpen.total ?? 0).toLocaleString()} (sent ${getDaysAgo(recap.mostAtRiskOpen.sentAt)} days ago)`}
                     </ThemedText>
                   </View>
                 </View>
