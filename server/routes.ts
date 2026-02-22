@@ -5087,6 +5087,7 @@ function formatBusiness(b: any) {
     cashappHandle: b.cashappHandle || null,
     paymentOptions: b.paymentOptions || null,
     paymentNotes: b.paymentNotes || null,
+    avatarConfig: b.avatarConfig || null,
   };
 }
 

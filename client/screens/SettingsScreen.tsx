@@ -26,6 +26,7 @@ import { Switch } from "react-native";
 import { useLanguage } from "@/context/LanguageContext";
 import { LANGUAGE_LABELS, type Language } from "@/i18n";
 import { syncNotificationSchedule } from "@/lib/notifications";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -315,29 +316,29 @@ export default function SettingsScreen() {
 
       <SectionHeader title={t.settings.businessProfile} />
 
-      <Pressable
-        onPress={handlePickImage}
-        style={[
-          styles.logoContainer,
-          { backgroundColor: theme.backgroundDefaultSecondary, borderColor: theme.border },
-        ]}
-      >
-        {profile.logoUri ? (
-          <Image source={{ uri: profile.logoUri }} style={styles.logo} />
-        ) : (
-          <View style={styles.logoPlaceholder}>
-            <Image
-              source={require("../../assets/images/business-avatar-default.png")}
-              style={styles.defaultLogo}
-            />
-          </View>
-        )}
-        <View
-          style={[styles.editBadge, { backgroundColor: theme.primary }]}
+      <View style={styles.avatarRow}>
+        <Pressable
+          onPress={() => navigation.navigate("AvatarBuilder" as any)}
+          style={[
+            styles.avatarContainer,
+            { backgroundColor: theme.backgroundDefaultSecondary, borderColor: theme.border },
+          ]}
+          testID="button-customize-avatar"
         >
-          <Feather name="camera" size={14} color="#FFFFFF" />
+          <ProfileAvatar
+            config={profile.avatarConfig || null}
+            size={64}
+            fallbackInitials={profile.companyName}
+          />
+          <View style={[styles.editBadge, { backgroundColor: theme.primary }]}>
+            <Feather name="edit-2" size={12} color="#FFFFFF" />
+          </View>
+        </Pressable>
+        <View style={{ flex: 1, marginLeft: Spacing.md }}>
+          <ThemedText type="body" style={{ fontWeight: "600" }}>{t.settings.avatar}</ThemedText>
+          <ThemedText type="caption" style={{ color: theme.textSecondary }}>{t.settings.avatarSubtitle}</ThemedText>
         </View>
-      </Pressable>
+      </View>
 
       <Input
         label={t.settings.companyName}
@@ -1193,6 +1194,16 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg,
+  },
+  avatarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  avatarContainer: {
+    position: "relative",
+    borderRadius: 40,
+    padding: 4,
   },
   logoContainer: {
     width: 100,

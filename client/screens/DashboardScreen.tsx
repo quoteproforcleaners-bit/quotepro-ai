@@ -25,6 +25,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { ThemedText } from "@/components/ThemedText";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Elevation } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
@@ -528,13 +529,23 @@ export default function DashboardScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.greetingRow}>
-          <ThemedText type="caption" style={{ color: dt.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: "500", fontSize: 11 }}>
-            {getGreeting()}
-          </ThemedText>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <ThemedText type="h4" numberOfLines={1} style={{ marginTop: 2, flex: 1 }}>
-              {profile?.companyName || "QuotePro"}
-            </ThemedText>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <ProfileAvatar
+              config={profile?.avatarConfig || null}
+              size={44}
+              fallbackInitials={profile?.companyName}
+              style={{ marginRight: Spacing.sm }}
+            />
+            <View style={{ flex: 1 }}>
+              <ThemedText type="caption" style={{ color: dt.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: "500", fontSize: 11 }}>
+                {getGreeting()}
+              </ThemedText>
+              <ThemedText type="h4" numberOfLines={1} style={{ marginTop: 2 }}>
+                {profile?.companyName || "QuotePro"}
+              </ThemedText>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end" }}>
             {currentStreak > 0 ? (
               <View style={[styles.streakBadge, { backgroundColor: dt.accentSoft }]}>
                 <Feather name="zap" size={12} color={theme.warning} />

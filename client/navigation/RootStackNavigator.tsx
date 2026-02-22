@@ -21,6 +21,7 @@ import AutomationsHubScreen from "@/screens/AutomationsHubScreen";
 import SalesStrategyScreen from "@/screens/SalesStrategyScreen";
 import QuotePreferencesScreen from "@/screens/QuotePreferencesScreen";
 import HelpGuideScreen from "@/screens/HelpGuideScreen";
+import AvatarBuilderScreen from "@/screens/AvatarBuilderScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -52,6 +53,7 @@ export type RootStackParamList = {
   SalesStrategy: undefined;
   QuotePreferences: undefined;
   HelpGuide: undefined;
+  AvatarBuilder: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -236,6 +238,13 @@ export default function RootStackNavigator() {
             component={HelpGuideScreen}
             options={{
               headerTitle: "Help & Guide",
+            }}
+          />
+          <Stack.Screen
+            name="AvatarBuilder"
+            component={AvatarBuilderScreen}
+            options={{
+              headerTitle: "Profile Avatar",
             }}
           />
         </>
