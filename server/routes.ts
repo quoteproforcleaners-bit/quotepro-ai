@@ -4067,13 +4067,26 @@ Respond with JSON: {"reply": string}`
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const { campaignName, segment } = req.body;
+      const { campaignName, segment, customPrompt } = req.body;
 
       const businessName = business.companyName || "our cleaning company";
       const ownerName = business.senderName || "";
       const targetDesc = segment === "dormant" ? "customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired" : "a curated customer list";
+
+      const campaignThemeGuides: Record<string, string> = {
+        "Spring Cleaning Special": "Focus on spring themes: fresh starts, deep cleaning after winter, spring refresh, decluttering, allergen removal, and getting the home ready for the warmer months ahead. Mention spring-specific language.",
+        "Holiday Deep Clean": "Focus on holiday preparation: getting the home guest-ready, pre-holiday deep cleaning, making spaces sparkle for gatherings, creating a welcoming environment for family and friends visiting during the holidays.",
+        "New Year Fresh Start": "Focus on new year themes: starting the year with a clean slate, fresh beginnings, new year resolutions for a cleaner home, kicking off the year right with a spotless home.",
+        "Back to School Clean": "Focus on back-to-school themes: getting the house in order as kids return to school, post-summer deep clean, establishing a clean routine for the school year, refreshing the home after a busy summer.",
+        "Win Back Lost Leads": "Focus on re-engaging: acknowledge it's been a while, offer a warm invitation to reconnect, mention you'd love the chance to earn their business, and make rebooking easy.",
+        "VIP Customer Appreciation": "Focus on gratitude and loyalty: thank them for being a valued customer, express genuine appreciation for their continued trust, offer them something special as a loyal client.",
+      };
+
+      const themeGuide = campaignThemeGuides[campaignName] || `The campaign is called "${campaignName}" — make sure the email content is specifically relevant to this theme and topic. The subject line and message body should clearly reflect the "${campaignName}" theme.`;
+
+      const customInstruction = customPrompt?.trim() ? `\n\nAdditional instructions from the business owner: ${customPrompt.trim()}` : "";
       
-      const systemPrompt = `Write an email for "${businessName}"${ownerName ? ` (${ownerName})` : ""}. Campaign: "${campaignName}" targeting ${targetDesc}. Format: first line "Subject: ...", blank line, then body under 150 words. Use [Customer] for their name. No placeholders for company/owner - use real names. No links/URLs. Tell them to reply to book. No emojis.`;
+      const systemPrompt = `Write a marketing email for "${businessName}"${ownerName ? ` (${ownerName})` : ""} targeting ${targetDesc}.\n\nCAMPAIGN THEME: ${themeGuide}${customInstruction}\n\nRules:\n- Format: first line "Subject: ...", blank line, then body under 150 words\n- The subject line MUST reference the campaign theme ("${campaignName}")\n- The email body MUST be specifically about the "${campaignName}" theme — not generic\n- Use [Customer] for their name\n- No placeholders for company/owner — use real names\n- No links/URLs\n- Tell them to reply to book\n- No emojis`;
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60000);
@@ -4082,7 +4095,7 @@ Respond with JSON: {"reply": string}`
         model: "gpt-5-nano",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Generate the email for "${campaignName}".` },
+          { role: "user", content: `Generate a themed email for the "${campaignName}" campaign.` },
         ],
         max_completion_tokens: 300,
       }, { signal: controller.signal as any });

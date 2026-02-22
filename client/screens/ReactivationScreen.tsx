@@ -44,15 +44,16 @@ interface CampaignTemplate {
   icon: keyof typeof Feather.glyphMap;
   segment: Segment;
   description: string;
+  promptSuggestions: string[];
 }
 
 const CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
-  { name: "Spring Cleaning Special", icon: "sun", segment: "dormant", description: "Reach out to past customers with a spring refresh offer" },
-  { name: "Holiday Deep Clean", icon: "gift", segment: "dormant", description: "Offer pre-holiday deep cleaning to all past customers" },
-  { name: "New Year Fresh Start", icon: "star", segment: "dormant", description: "Ring in the new year with a clean home promotion" },
-  { name: "Back to School Clean", icon: "book-open", segment: "dormant", description: "Target families getting ready for the school year" },
-  { name: "Win Back Lost Leads", icon: "refresh-cw", segment: "lost", description: "Follow up on quotes that were never accepted" },
-  { name: "VIP Customer Appreciation", icon: "heart", segment: "custom", description: "Send a thank-you offer to your best customers" },
+  { name: "Spring Cleaning Special", icon: "sun", segment: "dormant", description: "Reach out to past customers with a spring refresh offer", promptSuggestions: ["Mention a discount or special rate", "Focus on allergen and dust removal", "Highlight window and deep carpet cleaning"] },
+  { name: "Holiday Deep Clean", icon: "gift", segment: "dormant", description: "Offer pre-holiday deep cleaning to all past customers", promptSuggestions: ["Mention getting ready for holiday guests", "Offer a pre-holiday discount", "Focus on kitchen and living area deep clean"] },
+  { name: "New Year Fresh Start", icon: "star", segment: "dormant", description: "Ring in the new year with a clean home promotion", promptSuggestions: ["Tie into New Year's resolutions", "Offer a fresh-start package deal", "Mention starting the year clutter-free"] },
+  { name: "Back to School Clean", icon: "book-open", segment: "dormant", description: "Target families getting ready for the school year", promptSuggestions: ["Focus on kid-friendly cleaning", "Mention getting organized for school routines", "Offer a family home refresh package"] },
+  { name: "Win Back Lost Leads", icon: "refresh-cw", segment: "lost", description: "Follow up on quotes that were never accepted", promptSuggestions: ["Offer a limited-time discount on their original quote", "Mention availability opening up", "Keep it brief and no-pressure"] },
+  { name: "VIP Customer Appreciation", icon: "heart", segment: "custom", description: "Send a thank-you offer to your best customers", promptSuggestions: ["Include a loyalty discount", "Thank them for referrals", "Offer priority scheduling"] },
 ];
 
 export default function ReactivationScreen() {
@@ -64,7 +65,7 @@ export default function ReactivationScreen() {
 
   const [segment, setSegment] = useState<"dormant" | "lost">("dormant");
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalStep, setModalStep] = useState<"templates" | "custom">("templates");
+  const [modalStep, setModalStep] = useState<"templates" | "custom" | "customize">("templates");
   const [campaignName, setCampaignName] = useState("");
   const [campaignSegment, setCampaignSegment] = useState<Segment>("dormant");
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
@@ -75,6 +76,9 @@ export default function ReactivationScreen() {
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
   const [confirmSend, setConfirmSend] = useState(false);
   const [aiError, setAiError] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [selectedPromptChips, setSelectedPromptChips] = useState<string[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<CampaignTemplate | null>(null);
 
   const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"], enabled: segment === "dormant" });
   const lostQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/lost"], enabled: segment === "lost" });
@@ -124,7 +128,13 @@ export default function ReactivationScreen() {
     queryClient.invalidateQueries({ queryKey: ["/api/opportunities/lost"] });
   };
 
-  const generateAndAttachContent = async (campaign: any) => {
+  const buildFullPrompt = () => {
+    const parts = [...selectedPromptChips];
+    if (customPrompt.trim()) parts.push(customPrompt.trim());
+    return parts.join(". ");
+  };
+
+  const generateAndAttachContent = async (campaign: any, prompt?: string) => {
     try {
       setGeneratingContent(true);
       setAiError(false);
@@ -132,6 +142,7 @@ export default function ReactivationScreen() {
         campaignName: campaign.name,
         segment: campaign.segment,
         channel: campaign.channel || "email",
+        customPrompt: prompt || undefined,
       });
       const aiData = await aiRes.json();
       if (!aiData.content) {
@@ -156,6 +167,7 @@ export default function ReactivationScreen() {
     if (!campaignName.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
+      const prompt = buildFullPrompt();
       const campaignRes = await apiRequest("POST", "/api/campaigns", {
         name: campaignName,
         segment: campaignSegment,
@@ -168,20 +180,30 @@ export default function ReactivationScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       resetModal();
       setViewingCampaign(campaign);
-      generateAndAttachContent(campaign);
+      generateAndAttachContent(campaign, prompt);
     } catch (error) {
       console.error("Campaign creation error:", error);
     }
   };
 
-  const handleSelectTemplate = async (template: CampaignTemplate) => {
+  const handleSelectTemplate = (template: CampaignTemplate) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedTemplate(template);
+    setSelectedPromptChips([]);
+    setCustomPrompt("");
+    setModalStep("customize");
+  };
+
+  const handleConfirmTemplate = async () => {
+    if (!selectedTemplate) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const prompt = buildFullPrompt();
     try {
       const campaignRes = await apiRequest("POST", "/api/campaigns", {
-        name: template.name,
-        segment: template.segment,
+        name: selectedTemplate.name,
+        segment: selectedTemplate.segment,
         channel: "email",
-        templateKey: template.name,
+        templateKey: selectedTemplate.name,
         messageContent: "",
         messageSubject: "",
       });
@@ -189,10 +211,16 @@ export default function ReactivationScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       resetModal();
       setViewingCampaign(campaign);
-      generateAndAttachContent(campaign);
+      generateAndAttachContent(campaign, prompt);
     } catch (error) {
       console.error("Campaign creation error:", error);
     }
+  };
+
+  const togglePromptChip = (chip: string) => {
+    setSelectedPromptChips((prev) =>
+      prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip]
+    );
   };
 
   const openModal = () => {
@@ -202,6 +230,9 @@ export default function ReactivationScreen() {
     setCampaignSegment("dormant");
     setSelectedCustomerIds([]);
     setCustomerSearch("");
+    setSelectedTemplate(null);
+    setSelectedPromptChips([]);
+    setCustomPrompt("");
   };
 
   const resetModal = () => {
@@ -210,6 +241,9 @@ export default function ReactivationScreen() {
     setSelectedCustomerIds([]);
     setCustomerSearch("");
     setModalStep("templates");
+    setSelectedTemplate(null);
+    setSelectedPromptChips([]);
+    setCustomPrompt("");
   };
 
   const refetch = () => {
@@ -325,6 +359,73 @@ export default function ReactivationScreen() {
     );
   };
 
+  const renderCustomizeStep = () => {
+    if (!selectedTemplate) return null;
+    return (
+      <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+        <View style={[styles.templateCard, { backgroundColor: dt.accentSoft, borderColor: dt.accent, marginBottom: Spacing.lg }]}>
+          <View style={[styles.templateIcon, { backgroundColor: dt.accent }]}>
+            <Feather name={selectedTemplate.icon} size={18} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="subtitle">{selectedTemplate.name}</ThemedText>
+            <ThemedText type="caption" style={{ color: dt.textSecondary }}>{selectedTemplate.description}</ThemedText>
+          </View>
+        </View>
+
+        <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Customize your message (optional)</ThemedText>
+        <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: Spacing.md, lineHeight: 18 }}>
+          Select any suggestions below or write your own instructions for the AI.
+        </ThemedText>
+
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm, marginBottom: Spacing.lg }}>
+          {selectedTemplate.promptSuggestions.map((suggestion, idx) => {
+            const isSelected = selectedPromptChips.includes(suggestion);
+            return (
+              <Pressable
+                key={idx}
+                onPress={() => togglePromptChip(suggestion)}
+                style={{
+                  paddingHorizontal: Spacing.md,
+                  paddingVertical: Spacing.sm,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  backgroundColor: isSelected ? dt.accentSoft : dt.surfaceSecondary,
+                  borderColor: isSelected ? dt.accent : dt.border,
+                }}
+              >
+                <ThemedText type="caption" style={{ color: isSelected ? dt.accent : dt.textPrimary, fontWeight: isSelected ? "600" : "400" }}>
+                  {suggestion}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Your own instructions</ThemedText>
+        <TextInput
+          testID="input-custom-prompt"
+          value={customPrompt}
+          onChangeText={setCustomPrompt}
+          placeholder="e.g. Offer 15% off for first-time rebookers"
+          placeholderTextColor={dt.textSecondary}
+          multiline
+          numberOfLines={3}
+          style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border, minHeight: 80, textAlignVertical: "top" }]}
+        />
+
+        <Pressable
+          testID="button-confirm-template"
+          onPress={handleConfirmTemplate}
+          style={[styles.createBtn, { backgroundColor: dt.accent, marginTop: Spacing.lg, flexDirection: "row", justifyContent: "center", gap: Spacing.xs }]}
+        >
+          <Feather name="zap" size={16} color="#FFFFFF" />
+          <ThemedText type="subtitle" style={{ color: "#FFFFFF" }}>Generate Campaign</ThemedText>
+        </Pressable>
+      </ScrollView>
+    );
+  };
+
   const renderCustomStep = () => {
     if (generatingContent) return (
       <View style={{ alignItems: "center", paddingVertical: 60 }}>
@@ -413,6 +514,18 @@ export default function ReactivationScreen() {
           </View>
         </View>
       ) : null}
+
+      <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>Custom AI Instructions (optional)</ThemedText>
+      <TextInput
+        testID="input-custom-prompt-custom"
+        value={customPrompt}
+        onChangeText={setCustomPrompt}
+        placeholder="e.g. Mention a 10% discount, keep the tone casual"
+        placeholderTextColor={dt.textSecondary}
+        multiline
+        numberOfLines={3}
+        style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border, minHeight: 70, textAlignVertical: "top" }]}
+      />
 
       <Pressable
         testID="button-create-campaign"
@@ -538,18 +651,18 @@ export default function ReactivationScreen() {
               <View style={styles.modalHeader}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
                   {modalStep !== "templates" ? (
-                    <Pressable onPress={() => setModalStep(modalStep === "custom" ? "templates" : "templates")} hitSlop={8}>
+                    <Pressable onPress={() => setModalStep("templates")} hitSlop={8}>
                       <Feather name="arrow-left" size={20} color={dt.textPrimary} />
                     </Pressable>
                   ) : null}
-                  <ThemedText type="h3">{modalStep === "templates" ? "New Campaign" : "Campaign Details"}</ThemedText>
+                  <ThemedText type="h3">{modalStep === "templates" ? "New Campaign" : modalStep === "customize" ? "Customize Campaign" : "Campaign Details"}</ThemedText>
                 </View>
                 <Pressable testID="button-close-modal" onPress={resetModal}>
                   <Feather name="x" size={24} color={dt.textPrimary} />
                 </Pressable>
               </View>
 
-              {modalStep === "templates" ? renderTemplatesStep() : renderCustomStep()}
+              {modalStep === "templates" ? renderTemplatesStep() : modalStep === "customize" ? renderCustomizeStep() : renderCustomStep()}
             </View>
           </View>
         </KeyboardAvoidingView>
