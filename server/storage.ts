@@ -1215,6 +1215,7 @@ export async function getFollowUpQueueQuotes(businessId: string): Promise<any[]>
       sentAt: quotes.sentAt,
       createdAt: quotes.createdAt,
       lastContactAt: quotes.lastContactAt,
+      propertyDetails: quotes.propertyDetails,
       customerFirstName: customers.firstName,
       customerLastName: customers.lastName,
       customerPhone: customers.phone,
@@ -1250,8 +1251,25 @@ export async function getFollowUpQueueQuotes(businessId: string): Promise<any[]>
 
     const lastTouch = await getLastTouchForQuote(q.id);
 
+    const details = q.propertyDetails as Record<string, any> | null;
+    const customerFirstName = q.customerFirstName || details?.customerName?.split(" ")[0] || null;
+    const customerLastName = q.customerLastName || (details?.customerName?.split(" ").slice(1).join(" ")) || null;
+    const customerPhone = q.customerPhone || details?.customerPhone || null;
+    const customerEmail = q.customerEmail || details?.customerEmail || null;
+
     results.push({
-      ...q,
+      id: q.id,
+      businessId: q.businessId,
+      customerId: q.customerId,
+      total: q.total,
+      status: q.status,
+      sentAt: q.sentAt,
+      createdAt: q.createdAt,
+      lastContactAt: q.lastContactAt,
+      customerFirstName,
+      customerLastName,
+      customerPhone,
+      customerEmail,
       lastTouchedAt: lastTouch?.createdAt || null,
     });
   }

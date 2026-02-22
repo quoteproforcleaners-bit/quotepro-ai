@@ -324,7 +324,7 @@ export default function FollowUpQueueScreen() {
     const ageColor = age > 3 ? theme.error : age >= 1 ? theme.warning : theme.success;
     const hasPhone = !!item.customerPhone;
     const hasEmail = !!item.customerEmail;
-    const hasCustomer = !!item.customerId;
+    const hasCustomer = !!item.customerId || !!item.customerFirstName || !!item.customerLastName;
 
     return (
       <Pressable onPress={() => handleViewQuote(item)}>
