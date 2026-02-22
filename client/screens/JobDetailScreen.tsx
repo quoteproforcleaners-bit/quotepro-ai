@@ -152,7 +152,7 @@ export default function JobDetailScreen() {
   const [ratingComment, setRatingComment] = useState("");
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
-  const { data: job, isLoading: jobLoading } = useQuery<Job>({
+  const { data: job, isLoading: jobLoading, isError: jobError } = useQuery<Job>({
     queryKey: ["/api/jobs", jobId],
   });
 
@@ -304,11 +304,21 @@ export default function JobDetailScreen() {
     }
   };
 
-  if (jobLoading || !job) {
+  if (jobLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (jobError || !job) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <View style={styles.loadingContainer}>
+          <ThemedText type="body">Job not found</ThemedText>
         </View>
       </View>
     );

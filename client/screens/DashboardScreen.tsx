@@ -806,7 +806,7 @@ export default function DashboardScreen() {
                 value={`$${monthRevenue.toLocaleString()}`}
                 icon="trending-up"
                 color={theme.success}
-                onPress={() => navigation.navigate("Main", { screen: "RevenueTab" })}
+                onPress={() => navigation.navigate("Main", { screen: "GrowthTab" })}
               />
             </View>
           </View>
