@@ -75,7 +75,7 @@ export default function QuoteDetailScreen() {
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
 
-  const { data: quote, isLoading, refetch: refetchQuote } = useQuery<any>({
+  const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
   });
 
@@ -414,11 +414,30 @@ export default function QuoteDetailScreen() {
     }
   };
 
-  if (isLoading || !quote) {
+  if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <View style={styles.loading}>
           <ThemedText type="body">Loading...</ThemedText>
+        </View>
+      </View>
+    );
+  }
+
+  if (isError || !quote) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <View style={styles.loading}>
+          <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm }}>Could not load quote</ThemedText>
+          <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.lg, textAlign: "center" }}>
+            {error?.message?.includes("401") ? "Please log in again to view this quote." : "Something went wrong. Please try again."}
+          </ThemedText>
+          <Pressable
+            onPress={() => refetchQuote()}
+            style={{ backgroundColor: theme.primary, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: BorderRadius.sm }}
+          >
+            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>Retry</ThemedText>
+          </Pressable>
         </View>
       </View>
     );

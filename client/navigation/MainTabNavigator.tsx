@@ -127,16 +127,16 @@ function QuotesHeaderRight() {
 
 function AnimatedTabScreen({ children }: { children: React.ReactNode }) {
   const isFocused = useIsFocused();
-  const opacity = useSharedValue(1);
-  const translateY = useSharedValue(0);
+  const opacity = useSharedValue(isFocused ? 1 : 0.85);
+  const translateY = useSharedValue(isFocused ? 0 : 3);
 
   React.useEffect(() => {
     if (isFocused) {
-      opacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.quad) });
-      translateY.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.quad) });
+      opacity.value = withTiming(1, { duration: 250, easing: Easing.out(Easing.quad) });
+      translateY.value = withTiming(0, { duration: 250, easing: Easing.out(Easing.quad) });
     } else {
-      opacity.value = 0.85;
-      translateY.value = 3;
+      opacity.value = withTiming(0.85, { duration: 150 });
+      translateY.value = withTiming(3, { duration: 150 });
     }
   }, [isFocused]);
 
