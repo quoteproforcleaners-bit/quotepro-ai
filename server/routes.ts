@@ -4103,20 +4103,20 @@ Respond with JSON: {"reply": string}`
       clearTimeout(timeout);
 
       const raw = completion.choices[0]?.message?.content?.trim() || "";
+      console.log("AI campaign content raw response length:", raw.length, "for campaign:", campaignName);
       let subject = "";
       let content = raw;
-      if (raw.startsWith("Subject:")) {
-        const lines = raw.split("\n");
-        subject = lines[0].replace("Subject:", "").trim();
-        content = lines.slice(1).join("\n").trim();
+      const subjectMatch = raw.match(/^Subject:\s*(.+)/i);
+      if (subjectMatch) {
+        subject = subjectMatch[1].trim();
+        content = raw.substring(raw.indexOf("\n") + 1).trim();
       }
 
       if (!content) {
-        content = `Dear [Customer],\n\nWe wanted to reach out from ${businessName} with a special offer. We'd love the opportunity to serve you again.\n\nReply to this email to schedule your next cleaning, and we'll make sure to take great care of your home.\n\nBest regards,\n${ownerName || businessName}`;
-        subject = subject || campaignName || "A special offer just for you";
+        console.warn("AI returned empty content for campaign:", campaignName, "- raw was:", raw.substring(0, 200));
       }
 
-      return res.json({ content, subject, channel: "email" });
+      return res.json({ content, subject: subject || campaignName, channel: "email" });
     } catch (error: any) {
       console.error("AI generate campaign content error:", error?.message || error, error?.code, error?.status);
       return res.status(500).json({ message: "Failed to generate campaign content" });

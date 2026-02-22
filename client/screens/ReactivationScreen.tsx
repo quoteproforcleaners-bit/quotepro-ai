@@ -820,10 +820,12 @@ export default function ReactivationScreen() {
                       try {
                         setGeneratingContent(true);
                         setAiError(false);
+                        const templateMatch = CAMPAIGN_TEMPLATES.find(t => t.name === viewingCampaign?.name);
                         const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
-                          campaignName: viewingCampaign?.name,
+                          campaignName: viewingCampaign?.name || viewingCampaign?.templateKey,
                           segment: viewingCampaign?.segment,
                           channel: viewingCampaign?.channel || "email",
+                          customPrompt: templateMatch ? templateMatch.promptSuggestions[0] : undefined,
                         });
                         const aiData = await aiRes.json();
                         if (!aiData.content) {
