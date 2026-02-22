@@ -853,8 +853,7 @@ export async function getQuoteStats(businessId: string): Promise<{
     allQuotes.length > 0
       ? allQuotes.reduce((sum, q) => sum + q.total, 0) / allQuotes.length
       : 0;
-  const respondedCount = accepted + declined;
-  const closeRate = respondedCount > 0 ? (accepted / respondedCount) * 100 : 0;
+  const closeRate = allQuotes.length > 0 ? (accepted / allQuotes.length) * 100 : 0;
 
   return {
     totalQuotes: allQuotes.length,
@@ -1351,8 +1350,7 @@ export async function getWeeklyRecapStats(
   const quotesAccepted = acceptedInRange.length;
   const quotesDeclined = declinedInRange.length;
   const quotesExpired = expiredInRange.length;
-  const total = quotesAccepted + quotesDeclined + quotesExpired;
-  const closeRate = total > 0 ? Math.round((quotesAccepted / total) * 1000) / 10 : 0;
+  const closeRate = quotesSent > 0 ? Math.round((quotesAccepted / quotesSent) * 1000) / 10 : 0;
   const revenueWon = acceptedInRange.reduce((sum, q) => sum + q.total, 0);
   const biggestWin = acceptedInRange.length > 0
     ? Math.max(...acceptedInRange.map(q => q.total))
@@ -1999,8 +1997,7 @@ export async function getForecastData(businessId: string): Promise<{
     .where(eq(quotes.businessId, businessId));
 
   const accepted = allQuotes.filter(q => q.status === "accepted").length;
-  const responded = allQuotes.filter(q => q.status === "accepted" || q.status === "declined").length;
-  const closeRate = responded > 0 ? (accepted / responded) * 100 : 0;
+  const closeRate = allQuotes.length > 0 ? (accepted / allQuotes.length) * 100 : 0;
 
   const forecastedRevenue = openQuoteValue * (closeRate / 100);
   const confidenceLow = forecastedRevenue * 0.8;
