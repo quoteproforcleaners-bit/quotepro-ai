@@ -6,6 +6,9 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -36,6 +39,7 @@ function useDesignTokens() {
     warning: theme.warning,
     warningSoft: isDark ? "rgba(245,158,11,0.12)" : "rgba(245,158,11,0.08)",
     error: theme.error,
+    overlay: isDark ? "rgba(0,0,0,0.7)" : "rgba(0,0,0,0.5)",
   }), [theme, isDark]);
 }
 
@@ -82,9 +86,36 @@ export default function ReviewsReferralsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [reviewEmailSubject, setReviewEmailSubject] = useState("");
+  const [reviewEmailContent, setReviewEmailContent] = useState("");
+  const [generatingReview, setGeneratingReview] = useState(false);
+  const [sendingReview, setSendingReview] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+
   const { data: reviewRequests = [], refetch } = useQuery<any[]>({
     queryKey: ["/api/review-requests"],
   });
+
+  const { data: customers = [] } = useQuery<any[]>({
+    queryKey: ["/api/customers"],
+  });
+
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch.trim()) return customers;
+    const query = customerSearch.toLowerCase();
+    return customers.filter((c: any) => {
+      const name = (c.name || "").toLowerCase();
+      const email = (c.email || "").toLowerCase();
+      return name.includes(query) || email.includes(query);
+    });
+  }, [customers, customerSearch]);
+
+  const selectedCustomer = useMemo(() => {
+    if (!selectedCustomerId) return null;
+    return customers.find((c: any) => c.id === selectedCustomerId) || null;
+  }, [customers, selectedCustomerId]);
 
   const stats = useMemo(() => {
     const sent = reviewRequests.filter((r: any) => r.status !== "pending").length;
@@ -121,6 +152,100 @@ export default function ReviewsReferralsScreen() {
 
   const handleCreateRequest = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedCustomerId(null);
+    setReviewEmailSubject("");
+    setReviewEmailContent("");
+    setCustomerSearch("");
+    setGeneratingReview(false);
+    setSendingReview(false);
+    setReviewModalVisible(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setReviewModalVisible(false);
+    setSelectedCustomerId(null);
+    setReviewEmailSubject("");
+    setReviewEmailContent("");
+    setCustomerSearch("");
+    setGeneratingReview(false);
+    setSendingReview(false);
+  }, []);
+
+  const generateEmailContent = useCallback(async () => {
+    setGeneratingReview(true);
+    try {
+      const res = await apiRequest("POST", "/api/ai/generate-campaign-content", {
+        campaignName: "Review Request",
+        segment: "custom",
+        channel: "email",
+      });
+      const data = await res.json();
+      const content = data.content || data.body || "";
+      let subject = data.subject || "";
+      if (!subject && content) {
+        const subjectMatch = content.match(/^(?:Subject:\s*)(.+?)(?:\n|$)/i);
+        if (subjectMatch) {
+          subject = subjectMatch[1].trim();
+        } else {
+          subject = "We would love your feedback";
+        }
+      }
+      let body = content;
+      body = body.replace(/^Subject:\s*.+?\n/i, "").trim();
+      setReviewEmailSubject(subject);
+      setReviewEmailContent(body);
+    } catch {
+      setReviewEmailSubject("We would love your feedback");
+      setReviewEmailContent(
+        "Thank you for choosing our services. We strive to provide the best experience possible and your feedback helps us improve.\n\nWould you take a moment to share your experience? Your review means a lot to us and helps other customers find quality service.\n\nThank you for your time."
+      );
+    }
+    setGeneratingReview(false);
+  }, []);
+
+  const handleSelectCustomer = useCallback(async (customerId: number) => {
+    Haptics.selectionAsync();
+    setSelectedCustomerId(customerId);
+    setGeneratingReview(true);
+    setReviewEmailSubject("");
+    setReviewEmailContent("");
+    await generateEmailContent();
+  }, [generateEmailContent]);
+
+  const handleRegenerateEmail = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await generateEmailContent();
+  }, [generateEmailContent]);
+
+  const handleSendEmail = useCallback(async () => {
+    if (!selectedCustomerId || !reviewEmailSubject || !reviewEmailContent) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSendingReview(true);
+    try {
+      await apiRequest("POST", "/api/review-requests", {
+        customerId: selectedCustomerId,
+      });
+      await apiRequest("POST", "/api/communications", {
+        customerId: selectedCustomerId,
+        type: "email",
+        channel: "email",
+        subject: reviewEmailSubject,
+        content: reviewEmailContent,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/review-requests"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      handleCloseModal();
+    } catch {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+    setSendingReview(false);
+  }, [selectedCustomerId, reviewEmailSubject, reviewEmailContent, queryClient, handleCloseModal]);
+
+  const handleBackToCustomerPicker = useCallback(() => {
+    Haptics.selectionAsync();
+    setSelectedCustomerId(null);
+    setReviewEmailSubject("");
+    setReviewEmailContent("");
   }, []);
 
   const getCustomerName = (item: any) => {
@@ -229,6 +354,184 @@ export default function ReviewsReferralsScreen() {
     </View>
   ), [dt]);
 
+  const renderCustomerPickerStep = () => (
+    <View style={{ flex: 1 }}>
+      <View style={s.modalHeader}>
+        <ThemedText type="h4">{"Select a Customer"}</ThemedText>
+        <Pressable onPress={handleCloseModal} testID="button-close-modal" hitSlop={12}>
+          <Feather name="x" size={24} color={dt.textPrimary} />
+        </Pressable>
+      </View>
+
+      <View style={[s.searchContainer, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
+        <Feather name="search" size={16} color={dt.textMuted} />
+        <TextInput
+          testID="input-customer-search"
+          style={[s.searchInput, { color: dt.textPrimary }]}
+          placeholder="Search customers..."
+          placeholderTextColor={dt.textMuted}
+          value={customerSearch}
+          onChangeText={setCustomerSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {customerSearch.length > 0 ? (
+          <Pressable onPress={() => setCustomerSearch("")} hitSlop={8}>
+            <Feather name="x-circle" size={16} color={dt.textMuted} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: Spacing.xl }}
+        showsVerticalScrollIndicator={false}
+      >
+        {filteredCustomers.length > 0 ? (
+          filteredCustomers.map((customer: any) => (
+            <Pressable
+              key={customer.id}
+              testID={`button-select-customer-${customer.id}`}
+              onPress={() => handleSelectCustomer(customer.id)}
+              style={[s.customerRow, { borderColor: dt.borderSecondary }]}
+            >
+              <View style={[s.avatar, { backgroundColor: dt.accentSoft }]}>
+                <Feather name="user" size={18} color={dt.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="subtitle" numberOfLines={1}>
+                  {customer.name || `Customer #${customer.id}`}
+                </ThemedText>
+                {customer.email ? (
+                  <ThemedText type="caption" style={{ color: dt.textMuted }} numberOfLines={1}>
+                    {customer.email}
+                  </ThemedText>
+                ) : null}
+              </View>
+              <Feather name="chevron-right" size={18} color={dt.textMuted} />
+            </Pressable>
+          ))
+        ) : (
+          <View style={s.emptyCustomers}>
+            <Feather name="users" size={24} color={dt.textMuted} />
+            <ThemedText type="small" style={{ color: dt.textMuted, marginTop: Spacing.sm }}>
+              {"No customers found"}
+            </ThemedText>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+
+  const renderEmailDraftStep = () => (
+    <View style={{ flex: 1 }}>
+      <View style={s.modalHeader}>
+        <Pressable onPress={handleBackToCustomerPicker} testID="button-back-to-picker" hitSlop={12}>
+          <Feather name="arrow-left" size={24} color={dt.textPrimary} />
+        </Pressable>
+        <ThemedText type="h4" style={{ flex: 1, marginLeft: Spacing.sm }}>{"Review Request Email"}</ThemedText>
+        <Pressable onPress={handleCloseModal} testID="button-close-modal-draft" hitSlop={12}>
+          <Feather name="x" size={24} color={dt.textPrimary} />
+        </Pressable>
+      </View>
+
+      {selectedCustomer ? (
+        <View style={[s.recipientBanner, { backgroundColor: dt.accentSoft, borderColor: dt.borderSecondary }]}>
+          <Feather name="mail" size={16} color={dt.accent} />
+          <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+            <ThemedText type="caption" style={{ color: dt.textSecondary }}>{"To"}</ThemedText>
+            <ThemedText type="subtitle" numberOfLines={1}>
+              {selectedCustomer.name || `Customer #${selectedCustomer.id}`}
+            </ThemedText>
+          </View>
+        </View>
+      ) : null}
+
+      {generatingReview ? (
+        <View style={s.generatingContainer}>
+          <ActivityIndicator size="large" color={dt.accent} />
+          <ThemedText type="subtitle" style={{ color: dt.textSecondary, marginTop: Spacing.lg }}>
+            {"Drafting your review request..."}
+          </ThemedText>
+          <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: Spacing.xs }}>
+            {"AI is generating a personalized email"}
+          </ThemedText>
+        </View>
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: Spacing.xl }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ marginBottom: Spacing.md }}>
+            <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: Spacing.xs, fontWeight: "600" }}>
+              {"Subject"}
+            </ThemedText>
+            <TextInput
+              testID="input-email-subject"
+              style={[s.emailInput, { color: dt.textPrimary, backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}
+              value={reviewEmailSubject}
+              onChangeText={setReviewEmailSubject}
+              placeholder="Email subject"
+              placeholderTextColor={dt.textMuted}
+            />
+          </View>
+
+          <View style={{ marginBottom: Spacing.lg }}>
+            <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: Spacing.xs, fontWeight: "600" }}>
+              {"Body"}
+            </ThemedText>
+            <TextInput
+              testID="input-email-body"
+              style={[s.emailBodyInput, { color: dt.textPrimary, backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}
+              value={reviewEmailContent}
+              onChangeText={setReviewEmailContent}
+              placeholder="Email content"
+              placeholderTextColor={dt.textMuted}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+
+          <View style={s.draftActions}>
+            <Pressable
+              testID="button-regenerate-email"
+              onPress={handleRegenerateEmail}
+              disabled={generatingReview}
+              style={[s.secondaryBtn, { borderColor: dt.borderPrimary }]}
+            >
+              <Feather name="refresh-cw" size={16} color={dt.accent} />
+              <ThemedText type="subtitle" style={{ color: dt.accent, marginLeft: Spacing.xs }}>
+                {"Regenerate"}
+              </ThemedText>
+            </Pressable>
+
+            <Pressable
+              testID="button-send-email"
+              onPress={handleSendEmail}
+              disabled={sendingReview || !reviewEmailSubject || !reviewEmailContent}
+              style={[
+                s.primaryBtn,
+                { backgroundColor: dt.accent, opacity: sendingReview || !reviewEmailSubject || !reviewEmailContent ? 0.5 : 1 },
+              ]}
+            >
+              {sendingReview ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Feather name="send" size={16} color="#FFFFFF" />
+                  <ThemedText type="subtitle" style={{ color: "#FFFFFF", marginLeft: Spacing.xs }}>
+                    {"Send Email"}
+                  </ThemedText>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
+
   return (
     <ProGate featureName="Reviews & Referrals">
     <View style={s.flex}>
@@ -258,6 +561,20 @@ export default function ReviewsReferralsScreen() {
       >
         <Feather name="plus" size={24} color="#FFFFFF" />
       </Pressable>
+
+      <Modal
+        visible={reviewModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={handleCloseModal}
+        testID="modal-review-request"
+      >
+        <View style={[s.modalOverlay, { backgroundColor: dt.overlay }]}>
+          <View style={[s.modalContent, { backgroundColor: dt.surfacePrimary, paddingBottom: insets.bottom + Spacing.lg }]}>
+            {selectedCustomerId ? renderEmailDraftStep() : renderCustomerPickerStep()}
+          </View>
+        </View>
+      </Modal>
     </View>
     </ProGate>
   );
@@ -280,4 +597,92 @@ const s = StyleSheet.create({
   empty: { ...centered, paddingVertical: Spacing["5xl"] },
   emptyIcon: { width: 64, height: 64, borderRadius: 32, ...centered },
   fab: { position: "absolute", right: Spacing.lg, width: 56, height: 56, borderRadius: 28, ...centered },
+  modalOverlay: { flex: 1, justifyContent: "flex-end" },
+  modalContent: {
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    maxHeight: "90%",
+    minHeight: "60%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.lg,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 2,
+  },
+  customerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    gap: Spacing.sm,
+  },
+  emptyCustomers: {
+    ...centered,
+    paddingVertical: Spacing["3xl"],
+  },
+  recipientBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  generatingContainer: {
+    flex: 1,
+    ...centered,
+    paddingVertical: Spacing["3xl"],
+  },
+  emailInput: {
+    fontSize: 15,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  emailBodyInput: {
+    fontSize: 15,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    minHeight: 180,
+  },
+  draftActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  secondaryBtn: {
+    flex: 1,
+    flexDirection: "row",
+    ...centered,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  primaryBtn: {
+    flex: 1,
+    flexDirection: "row",
+    ...centered,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
 });

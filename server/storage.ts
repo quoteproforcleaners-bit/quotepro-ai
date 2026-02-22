@@ -1826,6 +1826,8 @@ export async function updateCampaign(
     status: string;
     completedCount: number;
     customerIds: string[] | null;
+    messageContent: string;
+    messageSubject: string;
   }>
 ): Promise<Campaign> {
   const [c] = await db

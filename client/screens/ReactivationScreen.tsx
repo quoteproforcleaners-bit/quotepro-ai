@@ -74,6 +74,7 @@ export default function ReactivationScreen() {
   const [sendingCampaign, setSendingCampaign] = useState(false);
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
   const [confirmSend, setConfirmSend] = useState(false);
+  const [aiError, setAiError] = useState(false);
 
   const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"], enabled: segment === "dormant" });
   const lostQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/lost"], enabled: segment === "lost" });
@@ -126,12 +127,17 @@ export default function ReactivationScreen() {
   const generateAndAttachContent = async (campaign: any) => {
     try {
       setGeneratingContent(true);
+      setAiError(false);
       const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
         campaignName: campaign.name,
         segment: campaign.segment,
-        channel: campaign.channel,
+        channel: campaign.channel || "email",
       });
       const aiData = await aiRes.json();
+      if (!aiData.content) {
+        setAiError(true);
+        return;
+      }
       await apiRequest("PUT", `/api/campaigns/${campaign.id}`, {
         messageContent: aiData.content,
         messageSubject: aiData.subject || "",
@@ -140,6 +146,7 @@ export default function ReactivationScreen() {
       setViewingCampaign((prev: any) => prev?.id === campaign.id ? { ...prev, messageContent: aiData.content, messageSubject: aiData.subject || "" } : prev);
     } catch (e) {
       console.error("AI content generation error:", e);
+      setAiError(true);
     } finally {
       setGeneratingContent(false);
     }
@@ -467,7 +474,12 @@ export default function ReactivationScreen() {
                   return (
                     <Pressable
                       key={campaign.id}
-                      onPress={() => setViewingCampaign(campaign)}
+                      onPress={() => {
+                        setViewingCampaign(campaign);
+                        if (!campaign.messageContent) {
+                          generateAndAttachContent(campaign);
+                        }
+                      }}
                       style={{ flexDirection: "row", alignItems: "center", paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: dt.border }}
                     >
                       <View style={{ flex: 1 }}>
@@ -548,7 +560,7 @@ export default function ReactivationScreen() {
           <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: Spacing.xl, maxHeight: "80%", marginHorizontal: 0 }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="h3" style={{ flex: 1 }}>{viewingCampaign?.name}</ThemedText>
-              <Pressable onPress={() => { setViewingCampaign(null); setConfirmSend(false); setSendResult(null); }} hitSlop={8}>
+              <Pressable onPress={() => { setViewingCampaign(null); setConfirmSend(false); setSendResult(null); setAiError(false); }} hitSlop={8}>
                 <Feather name="x" size={24} color={dt.textPrimary} />
               </Pressable>
             </View>
@@ -586,8 +598,19 @@ export default function ReactivationScreen() {
                 </View>
               ) : (
                 <View style={{ alignItems: "center", paddingVertical: Spacing.xl }}>
-                  <Feather name="file-text" size={32} color={dt.textSecondary} />
-                  <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.sm }}>No message content yet</ThemedText>
+                  <Feather name={aiError ? "alert-circle" : "file-text"} size={32} color={aiError ? theme.error : dt.textSecondary} />
+                  <ThemedText type="caption" style={{ color: aiError ? theme.error : dt.textSecondary, marginTop: Spacing.sm }}>
+                    {aiError ? "Failed to generate content. Tap below to try again." : "No message content yet"}
+                  </ThemedText>
+                  <Pressable
+                    onPress={() => {
+                      if (viewingCampaign) generateAndAttachContent(viewingCampaign);
+                    }}
+                    style={{ marginTop: Spacing.md, flexDirection: "row", alignItems: "center", paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: BorderRadius.sm, backgroundColor: dt.accentSoft }}
+                  >
+                    <Feather name="zap" size={16} color={dt.accent} />
+                    <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600", marginLeft: Spacing.xs }}>Generate with AI</ThemedText>
+                  </Pressable>
                 </View>
               )}
               
@@ -683,12 +706,17 @@ export default function ReactivationScreen() {
                     onPress={async () => {
                       try {
                         setGeneratingContent(true);
+                        setAiError(false);
                         const aiRes = await apiRequest("POST", "/api/ai/generate-campaign-content", {
                           campaignName: viewingCampaign?.name,
                           segment: viewingCampaign?.segment,
-                          channel: viewingCampaign?.channel,
+                          channel: viewingCampaign?.channel || "email",
                         });
                         const aiData = await aiRes.json();
+                        if (!aiData.content) {
+                          setAiError(true);
+                          return;
+                        }
                         await apiRequest("PUT", `/api/campaigns/${viewingCampaign?.id}`, {
                           messageContent: aiData.content,
                           messageSubject: aiData.subject || "",
@@ -697,6 +725,7 @@ export default function ReactivationScreen() {
                         setViewingCampaign({ ...viewingCampaign, messageContent: aiData.content, messageSubject: aiData.subject || "" });
                       } catch (e) {
                         console.error("Regenerate error:", e);
+                        setAiError(true);
                       } finally {
                         setGeneratingContent(false);
                       }
