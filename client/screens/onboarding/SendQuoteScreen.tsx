@@ -9,16 +9,24 @@ import { Input } from "@/components/Input";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 
+const GOAL_CTA: Record<string, { heading: string; sub: string }> = {
+  send_quote: { heading: "Send It", sub: "Your quote is ready. Who's it for?" },
+  convert_recurring: { heading: "Lock In a Recurring Client", sub: "Send this quote and start building steady income" },
+  raise_prices: { heading: "Send Your New Price", sub: "Confident pricing starts with a professional quote" },
+  more_repeat: { heading: "Win a Repeat Customer", sub: "A great first impression brings them back" },
+};
+
 interface Props {
   selectedTierPrice: number;
   selectedTierName: string;
   businessName: string;
+  goal?: string;
   onSend: (contact: { name: string; email: string; phone: string }) => void;
   onSkip: () => void;
   onBack: () => void;
 }
 
-export default function SendQuoteScreen({ selectedTierPrice, selectedTierName, businessName, onSend, onSkip, onBack }: Props) {
+export default function SendQuoteScreen({ selectedTierPrice, selectedTierName, businessName, goal, onSend, onSkip, onBack }: Props) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
   const [name, setName] = useState("");
@@ -39,9 +47,9 @@ export default function SendQuoteScreen({ selectedTierPrice, selectedTierName, b
       <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginBottom: Spacing.xs }}>
         STEP 5 OF 7
       </ThemedText>
-      <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>Send It</ThemedText>
+      <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>{(GOAL_CTA[goal || "send_quote"] || GOAL_CTA.send_quote).heading}</ThemedText>
       <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.xl }}>
-        Your quote is ready. Who's it for?
+        {(GOAL_CTA[goal || "send_quote"] || GOAL_CTA.send_quote).sub}
       </ThemedText>
 
       <View style={[styles.quoteSummary, { backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", borderColor: theme.border }]}>

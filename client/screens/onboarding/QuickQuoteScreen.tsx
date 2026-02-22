@@ -28,7 +28,15 @@ const FREQUENCIES = [
   { id: "monthly", label: "Monthly" },
 ];
 
+const GOAL_SUBTITLES: Record<string, string> = {
+  send_quote: "Build a real quote in about 60 seconds",
+  convert_recurring: "Start with a quote, then set up recurring visits",
+  raise_prices: "See what your services should really cost",
+  more_repeat: "A great quote is the first step to repeat business",
+};
+
 interface Props {
+  goal?: string;
   onNext: (quoteInput: {
     serviceType: string;
     sqft: number;
@@ -40,7 +48,7 @@ interface Props {
   onBack: () => void;
 }
 
-export default function QuickQuoteScreen({ onNext, onBack }: Props) {
+export default function QuickQuoteScreen({ goal, onNext, onBack }: Props) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
   const [serviceType, setServiceType] = useState("regular");
@@ -48,9 +56,10 @@ export default function QuickQuoteScreen({ onNext, onBack }: Props) {
   const [beds, setBeds] = useState(3);
   const [baths, setBaths] = useState(2);
   const [condition, setCondition] = useState<"maintained" | "needs_love">("maintained");
-  const [frequency, setFrequency] = useState("biweekly");
+  const [frequency, setFrequency] = useState(goal === "convert_recurring" ? "biweekly" : goal === "raise_prices" ? "one-time" : "biweekly");
 
   const selectedSize = SIZE_BUCKETS[sizeIdx];
+  const subtitle = GOAL_SUBTITLES[goal || "send_quote"] || GOAL_SUBTITLES.send_quote;
 
   return (
     <ScrollView
@@ -67,7 +76,7 @@ export default function QuickQuoteScreen({ onNext, onBack }: Props) {
       </ThemedText>
       <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>Create your first quote</ThemedText>
       <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing["2xl"] }}>
-        Takes about 60 seconds
+        {subtitle}
       </ThemedText>
 
       <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm }}>Service Type</ThemedText>
@@ -95,38 +104,50 @@ export default function QuickQuoteScreen({ onNext, onBack }: Props) {
           return (
             <Pressable
               key={s.id}
-              testID={`size-${s.id}`}
               onPress={() => { setSizeIdx(i); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
               style={[styles.chip, { backgroundColor: sel ? theme.primary + "12" : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", borderColor: sel ? theme.primary : theme.border }]}
             >
-              <ThemedText type="small" style={{ color: sel ? theme.primary : theme.text, fontWeight: sel ? "600" : "400" }}>{s.label}</ThemedText>
+              <ThemedText type="small" style={{ color: sel ? theme.primary : theme.text, fontWeight: sel ? "600" : "400" }}>
+                {s.label} ({s.sqft.toLocaleString()} sf)
+              </ThemedText>
             </Pressable>
           );
         })}
       </View>
-      <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 4 }}>~{selectedSize.sqft.toLocaleString()} sq ft</ThemedText>
 
-      <View style={[styles.counterRow, { marginTop: Spacing.xl }]}>
-        <View style={styles.counterItem}>
-          <ThemedText type="subtitle">Bedrooms</ThemedText>
-          <View style={styles.counterControls}>
-            <Pressable onPress={() => setBeds(Math.max(1, beds - 1))} style={[styles.counterBtn, { backgroundColor: theme.backgroundSecondary }]}>
+      <View style={[styles.countersRow, { marginTop: Spacing.xl }]}>
+        <View style={styles.counterBox}>
+          <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm }}>Beds</ThemedText>
+          <View style={styles.counter}>
+            <Pressable
+              onPress={() => { if (beds > 1) { setBeds(beds - 1); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } }}
+              style={[styles.counterBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }]}
+            >
               <Feather name="minus" size={16} color={theme.text} />
             </Pressable>
-            <ThemedText type="h3" style={{ minWidth: 30, textAlign: "center" }}>{beds}</ThemedText>
-            <Pressable onPress={() => setBeds(Math.min(8, beds + 1))} style={[styles.counterBtn, { backgroundColor: theme.backgroundSecondary }]}>
+            <ThemedText type="h3" style={{ width: 32, textAlign: "center" }}>{beds}</ThemedText>
+            <Pressable
+              onPress={() => { if (beds < 8) { setBeds(beds + 1); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } }}
+              style={[styles.counterBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }]}
+            >
               <Feather name="plus" size={16} color={theme.text} />
             </Pressable>
           </View>
         </View>
-        <View style={styles.counterItem}>
-          <ThemedText type="subtitle">Bathrooms</ThemedText>
-          <View style={styles.counterControls}>
-            <Pressable onPress={() => setBaths(Math.max(1, baths - 1))} style={[styles.counterBtn, { backgroundColor: theme.backgroundSecondary }]}>
+        <View style={styles.counterBox}>
+          <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm }}>Baths</ThemedText>
+          <View style={styles.counter}>
+            <Pressable
+              onPress={() => { if (baths > 1) { setBaths(baths - 1); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } }}
+              style={[styles.counterBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }]}
+            >
               <Feather name="minus" size={16} color={theme.text} />
             </Pressable>
-            <ThemedText type="h3" style={{ minWidth: 30, textAlign: "center" }}>{baths}</ThemedText>
-            <Pressable onPress={() => setBaths(Math.min(8, baths + 1))} style={[styles.counterBtn, { backgroundColor: theme.backgroundSecondary }]}>
+            <ThemedText type="h3" style={{ width: 32, textAlign: "center" }}>{baths}</ThemedText>
+            <Pressable
+              onPress={() => { if (baths < 6) { setBaths(baths + 1); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } }}
+              style={[styles.counterBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }]}
+            >
               <Feather name="plus" size={16} color={theme.text} />
             </Pressable>
           </View>
@@ -135,19 +156,17 @@ export default function QuickQuoteScreen({ onNext, onBack }: Props) {
 
       <ThemedText type="subtitle" style={{ marginTop: Spacing.xl, marginBottom: Spacing.sm }}>Condition</ThemedText>
       <View style={styles.chipRow}>
-        {[
-          { id: "maintained" as const, label: "Maintained", icon: "check-circle" as const },
-          { id: "needs_love" as const, label: "Needs Love", icon: "alert-circle" as const },
-        ].map((c) => {
+        {([
+          { id: "maintained", label: "Well Maintained" },
+          { id: "needs_love", label: "Needs Extra Love" },
+        ] as const).map((c) => {
           const sel = condition === c.id;
           return (
             <Pressable
               key={c.id}
-              testID={`condition-${c.id}`}
               onPress={() => { setCondition(c.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
               style={[styles.chip, { flex: 1, backgroundColor: sel ? theme.primary + "12" : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", borderColor: sel ? theme.primary : theme.border }]}
             >
-              <Feather name={c.icon} size={16} color={sel ? theme.primary : theme.textSecondary} />
               <ThemedText type="small" style={{ color: sel ? theme.primary : theme.text, fontWeight: sel ? "600" : "400" }}>{c.label}</ThemedText>
             </Pressable>
           );
@@ -161,7 +180,6 @@ export default function QuickQuoteScreen({ onNext, onBack }: Props) {
           return (
             <Pressable
               key={f.id}
-              testID={`freq-${f.id}`}
               onPress={() => { setFrequency(f.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
               style={[styles.chip, { backgroundColor: sel ? theme.primary + "12" : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", borderColor: sel ? theme.primary : theme.border }]}
             >
@@ -172,22 +190,15 @@ export default function QuickQuoteScreen({ onNext, onBack }: Props) {
       </View>
 
       <Pressable
-        testID="button-generate-quote"
+        testID="button-quote-next"
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-          onNext({
-            serviceType,
-            sqft: selectedSize.sqft,
-            beds,
-            baths,
-            condition,
-            frequency,
-          });
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          onNext({ serviceType, sqft: selectedSize.sqft, beds, baths, condition, frequency });
         }}
         style={[styles.nextBtn, { backgroundColor: theme.primary }]}
       >
-        <Feather name="zap" size={18} color="#FFFFFF" />
-        <ThemedText type="subtitle" style={{ color: "#FFFFFF", fontWeight: "700" }}>Generate Quote</ThemedText>
+        <ThemedText type="subtitle" style={{ color: "#FFFFFF", fontWeight: "700" }}>See My Quote</ThemedText>
+        <Feather name="arrow-right" size={18} color="#FFFFFF" />
       </Pressable>
     </ScrollView>
   );
@@ -198,10 +209,10 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.xl },
   backBtn: { marginBottom: Spacing.lg },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.xs, borderWidth: 1.5 },
-  counterRow: { flexDirection: "row", gap: Spacing.xl },
-  counterItem: { flex: 1 },
-  counterControls: { flexDirection: "row", alignItems: "center", gap: Spacing.md, marginTop: Spacing.sm },
+  chip: { flexDirection: "row", alignItems: "center", gap: Spacing.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.xs, borderWidth: 1 },
+  countersRow: { flexDirection: "row", gap: Spacing.xl },
+  counterBox: { flex: 1 },
+  counter: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
   counterBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  nextBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: Spacing.sm, height: 56, borderRadius: BorderRadius.md, marginTop: Spacing["2xl"] },
+  nextBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: Spacing.sm, height: 56, borderRadius: BorderRadius.md, marginTop: Spacing["3xl"] },
 });

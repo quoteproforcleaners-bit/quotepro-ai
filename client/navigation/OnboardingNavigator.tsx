@@ -225,6 +225,7 @@ export default function OnboardingNavigator() {
       <Stack.Screen name="QuickQuote">
         {({ navigation }) => (
           <QuickQuoteScreen
+            goal={goal}
             onNext={(input) => handleQuoteGenerated(input, navigation)}
             onBack={() => navigation.goBack()}
           />
@@ -236,6 +237,7 @@ export default function OnboardingNavigator() {
             <QuoteRevealScreen
               tiers={tiers}
               frequency={quoteInput?.frequency || "one-time"}
+              goal={goal}
               onNext={(tier, addOns) => handleTierSelected(tier, addOns, navigation)}
               onBack={() => navigation.goBack()}
             />
@@ -248,6 +250,7 @@ export default function OnboardingNavigator() {
             selectedTierPrice={currentTierPrice}
             selectedTierName={currentTierName}
             businessName={currentBizName}
+            goal={goal}
             onSend={(contact) => handleSendQuote(contact, navigation)}
             onSkip={() => {
               setOnboardingStatus({ currentStep: 5 });
@@ -275,6 +278,7 @@ export default function OnboardingNavigator() {
             sentQuote={sentQuote}
             followupsEnabled={followupsEnabled}
             businessName={currentBizName}
+            goal={goal}
             onFinish={handleFinish}
           />
         )}

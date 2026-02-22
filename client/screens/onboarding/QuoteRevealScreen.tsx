@@ -16,9 +16,17 @@ interface QuoteTier {
   scope: string;
 }
 
+const GOAL_INSIGHT: Record<string, { title: string; tip: string }> = {
+  send_quote: { title: "Revenue Potential", tip: "Biweekly is the most popular choice" },
+  convert_recurring: { title: "Recurring Revenue", tip: "Switch one-time clients to biweekly and double your income from each customer" },
+  raise_prices: { title: "What This Job Is Worth", tip: "Most cleaners undercharge by 20-30%. The Better tier is where you should be" },
+  more_repeat: { title: "Lifetime Customer Value", tip: "A single repeat customer can be worth thousands per year" },
+};
+
 interface Props {
   tiers: { good: QuoteTier; better: QuoteTier; best: QuoteTier };
   frequency: string;
+  goal?: string;
   onNext: (selectedTier: string, addOns: string[]) => void;
   onBack: () => void;
 }
@@ -29,7 +37,7 @@ const ADD_ONS = [
   { id: "deepCleanReset", label: "Deep Clean Reset in 6 months", price: 199 },
 ];
 
-export default function QuoteRevealScreen({ tiers, frequency, onNext, onBack }: Props) {
+export default function QuoteRevealScreen({ tiers, frequency, goal, onNext, onBack }: Props) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
   const [selectedTier, setSelectedTier] = useState("better");
@@ -115,7 +123,7 @@ export default function QuoteRevealScreen({ tiers, frequency, onNext, onBack }: 
       <View style={[styles.insightCard, { backgroundColor: isDark ? "#0A2E1A" : "#ECFDF5", borderColor: theme.success + "30" }]}>
         <View style={styles.insightHeader}>
           <Feather name="trending-up" size={18} color={theme.success} />
-          <ThemedText type="subtitle" style={{ color: theme.success, fontWeight: "700" }}>Revenue Potential</ThemedText>
+          <ThemedText type="subtitle" style={{ color: theme.success, fontWeight: "700" }}>{(GOAL_INSIGHT[goal || "send_quote"] || GOAL_INSIGHT.send_quote).title}</ThemedText>
         </View>
         <View style={styles.insightGrid}>
           <View style={styles.insightItem}>
@@ -132,7 +140,7 @@ export default function QuoteRevealScreen({ tiers, frequency, onNext, onBack }: 
           </View>
         </View>
         <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600", marginTop: Spacing.sm }}>
-          Biweekly is the most popular choice
+          {(GOAL_INSIGHT[goal || "send_quote"] || GOAL_INSIGHT.send_quote).tip}
         </ThemedText>
       </View>
 

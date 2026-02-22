@@ -9,14 +9,22 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 
+const GOAL_TIPS: Record<string, string> = {
+  send_quote: "Check the Growth tab daily for smart follow-up suggestions and revenue opportunities.",
+  convert_recurring: "Use the Jobs tab to schedule recurring visits and lock in steady income.",
+  raise_prices: "Review your Pricing Settings to fine-tune rates as you gain confidence.",
+  more_repeat: "The Growth tab shows which past customers are ready to rebook.",
+};
+
 interface Props {
   sentQuote: boolean;
   followupsEnabled: boolean;
   businessName: string;
+  goal?: string;
   onFinish: () => void;
 }
 
-export default function SuccessScreen({ sentQuote, followupsEnabled, businessName, onFinish }: Props) {
+export default function SuccessScreen({ sentQuote, followupsEnabled, businessName, goal, onFinish }: Props) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
   const scale = useSharedValue(0.3);
@@ -83,7 +91,7 @@ export default function SuccessScreen({ sentQuote, followupsEnabled, businessNam
             <ThemedText type="subtitle" style={{ color: theme.primary, fontWeight: "600" }}>Pro Tip</ThemedText>
           </View>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>
-            Check the Growth tab daily for smart follow-up suggestions and revenue opportunities.
+            {GOAL_TIPS[goal || "send_quote"] || GOAL_TIPS.send_quote}
           </ThemedText>
         </View>
 

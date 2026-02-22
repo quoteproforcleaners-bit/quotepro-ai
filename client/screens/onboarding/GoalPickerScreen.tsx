@@ -8,10 +8,10 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 
 const GOALS = [
-  { id: "send_quote", label: "Send a quote today", icon: "send" as const },
-  { id: "convert_recurring", label: "Convert one-time clients to recurring", icon: "repeat" as const },
-  { id: "raise_prices", label: "Raise prices without losing clients", icon: "trending-up" as const },
-  { id: "more_repeat", label: "Get more repeat customers", icon: "users" as const },
+  { id: "send_quote", label: "Send a quote today", icon: "send" as const, hint: "Most popular" },
+  { id: "convert_recurring", label: "Convert one-time clients to recurring", icon: "repeat" as const, hint: null },
+  { id: "raise_prices", label: "Raise prices without losing clients", icon: "trending-up" as const, hint: null },
+  { id: "more_repeat", label: "Get more repeat customers", icon: "users" as const, hint: null },
 ];
 
 interface Props {
@@ -35,9 +35,9 @@ export default function GoalPickerScreen({ onNext, onBack }: Props) {
           <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginBottom: Spacing.xs }}>
             STEP 1 OF 7
           </ThemedText>
-          <ThemedText type="h2">What are you here to do?</ThemedText>
+          <ThemedText type="h2">What matters most right now?</ThemedText>
           <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
-            We'll customize your experience
+            We'll highlight tips that match your priority
           </ThemedText>
         </View>
 
@@ -60,7 +60,12 @@ export default function GoalPickerScreen({ onNext, onBack }: Props) {
                 <View style={[styles.goalIcon, { backgroundColor: isSelected ? theme.primary + "20" : theme.backgroundSecondary }]}>
                   <Feather name={g.icon} size={20} color={isSelected ? theme.primary : theme.textSecondary} />
                 </View>
-                <ThemedText type="subtitle" style={{ flex: 1 }}>{g.label}</ThemedText>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="subtitle">{g.label}</ThemedText>
+                  {g.hint ? (
+                    <ThemedText type="caption" style={{ color: theme.primary, marginTop: 2 }}>{g.hint}</ThemedText>
+                  ) : null}
+                </View>
                 <View style={[styles.radio, { borderColor: isSelected ? theme.primary : theme.border }]}>
                   {isSelected ? <View style={[styles.radioInner, { backgroundColor: theme.primary }]} /> : null}
                 </View>
