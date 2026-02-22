@@ -547,8 +547,10 @@ export default function DashboardScreen() {
       navigation.navigate("QuoteCalculator");
     } else if (lower.includes("revenue") || lower.includes("report")) {
       navigation.navigate("WeeklyRecap");
+    } else if (lower.includes("metric")) {
+      if (requirePro()) executeCommand("How many cleans booked this month?");
     } else if (lower.includes("follow")) {
-      executeCommand("follow up quotes");
+      if (requirePro()) executeCommand("follow up quotes");
     } else if (lower.includes("draft") || lower.includes("message")) {
       navigation.navigate("AIAssistant");
     } else if (lower.includes("customer") || lower.includes("search")) {
