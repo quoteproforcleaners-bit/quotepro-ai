@@ -26,7 +26,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius } from "@/constants/theme";
+import { Spacing, BorderRadius, Elevation } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { FeatureFlags } from "@/lib/featureFlags";
 import { runAiCommand, EXAMPLE_PROMPTS, AiCommandResult } from "@/lib/aiCommandRouter";
@@ -119,6 +119,7 @@ function useDesignTokens() {
     gradientBottom: theme.bg1,
     surfacePrimary: theme.surface0,
     surfaceSecondary: theme.surface1,
+    surfaceEmphasis: (theme as any).surface2 || theme.surface1,
     borderPrimary: theme.border,
     borderSecondary: theme.divider,
     borderAccent: isDark ? `${theme.primary}35` : `${theme.primary}25`,
@@ -128,11 +129,13 @@ function useDesignTokens() {
     accent: theme.primary,
     accentMuted: isDark ? "rgba(47, 123, 255, 0.55)" : "rgba(0,100,200,0.5)",
     accentSoft: theme.primarySoft,
+    brandGlow: (theme as any).brandGlow || "rgba(47,123,255,0.18)",
+    warningSoft: (theme as any).warningSoft || "rgba(245,158,11,0.16)",
+    warningBorder: (theme as any).warningBorder || "rgba(245,158,11,0.35)",
+    warningGradientTop: isDark ? "#1B2436" : "#FFFBEB",
+    warningGradientBottom: isDark ? "#121B2B" : "#FEF3C7",
     chipBg: isDark ? theme.divider : "rgba(0,0,0,0.03)",
     chipBorder: theme.border,
-    shadowPrimary: isDark
-      ? { boxShadow: "0px 4px 12px rgba(0,0,0,0.25)" }
-      : { boxShadow: "0px 2px 8px rgba(0,0,0,0.06)" },
   }), [theme, isDark]);
 }
 
@@ -307,11 +310,11 @@ function GlanceCard({ title, value, icon, color, onPress }: {
   const dt = useDesignTokens();
   return (
     <Pressable
-      style={[styles.glanceCard, { backgroundColor: dt.surfaceSecondary }]}
+      style={[styles.glanceCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
       onPress={onPress}
       testID={`glance-${title.toLowerCase().replace(/\s/g, "-")}`}
     >
-      <View style={[styles.glanceIcon, { backgroundColor: `${color}12` }]}>
+      <View style={[styles.glanceIcon, { backgroundColor: `${color}18` }]}>
         <Feather name={icon} size={15} color={color} />
       </View>
       <ThemedText type="h3" style={{ marginTop: 6 }}>{value}</ThemedText>
@@ -548,37 +551,35 @@ export default function DashboardScreen() {
         {followUpQueueCount > 0 ? (
           <Pressable
             onPress={() => navigation.navigate("FollowUpQueue")}
-            style={[
-              styles.focusCard,
-              {
-                backgroundColor: dt.surfacePrimary,
-                borderColor: theme.warning + "40",
-                ...(Platform.OS === "ios" ? dt.shadowPrimary : {}),
-              },
-            ]}
+            style={[styles.focusCard, { borderColor: dt.warningBorder }, Elevation.e2]}
             testID="todays-focus-card"
           >
-            <View style={styles.focusCardHeader}>
-              <View style={[styles.focusIcon, { backgroundColor: theme.warning + "15" }]}>
-                <Feather name="alert-circle" size={16} color={theme.warning} />
+            <LinearGradient
+              colors={[dt.warningGradientTop, dt.warningGradientBottom]}
+              style={styles.focusCardGradient}
+            >
+              <View style={styles.focusCardHeader}>
+                <View style={[styles.focusIcon, { backgroundColor: dt.warningSoft }]}>
+                  <Feather name="alert-circle" size={16} color={theme.warning} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="subtitle" style={{ fontWeight: "700" }}>
+                    {`$${amountAtRisk.toLocaleString()} ${t.dashboard.atRisk}`}
+                  </ThemedText>
+                  <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                    {followUpQueueCount === 1 ? `1 ${t.dashboard.quoteNeedsAttention}` : `${followUpQueueCount} ${t.dashboard.quotesNeedAttention}`}
+                  </ThemedText>
+                </View>
+                <Feather name="chevron-right" size={18} color={dt.textMuted} />
               </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="subtitle" style={{ fontWeight: "700" }}>
-                  {`$${amountAtRisk.toLocaleString()} ${t.dashboard.atRisk}`}
-                </ThemedText>
-                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                  {followUpQueueCount === 1 ? `1 ${t.dashboard.quoteNeedsAttention}` : `${followUpQueueCount} ${t.dashboard.quotesNeedAttention}`}
-                </ThemedText>
+              <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm, marginLeft: 44 }}>
+                {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
+              </ThemedText>
+              <View style={[styles.focusCta, { backgroundColor: dt.warningSoft, borderWidth: 1, borderColor: dt.warningBorder }]}>
+                <Feather name="arrow-right" size={14} color={theme.warning} />
+                <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{t.dashboard.followUpNow}</ThemedText>
               </View>
-              <Feather name="chevron-right" size={18} color={dt.textMuted} />
-            </View>
-            <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm, marginLeft: 44 }}>
-              {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
-            </ThemedText>
-            <View style={[styles.focusCta, { backgroundColor: theme.warning + "12" }]}>
-              <Feather name="arrow-right" size={14} color={theme.warning} />
-              <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{t.dashboard.followUpNow}</ThemedText>
-            </View>
+            </LinearGradient>
           </Pressable>
         ) : (
           <View
@@ -586,12 +587,14 @@ export default function DashboardScreen() {
               styles.focusCard,
               {
                 backgroundColor: dt.surfacePrimary,
-                borderColor: theme.success + "30",
+                borderColor: theme.successBorder,
+                padding: Spacing.lg,
               },
+              Elevation.e1,
             ]}
           >
             <View style={styles.focusCardHeader}>
-              <View style={[styles.focusIcon, { backgroundColor: theme.success + "15" }]}>
+              <View style={[styles.focusIcon, { backgroundColor: theme.successSoft }]}>
                 <Feather name="check-circle" size={16} color={theme.success} />
               </View>
               <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{t.growth.allCaughtUp}</ThemedText>
@@ -602,7 +605,7 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        <View style={[styles.streakCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
+        <View style={[styles.streakCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e2]}>
           <View style={styles.streakCardRow}>
             <Feather name="zap" size={16} color={currentStreak > 0 ? theme.warning : dt.textMuted} />
             <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.sm }}>
@@ -614,7 +617,7 @@ export default function DashboardScreen() {
           </ThemedText>
           {currentStreak === 0 ? (
             <Pressable onPress={() => navigation.navigate("FollowUpQueue")} style={styles.streakGoBtn} testID="streak-nudge-cta">
-              <View style={styles.streakGoBtnInner}>
+              <View style={[styles.streakGoBtnInner, Elevation.e3]}>
                 <ThemedText type="body" style={styles.streakGoText}>{t.dashboard.go}</ThemedText>
                 <Feather name="arrow-right" size={18} color="#FFFFFF" style={{ marginLeft: 4 }} />
               </View>
@@ -625,10 +628,10 @@ export default function DashboardScreen() {
         <View style={[
           styles.commandCard,
           {
-            backgroundColor: dt.surfacePrimary,
+            backgroundColor: dt.surfaceEmphasis,
             borderColor: dt.borderAccent,
-            ...(Platform.OS === "ios" ? dt.shadowPrimary : {}),
           },
+          Elevation.e2,
         ]}>
           <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm, fontWeight: "600" }}>
             {t.dashboard.whatToDo}
@@ -647,7 +650,11 @@ export default function DashboardScreen() {
             />
             <Pressable
               onPress={handleSubmit}
-              style={[styles.sendBtn, { backgroundColor: commandText.trim() ? dt.accent : dt.chipBg }]}
+              style={[
+                styles.sendBtn,
+                { backgroundColor: commandText.trim() ? dt.accent : dt.chipBg },
+                commandText.trim() ? { shadowColor: dt.accent, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 } : {},
+              ]}
               testID="command-send"
             >
               <Feather name="send" size={15} color={commandText.trim() ? "#FFF" : dt.textMuted} />
@@ -667,7 +674,7 @@ export default function DashboardScreen() {
         ) : null}
 
         {!FeatureFlags.aiEnabled ? (
-          <View style={[styles.aiBanner, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
+          <View style={[styles.aiBanner, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderAccent }, Elevation.e2]}>
             <View style={styles.aiBannerContent}>
               <View style={[styles.aiBannerIcon, { backgroundColor: dt.accentSoft }]}>
                 <Feather name="zap" size={14} color={dt.accent} />
@@ -682,7 +689,7 @@ export default function DashboardScreen() {
               </View>
             </View>
             <Pressable
-              style={[styles.upgradeCta, { borderColor: dt.accent }]}
+              style={[styles.upgradeCta, { borderColor: dt.accent, backgroundColor: dt.accentSoft }]}
               onPress={() => navigation.navigate("Paywall")}
               testID="upgrade-cta"
             >
@@ -732,11 +739,11 @@ export default function DashboardScreen() {
         {totalOpportunities > 0 ? (
           <Pressable
             onPress={() => navigation.navigate("Opportunities")}
-            style={[styles.opportunityCard, { backgroundColor: dt.surfacePrimary, borderColor: theme.success + "30" }]}
+            style={[styles.opportunityCard, { backgroundColor: dt.surfacePrimary, borderColor: theme.successBorder }, Elevation.e1]}
             testID="opportunities-card"
           >
             <View style={styles.focusCardHeader}>
-              <View style={[styles.focusIcon, { backgroundColor: theme.success + "15" }]}>
+              <View style={[styles.focusIcon, { backgroundColor: theme.successSoft }]}>
                 <Feather name="repeat" size={16} color={theme.success} />
               </View>
               <View style={{ flex: 1 }}>
@@ -754,7 +761,7 @@ export default function DashboardScreen() {
 
         <Pressable
           onPress={() => navigation.navigate("WeeklyRecap")}
-          style={[styles.recapLink, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}
+          style={[styles.recapLink, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
           testID="weekly-recap-link"
         >
           <Feather name="bar-chart" size={14} color={dt.accent} />
@@ -902,6 +909,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   glanceIcon: {
     width: 30,
@@ -919,10 +927,14 @@ const styles = StyleSheet.create({
   },
   focusCard: {
     marginHorizontal: Spacing.lg,
-    padding: Spacing.lg,
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
     marginBottom: Spacing.md,
+    overflow: "hidden",
+  },
+  focusCardGradient: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.xl - 1,
   },
   focusCardHeader: {
     flexDirection: "row",
@@ -954,14 +966,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.full,
     marginTop: Spacing.md,
   },
   streakCard: {
     marginHorizontal: Spacing.lg,
     padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
     marginBottom: Spacing.md,
   },
   streakCardRow: {

@@ -9,10 +9,13 @@ import Animated, {
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius } from "@/constants/theme";
+import { Spacing, BorderRadius, Elevation } from "@/constants/theme";
+
+export type CardVariant = "base" | "raised" | "emphasis" | "warning";
 
 interface CardProps {
   elevation?: number;
+  variant?: CardVariant;
   title?: string;
   description?: string;
   children?: React.ReactNode;
@@ -28,36 +31,55 @@ const springConfig: WithSpringConfig = {
   energyThreshold: 0.001,
 };
 
-const getBackgroundColorForElevation = (
-  elevation: number,
-  theme: any,
-): string => {
-  switch (elevation) {
-    case 1:
-      return theme.backgroundDefault;
-    case 2:
-      return theme.backgroundSecondary;
-    case 3:
-      return theme.backgroundTertiary;
-    default:
-      return theme.backgroundRoot;
-  }
-};
-
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function getVariantStyles(variant: CardVariant, theme: any, isDark: boolean) {
+  switch (variant) {
+    case "raised":
+      return {
+        backgroundColor: theme.surface1,
+        borderColor: theme.border,
+        borderWidth: 1,
+        ...Elevation.e2,
+      };
+    case "emphasis":
+      return {
+        backgroundColor: isDark ? theme.surface2 : theme.surface1,
+        borderColor: isDark ? `${theme.primary}35` : `${theme.primary}25`,
+        borderWidth: 1,
+        ...Elevation.e2,
+      };
+    case "warning":
+      return {
+        backgroundColor: theme.surface0,
+        borderColor: theme.warningBorder,
+        borderWidth: 1,
+        ...Elevation.e2,
+      };
+    case "base":
+    default:
+      return {
+        backgroundColor: theme.surface0,
+        borderColor: theme.border,
+        borderWidth: 1,
+        ...Elevation.e1,
+      };
+  }
+}
 
 export function Card({
   elevation = 1,
+  variant = "base",
   title,
   description,
   children,
   onPress,
   style,
 }: CardProps) {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const scale = useSharedValue(1);
 
-  const cardBackgroundColor = getBackgroundColorForElevation(elevation, theme);
+  const variantStyles = getVariantStyles(variant, theme, isDark);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -78,9 +100,7 @@ export function Card({
       onPressOut={handlePressOut}
       style={[
         styles.card,
-        {
-          backgroundColor: cardBackgroundColor,
-        },
+        variantStyles,
         animatedStyle,
         style,
       ]}
