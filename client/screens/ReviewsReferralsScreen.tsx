@@ -10,6 +10,7 @@ import {
   TextInput,
   ScrollView,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useTheme } from "@/hooks/useTheme";
@@ -575,15 +576,20 @@ export default function ReviewsReferralsScreen() {
       <Modal
         visible={reviewModalVisible}
         animationType="slide"
-        transparent
+        transparent={false}
+        presentationStyle="fullScreen"
         onRequestClose={handleCloseModal}
         testID="modal-review-request"
       >
-        <View style={[s.modalOverlay, { backgroundColor: dt.overlay }]}>
-          <View style={[s.modalContent, { backgroundColor: dt.surfacePrimary, paddingBottom: insets.bottom + Spacing.lg }]}>
+        <KeyboardAvoidingView
+          style={[s.flex, { backgroundColor: dt.surfacePrimary }]}
+          behavior="padding"
+          keyboardVerticalOffset={0}
+        >
+          <View style={[s.flex, { backgroundColor: dt.surfacePrimary, paddingTop: insets.top, paddingBottom: insets.bottom + Spacing.lg, paddingHorizontal: Spacing.lg }]}>
             {selectedCustomerId ? renderEmailDraftStep() : renderCustomerPickerStep()}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
     </ProGate>
