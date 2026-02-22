@@ -171,34 +171,46 @@ export const Typography = {
 };
 
 export const Elevation = {
-  e0: {
-    shadowColor: "#000",
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 0,
-  },
-  e1: {
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 2,
-  },
-  e2: {
-    shadowColor: "#000",
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
-  },
-  e3: {
-    shadowColor: "#000",
-    shadowOpacity: 0.28,
-    shadowRadius: 26,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 6,
-  },
+  e0: Platform.select({
+    web: { boxShadow: "none" },
+    default: {
+      shadowColor: "#000",
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 0,
+    },
+  }) as any,
+  e1: Platform.select({
+    web: { boxShadow: "0px 6px 10px rgba(0,0,0,0.18)" },
+    default: {
+      shadowColor: "#000",
+      shadowOpacity: 0.18,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 2,
+    },
+  }) as any,
+  e2: Platform.select({
+    web: { boxShadow: "0px 10px 18px rgba(0,0,0,0.22)" },
+    default: {
+      shadowColor: "#000",
+      shadowOpacity: 0.22,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 4,
+    },
+  }) as any,
+  e3: Platform.select({
+    web: { boxShadow: "0px 14px 26px rgba(0,0,0,0.28)" },
+    default: {
+      shadowColor: "#000",
+      shadowOpacity: 0.28,
+      shadowRadius: 26,
+      shadowOffset: { width: 0, height: 14 },
+      elevation: 6,
+    },
+  }) as any,
 };
 
 export const Fonts = Platform.select({

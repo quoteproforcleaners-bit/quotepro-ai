@@ -653,7 +653,10 @@ export default function DashboardScreen() {
               style={[
                 styles.sendBtn,
                 { backgroundColor: commandText.trim() ? dt.accent : dt.chipBg },
-                commandText.trim() ? { shadowColor: dt.accent, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 } : {},
+                commandText.trim() ? Platform.select({
+                  web: { boxShadow: `0px 2px 8px ${dt.brandGlow}` } as any,
+                  default: { shadowColor: dt.accent, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+                }) : {},
               ]}
               testID="command-send"
             >
@@ -992,7 +995,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
-    boxShadow: "0 0 12px rgba(0,136,255,0.6), 0 0 24px rgba(0,136,255,0.3)",
   },
   streakGoText: {
     color: "#FFFFFF",
