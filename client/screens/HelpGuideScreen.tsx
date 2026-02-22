@@ -452,7 +452,7 @@ export default function HelpGuideScreen() {
   const { language } = useLanguage();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const sections = getGuideData(language === "en");
+  const sections = getGuideData(language === "en" || language === "pt" || language === "ru");
 
   const toggleSection = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -472,12 +472,16 @@ export default function HelpGuideScreen() {
             <Feather name="book-open" size={22} color="#FFFFFF" />
           </View>
           <ThemedText type="h3" style={{ marginTop: Spacing.md }}>
-            {language === "en" ? "QuotePro User Guide" : "Guia del Usuario QuotePro"}
+            {language === "es" ? "Guía del Usuario QuotePro" : language === "pt" ? "Guia do Usuário QuotePro" : language === "ru" ? "Руководство QuotePro" : "QuotePro User Guide"}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.xs, textAlign: "center" }}>
-            {language === "en"
-              ? "Tap any section below to learn more about each feature."
-              : "Toca cualquier seccion para aprender mas sobre cada funcion."}
+            {language === "es"
+              ? "Toca cualquier sección para aprender más sobre cada función."
+              : language === "pt"
+              ? "Toque em qualquer seção abaixo para saber mais sobre cada recurso."
+              : language === "ru"
+              ? "Нажмите на любой раздел, чтобы узнать больше о каждой функции."
+              : "Tap any section below to learn more about each feature."}
           </ThemedText>
         </View>
 

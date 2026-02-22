@@ -163,7 +163,7 @@ export default function LoginScreen() {
       >
 
         <View style={styles.languageRow}>
-          {(["en", "es"] as Language[]).map((lang) => (
+          {(["en", "es", "pt", "ru"] as Language[]).map((lang) => (
             <Pressable
               key={lang}
               onPress={() => setLanguage(lang)}

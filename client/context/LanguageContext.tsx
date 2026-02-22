@@ -26,12 +26,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       AsyncStorage.getItem(STORAGE_KEY),
       AsyncStorage.getItem(COMM_STORAGE_KEY),
     ]).then(([stored, commStored]) => {
-      if (stored === "en" || stored === "es") {
+      if (stored === "en" || stored === "es" || stored === "pt" || stored === "ru") {
         setLang(stored);
       }
-      if (commStored === "en" || commStored === "es") {
+      if (commStored === "en" || commStored === "es" || commStored === "pt" || commStored === "ru") {
         setCommLang(commStored);
-      } else if (stored === "en" || stored === "es") {
+      } else if (stored === "en" || stored === "es" || stored === "pt" || stored === "ru") {
         setCommLang(stored);
       }
       setIsLoaded(true);
