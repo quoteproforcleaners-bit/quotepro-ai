@@ -28,6 +28,7 @@ import { LANGUAGE_LABELS, type Language } from "@/i18n";
 import { syncNotificationSchedule } from "@/lib/notifications";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useDarkModePreference } from "@/hooks/useColorScheme";
+import { useAIConsent } from "@/context/AIConsentContext";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -40,6 +41,7 @@ export default function SettingsScreen() {
   const { isPro } = useSubscription();
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
   const { preference: darkModePref, setPreference: setDarkModePref } = useDarkModePreference();
+  const { hasConsented: aiConsented, requestConsent: requestAIConsent, revokeConsent: revokeAIConsent } = useAIConsent();
 
   const queryClient = useQueryClient();
 
@@ -1003,6 +1005,32 @@ export default function SettingsScreen() {
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
         </View>
       </Pressable>
+
+      <SectionHeader title={t.aiConsent.settingsTitle} />
+
+      <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.aiConsent.settingsTitle}</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              {t.aiConsent.settingsDescription}
+            </ThemedText>
+          </View>
+          <Switch
+            value={aiConsented}
+            onValueChange={async (val) => {
+              if (val) {
+                await requestAIConsent();
+              } else {
+                revokeAIConsent();
+              }
+            }}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-ai-consent"
+          />
+        </View>
+      </View>
 
       <SectionHeader title={t.display.appearance} />
 

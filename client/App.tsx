@@ -12,6 +12,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { AppProvider } from "@/context/AppContext";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { AIConsentProvider } from "@/context/AIConsentContext";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary, sendCrashReport } from "@/components/ErrorBoundary";
 import { setupNotificationHandler, registerForPushNotificationsAsync, savePushTokenToServer } from "@/lib/notifications";
@@ -84,9 +85,11 @@ export default function App() {
                 <AuthProvider>
                   <AppProvider>
                     <SubscriptionProvider>
-                      <NavigationContainer>
-                        <RootStackNavigator />
-                      </NavigationContainer>
+                      <AIConsentProvider>
+                        <NavigationContainer>
+                          <RootStackNavigator />
+                        </NavigationContainer>
+                      </AIConsentProvider>
                     </SubscriptionProvider>
                   </AppProvider>
                 </AuthProvider>
