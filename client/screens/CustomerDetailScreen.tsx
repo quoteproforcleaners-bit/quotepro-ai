@@ -28,6 +28,7 @@ import { useApp } from "@/context/AppContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { ProGate } from "@/components/ProGate";
+import { useAIConsent } from "@/context/AIConsentContext";
 
 interface Customer {
   id: string;
@@ -62,6 +63,7 @@ export default function CustomerDetailScreen() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const { isPro } = useSubscription();
+  const { requestConsent } = useAIConsent();
   const { communicationLanguage, t } = useLanguage();
   const [showCommForm, setShowCommForm] = useState(false);
   const [commChannel, setCommChannel] = useState<string>("phone");
@@ -243,6 +245,8 @@ export default function CustomerDetailScreen() {
 
   const handleAiDraft = async () => {
     if (!customer || aiDrafting) return;
+    const consented = await requestConsent();
+    if (!consented) return;
     setAiDrafting(true);
     try {
       const res = await apiRequest("POST", "/api/ai/communication-draft", {

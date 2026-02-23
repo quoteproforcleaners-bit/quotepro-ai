@@ -23,6 +23,7 @@ import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAIConsent } from "@/context/AIConsentContext";
 
 type RouteParams = {
   QuoteDetail: { quoteId: string };
@@ -64,6 +65,7 @@ export default function QuoteDetailScreen() {
   const { user } = useAuth();
   const { isPro } = useSubscription();
   const { communicationLanguage } = useLanguage();
+  const { requestConsent } = useAIConsent();
   const queryClient = useQueryClient();
 
   const [aiDraft, setAiDraft] = useState<string | null>(null);
@@ -203,6 +205,8 @@ export default function QuoteDetailScreen() {
       navigation.navigate("Paywall");
       return;
     }
+    const consented = await requestConsent();
+    if (!consented) return;
     setAiDraftType(type);
     setAiDraftPurpose(purpose);
     setAiDraftLoading(true);

@@ -22,6 +22,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import { ProGate } from "@/components/ProGate";
+import { useAIConsent } from "@/context/AIConsentContext";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -62,6 +63,7 @@ export default function ReactivationScreen() {
   const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
   const dt = useDesignTokens();
+  const { requestConsent } = useAIConsent();
 
   const [segment, setSegment] = useState<"dormant" | "lost">("dormant");
   const [modalVisible, setModalVisible] = useState(false);
@@ -138,6 +140,8 @@ export default function ReactivationScreen() {
   };
 
   const generateAndAttachContent = async (campaign: any, _prompt?: string) => {
+    const consented = await requestConsent();
+    if (!consented) return;
     try {
       setGeneratingContent(true);
       setAiError(false);
@@ -867,6 +871,8 @@ export default function ReactivationScreen() {
                 <View style={{ flexDirection: "row", gap: Spacing.sm }}>
                   <Pressable
                     onPress={async () => {
+                      const consented = await requestConsent();
+                      if (!consented) return;
                       try {
                         setGeneratingContent(true);
                         setAiError(false);

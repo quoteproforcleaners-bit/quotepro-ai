@@ -22,6 +22,7 @@ import { apiRequest } from "@/lib/query-client";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ProGate } from "@/components/ProGate";
+import { useAIConsent } from "@/context/AIConsentContext";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -84,6 +85,7 @@ export default function ReviewsReferralsScreen() {
   const { theme } = useTheme();
   const dt = useDesignTokens();
   const queryClient = useQueryClient();
+  const { requestConsent } = useAIConsent();
   const [refreshing, setRefreshing] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
@@ -180,6 +182,8 @@ export default function ReviewsReferralsScreen() {
   }, []);
 
   const generateEmailContent = useCallback(async () => {
+    const consented = await requestConsent();
+    if (!consented) return;
     setGeneratingReview(true);
     const fallbackSubject = "We would love your feedback";
     const fallbackBody =

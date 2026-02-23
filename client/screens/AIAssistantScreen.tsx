@@ -18,6 +18,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { apiRequest } from "@/lib/query-client";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useSubscription } from "@/context/SubscriptionContext";
+import { useAIConsent } from "@/context/AIConsentContext";
 
 interface Message {
   id: string;
@@ -86,6 +87,7 @@ export default function AIAssistantScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const { isPro } = useSubscription();
+  const { requestConsent } = useAIConsent();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -130,6 +132,9 @@ export default function AIAssistantScreen() {
       isTyping: true,
       timestamp: new Date(),
     };
+
+    const consented = await requestConsent();
+    if (!consented) return;
 
     setMessages((prev) => [loadingMessage, userMessage, ...prev]);
     setInput("");

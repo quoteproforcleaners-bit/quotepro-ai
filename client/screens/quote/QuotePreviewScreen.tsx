@@ -34,6 +34,7 @@ import {
   generateSmsDraft,
 } from "@/lib/quoteCalculator";
 import { apiRequest, getPublicBaseUrl } from "@/lib/query-client";
+import { useAIConsent } from "@/context/AIConsentContext";
 import { getPaymentOptions, getEnabledPaymentMethods, PAYMENT_METHOD_LABELS, formatPaymentOptionsForMessage } from "@/lib/paymentOptions";
 
 function FormattedDraftText({ text, style }: { text: string; style?: any }) {
@@ -96,6 +97,7 @@ export default function QuotePreviewScreen({
   const { theme } = useTheme();
   const { user } = useAuth();
   const { isPro } = useSubscription();
+  const { requestConsent } = useAIConsent();
   const { communicationLanguage } = useLanguage();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
@@ -184,6 +186,8 @@ export default function QuotePreviewScreen({
 
   const fetchAiDescriptions = useCallback(async () => {
     if (!isPro) return;
+    const consented = await requestConsent();
+    if (!consented) return;
     setAiDescLoading(true);
     try {
       const res = await apiRequest("POST", "/api/ai/quote-descriptions", {
@@ -227,6 +231,8 @@ export default function QuotePreviewScreen({
 
   const fetchAiEmailDraft = useCallback(async () => {
     if (!isPro) return;
+    const consented = await requestConsent();
+    if (!consented) return;
     setAiEmailLoading(true);
     try {
       const selectedOpt = options[selectedOption];
@@ -264,6 +270,8 @@ export default function QuotePreviewScreen({
 
   const fetchAiSmsDraft = useCallback(async () => {
     if (!isPro) return;
+    const consented = await requestConsent();
+    if (!consented) return;
     setAiSmsLoading(true);
     try {
       const selectedOpt = options[selectedOption];
