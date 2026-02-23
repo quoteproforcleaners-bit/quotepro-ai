@@ -59,6 +59,8 @@ export default function OnboardingNavigator() {
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [sentQuote, setSentQuote] = useState(false);
   const [followupsEnabled, setFollowupsEnabled] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const handleSkipAll = useCallback(async (navigation: any) => {
     await markSkipped();
@@ -118,9 +120,9 @@ export default function OnboardingNavigator() {
   }, []);
 
   const handleSendQuote = useCallback(async (contact: { name: string; email: string; phone: string }, navigation: any) => {
+    setIsSending(true);
+    setSendError(null);
     try {
-      const tierData = selectedTier === "good" ? tiers.good : selectedTier === "best" ? tiers.best : tiers.better;
-
       let customerId: string | undefined;
       try {
         const custRes = await apiRequest("POST", "/api/customers", {
@@ -133,33 +135,55 @@ export default function OnboardingNavigator() {
         customerId = cust.id;
       } catch {}
 
+      let quoteId: string | undefined;
       try {
-        await apiRequest("POST", "/api/quotes", {
+        const quoteRes = await apiRequest("POST", "/api/quotes", {
           customerId,
           customerName: contact.name,
           customerEmail: contact.email,
           customerPhone: contact.phone,
           homeDetails: quoteInput,
-          options: [
-            { name: "Good", ...tiers.good },
-            { name: "Better", ...tiers.better },
-            { name: "Best", ...tiers.best },
-          ],
+          options: {
+            good: tiers.good,
+            better: tiers.better,
+            best: tiers.best,
+          },
           selectedOption: selectedTier,
-          status: "sent",
+          status: "draft",
           frequency: quoteInput?.frequency || "one-time",
         });
+        const quoteData = await quoteRes.json();
+        quoteId = quoteData.id;
       } catch {}
+
+      if (quoteId && contact.email) {
+        try {
+          const sendRes = await apiRequest("POST", `/api/quotes/${quoteId}/onboarding-send`, {
+            to: contact.email,
+            subject: `Your ${bizName || "QuotePro"} Quote`,
+          });
+          const sendData = await sendRes.json();
+          if (!sendData.success) {
+            setSendError(sendData.message || "Could not send email. Your quote was saved.");
+          }
+        } catch {
+          setSendError("Could not send email right now. Your quote was saved and you can send it later.");
+        }
+      }
 
       setSentQuote(true);
       await setOnboardingStatus({ sentQuote: true, ownerContact: { email: contact.email, phone: contact.phone }, currentStep: 5 });
       cancelOnboardingNudge();
       scheduleFirstWinCelebration();
       trackEvent("onboarding_quote_sent", { tier: selectedTier });
-    } catch {}
 
-    navigation.navigate("FollowUpSetup");
-  }, [selectedTier, tiers, quoteInput]);
+      navigation.navigate("FollowUpSetup");
+    } catch {
+      setSendError("Something went wrong. Please try again.");
+    } finally {
+      setIsSending(false);
+    }
+  }, [selectedTier, tiers, quoteInput, bizName]);
 
   const handleFollowUpNext = useCallback(async (data: { cadence: string; tone: string }, navigation: any) => {
     setFollowupsEnabled(true);
@@ -251,12 +275,16 @@ export default function OnboardingNavigator() {
             selectedTierName={currentTierName}
             businessName={currentBizName}
             goal={goal}
+            tiers={tiers}
+            selectedTier={selectedTier}
             onSend={(contact) => handleSendQuote(contact, navigation)}
             onSkip={() => {
               setOnboardingStatus({ currentStep: 5 });
               navigation.navigate("FollowUpSetup");
             }}
             onBack={() => navigation.goBack()}
+            isSending={isSending}
+            sendError={sendError}
           />
         )}
       </Stack.Screen>

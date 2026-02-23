@@ -1690,6 +1690,167 @@ ${paymentHtml}
     }
   });
 
+  // ─── Onboarding Quote Send (no Pro requirement for first quote) ───
+  app.post("/api/quotes/:id/onboarding-send", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const quote = await getQuoteById(req.params.id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { to, subject } = req.body;
+      if (!to) {
+        return res.status(400).json({ message: "Recipient email is required" });
+      }
+
+      const sgApiKey = process.env.SENDGRID_API_KEY;
+      if (!sgApiKey) {
+        return res.status(503).json({ message: "Email service not configured" });
+      }
+
+      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+      const fromName = business.companyName || "QuotePro";
+      const replyToEmail = business.email || undefined;
+
+      const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
+      const primaryColor = (business as any).primaryColor || "#2563EB";
+      const quoteUrl = `${getPublicBaseUrl(req)}/q/${quote.publicToken}`;
+
+      const propertyDetails = (quote.propertyDetails as any) || {};
+      const beds = propertyDetails.beds;
+      const baths = propertyDetails.baths;
+      const sqft = propertyDetails.sqft;
+      
+      const options = (quote.options as any) || {};
+      const optionsArray = [
+        { key: 'good', label: 'Good', name: options.good?.name || 'Good', scope: options.good?.scope || '', price: options.good?.price || 0 },
+        { key: 'better', label: 'Better', name: options.better?.name || 'Better', scope: options.better?.scope || '', price: options.better?.price || 0 },
+        { key: 'best', label: 'Best', name: options.best?.name || 'Best', scope: options.best?.scope || '', price: options.best?.price || 0 },
+      ];
+
+      const propertyInfoHtml = (beds || baths || sqft) ? `
+      <tr><td align="center" style="padding:24px 20px;background-color:#ffffff;border-bottom:1px solid #eeeeee;">
+        <table width="100%" cellpadding="0" cellspacing="0" align="center">
+          <tr>
+            ${beds ? `<td align="center" style="padding:0 16px;font-size:14px;"><div style="font-weight:600;color:#333333;">${beds}</div><div style="color:#666666;font-size:12px;">Beds</div></td>` : ''}
+            ${baths ? `<td align="center" style="padding:0 16px;font-size:14px;"><div style="font-weight:600;color:#333333;">${baths}</div><div style="color:#666666;font-size:12px;">Baths</div></td>` : ''}
+            ${sqft ? `<td align="center" style="padding:0 16px;font-size:14px;"><div style="font-weight:600;color:#333333;">${sqft}</div><div style="color:#666666;font-size:12px;">Sq Ft</div></td>` : ''}
+          </tr>
+        </table>
+      </td></tr>` : '';
+
+      const savedRecommended = (quote as any).recommendedOption || 'better';
+      const optionsCardsHtml = optionsArray.map((option) => {
+        const isRecommended = option.key === savedRecommended;
+        const borderColor = isRecommended ? primaryColor : '#eeeeee';
+        const backgroundColor = isRecommended ? '#f9f9ff' : '#ffffff';
+        const badgeHtml = isRecommended ? `<div style="display:inline-block;background:${primaryColor};color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;margin-bottom:12px;">RECOMMENDED</div><br/>` : '';
+        return `
+      <tr><td style="padding:16px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="border:2px solid ${borderColor};border-radius:8px;background-color:${backgroundColor};">
+          <tr><td style="padding:20px;">
+            ${badgeHtml}
+            <div style="font-size:18px;font-weight:700;color:#333333;margin-bottom:4px;">${option.name}</div>
+            ${option.scope ? `<div style="font-size:14px;color:#666666;margin-bottom:16px;line-height:1.4;">${option.scope}</div>` : ''}
+            <div style="font-size:28px;font-weight:700;color:${primaryColor};margin-bottom:20px;">$${option.price.toFixed(2)}</div>
+            <a href="${quoteUrl}?option=${option.key}" style="display:block;background:${primaryColor};color:white;padding:14px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">Accept ${option.name}</a>
+          </td></tr>
+        </table>
+      </td></tr>`;
+      }).join('');
+
+      const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;background-color:#ffffff;">
+        <tr><td style="padding:32px 20px;text-align:center;border-bottom:1px solid #eeeeee;">
+          ${business.logoUri ? `<div style="margin-bottom:16px;"><img src="${business.logoUri}" alt="${business.companyName}" style="max-height:50px;max-width:200px;"></div>` : ''}
+          <h1 style="margin:0;font-size:24px;font-weight:700;color:#333333;">Your Quote Options</h1>
+          <p style="margin:8px 0 0;font-size:14px;color:#666666;">Hi ${customerName}, please select the option that works best for you.</p>
+        </td></tr>
+        ${propertyInfoHtml}
+        <tr><td style="padding:24px 0;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;">
+            ${optionsCardsHtml}
+          </table>
+        </td></tr>
+        <tr><td style="padding:20px;text-align:center;background-color:#f9f9f9;border-top:1px solid #eeeeee;">
+          <p style="margin:0;font-size:12px;color:#666666;line-height:1.5;">
+            If buttons don't work, reply with <strong>1</strong> (Good), <strong>2</strong> (Better), or <strong>3</strong> (Best) to select your option.
+          </p>
+        </td></tr>
+        <tr><td style="padding:24px 20px;text-align:center;border-top:1px solid #eeeeee;background-color:#ffffff;">
+          <div style="font-weight:600;color:#333333;margin-bottom:8px;">${business.companyName || 'QuotePro'}</div>
+          ${business.phone ? `<div style="font-size:13px;color:#666666;margin-bottom:4px;">Phone: <a href="tel:${business.phone}" style="color:${primaryColor};text-decoration:none;">${business.phone}</a></div>` : ''}
+          ${replyToEmail ? `<div style="font-size:13px;color:#666666;">Email: <a href="mailto:${replyToEmail}" style="color:${primaryColor};text-decoration:none;">${replyToEmail}</a></div>` : ''}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+      const emailPayload: any = {
+        personalizations: [{ to: [{ email: to }] }],
+        from: { email: brandedFromEmail, name: fromName },
+        subject: subject || `Your ${business.companyName || "QuotePro"} Quote`,
+        content: [
+          { type: "text/plain", value: `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}` },
+          { type: "text/html", value: emailHtml },
+        ],
+      };
+      if (replyToEmail) {
+        emailPayload.reply_to = { email: replyToEmail, name: fromName };
+      }
+
+      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${sgApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emailPayload),
+      });
+
+      if (!sgRes.ok) {
+        const errText = await sgRes.text();
+        console.error("SendGrid onboarding error:", sgRes.status, errText);
+        let errorDetail = "Failed to send email";
+        try {
+          const errJson = JSON.parse(errText);
+          if (errJson.errors && errJson.errors.length > 0) {
+            errorDetail = errJson.errors.map((e: any) => e.message).join("; ");
+          }
+        } catch {}
+        return res.status(502).json({ message: errorDetail });
+      }
+
+      console.log(`Onboarding quote email sent: from=${brandedFromEmail}, to=${to}, quoteId=${quote.id}`);
+
+      await createCommunication({
+        businessId: business.id,
+        quoteId: quote.id,
+        customerId: quote.customerId || undefined,
+        channel: "email",
+        direction: "outbound",
+        content: `Quote email sent to ${to}`,
+        status: "sent",
+      });
+
+      await updateQuote(quote.id, { status: "sent" });
+
+      return res.json({ success: true, message: "Quote email sent successfully" });
+    } catch (error: any) {
+      console.error("Onboarding send quote error:", error);
+      return res.status(500).json({ message: "Failed to send quote email" });
+    }
+  });
+
   // ─── Communications ───
 
   app.get("/api/communications", requireAuth, async (req: Request, res: Response) => {
