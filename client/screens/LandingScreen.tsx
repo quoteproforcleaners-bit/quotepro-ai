@@ -26,15 +26,24 @@ const appIcon = require("../../assets/images/icon.png");
 type HeadlineVariant = "A" | "B" | "C" | "D";
 const ONBOARDING_HEADLINE_VARIANT: HeadlineVariant = "A";
 
-const HEADLINE_VARIANTS: Record<HeadlineVariant, string> = {
-  A: "Close More Cleaning Jobs in 30 Seconds",
-  B: "Stop Losing Jobs to Better Quotes",
-  C: "Turn Quotes Into Closed Jobs With AI",
-  D: "Add $5,000/Month With Better Quotes",
+const COPY = {
+  headline: {
+    A: "Close More Cleaning Jobs\nin 30 Seconds",
+    B: "Stop Losing Jobs\nto Better Quotes",
+    C: "Turn Quotes Into\nClosed Jobs With AI",
+    D: "Add $5,000/Month\nWith Better Quotes",
+  } as Record<HeadlineVariant, string>,
+  tension: "Most cleaners lose jobs because their quotes look unprofessional. Fix it in minutes.",
+  cta: "createFreeQuote",
+  noAccount: "noAccountNeeded",
+  speedLine: "speedLine",
+  trust1: "builtBy",
+  trust2: "designedToHelp",
+  previewTitle: "previewTitle",
+  previewCaption: "previewSubline",
+  signIn: "signIn",
+  saveLink: "whyCreateAccount",
 };
-
-const TENSION_COPY =
-  "Most cleaning businesses lose jobs because their quotes look unprofessional — fix it in minutes.";
 
 const OUTCOME_FEATURES = [
   { icon: "zap" as const, titleKey: "winMoreJobs", descKey: "winMoreJobsDesc" },
@@ -54,6 +63,7 @@ export default function LandingScreen() {
 
   const landing = t.landing;
   const isWide = width > 600;
+  const containerMaxWidth = isWide ? 540 : undefined;
 
   const handleCreateQuote = () => {
     enterGuestMode();
@@ -65,15 +75,15 @@ export default function LandingScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + Spacing.lg }]}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + Spacing.md }]}>
       <ScrollView
         contentContainerStyle={[
           styles.content,
           {
             paddingBottom: insets.bottom + Spacing.xl,
-            maxWidth: isWide ? 520 : undefined,
+            maxWidth: containerMaxWidth,
             alignSelf: isWide ? "center" : undefined,
-            width: isWide ? 520 : undefined,
+            width: isWide ? containerMaxWidth : undefined,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -109,11 +119,11 @@ export default function LandingScreen() {
           <ThemedText type="h1" style={[styles.appName, { color: theme.text }]}>
             QuotePro
           </ThemedText>
-          <ThemedText type="h3" style={{ color: theme.text, textAlign: "center", marginBottom: Spacing.xs }}>
-            {landing.tagline || HEADLINE_VARIANTS[ONBOARDING_HEADLINE_VARIANT]}
+          <ThemedText type="h3" style={styles.headline}>
+            {landing.tagline || COPY.headline[ONBOARDING_HEADLINE_VARIANT]}
           </ThemedText>
-          <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", maxWidth: 320, lineHeight: 18 }}>
-            {landing.tensionCopy || TENSION_COPY}
+          <ThemedText type="small" style={[styles.tensionText, { color: theme.textSecondary }]}>
+            {landing.tensionCopy || COPY.tension}
           </ThemedText>
         </View>
 
@@ -124,26 +134,29 @@ export default function LandingScreen() {
         >
           <Feather name="file-text" size={20} color="#FFFFFF" />
           <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: Spacing.sm }}>
-            {landing.createFreeQuote}
+            {landing[COPY.cta as keyof typeof landing]}
           </ThemedText>
         </Pressable>
 
         <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
-          {landing.noAccountNeeded}
+          {landing[COPY.noAccount as keyof typeof landing]}
+        </ThemedText>
+        <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginTop: 4, opacity: 0.6 }}>
+          {landing[COPY.speedLine as keyof typeof landing] || "Start in under 30 seconds."}
         </ThemedText>
 
-        <View style={[styles.proofSection, { marginTop: Spacing.lg }]}>
+        <View style={[styles.proofSection, { marginTop: Spacing.md }]}>
           <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center" }}>
-            {landing.builtBy}
+            {landing[COPY.trust1 as keyof typeof landing]}
           </ThemedText>
           <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginTop: 2 }}>
-            {landing.designedToHelp}
+            {landing[COPY.trust2 as keyof typeof landing]}
           </ThemedText>
         </View>
 
         <View style={[styles.previewCard, { backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", borderColor: theme.border }]}>
-          <ThemedText type="caption" style={{ color: theme.textSecondary, fontWeight: "600", marginBottom: Spacing.sm }}>
-            {landing.previewTitle}
+          <ThemedText type="caption" style={{ color: theme.textSecondary, fontWeight: "600", marginBottom: Spacing.sm, textAlign: "center" }}>
+            {landing[COPY.previewTitle as keyof typeof landing]}
           </ThemedText>
           <View style={styles.previewTiers}>
             {[
@@ -171,11 +184,11 @@ export default function LandingScreen() {
             ))}
           </View>
           <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
-            {landing.previewSubline}
+            {landing[COPY.previewCaption as keyof typeof landing]}
           </ThemedText>
         </View>
 
-        <View style={[styles.divider, { marginVertical: Spacing.xl }]}>
+        <View style={[styles.divider, { marginVertical: Spacing.lg }]}>
           <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
           <ThemedText type="small" style={{ marginHorizontal: Spacing.md, color: theme.textSecondary }}>
             {t.common.or}
@@ -188,9 +201,9 @@ export default function LandingScreen() {
           onPress={handleSignIn}
           testID="button-sign-in"
         >
-          <Feather name="log-in" size={18} color={theme.text} />
-          <ThemedText type="body" style={{ fontWeight: "600", marginLeft: Spacing.sm }}>
-            {landing.signIn}
+          <Feather name="log-in" size={18} color={theme.textSecondary} />
+          <ThemedText type="body" style={{ fontWeight: "600", marginLeft: Spacing.sm, color: theme.textSecondary }}>
+            {landing[COPY.signIn as keyof typeof landing]}
           </ThemedText>
         </Pressable>
 
@@ -199,13 +212,12 @@ export default function LandingScreen() {
           style={styles.benefitsLink}
           testID="button-why-account"
         >
-          <Feather name="info" size={14} color={theme.primary} />
-          <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600", marginLeft: 6 }}>
-            {landing.whyCreateAccount}
+          <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
+            {landing[COPY.saveLink as keyof typeof landing]}
           </ThemedText>
         </Pressable>
 
-        <View style={[styles.featuresGrid, { marginTop: Spacing["2xl"] }]}>
+        <View style={[styles.featuresGrid, { marginTop: Spacing.xl }]}>
           {OUTCOME_FEATURES.map((b, i) => (
             <View key={i} style={styles.featureCard}>
               <Feather name={b.icon} size={22} color={theme.primary} />
@@ -219,7 +231,7 @@ export default function LandingScreen() {
 
       <Modal visible={showBenefits} transparent animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setShowBenefits(false)}>
-          <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, maxWidth: isWide ? 520 : undefined, alignSelf: isWide ? "center" : undefined }]} onStartShouldSetResponder={() => true}>
+          <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, maxWidth: containerMaxWidth, alignSelf: isWide ? "center" : undefined }]} onStartShouldSetResponder={() => true}>
             <View style={styles.modalHeader}>
               <ThemedText type="subtitle" style={{ fontWeight: "700", flex: 1 }}>
                 {landing.benefitsTitle}
@@ -273,7 +285,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     gap: Spacing.sm,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
     flexWrap: "wrap",
   },
   languageChip: {
@@ -284,18 +296,28 @@ const styles = StyleSheet.create({
   },
   branding: {
     alignItems: "center",
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   appLogo: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    marginBottom: Spacing.md,
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    marginBottom: Spacing.sm,
   },
   appName: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: "800",
+    marginBottom: 4,
+  },
+  headline: {
+    textAlign: "center",
     marginBottom: Spacing.xs,
+    maxWidth: 320,
+  },
+  tensionText: {
+    textAlign: "center",
+    maxWidth: 300,
+    lineHeight: 20,
   },
   primaryButton: {
     width: "100%",
@@ -307,12 +329,13 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     width: "100%",
-    height: 48,
+    height: 46,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
+    opacity: 0.85,
   },
   divider: {
     flexDirection: "row",
@@ -326,8 +349,8 @@ const styles = StyleSheet.create({
   benefitsLink: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: Spacing.md,
-    paddingVertical: Spacing.sm,
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   proofSection: {
     alignItems: "center",
@@ -338,7 +361,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    marginTop: Spacing.lg,
+    marginTop: Spacing.md,
   },
   previewTiers: {
     flexDirection: "row",

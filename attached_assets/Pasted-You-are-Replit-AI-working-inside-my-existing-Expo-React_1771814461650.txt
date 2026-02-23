@@ -1,0 +1,79 @@
+You are Replit AI working inside my existing Expo/React Native iOS app “QuotePro”. Improve the current Landing/Onboarding first screen (the one with the language pills, logo, “QuotePro”, revenue headline, CTA, preview card, and sign-in) to make it a true 10/10 conversion screen while keeping the same overall layout, dark premium style, and existing navigation/actions.
+
+GOAL
+Increase “Create My First Quote” taps and make the copy tighter, punchier, and more persuasive without adding clutter.
+
+DO NOT CHANGE
+- Keep the language selector pills at the top.
+- Keep primary CTA above the fold.
+- Keep “No account needed…” message.
+- Keep the sign-in option.
+- Keep the preview card concept (Good/Better/Best).
+- Do NOT add new dependencies.
+- Do NOT change the button handlers/navigation logic; only update UI + copy + spacing.
+
+CHANGES TO IMPLEMENT
+
+1) Tighten the tension line (shorter + punchier)
+Replace:
+“Most cleaning businesses lose jobs because their quotes look unprofessional — fix it in minutes.”
+With:
+“Most cleaners lose jobs because their quotes look unprofessional. Fix it in minutes.”
+
+2) Tighten the trust lines (stronger cadence)
+Replace:
+“Built by a real cleaning business owner.
+Designed to help you win more jobs and charge what you're worth.”
+With:
+“Built by a real cleaning business owner.
+Designed to help you win more jobs — and charge what you’re worth.”
+
+3) Upgrade the Preview card header to make it emotionally real
+Replace the “Preview” title with:
+“This Is What Your Customers See”
+(Keep it small but clear.)
+
+4) Improve the preview caption (slightly more benefit-driven)
+Replace:
+“Looks professional. Sends fast.”
+With:
+“Professional. Clear. Easy to say yes to.”
+
+5) Add a tiny speed reinforcement under the CTA (microcopy)
+Under “No account needed — build your first quote now” add a smaller line:
+“Start in under 30 seconds.”
+(Use subtle opacity so it doesn’t compete with CTA.)
+
+6) Spacing + hierarchy polish (make it feel less tall/empty, more cohesive)
+- Slightly reduce vertical spacing between:
+  - App name + headline
+  - Tension line + CTA
+- Slightly reduce the height of the “or” divider area so it doesn’t pull attention away from the preview and CTA.
+- Ensure the primary CTA remains the brightest element and the sign-in stays visually secondary.
+
+7) Typography refinements
+- Ensure the headline wraps cleanly on iPhone with balanced line breaks:
+  “Close More Cleaning Jobs in 30”
+  “Seconds”
+If needed, insert a manual line break only for the headline (not globally).
+- Increase line-height slightly on the tension line for readability.
+- Ensure all text respects Dynamic Type but doesn’t overflow: add maxWidth constraints and center align.
+
+8) iPad layout (reviewer device)
+On larger screens:
+- Constrain the main content container to maxWidth ~520–560
+- Center it horizontally so it doesn’t stretch.
+- Keep buttons full-width within the constrained container.
+
+IMPLEMENTATION NOTES
+- Locate the existing first screen component (LandingScreen/WelcomeScreen/OnboardingScreen).
+- Only modify this screen’s UI and copy constants.
+- Keep all copy in a single constants object at top of file so I can edit quickly later:
+  const COPY = { headline, tension, cta, noAccount, speedLine, trust1, trust2, previewTitle, previewCaption, signIn, saveLink };
+- Make sure the language pills remain tappable and not crowded.
+
+DELIVERABLE
+- Implement these copy + spacing + typography changes.
+- Provide the list of files changed and a brief summary.
+
+Start by opening the existing first screen file and applying the changes exactly as described.
