@@ -668,6 +668,24 @@ const en = {
     growRevenueFasterDesc: "AI-powered tools to raise prices, win repeats, and scale",
   },
 
+  aiConsent: {
+    title: "AI Features Use Your Data",
+    description: "Some features in QuotePro use AI to generate content like email drafts, quote suggestions, and business insights. To do this, some of your data is sent to a third-party AI service.",
+    dataSharedTitle: "Data that may be shared:",
+    dataItem1: "Customer names and contact details",
+    dataItem2: "Quote amounts and service details",
+    dataItem3: "Job history and scheduling info",
+    dataItem4: "Communication history and notes",
+    providerTitle: "Who receives this data:",
+    providerDescription: "Your data is processed by OpenAI. It is used only to generate responses for you and is not used to train AI models.",
+    privacyNote: "You can change this setting at any time in Settings. See our Privacy Policy for full details.",
+    acceptButton: "I Agree, Enable AI",
+    declineButton: "No Thanks",
+    settingsTitle: "AI Data Sharing",
+    settingsDescription: "Allow AI features to process your business data",
+    consentRequired: "AI features require your permission to share data with OpenAI. Tap to enable.",
+  },
+
   authGate: {
     title: "Create Your Account",
     subtitle: "Sign up to save your quote and unlock all features",

@@ -670,6 +670,24 @@ const pt: Translations = {
     growRevenueFasterDesc: "Ferramentas com IA para aumentar pre\u00e7os, ganhar recorrentes e escalar",
   },
 
+  aiConsent: {
+    title: "Recursos de IA Usam Seus Dados",
+    description: "Alguns recursos do QuotePro usam IA para gerar conte\u00fado como rascunhos de e-mail, sugest\u00f5es de or\u00e7amentos e insights de neg\u00f3cio. Para isso, alguns dos seus dados s\u00e3o enviados a um servi\u00e7o de IA externo.",
+    dataSharedTitle: "Dados que podem ser compartilhados:",
+    dataItem1: "Nomes e dados de contato de clientes",
+    dataItem2: "Valores de or\u00e7amentos e detalhes de servi\u00e7os",
+    dataItem3: "Hist\u00f3rico de servi\u00e7os e informa\u00e7\u00f5es de agendamento",
+    dataItem4: "Hist\u00f3rico de comunica\u00e7\u00f5es e notas",
+    providerTitle: "Quem recebe esses dados:",
+    providerDescription: "Seus dados s\u00e3o processados pela OpenAI. Eles s\u00e3o usados apenas para gerar respostas para voc\u00ea e n\u00e3o s\u00e3o usados para treinar modelos de IA.",
+    privacyNote: "Voc\u00ea pode alterar esta configura\u00e7\u00e3o a qualquer momento em Configura\u00e7\u00f5es. Consulte nossa Pol\u00edtica de Privacidade para mais detalhes.",
+    acceptButton: "Concordo, Ativar IA",
+    declineButton: "N\u00e3o, Obrigado",
+    settingsTitle: "Compartilhamento de Dados com IA",
+    settingsDescription: "Permitir que recursos de IA processem seus dados de neg\u00f3cio",
+    consentRequired: "Os recursos de IA requerem sua permiss\u00e3o para compartilhar dados com a OpenAI. Toque para ativar.",
+  },
+
   authGate: {
     title: "Crie Sua Conta",
     subtitle: "Cadastre-se para salvar seu orçamento e desbloquear todos os recursos",

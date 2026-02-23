@@ -670,6 +670,24 @@ const es: Translations = {
     growRevenueFasterDesc: "Herramientas con IA para subir precios, ganar recurrentes y escalar",
   },
 
+  aiConsent: {
+    title: "Las Funciones de IA Usan Tus Datos",
+    description: "Algunas funciones de QuotePro usan IA para generar contenido como borradores de correo, sugerencias de cotizaciones e informes de negocio. Para esto, algunos de tus datos se env\u00edan a un servicio de IA externo.",
+    dataSharedTitle: "Datos que pueden compartirse:",
+    dataItem1: "Nombres y datos de contacto de clientes",
+    dataItem2: "Montos de cotizaciones y detalles de servicios",
+    dataItem3: "Historial de trabajos e informaci\u00f3n de programaci\u00f3n",
+    dataItem4: "Historial de comunicaciones y notas",
+    providerTitle: "Qui\u00e9n recibe estos datos:",
+    providerDescription: "Tus datos son procesados por OpenAI. Solo se usan para generar respuestas para ti y no se usan para entrenar modelos de IA.",
+    privacyNote: "Puedes cambiar esta configuraci\u00f3n en cualquier momento en Ajustes. Consulta nuestra Pol\u00edtica de Privacidad para m\u00e1s detalles.",
+    acceptButton: "Acepto, Activar IA",
+    declineButton: "No Gracias",
+    settingsTitle: "Compartir Datos con IA",
+    settingsDescription: "Permitir que las funciones de IA procesen tus datos de negocio",
+    consentRequired: "Las funciones de IA requieren tu permiso para compartir datos con OpenAI. Toca para activar.",
+  },
+
   authGate: {
     title: "Crea Tu Cuenta",
     subtitle: "Reg\u00edstrate para guardar tu cotizaci\u00f3n y desbloquear todas las funciones",
