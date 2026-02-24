@@ -19,6 +19,7 @@ import { apiRequest } from "@/lib/query-client";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useAIConsent } from "@/context/AIConsentContext";
+import { AIConsentGate } from "@/components/AIConsentGate";
 
 interface Message {
   id: string;
@@ -269,6 +270,7 @@ export default function AIAssistantScreen() {
   );
 
   return (
+    <AIConsentGate>
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       behavior="padding"
@@ -366,6 +368,7 @@ export default function AIAssistantScreen() {
         </Pressable>
       </View>
     </KeyboardAvoidingView>
+    </AIConsentGate>
   );
 }
 

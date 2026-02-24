@@ -686,6 +686,13 @@ const pt: Translations = {
     settingsTitle: "Compartilhamento de Dados com IA",
     settingsDescription: "Permitir que recursos de IA processem seus dados de neg\u00f3cio",
     consentRequired: "Os recursos de IA requerem sua permiss\u00e3o para compartilhar dados com a OpenAI. Toque para ativar.",
+    gateTitle: "Permiss\u00e3o de Compartilhamento de Dados Necess\u00e1ria",
+    gateDescription: "Este recurso envia seus dados pessoais para um servi\u00e7o de IA externo (OpenAI). Voc\u00ea deve revisar e concordar com o compartilhamento de dados antes de usar recursos de IA.",
+    gateDataTitle: "Dados pessoais que ser\u00e3o compartilhados com a OpenAI:",
+    gateProviderLabel: "Servi\u00e7o Externo: OpenAI",
+    gateNote: "Voc\u00ea pode revogar esta permiss\u00e3o a qualquer momento em Configura\u00e7\u00f5es. Seus dados nunca s\u00e3o usados para treinar modelos de IA.",
+    gateAllowButton: "Permitir Compartilhamento e Continuar",
+    gateFooter: "Os recursos de IA n\u00e3o est\u00e3o dispon\u00edveis sem permiss\u00e3o de compartilhamento de dados.",
   },
 
   authGate: {

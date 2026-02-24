@@ -686,6 +686,13 @@ const es: Translations = {
     settingsTitle: "Compartir Datos con IA",
     settingsDescription: "Permitir que las funciones de IA procesen tus datos de negocio",
     consentRequired: "Las funciones de IA requieren tu permiso para compartir datos con OpenAI. Toca para activar.",
+    gateTitle: "Se Requiere Permiso para Compartir Datos",
+    gateDescription: "Esta funci\u00f3n env\u00eda tus datos personales a un servicio de IA externo (OpenAI). Debes revisar y aceptar el uso compartido de datos antes de usar las funciones de IA.",
+    gateDataTitle: "Datos personales que se compartir\u00e1n con OpenAI:",
+    gateProviderLabel: "Servicio Externo: OpenAI",
+    gateNote: "Puedes revocar este permiso en cualquier momento en Ajustes. Tus datos nunca se usan para entrenar modelos de IA.",
+    gateAllowButton: "Permitir Compartir Datos y Continuar",
+    gateFooter: "Las funciones de IA no est\u00e1n disponibles sin permiso de compartir datos.",
   },
 
   authGate: {

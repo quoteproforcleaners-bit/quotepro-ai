@@ -684,6 +684,13 @@ const en = {
     settingsTitle: "AI Data Sharing",
     settingsDescription: "Allow AI features to process your business data",
     consentRequired: "AI features require your permission to share data with OpenAI. Tap to enable.",
+    gateTitle: "Data Sharing Permission Required",
+    gateDescription: "This feature sends your personal data to a third-party AI service (OpenAI). You must review and agree to data sharing before using AI features.",
+    gateDataTitle: "Personal data that will be shared with OpenAI:",
+    gateProviderLabel: "Third-Party Service: OpenAI",
+    gateNote: "You can revoke this permission at any time in Settings. Your data is never used to train AI models.",
+    gateAllowButton: "Allow Data Sharing & Continue",
+    gateFooter: "AI features are unavailable without data sharing permission.",
   },
 
   authGate: {

@@ -36,6 +36,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
 import { useProGate } from "@/components/ProGate";
+import { useAIConsent } from "@/context/AIConsentContext";
 
 type WidgetId = "followUp" | "streak" | "aiCommand" | "quickActions" | "glance" | "opportunities" | "recap";
 
@@ -356,6 +357,7 @@ export default function DashboardScreen() {
   const { t } = useLanguage();
   const inputRef = useRef<TextInput>(null);
   const { isPro, requirePro } = useProGate();
+  const { requestConsent } = useAIConsent();
 
   const [commandText, setCommandText] = useState("");
   const [commandResult, setCommandResult] = useState<AiCommandResult | null>(null);
@@ -509,14 +511,18 @@ export default function DashboardScreen() {
     }
   }, [appData, navigation]);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!requirePro()) return;
+    const consented = await requestConsent();
+    if (!consented) return;
     executeCommand(commandText);
     setCommandText("");
   };
 
-  const handlePromptTap = (prompt: string) => {
+  const handlePromptTap = async (prompt: string) => {
     if (!requirePro()) return;
+    const consented = await requestConsent();
+    if (!consented) return;
     setCommandText(prompt);
     executeCommand(prompt);
   };
