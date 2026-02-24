@@ -46,7 +46,7 @@ const SURCHARGE_TYPE_OPTIONS: {
   { label: "Percent %", value: "percent" },
 ];
 
-export function PricingEngineScreen({
+export default function PricingEngineScreen({
   laborEstimate,
   pricing,
   frequency,

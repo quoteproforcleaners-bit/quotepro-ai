@@ -263,90 +263,109 @@ export default function QuoteCalculatorScreen() {
     return (
       <View style={styles.typeSelector}>
         <ThemedText type="h2" style={styles.typeSelectorTitle}>
-          Quote Type
-        </ThemedText>
-        <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xl }}>
-          Select the type of quote you want to create
+          What are you quoting?
         </ThemedText>
 
-        <Pressable
-          onPress={() => {
-            setQuoteType("residential");
-            if (Platform.OS !== "web") Haptics.selectionAsync();
-          }}
-          style={[
-            styles.typeCard,
-            {
-              backgroundColor: isDark ? theme.surface1 : theme.surface0,
-              borderColor: quoteType === "residential" ? theme.primary : theme.border,
-              borderWidth: quoteType === "residential" ? 2 : 1,
-            },
-          ]}
-          testID="button-type-residential"
-        >
-          <View style={[styles.typeIconWrap, { backgroundColor: `${theme.primary}15` }]}>
-            <Feather name="home" size={24} color={theme.primary} />
-          </View>
-          <View style={styles.typeCardContent}>
-            <ThemedText type="h4">Residential</ThemedText>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              Home cleaning quotes with room-by-room pricing
-            </ThemedText>
-          </View>
-          {quoteType === "residential" ? (
-            <Feather name="check-circle" size={22} color={theme.primary} />
-          ) : (
-            <Feather name="circle" size={22} color={theme.border} />
-          )}
-        </Pressable>
-
-        <Pressable
-          onPress={() => {
-            if (commercialEnabled) {
-              setQuoteType("commercial");
+        <View style={[styles.toggleTrack, { backgroundColor: isDark ? theme.surface1 : theme.border + "40" }]}>
+          <Pressable
+            onPress={() => {
+              setQuoteType("residential");
               if (Platform.OS !== "web") Haptics.selectionAsync();
-            }
-          }}
-          style={[
-            styles.typeCard,
-            {
-              backgroundColor: isDark ? theme.surface1 : theme.surface0,
-              borderColor: quoteType === "commercial" ? theme.primary : theme.border,
-              borderWidth: quoteType === "commercial" ? 2 : 1,
-              opacity: commercialEnabled ? 1 : 0.5,
-            },
-          ]}
-          testID="button-type-commercial"
-        >
-          <View style={[styles.typeIconWrap, { backgroundColor: `${theme.success}15` }]}>
-            <Feather name="briefcase" size={24} color={theme.success} />
-          </View>
-          <View style={styles.typeCardContent}>
-            <ThemedText type="h4">Commercial</ThemedText>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              Facility walkthrough with labor estimates and tiered pricing
+            }}
+            style={[
+              styles.toggleOption,
+              quoteType === "residential"
+                ? { backgroundColor: theme.primary }
+                : { backgroundColor: "transparent" },
+            ]}
+            testID="button-type-residential"
+          >
+            <Feather
+              name="home"
+              size={20}
+              color={quoteType === "residential" ? "#fff" : theme.textSecondary}
+            />
+            <ThemedText
+              type="body"
+              style={{
+                color: quoteType === "residential" ? "#fff" : theme.textSecondary,
+                fontWeight: "700",
+                fontSize: 16,
+              }}
+            >
+              Residential
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              if (commercialEnabled) {
+                setQuoteType("commercial");
+                if (Platform.OS !== "web") Haptics.selectionAsync();
+              }
+            }}
+            style={[
+              styles.toggleOption,
+              quoteType === "commercial"
+                ? { backgroundColor: theme.primary }
+                : { backgroundColor: "transparent" },
+              !commercialEnabled ? { opacity: 0.4 } : null,
+            ]}
+            testID="button-type-commercial"
+          >
+            <Feather
+              name="briefcase"
+              size={20}
+              color={quoteType === "commercial" ? "#fff" : theme.textSecondary}
+            />
+            <ThemedText
+              type="body"
+              style={{
+                color: quoteType === "commercial" ? "#fff" : theme.textSecondary,
+                fontWeight: "700",
+                fontSize: 16,
+              }}
+            >
+              Commercial
             </ThemedText>
             {!commercialEnabled ? (
-              <View style={[styles.upgradeBadge, { backgroundColor: `${theme.warning}20` }]}>
-                <Feather name="lock" size={12} color={theme.warning} />
-                <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "600" }}>
-                  Upgrade
-                </ThemedText>
+              <Feather name="lock" size={14} color={theme.textSecondary} />
+            ) : null}
+          </Pressable>
+        </View>
+
+        <View style={[styles.typeDetailCard, { backgroundColor: isDark ? theme.surface1 : theme.surface0, borderColor: theme.border }]}>
+          {quoteType === "residential" ? (
+            <>
+              <View style={[styles.typeDetailIcon, { backgroundColor: `${theme.primary}15` }]}>
+                <Feather name="home" size={32} color={theme.primary} />
               </View>
-            ) : (
-              <View style={[styles.betaBadge, { backgroundColor: `${theme.primary}15` }]}>
+              <ThemedText type="h3" style={{ textAlign: "center", marginTop: Spacing.md }}>
+                Home Cleaning
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
+                Room-by-room pricing based on bedrooms, bathrooms, and square footage
+              </ThemedText>
+            </>
+          ) : (
+            <>
+              <View style={[styles.typeDetailIcon, { backgroundColor: `${theme.success}15` }]}>
+                <Feather name="briefcase" size={32} color={theme.success} />
+              </View>
+              <ThemedText type="h3" style={{ textAlign: "center", marginTop: Spacing.md }}>
+                Commercial Facility
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
+                Full walkthrough with labor estimates, tiered pricing, and professional proposals
+              </ThemedText>
+              <View style={[styles.betaBadge, { backgroundColor: `${theme.primary}15`, marginTop: Spacing.sm }]}>
                 <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
                   BETA
                 </ThemedText>
               </View>
-            )}
-          </View>
-          {quoteType === "commercial" ? (
-            <Feather name="check-circle" size={22} color={theme.primary} />
-          ) : (
-            <Feather name="circle" size={22} color={theme.border} />
+            </>
           )}
-        </Pressable>
+        </View>
       </View>
     );
   };
@@ -493,44 +512,46 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.xl,
     paddingTop: Spacing["3xl"],
+    alignItems: "center",
   },
   typeSelectorTitle: {
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xl,
+    textAlign: "center",
   },
-  typeCard: {
+  toggleTrack: {
+    flexDirection: "row",
+    borderRadius: 16,
+    padding: 4,
+    width: "100%",
+    marginBottom: Spacing.xl,
+  },
+  toggleOption: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    padding: Spacing.lg,
-    borderRadius: 16,
-    marginBottom: Spacing.md,
-    gap: Spacing.md,
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 13,
   },
-  typeIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+  typeDetailCard: {
+    width: "100%",
+    alignItems: "center",
+    padding: Spacing.xl,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  typeDetailIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  typeCardContent: {
-    flex: 1,
-    gap: 4,
-  },
-  upgradeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginTop: 4,
-  },
   betaBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    alignSelf: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
     borderRadius: 8,
-    marginTop: 4,
   },
 });

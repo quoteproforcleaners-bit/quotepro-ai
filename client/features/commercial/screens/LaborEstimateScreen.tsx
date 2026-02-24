@@ -44,7 +44,7 @@ function BreakdownRow({
   );
 }
 
-export function LaborEstimateScreen({
+export default function LaborEstimateScreen({
   walkthrough,
   laborEstimate,
   onUpdate,
