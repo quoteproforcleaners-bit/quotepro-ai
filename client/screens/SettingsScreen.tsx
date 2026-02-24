@@ -9,6 +9,7 @@ import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
@@ -29,6 +30,7 @@ import { syncNotificationSchedule } from "@/lib/notifications";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useDarkModePreference } from "@/hooks/useColorScheme";
 import { useAIConsent } from "@/context/AIConsentContext";
+import { FeatureFlags } from "@/lib/featureFlags";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -42,6 +44,26 @@ export default function SettingsScreen() {
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
   const { preference: darkModePref, setPreference: setDarkModePref } = useDarkModePreference();
   const { hasConsented: aiConsented, requestConsent: requestAIConsent, revokeConsent: revokeAIConsent } = useAIConsent();
+  const [commercialEnabled, setCommercialEnabled] = useState(FeatureFlags.commercialQuotingEnabled);
+
+  useEffect(() => {
+    AsyncStorage.getItem("@quotepro_commercial_enabled").then((val) => {
+      if (val !== null) {
+        const enabled = val === "true";
+        setCommercialEnabled(enabled);
+        FeatureFlags.commercialQuotingEnabled = enabled;
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleToggleCommercial = async (val: boolean) => {
+    setCommercialEnabled(val);
+    FeatureFlags.commercialQuotingEnabled = val;
+    try {
+      await AsyncStorage.setItem("@quotepro_commercial_enabled", val ? "true" : "false");
+    } catch {}
+    Haptics.selectionAsync();
+  };
 
   const queryClient = useQueryClient();
 
@@ -1005,6 +1027,26 @@ export default function SettingsScreen() {
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
         </View>
       </Pressable>
+
+      <SectionHeader title="Features" subtitle="Enable or disable app features" />
+
+      <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Enable Commercial Quoting (Beta)</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              Create quotes for commercial facilities with labor estimates, tiered pricing, and proposals
+            </ThemedText>
+          </View>
+          <Switch
+            value={commercialEnabled}
+            onValueChange={handleToggleCommercial}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-commercial-quoting"
+          />
+        </View>
+      </View>
 
       <SectionHeader title={t.aiConsent.settingsTitle} />
 

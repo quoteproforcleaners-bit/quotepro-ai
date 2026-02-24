@@ -56,6 +56,7 @@ export function QuoteListItem({ quote, onPress }: QuoteListItemProps) {
   const sqft = quote.propertySqft ?? quote.homeDetails?.sqft ?? 0;
   const status = quote.status || "draft";
   const statusColor = statusColors[status] || theme.textSecondary;
+  const isCommercial = quote.propertyDetails && typeof quote.propertyDetails === "object" && quote.propertyDetails.quoteType === "commercial";
 
   const formattedDate = new Date(quote.createdAt).toLocaleDateString("en-US", {
     month: "short",
@@ -79,9 +80,26 @@ export function QuoteListItem({ quote, onPress }: QuoteListItemProps) {
     >
       <View style={styles.content}>
         <View style={styles.header}>
-          <ThemedText type="body" style={{ fontWeight: "600" }}>
-            {customerName}
-          </ThemedText>
+          <View style={styles.nameRow}>
+            <ThemedText type="body" style={{ fontWeight: "600", flex: 1 }}>
+              {customerName}
+            </ThemedText>
+            {isCommercial ? (
+              <View
+                style={[
+                  styles.commercialBadge,
+                  { backgroundColor: `${theme.accent}15`, borderColor: `${theme.accent}30` },
+                ]}
+              >
+                <ThemedText
+                  type="caption"
+                  style={{ color: theme.accent, fontWeight: "700", fontSize: 10 }}
+                >
+                  Commercial
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
           <View
             style={[
               styles.statusBadge,
@@ -136,6 +154,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: Spacing.xs,
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: Spacing.xs,
+    marginRight: Spacing.sm,
+  },
+  commercialBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
   statusBadge: {
     paddingHorizontal: Spacing.sm,

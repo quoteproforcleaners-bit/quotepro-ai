@@ -3,4 +3,5 @@ export const FeatureFlags = {
   aiEnabled: false,
   aiLaunchEtaDays: 14,
   growthSuiteEnabled: true,
+  commercialQuotingEnabled: true,
 };

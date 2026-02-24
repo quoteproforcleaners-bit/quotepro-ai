@@ -11,11 +11,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { FAB } from "@/components/FAB";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProBanner } from "@/components/ProBanner";
+import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
 
 type FilterType = "all" | "draft" | "sent" | "accepted";
+type TypeFilter = "all" | "residential" | "commercial";
 
 export default function QuotesScreen() {
   const insets = useSafeAreaInsets();
@@ -25,6 +27,7 @@ export default function QuotesScreen() {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
   const { data: quotes = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ['/api/quotes'],
@@ -46,9 +49,18 @@ export default function QuotesScreen() {
     navigation.navigate("QuoteDetail", { quoteId: quote.id });
   };
 
+  const getQuoteType = (q: any): string => {
+    const pd = q.propertyDetails;
+    if (pd && typeof pd === "object" && pd.quoteType === "commercial") {
+      return "commercial";
+    }
+    return "residential";
+  };
+
   const filteredQuotes = (quotes || []).filter((q: any) => {
-    if (filter === "all") return true;
-    return q.status === filter;
+    if (filter !== "all" && q.status !== filter) return false;
+    if (typeFilter !== "all" && getQuoteType(q) !== typeFilter) return false;
+    return true;
   });
 
   const filterOptions = [
@@ -56,6 +68,12 @@ export default function QuotesScreen() {
     { label: t.quotes.draft, value: "draft" as FilterType },
     { label: t.quotes.sent, value: "sent" as FilterType },
     { label: t.quotes.accepted, value: "accepted" as FilterType },
+  ];
+
+  const typeFilterOptions = [
+    { label: t.common.all, value: "all" as TypeFilter },
+    { label: "Residential", value: "residential" as TypeFilter },
+    { label: "Commercial", value: "commercial" as TypeFilter },
   ];
 
   const renderHeader = () => (
@@ -66,6 +84,16 @@ export default function QuotesScreen() {
           options={filterOptions}
           value={filter}
           onChange={setFilter}
+        />
+      </View>
+      <View style={styles.typeFilterContainer}>
+        <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+          Type
+        </ThemedText>
+        <SegmentedControl
+          options={typeFilterOptions}
+          value={typeFilter}
+          onChange={setTypeFilter}
         />
       </View>
     </View>
@@ -121,6 +149,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   filterContainer: {
+    marginBottom: Spacing.sm,
+  },
+  typeFilterContainer: {
     marginBottom: Spacing.lg,
   },
 });

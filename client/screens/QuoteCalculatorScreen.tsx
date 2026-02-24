@@ -14,11 +14,6 @@ import {
   HomeDetails,
   AddOns,
   ServiceFrequency,
-  PricingSettings,
-  BusinessProfile,
-  Quote,
-  DEFAULT_PRICING_SETTINGS,
-  DEFAULT_BUSINESS_PROFILE,
 } from "@/types";
 import { apiRequest } from "@/lib/query-client";
 import { useApp } from "@/context/AppContext";
@@ -30,13 +25,17 @@ import CustomerInfoScreen from "@/screens/quote/CustomerInfoScreen";
 import HomeDetailsScreen from "@/screens/quote/HomeDetailsScreen";
 import ServiceAddOnsScreen from "@/screens/quote/ServiceAddOnsScreen";
 import QuotePreviewScreen from "@/screens/quote/QuotePreviewScreen";
+import { FeatureFlags } from "@/lib/featureFlags";
+import CommercialQuoteScreen from "@/features/commercial/screens/CommercialQuoteScreen";
 
-const STEPS = ["Customer", "Property", "Services", "Quote"];
+type QuoteType = "residential" | "commercial";
+
+const STEPS = ["Type", "Customer", "Property", "Services", "Quote"];
 
 export default function QuoteCalculatorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const route = useRoute();
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { pricingSettings, businessProfile } = useApp();
   const { user, isGuest } = useAuth();
@@ -46,6 +45,7 @@ export default function QuoteCalculatorScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [pendingAction, setPendingAction] = useState<"save" | "saveAndSend" | null>(null);
+  const [quoteType, setQuoteType] = useState<QuoteType>("residential");
 
   const isGuestMode = !user;
 
@@ -105,12 +105,31 @@ export default function QuoteCalculatorScreen() {
   }, []);
 
   useEffect(() => {
-    if (isGuestMode && currentStep > 0) {
+    if (isGuestMode && currentStep > 1) {
       saveGuestDraft({ customer, homeDetails, addOns, frequency, selectedOption });
     }
   }, [currentStep, customer, homeDetails, addOns, frequency, selectedOption]);
 
+  const [showCommercial, setShowCommercial] = useState(false);
+
+  if (showCommercial) {
+    return (
+      <CommercialQuoteScreen
+        customerName={customer.name}
+        customerAddress={customer.address}
+      />
+    );
+  }
+
   const handleNext = () => {
+    if (currentStep === 0 && quoteType === "commercial") {
+      if (Platform.OS !== "web") {
+        Haptics.selectionAsync();
+      }
+      setShowCommercial(true);
+      return;
+    }
+
     setCurrentStep((prev) => {
       if (prev < STEPS.length - 1) {
         if (Platform.OS !== "web") {
@@ -234,25 +253,123 @@ export default function QuoteCalculatorScreen() {
   const canProceed = () => {
     switch (currentStep) {
       case 0:
-        return customer.name.trim().length > 0;
-      case 1:
-        return homeDetails.sqft > 0;
-      case 2:
         return true;
+      case 1:
+        return customer.name.trim().length > 0;
+      case 2:
+        return homeDetails.sqft > 0;
       case 3:
+        return true;
+      case 4:
         return true;
       default:
         return false;
     }
   };
 
+  const renderQuoteTypeSelector = () => {
+    const commercialEnabled = FeatureFlags.commercialQuotingEnabled;
+
+    return (
+      <View style={styles.typeSelector}>
+        <ThemedText type="h2" style={styles.typeSelectorTitle}>
+          Quote Type
+        </ThemedText>
+        <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xl }}>
+          Select the type of quote you want to create
+        </ThemedText>
+
+        <Pressable
+          onPress={() => {
+            setQuoteType("residential");
+            if (Platform.OS !== "web") Haptics.selectionAsync();
+          }}
+          style={[
+            styles.typeCard,
+            {
+              backgroundColor: isDark ? theme.surface1 : theme.surface0,
+              borderColor: quoteType === "residential" ? theme.primary : theme.border,
+              borderWidth: quoteType === "residential" ? 2 : 1,
+            },
+          ]}
+          testID="button-type-residential"
+        >
+          <View style={[styles.typeIconWrap, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="home" size={24} color={theme.primary} />
+          </View>
+          <View style={styles.typeCardContent}>
+            <ThemedText type="h4">Residential</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Home cleaning quotes with room-by-room pricing
+            </ThemedText>
+          </View>
+          {quoteType === "residential" ? (
+            <Feather name="check-circle" size={22} color={theme.primary} />
+          ) : (
+            <Feather name="circle" size={22} color={theme.border} />
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => {
+            if (commercialEnabled) {
+              setQuoteType("commercial");
+              if (Platform.OS !== "web") Haptics.selectionAsync();
+            }
+          }}
+          style={[
+            styles.typeCard,
+            {
+              backgroundColor: isDark ? theme.surface1 : theme.surface0,
+              borderColor: quoteType === "commercial" ? theme.primary : theme.border,
+              borderWidth: quoteType === "commercial" ? 2 : 1,
+              opacity: commercialEnabled ? 1 : 0.5,
+            },
+          ]}
+          testID="button-type-commercial"
+        >
+          <View style={[styles.typeIconWrap, { backgroundColor: `${theme.success}15` }]}>
+            <Feather name="briefcase" size={24} color={theme.success} />
+          </View>
+          <View style={styles.typeCardContent}>
+            <ThemedText type="h4">Commercial</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Facility walkthrough with labor estimates and tiered pricing
+            </ThemedText>
+            {!commercialEnabled ? (
+              <View style={[styles.upgradeBadge, { backgroundColor: `${theme.warning}20` }]}>
+                <Feather name="lock" size={12} color={theme.warning} />
+                <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "600" }}>
+                  Upgrade
+                </ThemedText>
+              </View>
+            ) : (
+              <View style={[styles.betaBadge, { backgroundColor: `${theme.primary}15` }]}>
+                <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
+                  BETA
+                </ThemedText>
+              </View>
+            )}
+          </View>
+          {quoteType === "commercial" ? (
+            <Feather name="check-circle" size={22} color={theme.primary} />
+          ) : (
+            <Feather name="circle" size={22} color={theme.border} />
+          )}
+        </Pressable>
+      </View>
+    );
+  };
+
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 0:
-        return <CustomerInfoScreen data={customer} onUpdate={setCustomer} />;
+        return renderQuoteTypeSelector();
       case 1:
-        return <HomeDetailsScreen data={homeDetails} onUpdate={setHomeDetails} />;
+        return <CustomerInfoScreen data={customer} onUpdate={setCustomer} />;
       case 2:
+        return <HomeDetailsScreen data={homeDetails} onUpdate={setHomeDetails} />;
+      case 3:
         return (
           <ServiceAddOnsScreen
             frequency={frequency}
@@ -262,7 +379,7 @@ export default function QuoteCalculatorScreen() {
             onAddOnsChange={setAddOns}
           />
         );
-      case 3:
+      case 4:
         return (
           <QuotePreviewScreen
             customer={customer}
@@ -284,6 +401,12 @@ export default function QuoteCalculatorScreen() {
         return null;
     }
   };
+
+  const stepLabels = currentStep === 0
+    ? STEPS
+    : quoteType === "residential"
+    ? STEPS
+    : STEPS;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -381,5 +504,49 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  typeSelector: {
+    flex: 1,
+    padding: Spacing.xl,
+    paddingTop: Spacing["3xl"],
+  },
+  typeSelectorTitle: {
+    marginBottom: Spacing.sm,
+  },
+  typeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderRadius: 16,
+    marginBottom: Spacing.md,
+    gap: Spacing.md,
+  },
+  typeIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  typeCardContent: {
+    flex: 1,
+    gap: 4,
+  },
+  upgradeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  betaBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: 4,
   },
 });

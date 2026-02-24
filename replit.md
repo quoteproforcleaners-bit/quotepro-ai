@@ -32,6 +32,28 @@ Session-based authentication uses `express-session`, supporting email/password, 
 
 The core logic, located in `/client/lib/quoteCalculator.ts`, calculates base hours based on square footage and applies multipliers for property attributes. It supports **customizable service types**, frequency discounts, and add-on pricing. Internal calculations for hours and estimated times are not exposed to customers.
 
+### Commercial Quoting Feature
+
+A comprehensive commercial quoting add-on (`/client/features/commercial/`) with:
+- **Feature Flag**: `commercialQuotingEnabled` in `/client/lib/featureFlags.ts`, persisted via AsyncStorage toggle in Settings
+- **Quote Type Selector**: Added to QuoteCalculatorScreen - Residential vs Commercial selection at start of quote flow
+- **Commercial Walkthrough Wizard** (6 steps): Site Basics, Areas & Counts, Floors & Surfaces, Frequency & Timing, Supplies & Equipment, Notes & Photos
+- **Labor Estimate Engine**: Transparent labor-hours-per-visit calculator based on facility type, sqft, room counts, floor mix, with user override
+- **Pricing/Margin Engine**: Configurable hourly rate, overhead %, profit margin %, supplies surcharge, rounding rules, with Margin Health badge
+- **Tier Builder**: Auto-generated Good/Better/Best tiers (Basic Janitorial, Enhanced Sanitation, Premium Maintenance) with editable names, tasks, prices
+- **Proposal Preview**: Full commercial proposal preview with Cover, Scope of Work, Schedule, Pricing Table, Terms, Acceptance
+- **AI Features**: "Generate Professional Scope" and "AI Risk Scan" buttons (both use AIConsentContext for Apple compliance)
+- **PDF Export**: Commercial proposal PDF via `/api/quotes/:id/commercial-pdf` using expo-print + expo-sharing
+- **Server Endpoints**: `/api/commercial/generate-scope`, `/api/commercial/risk-scan`, `/api/quotes/:id/commercial-pdf`
+- **Quote List**: Commercial badge on list items, Type filter (All/Residential/Commercial)
+- Commercial quote data stored in existing quotes table using `propertyDetails` JSONB field with `quoteType: "commercial"` and `commercialData` object
+
+Key files:
+- Types: `client/features/commercial/types.ts`
+- Labor model: `client/features/commercial/laborModel.ts`
+- Screens: `client/features/commercial/screens/` (CommercialQuoteScreen, WalkthroughScreen, LaborEstimateScreen, PricingEngineScreen, TierBuilderScreen, ProposalPreviewScreen)
+- Components: `client/features/commercial/components/` (SiteBasicsStep, AreasCountsStep, FloorsSurfacesStep, FrequencyTimingStep, SuppliesEquipmentStep, NotesPhotosStep, TierCard, MarginBadge)
+
 ## External Dependencies
 
 ### Core Framework

@@ -1493,6 +1493,324 @@ ${paymentHtml}
     }
   });
 
+  app.post("/api/commercial/generate-scope", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { walkthrough, tier } = req.body;
+      if (!walkthrough) return res.status(400).json({ message: "walkthrough data is required" });
+
+      const facilityName = walkthrough.facilityName || "the facility";
+      const facilityType = walkthrough.facilityType || "Office";
+      const totalSqFt = walkthrough.totalSqFt || 0;
+      const frequency = walkthrough.frequency || "3x";
+      const bathroomCount = walkthrough.bathroomCount || 0;
+      const breakroomCount = walkthrough.breakroomCount || 0;
+      const carpetPercent = walkthrough.carpetPercent || 0;
+      const hardFloorPercent = walkthrough.hardFloorPercent || 0;
+      const glassLevel = walkthrough.glassLevel || "None";
+      const highTouchFocus = walkthrough.highTouchFocus || false;
+      const tierName = tier?.name || "Standard";
+      const tierIncluded = tier?.includedBullets?.join(", ") || "";
+      const tierExcluded = tier?.excludedBullets?.join(", ") || "";
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          {
+            role: "system",
+            content: `You are a professional commercial cleaning proposal writer. Generate a scope of work for a commercial cleaning contract. Respond with JSON: {"scopeParagraph": string, "includedTasks": string[], "excludedTasks": string[], "rotationTasks": [{"task": string, "frequency": string}]}. Keep the scope paragraph professional but concise (2-3 sentences). Include 5-8 included tasks and 3-5 excluded tasks. Rotation tasks are periodic tasks done weekly/monthly/quarterly.`,
+          },
+          {
+            role: "user",
+            content: `Facility: "${facilityName}" (${facilityType}), ${totalSqFt} sqft. Cleaning frequency: ${frequency}/week. ${bathroomCount} bathrooms, ${breakroomCount} breakrooms. Floors: ${carpetPercent}% carpet, ${hardFloorPercent}% hard floor. Glass level: ${glassLevel}. High-touch focus: ${highTouchFocus ? "yes" : "no"}. Tier: ${tierName}. Currently included: ${tierIncluded}. Currently excluded: ${tierExcluded}.`,
+          },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(content || "{}");
+      } catch {}
+
+      return res.json({
+        scopeParagraph: parsed.scopeParagraph || `Professional janitorial services for ${facilityName}.`,
+        includedTasks: parsed.includedTasks || [],
+        excludedTasks: parsed.excludedTasks || [],
+        rotationTasks: parsed.rotationTasks || [],
+      });
+    } catch (error: any) {
+      console.error("Commercial generate-scope error:", error);
+      return res.status(500).json({ message: "Failed to generate scope" });
+    }
+  });
+
+  app.post("/api/commercial/risk-scan", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { walkthrough, laborEstimate, pricing, tiers } = req.body;
+      if (!walkthrough || !pricing) return res.status(400).json({ message: "walkthrough and pricing data are required" });
+
+      const facilityName = walkthrough.facilityName || "the facility";
+      const facilityType = walkthrough.facilityType || "Office";
+      const totalSqFt = walkthrough.totalSqFt || 0;
+      const frequency = walkthrough.frequency || "3x";
+      const pricePerVisit = pricing.finalPricePerVisit || 0;
+      const monthlyPrice = pricing.monthlyPrice || 0;
+      const hourlyRate = pricing.hourlyRate || 0;
+      const targetMargin = pricing.targetMarginPct || 0;
+      const rawHours = laborEstimate?.rawHours || 0;
+      const overrideHours = laborEstimate?.overrideHours;
+      const recommendedCleaners = laborEstimate?.recommendedCleaners || 1;
+      const tierCount = tiers?.length || 0;
+      const lowestTierPrice = tiers?.length > 0 ? Math.min(...tiers.map((t: any) => t.pricePerVisit || 0)) : 0;
+      const highestTierPrice = tiers?.length > 0 ? Math.max(...tiers.map((t: any) => t.pricePerVisit || 0)) : 0;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          {
+            role: "system",
+            content: `You are a commercial cleaning business advisor. Analyze a commercial cleaning quote for potential risks and issues. Respond with JSON: {"warnings": [{"severity": "high"|"medium"|"low", "title": string, "description": string}], "suggestedClauses": string[], "overallAssessment": string}. Check for underpricing, unusual labor-to-sqft ratios, missing contract protections, facility-specific hazards, and margin concerns. Be specific and actionable.`,
+          },
+          {
+            role: "user",
+            content: `Facility: "${facilityName}" (${facilityType}), ${totalSqFt} sqft. Frequency: ${frequency}/week. Labor estimate: ${rawHours} hours/visit${overrideHours ? ` (overridden to ${overrideHours}h)` : ""}, ${recommendedCleaners} cleaners. Pricing: $${pricePerVisit}/visit, $${monthlyPrice}/month, $${hourlyRate}/hr rate, ${targetMargin}% target margin. ${tierCount} tiers priced from $${lowestTierPrice} to $${highestTierPrice}. Per-sqft rate: $${totalSqFt > 0 ? (pricePerVisit / (totalSqFt / 1000)).toFixed(2) : "N/A"}/1000sqft.`,
+          },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(content || "{}");
+      } catch {}
+
+      return res.json({
+        warnings: parsed.warnings || [],
+        suggestedClauses: parsed.suggestedClauses || [],
+        overallAssessment: parsed.overallAssessment || "Unable to generate assessment.",
+      });
+    } catch (error: any) {
+      console.error("Commercial risk-scan error:", error);
+      return res.status(500).json({ message: "Failed to run risk scan" });
+    }
+  });
+
+  app.get("/api/quotes/:id/commercial-pdf", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const quote = await getQuoteById(req.params.id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const pd = (quote.propertyDetails as any) || {};
+      const commercialData = pd.commercialData || pd;
+      const walkthrough = commercialData.walkthrough || {};
+      const laborEstimate = commercialData.laborEstimate || {};
+      const pricing = commercialData.pricing || {};
+      const tiers: any[] = commercialData.tiers || [];
+      const quoteType = commercialData.quoteType || pd.quoteType;
+
+      if (quoteType !== "commercial") {
+        return res.status(400).json({ message: "This is not a commercial quote" });
+      }
+
+      const primaryColor = ((business as any).quotePreferences as any)?.brandColor || business.primaryColor || "#2563EB";
+      const facilityName = walkthrough.facilityName || "Commercial Facility";
+      const siteAddress = walkthrough.siteAddress || "";
+      const facilityType = walkthrough.facilityType || "";
+      const totalSqFt = walkthrough.totalSqFt || 0;
+      const frequency = walkthrough.frequency || "";
+      const customerName = pd.customerName || "Client";
+      const customerEmail = pd.customerEmail || "";
+      const customerPhone = pd.customerPhone || "";
+
+      const tierRowsHtml = tiers
+        .map(
+          (tier: any, index: number) => `
+        <tr style="${index === 1 ? "background:#EBF5FF;font-weight:600;" : ""}">
+          <td style="padding:14px;border-bottom:1px solid #eee;">
+            <div style="font-weight:600;font-size:15px;">${tier.name || `Tier ${index + 1}`}</div>
+            <div style="font-size:12px;color:#666;margin-top:4px;">${tier.scopeText || ""}</div>
+          </td>
+          <td style="padding:14px;border-bottom:1px solid #eee;text-align:center;font-size:13px;">${tier.frequency || frequency}</td>
+          <td style="padding:14px;border-bottom:1px solid #eee;text-align:right;">$${(tier.pricePerVisit || 0).toFixed(2)}</td>
+          <td style="padding:14px;border-bottom:1px solid #eee;text-align:right;font-weight:600;">$${(tier.monthlyPrice || 0).toFixed(2)}</td>
+        </tr>`
+        )
+        .join("");
+
+      const includedExcludedHtml = tiers
+        .map(
+          (tier: any) => `
+        <div style="margin-bottom:20px;">
+          <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:${primaryColor};">${tier.name || "Service Tier"}</div>
+          ${
+            tier.includedBullets?.length > 0
+              ? `<div style="margin-bottom:8px;"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#666;margin-bottom:4px;">Included</div><ul style="margin:0;padding:0 0 0 18px;font-size:13px;color:#334155;">${tier.includedBullets.map((b: string) => `<li style="margin-bottom:3px;">${b}</li>`).join("")}</ul></div>`
+              : ""
+          }
+          ${
+            tier.excludedBullets?.length > 0
+              ? `<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#666;margin-bottom:4px;">Not Included</div><ul style="margin:0;padding:0 0 0 18px;font-size:13px;color:#94a3b8;">${tier.excludedBullets.map((b: string) => `<li style="margin-bottom:3px;">${b}</li>`).join("")}</ul></div>`
+              : ""
+          }
+        </div>`
+        )
+        .join("");
+
+      const scheduleInfo = [
+        walkthrough.preferredDays ? `Preferred Days: ${walkthrough.preferredDays}` : "",
+        walkthrough.preferredTimeWindow ? `Time Window: ${walkthrough.preferredTimeWindow}` : "",
+        walkthrough.afterHoursRequired ? "After-hours service required" : "",
+        walkthrough.suppliesByClient ? "Supplies provided by client" : "Supplies provided by cleaning company",
+        walkthrough.restroomConsumablesIncluded ? "Restroom consumables included" : "Restroom consumables not included",
+      ]
+        .filter(Boolean)
+        .map((s) => `<li style="margin-bottom:4px;">${s}</li>`)
+        .join("");
+
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:0;color:#1a1a1a;font-size:14px;background:#fff;}
+.page{padding:40px;max-width:800px;margin:0 auto;}
+.cover{text-align:center;padding:60px 40px;border-bottom:4px solid ${primaryColor};margin-bottom:32px;}
+.company-name{font-size:28px;font-weight:700;color:${primaryColor};margin-bottom:4px;}
+.company-details{font-size:12px;color:#666;margin-bottom:24px;}
+.proposal-badge{display:inline-block;background:${primaryColor};color:white;padding:8px 24px;border-radius:24px;font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:24px;}
+.facility-name{font-size:22px;font-weight:600;color:#1a1a1a;margin-bottom:4px;}
+.facility-meta{font-size:13px;color:#666;}
+.section{margin-bottom:28px;}
+.section-title{font-size:16px;font-weight:600;color:${primaryColor};margin-bottom:12px;border-bottom:2px solid ${primaryColor}22;padding-bottom:6px;}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.info-item{font-size:13px;}.info-label{color:#666;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:12px;background:#f8f9fa;border-bottom:2px solid #dee2e6;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#666;}
+.terms{background:#f8fafc;padding:20px;border-radius:8px;border:1px solid #e2e8f0;font-size:12px;color:#64748b;line-height:1.6;}
+.terms h4{color:#334155;margin:0 0 8px;font-size:13px;}
+.acceptance{border:2px solid ${primaryColor};border-radius:12px;padding:24px;margin-top:32px;}
+.acceptance h3{color:${primaryColor};margin:0 0 16px;font-size:16px;}
+.sig-line{border-bottom:1px solid #ccc;height:32px;margin-bottom:4px;}
+.sig-label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.5px;}
+.footer{margin-top:40px;text-align:center;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:16px;}
+</style></head><body>
+<div class="page">
+<div class="cover">
+  <div class="company-name">${business.companyName || "QuotePro"}</div>
+  <div class="company-details">${business.email ? business.email + " | " : ""}${business.phone || ""}${business.address ? " | " + business.address : ""}</div>
+  <div class="proposal-badge">Commercial Cleaning Proposal</div>
+  <div class="facility-name">${facilityName}</div>
+  <div class="facility-meta">${siteAddress}${facilityType ? " | " + facilityType : ""}${totalSqFt ? " | " + totalSqFt.toLocaleString() + " sqft" : ""}</div>
+</div>
+
+<div class="section">
+  <div class="section-title">Prepared For</div>
+  <div class="info-grid">
+    <div class="info-item"><div class="info-label">Name</div>${customerName}</div>
+    <div class="info-item"><div class="info-label">Email</div>${customerEmail || "N/A"}</div>
+    <div class="info-item"><div class="info-label">Phone</div>${customerPhone || "N/A"}</div>
+    <div class="info-item"><div class="info-label">Facility</div>${facilityName}</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Facility Overview</div>
+  <div class="info-grid">
+    <div class="info-item"><div class="info-label">Facility Type</div>${facilityType}</div>
+    <div class="info-item"><div class="info-label">Total Area</div>${totalSqFt ? totalSqFt.toLocaleString() + " sqft" : "N/A"}</div>
+    <div class="info-item"><div class="info-label">Floors</div>${walkthrough.floors || 1}</div>
+    <div class="info-item"><div class="info-label">Cleaning Frequency</div>${frequency}/week</div>
+    <div class="info-item"><div class="info-label">Bathrooms</div>${walkthrough.bathroomCount || 0}</div>
+    <div class="info-item"><div class="info-label">Breakrooms</div>${walkthrough.breakroomCount || 0}</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Scope of Work</div>
+  ${includedExcludedHtml}
+</div>
+
+<div class="section">
+  <div class="section-title">Schedule & Service Details</div>
+  <ul style="margin:0;padding:0 0 0 18px;font-size:13px;color:#334155;">
+    <li style="margin-bottom:4px;">Cleaning frequency: ${frequency}/week</li>
+    ${scheduleInfo}
+  </ul>
+</div>
+
+<div class="section">
+  <div class="section-title">Pricing</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Service Level</th>
+        <th style="text-align:center;">Frequency</th>
+        <th style="text-align:right;">Per Visit</th>
+        <th style="text-align:right;">Monthly</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tierRowsHtml}
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="terms">
+    <h4>Terms & Conditions</h4>
+    <p>1. This proposal is valid for 30 days from the date below.</p>
+    <p>2. Service may be cancelled by either party with 30 days written notice.</p>
+    <p>3. Pricing is based on the scope described above. Additional services or scope changes may adjust pricing.</p>
+    <p>4. Payment terms: Net 15 from date of invoice unless otherwise agreed.</p>
+    <p>5. The cleaning company maintains general liability insurance and workers' compensation coverage.</p>
+    ${walkthrough.accessConstraints ? `<p>6. Access: ${walkthrough.accessConstraints}</p>` : ""}
+    ${walkthrough.specialChemicals ? `<p>${walkthrough.accessConstraints ? "7" : "6"}. Special requirements: ${walkthrough.specialChemicals}</p>` : ""}
+  </div>
+</div>
+
+<div class="acceptance">
+  <h3>Acceptance</h3>
+  <p style="font-size:13px;color:#666;margin:0 0 20px;">By signing below, you agree to the scope of work and pricing outlined in this proposal.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+    <div>
+      <div class="sig-line"></div>
+      <div class="sig-label">Client Signature</div>
+    </div>
+    <div>
+      <div class="sig-line"></div>
+      <div class="sig-label">Date</div>
+    </div>
+    <div>
+      <div class="sig-line"></div>
+      <div class="sig-label">Printed Name</div>
+    </div>
+    <div>
+      <div class="sig-line"></div>
+      <div class="sig-label">Title</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Proposal prepared by ${business.companyName || "QuotePro"} | ${new Date().toLocaleDateString()} | Powered by QuotePro
+</div>
+</div>
+</body></html>`;
+
+      return res.json({
+        html,
+        customerName,
+        facilityName,
+        total: pricing.monthlyPrice || quote.total,
+      });
+    } catch (error: any) {
+      console.error("Commercial PDF generation error:", error);
+      return res.status(500).json({ message: "Failed to generate commercial PDF" });
+    }
+  });
+
   app.post("/api/quotes/:id/send-with-pdf", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const quote = await getQuoteById(req.params.id);
