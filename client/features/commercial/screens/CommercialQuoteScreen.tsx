@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, Pressable, Platform } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -61,11 +61,16 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
     siteAddress: customerAddress || "",
   });
 
-  const initialEstimate = useMemo(() => calculateLaborEstimate(walkthrough), []);
-
-  const [laborEstimate, setLaborEstimate] = useState<CommercialLaborEstimate>(initialEstimate);
-
   const defaultRate = pricingSettings?.hourlyRate || 55;
+
+  const [laborEstimate, setLaborEstimate] = useState<CommercialLaborEstimate>(() =>
+    calculateLaborEstimate({
+      ...DEFAULT_WALKTHROUGH,
+      facilityName: customerName || "",
+      siteAddress: customerAddress || "",
+    })
+  );
+
   const [pricing, setPricing] = useState<CommercialPricing>({
     hourlyRate: defaultRate,
     overheadPct: 15,

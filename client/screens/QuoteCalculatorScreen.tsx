@@ -26,7 +26,6 @@ import HomeDetailsScreen from "@/screens/quote/HomeDetailsScreen";
 import ServiceAddOnsScreen from "@/screens/quote/ServiceAddOnsScreen";
 import QuotePreviewScreen from "@/screens/quote/QuotePreviewScreen";
 import { FeatureFlags } from "@/lib/featureFlags";
-import CommercialQuoteScreen from "@/features/commercial/screens/CommercialQuoteScreen";
 
 type QuoteType = "residential" | "commercial";
 
@@ -89,6 +88,7 @@ export default function QuoteCalculatorScreen() {
   const [recommendedOption, setRecommendedOption] = useState<"good" | "better" | "best">(
     "better"
   );
+  const savedQuoteIdRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     if (isGuestMode) {
@@ -110,23 +110,15 @@ export default function QuoteCalculatorScreen() {
     }
   }, [currentStep, customer, homeDetails, addOns, frequency, selectedOption]);
 
-  const [showCommercial, setShowCommercial] = useState(false);
-
-  if (showCommercial) {
-    return (
-      <CommercialQuoteScreen
-        customerName={customer.name}
-        customerAddress={customer.address}
-      />
-    );
-  }
-
   const handleNext = () => {
     if (currentStep === 0 && quoteType === "commercial") {
       if (Platform.OS !== "web") {
         Haptics.selectionAsync();
       }
-      setShowCommercial(true);
+      navigation.navigate("CommercialQuote" as any, {
+        customerName: customer.name,
+        customerAddress: customer.address,
+      });
       return;
     }
 
@@ -226,8 +218,6 @@ export default function QuoteCalculatorScreen() {
       console.error("Failed to save quote:", error);
     }
   };
-
-  const savedQuoteIdRef = React.useRef<string | null>(null);
 
   const performSaveForSend = async (priceOverrides?: { good?: number; better?: number; best?: number }): Promise<string | null> => {
     if (savedQuoteIdRef.current) return savedQuoteIdRef.current;
@@ -401,12 +391,6 @@ export default function QuoteCalculatorScreen() {
         return null;
     }
   };
-
-  const stepLabels = currentStep === 0
-    ? STEPS
-    : quoteType === "residential"
-    ? STEPS
-    : STEPS;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>

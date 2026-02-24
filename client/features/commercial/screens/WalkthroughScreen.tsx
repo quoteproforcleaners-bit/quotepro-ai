@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { View, StyleSheet, Pressable, Platform } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
@@ -24,6 +25,7 @@ interface Props {
 
 export default function WalkthroughScreen({ walkthrough, onUpdate, onComplete, onCancel }: Props) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState(0);
 
   const handleNext = () => {
@@ -90,7 +92,7 @@ export default function WalkthroughScreen({ walkthrough, onUpdate, onComplete, o
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+      <View style={[styles.header, { borderBottomColor: theme.border, paddingTop: insets.top }]}>
         <Pressable onPress={handleBack} style={styles.headerButton} testID="button-walkthrough-back">
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Feather name="chevron-left" size={20} color={theme.primary} />

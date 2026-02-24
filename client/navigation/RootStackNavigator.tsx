@@ -22,6 +22,7 @@ import SalesStrategyScreen from "@/screens/SalesStrategyScreen";
 import QuotePreferencesScreen from "@/screens/QuotePreferencesScreen";
 import HelpGuideScreen from "@/screens/HelpGuideScreen";
 import AvatarBuilderScreen from "@/screens/AvatarBuilderScreen";
+import CommercialQuoteCalculatorScreen from "@/screens/CommercialQuoteCalculatorScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -54,6 +55,7 @@ export type RootStackParamList = {
   QuotePreferences: undefined;
   HelpGuide: undefined;
   AvatarBuilder: undefined;
+  CommercialQuote: { customerName?: string; customerAddress?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -119,6 +121,14 @@ export default function RootStackNavigator() {
             options={{
               presentation: "modal",
               animation: "slide_from_bottom",
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="CommercialQuote"
+            component={CommercialQuoteCalculatorScreen}
+            options={{
+              animation: "slide_from_right",
               headerShown: false,
             }}
           />
