@@ -30,6 +30,14 @@ import PricingEngineScreen from "./PricingEngineScreen";
 import TierBuilderScreen from "./TierBuilderScreen";
 import ProposalPreviewScreen from "./ProposalPreviewScreen";
 
+console.log("[CommercialQuoteScreen] Import check:", {
+  WalkthroughScreen: typeof WalkthroughScreen,
+  LaborEstimateScreen: typeof LaborEstimateScreen,
+  PricingEngineScreen: typeof PricingEngineScreen,
+  TierBuilderScreen: typeof TierBuilderScreen,
+  ProposalPreviewScreen: typeof ProposalPreviewScreen,
+});
+
 type Phase = "walkthrough" | "labor" | "pricing" | "tiers" | "proposal";
 
 const PHASES: { key: Phase; label: string }[] = [
@@ -201,6 +209,13 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
   };
 
   const renderPhase = () => {
+    console.log("[CommercialQuoteScreen] renderPhase:", phase, {
+      WalkthroughScreen: typeof WalkthroughScreen,
+      LaborEstimateScreen: typeof LaborEstimateScreen,
+      PricingEngineScreen: typeof PricingEngineScreen,
+      TierBuilderScreen: typeof TierBuilderScreen,
+      ProposalPreviewScreen: typeof ProposalPreviewScreen,
+    });
     switch (phase) {
       case "walkthrough":
         return (
