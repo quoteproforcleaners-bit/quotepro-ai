@@ -1,6 +1,7 @@
 import React from "react";
-import { View, StyleSheet, ScrollView, Pressable, Platform } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Platform, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
@@ -35,6 +36,10 @@ function ProGateOverlay({ featureName }: { featureName?: string }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { t } = useLanguage();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
+
+  const tabBarHeight = useBottomTabBarHeight();
 
   const handleUpgrade = () => {
     if (Platform.OS !== "web") {
@@ -57,7 +62,8 @@ function ProGateOverlay({ featureName }: { featureName?: string }) {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 80, paddingBottom: insets.bottom + 40 },
+          { paddingTop: insets.top + 80, paddingBottom: Math.max(tabBarHeight, insets.bottom) + 40 },
+          useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" as const } : undefined,
         ]}
         showsVerticalScrollIndicator={false}
       >
