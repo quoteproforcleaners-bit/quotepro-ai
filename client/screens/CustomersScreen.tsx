@@ -29,6 +29,8 @@ import { ProGate } from "@/components/ProGate";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
+import { useTutorial } from "@/context/TutorialContext";
+import { CUSTOMERS_TOUR } from "@/lib/tourDefinitions";
 
 interface Customer {
   id: string;
@@ -63,6 +65,15 @@ export default function CustomersScreen() {
     { label: t.customers.inactive, value: "inactive" },
     { label: t.customers.vip, value: "vip" },
   ];
+
+  const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
+
+  React.useEffect(() => {
+    if (!hasCompletedTour(CUSTOMERS_TOUR.id) && !tourActive) {
+      const timer = setTimeout(() => startTour(CUSTOMERS_TOUR), 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const [searchText, setSearchText] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");

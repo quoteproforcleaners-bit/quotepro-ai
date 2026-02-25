@@ -31,6 +31,8 @@ import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useDarkModePreference } from "@/hooks/useColorScheme";
 import { useAIConsent } from "@/context/AIConsentContext";
 import { FeatureFlags } from "@/lib/featureFlags";
+import { useTutorial } from "@/context/TutorialContext";
+import { DASHBOARD_TOUR } from "@/lib/tourDefinitions";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -44,6 +46,7 @@ export default function SettingsScreen() {
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
   const { preference: darkModePref, setPreference: setDarkModePref } = useDarkModePreference();
   const { hasConsented: aiConsented, requestConsent: requestAIConsent, revokeConsent: revokeAIConsent } = useAIConsent();
+  const { resetAllTours, startTour, completedTours } = useTutorial();
   const [commercialEnabled, setCommercialEnabled] = useState(FeatureFlags.commercialQuotingEnabled);
 
   useEffect(() => {
@@ -1045,6 +1048,32 @@ export default function SettingsScreen() {
             thumbColor="#FFFFFF"
             testID="switch-commercial-quoting"
           />
+        </View>
+        <View style={[styles.prefRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: Spacing.md }]}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Replay Guided Tours</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              {completedTours.length > 0 ? `${completedTours.length} tour${completedTours.length === 1 ? "" : "s"} completed` : "No tours completed yet"}
+            </ThemedText>
+          </View>
+          <Pressable
+            onPress={async () => {
+              await resetAllTours();
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              startTour(DASHBOARD_TOUR);
+            }}
+            style={{
+              paddingHorizontal: Spacing.lg,
+              paddingVertical: Spacing.sm,
+              backgroundColor: `${theme.primary}12`,
+              borderRadius: BorderRadius.sm,
+              borderWidth: 1,
+              borderColor: `${theme.primary}30`,
+            }}
+            testID="button-reset-tours"
+          >
+            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>Replay</ThemedText>
+          </Pressable>
         </View>
       </View>
 

@@ -88,9 +88,12 @@ export default function App() {
                   <AppProvider>
                     <SubscriptionProvider>
                       <AIConsentProvider>
-                        <NavigationContainer>
-                          <RootStackNavigator />
-                        </NavigationContainer>
+                        <TutorialProvider>
+                          <NavigationContainer>
+                            <RootStackNavigator />
+                            <TourOverlay />
+                          </NavigationContainer>
+                        </TutorialProvider>
                       </AIConsentProvider>
                     </SubscriptionProvider>
                   </AppProvider>

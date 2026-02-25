@@ -15,6 +15,8 @@ import { ProBanner } from "@/components/ProBanner";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
+import { useTutorial } from "@/context/TutorialContext";
+import { QUOTES_TOUR } from "@/lib/tourDefinitions";
 
 type FilterType = "all" | "draft" | "sent" | "accepted";
 type TypeFilter = "all" | "residential" | "commercial";
@@ -26,6 +28,7 @@ export default function QuotesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
   const [filter, setFilter] = useState<FilterType>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
@@ -34,6 +37,13 @@ export default function QuotesScreen() {
   });
 
   const [refreshing, setRefreshing] = useState(false);
+
+  React.useEffect(() => {
+    if (!hasCompletedTour(QUOTES_TOUR.id) && !tourActive) {
+      const timer = setTimeout(() => startTour(QUOTES_TOUR), 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);

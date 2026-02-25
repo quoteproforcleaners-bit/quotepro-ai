@@ -15,6 +15,8 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
 import { ProGate } from "@/components/ProGate";
 import OnboardingBanner from "@/components/OnboardingBanner";
+import { useTutorial } from "@/context/TutorialContext";
+import { GROWTH_TOUR } from "@/lib/tourDefinitions";
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -77,7 +79,15 @@ export default function GrowthDashboardScreen() {
   const { theme } = useTheme();
   const dt = useDesignTokens();
   const { t } = useLanguage();
+  const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
   const [refreshing, setRefreshing] = useState(false);
+
+  React.useEffect(() => {
+    if (!hasCompletedTour(GROWTH_TOUR.id) && !tourActive) {
+      const timer = setTimeout(() => startTour(GROWTH_TOUR), 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const { data: growthTasks = [], refetch: r1 } = useQuery<any[]>({ queryKey: ["/api/growth-tasks"] });
   const { data: forecast, refetch: r2 } = useQuery<any>({ queryKey: ["/api/forecast"] });

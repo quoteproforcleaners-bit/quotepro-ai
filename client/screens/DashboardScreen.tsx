@@ -37,6 +37,8 @@ import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
 import { useProGate } from "@/components/ProGate";
 import { useAIConsent } from "@/context/AIConsentContext";
+import { useTutorial } from "@/context/TutorialContext";
+import { DASHBOARD_TOUR } from "@/lib/tourDefinitions";
 
 type WidgetId = "followUp" | "streak" | "aiCommand" | "quickActions" | "glance" | "opportunities" | "recap";
 
@@ -358,6 +360,7 @@ export default function DashboardScreen() {
   const inputRef = useRef<TextInput>(null);
   const { isPro, requirePro } = useProGate();
   const { requestConsent } = useAIConsent();
+  const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
 
   const [commandText, setCommandText] = useState("");
   const [commandResult, setCommandResult] = useState<AiCommandResult | null>(null);
@@ -387,6 +390,15 @@ export default function DashboardScreen() {
         }
       } catch {}
     })();
+  }, []);
+
+  useEffect(() => {
+    if (!hasCompletedTour(DASHBOARD_TOUR.id) && !tourActive) {
+      const timer = setTimeout(() => {
+        startTour(DASHBOARD_TOUR);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   const { data: followUpQueue = [], refetch: refetchFollowUpQueue } = useQuery<any[]>({
