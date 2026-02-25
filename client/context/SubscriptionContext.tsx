@@ -227,7 +227,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
             ? (config.googleApiKey || config.apiKey)
             : config.apiKey;
           if (apiKey) {
-            RC.configure({ apiKey, appUserID: undefined });
+            RC.configure({ apiKey, appUserID: user?.id });
             configuredRef.current = true;
             setRevenueCatReady(true);
             console.log("Purchase: RevenueCat configured successfully");
