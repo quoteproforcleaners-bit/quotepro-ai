@@ -277,7 +277,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       await syncSubscriptionToServer(hasPro);
       return true;
     } catch (error: any) {
-      if (error.userCancelled) {
+      if (error.userCancelled || error.code === "1" || error.code === "PURCHASE_CANCELLED" || error.message?.includes("cancelled") || error.message?.includes("canceled")) {
         return false;
       }
       console.error("Purchase error:", error?.message, error?.code, error);
