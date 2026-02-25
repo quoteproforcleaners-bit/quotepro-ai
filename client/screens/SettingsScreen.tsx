@@ -32,7 +32,7 @@ import { useDarkModePreference } from "@/hooks/useColorScheme";
 import { useAIConsent } from "@/context/AIConsentContext";
 import { FeatureFlags } from "@/lib/featureFlags";
 import { useTutorial } from "@/context/TutorialContext";
-import { DASHBOARD_TOUR } from "@/lib/tourDefinitions";
+import { DASHBOARD_TOUR, SETTINGS_TOUR } from "@/lib/tourDefinitions";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -46,8 +46,15 @@ export default function SettingsScreen() {
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
   const { preference: darkModePref, setPreference: setDarkModePref } = useDarkModePreference();
   const { hasConsented: aiConsented, requestConsent: requestAIConsent, revokeConsent: revokeAIConsent } = useAIConsent();
-  const { resetAllTours, startTour, completedTours } = useTutorial();
+  const { resetAllTours, startTour, completedTours, hasCompletedTour, isActive: tourActive } = useTutorial();
   const [commercialEnabled, setCommercialEnabled] = useState(FeatureFlags.commercialQuotingEnabled);
+
+  useEffect(() => {
+    if (!hasCompletedTour(SETTINGS_TOUR.id) && !tourActive) {
+      const timer = setTimeout(() => startTour(SETTINGS_TOUR), 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem("@quotepro_commercial_enabled").then((val) => {

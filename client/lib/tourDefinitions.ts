@@ -71,6 +71,13 @@ export const QUOTES_TOUR: TourDefinition = {
       position: "center",
       icon: "eye",
     },
+    {
+      id: "quote_settings",
+      title: "Customize Your Quote Settings",
+      description: "Head over to Settings to set your hourly rates, service types, add-ons, and pricing tiers. Your quotes will use these rates automatically so every estimate is consistent.",
+      position: "center",
+      icon: "sliders",
+    },
   ],
 };
 
@@ -154,10 +161,61 @@ export const COMMERCIAL_TOUR: TourDefinition = {
   ],
 };
 
+export const SETTINGS_TOUR: TourDefinition = {
+  id: "settings_tour",
+  name: "Settings Tour",
+  triggerOnce: true,
+  steps: [
+    {
+      id: "settings_intro",
+      title: "Your Settings",
+      description: "This is where you customize everything about QuotePro - your business profile, pricing, notifications, and more.",
+      position: "center",
+      icon: "settings",
+    },
+    {
+      id: "business_profile",
+      title: "Business Profile",
+      description: "Add your company name, logo, and branding so your quotes look professional when you send them to customers.",
+      position: "center",
+      icon: "briefcase",
+    },
+    {
+      id: "quote_settings",
+      title: "Quote Settings",
+      description: "This is a big one! Set your hourly rates, service types, add-ons, and pricing tiers here. Everything you configure flows into your quotes automatically.",
+      position: "center",
+      icon: "sliders",
+    },
+    {
+      id: "payment_options",
+      title: "Payment Options",
+      description: "Choose which payment methods you accept (cash, check, Venmo, Zelle, etc.) and they'll show up on your quotes and invoices.",
+      position: "center",
+      icon: "credit-card",
+    },
+    {
+      id: "follow_up_settings",
+      title: "Follow-Up Behavior",
+      description: "Set how aggressively you want to follow up with customers. Choose your cadence, tone, and let the app remind you so no lead falls through the cracks.",
+      position: "center",
+      icon: "bell",
+    },
+    {
+      id: "features_toggle",
+      title: "Enable Features",
+      description: "Turn on Commercial Quoting to unlock proposals for offices, gyms, and retail spaces. You can also manage AI data sharing and replay these guided tours anytime.",
+      position: "center",
+      icon: "toggle-right",
+    },
+  ],
+};
+
 export const ALL_TOURS = [
   DASHBOARD_TOUR,
   QUOTES_TOUR,
   CUSTOMERS_TOUR,
   GROWTH_TOUR,
   COMMERCIAL_TOUR,
+  SETTINGS_TOUR,
 ];
