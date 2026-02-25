@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput, Linking, InteractionManager, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -48,22 +48,13 @@ export default function SettingsScreen() {
   const { hasConsented: aiConsented, requestConsent: requestAIConsent, revokeConsent: revokeAIConsent } = useAIConsent();
   const { resetAllTours, startTour, completedTours, hasCompletedTour, isActive: tourActive } = useTutorial();
   const [commercialEnabled, setCommercialEnabled] = useState(FeatureFlags.commercialQuotingEnabled);
-  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      setIsReady(true);
-    });
-    return () => task.cancel();
-  }, []);
-
-  useEffect(() => {
-    if (!isReady) return;
     if (!hasCompletedTour(SETTINGS_TOUR.id) && !tourActive) {
       const timer = setTimeout(() => startTour(SETTINGS_TOUR), 800);
       return () => clearTimeout(timer);
     }
-  }, [isReady]);
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem("@quotepro_commercial_enabled").then((val) => {
@@ -263,14 +254,6 @@ export default function SettingsScreen() {
       updateProfile({ logoUri: result.assets[0].uri });
     }
   };
-
-  if (!isReady) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.backgroundRoot, justifyContent: "center", alignItems: "center" }]}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
 
   return (
     <KeyboardAwareScrollViewCompat
