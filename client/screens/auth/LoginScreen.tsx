@@ -159,8 +159,8 @@ export default function LoginScreen() {
         style={[
           styles.content,
           {
-            paddingTop: insets.top + Spacing["3xl"],
-            paddingBottom: insets.bottom + Spacing.xl,
+            paddingTop: insets.top + Spacing.md,
+            paddingBottom: insets.bottom + Spacing.sm,
           },
           ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
@@ -198,14 +198,8 @@ export default function LoginScreen() {
             source={require('../../../assets/images/icon.png')}
             style={styles.appLogo}
           />
-          <ThemedText type="h1" style={styles.appName}>
+          <ThemedText type="h2" style={styles.appName}>
             QuotePro
-          </ThemedText>
-          <ThemedText
-            type="body"
-            style={[styles.tagline, { color: theme.textSecondary }]}
-          >
-            {t.login.tagline}
           </ThemedText>
         </View>
 
@@ -333,52 +327,40 @@ const styles = StyleSheet.create({
   },
   branding: {
     alignItems: "center",
-    marginBottom: Spacing["3xl"],
-  },
-  iconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
     marginBottom: Spacing.lg,
   },
   appLogo: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    marginBottom: Spacing.lg,
+    width: 60,
+    height: 60,
+    borderRadius: 14,
+    marginBottom: Spacing.sm,
   },
   appName: {
-    fontSize: 32,
-    marginBottom: Spacing.xs,
-  },
-  tagline: {
-    textAlign: "center",
+    fontSize: 26,
   },
   errorContainer: {
-    padding: Spacing.md,
+    padding: Spacing.sm,
     borderRadius: BorderRadius.md,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   appleButton: {
     width: "100%",
-    height: 52,
-    marginBottom: Spacing.md,
+    height: 48,
+    marginBottom: Spacing.sm,
   },
   googleButton: {
     width: "100%",
-    height: 52,
+    height: 48,
     borderWidth: 1,
     borderRadius: BorderRadius.lg,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   divider: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   dividerLine: {
     flex: 1,
@@ -389,26 +371,26 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     width: "100%",
-    height: 52,
+    height: 48,
     borderRadius: BorderRadius.lg,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
   },
   switchMode: {
     flexDirection: "row",
     justifyContent: "center",
-    marginTop: Spacing.lg,
+    marginTop: Spacing.md,
   },
   languageRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
   },
   languageChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
   },
