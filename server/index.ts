@@ -247,9 +247,6 @@ function setupErrorHandler(app: express.Application) {
     },
     () => {
       log(`express server serving on port ${port}`);
-      log(`GOOGLE_CLIENT_ID set: ${!!process.env.GOOGLE_CLIENT_ID}`);
-      log(`GOOGLE_CLIENT_SECRET set: ${!!process.env.GOOGLE_CLIENT_SECRET}`);
-      log(`REVENUECAT_API_KEY set: ${!!process.env.REVENUECAT_API_KEY}`);
     },
   );
 })();
