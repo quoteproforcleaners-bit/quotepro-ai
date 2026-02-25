@@ -1,0 +1,116 @@
+You are Replit AI working inside my existing React Native / Expo app “QuotePro for Cleaners”. I want to update the entire app’s color system because the UI currently feels too dark/heavy. Implement a cohesive, “clean + enterprise” LIGHT theme as the default across the whole app, with a consistent design system so colors are ubiquitous (used everywhere consistently). Keep the app feeling premium, not bland. Also keep Dark Mode as an optional toggle (if already present) but LIGHT must be the default.
+
+PRIMARY OBJECTIVES
+1) Replace the dark navy/black-heavy background approach with a light, airy, professional palette aligned with a cleaning brand (clean, trustworthy, modern).
+2) Centralize all colors + typography + spacing into a single theme file and refactor screens/components to use theme tokens only (no hardcoded hex values scattered around).
+3) Ensure consistent usage across: login, onboarding, dashboard, quote builder, quote list, customer screens, settings, modals, buttons, inputs, cards, tabs, badges, and PDF preview screens.
+4) Improve contrast/accessibility (text must be readable in sunlight).
+
+THEME SYSTEM (MUST IMPLEMENT)
+Create / update a centralized theme setup:
+- /src/theme/colors.ts
+- /src/theme/typography.ts
+- /src/theme/spacing.ts
+- /src/theme/index.ts
+(Or match existing structure; the key is ONE source of truth.)
+
+Define these tokens (names matter; use these everywhere):
+LIGHT THEME TOKENS
+- background:            #F6F8FB   (app background)
+- surface:               #FFFFFF   (cards/sheets)
+- surfaceMuted:          #F1F5F9   (soft sections)
+- border:                #E2E8F0
+- textPrimary:           #0F172A
+- textSecondary:         #334155
+- textTertiary:          #64748B
+- primary:               #2563EB   (main blue)
+- primaryPressed:        #1D4ED8
+- primarySoft:           #DBEAFE   (light blue for highlights)
+- success:               #16A34A
+- warning:               #D97706
+- danger:                #DC2626
+- badgePremiumBg:        #EEF2FF
+- badgePremiumText:      #4338CA
+- shadowColor:           rgba(15, 23, 42, 0.12)
+
+DARK THEME TOKENS (optional; keep if exists)
+- background:            #0B1220
+- surface:               #101B2D
+- surfaceMuted:          #0F172A
+- border:                rgba(148,163,184,0.25)
+- textPrimary:           #F8FAFC
+- textSecondary:         #CBD5E1
+- textTertiary:          #94A3B8
+- primary:               #3B82F6
+- primaryPressed:        #2563EB
+- primarySoft:           rgba(59,130,246,0.18)
+- success:               #22C55E
+- warning:               #F59E0B
+- danger:                #EF4444
+- badgePremiumBg:        rgba(99,102,241,0.18)
+- badgePremiumText:      #A5B4FC
+- shadowColor:           rgba(0,0,0,0.35)
+
+DEFAULT BEHAVIOR
+- Default app theme must be LIGHT.
+- Add a settings toggle: “Dark Mode” (off by default).
+- Persist theme choice in AsyncStorage.
+- Apply theme at app root so navigation headers, status bar, tab bar, screens, modals, and components all inherit correctly.
+
+COMPONENT SYSTEM (REFactor)
+Create / update these reusable components to enforce consistency:
+- <AppScreen> wrapper that applies background + safe area padding
+- <AppCard> uses surface + border + subtle shadow
+- <AppButton> variants: primary, secondary, ghost
+- <AppInput> consistent border, focus state, placeholder color, label
+- <Badge> variants: premium, success, warning, danger
+- <Divider> uses border token
+Remove any hard-coded colors from screens and replace with theme tokens.
+
+NAVIGATION STYLING
+Update navigation theme:
+- Header background = surface
+- Header title color = textPrimary
+- Back button / icons = primary
+- Tab bar background = surface
+- Tab active = primary
+- Tab inactive = textTertiary
+- Tab border top = border
+Ensure iOS looks polished.
+
+LOGIN / LANDING SCREEN (THE ONE IN SCREENSHOT)
+Rework the landing/login screen to match the new light premium theme:
+- Background: background token (light)
+- Main card sections: surface token with subtle shadow
+- CTA button: primary with stronger contrast + slight shadow
+- Make the Good/Better/Best preview card white with border and subtle elevation
+- Highlight “Better” using primarySoft background + primary text
+- Ensure all text is readable (no low-contrast gray on gray)
+
+VISUAL POLISH RULES
+- Use whitespace generously; increase vertical spacing between sections.
+- Use subtle shadows only on cards/buttons (no heavy neon glows).
+- Use consistent corner radius across app (e.g., 14 for cards, 12 for inputs, 16 for primary CTA).
+- Ensure disabled states are obvious (e.g., reduce opacity and use surfaceMuted).
+- Ensure pressed states are implemented for buttons.
+
+SEARCH & REPLACE GUIDELINES
+- Find and remove scattered hex codes (especially dark background/navy values).
+- Replace with theme tokens from colors.ts.
+- If a screen uses inline styles with hex values, refactor to use theme.
+
+QUALITY CHECKS
+- App should look consistent across all screens.
+- No screen should retain the old dark background unless Dark Mode is enabled.
+- Validate contrast: textPrimary must be used for main text, textSecondary for subtitles, tertiary only for hints.
+- Ensure status bar style changes based on theme.
+
+DELIVERABLES
+1) Centralized theme tokens
+2) Theme provider + persistence
+3) Refactored UI components
+4) Updated navigation theme
+5) Updated login/landing screen and key quote screens to the new palette
+6) Remove hard-coded colors and make the new palette ubiquitous throughout the app
+
+Now implement this end-to-end. Do not partially implement; ensure the entire app uses the new theme system consistently.

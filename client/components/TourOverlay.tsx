@@ -103,9 +103,9 @@ export function TourOverlay() {
     skipTour();
   };
 
-  const overlayColor = isDark ? "rgba(0,0,0,0.82)" : "rgba(0,0,0,0.65)";
-  const cardBg = isDark ? "#131F33" : "#FFFFFF";
-  const cardBorder = isDark ? "rgba(47,123,255,0.2)" : "rgba(0,122,255,0.12)";
+  const overlayColor = isDark ? "rgba(0,0,0,0.82)" : "rgba(15,23,42,0.45)";
+  const cardBg = isDark ? "#101B2D" : "#FFFFFF";
+  const cardBorder = isDark ? "rgba(59,130,246,0.2)" : "rgba(37,99,235,0.12)";
 
   return (
     <Animated.View
@@ -130,7 +130,7 @@ export function TourOverlay() {
               {
                 backgroundColor: cardBg,
                 borderColor: cardBorder,
-                shadowColor: isDark ? "#3B82F6" : "#007AFF",
+                shadowColor: isDark ? "#3B82F6" : "#2563EB",
               },
               cardAnimStyle,
             ]}
@@ -141,8 +141,8 @@ export function TourOverlay() {
                   styles.iconCircle,
                   {
                     backgroundColor: isDark
-                      ? "rgba(47,123,255,0.15)"
-                      : "rgba(0,122,255,0.08)",
+                      ? "rgba(59,130,246,0.15)"
+                      : "rgba(37,99,235,0.08)",
                   },
                   iconAnimStyle,
                 ]}
@@ -168,12 +168,12 @@ export function TourOverlay() {
               </Pressable>
             </View>
 
-            <ThemedText type="h3" style={[styles.title, { color: isDark ? "#F5F7FF" : "#0F172A" }]}>
+            <ThemedText type="h3" style={[styles.title, { color: isDark ? "#F8FAFC" : "#0F172A" }]}>
               {step.title}
             </ThemedText>
             <ThemedText
               type="body"
-              style={[styles.description, { color: isDark ? "#C0CAE0" : "#64748B" }]}
+              style={[styles.description, { color: isDark ? "#CBD5E1" : "#334155" }]}
             >
               {step.description}
             </ThemedText>

@@ -119,7 +119,7 @@ export function Card({
         ]}
       >
         <LinearGradient
-          colors={["#1E273A", "#121B2B"]}
+          colors={isDark ? ["#1E293B", "#0F172A"] : ["#FFFBEB", "#FEF3C7"]}
           style={[styles.heroGradient, { borderRadius: HERO_RADIUS - 1 }]}
         >
           <View style={[styles.heroHighlight, { borderTopLeftRadius: HERO_RADIUS - 1, borderTopRightRadius: HERO_RADIUS - 1 }]} />

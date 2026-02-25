@@ -65,7 +65,7 @@ export function TypeFilterBar<T extends string>({
     }
   };
 
-  const outerBg = isDark ? "#0E1929" : "#EAF0F7";
+  const outerBg = isDark ? "#101B2D" : "#F1F5F9";
 
   return (
     <View style={styles.wrapper}>
@@ -75,7 +75,7 @@ export function TypeFilterBar<T extends string>({
           {
             backgroundColor: outerBg,
             borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-            shadowColor: isDark ? "#000" : "#64748B",
+            shadowColor: isDark ? "#000" : "#0F172A",
           },
         ]}
       >
@@ -88,7 +88,7 @@ export function TypeFilterBar<T extends string>({
         >
           <Animated.View style={[styles.pillOuter, pillStyle]}>
             <LinearGradient
-              colors={isDark ? ["#2563EB", "#3B82F6"] : ["#0071E3", "#2E9BFF"]}
+              colors={isDark ? ["#2563EB", "#3B82F6"] : ["#2563EB", "#3B82F6"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.pillGradient}
@@ -98,7 +98,7 @@ export function TypeFilterBar<T extends string>({
             <View
               style={[
                 styles.pillGlow,
-                { shadowColor: isDark ? "#3B82F6" : "#007AFF" },
+                { shadowColor: isDark ? "#3B82F6" : "#2563EB" },
               ]}
             />
           </Animated.View>
@@ -146,7 +146,7 @@ function Segment<T extends string>({
     };
   });
 
-  const inactiveColor = isDark ? "#8E9AB6" : "#64748B";
+  const inactiveColor = isDark ? "#94A3B8" : "#64748B";
   const iconColor = isActive ? "#FFFFFF" : inactiveColor;
   const textColor = isActive ? "#FFFFFF" : inactiveColor;
 

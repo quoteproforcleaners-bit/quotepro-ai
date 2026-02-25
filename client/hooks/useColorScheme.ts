@@ -13,7 +13,7 @@ function isEveningHours(): boolean {
 
 export function useColorScheme() {
   const systemScheme = useSystemColorScheme();
-  const [preference, setPreference] = useState<DarkModePreference>("system");
+  const [preference, setPreference] = useState<DarkModePreference>("light");
   const [timeBasedDark, setTimeBasedDark] = useState(isEveningHours());
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export function useColorScheme() {
 }
 
 export function useDarkModePreference() {
-  const [preference, setPreferenceState] = useState<DarkModePreference>("system");
+  const [preference, setPreferenceState] = useState<DarkModePreference>("light");
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((value) => {
