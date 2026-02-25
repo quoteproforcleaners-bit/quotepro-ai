@@ -10,8 +10,8 @@ import { QuoteListItem } from "@/components/QuoteListItem";
 import { EmptyState } from "@/components/EmptyState";
 import { FAB } from "@/components/FAB";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { TypeFilterBar } from "@/components/TypeFilterBar";
 import { ProBanner } from "@/components/ProBanner";
-import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
@@ -70,10 +70,10 @@ export default function QuotesScreen() {
     { label: t.quotes.accepted, value: "accepted" as FilterType },
   ];
 
-  const typeFilterOptions = [
-    { label: t.common.all, value: "all" as TypeFilter },
-    { label: "Residential", value: "residential" as TypeFilter },
-    { label: "Commercial", value: "commercial" as TypeFilter },
+  const typeFilterOptions: { label: string; value: TypeFilter; icon: "grid" | "home" | "briefcase" }[] = [
+    { label: t.common.all, value: "all", icon: "grid" },
+    { label: "Residential", value: "residential", icon: "home" },
+    { label: "Commercial", value: "commercial", icon: "briefcase" },
   ];
 
   const renderHeader = () => (
@@ -86,16 +86,11 @@ export default function QuotesScreen() {
           onChange={setFilter}
         />
       </View>
-      <View style={styles.typeFilterContainer}>
-        <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
-          Type
-        </ThemedText>
-        <SegmentedControl
-          options={typeFilterOptions}
-          value={typeFilter}
-          onChange={setTypeFilter}
-        />
-      </View>
+      <TypeFilterBar
+        options={typeFilterOptions}
+        value={typeFilter}
+        onChange={setTypeFilter}
+      />
     </View>
   );
 
@@ -150,8 +145,5 @@ const styles = StyleSheet.create({
   },
   filterContainer: {
     marginBottom: Spacing.sm,
-  },
-  typeFilterContainer: {
-    marginBottom: Spacing.lg,
   },
 });
