@@ -7,7 +7,11 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useQueryClient } from "@tanstack/react-query";
 
 function isExpoGo(): boolean {
-  return Constants.executionEnvironment === "storeClient";
+  try {
+    return Constants.appOwnership === "expo";
+  } catch {
+    return false;
+  }
 }
 
 let PurchasesModule: typeof import("react-native-purchases").default | null = null;
@@ -122,7 +126,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
       try {
         if (Platform.OS === "web" || isExpoGo()) {
-          console.log(isExpoGo() ? "Expo Go detected — RevenueCat Browser Mode" : "Web platform — RevenueCat Browser Mode");
+          console.log(isExpoGo() ? "Expo Go detected — RevenueCat Browser Mode" : "Web platform — RevenueCat Browser Mode", "appOwnership:", Constants.appOwnership, "executionEnvironment:", Constants.executionEnvironment);
           setIsPro(user.subscriptionTier === "pro");
           setIsLoading(false);
           return;
