@@ -42,7 +42,7 @@ A comprehensive commercial quoting add-on (`/client/features/commercial/`) with:
 - **Pricing/Margin Engine**: Configurable hourly rate, overhead %, profit margin %, supplies surcharge, rounding rules, with Margin Health badge
 - **Tier Builder**: Auto-generated Good/Better/Best tiers (Basic Janitorial, Enhanced Sanitation, Premium Maintenance) with editable names, tasks, prices
 - **Proposal Preview**: Full commercial proposal preview with Cover, Scope of Work, Schedule, Pricing Table, Terms, Acceptance
-- **AI Features**: "Generate Professional Scope" and "AI Risk Scan" buttons (both use AIConsentContext for Apple compliance)
+- **AI Features**: "Generate Professional Scope" (generates per-tier scope paragraph + included/excluded tasks) and "AI Risk Scan" (analyzes pricing risks with severity levels, suggested clauses, overall assessment) - both use AIConsentContext for Apple compliance
 - **PDF Export**: Commercial proposal PDF via `/api/quotes/:id/commercial-pdf` using expo-print + expo-sharing
 - **Server Endpoints**: `/api/commercial/generate-scope`, `/api/commercial/risk-scan`, `/api/quotes/:id/commercial-pdf`
 - **Quote List**: Commercial badge on list items, Type filter (All/Residential/Commercial)

@@ -24,7 +24,7 @@ interface ProposalPreviewScreenProps {
   quoteId?: string;
   onAccept: () => void;
   onBack: () => void;
-  onScopeUpdate?: (tierIndex: number, scopeText: string) => void;
+  onScopeUpdate?: (tierIndex: number, scopeText: string, includedBullets?: string[], excludedBullets?: string[]) => void;
 }
 
 const FREQUENCY_LABELS: Record<CommercialFrequency, string> = {
@@ -53,7 +53,7 @@ export default function ProposalPreviewScreen({
 
   const [scopeLoading, setScopeLoading] = useState(false);
   const [riskLoading, setRiskLoading] = useState(false);
-  const [riskWarnings, setRiskWarnings] = useState<string[]>([]);
+  const [riskResults, setRiskResults] = useState<{ warnings: { severity: string; title: string; description: string }[]; overallAssessment: string; suggestedClauses: string[] } | null>(null);
   const [editingScopeIndex, setEditingScopeIndex] = useState<number | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -65,17 +65,18 @@ export default function ProposalPreviewScreen({
 
     setScopeLoading(true);
     try {
-      const res = await apiRequest("POST", "/api/commercial/generate-scope", {
-        walkthrough,
-        tiers,
-      });
-      const data = await res.json();
-      if (data.scopes && Array.isArray(data.scopes)) {
-        data.scopes.forEach((scope: string, i: number) => {
-          if (onScopeUpdate && i < tiers.length) {
-            onScopeUpdate(i, scope);
-          }
+      for (let i = 0; i < tiers.length; i++) {
+        const res = await apiRequest("POST", "/api/commercial/generate-scope", {
+          walkthrough,
+          tier: tiers[i],
         });
+        const data = await res.json();
+        if (onScopeUpdate) {
+          const scopeText = data.scopeParagraph || tiers[i].scopeText;
+          const included = data.includedTasks || tiers[i].includedBullets;
+          const excluded = data.excludedTasks || tiers[i].excludedBullets;
+          onScopeUpdate(i, scopeText, included, excluded);
+        }
       }
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -100,9 +101,11 @@ export default function ProposalPreviewScreen({
         tiers,
       });
       const data = await res.json();
-      if (data.warnings && Array.isArray(data.warnings)) {
-        setRiskWarnings(data.warnings);
-      }
+      setRiskResults({
+        warnings: data.warnings || [],
+        overallAssessment: data.overallAssessment || "",
+        suggestedClauses: data.suggestedClauses || [],
+      });
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -160,7 +163,7 @@ export default function ProposalPreviewScreen({
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 80 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 130 }]}
         showsVerticalScrollIndicator={false}
       >
         <Card variant="emphasis" style={styles.coverCard}>
@@ -224,15 +227,48 @@ export default function ProposalPreviewScreen({
           </Pressable>
         </View>
 
-        {riskWarnings.length > 0 ? (
+        {riskResults ? (
           <Card variant="warning" style={styles.riskCard}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm }}>Risk Warnings</ThemedText>
-            {riskWarnings.map((warning, i) => (
-              <View key={`warn-${i}`} style={styles.warningRow}>
-                <Feather name="alert-circle" size={14} color={theme.warning} style={{ marginTop: 3 }} />
-                <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm, color: theme.text }}>{warning}</ThemedText>
+            <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm }}>Risk Analysis</ThemedText>
+            {riskResults.overallAssessment ? (
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md, lineHeight: 20 }}>
+                {riskResults.overallAssessment}
+              </ThemedText>
+            ) : null}
+            {riskResults.warnings.map((w, i) => {
+              const severityColor = w.severity === "high" ? theme.error : w.severity === "medium" ? theme.warning : theme.textSecondary;
+              return (
+                <View key={`warn-${i}`} style={[styles.warningRow, { marginBottom: Spacing.md }]}>
+                  <Feather
+                    name={w.severity === "high" ? "alert-octagon" : "alert-circle"}
+                    size={16}
+                    color={severityColor}
+                    style={{ marginTop: 2 }}
+                  />
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <ThemedText type="small" style={{ fontWeight: "700", color: severityColor }}>
+                      {w.title}
+                    </ThemedText>
+                    <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2, lineHeight: 18 }}>
+                      {w.description}
+                    </ThemedText>
+                  </View>
+                </View>
+              );
+            })}
+            {riskResults.suggestedClauses.length > 0 ? (
+              <View style={{ marginTop: Spacing.sm }}>
+                <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700", marginBottom: Spacing.xs }}>
+                  SUGGESTED CONTRACT CLAUSES
+                </ThemedText>
+                {riskResults.suggestedClauses.map((clause, i) => (
+                  <View key={`clause-${i}`} style={styles.bulletRow}>
+                    <Feather name="file-text" size={12} color={theme.primary} style={{ marginTop: 3 }} />
+                    <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.xs, color: theme.text }}>{clause}</ThemedText>
+                  </View>
+                ))}
               </View>
-            ))}
+            ) : null}
           </Card>
         ) : null}
 
@@ -330,6 +366,13 @@ export default function ProposalPreviewScreen({
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: theme.backgroundRoot, paddingBottom: insets.bottom + Spacing.md, borderTopColor: theme.border }]}>
+        <Button
+          onPress={handleAccept}
+          style={{ marginBottom: Spacing.sm }}
+          testID="button-accept-proposal"
+        >
+          Accept Proposal
+        </Button>
         <View style={styles.footerRow}>
           <Button
             mode="outlined"
@@ -347,13 +390,6 @@ export default function ProposalPreviewScreen({
             testID="button-export-pdf"
           >
             {pdfLoading ? "Exporting..." : "Export PDF"}
-          </Button>
-          <Button
-            onPress={handleAccept}
-            style={styles.footerBtnSmall}
-            testID="button-accept-proposal"
-          >
-            Accept Proposal
           </Button>
         </View>
       </View>
