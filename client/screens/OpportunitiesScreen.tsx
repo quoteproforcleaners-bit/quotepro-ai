@@ -7,6 +7,8 @@ import {
   RefreshControl,
   Modal,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -40,12 +42,13 @@ interface LostQuote {
   total: number;
   status: string;
   customerId: string;
-  customerFirstName: string;
-  customerLastName: string;
-  customerPhone: string;
-  customerEmail: string;
+  customerFirstName: string | null;
+  customerLastName: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
   declinedAt: string | null;
   expiresAt: string | null;
+  propertyDetails: any;
 }
 
 interface Preferences {
@@ -83,6 +86,41 @@ function getDormantEmailTemplate(firstName: string, senderName: string): { subje
     subject: `We miss you, ${firstName}!`,
     body: `Hi ${firstName},\n\nIt's been a while since we last cleaned for you, and we wanted to reach out! We'd love to get you back on the schedule.\n\nMention this email for a special returning client offer.\n\nBest,\n${senderName}`,
   };
+}
+
+function getLostDisplayName(item: LostQuote): string {
+  if (item.customerFirstName) {
+    return `${item.customerFirstName} ${item.customerLastName || ""}`.trim();
+  }
+  const pd = item.propertyDetails;
+  if (pd && typeof pd === "object") {
+    if (pd.customerName) return pd.customerName;
+    if (pd.commercialData?.walkthrough?.facilityName) return pd.commercialData.walkthrough.facilityName;
+  }
+  return "Unnamed Quote";
+}
+
+function getLostFirstName(item: LostQuote): string {
+  if (item.customerFirstName) return item.customerFirstName;
+  const pd = item.propertyDetails;
+  if (pd && typeof pd === "object" && pd.customerName) {
+    return pd.customerName.split(" ")[0];
+  }
+  return "there";
+}
+
+function getLostPhone(item: LostQuote): string | null {
+  if (item.customerPhone) return item.customerPhone;
+  const pd = item.propertyDetails;
+  if (pd && typeof pd === "object" && pd.customerPhone) return pd.customerPhone;
+  return null;
+}
+
+function getLostEmail(item: LostQuote): string | null {
+  if (item.customerEmail) return item.customerEmail;
+  const pd = item.propertyDetails;
+  if (pd && typeof pd === "object" && pd.customerEmail) return pd.customerEmail;
+  return null;
 }
 
 function getLostSmsTemplate(firstName: string, quoteTotal: number, senderName: string): string {
@@ -215,15 +253,25 @@ export default function OpportunitiesScreen() {
 
   const handleDormantText = useCallback(async (item: DormantCustomer) => {
     trackEvent("reactivation_text_tap");
+    if (!item.phone) {
+      Alert.alert("No Phone Number", "This customer doesn't have a phone number on file. Try reaching out by email instead.");
+      return;
+    }
     const message = getDormantSmsTemplate(item.firstName, senderName);
     const isAvailable = await SMS.isAvailableAsync();
     if (isAvailable) {
       await SMS.sendSMSAsync([item.phone], message);
+    } else {
+      Alert.alert("SMS Unavailable", "Text messaging is not available on this device.");
     }
   }, [senderName]);
 
   const handleDormantEmail = useCallback(async (item: DormantCustomer) => {
     trackEvent("reactivation_email_tap");
+    if (!item.email) {
+      Alert.alert("No Email Address", "This customer doesn't have an email address on file. Try reaching out by text instead.");
+      return;
+    }
     const template = getDormantEmailTemplate(item.firstName, senderName);
     await MailComposer.composeAsync({
       recipients: [item.email],
@@ -234,18 +282,32 @@ export default function OpportunitiesScreen() {
 
   const handleLostText = useCallback(async (item: LostQuote) => {
     trackEvent("reactivation_text_tap");
-    const message = getLostSmsTemplate(item.customerFirstName, item.total, senderName);
+    const phone = getLostPhone(item);
+    if (!phone) {
+      Alert.alert("No Phone Number", "This quote doesn't have a phone number on file. Try reaching out by email instead.");
+      return;
+    }
+    const firstName = getLostFirstName(item);
+    const message = getLostSmsTemplate(firstName, item.total, senderName);
     const isAvailable = await SMS.isAvailableAsync();
     if (isAvailable) {
-      await SMS.sendSMSAsync([item.customerPhone], message);
+      await SMS.sendSMSAsync([phone], message);
+    } else {
+      Alert.alert("SMS Unavailable", "Text messaging is not available on this device.");
     }
   }, [senderName]);
 
   const handleLostEmail = useCallback(async (item: LostQuote) => {
     trackEvent("reactivation_email_tap");
-    const template = getLostEmailTemplate(item.customerFirstName, item.total, senderName);
+    const email = getLostEmail(item);
+    if (!email) {
+      Alert.alert("No Email Address", "This quote doesn't have an email address on file. Try reaching out by text instead.");
+      return;
+    }
+    const firstName = getLostFirstName(item);
+    const template = getLostEmailTemplate(firstName, item.total, senderName);
     await MailComposer.composeAsync({
-      recipients: [item.customerEmail],
+      recipients: [email],
       subject: template.subject,
       body: template.body,
     });
@@ -311,12 +373,13 @@ export default function OpportunitiesScreen() {
     const estimate = getLostEstimate(item.total, item.status);
     const dateStr = item.status === "declined" ? item.declinedAt : item.expiresAt;
     const statusColor = item.status === "expired" ? theme.warning : theme.error;
+    const displayName = getLostDisplayName(item);
     return (
       <Card style={styles.itemCard}>
         <View style={styles.itemHeader}>
           <View style={{ flex: 1 }}>
             <ThemedText type="subtitle" style={{ fontWeight: "600" }}>
-              {item.customerFirstName} {item.customerLastName}
+              {displayName}
             </ThemedText>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
               <ThemedText type="caption" style={{ color: theme.textSecondary }}>
@@ -362,7 +425,7 @@ export default function OpportunitiesScreen() {
           <ActionButton
             icon="slash"
             label="DNC"
-            onPress={() => handleDnc(item.customerId, `${item.customerFirstName} ${item.customerLastName}`)}
+            onPress={() => handleDnc(item.customerId, displayName)}
             color={theme.error}
           />
         </View>

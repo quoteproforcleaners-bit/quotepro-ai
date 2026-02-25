@@ -1446,6 +1446,7 @@ export async function getLostQuotes(
       declinedAt: quotes.declinedAt,
       expiresAt: quotes.expiresAt,
       createdAt: quotes.createdAt,
+      propertyDetails: quotes.propertyDetails,
       customerFirstName: customers.firstName,
       customerLastName: customers.lastName,
       customerPhone: customers.phone,
