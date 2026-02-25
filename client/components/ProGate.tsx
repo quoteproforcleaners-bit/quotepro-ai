@@ -62,7 +62,7 @@ function ProGateOverlay({ featureName }: { featureName?: string }) {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 80, paddingBottom: tabBarHeight + insets.bottom + 60 },
+          { paddingTop: insets.top + 80 },
           useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" as const } : undefined,
         ]}
         showsVerticalScrollIndicator={false}
@@ -92,7 +92,17 @@ function ProGateOverlay({ featureName }: { featureName?: string }) {
             </View>
           ))}
         </View>
+      </ScrollView>
 
+      <View style={[
+        styles.bottomBar,
+        {
+          backgroundColor: theme.backgroundRoot,
+          paddingBottom: tabBarHeight + Spacing.md,
+          borderTopColor: theme.border,
+        },
+        useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" as const } : undefined,
+      ]}>
         <Pressable
           onPress={handleUpgrade}
           style={[styles.upgradeBtn, { backgroundColor: theme.accent }]}
@@ -107,7 +117,7 @@ function ProGateOverlay({ featureName }: { featureName?: string }) {
         <ThemedText type="caption" style={[styles.priceNote, { color: theme.textSecondary }]}>
           $14.99/month
         </ThemedText>
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -138,6 +148,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     alignItems: "center",
     paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.md,
+    flexGrow: 1,
   },
   iconCircle: {
     width: 64,
@@ -174,6 +186,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  bottomBar: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+  },
   upgradeBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -189,7 +207,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   priceNote: {
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
     textAlign: "center",
   },
 });
