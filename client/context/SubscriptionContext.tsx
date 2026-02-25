@@ -205,7 +205,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   const purchase = useCallback(async (): Promise<boolean> => {
     try {
-      if (Platform.OS === "web" || !revenueCatReady) {
+      if (Platform.OS === "web") {
         await apiRequest("POST", "/api/subscription/upgrade");
         setIsPro(true);
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
@@ -214,6 +214,28 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
       const RC = getPurchases();
       if (!RC) throw new Error("RevenueCat not available");
+
+      if (!configuredRef.current) {
+        const baseUrl = getApiUrl();
+        const configRes = await fetch(new URL("/api/subscription/config", baseUrl), {
+          credentials: "include",
+        });
+        if (configRes.ok) {
+          const config = await configRes.json();
+          const apiKey = Platform.OS === "android"
+            ? (config.googleApiKey || config.apiKey)
+            : config.apiKey;
+          if (apiKey) {
+            RC.configure({ apiKey, appUserID: undefined });
+            configuredRef.current = true;
+            setRevenueCatReady(true);
+          }
+        }
+      }
+
+      if (!configuredRef.current) {
+        throw new Error("Subscription service is not ready. Please restart the app and try again.");
+      }
 
       let offering = currentOffering;
       if (!offering || offering.availablePackages.length === 0) {

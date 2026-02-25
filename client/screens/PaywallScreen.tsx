@@ -78,16 +78,17 @@ export default function PaywallScreen() {
   const handlePurchase = async () => {
     if (subscriptionLoading || purchasing) return;
 
-    if (!canPurchase) {
-      await handleRetryOfferings();
-      return;
-    }
-
     setPurchasing(true);
     try {
       if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
+
+      if (!canPurchase) {
+        await retryLoadOfferings();
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
       const success = await purchase();
       if (success) {
         if (Platform.OS !== "web") {
@@ -96,7 +97,7 @@ export default function PaywallScreen() {
         showModal("success", t.paywall.welcomeTitle, t.paywall.welcomeMessage);
       }
     } catch (error: any) {
-      if (!error?.userCancelled) {
+      if (!error?.userCancelled && !error?.message?.includes("userCancelled")) {
         const message = error?.message || t.paywall.purchaseFailedMessage;
         showModal("error", t.paywall.purchaseFailed, message);
       }
