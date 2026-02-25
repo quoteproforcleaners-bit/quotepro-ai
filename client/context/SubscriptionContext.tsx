@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
 import { Platform } from "react-native";
 import type { PurchasesOffering, CustomerInfo } from "react-native-purchases";
 import Constants from "expo-constants";
@@ -23,17 +23,25 @@ function getPurchases() {
   }
 }
 
+type OfferingsStatus = "idle" | "loading" | "ready" | "error";
+
 interface SubscriptionContextType {
   isPro: boolean;
   isLoading: boolean;
   currentOffering: PurchasesOffering | null;
+  offeringsStatus: OfferingsStatus;
+  offeringsError: string | null;
+  isConfigured: boolean;
   purchase: () => Promise<boolean>;
   restore: () => Promise<boolean>;
+  retryLoadOfferings: () => Promise<void>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 const ENTITLEMENT_IDS = ["Pro", "QuotePro for Cleaners Pro", "pro"];
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -42,6 +50,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);
   const [revenueCatReady, setRevenueCatReady] = useState(false);
+  const [offeringsStatus, setOfferingsStatus] = useState<OfferingsStatus>("idle");
+  const [offeringsError, setOfferingsError] = useState<string | null>(null);
+  const configuredRef = useRef(false);
 
   const checkEntitlements = useCallback((customerInfo: CustomerInfo) => {
     const hasEntitlement = ENTITLEMENT_IDS.some(id => customerInfo.entitlements.active[id] !== undefined);
@@ -60,6 +71,47 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   }, [queryClient]);
 
+  const loadOfferings = useCallback(async (retryCount = 0): Promise<void> => {
+    const RC = getPurchases();
+    if (!RC) return;
+
+    setOfferingsStatus("loading");
+    setOfferingsError(null);
+
+    const maxRetries = 2;
+    const retryDelays = [500, 1200];
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          await delay(retryDelays[attempt - 1]);
+        }
+        const offerings = await RC.getOfferings();
+        console.log("RevenueCat offerings loaded, current:", offerings.current?.identifier);
+        console.log("RevenueCat packages count:", offerings.current?.availablePackages?.length || 0);
+
+        if (offerings.current && offerings.current.availablePackages.length > 0) {
+          setCurrentOffering(offerings.current);
+          setOfferingsStatus("ready");
+          setOfferingsError(null);
+          return;
+        }
+
+        if (attempt === maxRetries) {
+          setOfferingsStatus("error");
+          setOfferingsError("No subscription packages found. Please try again.");
+          console.warn("RevenueCat: No packages in current offering after retries");
+        }
+      } catch (err: any) {
+        console.warn(`RevenueCat getOfferings attempt ${attempt + 1} failed:`, err?.message);
+        if (attempt === maxRetries) {
+          setOfferingsStatus("error");
+          setOfferingsError("Couldn't load subscription options. Please try again.");
+        }
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const initRevenueCat = async () => {
       if (!user) {
@@ -70,7 +122,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
       try {
         if (Platform.OS === "web" || isExpoGo()) {
-          console.log(isExpoGo() ? "Expo Go app detected. Using RevenueCat in Browser Mode." : "Web platform detected. Using RevenueCat in Browser Mode.");
+          console.log(isExpoGo() ? "Expo Go detected — RevenueCat Browser Mode" : "Web platform — RevenueCat Browser Mode");
           setIsPro(user.subscriptionTier === "pro");
           setIsLoading(false);
           return;
@@ -88,56 +140,57 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         }
 
         const config = await configRes.json();
-        const apiKey = Platform.OS === "android" 
-          ? (config.googleApiKey || config.apiKey) 
+        const apiKey = Platform.OS === "android"
+          ? (config.googleApiKey || config.apiKey)
           : config.apiKey;
 
-        if (apiKey) {
-          const RC = getPurchases();
-          if (!RC) {
-            console.warn("RevenueCat native module not available, using database status");
+        if (!apiKey) {
+          console.warn("RevenueCat: No API key available");
+          setIsPro(user.subscriptionTier === "pro");
+          setIsLoading(false);
+          return;
+        }
+
+        const RC = getPurchases();
+        if (!RC) {
+          console.warn("RevenueCat native module not available, using database status");
+          setIsPro(user.subscriptionTier === "pro");
+          setIsLoading(false);
+          return;
+        }
+
+        if (!configuredRef.current) {
+          try {
+            RC.configure({ apiKey, appUserID: user.id });
+            configuredRef.current = true;
+            setRevenueCatReady(true);
+            console.log("RevenueCat configured with key:", apiKey.slice(0, 8) + "...");
+          } catch (configError: any) {
+            console.warn("RevenueCat configure error:", configError);
             setIsPro(user.subscriptionTier === "pro");
             setIsLoading(false);
             return;
           }
+        }
 
-          try {
-            RC.configure({ apiKey, appUserID: user.id });
-            setRevenueCatReady(true);
-          } catch (configError: any) {
-            console.warn("RevenueCat configure error:", configError);
-            setIsPro(user.subscriptionTier === "pro");
-            return;
-          }
-
-          try {
-            const customerInfo = await RC.getCustomerInfo();
-            const hasPro = checkEntitlements(customerInfo);
-            await syncSubscriptionToServer(hasPro);
-          } catch (infoError: any) {
-            console.warn("RevenueCat getCustomerInfo error:", infoError);
-            setIsPro(user.subscriptionTier === "pro");
-          }
-
-          try {
-            const offerings = await RC.getOfferings();
-            if (offerings.current) {
-              setCurrentOffering(offerings.current);
-            }
-          } catch (offerError: any) {
-            console.warn("RevenueCat getOfferings error:", offerError);
-          }
-
-          try {
-            RC.addCustomerInfoUpdateListener((info) => {
-              const updatedPro = checkEntitlements(info);
-              syncSubscriptionToServer(updatedPro);
-            });
-          } catch (listenerError: any) {
-            console.warn("RevenueCat listener error:", listenerError);
-          }
-        } else {
+        try {
+          const customerInfo = await RC.getCustomerInfo();
+          const hasPro = checkEntitlements(customerInfo);
+          await syncSubscriptionToServer(hasPro);
+        } catch (infoError: any) {
+          console.warn("RevenueCat getCustomerInfo error:", infoError);
           setIsPro(user.subscriptionTier === "pro");
+        }
+
+        await loadOfferings();
+
+        try {
+          RC.addCustomerInfoUpdateListener((info) => {
+            const updatedPro = checkEntitlements(info);
+            syncSubscriptionToServer(updatedPro);
+          });
+        } catch (listenerError: any) {
+          console.warn("RevenueCat listener error:", listenerError);
         }
       } catch (error) {
         console.warn("Subscription init error:", error);
@@ -148,7 +201,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     };
 
     initRevenueCat();
-  }, [user, checkEntitlements, syncSubscriptionToServer]);
+  }, [user, checkEntitlements, syncSubscriptionToServer, loadOfferings]);
 
   const purchase = useCallback(async (): Promise<boolean> => {
     try {
@@ -163,24 +216,22 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       if (!RC) throw new Error("RevenueCat not available");
 
       let offering = currentOffering;
-      if (!offering?.monthly) {
-        try {
-          const offerings = await RC.getOfferings();
-          if (offerings.current) {
-            setCurrentOffering(offerings.current);
-            offering = offerings.current;
-          }
-        } catch (retryError) {
-          console.error("Failed to retry fetching offerings:", retryError);
+      if (!offering || offering.availablePackages.length === 0) {
+        const offerings = await RC.getOfferings();
+        if (offerings.current && offerings.current.availablePackages.length > 0) {
+          setCurrentOffering(offerings.current);
+          setOfferingsStatus("ready");
+          offering = offerings.current;
         }
       }
 
-      if (!offering?.monthly) {
-        console.error("No monthly package available");
-        return false;
+      const pkg = offering?.monthly || (offering?.availablePackages?.length ? offering.availablePackages[0] : null);
+
+      if (!pkg) {
+        throw new Error("No subscription package available. Please try again later.");
       }
 
-      const { customerInfo } = await RC.purchasePackage(offering.monthly);
+      const { customerInfo } = await RC.purchasePackage(pkg);
       const hasPro = checkEntitlements(customerInfo);
       await syncSubscriptionToServer(hasPro);
       return hasPro;
@@ -217,8 +268,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         isPro,
         isLoading,
         currentOffering,
+        offeringsStatus,
+        offeringsError,
+        isConfigured: revenueCatReady,
         purchase,
         restore,
+        retryLoadOfferings: loadOfferings,
       }}
     >
       {children}

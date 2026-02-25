@@ -87,5 +87,9 @@ Key files:
 - **SendGrid**: Email integration (env: SENDGRID_API_KEY, SENDGRID_FROM_EMAIL).
 - **Google Calendar**: OAuth2-based calendar sync (env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).
 - **Stripe Connect**: Online payments via Stripe Express and Stripe Checkout (env: STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY).
+- **RevenueCat**: In-app subscription management ($14.99/mo Pro tier). Configured via `SubscriptionContext` with retry logic for offerings loading, inline error states on paywall, and `offerings.current` usage (not hardcoded identifiers). API key fetched from server `/api/subscription/config`. Entitlement IDs: `["Pro", "QuotePro for Cleaners Pro", "pro"]`.
 - **Expo-notifications**: Push notification support.
 - **Expo-print**, **expo-sharing**: For quote PDF export.
+
+### iPad Layout Compatibility
+All onboarding screens use ScrollView with sticky footer buttons and 560px max-width centering for iPad compatibility. The pattern: content wraps in `<View style={{ maxWidth: 560, width: "100%" }}>` inside a ScrollView with `contentContainerStyle={{ alignItems: "center" }}` when `screenWidth > 600`.

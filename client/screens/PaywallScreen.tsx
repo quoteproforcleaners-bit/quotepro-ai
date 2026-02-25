@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, ActivityIndicator, Platform, Modal, ScrollView, Linking } from "react-native";
+import { View, StyleSheet, Pressable, ActivityIndicator, Platform, Modal, ScrollView, Linking, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
@@ -24,7 +24,17 @@ export default function PaywallScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { purchase, restore, currentOffering, isLoading: subscriptionLoading } = useSubscription();
+  const { width: screenWidth } = useWindowDimensions();
+  const {
+    purchase,
+    restore,
+    currentOffering,
+    isLoading: subscriptionLoading,
+    offeringsStatus,
+    offeringsError,
+    isConfigured,
+    retryLoadOfferings,
+  } = useSubscription();
   const { t } = useLanguage();
 
   const FEATURES = [
@@ -37,9 +47,12 @@ export default function PaywallScreen() {
   ];
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [modal, setModal] = useState<ModalState>({ visible: false, type: "info", title: "", message: "" });
 
   const monthlyPrice = currentOffering?.monthly?.product?.priceString || "$14.99";
+  const useMaxWidth = screenWidth > 600;
+  const canPurchase = offeringsStatus === "ready" || Platform.OS === "web";
 
   const showModal = (type: ModalState["type"], title: string, message: string) => {
     setModal({ visible: true, type, title, message });
@@ -53,16 +66,28 @@ export default function PaywallScreen() {
     }
   };
 
-  const handlePurchase = async () => {
-    if (subscriptionLoading) return;
+  const handleRetryOfferings = async () => {
+    setRetrying(true);
+    try {
+      await retryLoadOfferings();
+    } finally {
+      setRetrying(false);
+    }
+  };
 
-    if (!currentOffering?.monthly && Platform.OS !== "web") {
-      showModal("error", t.paywall.notAvailableTitle, t.paywall.notAvailableMessage);
+  const handlePurchase = async () => {
+    if (subscriptionLoading || purchasing) return;
+
+    if (!canPurchase) {
+      await handleRetryOfferings();
       return;
     }
 
     setPurchasing(true);
     try {
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
       const success = await purchase();
       if (success) {
         if (Platform.OS !== "web") {
@@ -71,10 +96,8 @@ export default function PaywallScreen() {
         showModal("success", t.paywall.welcomeTitle, t.paywall.welcomeMessage);
       }
     } catch (error: any) {
-      const message = error?.message?.includes("cancelled")
-        ? t.paywall.purchaseCancelled
-        : t.paywall.purchaseFailedMessage;
       if (!error?.userCancelled) {
+        const message = error?.message || t.paywall.purchaseFailedMessage;
         showModal("error", t.paywall.purchaseFailed, message);
       }
     } finally {
@@ -107,7 +130,11 @@ export default function PaywallScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl + 40 }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl + 40 },
+          useMaxWidth ? { maxWidth: 560, alignSelf: "center", width: "100%" } : undefined,
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <Pressable
@@ -160,14 +187,62 @@ export default function PaywallScreen() {
           </ThemedText>
         </View>
 
+        {offeringsStatus === "loading" ? (
+          <View style={[styles.statusCard, { backgroundColor: theme.backgroundSecondary }]}>
+            <ActivityIndicator size="small" color={theme.primary} />
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
+              Loading subscription options...
+            </ThemedText>
+          </View>
+        ) : null}
+
+        {offeringsStatus === "error" && Platform.OS !== "web" ? (
+          <View style={[styles.errorCard, { backgroundColor: theme.error + "10", borderColor: theme.error + "30" }]}>
+            <View style={styles.errorHeader}>
+              <Feather name="alert-circle" size={16} color={theme.error} />
+              <ThemedText type="subtitle" style={{ color: theme.error, flex: 1 }}>
+                Subscriptions temporarily unavailable
+              </ThemedText>
+            </View>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+              {offeringsError || "Please check your connection and try again."}
+            </ThemedText>
+            <View style={styles.errorActions}>
+              <Pressable
+                onPress={handleRetryOfferings}
+                disabled={retrying}
+                style={[styles.retryBtn, { backgroundColor: theme.primary }]}
+              >
+                {retrying ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600" }}>Retry</ThemedText>
+                )}
+              </Pressable>
+              <Pressable
+                onPress={() => navigation.goBack()}
+                style={[styles.continueBtn, { borderColor: theme.border }]}
+              >
+                <ThemedText type="small" style={{ color: theme.textSecondary, fontWeight: "600" }}>Continue Free</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         <ThemedText type="caption" style={[styles.disclosureText, { color: theme.textSecondary }]}>
           Payment will be charged to your Apple ID at confirmation of purchase. Subscription automatically renews unless canceled at least 24 hours before the end of the billing period. You can manage or cancel your subscription in your Apple Account Settings.
         </ThemedText>
 
         <Pressable
           onPress={handlePurchase}
-          disabled={purchasing || restoring}
-          style={[styles.purchaseBtn, { backgroundColor: theme.accent, opacity: purchasing ? 0.7 : 1 }]}
+          disabled={purchasing || restoring || (offeringsStatus === "loading" && Platform.OS !== "web")}
+          style={[
+            styles.purchaseBtn,
+            {
+              backgroundColor: theme.accent,
+              opacity: (purchasing || (offeringsStatus === "loading" && Platform.OS !== "web")) ? 0.5 : 1,
+            },
+          ]}
           testID="button-purchase"
         >
           {purchasing ? (
@@ -176,7 +251,9 @@ export default function PaywallScreen() {
             <>
               <Feather name="zap" size={20} color="#FFFFFF" />
               <ThemedText type="body" style={styles.purchaseBtnText}>
-                {t.paywall.subscribeNow}
+                {offeringsStatus === "loading" && Platform.OS !== "web"
+                  ? "Loading..."
+                  : t.paywall.subscribeNow}
               </ThemedText>
             </>
           )}
@@ -214,6 +291,14 @@ export default function PaywallScreen() {
             </ThemedText>
           </Pressable>
         </View>
+
+        {__DEV__ ? (
+          <View style={[styles.debugCard, { backgroundColor: theme.backgroundSecondary }]}>
+            <ThemedText type="caption" style={{ color: theme.textSecondary, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}>
+              {`RC: ${isConfigured ? "configured" : "not configured"}\nOfferings: ${offeringsStatus}\nPackages: ${currentOffering?.availablePackages?.length || 0}`}
+            </ThemedText>
+          </View>
+        ) : null}
       </ScrollView>
 
       <Modal
@@ -313,6 +398,45 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
   },
+  statusCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.md,
+  },
+  errorCard: {
+    width: "100%",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  errorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  errorActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  retryBtn: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  continueBtn: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+    borderWidth: 1,
+  },
   purchaseBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -352,6 +476,13 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textDecorationLine: "underline",
   },
+  debugCard: {
+    width: "100%",
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+    marginTop: Spacing.xl,
+    opacity: 0.6,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -361,6 +492,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "100%",
+    maxWidth: 400,
     borderRadius: BorderRadius.md,
     padding: Spacing.xl,
     alignItems: "center",
