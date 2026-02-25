@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Modal, ScrollView, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Pressable, Modal, ScrollView, ActivityIndicator, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -53,6 +53,8 @@ export default function SendQuoteScreen({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -82,8 +84,9 @@ export default function SendQuoteScreen({
     <>
       <KeyboardAwareScrollViewCompat
         style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing["3xl"] }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing["3xl"] }, useMaxWidth ? { alignItems: "center" } : undefined]}
       >
+        <View style={useMaxWidth ? { maxWidth: 560, width: "100%" } : { width: "100%" }}>
         <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
           <Feather name="arrow-left" size={22} color={theme.text} />
         </Pressable>
@@ -168,6 +171,7 @@ export default function SendQuoteScreen({
         <Pressable onPress={onSkip} style={styles.skipBtn}>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>Skip and send later</ThemedText>
         </Pressable>
+        </View>
       </KeyboardAwareScrollViewCompat>
 
       <Modal visible={showPreview} transparent animationType="slide">

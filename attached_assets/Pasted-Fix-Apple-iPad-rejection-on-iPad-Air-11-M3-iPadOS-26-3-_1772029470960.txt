@@ -1,0 +1,43 @@
+Fix Apple iPad rejection: on iPad Air 11" (M3) iPadOS 26.3 the primary action button is clipped/off-screen during setup. Apple screenshot shows the “You’re all set!” final setup screen where the blue CTA button at the bottom is not fully visible.
+
+Work in the QuotePro codebase and do NOT change business logic. Only layout/safe-area/scroll behavior.
+
+1) Find the Setup completion screen (likely titled “You’re all set!”) and any other setup/onboarding steps that contain a primary CTA at the bottom (Continue/Next/Finish/Get Started).
+
+2) On each setup screen, implement these layout rules:
+   - Wrap the entire screen in SafeAreaView (or ensure safe-area insets are applied).
+   - The content must be scrollable when vertical space is constrained (ScrollView).
+   - The primary CTA must never be clipped by the bottom edge or home indicator on iPad.
+
+3) Create a reusable component for setup screens:
+   - <SetupScreenLayout> (or similar) that provides:
+     a) SafeArea handling using react-native-safe-area-context useSafeAreaInsets()
+     b) ScrollView content area with contentContainerStyle paddingBottom that accounts for:
+        paddingBottom = insets.bottom + footerHeight + 16
+     c) A sticky footer area for the primary CTA that sits above the safe area:
+        footer paddingBottom = insets.bottom + 12
+        footer uses a solid background so it looks intentional
+   - The sticky footer should be inside the SafeAreaView, not absolutely positioned offscreen.
+
+4) Replace any “absolute bottom: 0” CTA patterns in setup screens with the new sticky footer pattern.
+   - If any screen currently uses fixed heights, remove them and let content flex/scroll.
+
+5) iPad readability improvements (for setup screens only):
+   - Center content on iPad with a maxWidth container (ex: 560–640) so it doesn’t feel awkward.
+   - Keep tap targets >= 44pt and spacing comfortable.
+
+6) Specifically fix the “You’re all set!” screen from Apple:
+   - Ensure the checklist + pro tip can scroll if needed
+   - Ensure the blue CTA is fully visible with safe area padding (no clipping)
+   - Test both portrait and landscape and also iPad multitasking/smaller heights
+
+7) Verification checklist (do this before finishing):
+   - iPad Air 11" dimensions: CTA visible without scrolling OR reachable via scrolling
+   - CTA never hidden behind home indicator/safe area
+   - No content overlaps with status bar or bottom area
+   - Works with Dynamic Type larger text without clipping
+
+Deliver:
+- New reusable SetupScreenLayout component
+- Updated setup screens to use it (including “You’re all set!”)
+- Brief code comments explaining safe area + sticky footer + bottom padding strategy

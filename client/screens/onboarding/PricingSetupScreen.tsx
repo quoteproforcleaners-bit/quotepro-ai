@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -26,6 +26,8 @@ export default function PricingSetupScreen({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [hourlyRate, setHourlyRate] = useState(settings.hourlyRate.toString());
   const [minimumTicket, setMinimumTicket] = useState(
     settings.minimumTicket.toString()
@@ -52,8 +54,10 @@ export default function PricingSetupScreen({
           paddingTop: insets.top + Spacing.xl,
           paddingBottom: insets.bottom + Spacing.xl,
         },
+        useMaxWidth ? { alignItems: "center" } : undefined,
       ]}
     >
+      <View style={useMaxWidth ? { maxWidth: 560, width: "100%" } : { width: "100%" }}>
       <View style={styles.header}>
         <ThemedText type="hero" style={styles.title}>
           Set Your Pricing
@@ -155,6 +159,7 @@ export default function PricingSetupScreen({
         <Button onPress={handleComplete} style={styles.completeButton}>
           Get Started
         </Button>
+      </View>
       </View>
     </KeyboardAwareScrollViewCompat>
   );

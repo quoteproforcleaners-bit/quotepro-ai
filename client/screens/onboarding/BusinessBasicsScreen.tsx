@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Image } from "react-native";
+import { View, StyleSheet, Pressable, Image, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -17,12 +17,16 @@ interface Props {
   onBack: () => void;
 }
 
+const MAX_CONTENT_WIDTH = 560;
+
 export default function BusinessBasicsScreen({ initialName, onNext, onBack }: Props) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
   const [businessName, setBusinessName] = useState(initialName || "");
   const [zipCode, setZipCode] = useState("");
   const [logoUri, setLogoUri] = useState<string | null>(null);
+  const useMaxWidth = screenWidth > MAX_CONTENT_WIDTH + 40;
 
   const handlePickLogo = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -40,8 +44,9 @@ export default function BusinessBasicsScreen({ initialName, onNext, onBack }: Pr
   return (
     <KeyboardAwareScrollViewCompat
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl }]}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl }, useMaxWidth ? { alignItems: "center" } : undefined]}
     >
+      <View style={useMaxWidth ? { maxWidth: MAX_CONTENT_WIDTH, width: "100%" } : { width: "100%" }}>
       <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
         <Feather name="arrow-left" size={22} color={theme.text} />
       </Pressable>
@@ -99,6 +104,7 @@ export default function BusinessBasicsScreen({ initialName, onNext, onBack }: Pr
       <Pressable onPress={() => onNext({ businessName: businessName || "My Cleaning Co", zipCode: "", logoUri: null })} style={styles.skipBtn}>
         <ThemedText type="small" style={{ color: theme.textSecondary }}>Skip for now</ThemedText>
       </Pressable>
+      </View>
     </KeyboardAwareScrollViewCompat>
   );
 }

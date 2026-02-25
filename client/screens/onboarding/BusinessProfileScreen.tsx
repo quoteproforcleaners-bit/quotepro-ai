@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Image, Pressable, Platform } from "react-native";
+import { View, StyleSheet, Image, Pressable, Platform, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -26,6 +26,8 @@ export default function BusinessProfileScreen({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [companyName, setCompanyName] = useState(profile.companyName);
   const [email, setEmail] = useState(profile.email);
   const [phone, setPhone] = useState(profile.phone);
@@ -71,8 +73,10 @@ export default function BusinessProfileScreen({
           paddingTop: insets.top + Spacing.xl,
           paddingBottom: insets.bottom + Spacing.xl,
         },
+        useMaxWidth ? { alignItems: "center" } : undefined,
       ]}
     >
+      <View style={[styles.innerWrap, useMaxWidth ? { maxWidth: 560 } : undefined]}>
       <View style={styles.header}>
         <ThemedText type="hero" style={styles.title}>
           Welcome to QuotePro
@@ -152,6 +156,7 @@ export default function BusinessProfileScreen({
           </ThemedText>
         </Pressable>
       </View>
+      </View>
     </KeyboardAwareScrollViewCompat>
   );
 }
@@ -162,6 +167,9 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg,
+  },
+  innerWrap: {
+    width: "100%",
   },
   header: {
     marginBottom: Spacing["3xl"],

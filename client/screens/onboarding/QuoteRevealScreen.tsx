@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from "react";
-import { View, StyleSheet, Pressable, ScrollView, TextInput } from "react-native";
+import { View, StyleSheet, Pressable, ScrollView, TextInput, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -45,9 +45,13 @@ const ADD_ONS = [
   { id: "deepCleanReset", label: "Deep Clean Reset in 6 months", price: 199 },
 ];
 
+const MAX_CONTENT_WIDTH = 560;
+
 export default function QuoteRevealScreen({ tiers, frequency: initialFrequency, goal, onNext, onBack }: Props) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > MAX_CONTENT_WIDTH + 40;
   const [selectedTier, setSelectedTier] = useState("better");
   const [addOns, setAddOns] = useState<string[]>([]);
   const [selectedFrequency, setSelectedFrequency] = useState(initialFrequency || "biweekly");
@@ -116,10 +120,11 @@ export default function QuoteRevealScreen({ tiers, frequency: initialFrequency, 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing["3xl"] }]}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing["3xl"] }, useMaxWidth ? { alignItems: "center" } : undefined]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
+      <View style={useMaxWidth ? { maxWidth: MAX_CONTENT_WIDTH, width: "100%" } : { width: "100%" }}>
       <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
         <Feather name="arrow-left" size={22} color={theme.text} />
       </Pressable>
@@ -274,6 +279,7 @@ export default function QuoteRevealScreen({ tiers, frequency: initialFrequency, 
         <ThemedText type="subtitle" style={{ color: "#FFFFFF", fontWeight: "700" }}>Next: Send Quote</ThemedText>
         <Feather name="arrow-right" size={18} color="#FFFFFF" />
       </Pressable>
+      </View>
     </ScrollView>
   );
 }
