@@ -885,6 +885,12 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
   app.put("/api/quotes/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const { lineItems, ...data } = req.body;
+      const dateFields = ["acceptedAt", "declinedAt", "sentAt", "expiresAt", "lastContactAt"] as const;
+      for (const field of dateFields) {
+        if (typeof data[field] === "string") {
+          data[field] = new Date(data[field]);
+        }
+      }
       const q = await updateQuote(req.params.id, data);
 
       if (lineItems) {
