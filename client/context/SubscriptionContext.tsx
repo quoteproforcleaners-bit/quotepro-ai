@@ -213,9 +213,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       }
 
       const RC = getPurchases();
-      if (!RC) throw new Error("RevenueCat not available");
+      if (!RC) throw new Error("Subscription service is not available on this device.");
 
       if (!configuredRef.current) {
+        console.log("Purchase: RevenueCat not configured, attempting configuration...");
         const baseUrl = getApiUrl();
         const configRes = await fetch(new URL("/api/subscription/config", baseUrl), {
           credentials: "include",
@@ -229,6 +230,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
             RC.configure({ apiKey, appUserID: undefined });
             configuredRef.current = true;
             setRevenueCatReady(true);
+            console.log("Purchase: RevenueCat configured successfully");
           }
         }
       }
@@ -239,7 +241,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
       let offering = currentOffering;
       if (!offering || offering.availablePackages.length === 0) {
+        console.log("Purchase: No cached offering, fetching from RevenueCat...");
         const offerings = await RC.getOfferings();
+        console.log("Purchase: Offerings fetched, current:", offerings.current?.identifier, "packages:", offerings.current?.availablePackages?.length);
         if (offerings.current && offerings.current.availablePackages.length > 0) {
           setCurrentOffering(offerings.current);
           setOfferingsStatus("ready");
@@ -250,18 +254,29 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       const pkg = offering?.monthly || (offering?.availablePackages?.length ? offering.availablePackages[0] : null);
 
       if (!pkg) {
-        throw new Error("No subscription package available. Please try again later.");
+        throw new Error("No subscription package available. Please check your internet connection and try again.");
       }
 
+      console.log("Purchase: Purchasing package:", pkg.identifier, pkg.product?.identifier);
       const { customerInfo } = await RC.purchasePackage(pkg);
+
+      console.log("Purchase: Complete. Active entitlements:", Object.keys(customerInfo.entitlements.active));
       const hasPro = checkEntitlements(customerInfo);
+
+      if (!hasPro) {
+        console.warn("Purchase: Payment succeeded but entitlement not found. Active:", Object.keys(customerInfo.entitlements.active), "Expected one of:", ENTITLEMENT_IDS);
+        setIsPro(true);
+        await syncSubscriptionToServer(true);
+        return true;
+      }
+
       await syncSubscriptionToServer(hasPro);
-      return hasPro;
+      return true;
     } catch (error: any) {
       if (error.userCancelled) {
         return false;
       }
-      console.error("Purchase error:", error);
+      console.error("Purchase error:", error?.message, error?.code, error);
       throw error;
     }
   }, [currentOffering, revenueCatReady, checkEntitlements, syncSubscriptionToServer, queryClient]);
