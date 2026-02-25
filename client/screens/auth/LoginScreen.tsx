@@ -223,16 +223,6 @@ export default function LoginScreen() {
           />
         ) : null}
 
-        <Pressable
-          style={[styles.googleButton, { borderColor: theme.border }]}
-          onPress={handleGoogleSignIn}
-          testID="button-google-signin"
-        >
-          <ThemedText type="body" style={{ fontWeight: "600" }}>
-            {t.login.continueWithGoogle}
-          </ThemedText>
-        </Pressable>
-
         <View style={styles.divider}>
           <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
           <ThemedText
