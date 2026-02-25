@@ -60,17 +60,23 @@ export default function ProposalPreviewScreen({
   const companyName = businessProfile?.companyName || "Our Company";
 
   const handleGenerateScope = async () => {
-    const consented = await requestConsent();
-    if (!consented) return;
-
-    setScopeLoading(true);
+    console.log("[ProposalPreview] Generate scope pressed");
     try {
+      const consented = await requestConsent();
+      console.log("[ProposalPreview] Consent result:", consented);
+      if (!consented) return;
+
+      setScopeLoading(true);
+      const results = [];
       for (let i = 0; i < tiers.length; i++) {
+        console.log("[ProposalPreview] Generating scope for tier", i, tiers[i].name);
         const res = await apiRequest("POST", "/api/commercial/generate-scope", {
           walkthrough,
           tier: tiers[i],
         });
         const data = await res.json();
+        console.log("[ProposalPreview] Scope response for tier", i, JSON.stringify(data).slice(0, 200));
+        results.push(data);
         if (onScopeUpdate) {
           const scopeText = data.scopeParagraph || tiers[i].scopeText;
           const included = data.includedTasks || tiers[i].includedBullets;
@@ -81,19 +87,23 @@ export default function ProposalPreviewScreen({
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-    } catch (err) {
-      Alert.alert("Error", "Could not generate scope. Please try again.");
+    } catch (err: any) {
+      console.error("[ProposalPreview] Generate scope error:", err?.message || err);
+      Alert.alert("Error", `Could not generate scope: ${err?.message || "Unknown error"}`);
     } finally {
       setScopeLoading(false);
     }
   };
 
   const handleRiskScan = async () => {
-    const consented = await requestConsent();
-    if (!consented) return;
-
-    setRiskLoading(true);
+    console.log("[ProposalPreview] Risk scan pressed");
     try {
+      const consented = await requestConsent();
+      console.log("[ProposalPreview] Risk consent result:", consented);
+      if (!consented) return;
+
+      setRiskLoading(true);
+      console.log("[ProposalPreview] Calling risk-scan API...");
       const res = await apiRequest("POST", "/api/commercial/risk-scan", {
         walkthrough,
         pricing,
@@ -101,6 +111,7 @@ export default function ProposalPreviewScreen({
         tiers,
       });
       const data = await res.json();
+      console.log("[ProposalPreview] Risk scan response:", JSON.stringify(data).slice(0, 200));
       setRiskResults({
         warnings: data.warnings || [],
         overallAssessment: data.overallAssessment || "",
@@ -109,8 +120,9 @@ export default function ProposalPreviewScreen({
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-    } catch (err) {
-      Alert.alert("Error", "Could not perform risk scan. Please try again.");
+    } catch (err: any) {
+      console.error("[ProposalPreview] Risk scan error:", err?.message || err);
+      Alert.alert("Error", `Could not perform risk scan: ${err?.message || "Unknown error"}`);
     } finally {
       setRiskLoading(false);
     }
