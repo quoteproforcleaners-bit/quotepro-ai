@@ -1234,7 +1234,7 @@ export default function SettingsScreen() {
       ) : null}
 
       <Pressable
-        onPress={logout}
+        onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); logout(); }}
         style={[
           styles.logoutButton,
           { backgroundColor: theme.error + "15", borderColor: theme.error + "30" },
