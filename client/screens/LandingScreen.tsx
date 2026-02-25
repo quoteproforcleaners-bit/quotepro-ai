@@ -5,7 +5,6 @@ import {
   Pressable,
   Image,
   Modal,
-  ScrollView,
   Platform,
   useWindowDimensions,
 } from "react-native";
@@ -22,28 +21,6 @@ import { LANGUAGE_LABELS, type Language } from "@/i18n";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 const appIcon = require("../../assets/images/icon.png");
-
-type HeadlineVariant = "A" | "B" | "C" | "D";
-const ONBOARDING_HEADLINE_VARIANT: HeadlineVariant = "A";
-
-const COPY = {
-  headline: {
-    A: "Close More Cleaning Jobs\nin 30 Seconds",
-    B: "Stop Losing Jobs\nto Better Quotes",
-    C: "Turn Quotes Into\nClosed Jobs With AI",
-    D: "Add $5,000/Month\nWith Better Quotes",
-  } as Record<HeadlineVariant, string>,
-  tension: "Most cleaners lose jobs because their quotes look unprofessional. Fix it in minutes.",
-  cta: "createFreeQuote",
-  noAccount: "noAccountNeeded",
-  speedLine: "speedLine",
-  trust1: "builtBy",
-  trust2: "designedToHelp",
-  previewTitle: "previewTitle",
-  previewCaption: "previewSubline",
-  signIn: "signIn",
-  saveLink: "whyCreateAccount",
-};
 
 const OUTCOME_FEATURES = [
   { icon: "zap" as const, titleKey: "winMoreJobs", descKey: "winMoreJobsDesc" },
@@ -75,18 +52,18 @@ export default function LandingScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + Spacing.md }]}>
-      <ScrollView
-        contentContainerStyle={[
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <View
+        style={[
           styles.content,
           {
-            paddingBottom: insets.bottom + Spacing.xl,
+            paddingTop: insets.top + Spacing.md,
+            paddingBottom: insets.bottom + Spacing.md,
             maxWidth: containerMaxWidth,
             alignSelf: isWide ? "center" : undefined,
             width: isWide ? containerMaxWidth : undefined,
           },
         ]}
-        showsVerticalScrollIndicator={false}
       >
         <View style={styles.languageRow}>
           {(Object.keys(LANGUAGE_LABELS) as Language[]).map((lang) => (
@@ -116,48 +93,15 @@ export default function LandingScreen() {
 
         <View style={styles.branding}>
           <Image source={appIcon} style={styles.appLogo} />
-          <ThemedText type="h1" style={[styles.appName, { color: theme.text }]}>
+          <ThemedText type="h2" style={[styles.appName, { color: theme.text }]}>
             QuotePro
           </ThemedText>
-          <ThemedText type="h3" style={styles.headline}>
-            {landing.tagline || COPY.headline[ONBOARDING_HEADLINE_VARIANT]}
-          </ThemedText>
-          <ThemedText type="small" style={[styles.tensionText, { color: theme.textSecondary }]}>
-            {landing.tensionCopy || COPY.tension}
+          <ThemedText type="body" style={[styles.headline, { color: theme.textSecondary }]}>
+            {landing.tagline}
           </ThemedText>
         </View>
 
-        <Pressable
-          style={[styles.primaryButton, { backgroundColor: theme.primary }]}
-          onPress={handleCreateQuote}
-          testID="button-create-free-quote"
-        >
-          <Feather name="file-text" size={20} color="#FFFFFF" />
-          <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: Spacing.sm }}>
-            {landing[COPY.cta as keyof typeof landing]}
-          </ThemedText>
-        </Pressable>
-
-        <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
-          {landing[COPY.noAccount as keyof typeof landing]}
-        </ThemedText>
-        <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginTop: 4, opacity: 0.6 }}>
-          {landing[COPY.speedLine as keyof typeof landing] || "Start in under 30 seconds."}
-        </ThemedText>
-
-        <View style={[styles.proofSection, { marginTop: Spacing.md }]}>
-          <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center" }}>
-            {landing[COPY.trust1 as keyof typeof landing]}
-          </ThemedText>
-          <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginTop: 2 }}>
-            {landing[COPY.trust2 as keyof typeof landing]}
-          </ThemedText>
-        </View>
-
-        <View style={[styles.previewCard, { backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", borderColor: theme.border }]}>
-          <ThemedText type="caption" style={{ color: theme.textSecondary, fontWeight: "600", marginBottom: Spacing.sm, textAlign: "center" }}>
-            {landing[COPY.previewTitle as keyof typeof landing]}
-          </ThemedText>
+        <View style={styles.previewCard}>
           <View style={styles.previewTiers}>
             {[
               { label: landing.previewGood || "Good", price: "$180" },
@@ -183,51 +127,50 @@ export default function LandingScreen() {
               </View>
             ))}
           </View>
-          <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
-            {landing[COPY.previewCaption as keyof typeof landing]}
-          </ThemedText>
         </View>
 
-        <View style={[styles.divider, { marginVertical: Spacing.lg }]}>
-          <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-          <ThemedText type="small" style={{ marginHorizontal: Spacing.md, color: theme.textSecondary }}>
-            {t.common.or}
-          </ThemedText>
-          <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+        <View style={styles.buttonsSection}>
+          <Pressable
+            style={[styles.primaryButton, { backgroundColor: theme.primary }]}
+            onPress={handleCreateQuote}
+            testID="button-create-free-quote"
+          >
+            <Feather name="file-text" size={18} color="#FFFFFF" />
+            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: Spacing.sm }}>
+              {landing.createFreeQuote}
+            </ThemedText>
+          </Pressable>
+
+          <View style={styles.divider}>
+            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+            <ThemedText type="small" style={{ marginHorizontal: Spacing.sm, color: theme.textSecondary }}>
+              {t.common.or}
+            </ThemedText>
+            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
+          </View>
+
+          <Pressable
+            style={[styles.secondaryButton, { borderColor: theme.border }]}
+            onPress={handleSignIn}
+            testID="button-sign-in"
+          >
+            <Feather name="log-in" size={16} color={theme.textSecondary} />
+            <ThemedText type="body" style={{ fontWeight: "600", marginLeft: Spacing.sm, color: theme.textSecondary }}>
+              {landing.signIn}
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setShowBenefits(true)}
+            style={styles.benefitsLink}
+            testID="button-why-account"
+          >
+            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
+              {landing.whyCreateAccount}
+            </ThemedText>
+          </Pressable>
         </View>
-
-        <Pressable
-          style={[styles.secondaryButton, { borderColor: theme.border }]}
-          onPress={handleSignIn}
-          testID="button-sign-in"
-        >
-          <Feather name="log-in" size={18} color={theme.textSecondary} />
-          <ThemedText type="body" style={{ fontWeight: "600", marginLeft: Spacing.sm, color: theme.textSecondary }}>
-            {landing[COPY.signIn as keyof typeof landing]}
-          </ThemedText>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setShowBenefits(true)}
-          style={styles.benefitsLink}
-          testID="button-why-account"
-        >
-          <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-            {landing[COPY.saveLink as keyof typeof landing]}
-          </ThemedText>
-        </Pressable>
-
-        <View style={[styles.featuresGrid, { marginTop: Spacing.xl }]}>
-          {OUTCOME_FEATURES.map((b, i) => (
-            <View key={i} style={styles.featureCard}>
-              <Feather name={b.icon} size={22} color={theme.primary} />
-              <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.xs, textAlign: "center", color: theme.textSecondary }}>
-                {landing[b.titleKey as keyof typeof landing]}
-              </ThemedText>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
+      </View>
 
       <Modal visible={showBenefits} transparent animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setShowBenefits(false)}>
@@ -278,90 +221,45 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    flex: 1,
     paddingHorizontal: Spacing.xl,
-    alignItems: "center",
+    justifyContent: "center",
   },
   languageRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
     flexWrap: "wrap",
   },
   languageChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
   },
   branding: {
     alignItems: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   appLogo: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
+    width: 56,
+    height: 56,
+    borderRadius: 14,
     marginBottom: Spacing.sm,
   },
   appName: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: "800",
-    marginBottom: 4,
+    marginBottom: 2,
   },
   headline: {
     textAlign: "center",
-    marginBottom: Spacing.xs,
-    maxWidth: 320,
-  },
-  tensionText: {
-    textAlign: "center",
     maxWidth: 300,
-    lineHeight: 20,
-  },
-  primaryButton: {
-    width: "100%",
-    height: 56,
-    borderRadius: BorderRadius.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-  },
-  secondaryButton: {
-    width: "100%",
-    height: 46,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    opacity: 0.85,
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  benefitsLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: Spacing.sm,
-    paddingVertical: Spacing.xs,
-  },
-  proofSection: {
-    alignItems: "center",
-    paddingVertical: Spacing.xs,
   },
   previewCard: {
     width: "100%",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   previewTiers: {
     flexDirection: "row",
@@ -374,17 +272,40 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
   },
-  featuresGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.md,
-    justifyContent: "center",
-    width: "100%",
-  },
-  featureCard: {
-    width: "47%",
-    paddingVertical: Spacing.md,
+  buttonsSection: {
     alignItems: "center",
+  },
+  primaryButton: {
+    width: "100%",
+    height: 48,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+  },
+  secondaryButton: {
+    width: "100%",
+    height: 44,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    opacity: 0.85,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    marginVertical: Spacing.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  benefitsLink: {
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   modalOverlay: {
     flex: 1,
