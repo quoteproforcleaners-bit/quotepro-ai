@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TextInput, Pressable, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import { readAsStringAsync, writeAsStringAsync, documentDirectory, cacheDirectory } from "expo-file-system/legacy";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
@@ -14,7 +15,8 @@ import { useAIConsent } from "@/context/AIConsentContext";
 import { useApp } from "@/context/AppContext";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { CommercialWalkthrough, CommercialLaborEstimate, CommercialPricing, CommercialTier, CommercialFrequency } from "../types";
+import { CommercialWalkthrough, CommercialLaborEstimate, CommercialPricing, CommercialTier, CommercialFrequency, ProposalAttachments } from "../types";
+import { AttachmentSection } from "../components/AttachmentSection";
 
 interface ProposalPreviewScreenProps {
   walkthrough: CommercialWalkthrough;
@@ -22,9 +24,11 @@ interface ProposalPreviewScreenProps {
   pricing: CommercialPricing;
   tiers: CommercialTier[];
   quoteId?: string;
+  attachments: ProposalAttachments;
   onAccept: () => void;
   onBack: () => void;
   onScopeUpdate?: (tierIndex: number, scopeText: string, includedBullets?: string[], excludedBullets?: string[]) => void;
+  onAttachmentsUpdate: (attachments: ProposalAttachments) => void;
 }
 
 const FREQUENCY_LABELS: Record<CommercialFrequency, string> = {
@@ -42,9 +46,11 @@ export default function ProposalPreviewScreen({
   pricing,
   tiers,
   quoteId,
+  attachments,
   onAccept,
   onBack,
   onScopeUpdate,
+  onAttachmentsUpdate,
 }: ProposalPreviewScreenProps) {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
@@ -60,23 +66,17 @@ export default function ProposalPreviewScreen({
   const companyName = businessProfile?.companyName || "Our Company";
 
   const handleGenerateScope = async () => {
-    console.log("[ProposalPreview] Generate scope pressed");
     try {
       const consented = await requestConsent();
-      console.log("[ProposalPreview] Consent result:", consented);
       if (!consented) return;
 
       setScopeLoading(true);
-      const results = [];
       for (let i = 0; i < tiers.length; i++) {
-        console.log("[ProposalPreview] Generating scope for tier", i, tiers[i].name);
         const res = await apiRequest("POST", "/api/commercial/generate-scope", {
           walkthrough,
           tier: tiers[i],
         });
         const data = await res.json();
-        console.log("[ProposalPreview] Scope response for tier", i, JSON.stringify(data).slice(0, 200));
-        results.push(data);
         if (onScopeUpdate) {
           const scopeText = data.scopeParagraph || tiers[i].scopeText;
           const included = data.includedTasks || tiers[i].includedBullets;
@@ -88,7 +88,6 @@ export default function ProposalPreviewScreen({
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (err: any) {
-      console.error("[ProposalPreview] Generate scope error:", err?.message || err);
       Alert.alert("Error", `Could not generate scope: ${err?.message || "Unknown error"}`);
     } finally {
       setScopeLoading(false);
@@ -96,14 +95,11 @@ export default function ProposalPreviewScreen({
   };
 
   const handleRiskScan = async () => {
-    console.log("[ProposalPreview] Risk scan pressed");
     try {
       const consented = await requestConsent();
-      console.log("[ProposalPreview] Risk consent result:", consented);
       if (!consented) return;
 
       setRiskLoading(true);
-      console.log("[ProposalPreview] Calling risk-scan API...");
       const res = await apiRequest("POST", "/api/commercial/risk-scan", {
         walkthrough,
         pricing,
@@ -111,7 +107,6 @@ export default function ProposalPreviewScreen({
         tiers,
       });
       const data = await res.json();
-      console.log("[ProposalPreview] Risk scan response:", JSON.stringify(data).slice(0, 200));
       setRiskResults({
         warnings: data.warnings || [],
         overallAssessment: data.overallAssessment || "",
@@ -121,10 +116,106 @@ export default function ProposalPreviewScreen({
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (err: any) {
-      console.error("[ProposalPreview] Risk scan error:", err?.message || err);
       Alert.alert("Error", `Could not perform risk scan: ${err?.message || "Unknown error"}`);
     } finally {
       setRiskLoading(false);
+    }
+  };
+
+  const readFileAsBase64 = async (uri: string): Promise<string> => {
+    if (Platform.OS === "web") {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1] || result);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+    return await readAsStringAsync(uri, {
+      encoding: "base64",
+    });
+  };
+
+  const buildAttachmentPages = async (): Promise<string> => {
+    let html = "";
+    const items: { label: string; attachment: typeof attachments.coi }[] = [];
+
+    if (attachments.coi) items.push({ label: "Certificate of Insurance (COI)", attachment: attachments.coi });
+    if (attachments.w9) items.push({ label: "W-9", attachment: attachments.w9 });
+
+    for (const item of items) {
+      const att = item.attachment!;
+      const isImage = att.mimeType.startsWith("image/");
+
+      if (isImage) {
+        try {
+          const base64 = await readFileAsBase64(att.uri);
+          html += `
+            <div style="page-break-before:always;padding:40px;text-align:center;">
+              <h2 style="font-family:-apple-system,sans-serif;color:#333;margin-bottom:20px;">${item.label}</h2>
+              <img src="data:${att.mimeType};base64,${base64}" style="max-width:100%;max-height:85vh;object-fit:contain;" />
+              <p style="font-family:-apple-system,sans-serif;font-size:11px;color:#999;margin-top:12px;">${att.name}</p>
+            </div>`;
+        } catch {
+          html += `
+            <div style="page-break-before:always;padding:40px;text-align:center;">
+              <h2 style="font-family:-apple-system,sans-serif;color:#333;">${item.label}</h2>
+              <p style="font-family:-apple-system,sans-serif;color:#666;">Attachment: ${att.name} (could not embed)</p>
+            </div>`;
+        }
+      } else {
+        html += `
+          <div style="page-break-before:always;padding:40px;text-align:center;">
+            <h2 style="font-family:-apple-system,sans-serif;color:#333;">${item.label}</h2>
+            <p style="font-family:-apple-system,sans-serif;color:#666;margin-top:20px;">See attached document: ${att.name}</p>
+          </div>`;
+      }
+    }
+
+    return html;
+  };
+
+  const mergePdfAttachments = async (proposalUri: string): Promise<string> => {
+    const pdfAttachments = [attachments.coi, attachments.w9].filter(
+      (a) => a && a.mimeType === "application/pdf"
+    );
+
+    if (pdfAttachments.length === 0) return proposalUri;
+
+    try {
+      const { PDFDocument } = await import("pdf-lib");
+      const proposalBase64 = await readFileAsBase64(proposalUri);
+      const proposalPdf = await PDFDocument.load(proposalBase64);
+
+      for (const att of pdfAttachments) {
+        if (!att) continue;
+        try {
+          const attBase64 = await readFileAsBase64(att.uri);
+          const attPdf = await PDFDocument.load(attBase64);
+          const pages = await proposalPdf.copyPages(attPdf, attPdf.getPageIndices());
+          pages.forEach((page) => proposalPdf.addPage(page));
+        } catch (e) {
+          console.warn(`Could not merge ${att.name}:`, e);
+        }
+      }
+
+      const mergedBase64 = await proposalPdf.saveAsBase64();
+
+      if (Platform.OS === "web") return proposalUri;
+
+      const mergedUri = (documentDirectory || cacheDirectory || "") + `merged_proposal_${Date.now()}.pdf`;
+      await writeAsStringAsync(mergedUri, mergedBase64, {
+        encoding: "base64",
+      });
+      return mergedUri;
+    } catch (err) {
+      console.warn("PDF merge failed, using base proposal:", err);
+      return proposalUri;
     }
   };
 
@@ -139,15 +230,33 @@ export default function ProposalPreviewScreen({
       const data = await res.json();
       if (!data.html) throw new Error("No PDF data");
 
+      let html = data.html;
+      const attachmentHtml = await buildAttachmentPages();
+      if (attachmentHtml) {
+        html = html.replace("</body>", `${attachmentHtml}</body>`);
+      }
+
       if (Platform.OS === "web") {
         const win = window.open("", "_blank");
         if (win) {
-          win.document.write(data.html);
+          win.document.write(html);
           win.document.close();
           win.print();
         }
       } else {
-        const { uri } = await Print.printToFileAsync({ html: data.html });
+        let { uri } = await Print.printToFileAsync({ html });
+
+        const hasPdfAttachments = [attachments.coi, attachments.w9].some(
+          (a) => a && a.mimeType === "application/pdf"
+        );
+        if (hasPdfAttachments) {
+          try {
+            uri = await mergePdfAttachments(uri);
+          } catch {
+            Alert.alert("Note", "Could not append PDF attachments. Shared proposal without them.");
+          }
+        }
+
         await Sharing.shareAsync(uri, {
           mimeType: "application/pdf",
           dialogTitle: `Commercial Proposal - ${walkthrough.facilityName || "Facility"}`,
@@ -207,10 +316,11 @@ export default function ProposalPreviewScreen({
         <SectionHeader title="Scope of Work" />
 
         <View style={styles.aiButtonsRow}>
-          <Pressable
+          <TouchableOpacity
             style={[styles.aiButton, { backgroundColor: isDark ? `${theme.primary}20` : `${theme.primary}10`, borderColor: `${theme.primary}30` }]}
             onPress={handleGenerateScope}
             disabled={scopeLoading}
+            activeOpacity={0.7}
             testID="button-generate-scope"
           >
             {scopeLoading ? (
@@ -221,11 +331,12 @@ export default function ProposalPreviewScreen({
             <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600", marginLeft: Spacing.xs }}>
               AI Generate Scope
             </ThemedText>
-          </Pressable>
-          <Pressable
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.aiButton, { backgroundColor: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.3)" }]}
             onPress={handleRiskScan}
             disabled={riskLoading}
+            activeOpacity={0.7}
             testID="button-risk-scan"
           >
             {riskLoading ? (
@@ -236,7 +347,7 @@ export default function ProposalPreviewScreen({
             <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: Spacing.xs }}>
               AI Risk Scan
             </ThemedText>
-          </Pressable>
+          </TouchableOpacity>
         </View>
 
         {riskResults ? (
@@ -288,9 +399,9 @@ export default function ProposalPreviewScreen({
           <Card key={`scope-${index}`} style={styles.scopeCard}>
             <View style={styles.scopeHeader}>
               <ThemedText type="h4">{tier.name}</ThemedText>
-              <Pressable onPress={() => setEditingScopeIndex(editingScopeIndex === index ? null : index)} testID={`button-edit-scope-${index}`}>
+              <TouchableOpacity onPress={() => setEditingScopeIndex(editingScopeIndex === index ? null : index)} testID={`button-edit-scope-${index}`}>
                 <Feather name={editingScopeIndex === index ? "check" : "edit-2"} size={16} color={theme.primary} />
-              </Pressable>
+              </TouchableOpacity>
             </View>
             {editingScopeIndex === index ? (
               <TextInput
@@ -369,6 +480,11 @@ export default function ProposalPreviewScreen({
           ))}
         </Card>
 
+        <AttachmentSection
+          attachments={attachments}
+          onUpdate={onAttachmentsUpdate}
+        />
+
         <SectionHeader title="Terms & Conditions" />
         <Card style={styles.termsCard}>
           <ThemedText type="small" style={{ color: theme.textSecondary, lineHeight: 20 }}>
@@ -401,7 +517,7 @@ export default function ProposalPreviewScreen({
             style={styles.footerBtnSmall}
             testID="button-export-pdf"
           >
-            {pdfLoading ? "Exporting..." : "Export PDF"}
+            {pdfLoading ? "Preparing..." : "Export PDF"}
           </Button>
         </View>
       </View>

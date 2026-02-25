@@ -79,6 +79,18 @@ export interface CommercialTier {
   frequency: CommercialFrequency;
 }
 
+export interface ProposalAttachment {
+  uri: string;
+  name: string;
+  mimeType: string;
+  size?: number;
+}
+
+export interface ProposalAttachments {
+  coi?: ProposalAttachment;
+  w9?: ProposalAttachment;
+}
+
 export interface CommercialQuoteData {
   quoteType: CommercialQuoteType;
   walkthrough: CommercialWalkthrough;
@@ -86,6 +98,7 @@ export interface CommercialQuoteData {
   pricing: CommercialPricing;
   tiers: CommercialTier[];
   status: CommercialQuoteStatus;
+  attachments?: ProposalAttachments;
 }
 
 export const DEFAULT_WALKTHROUGH: CommercialWalkthrough = {

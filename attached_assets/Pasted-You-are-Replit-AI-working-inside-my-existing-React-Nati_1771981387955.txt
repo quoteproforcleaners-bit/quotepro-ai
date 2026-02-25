@@ -1,0 +1,77 @@
+You are Replit AI working inside my existing React Native / Expo app that generates Commercial Quote proposals (PDF). Implement a feature that allows users to attach a Certificate of Insurance (COI) and a W-9 to a commercial proposal, and include them at the end of the generated PDF.
+
+GOAL
+On the final step/page of the Commercial Proposal flow (right before “Generate / Share PDF”), add an “Attachments” section where the user can:
+- Upload/select a COI document (PDF or image)
+- Upload/select a W-9 document (PDF or image)
+- See file name + preview (thumbnail for images, icon for PDFs)
+- Remove/replace each attachment
+When the proposal PDF is generated, append these attachments to the end of the proposal PDF in this order:
+1) Proposal pages (existing content)
+2) COI (if provided)
+3) W-9 (if provided)
+If user does not add an attachment, do not add a placeholder page.
+
+UI REQUIREMENTS
+- Add a card section titled “Attachments (Optional)”
+- Two rows/cards:
+  - “Certificate of Insurance (COI)” with buttons: Add / Replace / Remove
+  - “W-9” with buttons: Add / Replace / Remove
+- Show status text:
+  - “Not attached” OR “Attached: <filename>”
+- Add a small note: “Attachments will be appended to the end of your proposal PDF.”
+
+SUPPORTED FILE TYPES
+- PDF documents
+- Images: JPG, JPEG, PNG
+Use Expo DocumentPicker for PDFs and images, or the existing file picker in the app if already present.
+Store local URI + metadata (name, type, size) in the commercial quote record.
+
+DATA MODEL CHANGES
+Extend the commercial quote/proposal model to include:
+attachments: {
+  coi?: { uri: string, name: string, mimeType: string, size?: number },
+  w9?:  { uri: string, name: string, mimeType: string, size?: number }
+}
+Ensure backward compatibility for existing quotes with no attachments.
+
+PDF GENERATION REQUIREMENTS
+- Reuse the existing PDF generation pipeline/template for commercial proposals.
+- After generating the base proposal PDF, append selected attachment documents to the final PDF output:
+  - If attachment is a PDF: merge pages directly into the final PDF.
+  - If attachment is an image: convert to a PDF page sized to fit (Letter or A4 consistent with proposal), preserving aspect ratio and adding reasonable margins.
+- Maintain correct page order.
+- Output remains a single PDF file for sharing/emailing.
+
+IMPLEMENTATION NOTES (IMPORTANT)
+- Use a PDF merge library compatible with React Native/Expo if already in project; otherwise implement a reliable approach using:
+  - expo-file-system for file access
+  - a JS PDF library (e.g., pdf-lib) to merge PDFs and embed images into new pages
+- Handle iOS file URIs properly (copy to app document directory if needed before processing).
+- If the attachment is very large, show a friendly error and suggest using a smaller file.
+- Ensure the feature works offline after files are selected (store them locally in app storage).
+
+SHARING FLOW
+- The “Share Proposal” action should share the merged PDF (proposal + attachments).
+- If share is tapped and attachments exist, ensure merging happens BEFORE the share sheet opens.
+- Show a loading indicator: “Preparing proposal…” while merging.
+
+EDGE CASES
+- User attaches only COI or only W-9: append only what exists.
+- User replaces an attachment: update stored metadata and use the new file in the final PDF.
+- If merge fails: fall back to sharing the base proposal PDF and show an error: “Could not append attachments. Shared proposal without attachments.”
+
+TESTING / QA CHECKLIST
+- Generate commercial proposal PDF with no attachments: unchanged.
+- Generate with COI PDF attached: COI pages appear at end.
+- Generate with W-9 image attached: image appears as final page.
+- Generate with both: proposal -> COI -> W-9 order.
+- Replace/remove attachments: correct behavior.
+- Share on iOS: resulting PDF opens and includes appended pages.
+
+DELIVERABLES
+- Updated Commercial Proposal final step UI with attachments section
+- Updated quote data model + persistence
+- PDF merge/append implementation
+- Loading + error handling
+Implement this end-to-end without breaking existing residential quoting.

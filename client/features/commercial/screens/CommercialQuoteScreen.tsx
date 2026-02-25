@@ -16,6 +16,7 @@ import {
   CommercialLaborEstimate,
   CommercialPricing,
   CommercialTier,
+  ProposalAttachments,
   DEFAULT_WALKTHROUGH,
 } from "../types";
 import {
@@ -83,6 +84,7 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
   });
 
   const [tiers, setTiers] = useState<CommercialTier[]>([]);
+  const [attachments, setAttachments] = useState<ProposalAttachments>({});
 
   const phaseIndex = PHASES.findIndex((p) => p.key === phase);
 
@@ -145,7 +147,7 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
     try {
       const quoteId = savedQuoteId || (await saveCommercialQuote());
       if (quoteId) {
-        await apiRequest("PUT", `/api/quotes/${quoteId}`, { status: "accepted", acceptedAt: new Date() });
+        await apiRequest("PUT", `/api/quotes/${quoteId}`, { status: "accepted", acceptedAt: new Date().toISOString() });
         queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -171,6 +173,10 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
             pricing,
             tiers,
             status: "draft",
+            attachments: (attachments.coi || attachments.w9) ? {
+              coi: attachments.coi ? { name: attachments.coi.name, mimeType: attachments.coi.mimeType, size: attachments.coi.size } : undefined,
+              w9: attachments.w9 ? { name: attachments.w9.name, mimeType: attachments.w9.mimeType, size: attachments.w9.size } : undefined,
+            } : undefined,
           },
         },
         options: {
@@ -250,6 +256,7 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
             pricing={pricing}
             tiers={tiers}
             quoteId={savedQuoteId || undefined}
+            attachments={attachments}
             onAccept={handleAccept}
             onBack={() => handleBack("tiers")}
             onScopeUpdate={(tierIndex, scopeText, includedBullets, excludedBullets) => {
@@ -266,6 +273,7 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
                 )
               );
             }}
+            onAttachmentsUpdate={setAttachments}
           />
         );
       default:

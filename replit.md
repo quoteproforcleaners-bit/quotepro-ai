@@ -43,7 +43,8 @@ A comprehensive commercial quoting add-on (`/client/features/commercial/`) with:
 - **Tier Builder**: Auto-generated Good/Better/Best tiers (Basic Janitorial, Enhanced Sanitation, Premium Maintenance) with editable names, tasks, prices
 - **Proposal Preview**: Full commercial proposal preview with Cover, Scope of Work, Schedule, Pricing Table, Terms, Acceptance
 - **AI Features**: "Generate Professional Scope" (generates per-tier scope paragraph + included/excluded tasks) and "AI Risk Scan" (analyzes pricing risks with severity levels, suggested clauses, overall assessment) - both use AIConsentContext for Apple compliance
-- **PDF Export**: Commercial proposal PDF via `/api/quotes/:id/commercial-pdf` using expo-print + expo-sharing
+- **Attachments**: COI (Certificate of Insurance) and W-9 document attachments via expo-document-picker, supports PDF and image files, images embedded as base64 in proposal HTML, PDFs merged via pdf-lib, stored locally with metadata in quote data
+- **PDF Export**: Commercial proposal PDF via `/api/quotes/:id/commercial-pdf` using expo-print + expo-sharing, with optional COI/W-9 attachment pages appended
 - **Server Endpoints**: `/api/commercial/generate-scope`, `/api/commercial/risk-scan`, `/api/quotes/:id/commercial-pdf`
 - **Quote List**: Commercial badge on list items, Type filter (All/Residential/Commercial)
 - Commercial quote data stored in existing quotes table using `propertyDetails` JSONB field with `quoteType: "commercial"` and `commercialData` object
