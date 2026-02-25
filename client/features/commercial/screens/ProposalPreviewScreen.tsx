@@ -17,6 +17,7 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { CommercialWalkthrough, CommercialLaborEstimate, CommercialPricing, CommercialTier, CommercialFrequency, ProposalAttachments } from "../types";
 import { AttachmentSection } from "../components/AttachmentSection";
+import { ProBadge } from "@/components/ProBadge";
 
 interface ProposalPreviewScreenProps {
   walkthrough: CommercialWalkthrough;
@@ -289,7 +290,10 @@ export default function ProposalPreviewScreen({
       >
         <Card variant="emphasis" style={styles.coverCard}>
           <View style={styles.coverHeader}>
-            <ThemedText type="h2">{companyName}</ThemedText>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <ThemedText type="h2" style={{ flex: 1 }}>{companyName}</ThemedText>
+              <ProBadge size="medium" />
+            </View>
             <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
               Commercial Cleaning Proposal
             </ThemedText>

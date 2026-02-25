@@ -24,6 +24,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAIConsent } from "@/context/AIConsentContext";
+import { ProBadge } from "@/components/ProBadge";
 
 type RouteParams = {
   QuoteDetail: { quoteId: string };
@@ -456,6 +457,7 @@ export default function QuoteDetailScreen() {
   };
 
   const customerName = quote.propertyDetails?.customerName || "Quick Quote";
+  const isCommercial = quote.propertyDetails && typeof quote.propertyDetails === "object" && quote.propertyDetails.quoteType === "commercial";
   const beds = quote.propertyBeds || 0;
   const baths = quote.propertyBaths || 0;
   const sqft = quote.propertySqft || 0;
@@ -499,7 +501,10 @@ export default function QuoteDetailScreen() {
           ]}
         >
           <View style={styles.customerHeader}>
-            <ThemedText type="h3">{customerName}</ThemedText>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, marginRight: 8 }}>
+              <ThemedText type="h3" style={{ flexShrink: 1 }}>{customerName}</ThemedText>
+              {isCommercial ? <ProBadge size="medium" /> : null}
+            </View>
             <View
               style={[
                 styles.statusBadge,

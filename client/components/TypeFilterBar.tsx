@@ -5,8 +5,6 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
-  interpolateColor,
-  runOnJS,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -14,7 +12,6 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface TypeFilterOption<T extends string> {
@@ -42,13 +39,13 @@ export function TypeFilterBar<T extends string>({
     if (segmentWidth.value === 0) return { opacity: 0 };
     return {
       opacity: 1,
-      width: segmentWidth.value - 4,
+      width: segmentWidth.value - 6,
       transform: [
         {
-          translateX: withSpring(selectedIndex * segmentWidth.value + 2, {
-            damping: 18,
-            stiffness: 220,
-            mass: 0.8,
+          translateX: withSpring(selectedIndex * segmentWidth.value + 3, {
+            damping: 16,
+            stiffness: 200,
+            mass: 0.7,
           }),
         },
       ],
@@ -68,51 +65,56 @@ export function TypeFilterBar<T extends string>({
     }
   };
 
-  const bgStart = isDark ? "#0C1524" : "#E8EDF5";
-  const bgEnd = isDark ? "#111D32" : "#F0F3F9";
+  const outerBg = isDark ? "#0E1929" : "#EAF0F7";
 
   return (
     <View style={styles.wrapper}>
-      <LinearGradient
-        colors={[bgStart, bgEnd]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
+      <View
         style={[
-          styles.container,
+          styles.glassWrap,
           {
-            shadowColor: isDark ? "#000" : "#334155",
+            backgroundColor: outerBg,
+            borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+            shadowColor: isDark ? "#000" : "#64748B",
           },
         ]}
-        onLayout={(e) => {
-          const innerWidth = e.nativeEvent.layout.width - 12;
-          segmentWidth.value = innerWidth / options.length;
-        }}
       >
-        <Animated.View style={[styles.pillTrack, pillStyle]}>
-          <LinearGradient
-            colors={isDark ? ["#2467DE", "#3B82F6"] : ["#007AFF", "#3B9EFF"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[
-              styles.pillGradient,
-              {
-                shadowColor: isDark ? "#3B82F6" : "#007AFF",
-              },
-            ]}
-          />
-        </Animated.View>
+        <View
+          style={styles.innerTrack}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            segmentWidth.value = w / options.length;
+          }}
+        >
+          <Animated.View style={[styles.pillOuter, pillStyle]}>
+            <LinearGradient
+              colors={isDark ? ["#2563EB", "#3B82F6"] : ["#0071E3", "#2E9BFF"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.pillGradient}
+            >
+              <View style={styles.pillHighlight} />
+            </LinearGradient>
+            <View
+              style={[
+                styles.pillGlow,
+                { shadowColor: isDark ? "#3B82F6" : "#007AFF" },
+              ]}
+            />
+          </Animated.View>
 
-        {options.map((option, index) => (
-          <Segment
-            key={option.value}
-            option={option}
-            isActive={option.value === value}
-            onPress={() => handleSelect(option.value)}
-            theme={theme}
-            isDark={isDark}
-          />
-        ))}
-      </LinearGradient>
+          {options.map((option) => (
+            <Segment
+              key={option.value}
+              option={option}
+              isActive={option.value === value}
+              onPress={() => handleSelect(option.value)}
+              theme={theme}
+              isDark={isDark}
+            />
+          ))}
+        </View>
+      </View>
     </View>
   );
 }
@@ -131,44 +133,34 @@ function Segment<T extends string>({
   isDark: boolean;
 }) {
   const pressed = useSharedValue(0);
-  const activeProgress = useSharedValue(isActive ? 1 : 0);
 
-  React.useEffect(() => {
-    activeProgress.value = withSpring(isActive ? 1 : 0, {
-      damping: 16,
-      stiffness: 180,
-    });
-  }, [isActive]);
+  React.useEffect(() => {}, [isActive]);
 
   const containerAnimStyle = useAnimatedStyle(() => {
-    const scale = isActive
-      ? withSpring(1.03 - pressed.value * 0.02, { damping: 20, stiffness: 300 })
-      : withSpring(1 - pressed.value * 0.03, { damping: 20, stiffness: 300 });
+    const baseScale = isActive
+      ? withSpring(1.03 - pressed.value * 0.02, { damping: 18, stiffness: 260 })
+      : withSpring(1 - pressed.value * 0.04, { damping: 18, stiffness: 260 });
     return {
-      transform: [{ scale }],
+      transform: [{ scale: baseScale }],
+      opacity: withTiming(isActive ? 1 : (pressed.value > 0.5 ? 0.6 : 1), { duration: 100 }),
     };
   });
 
-  const textAnimStyle = useAnimatedStyle(() => {
-    return {
-      opacity: withTiming(isActive ? 1 : 0.55, { duration: 150 }),
-    };
-  });
-
-  const iconColor = isActive ? "#FFFFFF" : (isDark ? theme.textMuted : theme.textSecondary);
-  const textColor = isActive ? "#FFFFFF" : (isDark ? theme.textMuted : theme.textSecondary);
+  const inactiveColor = isDark ? "#8E9AB6" : "#64748B";
+  const iconColor = isActive ? "#FFFFFF" : inactiveColor;
+  const textColor = isActive ? "#FFFFFF" : inactiveColor;
 
   return (
     <AnimatedPressable
       style={[styles.segment, containerAnimStyle]}
       onPress={onPress}
-      onPressIn={() => { pressed.value = withTiming(1, { duration: 80 }); }}
-      onPressOut={() => { pressed.value = withTiming(0, { duration: 150 }); }}
+      onPressIn={() => { pressed.value = withTiming(1, { duration: 60 }); }}
+      onPressOut={() => { pressed.value = withTiming(0, { duration: 180 }); }}
     >
-      <Animated.View style={[styles.segmentInner, textAnimStyle]}>
+      <View style={styles.segmentInner}>
         <Feather
           name={option.icon}
-          size={14}
+          size={15}
           color={iconColor}
           style={styles.segmentIcon}
         />
@@ -177,51 +169,74 @@ function Segment<T extends string>({
           style={[
             styles.segmentText,
             { color: textColor },
-            isActive && styles.segmentTextActive,
+            isActive ? styles.segmentTextActive : styles.segmentTextInactive,
           ]}
         >
           {option.label}
         </ThemedText>
-      </Animated.View>
+      </View>
+      {isActive ? <View style={styles.activeDot} /> : null}
     </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  container: {
+  glassWrap: {
+    borderRadius: 26,
+    borderWidth: 1,
+    padding: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  innerTrack: {
     flexDirection: "row",
-    borderRadius: 24,
-    padding: 6,
+    borderRadius: 22,
     position: "relative",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 6,
   },
-  pillTrack: {
+  pillOuter: {
     position: "absolute",
-    top: 6,
-    bottom: 6,
+    top: 0,
+    bottom: 0,
     left: 0,
     borderRadius: 20,
-    overflow: "hidden",
+    overflow: "visible",
   },
   pillGradient: {
     flex: 1,
     borderRadius: 20,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
+    overflow: "hidden",
+  },
+  pillHighlight: {
+    position: "absolute",
+    top: 0,
+    left: 8,
+    right: 8,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 1,
+  },
+  pillGlow: {
+    position: "absolute",
+    top: 2,
+    left: 4,
+    right: 4,
+    bottom: -2,
+    borderRadius: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 0,
   },
   segment: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     zIndex: 1,
   },
   segmentInner: {
@@ -230,15 +245,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   segmentIcon: {
-    marginRight: 5,
+    marginRight: 6,
   },
   segmentText: {
     textAlign: "center",
     fontSize: 13,
-    fontWeight: "500",
-    letterSpacing: 0.2,
+    letterSpacing: 0.15,
   },
   segmentTextActive: {
     fontWeight: "700",
+  },
+  segmentTextInactive: {
+    fontWeight: "500",
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    marginTop: 3,
   },
 });
