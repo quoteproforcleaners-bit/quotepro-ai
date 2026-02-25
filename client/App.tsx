@@ -13,6 +13,8 @@ import { AppProvider } from "@/context/AppContext";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AIConsentProvider } from "@/context/AIConsentContext";
+import { TutorialProvider } from "@/context/TutorialContext";
+import { TourOverlay } from "@/components/TourOverlay";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary, sendCrashReport } from "@/components/ErrorBoundary";
 import { setupNotificationHandler, registerForPushNotificationsAsync, savePushTokenToServer } from "@/lib/notifications";
