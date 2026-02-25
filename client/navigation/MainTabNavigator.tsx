@@ -22,6 +22,7 @@ import QuotesScreen from "@/screens/QuotesScreen";
 import JobsScreen from "@/screens/JobsScreen";
 import GrowthDashboardScreen from "@/screens/GrowthDashboardScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -192,7 +193,9 @@ function AnimatedGrowth(props: any) {
 function AnimatedSettings(props: any) {
   return (
     <AnimatedTabScreen>
-      <SettingsScreen {...props} />
+      <ErrorBoundary>
+        <SettingsScreen {...props} />
+      </ErrorBoundary>
     </AnimatedTabScreen>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput, Linking, useWindowDimensions } from "react-native";
+import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput, Linking, useWindowDimensions, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -11,7 +11,6 @@ import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
 import { SectionHeader } from "@/components/SectionHeader";
 import { ThemedText } from "@/components/ThemedText";
@@ -48,13 +47,22 @@ export default function SettingsScreen() {
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
   const { preference: darkModePref, setPreference: setDarkModePref } = useDarkModePreference();
   const { hasConsented: aiConsented, requestConsent: requestAIConsent, revokeConsent: revokeAIConsent } = useAIConsent();
-  const { resetAllTours, startTour, completedTours, hasCompletedTour, isActive: tourActive } = useTutorial();
+  const tutorialCtx = useTutorial();
+  const resetAllTours = tutorialCtx?.resetAllTours;
+  const startTour = tutorialCtx?.startTour;
+  const completedTours = tutorialCtx?.completedTours || [];
+  const hasCompletedTour = tutorialCtx?.hasCompletedTour || (() => false);
+  const tourActive = tutorialCtx?.isActive || false;
   const [commercialEnabled, setCommercialEnabled] = useState(FeatureFlags.commercialQuotingEnabled);
 
   useEffect(() => {
-    if (!hasCompletedTour(SETTINGS_TOUR.id) && !tourActive) {
-      const timer = setTimeout(() => startTour(SETTINGS_TOUR), 800);
-      return () => clearTimeout(timer);
+    try {
+      if (startTour && hasCompletedTour && !hasCompletedTour(SETTINGS_TOUR.id) && !tourActive) {
+        const timer = setTimeout(() => startTour(SETTINGS_TOUR), 800);
+        return () => clearTimeout(timer);
+      }
+    } catch (e) {
+      console.warn("Settings tour error:", e);
     }
   }, []);
 
@@ -258,7 +266,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <KeyboardAwareScrollViewCompat
+    <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       contentContainerStyle={[
         styles.content,
@@ -269,6 +277,7 @@ export default function SettingsScreen() {
         useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined,
       ]}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
+      keyboardShouldPersistTaps="handled"
     >
       <SectionHeader title={t.settings.subscription} />
 
@@ -1068,9 +1077,13 @@ export default function SettingsScreen() {
           </View>
           <Pressable
             onPress={async () => {
-              await resetAllTours();
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              startTour(DASHBOARD_TOUR);
+              try {
+                if (resetAllTours) await resetAllTours();
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                if (startTour) startTour(DASHBOARD_TOUR);
+              } catch (e) {
+                console.warn("Reset tours error:", e);
+              }
             }}
             style={{
               paddingHorizontal: Spacing.lg,
@@ -1334,7 +1347,7 @@ export default function SettingsScreen() {
           {t.settings.appDescription}
         </ThemedText>
       </View>
-    </KeyboardAwareScrollViewCompat>
+    </ScrollView>
   );
 }
 
