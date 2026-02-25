@@ -6,6 +6,7 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -48,6 +49,8 @@ export default function UpsellOpportunitiesScreen() {
   const insets = useSafeAreaInsets();
   const dt = useDesignTokens();
   const queryClient = useQueryClient();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [refreshing, setRefreshing] = useState(false);
   const [loadingId, setLoadingId] = useState<number | null>(null);
 
@@ -195,6 +198,7 @@ export default function UpsellOpportunitiesScreen() {
           paddingTop: headerHeight + Spacing.xl,
           paddingBottom: insets.bottom + Spacing.xl,
           gap: Spacing.md,
+          ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined),
         }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dt.accent} />

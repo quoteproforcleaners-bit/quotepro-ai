@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Image,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -27,6 +28,8 @@ type Mode = "login" | "register";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const { theme } = useTheme();
   const { login, register, loginWithApple, setAuthData, refreshAuth } = useAuth();
   const { language, setLanguage, t } = useLanguage();
@@ -159,6 +162,7 @@ export default function LoginScreen() {
             paddingTop: insets.top + Spacing["3xl"],
             paddingBottom: insets.bottom + Spacing.xl,
           },
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
       >
 

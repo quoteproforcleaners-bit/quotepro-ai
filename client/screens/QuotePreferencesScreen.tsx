@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { View, StyleSheet, Switch, TextInput, RefreshControl, ActivityIndicator, Pressable, Alert } from "react-native";
+import { View, StyleSheet, Switch, TextInput, RefreshControl, ActivityIndicator, Pressable, Alert, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -85,6 +85,8 @@ export default function QuotePreferencesScreen() {
   const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
   const dt = useDesignTokens();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const { data: serverPrefs, isLoading } = useQuery<QuotePreferences>({
     queryKey: ["/api/quote-preferences"],
@@ -133,7 +135,7 @@ export default function QuotePreferencesScreen() {
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <KeyboardAwareScrollViewCompat
         style={styles.container}
-        contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + 80, paddingHorizontal: Spacing.lg }}
+        contentContainerStyle={[{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + 80, paddingHorizontal: Spacing.lg }, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : [])]}
         refreshControl={<RefreshControl refreshing={false} onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/quote-preferences"] })} tintColor={dt.accent} />}
       >
         <ThemedText type="h4" style={styles.sectionTitle}>Business Info on Quote</ThemedText>

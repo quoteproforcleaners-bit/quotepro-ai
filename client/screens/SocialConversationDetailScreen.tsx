@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, FlatList, ActivityIndicator } from "react-native";
+import { View, StyleSheet, FlatList, ActivityIndicator, useWindowDimensions } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
@@ -15,6 +15,8 @@ export default function SocialConversationDetailScreen() {
   const insets = useSafeAreaInsets();
   const route = useRoute<any>();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const conversationId = route.params?.conversationId;
 
   const { data: messages = [], isLoading } = useQuery<any[]>({
@@ -77,6 +79,7 @@ export default function SocialConversationDetailScreen() {
           paddingBottom: insets.bottom + Spacing.xl,
           paddingHorizontal: Spacing.lg,
           flexGrow: 1,
+          ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined),
         }}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
         ListEmptyComponent={

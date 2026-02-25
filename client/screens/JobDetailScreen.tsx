@@ -10,6 +10,7 @@ import {
   Platform,
   TextInput,
   Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -139,6 +140,8 @@ export default function JobDetailScreen() {
   const jobId = route.params.jobId;
 
   const { t } = useLanguage();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const [selectedPhoto, setSelectedPhoto] = useState<JobPhoto | null>(null);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
@@ -341,6 +344,7 @@ export default function JobDetailScreen() {
               paddingTop: headerHeight + Spacing.xl,
               paddingBottom: insets.bottom + Spacing.xl + 80,
             },
+            ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
           ]}
           scrollIndicatorInsets={{ bottom: insets.bottom }}
         >

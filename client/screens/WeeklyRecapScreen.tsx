@@ -7,6 +7,7 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -119,6 +120,8 @@ export default function WeeklyRecapScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const dt = useDesignTokens();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const [weekOffset, setWeekOffset] = useState(-1);
   const [refreshing, setRefreshing] = useState(false);
@@ -204,6 +207,7 @@ export default function WeeklyRecapScreen() {
             paddingTop: headerHeight + Spacing.xl,
             paddingBottom: insets.bottom + Spacing.xl,
           },
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         refreshControl={

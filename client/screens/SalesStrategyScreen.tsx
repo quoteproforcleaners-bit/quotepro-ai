@@ -6,6 +6,7 @@ import {
   RefreshControl,
   Switch,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -54,6 +55,8 @@ export default function SalesStrategyScreen() {
   const queryClient = useQueryClient();
   const dt = useDesignTokens();
   const { t, tc } = useLanguage();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const ss = t.salesStrategy;
   const ssc = tc.salesStrategy;
 
@@ -111,7 +114,7 @@ export default function SalesStrategyScreen() {
     <ProGate featureName="Sales Strategy">
     <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
+      contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/sales-strategy"] })} tintColor={dt.accent} />}
     >
       <ThemedText type="h3" style={styles.sectionTitle}>{ss.salesProfile}</ThemedText>

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
@@ -60,6 +60,8 @@ export default function QuoteDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const route = useRoute<RouteProp<RouteParams, "QuoteDetail">>();
   const { theme } = useTheme();
   const { businessProfile } = useApp();
@@ -492,6 +494,7 @@ export default function QuoteDetailScreen() {
             paddingTop: headerHeight + Spacing.xl,
             paddingBottom: insets.bottom + Spacing.xl + 80,
           },
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
       >
         <View

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, FlatList, RefreshControl } from "react-native";
+import { View, StyleSheet, FlatList, RefreshControl, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -28,6 +28,8 @@ export default function QuotesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const { t } = useLanguage();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
   const [filter, setFilter] = useState<FilterType>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
@@ -132,6 +134,7 @@ export default function QuotesScreen() {
             paddingBottom: tabBarHeight + Spacing.xl + 80,
           },
           filteredQuotes.length === 0 && styles.emptyContent,
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         refreshControl={

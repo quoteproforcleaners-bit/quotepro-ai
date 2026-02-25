@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -206,6 +207,8 @@ export default function TasksQueueScreen() {
   const insets = useSafeAreaInsets();
   const dt = useDesignTokens();
   const queryClient = useQueryClient();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [activeFilter, setActiveFilter] = useState("all");
 
   const { data: tasks = [], isLoading } = useQuery<any[]>({
@@ -300,6 +303,7 @@ export default function TasksQueueScreen() {
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: insets.bottom + Spacing.xl },
+            ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
           ]}
           ListEmptyComponent={EmptyState}
           showsVerticalScrollIndicator={false}

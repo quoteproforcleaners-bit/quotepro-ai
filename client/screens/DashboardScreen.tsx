@@ -8,6 +8,7 @@ import {
   Pressable,
   FlatList,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -352,6 +353,8 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme, isDark } = useTheme();
   const dt = useDesignTokens();
@@ -891,6 +894,7 @@ export default function DashboardScreen() {
         contentContainerStyle={[
           styles.content,
           { paddingTop: headerHeight + Spacing.md, paddingBottom: tabBarHeight + Spacing.xl },
+          useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined,
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

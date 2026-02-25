@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput, Linking } from "react-native";
+import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput, Linking, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -38,6 +38,8 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const { theme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user, logout } = useAuth();
@@ -264,6 +266,7 @@ export default function SettingsScreen() {
           paddingTop: headerHeight + Spacing.xl,
           paddingBottom: tabBarHeight + Spacing.xl,
         },
+        useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined,
       ]}
       scrollIndicatorInsets={{ bottom: insets.bottom }}
     >

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -169,6 +170,8 @@ export default function OpportunitiesScreen() {
   const { theme, isDark } = useTheme();
   const { businessProfile } = useApp();
   const queryClient = useQueryClient();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const senderName = businessProfile?.senderName || businessProfile?.companyName || "Your Cleaner";
 
@@ -449,6 +452,7 @@ export default function OpportunitiesScreen() {
             paddingTop: headerHeight + Spacing.md,
             paddingBottom: insets.bottom + Spacing.xl,
           },
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={

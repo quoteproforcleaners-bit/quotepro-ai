@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, FlatList, Pressable, RefreshControl } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, useWindowDimensions } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -23,6 +23,8 @@ export default function SocialLeadsScreen() {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [filter, setFilter] = useState("all");
 
   const { data: leads = [], refetch } = useQuery<any[]>({
@@ -78,7 +80,7 @@ export default function SocialLeadsScreen() {
   return (
     <ProGate featureName="Social Leads">
       <View style={{ flex: 1 }}>
-        <View style={{ paddingTop: headerHeight + Spacing.md, paddingHorizontal: Spacing.lg }}>
+        <View style={{ paddingTop: headerHeight + Spacing.md, paddingHorizontal: Spacing.lg, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}>
           <SegmentedControl
             options={FILTER_OPTIONS}
             value={filter}
@@ -94,6 +96,7 @@ export default function SocialLeadsScreen() {
             paddingBottom: insets.bottom + Spacing.xl,
             paddingHorizontal: Spacing.lg,
             flexGrow: 1,
+            ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined),
           }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
           ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, RefreshControl, Pressable, TextInput } from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl, Pressable, TextInput, useWindowDimensions } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
@@ -306,6 +306,8 @@ export default function SocialScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const { data: automation, isLoading } = useQuery<any>({
     queryKey: ["/api/social/automation"],
@@ -348,7 +350,7 @@ export default function SocialScreen() {
       <ProGate featureName="Social AI Assistant">
         <ScrollView
           style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
-          contentContainerStyle={{ paddingTop: headerHeight + Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl, paddingHorizontal: Spacing.lg }}
+          contentContainerStyle={{ paddingTop: headerHeight + Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl, paddingHorizontal: Spacing.lg, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}
         >
           <OnboardingWizard onComplete={() => {
             queryClient.invalidateQueries({ queryKey: ["/api/social/automation"] });
@@ -368,6 +370,7 @@ export default function SocialScreen() {
           paddingTop: headerHeight + Spacing.lg,
           paddingBottom: tabBarHeight + Spacing.xl,
           paddingHorizontal: Spacing.lg,
+          ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined),
         }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
       >

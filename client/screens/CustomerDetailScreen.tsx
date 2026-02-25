@@ -8,6 +8,7 @@ import {
   Linking,
   ActivityIndicator,
   Modal,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight, HeaderButton } from "@react-navigation/elements";
@@ -49,6 +50,8 @@ export default function CustomerDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const route = useRoute();
   const { customerId } = route.params as { customerId: string };
   const { theme } = useTheme();
@@ -343,6 +346,7 @@ export default function CustomerDetailScreen() {
             paddingTop: headerHeight + Spacing.xl,
             paddingBottom: insets.bottom + Spacing.xl + 80,
           },
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
       >

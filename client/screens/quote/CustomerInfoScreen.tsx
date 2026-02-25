@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from "react";
-import { View, StyleSheet, Pressable, FlatList } from "react-native";
+import { View, StyleSheet, Pressable, FlatList, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -20,6 +20,8 @@ export default function CustomerInfoScreen({ data, onUpdate }: Props) {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [nameQuery, setNameQuery] = useState("");
   const selectedRef = useRef(false);
@@ -76,6 +78,7 @@ export default function CustomerInfoScreen({ data, onUpdate }: Props) {
           paddingTop: headerHeight + Spacing.xl,
           paddingBottom: insets.bottom + Spacing.xl,
         },
+        ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
       ]}
       keyboardShouldPersistTaps="handled"
     >

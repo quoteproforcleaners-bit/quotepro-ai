@@ -6,6 +6,7 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -87,6 +88,8 @@ export default function AIAssistantScreen() {
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const { isPro } = useSubscription();
   const { requestConsent } = useAIConsent();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -287,6 +290,7 @@ export default function AIAssistantScreen() {
           styles.listContent,
           { paddingTop: headerHeight },
           messages.length === 0 ? styles.emptyListContent : undefined,
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"

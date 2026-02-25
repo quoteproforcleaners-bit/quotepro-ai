@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable, Platform } from "react-native";
+import { View, StyleSheet, Pressable, Platform, useWindowDimensions } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
@@ -36,6 +36,8 @@ export default function QuoteCalculatorScreen() {
   const route = useRoute();
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const { pricingSettings, businessProfile } = useApp();
   const { user, isGuest } = useAuth();
   const queryClient = useQueryClient();
@@ -464,7 +466,7 @@ export default function QuoteCalculatorScreen() {
         )}
       </View>
 
-      <View style={styles.content}>{renderCurrentStep()}</View>
+      <View style={[styles.content, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : [])]}>{renderCurrentStep()}</View>
 
       <AuthGateModal
         visible={showAuthGate}

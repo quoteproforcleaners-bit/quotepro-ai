@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { ScrollView } from "react-native";
@@ -29,6 +29,8 @@ export default function ServiceAddOnsScreen({
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const frequencyOptions: { label: string; value: ServiceFrequency }[] = [
     { label: "One-time", value: "one-time" },
@@ -52,6 +54,7 @@ export default function ServiceAddOnsScreen({
           paddingTop: headerHeight + Spacing.xl,
           paddingBottom: insets.bottom + Spacing.xl,
         },
+        ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
       ]}
     >
       <View style={styles.header}>

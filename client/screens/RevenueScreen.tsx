@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, ScrollView, RefreshControl, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl, Pressable, useWindowDimensions } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
@@ -42,6 +42,8 @@ export default function RevenueScreen() {
   const { theme } = useTheme();
   const { isPro } = useSubscription();
   const { t } = useLanguage();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const { data: pipeline, refetch: refetchPipeline } = useQuery<PipelineData>({
     queryKey: ["/api/revenue/pipeline"],
@@ -85,6 +87,7 @@ export default function RevenueScreen() {
               paddingTop: headerHeight + Spacing.xl,
               paddingBottom: tabBarHeight + Spacing.xl,
             },
+            ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
           ]}
         >
           <View style={styles.paywallContainer}>
@@ -135,6 +138,7 @@ export default function RevenueScreen() {
             paddingTop: headerHeight + Spacing.xl,
             paddingBottom: tabBarHeight + Spacing.xl,
           },
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

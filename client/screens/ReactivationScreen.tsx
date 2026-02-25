@@ -9,6 +9,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -64,6 +65,8 @@ export default function ReactivationScreen() {
   const queryClient = useQueryClient();
   const dt = useDesignTokens();
   const { requestConsent } = useAIConsent();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const [segment, setSegment] = useState<"dormant" | "lost">("dormant");
   const [modalVisible, setModalVisible] = useState(false);
@@ -562,7 +565,7 @@ export default function ReactivationScreen() {
         keyExtractor={(item, i) => item.id?.toString() ?? i.toString()}
         renderItem={segment === "dormant" ? renderDormantItem : renderLostItem}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={dt.accent} />}
-        contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + 100, paddingHorizontal: Spacing.lg }}
+        contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + 100, paddingHorizontal: Spacing.lg, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}
         ListHeaderComponent={
           <>
             <Card style={{ marginBottom: Spacing.md, padding: Spacing.md }}>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { View, StyleSheet, ScrollView, Share, Pressable, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, StyleSheet, ScrollView, Share, Pressable, ActivityIndicator, Platform, Alert, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
@@ -95,6 +95,8 @@ export default function QuotePreviewScreen({
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const { user } = useAuth();
   const { isPro } = useSubscription();
   const { requestConsent } = useAIConsent();
@@ -481,6 +483,7 @@ export default function QuotePreviewScreen({
             paddingTop: headerHeight + Spacing.xl,
             paddingBottom: insets.bottom + Spacing.xl + 120,
           },
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
       >
         <View style={[styles.summaryCard, { backgroundColor: theme.gradientPrimary, borderColor: `${theme.primary}20` }]}>

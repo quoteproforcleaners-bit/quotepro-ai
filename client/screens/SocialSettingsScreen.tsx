@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, ScrollView, TextInput, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView, TextInput, Pressable, useWindowDimensions } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -17,6 +17,8 @@ export default function SocialSettingsScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/social/automation"],
@@ -76,6 +78,7 @@ export default function SocialSettingsScreen() {
           paddingTop: headerHeight + Spacing.lg,
           paddingBottom: insets.bottom + Spacing.xl,
           paddingHorizontal: Spacing.lg,
+          ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined),
         }}
       >
         <ThemedText type="h4" style={{ marginBottom: Spacing.md }}>Connected Channels</ThemedText>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Platform } from "react-native";
+import { View, StyleSheet, Pressable, Platform, useWindowDimensions } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
@@ -52,6 +52,8 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { pricingSettings, businessProfile } = useApp();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const [phase, setPhase] = useState<Phase>("walkthrough");
   const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null);
@@ -350,7 +352,7 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
           <ThemedText type="link">Save</ThemedText>
         </Pressable>
       </View>
-      <View style={styles.content}>{renderPhase()}</View>
+      <View style={[styles.content, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}>{renderPhase()}</View>
     </View>
   );
 }

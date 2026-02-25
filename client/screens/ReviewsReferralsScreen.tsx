@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -85,6 +86,8 @@ export default function ReviewsReferralsScreen() {
   const { theme } = useTheme();
   const dt = useDesignTokens();
   const queryClient = useQueryClient();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const { requestConsent } = useAIConsent();
   const [refreshing, setRefreshing] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -561,6 +564,7 @@ export default function ReviewsReferralsScreen() {
           paddingTop: headerHeight + Spacing.xl,
           paddingBottom: insets.bottom + Spacing.xl + 80,
           gap: Spacing.md,
+          ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined),
         }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dt.accent} />

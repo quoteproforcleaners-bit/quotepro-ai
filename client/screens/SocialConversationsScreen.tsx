@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, FlatList, Pressable, RefreshControl } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, RefreshControl, useWindowDimensions } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -17,6 +17,8 @@ export default function SocialConversationsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const { data: conversations = [], refetch, isLoading } = useQuery<any[]>({
     queryKey: ["/api/social/conversations"],
@@ -91,6 +93,7 @@ export default function SocialConversationsScreen() {
           paddingBottom: insets.bottom + Spacing.xl,
           paddingHorizontal: Spacing.lg,
           flexGrow: 1,
+          ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined),
         }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}

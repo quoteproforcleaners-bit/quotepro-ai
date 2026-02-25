@@ -7,6 +7,7 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -57,6 +58,8 @@ export default function CustomersScreen() {
   const { theme } = useTheme();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const filterOptions: { label: string; value: StatusFilter }[] = [
     { label: t.common.all, value: "all" },
@@ -348,6 +351,7 @@ export default function CustomersScreen() {
             paddingBottom: tabBarHeight + Spacing.xl + 80,
           },
           customers.length === 0 ? styles.emptyContent : null,
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         refreshControl={

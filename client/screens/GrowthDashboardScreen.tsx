@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { View, StyleSheet, ScrollView, RefreshControl, Pressable, Platform } from "react-native";
+import { View, StyleSheet, ScrollView, RefreshControl, Pressable, Platform, useWindowDimensions } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
@@ -81,6 +81,8 @@ export default function GrowthDashboardScreen() {
   const { t } = useLanguage();
   const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
   const [refreshing, setRefreshing] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   React.useEffect(() => {
     if (!hasCompletedTour(GROWTH_TOUR.id) && !tourActive) {
@@ -139,7 +141,7 @@ export default function GrowthDashboardScreen() {
     <ProGate featureName="Growth Dashboard">
     <LinearGradient colors={[dt.gradientTop, dt.gradientBottom]} style={s.flex}>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.lg, paddingTop: headerHeight + Spacing.xl, paddingBottom: tabBarHeight + Spacing.xl }}
+        contentContainerStyle={[{ paddingHorizontal: Spacing.lg, gap: Spacing.lg, paddingTop: headerHeight + Spacing.xl, paddingBottom: tabBarHeight + Spacing.xl }, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : [])]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >

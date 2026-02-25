@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
+import { View, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
@@ -31,6 +31,8 @@ export default function TierBuilderScreen({
 }: TierBuilderScreenProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const currentTiers = tiers.length > 0 ? tiers : generateDefaultTiers(walkthrough, laborEstimate, pricing);
 
@@ -52,7 +54,7 @@ export default function TierBuilderScreen({
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 80 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 80 }, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}
         showsVerticalScrollIndicator={false}
       >
         <SectionHeader

@@ -6,6 +6,7 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -82,6 +83,8 @@ export default function AutomationsHubScreen() {
   const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
   const dt = useDesignTokens();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const { data: serverSettings, isLoading } = useQuery<AutomationSettings>({
     queryKey: ["/api/growth-automation-settings"],
@@ -120,7 +123,7 @@ export default function AutomationsHubScreen() {
     <ProGate featureName="Automations">
     <KeyboardAwareScrollViewCompat
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
+      contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}
       refreshControl={<RefreshControl refreshing={false} onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/growth-automation-settings"] })} tintColor={dt.accent} />}
     >
       <Card style={{...styles.masterCard, borderColor: dt.accent + "40"}}>

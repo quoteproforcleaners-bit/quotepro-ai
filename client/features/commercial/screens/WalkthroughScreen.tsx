@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Platform } from "react-native";
+import { View, StyleSheet, Pressable, Platform, useWindowDimensions } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,6 +26,8 @@ interface Props {
 export default function WalkthroughScreen({ walkthrough, onUpdate, onComplete, onCancel }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [currentStep, setCurrentStep] = useState(0);
 
   const handleNext = () => {
@@ -132,7 +134,7 @@ export default function WalkthroughScreen({ walkthrough, onUpdate, onComplete, o
         </Pressable>
       </View>
 
-      <View style={styles.content}>{renderCurrentStep()}</View>
+      <View style={[styles.content, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}>{renderCurrentStep()}</View>
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView, TextInput as RNTextInput } from "react-native";
+import { View, StyleSheet, Pressable, ScrollView, TextInput as RNTextInput, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -19,6 +19,8 @@ export default function AvatarBuilderScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const navigation = useNavigation();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const { businessProfile, updateBusinessProfile } = useApp();
   const { t } = useLanguage();
 
@@ -44,7 +46,7 @@ export default function AvatarBuilderScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      contentContainerStyle={{ paddingTop: headerHeight + Spacing.lg, paddingBottom: insets.bottom + Spacing.xl }}
+      contentContainerStyle={{ paddingTop: headerHeight + Spacing.lg, paddingBottom: insets.bottom + Spacing.xl, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}
     >
       <View style={styles.previewContainer}>
         <ProfileAvatar

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform } from "react-native";
+import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Alert, Platform, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -55,6 +55,8 @@ export default function ProposalPreviewScreen({
 }: ProposalPreviewScreenProps) {
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const { requestConsent } = useAIConsent();
   const { businessProfile } = useApp();
 
@@ -285,7 +287,7 @@ export default function ProposalPreviewScreen({
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 130 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 130 }, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}
         showsVerticalScrollIndicator={false}
       >
         <Card variant="emphasis" style={styles.coverCard}>

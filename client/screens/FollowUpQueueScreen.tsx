@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -126,6 +127,8 @@ export default function FollowUpQueueScreen() {
   const { theme, isDark } = useTheme();
   const { businessProfile } = useApp();
   const queryClient = useQueryClient();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const [activeTab, setActiveTab] = useState<FilterTab>("due_today");
   const [snoozeQuoteId, setSnoozeQuoteId] = useState<number | null>(null);
@@ -416,7 +419,7 @@ export default function FollowUpQueueScreen() {
   return (
     <ProGate featureName="Follow-Up Queue">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View style={[styles.header, { paddingTop: headerHeight + Spacing.md }]}>
+      <View style={[styles.header, { paddingTop: headerHeight + Spacing.md }, useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined]}>
         <View style={[styles.atRiskCard, { backgroundColor: surfaceBg }]}>
           <ThemedText type="caption" style={{ color: theme.textSecondary }}>{"Total at-risk revenue"}</ThemedText>
           <ThemedText type="h2" style={{ color: theme.warning }}>
@@ -491,6 +494,7 @@ export default function FollowUpQueueScreen() {
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: insets.bottom + Spacing.xl },
+            ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
           ]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={

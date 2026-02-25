@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, StyleSheet, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -450,6 +450,8 @@ export default function HelpGuideScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const { language } = useLanguage();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const sections = getGuideData(language === "en" || language === "pt" || language === "ru");
@@ -464,6 +466,7 @@ export default function HelpGuideScreen() {
         contentContainerStyle={[
           styles.content,
           { paddingTop: headerHeight + Spacing.lg, paddingBottom: insets.bottom + Spacing.xl },
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         showsVerticalScrollIndicator={false}
       >

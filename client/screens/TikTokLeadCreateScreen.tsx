@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, TextInput } from "react-native";
+import { View, StyleSheet, ScrollView, TextInput, useWindowDimensions } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -19,6 +19,8 @@ export default function TikTokLeadCreateScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const [dmText, setDmText] = useState("");
   const [senderName, setSenderName] = useState("");
@@ -48,6 +50,7 @@ export default function TikTokLeadCreateScreen() {
           paddingTop: headerHeight + Spacing.lg,
           paddingBottom: insets.bottom + Spacing.xl,
           paddingHorizontal: Spacing.lg,
+          ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined),
         }}
       >
         <View style={[styles.infoCard, { backgroundColor: theme.gradientAccent }]}>

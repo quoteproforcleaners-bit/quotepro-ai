@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Platform, Modal, ScrollView } from "react-native";
+import { View, StyleSheet, Pressable, Platform, Modal, ScrollView, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -20,6 +20,8 @@ export default function PricingScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const { pricingSettings: settings, updatePricingSettings } = useApp();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
   const [editingService, setEditingService] = useState<ServiceTypeConfig | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
 
@@ -167,6 +169,7 @@ export default function PricingScreen() {
             paddingTop: headerHeight + Spacing.xl,
             paddingBottom: insets.bottom + Spacing.xl,
           },
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
       >

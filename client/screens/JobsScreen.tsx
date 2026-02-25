@@ -11,6 +11,7 @@ import {
   Platform,
   TextInput,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
@@ -139,6 +140,8 @@ export default function JobsScreen() {
   const queryClient = useQueryClient();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { t } = useLanguage();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const filterOptions: { label: string; value: StatusFilter }[] = [
     { label: t.common.all, value: "all" },
@@ -546,6 +549,7 @@ export default function JobsScreen() {
             paddingBottom: tabBarHeight + Spacing.xl + 80,
           },
           filteredJobs.length === 0 ? styles.emptyContent : null,
+          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         refreshControl={

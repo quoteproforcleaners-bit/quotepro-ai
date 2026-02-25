@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, ScrollView, StyleSheet, TextInput } from "react-native";
+import { View, ScrollView, StyleSheet, TextInput, useWindowDimensions } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Card } from "@/components/Card";
 import { ThemedText } from "@/components/ThemedText";
@@ -51,6 +51,8 @@ export default function LaborEstimateScreen({
   onNext,
 }: LaborEstimateScreenProps) {
   const { theme, isDark } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const useMaxWidth = screenWidth > 600;
 
   const rawEstimate = useMemo(
     () => calculateLaborEstimate(walkthrough),
@@ -87,7 +89,7 @@ export default function LaborEstimateScreen({
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}
         showsVerticalScrollIndicator={false}
       >
         <SectionHeader
