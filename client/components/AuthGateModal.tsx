@@ -170,6 +170,16 @@ export default function AuthGateModal({ visible, onClose, onAuthenticated, messa
             />
           ) : null}
 
+          <Pressable
+            style={[styles.googleButton, { borderColor: theme.border }]}
+            onPress={handleGoogleSignIn}
+            testID="authgate-button-google"
+          >
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              {t.login.continueWithGoogle}
+            </ThemedText>
+          </Pressable>
+
           <View style={styles.divider}>
             <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
             <ThemedText type="small" style={{ color: theme.textSecondary, marginHorizontal: Spacing.md }}>
