@@ -62,7 +62,7 @@ function ProGateOverlay({ featureName }: { featureName?: string }) {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 80, paddingBottom: Math.max(tabBarHeight, insets.bottom) + 40 },
+          { paddingTop: insets.top + 80, paddingBottom: tabBarHeight + insets.bottom + 60 },
           useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" as const } : undefined,
         ]}
         showsVerticalScrollIndicator={false}
