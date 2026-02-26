@@ -1,20 +1,13 @@
 import React, { useCallback, useMemo } from "react";
 import { View, Platform, StyleSheet, Text } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { useNavigation, useIsFocused } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { HeaderButton } from "@react-navigation/elements";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  Easing,
-  WithSpringConfig,
-} from "react-native-reanimated";
+import { WithSpringConfig } from "react-native-reanimated";
 import { useQuery } from "@tanstack/react-query";
 import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
@@ -126,77 +119,11 @@ function QuotesHeaderRight() {
   );
 }
 
-function AnimatedTabScreen({ children }: { children: React.ReactNode }) {
-  const isFocused = useIsFocused();
-  const opacity = useSharedValue(isFocused ? 1 : 0.85);
-  const translateY = useSharedValue(isFocused ? 0 : 3);
-
-  React.useEffect(() => {
-    if (isFocused) {
-      opacity.value = withTiming(1, { duration: 250, easing: Easing.out(Easing.quad) });
-      translateY.value = withTiming(0, { duration: 250, easing: Easing.out(Easing.quad) });
-    } else {
-      opacity.value = withTiming(0.85, { duration: 150 });
-      translateY.value = withTiming(3, { duration: 150 });
-    }
-  }, [isFocused]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    flex: 1,
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return <Animated.View style={animStyle}>{children}</Animated.View>;
-}
-
-function AnimatedDashboard(props: any) {
+function WrappedSettings(props: any) {
   return (
-    <AnimatedTabScreen>
-      <DashboardScreen {...props} />
-    </AnimatedTabScreen>
-  );
-}
-
-function AnimatedCustomers(props: any) {
-  return (
-    <AnimatedTabScreen>
-      <CustomersScreen {...props} />
-    </AnimatedTabScreen>
-  );
-}
-
-function AnimatedQuotes(props: any) {
-  return (
-    <AnimatedTabScreen>
-      <QuotesScreen {...props} />
-    </AnimatedTabScreen>
-  );
-}
-
-function AnimatedJobs(props: any) {
-  return (
-    <AnimatedTabScreen>
-      <JobsScreen {...props} />
-    </AnimatedTabScreen>
-  );
-}
-
-function AnimatedGrowth(props: any) {
-  return (
-    <AnimatedTabScreen>
-      <GrowthDashboardScreen {...props} />
-    </AnimatedTabScreen>
-  );
-}
-
-function AnimatedSettings(props: any) {
-  return (
-    <AnimatedTabScreen>
-      <ErrorBoundary>
-        <SettingsScreen {...props} />
-      </ErrorBoundary>
-    </AnimatedTabScreen>
+    <ErrorBoundary>
+      <SettingsScreen {...props} />
+    </ErrorBoundary>
   );
 }
 
@@ -276,7 +203,7 @@ export default function MainTabNavigator() {
     >
       <Tab.Screen
         name="HomeTab"
-        component={AnimatedDashboard}
+        component={DashboardScreen}
         options={{
           title: t.tabs.home,
           headerTitle: () => <HeaderTitle title="QuotePro" />,
@@ -288,7 +215,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="CustomersTab"
-        component={AnimatedCustomers}
+        component={CustomersScreen}
         options={{
           title: t.tabs.customers,
           headerTitle: t.tabs.customers,
@@ -300,7 +227,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="QuotesTab"
-        component={AnimatedQuotes}
+        component={QuotesScreen}
         options={{
           title: t.tabs.quotes,
           headerTitle: t.tabs.quotes,
@@ -313,7 +240,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="JobsTab"
-        component={AnimatedJobs}
+        component={JobsScreen}
         options={{
           title: t.tabs.jobs,
           headerTitle: t.tabs.jobs,
@@ -325,7 +252,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="GrowthTab"
-        component={AnimatedGrowth}
+        component={GrowthDashboardScreen}
         options={{
           title: t.tabs.growth,
           headerTitle: t.tabs.growth,
@@ -337,7 +264,7 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="SettingsTab"
-        component={AnimatedSettings}
+        component={WrappedSettings}
         options={{
           title: t.tabs.settings,
           headerTitle: t.tabs.settings,
