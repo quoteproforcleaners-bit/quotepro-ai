@@ -36,7 +36,7 @@ export type RootStackParamList = {
   GuestQuoteCalculator: undefined;
   Onboarding: undefined;
   Main: undefined;
-  QuoteCalculator: { prefillCustomer?: { name: string; phone: string; email: string; address: string; customerId: string } } | undefined;
+  QuoteCalculator: { prefillCustomer?: { name: string; phone: string; email: string; address: string; customerId: string }; editQuoteId?: string; editQuoteData?: any } | undefined;
   QuoteDetail: { quoteId: string };
   CustomerDetail: { customerId: string };
   JobDetail: { jobId: string };

@@ -43,54 +43,105 @@ export default function QuoteCalculatorScreen() {
   const queryClient = useQueryClient();
   const routeParams = (route.params as any) || {};
   const prefill = routeParams.prefillCustomer;
-  const [currentStep, setCurrentStep] = useState(0);
+  const editQuoteId = routeParams.editQuoteId as string | undefined;
+  const editQuoteData = routeParams.editQuoteData as any | undefined;
+  const isEditMode = !!editQuoteId;
+  const [currentStep, setCurrentStep] = useState(isEditMode ? 1 : 0);
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [pendingAction, setPendingAction] = useState<"save" | "saveAndSend" | null>(null);
   const [quoteType, setQuoteType] = useState<QuoteType>("residential");
 
   const isGuestMode = !user;
 
-  const [customer, setCustomer] = useState<CustomerInfo>({
-    name: prefill?.name || "",
-    phone: prefill?.phone || "",
-    email: prefill?.email || "",
-    address: prefill?.address || "",
-    datePreference: "",
+  const [customer, setCustomer] = useState<CustomerInfo>(() => {
+    if (editQuoteData) {
+      const pd = editQuoteData.propertyDetails || {};
+      return {
+        name: pd.customerName || "",
+        phone: pd.customerPhone || "",
+        email: pd.customerEmail || "",
+        address: pd.customerAddress || "",
+        datePreference: pd.datePreference || "",
+      };
+    }
+    return {
+      name: prefill?.name || "",
+      phone: prefill?.phone || "",
+      email: prefill?.email || "",
+      address: prefill?.address || "",
+      datePreference: "",
+    };
   });
 
-  const [homeDetails, setHomeDetails] = useState<HomeDetails>({
-    sqft: 0,
-    beds: 3,
-    baths: 2,
-    halfBaths: 0,
-    conditionScore: 7,
-    peopleCount: 2,
-    petType: "none",
-    petShedding: false,
-    homeType: "house",
-    kitchensCount: 1,
+  const [homeDetails, setHomeDetails] = useState<HomeDetails>(() => {
+    if (editQuoteData) {
+      const pd = editQuoteData.propertyDetails || {};
+      return {
+        sqft: editQuoteData.propertySqft || 0,
+        beds: editQuoteData.propertyBeds || 3,
+        baths: Math.floor(editQuoteData.propertyBaths || 2),
+        halfBaths: pd.halfBaths || 0,
+        conditionScore: pd.conditionScore || 7,
+        peopleCount: pd.peopleCount || 2,
+        petType: pd.petType || "none",
+        petShedding: pd.petShedding || false,
+        homeType: pd.homeType || "house",
+        kitchensCount: pd.kitchensCount || 1,
+      };
+    }
+    return {
+      sqft: 0,
+      beds: 3,
+      baths: 2,
+      halfBaths: 0,
+      conditionScore: 7,
+      peopleCount: 2,
+      petType: "none",
+      petShedding: false,
+      homeType: "house",
+      kitchensCount: 1,
+    };
   });
 
-  const [frequency, setFrequency] = useState<ServiceFrequency>("one-time");
-  const [addOns, setAddOns] = useState<AddOns>({
-    insideFridge: false,
-    insideOven: false,
-    insideCabinets: false,
-    interiorWindows: false,
-    blindsDetail: false,
-    baseboardsDetail: false,
-    laundryFoldOnly: false,
-    dishes: false,
-    organizationTidy: false,
-    biannualDeepClean: false,
+  const [frequency, setFrequency] = useState<ServiceFrequency>(
+    editQuoteData?.frequencySelected || "one-time"
+  );
+  const [addOns, setAddOns] = useState<AddOns>(() => {
+    if (editQuoteData?.addOns) {
+      return {
+        insideFridge: false,
+        insideOven: false,
+        insideCabinets: false,
+        interiorWindows: false,
+        blindsDetail: false,
+        baseboardsDetail: false,
+        laundryFoldOnly: false,
+        dishes: false,
+        organizationTidy: false,
+        biannualDeepClean: false,
+        ...editQuoteData.addOns,
+      };
+    }
+    return {
+      insideFridge: false,
+      insideOven: false,
+      insideCabinets: false,
+      interiorWindows: false,
+      blindsDetail: false,
+      baseboardsDetail: false,
+      laundryFoldOnly: false,
+      dishes: false,
+      organizationTidy: false,
+      biannualDeepClean: false,
+    };
   });
   const [selectedOption, setSelectedOption] = useState<"good" | "better" | "best">(
-    "better"
+    editQuoteData?.selectedOption || "better"
   );
   const [recommendedOption, setRecommendedOption] = useState<"good" | "better" | "best">(
-    "better"
+    editQuoteData?.recommendedOption || "better"
   );
-  const savedQuoteIdRef = React.useRef<string | null>(null);
+  const savedQuoteIdRef = React.useRef<string | null>(isEditMode ? editQuoteId! : null);
 
   useEffect(() => {
     if (isGuestMode) {
@@ -136,8 +187,9 @@ export default function QuoteCalculatorScreen() {
   };
 
   const handleBack = () => {
+    const minStep = isEditMode ? 1 : 0;
     setCurrentStep((prev) => {
-      if (prev > 0) {
+      if (prev > minStep) {
         if (Platform.OS !== "web") {
           Haptics.selectionAsync();
         }
@@ -203,25 +255,46 @@ export default function QuoteCalculatorScreen() {
       subtotal: selectedPrice,
       tax,
       total: selectedPrice + tax,
-      status: "draft",
+      ...(isEditMode ? {} : { status: "draft" }),
     };
   };
 
   const performSave = async () => {
     try {
       const payload = buildQuotePayload();
-      const res = await apiRequest("POST", "/api/quotes", payload);
-      const newQuote = await res.json();
-      queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
-      await clearGuestDraft();
-      navigation.replace("QuoteDetail", { quoteId: newQuote.id });
+      if (isEditMode && editQuoteId) {
+        await apiRequest("PUT", `/api/quotes/${editQuoteId}`, payload);
+        queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/quotes', editQuoteId] });
+        queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
+        navigation.goBack();
+      } else {
+        const res = await apiRequest("POST", "/api/quotes", payload);
+        const newQuote = await res.json();
+        queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
+        await clearGuestDraft();
+        navigation.replace("QuoteDetail", { quoteId: newQuote.id });
+      }
     } catch (error) {
       console.error("Failed to save quote:", error);
     }
   };
 
   const performSaveForSend = async (priceOverrides?: { good?: number; better?: number; best?: number }): Promise<string | null> => {
+    if (isEditMode && editQuoteId) {
+      try {
+        const payload = buildQuotePayload(priceOverrides);
+        await apiRequest("PUT", `/api/quotes/${editQuoteId}`, payload);
+        queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/quotes', editQuoteId] });
+        queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
+        return editQuoteId;
+      } catch (error) {
+        console.error("Failed to update quote:", error);
+        return null;
+      }
+    }
     if (savedQuoteIdRef.current) return savedQuoteIdRef.current;
     try {
       const payload = buildQuotePayload(priceOverrides);
@@ -406,6 +479,7 @@ export default function QuoteCalculatorScreen() {
             onSave={handleSave}
             onSaveForSend={performSaveForSend}
             isGuestMode={isGuestMode}
+            isEditMode={isEditMode}
           />
         );
       default:
@@ -421,7 +495,7 @@ export default function QuoteCalculatorScreen() {
           { borderBottomColor: theme.border, paddingTop: insets.top },
         ]}
       >
-        {currentStep > 0 ? (
+        {currentStep > (isEditMode ? 1 : 0) ? (
           <Pressable onPress={handleBack} style={styles.headerButton} testID="button-back-step-header">
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Feather name="chevron-left" size={20} color={theme.primary} />
@@ -435,7 +509,7 @@ export default function QuoteCalculatorScreen() {
         )}
         <View style={styles.headerCenter}>
           <ThemedText type="body" style={{ fontWeight: "600" }}>
-            {STEPS[currentStep]}
+            {isEditMode ? `Edit - ${STEPS[currentStep]}` : STEPS[currentStep]}
           </ThemedText>
           <View style={styles.stepIndicator}>
             {STEPS.map((_, index) => (

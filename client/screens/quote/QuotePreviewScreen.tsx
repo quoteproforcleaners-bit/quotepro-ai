@@ -75,6 +75,7 @@ interface Props {
   onSave: () => void;
   onSaveForSend?: (priceOverrides?: { good?: number; better?: number; best?: number }) => Promise<string | null>;
   isGuestMode?: boolean;
+  isEditMode?: boolean;
 }
 
 export default function QuotePreviewScreen({
@@ -91,6 +92,7 @@ export default function QuotePreviewScreen({
   onSave,
   onSaveForSend,
   isGuestMode = false,
+  isEditMode = false,
 }: Props) {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -959,11 +961,11 @@ export default function QuotePreviewScreen({
                 onPress={handleSave}
                 style={[styles.secondaryFooterBtn, { borderColor: theme.border }]}
               >
-                <Feather name="bookmark" size={16} color={theme.textSecondary} />
-                <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 6, fontWeight: "600" }}>Save & Send Later</ThemedText>
+                <Feather name={isEditMode ? "check" : "bookmark"} size={16} color={theme.textSecondary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 6, fontWeight: "600" }}>{isEditMode ? "Update Quote" : "Save & Send Later"}</ThemedText>
               </Pressable>
               <View style={{ flex: 1 }}>
-                <Button onPress={handleSaveAndSend}>Save & Send</Button>
+                <Button onPress={handleSaveAndSend}>{isEditMode ? "Update & Send" : "Save & Send"}</Button>
               </View>
             </>
           )}

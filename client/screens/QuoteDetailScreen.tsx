@@ -1111,6 +1111,22 @@ export default function QuoteDetailScreen() {
         <SectionHeader title="Quick Actions" />
 
         <View style={styles.actions}>
+          {!isCommercial ? (
+            <Pressable
+              onPress={() => {
+                navigation.navigate("QuoteCalculator", {
+                  editQuoteId: quote.id,
+                  editQuoteData: quote,
+                });
+              }}
+              style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+              testID="edit-quote-btn"
+            >
+              <Feather name="edit-2" size={20} color={theme.primary} />
+              <ThemedText type="small" style={{ marginTop: 4 }}>Edit</ThemedText>
+            </Pressable>
+          ) : null}
+
           <Pressable
             onPress={handleCopyEmail}
             style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
