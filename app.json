@@ -2,6 +2,12 @@
   "expo": {
     "name": "QuotePro",
     "slug": "quotepro",
+    "owner": "quotepro",
+    "extra": {
+      "eas": {
+        "projectId": "1f443844-46bd-4e73-8e18-259c56ec1a81"
+      }
+    },
     "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
