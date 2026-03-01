@@ -3938,6 +3938,10 @@ Respond with JSON: {"reply": string}`
     res.send(getTermsOfServiceHTML());
   });
 
+  app.get("/delete-account", (_req: Request, res: Response) => {
+    res.send(getDeleteAccountHTML());
+  });
+
   // ─── Sticky Product: Follow-Up Queue ───
 
   app.get("/api/followup-queue", requireAuth, async (req: Request, res: Response) => {
@@ -6048,5 +6052,41 @@ function getTermsOfServiceHTML(): string {
 
 <h2>12. Contact</h2>
 <p>For questions about these Terms, please contact us at <a href="mailto:quoteproforcleaners@gmail.com">quoteproforcleaners@gmail.com</a>.</p>
+</div></body></html>`;
+}
+
+function getDeleteAccountHTML(): string {
+  const styles = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;color:#1E293B;line-height:1.7}.container{max-width:720px;margin:0 auto;padding:40px 24px}h1{font-size:28px;font-weight:700;color:#0F172A;margin-bottom:8px}h2{font-size:20px;font-weight:600;color:#0F172A;margin-top:32px;margin-bottom:12px}.updated{font-size:14px;color:#64748B;margin-bottom:32px}p,li{font-size:15px;margin-bottom:12px;color:#334155}ul{padding-left:20px}a{color:#2563EB;text-decoration:none}.back{display:inline-block;margin-bottom:24px;font-size:14px;color:#64748B}`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Delete Account - QuotePro</title><style>${styles}</style></head><body><div class="container">
+<a href="/" class="back">&larr; Back to QuotePro</a>
+<h1>Delete Your Account</h1>
+<p class="updated">QuotePro for Cleaners</p>
+
+<h2>How to Request Account Deletion</h2>
+<p>To request deletion of your QuotePro account and all associated data, please email us at <a href="mailto:quoteproforcleaners@gmail.com">quoteproforcleaners@gmail.com</a> with the subject line "Account Deletion Request" and include the email address associated with your account.</p>
+
+<h2>What Happens When You Delete Your Account</h2>
+<p>When you request account deletion, the following data will be permanently deleted within 30 days:</p>
+<ul>
+<li>Your account profile information (name, email address)</li>
+<li>All quotes you have created</li>
+<li>Customer information you have entered</li>
+<li>Business profile and settings</li>
+<li>Job history and records</li>
+<li>Any AI-generated content associated with your account</li>
+</ul>
+
+<h2>Data We May Retain</h2>
+<p>We may retain certain data as required by law or for legitimate business purposes, including:</p>
+<ul>
+<li>Transaction records related to subscription payments (retained for tax and accounting purposes)</li>
+<li>Data necessary to comply with legal obligations</li>
+</ul>
+
+<h2>Subscription Cancellation</h2>
+<p>Deleting your account does not automatically cancel your subscription. Before requesting account deletion, please cancel your subscription through the App Store or Google Play Store to avoid future charges.</p>
+
+<h2>Contact</h2>
+<p>If you have questions about the account deletion process, contact us at <a href="mailto:quoteproforcleaners@gmail.com">quoteproforcleaners@gmail.com</a>.</p>
 </div></body></html>`;
 }
