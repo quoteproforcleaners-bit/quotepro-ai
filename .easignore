@@ -1,0 +1,14 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.git/
+attached_assets/
+.cache/
+.local/
+uploads/
+*.log
+*.md
+QuotePro_User_Manual.md
+design_guidelines.md
+.upm/
