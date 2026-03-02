@@ -654,7 +654,7 @@ export default function DashboardScreen() {
     return Math.round((recentlyFollowedUp / followUpQueueCount) * 100);
   }, [followUpQueue, followUpQueueCount]);
 
-  const weekDays = ["M", "T", "W", "T", "F", "S", "S"];
+  const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   const streakDaysToShow = Math.min(currentStreak, 7);
 
   const saveWidgetConfig = useCallback(async (order: WidgetId[], hidden: Set<WidgetId>) => {
