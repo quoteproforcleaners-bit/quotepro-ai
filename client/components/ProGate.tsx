@@ -39,7 +39,12 @@ function ProGateOverlay({ featureName }: { featureName?: string }) {
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
 
-  const tabBarHeight = useBottomTabBarHeight();
+  let tabBarHeight = 0;
+  try {
+    tabBarHeight = useBottomTabBarHeight();
+  } catch {
+    tabBarHeight = 0;
+  }
 
   const handleUpgrade = () => {
     if (Platform.OS !== "web") {
