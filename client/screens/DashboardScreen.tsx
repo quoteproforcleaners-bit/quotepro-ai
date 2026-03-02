@@ -15,7 +15,6 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
   useSharedValue,
@@ -28,9 +27,8 @@ import Animated, {
 import { ThemedText } from "@/components/ThemedText";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius, Elevation, GlowEffects } from "@/constants/theme";
+import { Spacing, BorderRadius, Elevation } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
-import { FeatureFlags } from "@/lib/featureFlags";
 import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
@@ -43,7 +41,7 @@ type WidgetId = "hero" | "quickQuote" | "momentum" | "streak" | "aiEngine" | "gl
 const DEFAULT_WIDGET_ORDER: WidgetId[] = ["hero", "quickQuote", "momentum", "streak", "aiEngine", "glance"];
 
 const WIDGET_LABELS: Record<WidgetId, { en: string; icon: keyof typeof Feather.glyphMap }> = {
-  hero: { en: "Revenue Waiting to Close", icon: "dollar-sign" },
+  hero: { en: "Revenue Leak Detector", icon: "alert-triangle" },
   quickQuote: { en: "Quick Quote", icon: "zap" },
   momentum: { en: "Sales Momentum", icon: "trending-up" },
   streak: { en: "Follow-Up Streak", icon: "target" },
@@ -51,35 +49,84 @@ const WIDGET_LABELS: Record<WidgetId, { en: string; icon: keyof typeof Feather.g
   glance: { en: "Today at a Glance", icon: "eye" },
 };
 
-function useDesignTokens() {
+function useSemanticTokens() {
   const { theme, isDark } = useTheme();
-  return useMemo(() => ({
-    gradientTop: isDark ? "#0B1220" : theme.bg0,
-    gradientBottom: isDark ? "#101B2D" : theme.bg1,
-    surfacePrimary: theme.surface0,
-    surfaceSecondary: theme.surface1,
-    surfaceRaised: (theme as any).surface2 || theme.surface1,
-    surfaceHero: (theme as any).surface3 || theme.surface1,
-    surfaceEmphasis: (theme as any).surface2 || theme.surface1,
-    borderPrimary: theme.border,
-    borderSecondary: theme.divider,
-    borderAccent: isDark ? `${theme.primary}35` : `${theme.primary}18`,
-    textPrimary: theme.text,
-    textSecondary: theme.textSecondary,
-    textMuted: theme.textMuted,
-    accent: theme.primary,
-    accentMuted: isDark ? "rgba(59, 130, 246, 0.55)" : "rgba(37, 99, 235, 0.45)",
-    accentSoft: theme.primarySoft,
-    brandGlow: (theme as any).brandGlow || "rgba(37, 99, 235, 0.08)",
-    brandSoft: (theme as any).brandSoft || theme.primarySoft,
-    warningSoft: (theme as any).warningSoft || "rgba(217, 119, 6, 0.10)",
-    warningBorder: (theme as any).warningBorder || "rgba(217, 119, 6, 0.20)",
-    warningGlow: (theme as any).warningGlow || "rgba(217, 119, 6, 0.18)",
-    warningGradientTop: isDark ? "#1E293B" : "#FFFBEB",
-    warningGradientBottom: isDark ? "#0F172A" : "#FEF3C7",
-    chipBg: isDark ? theme.divider : "rgba(0,0,0,0.03)",
-    chipBorder: theme.border,
-  }), [theme, isDark]);
+  return useMemo(() => {
+    const t = theme as any;
+    return {
+      pageBg: t.colorPageBg || (isDark ? "#0B1220" : "#F6F8FB"),
+      cardBg: t.colorCardBg || (isDark ? "#141E30" : "#FFFFFF"),
+      primary: t.colorPrimary || theme.primary,
+      primaryText: t.colorPrimaryText || theme.primaryText,
+      urgency: t.colorUrgency || theme.warning,
+      urgencyBg: t.colorUrgencyBg || (isDark ? "rgba(245,158,11,0.08)" : "rgba(217,119,6,0.06)"),
+      urgencyBorder: t.colorUrgencyBorder || theme.warningBorder,
+      success: t.colorSuccess || theme.success,
+      successBg: t.colorSuccessBg || (isDark ? "rgba(34,197,94,0.08)" : "rgba(22,163,74,0.06)"),
+      danger: t.colorDanger || theme.error,
+      dangerBg: t.colorDangerBg || "rgba(220,38,38,0.06)",
+      textPrimary: t.colorTextPrimary || theme.text,
+      textSecondary: t.colorTextSecondary || theme.textSecondary,
+      textMuted: t.colorTextMuted || theme.textMuted,
+      divider: t.colorDivider || theme.border,
+      border: theme.border,
+      primarySoft: theme.primarySoft,
+      surface: isDark ? (t.surface2 || "#1E293B") : (t.surface1 || "#F6F8FB"),
+      isDark,
+    };
+  }, [theme, isDark]);
+}
+
+function getRiskState(oldestDays: number): { label: string; borderColor: (st: ReturnType<typeof useSemanticTokens>) => string; pillColor: (st: ReturnType<typeof useSemanticTokens>) => string; pillBg: (st: ReturnType<typeof useSemanticTokens>) => string } {
+  if (oldestDays >= 5) return {
+    label: "Critical",
+    borderColor: (st) => st.urgency,
+    pillColor: (st) => st.danger,
+    pillBg: (st) => st.dangerBg,
+  };
+  if (oldestDays >= 3) return {
+    label: "Cold",
+    borderColor: (st) => st.urgency,
+    pillColor: (st) => st.urgency,
+    pillBg: (st) => st.urgencyBg,
+  };
+  return {
+    label: "Cooling",
+    borderColor: (st) => st.isDark ? "rgba(217,160,50,0.4)" : "rgba(180,130,30,0.3)",
+    pillColor: (st) => st.isDark ? "#E0A830" : "#B08020",
+    pillBg: (st) => st.isDark ? "rgba(224,168,48,0.08)" : "rgba(176,128,32,0.06)",
+  };
+}
+
+function getProtectionScore(healthPercent: number, followUpCount: number, closeRate: number): { score: number; grade: string } {
+  if (followUpCount === 0) return { score: 100, grade: "A+" };
+  const healthWeight = healthPercent * 0.5;
+  const closeWeight = Math.min(closeRate, 100) * 0.3;
+  const responsiveness = followUpCount <= 2 ? 20 : followUpCount <= 5 ? 10 : 0;
+  const score = Math.round(healthWeight + closeWeight + responsiveness);
+  let grade = "F";
+  if (score >= 90) grade = "A";
+  else if (score >= 80) grade = "B+";
+  else if (score >= 70) grade = "B";
+  else if (score >= 60) grade = "C";
+  else if (score >= 50) grade = "D";
+  return { score, grade };
+}
+
+function ProtectionScoreBar({ score, st }: { score: number; st: ReturnType<typeof useSemanticTokens> }) {
+  const amberColor = st.isDark ? "#E0A830" : "#B08020";
+  const barColor = score >= 90 ? st.primary : score >= 70 ? amberColor : st.danger;
+  return (
+    <View style={{ marginTop: Spacing.md }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+        <ThemedText type="caption" style={{ color: st.textMuted, fontWeight: "600", fontSize: 11 }}>Revenue Protection Score</ThemedText>
+        <ThemedText type="caption" style={{ color: barColor, fontWeight: "700", fontSize: 11 }}>{score}/100</ThemedText>
+      </View>
+      <View style={{ height: 5, backgroundColor: st.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)", borderRadius: 3, overflow: "hidden" }}>
+        <View style={{ height: 5, width: `${Math.min(score, 100)}%`, backgroundColor: barColor, borderRadius: 3 }} />
+      </View>
+    </View>
+  );
 }
 
 function PulsingCta({ children, style }: { children: React.ReactNode; style?: any }) {
@@ -88,8 +135,8 @@ function PulsingCta({ children, style }: { children: React.ReactNode; style?: an
   useEffect(() => {
     pulseVal.value = withRepeat(
       withSequence(
-        withTiming(1.03, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) })
+        withTiming(1.02, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.ease) })
       ),
       -1,
       true
@@ -103,41 +150,21 @@ function PulsingCta({ children, style }: { children: React.ReactNode; style?: an
   return <Animated.View style={[style, animStyle]}>{children}</Animated.View>;
 }
 
-function FollowUpHealthBar({ percent }: { percent: number }) {
-  const dt = useDesignTokens();
-  const { theme } = useTheme();
-  const barColor = percent >= 70 ? theme.success : percent >= 40 ? theme.warning : "#EF4444";
-  return (
-    <View style={{ marginTop: Spacing.sm }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-        <ThemedText type="caption" style={{ color: dt.textMuted, fontSize: 11 }}>Follow-up health</ThemedText>
-        <ThemedText type="caption" style={{ color: barColor, fontWeight: "700", fontSize: 11 }}>{percent}%</ThemedText>
-      </View>
-      <View style={{ height: 6, backgroundColor: dt.chipBg, borderRadius: 3, overflow: "hidden" }}>
-        <View style={{ height: 6, width: `${Math.min(percent, 100)}%`, backgroundColor: barColor, borderRadius: 3 }} />
-      </View>
-    </View>
-  );
-}
-
-function FunnelStep({ label, value, color, isLast }: { label: string; value: number; color: string; isLast?: boolean }) {
-  const dt = useDesignTokens();
+function FunnelStep({ label, value, color, isLast, st }: { label: string; value: number; color: string; isLast?: boolean; st: ReturnType<typeof useSemanticTokens> }) {
   return (
     <View style={{ flex: 1, alignItems: "center" }}>
       <ThemedText type="h3" style={{ color, fontWeight: "800" }}>{value}</ThemedText>
-      <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2, fontSize: 11 }}>{label}</ThemedText>
+      <ThemedText type="caption" style={{ color: st.textMuted, marginTop: 2, fontSize: 11 }}>{label}</ThemedText>
       {!isLast ? (
         <View style={{ position: "absolute", right: -4, top: 6 }}>
-          <Feather name="chevron-right" size={12} color={dt.textMuted} />
+          <Feather name="chevron-right" size={12} color={st.textMuted} />
         </View>
       ) : null}
     </View>
   );
 }
 
-function StreakDots({ days, streak }: { days: string[]; streak: number }) {
-  const dt = useDesignTokens();
-  const { theme } = useTheme();
+function StreakDots({ days, streak, st }: { days: string[]; streak: number; st: ReturnType<typeof useSemanticTokens> }) {
   return (
     <View style={{ flexDirection: "row", gap: 6, marginTop: Spacing.sm }}>
       {days.map((day, i) => {
@@ -148,15 +175,15 @@ function StreakDots({ days, streak }: { days: string[]; streak: number }) {
               width: 24,
               height: 24,
               borderRadius: 12,
-              backgroundColor: active ? theme.success : dt.chipBg,
+              backgroundColor: active ? st.success : (st.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"),
               alignItems: "center",
               justifyContent: "center",
               borderWidth: active ? 0 : 1,
-              borderColor: dt.borderSecondary,
+              borderColor: st.divider,
             }}>
               {active ? <Feather name="check" size={12} color="#FFF" /> : null}
             </View>
-            <ThemedText type="caption" style={{ color: active ? theme.success : dt.textMuted, fontSize: 9, marginTop: 2, fontWeight: "600" }}>{day}</ThemedText>
+            <ThemedText type="caption" style={{ color: active ? st.success : st.textMuted, fontSize: 9, marginTop: 2, fontWeight: "600" }}>{day}</ThemedText>
           </View>
         );
       })}
@@ -164,26 +191,23 @@ function StreakDots({ days, streak }: { days: string[]; streak: number }) {
   );
 }
 
-function GlanceCard({ title, value, icon, color, onPress }: {
-  title: string; value: string; icon: keyof typeof Feather.glyphMap; color: string; onPress?: () => void;
+function GlanceCard({ title, value, icon, color, onPress, st }: {
+  title: string; value: string; icon: keyof typeof Feather.glyphMap; color: string; onPress?: () => void; st: ReturnType<typeof useSemanticTokens>;
 }) {
-  const dt = useDesignTokens();
-  const { isDark } = useTheme();
   return (
     <Pressable
-      style={[s.glanceCard, { backgroundColor: isDark ? dt.surfaceSecondary : dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
+      style={[s.glanceCard, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}
       onPress={onPress}
       testID={`glance-${title.toLowerCase().replace(/\s/g, "-")}`}
     >
-      <View style={[s.glanceIcon, { backgroundColor: `${color}20` }]}>
+      <View style={[s.glanceIcon, { backgroundColor: `${color}14` }]}>
         <Feather name={icon} size={15} color={color} />
       </View>
       <ThemedText type="h3" style={{ marginTop: 6 }}>{value}</ThemedText>
-      <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>{title}</ThemedText>
+      <ThemedText type="caption" style={{ color: st.textSecondary, marginTop: 2 }}>{title}</ThemedText>
     </Pressable>
   );
 }
-
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -192,8 +216,8 @@ export default function DashboardScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
-  const { theme, isDark } = useTheme();
-  const dt = useDesignTokens();
+  const { isDark } = useTheme();
+  const st = useSemanticTokens();
   const { businessProfile: profile } = useApp();
   const { t } = useLanguage();
   const { isPro, requirePro } = useProGate();
@@ -308,19 +332,11 @@ export default function DashboardScreen() {
   const sentQuotes = stats?.sentQuotes || 0;
   const acceptedQuotes = stats?.acceptedQuotes || 0;
   const wonQuotes = acceptedQuotes;
+  const closeRate = stats?.closeRate || 0;
 
   const viewedQuotes = useMemo(() => {
     return (quotes || []).filter((q: any) => q.viewedAt || q.status === "viewed").length;
   }, [quotes]);
-
-  const todayJobCount = useMemo(() => {
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-    return (allJobs || []).filter((j: any) => {
-      if (!j.startDatetime) return false;
-      return j.startDatetime.slice(0, 10) === todayStr && j.status !== "cancelled";
-    }).length;
-  }, [allJobs]);
 
   const followUpHealthPercent = useMemo(() => {
     if (followUpQueueCount === 0) return 100;
@@ -331,6 +347,18 @@ export default function DashboardScreen() {
     }).length;
     return Math.round((recentlyFollowedUp / followUpQueueCount) * 100);
   }, [followUpQueue, followUpQueueCount]);
+
+  const protectionScore = useMemo(() => {
+    return getProtectionScore(followUpHealthPercent, followUpQueueCount, closeRate);
+  }, [followUpHealthPercent, followUpQueueCount, closeRate]);
+
+  const estimatedLoss = useMemo(() => {
+    if (followUpQueueCount === 0) return 0;
+    const rate = closeRate > 0 ? closeRate / 100 : 0.45;
+    return Math.round(amountAtRisk * (1 - rate));
+  }, [amountAtRisk, closeRate, followUpQueueCount]);
+
+  const riskState = useMemo(() => getRiskState(oldestQuoteDays), [oldestQuoteDays]);
 
   const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   const streakDaysToShow = Math.min(currentStreak, 7);
@@ -368,67 +396,84 @@ export default function DashboardScreen() {
     });
   }, [widgetOrder, saveWidgetConfig]);
 
+  const riskBorderColor = riskState.borderColor(st);
+  const riskPillColor = riskState.pillColor(st);
+  const riskPillBg = riskState.pillBg(st);
+
   const renderWidget = useCallback((widgetId: WidgetId) => {
     switch (widgetId) {
       case "hero":
         return (
           <View key="hero">
             {followUpQueueCount > 0 ? (
-              <Pressable
-                onPress={() => navigation.navigate("FollowUpQueue")}
-                style={[s.heroCard, { borderColor: dt.warningBorder }, Elevation.e3, isDark ? GlowEffects.glowWarning : {}]}
+              <View
+                style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider, borderLeftWidth: 3, borderLeftColor: riskBorderColor }, Elevation.e1]}
                 testID="hero-revenue-card"
               >
-                <LinearGradient
-                  colors={[dt.warningGradientTop, dt.warningGradientBottom]}
-                  style={s.heroCardGradient}
-                >
-                  {isDark ? <View style={s.heroCardHighlight} /> : null}
-                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
-                    <Feather name="dollar-sign" size={16} color={theme.warning} />
-                    <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "700", marginLeft: 4, letterSpacing: 0.5 }}>REVENUE WAITING TO CLOSE</ThemedText>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: Spacing.sm }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Feather name="alert-triangle" size={14} color={st.urgency} />
+                    <ThemedText type="caption" style={{ color: st.urgency, fontWeight: "700", marginLeft: 6, letterSpacing: 0.5, fontSize: 11 }}>REVENUE LEAK DETECTOR</ThemedText>
                   </View>
-                  <ThemedText type="h2" style={{ fontWeight: "800", marginTop: 4 }}>
-                    ${amountAtRisk.toLocaleString()} waiting to close
+                  <View style={[s.riskPill, { backgroundColor: riskPillBg, borderColor: `${riskPillColor}30` }]}>
+                    <ThemedText type="caption" style={{ color: riskPillColor, fontWeight: "700", fontSize: 10 }}>{riskState.label}</ThemedText>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: "row", alignItems: "baseline", marginTop: Spacing.xs }}>
+                  <ThemedText type="h2" style={{ color: st.urgency, fontWeight: "800" }}>
+                    ${amountAtRisk.toLocaleString()}
                   </ThemedText>
-                  <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: 4 }}>
-                    {followUpQueueCount} {followUpQueueCount === 1 ? "quote needs" : "quotes need"} attention  |  Oldest: {oldestQuoteDays} {oldestQuoteDays === 1 ? "day" : "days"}
+                  <ThemedText type="small" style={{ color: st.textSecondary, marginLeft: 6 }}>at risk</ThemedText>
+                </View>
+
+                <ThemedText type="small" style={{ color: st.textSecondary, marginTop: 6 }}>
+                  {followUpQueueCount} {followUpQueueCount === 1 ? "quote" : "quotes"} slipping  {"\u00B7"}  Oldest: {oldestQuoteDays} {oldestQuoteDays === 1 ? "day" : "days"}
+                </ThemedText>
+
+                <ThemedText type="caption" style={{ color: st.textMuted, marginTop: 4, fontStyle: "italic", lineHeight: 16 }}>
+                  If your close rate stays at {Math.round(closeRate || 45)}%, you're likely losing ~${estimatedLoss.toLocaleString()}.
+                </ThemedText>
+
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: Spacing.sm }}>
+                  <ThemedText type="caption" style={{ color: st.textMuted, fontWeight: "600", fontSize: 11 }}>
+                    Score: {protectionScore.score}/100 ({protectionScore.grade})
                   </ThemedText>
-                  <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 6, fontStyle: "italic" }}>
-                    Leads go cold after 24-48 hours.
-                  </ThemedText>
-                  <FollowUpHealthBar percent={followUpHealthPercent} />
-                  <PulsingCta style={{ marginTop: Spacing.md }}>
+                </View>
+                <ProtectionScoreBar score={protectionScore.score} st={st} />
+
+                <View style={{ flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.lg }}>
+                  <PulsingCta style={{ flex: 1 }}>
                     <Pressable
                       onPress={() => navigation.navigate("FollowUpQueue")}
-                      style={[s.heroCta, { backgroundColor: theme.warning }]}
+                      style={[s.ctaButton, { backgroundColor: st.urgency }]}
                       testID="hero-follow-up-cta"
                     >
-                      <Feather name="arrow-right" size={16} color="#FFF" />
-                      <ThemedText type="body" style={{ color: "#FFF", fontWeight: "700", marginLeft: 6 }}>Follow Up Now</ThemedText>
+                      <Feather name="shield" size={14} color="#FFF" />
+                      <ThemedText type="body" style={{ color: "#FFF", fontWeight: "700", marginLeft: 6 }}>Stop the Leak</ThemedText>
                     </Pressable>
                   </PulsingCta>
-                  <Pressable
-                    onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })}
-                    style={{ alignSelf: "center", marginTop: Spacing.sm }}
-                    testID="hero-view-quotes"
-                  >
-                    <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600" }}>View Quotes</ThemedText>
-                  </Pressable>
-                </LinearGradient>
-              </Pressable>
+                </View>
+                <Pressable
+                  onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })}
+                  style={{ alignSelf: "center", marginTop: Spacing.md }}
+                  testID="hero-view-quotes"
+                >
+                  <ThemedText type="small" style={{ color: st.primary, fontWeight: "600" }}>See what's leaking</ThemedText>
+                </Pressable>
+              </View>
             ) : (
-              <View style={[s.heroCard, { backgroundColor: dt.surfacePrimary, borderColor: theme.successBorder, padding: Spacing.lg }, Elevation.e1]}>
+              <View style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider, borderLeftWidth: 3, borderLeftColor: st.success }, Elevation.e1]}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <View style={[s.focusIcon, { backgroundColor: theme.successSoft }]}>
-                    <Feather name="check-circle" size={16} color={theme.success} />
+                  <View style={[s.iconCircle, { backgroundColor: st.successBg }]}>
+                    <Feather name="check-circle" size={16} color={st.success} />
                   </View>
                   <View style={{ flex: 1, marginLeft: Spacing.sm }}>
                     <ThemedText type="subtitle" style={{ fontWeight: "700" }}>All Caught Up</ThemedText>
-                    <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: 2 }}>No revenue at risk. Keep the momentum going.</ThemedText>
+                    <ThemedText type="small" style={{ color: st.textSecondary, marginTop: 2 }}>No revenue at risk. Keep the momentum going.</ThemedText>
                   </View>
                 </View>
-                <FollowUpHealthBar percent={100} />
+                <ProtectionScoreBar score={100} st={st} />
               </View>
             )}
           </View>
@@ -439,20 +484,20 @@ export default function DashboardScreen() {
           <Pressable
             key="quickQuote"
             onPress={() => navigation.navigate("QuoteCalculator")}
-            style={[s.quickQuoteCard, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceEmphasis, borderColor: dt.borderAccent }, Elevation.e2, isDark ? GlowEffects.glowBlueSubtle : {}]}
+            style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}
             testID="quick-quote-card"
           >
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={[s.quickQuoteIcon, { backgroundColor: dt.accentSoft }]}>
-                <Feather name="zap" size={18} color={dt.accent} />
+              <View style={[s.iconCircle, { backgroundColor: st.primarySoft }]}>
+                <Feather name="zap" size={18} color={st.primary} />
               </View>
               <View style={{ flex: 1, marginLeft: Spacing.sm }}>
                 <ThemedText type="subtitle" style={{ fontWeight: "700" }}>Quick Quote</ThemedText>
-                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                  Send a price in under 10 seconds.
+                <ThemedText type="caption" style={{ color: st.textSecondary, marginTop: 2 }}>
+                  Create and send a quote with AI.
                 </ThemedText>
               </View>
-              <View style={[s.quickQuoteCta, { backgroundColor: dt.accent }]}>
+              <View style={[s.ctaCircle, { backgroundColor: st.primary }]}>
                 <Feather name="plus" size={16} color="#FFF" />
               </View>
             </View>
@@ -461,22 +506,24 @@ export default function DashboardScreen() {
 
       case "momentum":
         return (
-          <View key="momentum" style={[s.sectionCard, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderSecondary }, Elevation.e1]}>
+          <View key="momentum" style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}>
             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.md }}>
-              <Feather name="trending-up" size={14} color={dt.accent} />
+              <Feather name="trending-up" size={14} color={st.primary} />
               <ThemedText type="small" style={{ fontWeight: "700", marginLeft: 6, letterSpacing: 0.3 }}>SALES MOMENTUM</ThemedText>
             </View>
             <View style={{ flexDirection: "row" }}>
-              <FunnelStep label="Sent" value={sentQuotes} color={dt.accent} />
-              <FunnelStep label="Viewed" value={viewedQuotes} color={theme.warning} />
-              <FunnelStep label="Accepted" value={acceptedQuotes} color={theme.success} />
-              <FunnelStep label="Won" value={wonQuotes} color="#10B981" isLast />
+              <FunnelStep label="Sent" value={sentQuotes} color={st.primary} st={st} />
+              <FunnelStep label="Viewed" value={viewedQuotes} color={st.textSecondary} st={st} />
+              <FunnelStep label="Accepted" value={acceptedQuotes} color={st.textSecondary} st={st} />
+              <FunnelStep label="Won" value={wonQuotes} color={st.success} isLast st={st} />
             </View>
             {stats?.closeRate != null ? (
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: Spacing.md, paddingTop: Spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: dt.borderSecondary }}>
-                <Feather name="target" size={12} color={dt.textMuted} />
-                <ThemedText type="caption" style={{ color: dt.textSecondary, marginLeft: 4 }}>
-                  Close rate: {Math.round(stats.closeRate)}%
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: Spacing.md, paddingTop: Spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: st.divider }}>
+                <ThemedText type="caption" style={{ color: st.textMuted, fontWeight: "600" }}>
+                  Close rate
+                </ThemedText>
+                <ThemedText type="small" style={{ color: st.textPrimary, fontWeight: "700", marginLeft: 6 }}>
+                  {Math.round(stats.closeRate)}%
                 </ThemedText>
               </View>
             ) : null}
@@ -485,20 +532,20 @@ export default function DashboardScreen() {
 
       case "streak":
         return (
-          <View key="streak" style={[s.sectionCard, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e2]}>
+          <View key="streak" style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Feather name="target" size={16} color={currentStreak > 0 ? theme.success : dt.textMuted} />
+              <Feather name="target" size={16} color={currentStreak > 0 ? st.success : st.textMuted} />
               <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.sm, flex: 1 }}>
                 Follow-Up Streak: {currentStreak} {currentStreak === 1 ? "day" : "days"}
               </ThemedText>
             </View>
-            <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 4 }}>
+            <ThemedText type="caption" style={{ color: st.textSecondary, marginTop: 4 }}>
               Top closers follow up daily.
             </ThemedText>
-            <StreakDots days={weekDays} streak={streakDaysToShow} />
+            <StreakDots days={weekDays} streak={streakDaysToShow} st={st} />
             <Pressable
               onPress={() => navigation.navigate("FollowUpQueue")}
-              style={[s.streakCta, { backgroundColor: currentStreak > 0 ? theme.success : dt.accent, marginTop: Spacing.md }]}
+              style={[s.ctaButton, { backgroundColor: currentStreak > 0 ? st.success : st.primary, marginTop: Spacing.md }]}
               testID="keep-streak-cta"
             >
               <Feather name="zap" size={14} color="#FFF" />
@@ -511,54 +558,60 @@ export default function DashboardScreen() {
 
       case "aiEngine":
         return (
-          <View key="aiEngine" style={[s.sectionCard, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceEmphasis, borderColor: dt.borderAccent }, Elevation.e2]}>
+          <View key="aiEngine" style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}>
             {isPro ? (
               <>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <View style={[s.aiIcon, { backgroundColor: "#10B98120" }]}>
-                    <Feather name="cpu" size={16} color="#10B981" />
+                  <View style={[s.iconCircle, { backgroundColor: st.successBg }]}>
+                    <Feather name="cpu" size={16} color={st.success} />
                   </View>
                   <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                    <ThemedText type="subtitle" style={{ fontWeight: "700" }}>AI Revenue Engine: ON</ThemedText>
-                    <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <ThemedText type="subtitle" style={{ fontWeight: "700" }}>AI Revenue Engine</ThemedText>
+                      <ThemedText type="caption" style={{ color: st.success, fontWeight: "700", marginLeft: 8 }}>ON</ThemedText>
+                    </View>
+                    <ThemedText type="caption" style={{ color: st.textSecondary, marginTop: 2 }}>
                       Auto follow-ups and smart replies active.
                     </ThemedText>
                   </View>
-                  <View style={[s.statusDot, { backgroundColor: "#10B981" }]} />
+                  <View style={[s.statusDot, { backgroundColor: st.success }]} />
                 </View>
                 <Pressable
                   onPress={() => navigation.navigate("AutomationsHub")}
-                  style={[s.aiCta, { borderColor: "#10B981", marginTop: Spacing.md }]}
+                  style={[s.outlineButton, { borderColor: st.primary, marginTop: Spacing.md }]}
                   testID="manage-sequences-cta"
                 >
-                  <ThemedText type="small" style={{ color: "#10B981", fontWeight: "600" }}>Manage Sequences</ThemedText>
-                  <Feather name="chevron-right" size={14} color="#10B981" style={{ marginLeft: 4 }} />
+                  <ThemedText type="small" style={{ color: st.primary, fontWeight: "600" }}>Manage Sequences</ThemedText>
+                  <Feather name="chevron-right" size={14} color={st.primary} style={{ marginLeft: 4 }} />
                 </Pressable>
               </>
             ) : (
               <>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <View style={[s.aiIcon, { backgroundColor: dt.chipBg }]}>
-                    <Feather name="cpu" size={16} color={dt.textMuted} />
+                  <View style={[s.iconCircle, { backgroundColor: st.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }]}>
+                    <Feather name="cpu" size={16} color={st.textMuted} />
                   </View>
                   <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                    <ThemedText type="subtitle" style={{ fontWeight: "700" }}>AI Revenue Engine: OFF</ThemedText>
-                    <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                      Turn on auto follow-ups + smart replies to close more quotes.
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <ThemedText type="subtitle" style={{ fontWeight: "700" }}>AI Revenue Engine</ThemedText>
+                      <ThemedText type="caption" style={{ color: st.textMuted, fontWeight: "700", marginLeft: 8 }}>OFF</ThemedText>
+                    </View>
+                    <ThemedText type="caption" style={{ color: st.textSecondary, marginTop: 2 }}>
+                      Turn on to close more quotes automatically.
                     </ThemedText>
                   </View>
                 </View>
                 <View style={{ marginTop: Spacing.md, marginLeft: 44 }}>
                   {["Auto follow-ups", "Smart objection replies", "Quote descriptions that sell"].map(item => (
                     <View key={item} style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-                      <Feather name="check" size={12} color={dt.accent} />
-                      <ThemedText type="small" style={{ color: dt.textSecondary, marginLeft: 8 }}>{item}</ThemedText>
+                      <Feather name="check" size={12} color={st.primary} />
+                      <ThemedText type="small" style={{ color: st.textSecondary, marginLeft: 8 }}>{item}</ThemedText>
                     </View>
                   ))}
                 </View>
                 <Pressable
                   onPress={() => navigation.navigate("Paywall")}
-                  style={[s.activateBtn, { backgroundColor: dt.accent, marginTop: Spacing.md }]}
+                  style={[s.ctaButton, { backgroundColor: st.primary, marginTop: Spacing.md }]}
                   testID="activate-ai-cta"
                 >
                   <Feather name="zap" size={14} color="#FFF" />
@@ -580,22 +633,25 @@ export default function DashboardScreen() {
                 title="Need follow-up"
                 value={followUpQueueCount.toString()}
                 icon="phone-missed"
-                color={theme.warning}
+                color={st.urgency}
                 onPress={() => navigation.navigate("FollowUpQueue")}
+                st={st}
               />
               <GlanceCard
                 title="Quotes out"
                 value={sentQuotes.toString()}
                 icon="send"
-                color={dt.accent}
+                color={st.primary}
                 onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })}
+                st={st}
               />
               <GlanceCard
                 title="Won this month"
                 value={`$${monthRevenue.toLocaleString()}`}
                 icon="trending-up"
-                color={theme.success}
+                color={st.success}
                 onPress={() => navigation.navigate("Main", { screen: "GrowthTab" })}
+                st={st}
               />
             </View>
           </View>
@@ -604,19 +660,10 @@ export default function DashboardScreen() {
       default:
         return null;
     }
-  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, followUpHealthPercent, currentStreak, sentQuotes, viewedQuotes, acceptedQuotes, wonQuotes, monthRevenue, dt, theme, isDark, navigation, isPro, stats]);
+  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, followUpHealthPercent, currentStreak, sentQuotes, viewedQuotes, acceptedQuotes, wonQuotes, monthRevenue, st, isDark, navigation, isPro, stats, closeRate, estimatedLoss, protectionScore, riskState, riskBorderColor, riskPillColor, riskPillBg, streakDaysToShow, weekDays]);
 
   return (
-    <LinearGradient
-      colors={[dt.gradientTop, dt.gradientBottom]}
-      style={s.container}
-    >
-      {isDark ? (
-        <>
-          <View style={s.vignetteTop} />
-          <View style={s.vignetteBottom} />
-        </>
-      ) : null}
+    <View style={[s.container, { backgroundColor: st.pageBg }]}>
       <ScrollView
         contentContainerStyle={[
           s.content,
@@ -639,10 +686,10 @@ export default function DashboardScreen() {
               <ThemedText type="h4" numberOfLines={1} style={{ fontWeight: "800" }}>
                 QuotePro
               </ThemedText>
-              <View style={[s.salesBadge, { backgroundColor: dt.accentSoft }]}>
-                <Feather name="zap" size={10} color={dt.accent} />
-                <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "700", marginLeft: 3, fontSize: 10, letterSpacing: 0.3 }}>
-                  Sales-First Mode
+              <View style={[s.salesBadge, { backgroundColor: st.primarySoft }]}>
+                <Feather name="zap" size={10} color={st.primary} />
+                <ThemedText type="caption" style={{ color: st.primary, fontWeight: "700", marginLeft: 3, fontSize: 10, letterSpacing: 0.3 }}>
+                  Revenue OS
                 </ThemedText>
               </View>
             </View>
@@ -650,17 +697,17 @@ export default function DashboardScreen() {
           <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
             <Pressable
               onPress={() => setIsEditingWidgets(!isEditingWidgets)}
-              style={[s.headerBtn, { backgroundColor: isEditingWidgets ? dt.accentSoft : dt.chipBg, borderColor: isEditingWidgets ? dt.accent : dt.chipBorder }]}
+              style={[s.headerBtn, { backgroundColor: isEditingWidgets ? st.primarySoft : (st.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"), borderColor: isEditingWidgets ? st.primary : st.divider }]}
               testID="customize-widgets-btn"
             >
-              <Feather name={isEditingWidgets ? "check" : "sliders"} size={14} color={isEditingWidgets ? dt.accent : dt.textSecondary} />
+              <Feather name={isEditingWidgets ? "check" : "sliders"} size={14} color={isEditingWidgets ? st.primary : st.textSecondary} />
             </Pressable>
             <Pressable
               onPress={() => navigation.navigate("Main", { screen: "SettingsTab" })}
-              style={[s.headerBtn, { backgroundColor: dt.chipBg, borderColor: dt.chipBorder }]}
+              style={[s.headerBtn, { backgroundColor: st.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)", borderColor: st.divider }]}
               testID="settings-btn"
             >
-              <Feather name="settings" size={14} color={dt.textSecondary} />
+              <Feather name="settings" size={14} color={st.textSecondary} />
             </Pressable>
           </View>
         </View>
@@ -668,32 +715,32 @@ export default function DashboardScreen() {
         <OnboardingBanner />
 
         {isEditingWidgets ? (
-          <View style={[s.editorCard, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderPrimary }, Elevation.e2]}>
+          <View style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}>
             <View style={s.editorHeader}>
-              <Feather name="layout" size={16} color={dt.accent} />
+              <Feather name="layout" size={16} color={st.primary} />
               <ThemedText type="subtitle" style={{ fontWeight: "700", marginLeft: Spacing.sm, flex: 1 }}>
                 Customize Dashboard
               </ThemedText>
               <Pressable onPress={() => setIsEditingWidgets(false)} hitSlop={12} testID="editor-done-btn">
-                <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600" }}>Done</ThemedText>
+                <ThemedText type="small" style={{ color: st.primary, fontWeight: "600" }}>Done</ThemedText>
               </Pressable>
             </View>
             {widgetOrder.map((widgetId, index) => {
               const isHidden = hiddenWidgets.has(widgetId);
               const label = WIDGET_LABELS[widgetId];
               return (
-                <View key={widgetId} style={[s.editorRow, { borderTopColor: dt.borderSecondary }]}>
+                <View key={widgetId} style={[s.editorRow, { borderTopColor: st.divider }]}>
                   <Pressable
                     onPress={() => toggleWidgetVisibility(widgetId)}
-                    style={[s.editorVisibilityBtn, { backgroundColor: isHidden ? "transparent" : dt.accentSoft }]}
+                    style={[s.editorVisibilityBtn, { backgroundColor: isHidden ? "transparent" : st.primarySoft }]}
                     testID={`toggle-${widgetId}`}
                   >
-                    <Feather name={isHidden ? "eye-off" : "eye"} size={14} color={isHidden ? dt.textMuted : dt.accent} />
+                    <Feather name={isHidden ? "eye-off" : "eye"} size={14} color={isHidden ? st.textMuted : st.primary} />
                   </Pressable>
-                  <Feather name={label.icon} size={14} color={isHidden ? dt.textMuted : dt.textSecondary} style={{ marginLeft: Spacing.sm }} />
+                  <Feather name={label.icon} size={14} color={isHidden ? st.textMuted : st.textSecondary} style={{ marginLeft: Spacing.sm }} />
                   <ThemedText
                     type="small"
-                    style={{ flex: 1, marginLeft: Spacing.sm, color: isHidden ? dt.textMuted : dt.textPrimary, fontWeight: "500" }}
+                    style={{ flex: 1, marginLeft: Spacing.sm, color: isHidden ? st.textMuted : st.textPrimary, fontWeight: "500" }}
                     numberOfLines={1}
                   >
                     {label.en}
@@ -705,7 +752,7 @@ export default function DashboardScreen() {
                       disabled={index === 0}
                       testID={`move-up-${widgetId}`}
                     >
-                      <Feather name="chevron-up" size={16} color={dt.textSecondary} />
+                      <Feather name="chevron-up" size={16} color={st.textSecondary} />
                     </Pressable>
                     <Pressable
                       onPress={() => moveWidget(widgetId, "down")}
@@ -713,7 +760,7 @@ export default function DashboardScreen() {
                       disabled={index === widgetOrder.length - 1}
                       testID={`move-down-${widgetId}`}
                     >
-                      <Feather name="chevron-down" size={16} color={dt.textSecondary} />
+                      <Feather name="chevron-down" size={16} color={st.textSecondary} />
                     </Pressable>
                   </View>
                 </View>
@@ -727,8 +774,7 @@ export default function DashboardScreen() {
           return renderWidget(widgetId);
         })}
       </ScrollView>
-
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -737,7 +783,7 @@ const s = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flexGrow: 1,
+    paddingHorizontal: 0,
   },
   headerRow: {
     flexDirection: "row",
@@ -762,69 +808,52 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth,
   },
-  heroCard: {
+  card: {
     marginHorizontal: Spacing.lg,
-    borderRadius: 22,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
-    overflow: "hidden",
-  },
-  heroCardGradient: {
     padding: Spacing.lg,
-    borderRadius: 21,
-    overflow: "hidden",
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Spacing.md,
   },
-  heroCardHighlight: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderTopLeftRadius: 21,
-    borderTopRightRadius: 21,
+  riskPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
-  heroCta: {
+  ctaButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
     borderRadius: BorderRadius.full,
   },
-  focusIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  outlineButton: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-  },
-  quickQuoteCard: {
-    marginHorizontal: Spacing.lg,
-    padding: Spacing.lg,
-    borderRadius: 22,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.full,
     borderWidth: 1,
-    marginBottom: Spacing.md,
   },
-  quickQuoteIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickQuoteCta: {
+  iconCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
-  sectionCard: {
-    marginHorizontal: Spacing.lg,
-    padding: Spacing.lg,
-    borderRadius: 22,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
+  ctaCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -852,76 +881,15 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  streakCta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: BorderRadius.full,
-  },
-  aiIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  aiCta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-  },
-  activateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: BorderRadius.full,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  vignetteTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-    backgroundColor: "rgba(0,0,0,0.22)",
-    zIndex: 0,
-  },
-  vignetteBottom: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: "rgba(0,0,0,0.10)",
-    zIndex: 0,
-  },
-  editorCard: {
-    marginHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
-    overflow: "hidden",
-  },
   editorHeader: {
     flexDirection: "row",
     alignItems: "center",
-    padding: Spacing.md,
     paddingBottom: Spacing.sm,
   },
   editorRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   editorVisibilityBtn: {
