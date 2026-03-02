@@ -7,7 +7,7 @@ import { Feather } from "@expo/vector-icons";
 import { HeaderButton } from "@react-navigation/elements";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
-import { WithSpringConfig } from "react-native-reanimated";
+import Animated, { useSharedValue, withSpring, useAnimatedStyle, WithSpringConfig } from "react-native-reanimated";
 import { useQuery } from "@tanstack/react-query";
 import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
