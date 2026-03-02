@@ -952,7 +952,7 @@ export default function QuoteDetailScreen() {
                   Send with QuotePro AI
                 </ThemedText>
                 <ThemedText type="small" style={{ color: "rgba(255,255,255,0.85)", marginTop: 2 }}>
-                  AI writes and sends professional emails and texts in seconds - $14.99/mo
+                  AI writes and sends professional emails and texts in seconds - $19.99/mo
                 </ThemedText>
               </View>
               <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.8)" />

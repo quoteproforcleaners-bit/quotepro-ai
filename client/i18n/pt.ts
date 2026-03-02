@@ -445,7 +445,7 @@ const pt: Translations = {
     smartAlerts: "Alertas inteligentes de acompanhamento",
     aiSalesAssistant: "Assistente de Vendas IA",
     closeRateAnalytics: "Análise de taxa de fechamento",
-    upgradeToAI: "Atualizar para QuotePro AI - $14.99/mês",
+    upgradeToAI: "Atualizar para QuotePro AI - $19.99/mês",
     pipeline: "Pipeline",
     openQuotes: "Orçamentos Abertos",
     expected: "Esperado",

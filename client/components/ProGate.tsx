@@ -115,7 +115,7 @@ function ProGateOverlay({ featureName }: { featureName?: string }) {
         </Pressable>
 
         <ThemedText type="caption" style={[styles.priceNote, { color: theme.textSecondary }]}>
-          $14.99/month
+          $19.99/month
         </ThemedText>
       </View>
     </View>

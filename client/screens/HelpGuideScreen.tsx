@@ -211,7 +211,7 @@ function getGuideData(isEnglish: boolean): Section[] {
         title: "Free vs. QuotePro AI",
         content: [
           "Free Plan: Unlimited quotes, customer management, manual email/SMS drafts, PDF export, job scheduling.",
-          "QuotePro AI ($14.99/mo): Everything in Free, plus AI-written messages, direct sending, smart descriptions, one-tap regeneration, Growth Dashboard, Growth Tasks, Automations Hub, Sales Strategy, Reactivation Campaigns, Upsell Detection, and Reviews/Referral management.",
+          "QuotePro AI ($19.99/mo): Everything in Free, plus AI-written messages, direct sending, smart descriptions, one-tap regeneration, Growth Dashboard, Growth Tasks, Automations Hub, Sales Strategy, Reactivation Campaigns, Upsell Detection, and Reviews/Referral management.",
           "Subscribe, manage, or cancel anytime from Settings.",
         ],
       },
@@ -381,7 +381,7 @@ function getGuideData(isEnglish: boolean): Section[] {
       title: "Gratis vs. QuotePro AI",
       content: [
         "Plan Gratis: Cotizaciones ilimitadas, gestion de clientes, borradores manuales, exportar PDF, programacion de trabajos.",
-        "QuotePro AI ($14.99/mes): Todo lo gratis mas mensajes AI, envio directo, descripciones inteligentes, Panel de Crecimiento, Tareas, Automatizaciones, Estrategia de Ventas y mas.",
+        "QuotePro AI ($19.99/mes): Todo lo gratis mas mensajes AI, envio directo, descripciones inteligentes, Panel de Crecimiento, Tareas, Automatizaciones, Estrategia de Ventas y mas.",
         "Suscribete, administra o cancela en cualquier momento desde Configuracion.",
       ],
     },

@@ -50,7 +50,7 @@ export default function PaywallScreen() {
   const [retrying, setRetrying] = useState(false);
   const [modal, setModal] = useState<ModalState>({ visible: false, type: "info", title: "", message: "" });
 
-  const monthlyPrice = currentOffering?.monthly?.product?.priceString || "$14.99";
+  const monthlyPrice = currentOffering?.monthly?.product?.priceString || "$19.99";
   const useMaxWidth = screenWidth > 600;
   const canPurchase = offeringsStatus === "ready" || Platform.OS === "web";
 

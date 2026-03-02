@@ -8,7 +8,7 @@ QuotePro is a comprehensive SaaS platform for residential cleaning companies, ai
 
 Preferred communication style: Simple, everyday language.
 iPhone-only app. No hours/times shown to customers. Customizable service types.
-Freemium model: Basic quote creation is free. All premium features (CRM, Jobs, Growth, AI, Automations, Sales Strategy, Social) are paywalled at $14.99/month via RevenueCat. ProGate component (`/client/components/ProGate.tsx`) wraps 21 premium screens, showing inline paywall overlay for non-Pro users. Dashboard AI Command Center also gated via `useProGate` hook. QuoteDetail and QuotePreview have individual AI feature gates. AIAssistantScreen and RevenueScreen have their own isPro redirects.
+Freemium model: Basic quote creation is free. All premium features (CRM, Jobs, Growth, AI, Automations, Sales Strategy, Social) are paywalled at $19.99/month via RevenueCat. ProGate component (`/client/components/ProGate.tsx`) wraps 21 premium screens, showing inline paywall overlay for non-Pro users. Dashboard AI Command Center also gated via `useProGate` hook. QuoteDetail and QuotePreview have individual AI feature gates. AIAssistantScreen and RevenueScreen have their own isPro redirects.
 
 ## System Architecture
 
@@ -87,7 +87,7 @@ Key files:
 - **SendGrid**: Email integration (env: SENDGRID_API_KEY, SENDGRID_FROM_EMAIL).
 - **Google Calendar**: OAuth2-based calendar sync (env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).
 - **Stripe Connect**: Online payments via Stripe Express and Stripe Checkout (env: STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY).
-- **RevenueCat**: In-app subscription management ($14.99/mo Pro tier). Configured via `SubscriptionContext` with retry logic for offerings loading, inline error states on paywall, and `offerings.current` usage (not hardcoded identifiers). API key fetched from server `/api/subscription/config`. Entitlement IDs: `["Pro", "QuotePro for Cleaners Pro", "pro"]`.
+- **RevenueCat**: In-app subscription management ($19.99/mo Pro tier). Configured via `SubscriptionContext` with retry logic for offerings loading, inline error states on paywall, and `offerings.current` usage (not hardcoded identifiers). API key fetched from server `/api/subscription/config`. Entitlement IDs: `["Pro", "QuotePro for Cleaners Pro", "pro"]`.
 - **Expo-notifications**: Push notification support.
 - **Expo-print**, **expo-sharing**: For quote PDF export.
 

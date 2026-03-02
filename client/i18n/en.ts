@@ -443,7 +443,7 @@ const en = {
     smartAlerts: "Smart follow-up alerts",
     aiSalesAssistant: "AI Sales Assistant",
     closeRateAnalytics: "Close rate analytics",
-    upgradeToAI: "Upgrade to QuotePro AI - $14.99/mo",
+    upgradeToAI: "Upgrade to QuotePro AI - $19.99/mo",
     pipeline: "Pipeline",
     openQuotes: "Open Quotes",
     expected: "Expected",

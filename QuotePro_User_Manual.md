@@ -513,7 +513,7 @@ The Settings tab is where you customize every aspect of QuotePro.
 ### Subscription
 
 - View your current subscription status (Free or QuotePro AI).
-- Upgrade to QuotePro AI for $14.99/month.
+- Upgrade to QuotePro AI for $19.99/month.
 - See what AI features are included.
 
 ### Business Profile
@@ -621,7 +621,7 @@ The free plan includes everything you need to start quoting:
 - Job scheduling and tracking.
 - Basic CRM features.
 
-### QuotePro AI - $14.99/month
+### QuotePro AI - $19.99/month
 
 The Pro plan unlocks powerful AI and automation features:
 - **AI-Written Messages** - Generate personalized emails and texts in seconds using AI.

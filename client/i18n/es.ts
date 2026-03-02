@@ -445,7 +445,7 @@ const es: Translations = {
     smartAlerts: "Alertas inteligentes de seguimiento",
     aiSalesAssistant: "Asistente de ventas IA",
     closeRateAnalytics: "An\u00e1lisis de tasa de cierre",
-    upgradeToAI: "Mejorar a QuotePro AI - $14.99/mes",
+    upgradeToAI: "Mejorar a QuotePro AI - $19.99/mes",
     pipeline: "Pipeline",
     openQuotes: "Cotizaciones abiertas",
     expected: "Esperado",

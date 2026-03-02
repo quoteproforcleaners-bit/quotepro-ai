@@ -445,7 +445,7 @@ const ru: Translations = {
     smartAlerts: "Умные уведомления о напоминаниях",
     aiSalesAssistant: "ИИ Помощник по Продажам",
     closeRateAnalytics: "Аналитика конверсии",
-    upgradeToAI: "Перейти на QuotePro AI - $14.99/мес",
+    upgradeToAI: "Перейти на QuotePro AI - $19.99/мес",
     pipeline: "Воронка",
     openQuotes: "Открытые Сметы",
     expected: "Ожидаемый",
