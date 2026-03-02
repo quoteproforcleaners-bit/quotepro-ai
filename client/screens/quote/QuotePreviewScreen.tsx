@@ -8,6 +8,8 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import * as SMS from "expo-sms";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { ThemedText } from "@/components/ThemedText";
 import { QuoteCard } from "@/components/QuoteCard";
 import { Button } from "@/components/Button";
@@ -105,18 +107,20 @@ export default function QuotePreviewScreen({
   const { communicationLanguage } = useLanguage();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
-  const [showEmail, setShowEmail] = useState(false);
-  const [showSms, setShowSms] = useState(false);
+  type DraftPurpose = "initial_quote" | "follow_up" | "thank_you" | "booking_confirmation" | "reschedule";
+
   const [sendingDraft, setSendingDraft] = useState(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const [aiDescriptions, setAiDescriptions] = useState<{ good: string; better: string; best: string } | null>(null);
   const [aiDescLoading, setAiDescLoading] = useState(false);
-  const [aiEmailDraft, setAiEmailDraft] = useState<string | null>(null);
-  const [aiEmailLoading, setAiEmailLoading] = useState(false);
-  const [aiSmsDraft, setAiSmsDraft] = useState<string | null>(null);
-  const [aiSmsLoading, setAiSmsLoading] = useState(false);
+  const [aiDraft, setAiDraft] = useState<string | null>(null);
+  const [aiDraftType, setAiDraftType] = useState<"email" | "sms">("email");
+  const [aiDraftPurpose, setAiDraftPurpose] = useState<DraftPurpose>("initial_quote");
+  const [aiDraftLoading, setAiDraftLoading] = useState(false);
+  const [showAiDraft, setShowAiDraft] = useState(false);
   const [includeQuoteLink, setIncludeQuoteLink] = useState(true);
   const [priceOverrides, setPriceOverrides] = useState<{ good?: number; better?: number; best?: number }>({});
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const baseOptions = useMemo(() => {
     return calculateAllOptions(
@@ -178,13 +182,9 @@ export default function QuotePreviewScreen({
   }, [isPro]);
 
   useEffect(() => {
-    if (isPro && aiEmailDraft) {
-      setAiEmailDraft(null);
-      fetchAiEmailDraft();
-    }
-    if (isPro && aiSmsDraft) {
-      setAiSmsDraft(null);
-      fetchAiSmsDraft();
+    if (isPro && aiDraft && showAiDraft) {
+      setAiDraft(null);
+      fetchAiDraft(aiDraftType, aiDraftPurpose);
     }
   }, [includeQuoteLink]);
 
@@ -233,66 +233,36 @@ export default function QuotePreviewScreen({
     return enabled.map(({ label }) => label).join(", ");
   }, [businessProfile.paymentOptions]);
 
-  const fetchAiEmailDraft = useCallback(async () => {
-    if (!isPro) return;
+  const fetchAiDraft = useCallback(async (type: "email" | "sms", purpose: DraftPurpose) => {
+    if (!isPro) {
+      navigation.navigate("Paywall");
+      return;
+    }
     const consented = await requestConsent();
     if (!consented) return;
-    setAiEmailLoading(true);
-    try {
-      const selectedOpt = options[selectedOption];
-      const baseUrl = getPublicBaseUrl();
-      const linkPlaceholder = includeQuoteLink && baseUrl
-        ? `${baseUrl}/q/VIEW_QUOTE_LINK`
-        : "";
-      const res = await apiRequest("POST", "/api/ai/communication-draft", {
-        type: "email",
-        purpose: "initial_quote",
-        customerName: customer.name || "Customer",
-        companyName: businessProfile.companyName || "Our Company",
-        senderName: businessProfile.senderName || "Team",
-        quoteDetails: {
-          selectedOption: selectedOpt.serviceTypeName,
-          price: selectedOpt.price,
-          scope: aiDescriptions?.[(selectedOption as keyof typeof aiDescriptions)] || selectedOpt.scope,
-          propertyInfo: `${homeDetails.beds} bed, ${homeDetails.baths} bath, ${homeDetails.sqft} sqft`,
-        },
-        bookingLink: businessProfile.bookingLink || "",
-        quoteLink: linkPlaceholder,
-        paymentMethodsText,
-        language: communicationLanguage,
-      });
-      const data = await res.json();
-      if (data.draft) {
-        setAiEmailDraft(data.draft);
-      }
-    } catch (err) {
-      console.log("AI email draft unavailable");
-    } finally {
-      setAiEmailLoading(false);
-    }
-  }, [customer, businessProfile, homeDetails, options, selectedOption, aiDescriptions, isPro, includeQuoteLink]);
+    setAiDraftType(type);
+    setAiDraftPurpose(purpose);
+    setAiDraftLoading(true);
+    setShowAiDraft(true);
+    setAiDraft(null);
+    setSendSuccess(null);
 
-  const fetchAiSmsDraft = useCallback(async () => {
-    if (!isPro) return;
-    const consented = await requestConsent();
-    if (!consented) return;
-    setAiSmsLoading(true);
     try {
-      const selectedOpt = options[selectedOption];
+      const sel = options[selectedOption];
       const baseUrl = getPublicBaseUrl();
       const linkPlaceholder = includeQuoteLink && baseUrl
         ? `${baseUrl}/q/VIEW_QUOTE_LINK`
         : "";
       const res = await apiRequest("POST", "/api/ai/communication-draft", {
-        type: "sms",
-        purpose: "initial_quote",
+        type,
+        purpose,
         customerName: customer.name || "Customer",
         companyName: businessProfile.companyName || "Our Company",
         senderName: businessProfile.senderName || "Team",
         quoteDetails: {
-          selectedOption: selectedOpt.serviceTypeName,
-          price: selectedOpt.price,
-          scope: selectedOpt.scope,
+          selectedOption: sel.serviceTypeName,
+          price: sel.price,
+          scope: aiDescriptions?.[(selectedOption as keyof typeof aiDescriptions)] || sel.scope,
           propertyInfo: `${homeDetails.beds} bed, ${homeDetails.baths} bath, ${homeDetails.sqft} sqft`,
         },
         bookingLink: businessProfile.bookingLink || "",
@@ -302,17 +272,29 @@ export default function QuotePreviewScreen({
       });
       const data = await res.json();
       if (data.draft) {
-        setAiSmsDraft(data.draft);
+        setAiDraft(data.draft);
       }
-    } catch (err) {
-      console.log("AI SMS draft unavailable");
+    } catch (err: any) {
+      if (err?.message?.includes("403") || err?.status === 403) {
+        navigation.navigate("Paywall");
+        setShowAiDraft(false);
+      }
+      setAiDraft(null);
     } finally {
-      setAiSmsLoading(false);
+      setAiDraftLoading(false);
     }
-  }, [customer, businessProfile, homeDetails, options, selectedOption, isPro, includeQuoteLink]);
+  }, [customer, businessProfile, homeDetails, options, selectedOption, aiDescriptions, isPro, includeQuoteLink, paymentMethodsText, communicationLanguage]);
+
+  const handleCopyDraft = async () => {
+    if (!aiDraft) return;
+    await Clipboard.setStringAsync(aiDraft);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
 
   const handleCopyEmail = async () => {
-    const text = aiEmailDraft || emailDraft;
+    const text = (aiDraft && aiDraftType === "email") ? aiDraft : emailDraft;
     await Clipboard.setStringAsync(text);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -320,7 +302,7 @@ export default function QuotePreviewScreen({
   };
 
   const handleCopySms = async () => {
-    const text = aiSmsDraft || smsDraft;
+    const text = (aiDraft && aiDraftType === "sms") ? aiDraft : smsDraft;
     await Clipboard.setStringAsync(text);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -336,7 +318,7 @@ export default function QuotePreviewScreen({
   };
 
   const handleSendNativeSms = async () => {
-    const text = aiSmsDraft || smsDraft;
+    const text = (aiDraft && aiDraftType === "sms") ? aiDraft : smsDraft;
     const phone = customer.phone;
     const smsBody = businessProfile?.smsSignature
       ? `${text}\n\n${businessProfile.smsSignature}`
@@ -361,31 +343,69 @@ export default function QuotePreviewScreen({
   };
 
   const handleShareEmail = async () => {
-    const text = aiEmailDraft || emailDraft;
-    await Share.share({ message: text });
+    await Share.share({ message: emailDraft });
   };
 
-  const handleSendAiDraft = async (type: "email" | "sms") => {
-    const draft = type === "email" ? aiEmailDraft : aiSmsDraft;
-    if (!draft) return;
+  const handleExportPdf = async () => {
+    setPdfLoading(true);
+    try {
+      let quoteId: string | null = null;
+      if (onSaveForSend) {
+        quoteId = await onSaveForSend(priceOverrides);
+      }
+      if (!quoteId) {
+        Alert.alert("Save Required", "Please save the quote first to export as PDF.");
+        return;
+      }
+      const res = await apiRequest("GET", `/api/quotes/${quoteId}/pdf`);
+      const data = await res.json();
+      if (!data.html) throw new Error("No PDF data");
+
+      if (Platform.OS === "web") {
+        const win = window.open("", "_blank");
+        if (win) {
+          win.document.write(data.html);
+          win.document.close();
+          win.print();
+        }
+      } else {
+        const { uri } = await Print.printToFileAsync({ html: data.html });
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: `Quote for ${customer.name || "Customer"}`,
+          UTI: "com.adobe.pdf",
+        });
+      }
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (err) {
+      Alert.alert("Export Failed", "Could not generate PDF. Please try again.");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  const handleSendDraft = async () => {
+    if (!aiDraft) return;
 
     const recipientEmail = customer.email;
     const recipientPhone = customer.phone;
 
-    if (type === "email" && !businessProfile?.email) {
+    if (aiDraftType === "email" && !businessProfile?.email) {
       Alert.alert("Business Email Required", "Please add your email address in Settings before sending emails.");
       return;
     }
-    if (type === "email" && !recipientEmail) {
+    if (aiDraftType === "email" && !recipientEmail) {
       Alert.alert("No Email", "This customer doesn't have an email address. Add one to send emails.");
       return;
     }
-    if (type === "sms" && !recipientPhone) {
+    if (aiDraftType === "sms" && !recipientPhone) {
       Alert.alert("No Phone", "This customer doesn't have a phone number. Add one to send texts.");
       return;
     }
 
-    if (type === "sms") {
+    if (aiDraftType === "sms") {
       try {
         const isAvailable = await SMS.isAvailableAsync();
         if (!isAvailable) {
@@ -393,8 +413,8 @@ export default function QuotePreviewScreen({
           return;
         }
         const smsBody = businessProfile?.smsSignature
-          ? `${draft}\n\n${businessProfile.smsSignature}`
-          : draft;
+          ? `${aiDraft}\n\n${businessProfile.smsSignature}`
+          : aiDraft;
         const { result } = await SMS.sendSMSAsync([recipientPhone!], smsBody);
         if (result === "sent") {
           setSendSuccess("SMS opened!");
@@ -417,9 +437,9 @@ export default function QuotePreviewScreen({
         quoteId = await onSaveForSend(priceOverrides);
       }
 
-      const subjectMatch = draft.match(/^Subject:\s*(.+?)(?:\n|$)/i);
+      const subjectMatch = aiDraft.match(/^Subject:\s*(.+?)(?:\n|$)/i);
       const subject = subjectMatch ? subjectMatch[1].trim() : `Quote from ${businessProfile?.companyName || "QuotePro"}`;
-      const bodyText = subjectMatch ? draft.replace(/^Subject:\s*.+?\n+/i, "").trim() : draft;
+      const bodyText = subjectMatch ? aiDraft.replace(/^Subject:\s*.+?\n+/i, "").trim() : aiDraft;
 
       const emailPayload: any = { to: recipientEmail, subject, body: bodyText };
       if (quoteId && includeQuoteLink) {
@@ -465,10 +485,26 @@ export default function QuotePreviewScreen({
       handleSave();
       return;
     }
-    if (!aiEmailDraft && !aiEmailLoading) {
-      await fetchAiEmailDraft();
+    if (!aiDraft && !aiDraftLoading) {
+      await fetchAiDraft("email", "initial_quote");
     }
     handleSave();
+  };
+
+  const purposeLabels: Record<DraftPurpose, string> = {
+    initial_quote: "Send Quote",
+    follow_up: "Follow Up",
+    thank_you: "Thank You",
+    booking_confirmation: "Confirm Booking",
+    reschedule: "Reschedule",
+  };
+
+  const purposeIcons: Record<DraftPurpose, string> = {
+    initial_quote: "send",
+    follow_up: "clock",
+    thank_you: "heart",
+    booking_confirmation: "check-circle",
+    reschedule: "calendar",
   };
 
   const taxRate = pricingSettings.taxRate || 0;
@@ -633,203 +669,25 @@ export default function QuotePreviewScreen({
 
         <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
 
-        <SectionHeader title="Deliver This Quote" subtitle="Choose how to send your quote to the customer" />
+        {sendSuccess ? (
+          <View style={{ backgroundColor: `${theme.success}15`, padding: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
+            <ThemedText type="small" style={{ color: theme.success, textAlign: "center", fontWeight: "600" }}>
+              {sendSuccess}
+            </ThemedText>
+          </View>
+        ) : null}
+
+        <SectionHeader title="Send This Quote" />
 
         {isPro ? (
-          <View style={{ gap: Spacing.md }}>
-            <View style={[styles.deliveryCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-              <Pressable
-                onPress={() => {
-                  if (!aiEmailDraft && !aiEmailLoading) fetchAiEmailDraft();
-                  setShowEmail(!showEmail);
-                  setShowSms(false);
-                  setSendSuccess(null);
-                }}
-                style={styles.deliveryRow}
-                testID="ai-write-email-btn"
-              >
-                <View style={[styles.deliveryIconWrap, { backgroundColor: `${theme.primary}10` }]}>
-                  <Feather name="mail" size={18} color={theme.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <ThemedText type="body" style={{ fontWeight: "600" }}>Send via Email</ThemedText>
-                  <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 1 }}>AI-powered personalized email</ThemedText>
-                </View>
-                <Feather name={showEmail ? "chevron-up" : "chevron-right"} size={20} color={theme.textSecondary} />
-              </Pressable>
-
-              {showEmail ? (
-                <View style={[styles.deliveryExpanded, { borderTopColor: theme.border }]}>
-                  <Toggle
-                    label="Include Quote Link"
-                    description="AI will include a link where the customer can view and accept the quote online"
-                    value={includeQuoteLink}
-                    onChange={setIncludeQuoteLink}
-                  />
-                </View>
-              ) : null}
-            </View>
-
-            <View style={styles.quickActionsRow}>
-              <Pressable
-                onPress={() => {
-                  if (!aiSmsDraft && !aiSmsLoading) fetchAiSmsDraft();
-                  setShowSms(!showSms);
-                  setShowEmail(false);
-                  setSendSuccess(null);
-                }}
-                style={[styles.quickActionCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
-                testID="ai-write-sms-btn"
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: `${theme.primary}12` }]}>
-                  <Feather name="message-square" size={16} color={theme.primary} />
-                </View>
-                <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.xs }}>Send via SMS</ThemedText>
-              </Pressable>
-
-              <Pressable
-                onPress={handleCopyQuoteLink}
-                style={[styles.quickActionCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
-                testID="copy-quote-link-btn"
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: `${theme.primary}12` }]}>
-                  <Feather name="link" size={16} color={theme.primary} />
-                </View>
-                <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.xs }}>Copy Quote Link</ThemedText>
-              </Pressable>
-            </View>
-
-            {showEmail ? (
-              <View style={[styles.draftCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                <View style={styles.draftTitleRow}>
-                  <View style={[styles.draftIconWrap, { backgroundColor: `${theme.primary}10` }]}>
-                    <Feather name="mail" size={14} color={theme.primary} />
-                  </View>
-                  <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>Email Draft</ThemedText>
-                  {aiEmailDraft ? (
-                    <View style={[styles.aiSmallBadge, { backgroundColor: `${theme.primary}12` }]}>
-                      <Feather name="zap" size={10} color={theme.primary} />
-                      <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 2, fontWeight: "500" }}>AI</ThemedText>
-                    </View>
-                  ) : null}
-                </View>
-                {aiEmailLoading ? (
-                  <View style={styles.draftLoading}>
-                    <ActivityIndicator size="small" color={theme.primary} />
-                    <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 8 }}>AI is writing your email...</ThemedText>
-                  </View>
-                ) : (
-                  <>
-                    <View style={[styles.draftPreview, { backgroundColor: theme.backgroundSecondary }]}>
-                      <FormattedDraftText text={aiEmailDraft || emailDraft} />
-                    </View>
-                    {sendSuccess ? (
-                      <View style={[styles.sendSuccessBanner, { backgroundColor: `${theme.success}12` }]}>
-                        <Feather name="check-circle" size={16} color={theme.success} />
-                        <ThemedText type="small" style={{ color: theme.success, marginLeft: 6, fontWeight: "600" }}>{sendSuccess}</ThemedText>
-                      </View>
-                    ) : null}
-                    <View style={[styles.draftActions, { borderTopColor: theme.border }]}>
-                      {aiEmailDraft && !sendSuccess ? (
-                        <Pressable
-                          onPress={() => handleSendAiDraft("email")}
-                          disabled={sendingDraft}
-                          style={[styles.sendButton, { backgroundColor: theme.primary, opacity: sendingDraft ? 0.7 : 1 }]}
-                          testID="send-email-btn"
-                        >
-                          {sendingDraft ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <Feather name="send" size={14} color="#FFFFFF" />
-                          )}
-                          <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
-                            {sendingDraft ? "Sending..." : "Send Email"}
-                          </ThemedText>
-                        </Pressable>
-                      ) : null}
-                      <Pressable onPress={handleCopyEmail} style={styles.draftAction}>
-                        <Feather name="copy" size={16} color={theme.primary} />
-                        <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Copy</ThemedText>
-                      </Pressable>
-                      {aiEmailDraft ? (
-                        <Pressable onPress={() => { setAiEmailDraft(null); setSendSuccess(null); fetchAiEmailDraft(); }} style={styles.draftAction}>
-                          <Feather name="refresh-cw" size={16} color={theme.primary} />
-                          <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Regenerate</ThemedText>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  </>
-                )}
-              </View>
-            ) : null}
-
-            {showSms ? (
-              <View style={[styles.draftCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                <View style={styles.draftTitleRow}>
-                  <View style={[styles.draftIconWrap, { backgroundColor: `${theme.primary}12` }]}>
-                    <Feather name="message-square" size={14} color={theme.primary} />
-                  </View>
-                  <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>SMS Draft</ThemedText>
-                  {aiSmsDraft ? (
-                    <View style={[styles.aiSmallBadge, { backgroundColor: `${theme.primary}12` }]}>
-                      <Feather name="zap" size={10} color={theme.primary} />
-                      <ThemedText type="caption" style={{ color: theme.primary, marginLeft: 2, fontWeight: "500" }}>AI</ThemedText>
-                    </View>
-                  ) : null}
-                </View>
-                {aiSmsLoading ? (
-                  <View style={styles.draftLoading}>
-                    <ActivityIndicator size="small" color={theme.primary} />
-                    <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 8 }}>AI is writing your SMS...</ThemedText>
-                  </View>
-                ) : (
-                  <>
-                    <View style={[styles.draftPreview, { backgroundColor: theme.backgroundSecondary }]}>
-                      <FormattedDraftText text={aiSmsDraft || smsDraft} />
-                    </View>
-                    {sendSuccess ? (
-                      <View style={[styles.sendSuccessBanner, { backgroundColor: `${theme.success}12` }]}>
-                        <Feather name="check-circle" size={16} color={theme.success} />
-                        <ThemedText type="small" style={{ color: theme.success, marginLeft: 6, fontWeight: "600" }}>{sendSuccess}</ThemedText>
-                      </View>
-                    ) : null}
-                    <View style={[styles.draftActions, { borderTopColor: theme.border }]}>
-                      {aiSmsDraft && !sendSuccess ? (
-                        <Pressable
-                          onPress={() => handleSendAiDraft("sms")}
-                          disabled={sendingDraft}
-                          style={[styles.sendButton, { backgroundColor: theme.primary, opacity: sendingDraft ? 0.7 : 1 }]}
-                          testID="send-sms-btn"
-                        >
-                          {sendingDraft ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <Feather name="message-square" size={14} color="#FFFFFF" />
-                          )}
-                          <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
-                            Open in Messages
-                          </ThemedText>
-                        </Pressable>
-                      ) : null}
-                      <Pressable onPress={handleCopySms} style={styles.draftAction}>
-                        <Feather name="copy" size={16} color={theme.primary} />
-                        <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Copy</ThemedText>
-                      </Pressable>
-                      {aiSmsDraft ? (
-                        <Pressable onPress={() => { setAiSmsDraft(null); setSendSuccess(null); fetchAiSmsDraft(); }} style={styles.draftAction}>
-                          <Feather name="refresh-cw" size={16} color={theme.primary} />
-                          <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Regenerate</ThemedText>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  </>
-                )}
-              </View>
-            ) : null}
+          <View style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+              AI writes a personalized message and sends it directly to your customer
+            </ThemedText>
           </View>
         ) : (
           <Pressable onPress={() => navigation.navigate("Paywall")} testID="upgrade-send-quote">
-            <View style={[styles.upgradeCard, { backgroundColor: theme.primary }]}>
+            <View style={[styles.upgradeCard, { backgroundColor: '#2F7BFF' }]}>
               <View style={styles.upgradeIcon}>
                 <Feather name="zap" size={20} color="#FFFFFF" />
               </View>
@@ -846,98 +704,206 @@ export default function QuotePreviewScreen({
           </Pressable>
         )}
 
-        <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
+        <View style={styles.purposeRow}>
+          {(["initial_quote", "follow_up", "thank_you", "booking_confirmation", "reschedule"] as DraftPurpose[]).map((purpose) => (
+            <Pressable
+              key={purpose}
+              onPress={() => setAiDraftPurpose(purpose)}
+              style={[
+                styles.purposeChip,
+                {
+                  backgroundColor: aiDraftPurpose === purpose ? theme.primary : theme.backgroundSecondary,
+                },
+              ]}
+              testID={`purpose-${purpose}`}
+            >
+              <Feather
+                name={purposeIcons[purpose] as any}
+                size={14}
+                color={aiDraftPurpose === purpose ? "#FFFFFF" : theme.textSecondary}
+              />
+              <ThemedText
+                type="caption"
+                style={{
+                  color: aiDraftPurpose === purpose ? "#FFFFFF" : theme.text,
+                  marginLeft: 4,
+                  fontWeight: aiDraftPurpose === purpose ? "600" : "400",
+                }}
+              >
+                {purposeLabels[purpose]}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
 
-        <SectionHeader title="Manual Drafts" subtitle="Copy and paste these drafts" />
-
-        <Pressable
-          onPress={() => {
-            setShowEmail(!showEmail);
-            setShowSms(false);
-          }}
-          style={[
-            styles.draftHeader,
-            { backgroundColor: theme.cardBackground, borderColor: theme.border },
-          ]}
-        >
-          <View style={styles.draftTitleRow}>
-            <Feather name="mail" size={18} color={theme.primary} />
-            <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>
-              Email Draft
-            </ThemedText>
-          </View>
-          <Feather
-            name={showEmail && !isPro ? "chevron-up" : "chevron-down"}
-            size={20}
-            color={theme.textSecondary}
+        <View style={[styles.quoteLinkToggle, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <Toggle
+            label="Include Quote Link"
+            description="Include a link where the customer can view and accept the quote online"
+            value={includeQuoteLink}
+            onChange={setIncludeQuoteLink}
           />
-        </Pressable>
+        </View>
 
-        {showEmail && !isPro ? (
+        <View style={styles.aiButtonRow}>
+          <Pressable
+            onPress={() => fetchAiDraft("email", aiDraftPurpose)}
+            style={[styles.aiGenerateBtn, { backgroundColor: isPro ? theme.primary : theme.textSecondary }]}
+            testID="ai-email-btn"
+          >
+            <Feather name="mail" size={16} color="#FFFFFF" />
+            <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
+              Write Email
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => fetchAiDraft("sms", aiDraftPurpose)}
+            style={[styles.aiGenerateBtn, { backgroundColor: isPro ? theme.primary : theme.textSecondary }]}
+            testID="ai-sms-btn"
+          >
+            <Feather name="message-square" size={16} color="#FFFFFF" />
+            <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
+              Write SMS
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        {showAiDraft ? (
           <View
             style={[
-              styles.draftContent,
-              { backgroundColor: theme.backgroundSecondary },
+              styles.aiDraftCard,
+              { backgroundColor: theme.cardBackground, borderColor: theme.border },
             ]}
           >
-            <FormattedDraftText text={emailDraft} />
-            <View style={[styles.draftActions, { borderTopColor: theme.border }]}>
-              <Pressable onPress={handleCopyEmail} style={styles.draftAction}>
-                <Feather name="copy" size={16} color={theme.primary} />
-                <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Copy</ThemedText>
-              </Pressable>
-              <Pressable onPress={handleShareEmail} style={styles.draftAction}>
-                <Feather name="share" size={16} color={theme.primary} />
-                <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Share</ThemedText>
+            <View style={styles.aiDraftHeader}>
+              <View style={styles.draftTitleRow}>
+                <Feather
+                  name={aiDraftType === "email" ? "mail" : "message-square"}
+                  size={16}
+                  color={theme.primary}
+                />
+                <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>
+                  {aiDraftType === "email" ? "Email" : "SMS"} - {purposeLabels[aiDraftPurpose]}
+                </ThemedText>
+              </View>
+              <Pressable onPress={() => { setShowAiDraft(false); setSendSuccess(null); }}>
+                <Feather name="x" size={18} color={theme.textSecondary} />
               </Pressable>
             </View>
+
+            {aiDraftLoading ? (
+              <View style={styles.draftLoading}>
+                <ActivityIndicator size="small" color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 8 }}>
+                  AI is writing your message...
+                </ThemedText>
+              </View>
+            ) : aiDraft ? (
+              <>
+                <FormattedDraftText text={aiDraft} />
+
+                {sendSuccess ? (
+                  <View style={[styles.sendSuccessBanner, { backgroundColor: `${theme.success}15` }]}>
+                    <Feather name="check-circle" size={16} color={theme.success} />
+                    <ThemedText type="small" style={{ color: theme.success, marginLeft: 6, fontWeight: "600" }}>
+                      {sendSuccess}
+                    </ThemedText>
+                  </View>
+                ) : null}
+
+                <View style={styles.aiDraftActions}>
+                  <Pressable
+                    onPress={handleSendDraft}
+                    disabled={sendingDraft || !!sendSuccess}
+                    style={[
+                      styles.sendButton,
+                      {
+                        backgroundColor: sendSuccess ? theme.textSecondary : theme.primary,
+                        opacity: sendingDraft ? 0.7 : 1,
+                      },
+                    ]}
+                    testID="send-draft-btn"
+                  >
+                    {sendingDraft ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Feather name="send" size={14} color="#FFFFFF" />
+                    )}
+                    <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
+                      {sendingDraft ? "Sending..." : sendSuccess ? "Sent" : aiDraftType === "email" ? "Send Email" : "Open in Messages"}
+                    </ThemedText>
+                  </Pressable>
+
+                  <Pressable onPress={handleCopyDraft} style={styles.draftAction} testID="copy-ai-draft">
+                    <Feather name="copy" size={16} color={theme.primary} />
+                    <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>
+                      Copy
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => fetchAiDraft(aiDraftType, aiDraftPurpose)}
+                    style={styles.draftAction}
+                    testID="regenerate-ai-draft"
+                  >
+                    <Feather name="refresh-cw" size={16} color={theme.primary} />
+                    <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>
+                      Regenerate
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                Could not generate draft. Please try again.
+              </ThemedText>
+            )}
           </View>
         ) : null}
 
-        <Pressable
-          onPress={() => {
-            setShowSms(!showSms);
-            setShowEmail(false);
-          }}
-          style={[
-            styles.draftHeader,
-            { backgroundColor: theme.cardBackground, borderColor: theme.border },
-            { marginTop: Spacing.sm },
-          ]}
-        >
-          <View style={styles.draftTitleRow}>
-            <Feather name="message-square" size={18} color={theme.primary} />
-            <ThemedText type="body" style={{ fontWeight: "600", marginLeft: 8 }}>
-              SMS Draft
-            </ThemedText>
-          </View>
-          <Feather
-            name={showSms && !isPro ? "chevron-up" : "chevron-down"}
-            size={20}
-            color={theme.textSecondary}
-          />
-        </Pressable>
+        <SectionHeader title="Quick Actions" />
 
-        {showSms && !isPro ? (
-          <View
-            style={[
-              styles.draftContent,
-              { backgroundColor: theme.backgroundSecondary },
-            ]}
+        <View style={styles.actions}>
+          <Pressable
+            onPress={handleCopyEmail}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="copy-email-btn"
           >
-            <FormattedDraftText text={smsDraft} />
-            <View style={[styles.draftActions, { borderTopColor: theme.border }]}>
-              <Pressable onPress={handleSendNativeSms} style={styles.draftAction}>
-                <Feather name="message-square" size={16} color={theme.primary} />
-                <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Open in Messages</ThemedText>
-              </Pressable>
-              <Pressable onPress={handleCopySms} style={styles.draftAction}>
-                <Feather name="copy" size={16} color={theme.primary} />
-                <ThemedText type="small" style={{ color: theme.primary, marginLeft: 4 }}>Copy</ThemedText>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
+            <Feather name="mail" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Copy Email</ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={handleSendNativeSms}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="send-sms-btn"
+          >
+            <Feather name="message-square" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Text</ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={handleExportPdf}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="export-pdf-btn"
+          >
+            {pdfLoading ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <Feather name="file-text" size={20} color={theme.primary} />
+            )}
+            <ThemedText type="small" style={{ marginTop: 4 }}>Export PDF</ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={handleCopyQuoteLink}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="copy-link-btn"
+          >
+            <Feather name="link" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Copy Link</ThemedText>
+          </Pressable>
+        </View>
       </ScrollView>
 
       <View
@@ -1068,72 +1034,74 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: Spacing.sm,
   },
-  deliveryCard: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  deliveryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: Spacing.lg,
-  },
-  deliveryIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: Spacing.md,
-  },
-  deliveryExpanded: {
-    paddingHorizontal: Spacing.lg,
-    borderTopWidth: 1,
-  },
-  quickActionsRow: {
-    flexDirection: "row",
-    gap: Spacing.md,
-  },
-  quickActionCard: {
-    flex: 1,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  quickActionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  draftCard: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    padding: Spacing.lg,
-    overflow: "hidden",
-  },
-  draftPreview: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    marginTop: Spacing.md,
-  },
   upgradeCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
     marginBottom: Spacing.md,
   },
   upgradeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: Spacing.md,
+    marginRight: Spacing.sm,
+  },
+  quoteLinkToggle: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  purposeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  purposeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+  },
+  aiButtonRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  aiGenerateBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+  },
+  aiDraftCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  aiDraftHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  aiDraftActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.lg,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.05)",
   },
   sendSuccessBanner: {
     flexDirection: "row",
@@ -1141,57 +1109,41 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.xs,
     marginTop: Spacing.md,
   },
   sendButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm + 2,
-    borderRadius: BorderRadius.sm,
-  },
-  draftHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.xs,
   },
   draftTitleRow: {
     flexDirection: "row",
     alignItems: "center",
   },
-  draftIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  draftContent: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.sm,
-    marginTop: Spacing.xs,
-  },
   draftLoading: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: Spacing.xl,
-  },
-  draftActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.lg,
-    marginTop: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
+    paddingVertical: Spacing.lg,
   },
   draftAction: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  actions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
+    minWidth: 80,
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.xs,
   },
   footer: {
     position: "absolute",
