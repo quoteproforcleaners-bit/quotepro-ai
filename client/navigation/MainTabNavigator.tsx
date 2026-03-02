@@ -7,7 +7,24 @@ import { Feather } from "@expo/vector-icons";
 import { HeaderButton } from "@react-navigation/elements";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
-import Animated, { useSharedValue, withSpring, useAnimatedStyle, WithSpringConfig } from "react-native-reanimated";
+let Animated: any;
+let useSharedValue: any;
+let withSpring: any;
+let useAnimatedStyle: any;
+let reanimatedAvailable = false;
+try {
+  const reanimated = require("react-native-reanimated");
+  Animated = reanimated.default;
+  useSharedValue = reanimated.useSharedValue;
+  withSpring = reanimated.withSpring;
+  useAnimatedStyle = reanimated.useAnimatedStyle;
+  if (typeof useSharedValue === "function") {
+    reanimatedAvailable = true;
+  }
+} catch {
+  reanimatedAvailable = false;
+}
+type WithSpringConfig = any;
 import { useQuery } from "@tanstack/react-query";
 import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
@@ -39,15 +56,15 @@ const pillSpring: WithSpringConfig = {
   overshootClamping: false,
 };
 
-function TabIcon({ name, color, size, focused, isHome, badgeCount }: {
+function AnimatedTabIcon({ name, color, size, focused, isHome, badgeCount, theme }: {
   name: keyof typeof Feather.glyphMap;
   color: string;
   size: number;
   focused: boolean;
   isHome?: boolean;
   badgeCount?: number;
+  theme: any;
 }) {
-  const { theme } = useTheme();
   const scale = useSharedValue(focused ? 1 : 0);
   const iconScale = useSharedValue(focused ? 1.08 : 1);
 
@@ -93,6 +110,61 @@ function TabIcon({ name, color, size, focused, isHome, badgeCount }: {
       ) : null}
     </View>
   );
+}
+
+function StaticTabIcon({ name, color, size, focused, isHome, badgeCount, theme }: {
+  name: keyof typeof Feather.glyphMap;
+  color: string;
+  size: number;
+  focused: boolean;
+  isHome?: boolean;
+  badgeCount?: number;
+  theme: any;
+}) {
+  const showBadge = badgeCount != null && badgeCount > 0;
+
+  return (
+    <View style={styles.tabIconWrapper}>
+      {focused ? (
+        <View
+          style={[
+            styles.pill,
+            { backgroundColor: theme.primary, opacity: 0.12 },
+          ]}
+        />
+      ) : null}
+      <Feather name={name} size={focused ? size + 2 : size} color={color} />
+      {isHome && focused ? (
+        <View style={[styles.boltBadge, { backgroundColor: theme.primary }]}>
+          <Feather name="zap" size={8} color="#FFF" />
+        </View>
+      ) : null}
+      {showBadge ? (
+        <View style={styles.notifBadge}>
+          <Text style={styles.notifBadgeText}>
+            {badgeCount > 99 ? "99+" : String(badgeCount)}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function TabIcon({ name, color, size, focused, isHome, badgeCount }: {
+  name: keyof typeof Feather.glyphMap;
+  color: string;
+  size: number;
+  focused: boolean;
+  isHome?: boolean;
+  badgeCount?: number;
+}) {
+  const { theme } = useTheme();
+  const props = { name, color, size, focused, isHome, badgeCount, theme };
+
+  if (reanimatedAvailable) {
+    return <AnimatedTabIcon {...props} />;
+  }
+  return <StaticTabIcon {...props} />;
 }
 
 function QuotesHeaderRight() {

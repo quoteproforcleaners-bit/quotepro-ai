@@ -6,9 +6,10 @@ import {
   RefreshControl,
   TextInput,
   Pressable,
-  FlatList,
+  Modal,
   Platform,
   useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -16,13 +17,15 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withRepeat,
+  withSequence,
   Easing,
   runOnJS,
 } from "react-native-reanimated";
@@ -32,7 +35,6 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Elevation, GlowEffects } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { FeatureFlags } from "@/lib/featureFlags";
-import { runAiCommand, EXAMPLE_PROMPTS, AiCommandResult } from "@/lib/aiCommandRouter";
 import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
@@ -40,98 +42,22 @@ import { useProGate } from "@/components/ProGate";
 import { useAIConsent } from "@/context/AIConsentContext";
 import { useTutorial } from "@/context/TutorialContext";
 import { DASHBOARD_TOUR } from "@/lib/tourDefinitions";
+import { calculateQuoteOption, getServiceTypeById } from "@/lib/quoteCalculator";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
-type WidgetId = "followUp" | "streak" | "aiCommand" | "quickActions" | "glance" | "opportunities" | "recap";
+type WidgetId = "hero" | "quickQuote" | "momentum" | "streak" | "aiEngine" | "glance";
 
-const DEFAULT_WIDGET_ORDER: WidgetId[] = ["followUp", "streak", "aiCommand", "quickActions", "glance", "opportunities", "recap"];
+const DEFAULT_WIDGET_ORDER: WidgetId[] = ["hero", "quickQuote", "momentum", "streak", "aiEngine", "glance"];
 
 const WIDGET_LABELS: Record<WidgetId, { en: string; icon: keyof typeof Feather.glyphMap }> = {
-  followUp: { en: "Follow-Up Focus", icon: "alert-circle" },
-  streak: { en: "Follow-Up Streak", icon: "zap" },
-  aiCommand: { en: "AI Command Center", icon: "cpu" },
-  quickActions: { en: "Quick Actions", icon: "grid" },
+  hero: { en: "Revenue Waiting to Close", icon: "dollar-sign" },
+  quickQuote: { en: "Quick Quote", icon: "zap" },
+  momentum: { en: "Sales Momentum", icon: "trending-up" },
+  streak: { en: "Follow-Up Streak", icon: "target" },
+  aiEngine: { en: "AI Revenue Engine", icon: "cpu" },
   glance: { en: "Today at a Glance", icon: "eye" },
-  opportunities: { en: "Opportunities", icon: "repeat" },
-
-  recap: { en: "Weekly Recap", icon: "bar-chart" },
 };
-
-/*
- * ─── Design Tokens (Home Screen) ───
- * Adjust these to tweak the visual polish.
- * "dt" = design token
- */
-const DAILY_QUOTES = [
-  { text: "Success is the sum of small efforts repeated day in and day out.", author: "Robert Collier" },
-  { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
-  { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
-  { text: "Every expert was once a beginner.", author: "Helen Hayes" },
-  { text: "Your most unhappy customers are your greatest source of learning.", author: "Bill Gates" },
-  { text: "The best time to plant a tree was 20 years ago. The second best time is now.", author: "Chinese Proverb" },
-  { text: "Quality means doing it right when no one is looking.", author: "Henry Ford" },
-  { text: "Go the extra mile. It's never crowded there.", author: "Wayne Dyer" },
-  { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
-  { text: "Opportunities don't happen. You create them.", author: "Chris Grosser" },
-  { text: "It always seems impossible until it's done.", author: "Nelson Mandela" },
-  { text: "Hustle beats talent when talent doesn't hustle.", author: "Ross Simmonds" },
-  { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
-  { text: "Small business is the backbone of our economy.", author: "Tina Fey" },
-  { text: "People don't buy what you do; they buy why you do it.", author: "Simon Sinek" },
-  { text: "A satisfied customer is the best business strategy of all.", author: "Michael LeBoeuf" },
-  { text: "Customer service is not a department, it's everyone's job.", author: "Anonymous" },
-  { text: "The goal is not to be busy, it's to be productive.", author: "Tim Ferriss" },
-  { text: "Success usually comes to those who are too busy to be looking for it.", author: "Henry David Thoreau" },
-  { text: "The way to get started is to quit talking and begin doing.", author: "Walt Disney" },
-  { text: "Work hard in silence. Let success make the noise.", author: "Frank Ocean" },
-  { text: "Your reputation is built one clean at a time.", author: "QuotePro" },
-  { text: "Consistency is what transforms average into excellence.", author: "Anonymous" },
-  { text: "Make every detail perfect, and limit the number of details.", author: "Jack Dorsey" },
-  { text: "In the middle of difficulty lies opportunity.", author: "Albert Einstein" },
-  { text: "Revenue is vanity, profit is sanity, but cash is king.", author: "Anonymous" },
-  { text: "If you're not taking care of your customer, your competitor will.", author: "Bob Hooey" },
-  { text: "Do what you do so well that they want to see it again and bring their friends.", author: "Walt Disney" },
-  { text: "There are no traffic jams along the extra mile.", author: "Roger Staubach" },
-  { text: "The harder you work, the luckier you get.", author: "Gary Player" },
-  { text: "Dream big. Start small. Act now.", author: "Robin Sharma" },
-  { text: "What you do today can improve all your tomorrows.", author: "Ralph Marston" },
-  { text: "Strive not to be a success, but rather to be of value.", author: "Albert Einstein" },
-  { text: "The best marketing strategy ever: care.", author: "Gary Vaynerchuk" },
-  { text: "Don't be afraid to give up the good to go for the great.", author: "John D. Rockefeller" },
-  { text: "A clean home is a happy home, and you make that happen.", author: "QuotePro" },
-  { text: "Action is the foundational key to all success.", author: "Pablo Picasso" },
-  { text: "Winners are not people who never fail but people who never quit.", author: "Edwin Louis Cole" },
-  { text: "The difference between ordinary and extraordinary is that little extra.", author: "Jimmy Johnson" },
-  { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
-  { text: "Price is what you pay. Value is what you get.", author: "Warren Buffett" },
-  { text: "Business opportunities are like buses, there's always another one coming.", author: "Richard Branson" },
-  { text: "Be so good they can't ignore you.", author: "Steve Martin" },
-  { text: "It's not about ideas. It's about making ideas happen.", author: "Scott Belsky" },
-  { text: "You don't build a business. You build people, and people build the business.", author: "Zig Ziglar" },
-  { text: "The customer's perception is your reality.", author: "Kate Zabriskie" },
-  { text: "Profit in business comes from repeat customers.", author: "W. Edwards Deming" },
-  { text: "Take care of your employees and they'll take care of your business.", author: "Richard Branson" },
-  { text: "Focus on being productive instead of busy.", author: "Tim Ferriss" },
-  { text: "Chase the vision, not the money; the money will end up following you.", author: "Tony Hsieh" },
-  { text: "Don't find customers for your products, find products for your customers.", author: "Seth Godin" },
-  { text: "Every day is a new opportunity to grow your business.", author: "QuotePro" },
-  { text: "Your limitation is only your imagination.", author: "Anonymous" },
-  { text: "Push yourself, because no one else is going to do it for you.", author: "Anonymous" },
-  { text: "Great things never come from comfort zones.", author: "Anonymous" },
-  { text: "The only limit to our realization of tomorrow is our doubts of today.", author: "Franklin D. Roosevelt" },
-  { text: "Stop selling. Start helping.", author: "Zig Ziglar" },
-  { text: "Make your product easier to buy than your competition, or you will lose.", author: "Mark Cuban" },
-  { text: "The biggest risk is not taking any risk.", author: "Mark Zuckerberg" },
-  { text: "Every accomplishment starts with the decision to try.", author: "John F. Kennedy" },
-  { text: "Success doesn't come from what you do occasionally, it comes from what you do consistently.", author: "Marie Forleo" },
-];
-
-function getDailyQuote() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  const diff = now.getTime() - start.getTime();
-  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
-  return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
-}
 
 function useDesignTokens() {
   const { theme, isDark } = useTheme();
@@ -164,168 +90,85 @@ function useDesignTokens() {
   }), [theme, isDark]);
 }
 
-function RotatingPrompts({ onTap }: { onTap: (prompt: string) => void }) {
-  const dt = useDesignTokens();
-  const [currentIndex, setCurrentIndex] = useState(() => Math.floor(Math.random() * EXAMPLE_PROMPTS.length));
-  const [displayText, setDisplayText] = useState(EXAMPLE_PROMPTS[currentIndex]);
-  const opacity = useSharedValue(1);
-  const translateY = useSharedValue(0);
-  const lastIndex = useRef(currentIndex);
-
-  const rotateToNext = useCallback(() => {
-    let next: number;
-    do {
-      next = Math.floor(Math.random() * EXAMPLE_PROMPTS.length);
-    } while (next === lastIndex.current && EXAMPLE_PROMPTS.length > 1);
-    lastIndex.current = next;
-    setDisplayText(EXAMPLE_PROMPTS[next]);
-    setCurrentIndex(next);
-    translateY.value = 8;
-    opacity.value = withTiming(1, { duration: 300, easing: Easing.in(Easing.ease) });
-    translateY.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) });
-  }, []);
+function PulsingCta({ children, style }: { children: React.ReactNode; style?: any }) {
+  const pulseVal = useSharedValue(1);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      opacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) }, (finished) => {
-        if (finished) {
-          runOnJS(rotateToNext)();
-        }
-      });
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [rotateToNext]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  return (
-    <Pressable onPress={() => onTap(displayText)} testID="rotating-prompt">
-      <Animated.View style={[styles.promptContainer, animStyle]}>
-        <Feather name="zap" size={13} color={dt.accent} style={{ marginRight: 6 }} />
-        <ThemedText type="small" style={{ color: dt.accentMuted, flex: 1, fontSize: 13 }} numberOfLines={1}>
-          {displayText}
-        </ThemedText>
-      </Animated.View>
-    </Pressable>
-  );
-}
-
-function useQuickActions() {
-  const { t } = useLanguage();
-  return [
-    { label: t.dashboard.newQuote, icon: "file-plus" as const, action: "create_quote" },
-    { label: t.dashboard.followUpQuotes, icon: "refresh-cw" as const, action: "follow_up" },
-    { label: t.dashboard.thisMonthBooked, icon: "bar-chart-2" as const, action: "metrics" },
-    { label: t.dashboard.draftReply, icon: "edit-3" as const, action: "draft" },
-    { label: t.dashboard.unpaidInvoices, icon: "alert-circle" as const, action: "invoices" },
-    { label: t.jobs.scheduleJob, icon: "calendar" as const, action: "schedule" },
-  ];
-}
-
-function QuickActionChips({ onAction }: { onAction: (action: string) => void }) {
-  const dt = useDesignTokens();
-  const { theme } = useTheme();
-  const { t } = useLanguage();
-  const quickActions = useQuickActions();
-  return (
-    <FlatList
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      data={quickActions}
-      keyExtractor={(item) => item.action}
-      contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.sm }}
-      renderItem={({ item }) => {
-        const disabled = item.action === "invoices";
-        return (
-          <Pressable
-            onPress={() => {
-              if (disabled) return;
-              onAction(item.action);
-            }}
-            style={({ pressed }) => [
-              styles.chip,
-              {
-                backgroundColor: pressed && !disabled ? dt.accentSoft : dt.chipBg,
-                borderColor: dt.chipBorder,
-                opacity: disabled ? 0.5 : 1,
-              },
-            ]}
-            testID={`chip-${item.action}`}
-          >
-            <Feather name={item.icon} size={13} color={disabled ? dt.textMuted : theme.textSecondary} />
-            <ThemedText
-              type="caption"
-              style={{
-                color: disabled ? dt.textMuted : dt.textPrimary,
-                marginLeft: 6,
-                fontWeight: "500",
-              }}
-            >
-              {disabled ? t.common.comingSoon : item.label}
-            </ThemedText>
-          </Pressable>
-        );
-      }}
-    />
-  );
-}
-
-function ResponseCard({ result, onDismiss, onAction }: {
-  result: AiCommandResult;
-  onDismiss: () => void;
-  onAction: (action: string) => void;
-}) {
-  const dt = useDesignTokens();
-  const { theme } = useTheme();
-  const opacity = useSharedValue(0);
-  const translateY = useSharedValue(10);
-
-  useEffect(() => {
-    opacity.value = withTiming(1, { duration: 250 });
-    translateY.value = withTiming(0, { duration: 250, easing: Easing.out(Easing.ease) });
+    pulseVal.value = withRepeat(
+      withSequence(
+        withTiming(1.03, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
   }, []);
 
   const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
+    transform: [{ scale: pulseVal.value }],
   }));
 
+  return <Animated.View style={[style, animStyle]}>{children}</Animated.View>;
+}
+
+function FollowUpHealthBar({ percent }: { percent: number }) {
+  const dt = useDesignTokens();
+  const { theme } = useTheme();
+  const barColor = percent >= 70 ? theme.success : percent >= 40 ? theme.warning : "#EF4444";
   return (
-    <Animated.View style={[styles.responseCard, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderSecondary }, animStyle]}>
-      <View style={styles.responseHeader}>
-        <View style={[styles.responseIconBg, { backgroundColor: dt.accentSoft }]}>
-          <Feather name="cpu" size={16} color={dt.accent} />
-        </View>
-        <ThemedText type="small" style={{ fontWeight: "600", flex: 1 }}>QuotePro</ThemedText>
-        <Pressable onPress={onDismiss} hitSlop={12}>
-          <Feather name="x" size={16} color={dt.textMuted} />
-        </Pressable>
+    <View style={{ marginTop: Spacing.sm }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+        <ThemedText type="caption" style={{ color: dt.textMuted, fontSize: 11 }}>Follow-up health</ThemedText>
+        <ThemedText type="caption" style={{ color: barColor, fontWeight: "700", fontSize: 11 }}>{percent}%</ThemedText>
       </View>
-      <ThemedText type="body" style={{ marginTop: Spacing.sm }}>
-        {result.responseText}
-      </ThemedText>
-      {result.metricValue ? (
-        <ThemedText type="h1" style={{ color: dt.accent, marginTop: Spacing.sm }}>
-          {result.metricValue}
-        </ThemedText>
-      ) : null}
-      {result.suggestedActions && result.suggestedActions.length > 0 ? (
-        <View style={styles.suggestedRow}>
-          {result.suggestedActions.map((a, i) => (
-            <Pressable
-              key={i}
-              style={[styles.suggestedChip, { backgroundColor: dt.accentSoft, borderColor: "transparent" }]}
-              onPress={() => onAction(a)}
-            >
-              <ThemedText type="caption" style={{ color: dt.accent }}>{a}</ThemedText>
-            </Pressable>
-          ))}
+      <View style={{ height: 6, backgroundColor: dt.chipBg, borderRadius: 3, overflow: "hidden" }}>
+        <View style={{ height: 6, width: `${Math.min(percent, 100)}%`, backgroundColor: barColor, borderRadius: 3 }} />
+      </View>
+    </View>
+  );
+}
+
+function FunnelStep({ label, value, color, isLast }: { label: string; value: number; color: string; isLast?: boolean }) {
+  const dt = useDesignTokens();
+  return (
+    <View style={{ flex: 1, alignItems: "center" }}>
+      <ThemedText type="h3" style={{ color, fontWeight: "800" }}>{value}</ThemedText>
+      <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2, fontSize: 11 }}>{label}</ThemedText>
+      {!isLast ? (
+        <View style={{ position: "absolute", right: -4, top: 6 }}>
+          <Feather name="chevron-right" size={12} color={dt.textMuted} />
         </View>
       ) : null}
-    </Animated.View>
+    </View>
+  );
+}
+
+function StreakDots({ days, streak }: { days: string[]; streak: number }) {
+  const dt = useDesignTokens();
+  const { theme } = useTheme();
+  return (
+    <View style={{ flexDirection: "row", gap: 6, marginTop: Spacing.sm }}>
+      {days.map((day, i) => {
+        const active = i < streak;
+        return (
+          <View key={day} style={{ alignItems: "center", flex: 1 }}>
+            <View style={{
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              backgroundColor: active ? theme.success : dt.chipBg,
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: active ? 0 : 1,
+              borderColor: dt.borderSecondary,
+            }}>
+              {active ? <Feather name="check" size={12} color="#FFF" /> : null}
+            </View>
+            <ThemedText type="caption" style={{ color: active ? theme.success : dt.textMuted, fontSize: 9, marginTop: 2, fontWeight: "600" }}>{day}</ThemedText>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -336,16 +179,330 @@ function GlanceCard({ title, value, icon, color, onPress }: {
   const { isDark } = useTheme();
   return (
     <Pressable
-      style={[styles.glanceCard, { backgroundColor: isDark ? dt.surfaceSecondary : dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
+      style={[s.glanceCard, { backgroundColor: isDark ? dt.surfaceSecondary : dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
       onPress={onPress}
       testID={`glance-${title.toLowerCase().replace(/\s/g, "-")}`}
     >
-      <View style={[styles.glanceIcon, { backgroundColor: `${color}20` }]}>
+      <View style={[s.glanceIcon, { backgroundColor: `${color}20` }]}>
         <Feather name={icon} size={15} color={color} />
       </View>
       <ThemedText type="h3" style={{ marginTop: 6 }}>{value}</ThemedText>
       <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>{title}</ThemedText>
     </Pressable>
+  );
+}
+
+function QuickQuoteModal({ visible, onClose, navigation }: {
+  visible: boolean;
+  onClose: () => void;
+  navigation: any;
+}) {
+  const { theme, isDark } = useTheme();
+  const dt = useDesignTokens();
+  const insets = useSafeAreaInsets();
+  const { pricingSettings } = useApp();
+  const { isPro } = useProGate();
+  const queryClient = useQueryClient();
+
+  const [customerName, setCustomerName] = useState("");
+  const [propertyType, setPropertyType] = useState<"residential" | "commercial">("residential");
+  const [sqft, setSqft] = useState("");
+  const [beds, setBeds] = useState("3");
+  const [baths, setBaths] = useState("2");
+  const [serviceType, setServiceType] = useState("standard");
+  const [notes, setNotes] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
+  const [calculatedPrice, setCalculatedPrice] = useState(0);
+  const [editablePrice, setEditablePrice] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const serviceTypes = [
+    { id: "standard", label: "Standard Clean" },
+    { id: "deep-clean", label: "Deep Clean" },
+    { id: "move-in-out", label: "Move In/Out" },
+  ];
+
+  const resetForm = () => {
+    setCustomerName("");
+    setPropertyType("residential");
+    setSqft("");
+    setBeds("3");
+    setBaths("2");
+    setServiceType("standard");
+    setNotes("");
+    setShowPreview(false);
+    setCalculatedPrice(0);
+    setEditablePrice("");
+  };
+
+  const handleCalculate = () => {
+    if (!pricingSettings) return;
+    const sqftNum = parseInt(sqft) || 2000;
+    const bedsNum = parseInt(beds) || 3;
+    const bathsNum = parseInt(baths) || 2;
+
+    const homeDetails = {
+      sqft: sqftNum,
+      beds: bedsNum,
+      baths: bathsNum,
+      halfBaths: 0,
+      homeType: "house" as const,
+      conditionScore: 7,
+      peopleCount: 2,
+      petType: "none" as const,
+      petShedding: false,
+    };
+
+    const noAddOns = {
+      insideFridge: false,
+      insideOven: false,
+      insideCabinets: false,
+      interiorWindows: false,
+      blindsDetail: false,
+      baseboardsDetail: false,
+      laundryFoldOnly: false,
+      dishes: false,
+      organizationTidy: false,
+      biannualDeepClean: false,
+    };
+
+    const svcType = getServiceTypeById(pricingSettings, serviceType) || pricingSettings.serviceTypes[0];
+    const option = calculateQuoteOption(homeDetails, noAddOns, "one-time", svcType, pricingSettings, "Quick Quote");
+    setCalculatedPrice(option.price);
+    setEditablePrice(option.price.toString());
+    setShowPreview(true);
+  };
+
+  const handleSendNow = async () => {
+    setSaving(true);
+    try {
+      const quoteData = {
+        customerName,
+        customerEmail: "",
+        customerPhone: "",
+        propertyType,
+        sqft: parseInt(sqft) || 2000,
+        beds: parseInt(beds) || 3,
+        baths: parseInt(baths) || 2,
+        serviceType,
+        total: parseFloat(editablePrice) || calculatedPrice,
+        notes,
+        status: "sent",
+        options: [{
+          name: "Quick Quote",
+          serviceTypeId: serviceType,
+          serviceTypeName: serviceTypes.find(st => st.id === serviceType)?.label || "Standard Clean",
+          scope: "",
+          price: parseFloat(editablePrice) || calculatedPrice,
+          addOnsIncluded: [],
+        }],
+      };
+      await apiRequest("POST", "/api/quotes", quoteData);
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reports/stats"] });
+      resetForm();
+      onClose();
+    } catch (e) {
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddDetails = () => {
+    resetForm();
+    onClose();
+    navigation.navigate("QuoteCalculator", {
+      prefillCustomer: { name: customerName, phone: "", email: "", address: "", customerId: "" },
+    });
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[s.modalContainer, { backgroundColor: isDark ? dt.gradientTop : "#FFF" }]}>
+        <View style={[s.modalHeader, { borderBottomColor: dt.borderSecondary, paddingTop: insets.top > 0 ? insets.top : Spacing.lg }]}>
+          <ThemedText type="h4" style={{ fontWeight: "700", flex: 1 }}>Quick Quote</ThemedText>
+          <Pressable onPress={() => { resetForm(); onClose(); }} hitSlop={12} testID="close-quick-quote">
+            <Feather name="x" size={22} color={dt.textPrimary} />
+          </Pressable>
+        </View>
+
+        {!showPreview ? (
+          <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: Spacing.lg, paddingBottom: insets.bottom + Spacing.xl }}>
+            <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "700", letterSpacing: 0.5, marginBottom: Spacing.md }}>
+              SEND A PRICE IN UNDER 10 SECONDS
+            </ThemedText>
+
+            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6 }}>Customer Name</ThemedText>
+            <TextInput
+              style={[s.modalInput, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
+              placeholder="Customer name"
+              placeholderTextColor={dt.textMuted}
+              value={customerName}
+              onChangeText={setCustomerName}
+              testID="quick-quote-name"
+            />
+
+            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6, marginTop: Spacing.md }}>Property Type</ThemedText>
+            <View style={{ flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.md }}>
+              {(["residential", "commercial"] as const).map(type => (
+                <Pressable
+                  key={type}
+                  onPress={() => setPropertyType(type)}
+                  style={[s.toggleBtn, {
+                    backgroundColor: propertyType === type ? dt.accent : dt.chipBg,
+                    borderColor: propertyType === type ? dt.accent : dt.chipBorder,
+                  }]}
+                  testID={`toggle-${type}`}
+                >
+                  <ThemedText type="small" style={{
+                    color: propertyType === type ? "#FFF" : dt.textPrimary,
+                    fontWeight: "600",
+                    textTransform: "capitalize",
+                  }}>{type}</ThemedText>
+                </Pressable>
+              ))}
+            </View>
+
+            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6 }}>Square Footage</ThemedText>
+            <TextInput
+              style={[s.modalInput, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
+              placeholder="e.g. 2000"
+              placeholderTextColor={dt.textMuted}
+              value={sqft}
+              onChangeText={setSqft}
+              keyboardType="numeric"
+              testID="quick-quote-sqft"
+            />
+
+            {propertyType === "residential" ? (
+              <View style={{ flexDirection: "row", gap: Spacing.md, marginTop: Spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6 }}>Beds</ThemedText>
+                  <TextInput
+                    style={[s.modalInput, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
+                    value={beds}
+                    onChangeText={setBeds}
+                    keyboardType="numeric"
+                    testID="quick-quote-beds"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6 }}>Baths</ThemedText>
+                  <TextInput
+                    style={[s.modalInput, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
+                    value={baths}
+                    onChangeText={setBaths}
+                    keyboardType="numeric"
+                    testID="quick-quote-baths"
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6, marginTop: Spacing.md }}>Service Type</ThemedText>
+            <View style={{ gap: Spacing.xs }}>
+              {serviceTypes.map(st => (
+                <Pressable
+                  key={st.id}
+                  onPress={() => setServiceType(st.id)}
+                  style={[s.serviceTypeRow, {
+                    backgroundColor: serviceType === st.id ? dt.accentSoft : dt.chipBg,
+                    borderColor: serviceType === st.id ? dt.accent : dt.chipBorder,
+                  }]}
+                  testID={`service-${st.id}`}
+                >
+                  <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: serviceType === st.id ? dt.accent : dt.textMuted, alignItems: "center", justifyContent: "center" }}>
+                    {serviceType === st.id ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dt.accent }} /> : null}
+                  </View>
+                  <ThemedText type="small" style={{ fontWeight: "500", marginLeft: Spacing.sm }}>{st.label}</ThemedText>
+                </Pressable>
+              ))}
+            </View>
+
+            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6, marginTop: Spacing.md }}>Notes (optional)</ThemedText>
+            <TextInput
+              style={[s.modalInput, s.modalTextArea, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
+              placeholder="Any special notes..."
+              placeholderTextColor={dt.textMuted}
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              testID="quick-quote-notes"
+            />
+
+            <Pressable
+              onPress={handleCalculate}
+              style={[s.primaryBtn, { backgroundColor: dt.accent, marginTop: Spacing.xl }]}
+              testID="quick-quote-calculate"
+            >
+              <Feather name="zap" size={16} color="#FFF" style={{ marginRight: 6 }} />
+              <ThemedText type="body" style={{ color: "#FFF", fontWeight: "700" }}>Calculate Quote</ThemedText>
+            </Pressable>
+          </KeyboardAwareScrollViewCompat>
+        ) : (
+          <ScrollView contentContainerStyle={{ padding: Spacing.lg, paddingBottom: insets.bottom + Spacing.xl }}>
+            <View style={[s.previewCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
+              <ThemedText type="caption" style={{ color: dt.textMuted, fontWeight: "600", letterSpacing: 0.5 }}>ESTIMATED PRICE</ThemedText>
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: Spacing.sm }}>
+                <ThemedText type="body" style={{ fontSize: 18, color: dt.textMuted }}>$</ThemedText>
+                <TextInput
+                  style={[s.priceInput, { color: dt.textPrimary }]}
+                  value={editablePrice}
+                  onChangeText={setEditablePrice}
+                  keyboardType="numeric"
+                  testID="editable-price"
+                />
+              </View>
+              {customerName ? (
+                <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm }}>
+                  For: {customerName}
+                </ThemedText>
+              ) : null}
+              <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 4 }}>
+                {serviceTypes.find(st => st.id === serviceType)?.label} | {sqft || "2000"} sq ft
+              </ThemedText>
+            </View>
+
+            {!isPro ? (
+              <View style={[s.aiLockedBadge, { backgroundColor: dt.warningSoft, borderColor: dt.warningBorder }]}>
+                <Feather name="lock" size={12} color={theme.warning} />
+                <ThemedText type="caption" style={{ color: theme.warning, marginLeft: 6, flex: 1 }}>
+                  Upgrade to auto-generate persuasive descriptions.
+                </ThemedText>
+              </View>
+            ) : null}
+
+            <View style={{ flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.lg }}>
+              <Pressable
+                onPress={handleSendNow}
+                style={[s.primaryBtn, { backgroundColor: dt.accent, flex: 1 }]}
+                disabled={saving}
+                testID="quick-quote-send"
+              >
+                {saving ? <ActivityIndicator color="#FFF" size="small" /> : (
+                  <>
+                    <Feather name="send" size={14} color="#FFF" style={{ marginRight: 6 }} />
+                    <ThemedText type="body" style={{ color: "#FFF", fontWeight: "700" }}>Send Now</ThemedText>
+                  </>
+                )}
+              </Pressable>
+              <Pressable
+                onPress={handleAddDetails}
+                style={[s.secondaryBtn, { borderColor: dt.borderPrimary, flex: 1 }]}
+                testID="quick-quote-details"
+              >
+                <Feather name="edit-2" size={14} color={dt.textPrimary} style={{ marginRight: 6 }} />
+                <ThemedText type="body" style={{ fontWeight: "600" }}>Add Details</ThemedText>
+              </Pressable>
+            </View>
+
+            <Pressable onPress={() => setShowPreview(false)} style={{ alignSelf: "center", marginTop: Spacing.lg }}>
+              <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600" }}>Back to Edit</ThemedText>
+            </Pressable>
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
   );
 }
 
@@ -360,25 +517,22 @@ export default function DashboardScreen() {
   const dt = useDesignTokens();
   const { businessProfile: profile } = useApp();
   const { t } = useLanguage();
-  const inputRef = useRef<TextInput>(null);
   const { isPro, requirePro } = useProGate();
-  const { requestConsent } = useAIConsent();
   const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
 
-  const [commandText, setCommandText] = useState("");
-  const [commandResult, setCommandResult] = useState<AiCommandResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(DEFAULT_WIDGET_ORDER);
   const [hiddenWidgets, setHiddenWidgets] = useState<Set<WidgetId>>(new Set());
   const [isEditingWidgets, setIsEditingWidgets] = useState(false);
+  const [quickQuoteVisible, setQuickQuoteVisible] = useState(false);
 
   useEffect(() => {
     trackEvent("app_open");
     trackEvent("home_view");
     (async () => {
       try {
-        const savedOrder = await AsyncStorage.getItem("dashboardWidgetOrder");
-        const savedHidden = await AsyncStorage.getItem("dashboardHiddenWidgets");
+        const savedOrder = await AsyncStorage.getItem("dashboardWidgetOrderV2");
+        const savedHidden = await AsyncStorage.getItem("dashboardHiddenWidgetsV2");
         if (savedOrder) {
           const parsed = JSON.parse(savedOrder) as WidgetId[];
           const validIds = new Set<string>(DEFAULT_WIDGET_ORDER);
@@ -455,24 +609,6 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return t.dashboard.goodMorning;
-    if (hour < 17) return t.dashboard.goodAfternoon;
-    return t.dashboard.goodEvening;
-  };
-
-  const todayJobCount = useMemo(() => {
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-    return (allJobs || []).filter((j: any) => {
-      if (!j.startDatetime) return false;
-      return j.startDatetime.slice(0, 10) === todayStr && j.status !== "cancelled";
-    }).length;
-  }, [allJobs]);
-
-  const monthRevenue = stats?.totalRevenue || 0;
-
   const followUpQueueCount = followUpQueue.length;
   const amountAtRisk = useMemo(() => {
     return followUpQueue.reduce((sum: number, q: any) => sum + (q.total || 0), 0);
@@ -489,104 +625,42 @@ export default function DashboardScreen() {
     return oldest;
   }, [followUpQueue]);
 
-  const totalOpportunities = opportunitiesDormant.length + opportunitiesLost.length;
-  const estimatedRecoverable = useMemo(() => {
-    let total = 0;
-    opportunitiesDormant.forEach((c: any) => {
-      total += (c.avgTicket || 150) * 0.25;
-    });
-    opportunitiesLost.forEach((q: any) => {
-      total += q.status === "expired" ? (q.total || 0) * 0.2 : (q.total || 0) * 0.1;
-    });
-    return Math.round(total);
-  }, [opportunitiesDormant, opportunitiesLost]);
-
   const currentStreak = streakData?.currentStreak || 0;
+  const monthRevenue = stats?.totalRevenue || 0;
+  const sentQuotes = stats?.sentQuotes || 0;
+  const acceptedQuotes = stats?.acceptedQuotes || 0;
+  const wonQuotes = acceptedQuotes;
 
-  const appData = useMemo(() => ({
-    stats,
-    quotes,
-    customers,
-    jobs: allJobs,
-  }), [stats, quotes, customers, allJobs]);
+  const viewedQuotes = useMemo(() => {
+    return (quotes || []).filter((q: any) => q.viewedAt || q.status === "viewed").length;
+  }, [quotes]);
 
-  const executeCommand = useCallback((text: string) => {
-    if (!text.trim()) return;
-    const result = runAiCommand(text, appData);
-    setCommandResult(result);
+  const todayJobCount = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    return (allJobs || []).filter((j: any) => {
+      if (!j.startDatetime) return false;
+      return j.startDatetime.slice(0, 10) === todayStr && j.status !== "cancelled";
+    }).length;
+  }, [allJobs]);
 
-    if (result.navigation) {
-      setTimeout(() => {
-        if (result.navigation!.screen) {
-          navigation.navigate(result.navigation!.screen, result.navigation!.params || {});
-        } else if (result.navigation!.tab) {
-          navigation.navigate("Main", { screen: result.navigation!.tab });
-        }
-      }, 600);
-    }
-  }, [appData, navigation]);
+  const followUpHealthPercent = useMemo(() => {
+    if (followUpQueueCount === 0) return 100;
+    const recentlyFollowedUp = followUpQueue.filter((q: any) => {
+      if (!q.lastFollowUpAt) return false;
+      const daysSince = (Date.now() - new Date(q.lastFollowUpAt).getTime()) / (1000 * 60 * 60 * 24);
+      return daysSince <= 2;
+    }).length;
+    return Math.round((recentlyFollowedUp / followUpQueueCount) * 100);
+  }, [followUpQueue, followUpQueueCount]);
 
-  const handleSubmit = async () => {
-    if (!requirePro()) return;
-    const consented = await requestConsent();
-    if (!consented) return;
-    executeCommand(commandText);
-    setCommandText("");
-  };
-
-  const handlePromptTap = async (prompt: string) => {
-    if (!requirePro()) return;
-    const consented = await requestConsent();
-    if (!consented) return;
-    setCommandText(prompt);
-    executeCommand(prompt);
-  };
-
-  const handleChipAction = (action: string) => {
-    switch (action) {
-      case "create_quote":
-        navigation.navigate("QuoteCalculator");
-        break;
-      case "follow_up":
-        if (requirePro()) navigation.navigate("FollowUpQueue");
-        break;
-      case "metrics":
-        if (requirePro()) executeCommand("How many cleans booked this month?");
-        break;
-      case "draft":
-        if (requirePro()) navigation.navigate("Main", { screen: "CustomersTab" });
-        break;
-      case "schedule":
-        if (requirePro()) navigation.navigate("Main", { screen: "JobsTab" });
-        break;
-    }
-  };
-
-  const handleSuggestedAction = (action: string) => {
-    const lower = action.toLowerCase();
-    if (lower.includes("quote") && lower.includes("create")) {
-      navigation.navigate("QuoteCalculator");
-    } else if (lower.includes("revenue") || lower.includes("report")) {
-      navigation.navigate("WeeklyRecap");
-    } else if (lower.includes("metric")) {
-      if (requirePro()) executeCommand("How many cleans booked this month?");
-    } else if (lower.includes("follow")) {
-      if (requirePro()) executeCommand("follow up quotes");
-    } else if (lower.includes("draft") || lower.includes("message")) {
-      navigation.navigate("AIAssistant");
-    } else if (lower.includes("customer") || lower.includes("search")) {
-      navigation.navigate("Main", { screen: "CustomersTab" });
-    } else if (lower.includes("quote")) {
-      navigation.navigate("Main", { screen: "QuotesTab" });
-    } else {
-      executeCommand(action);
-    }
-  };
+  const weekDays = ["M", "T", "W", "T", "F", "S", "S"];
+  const streakDaysToShow = Math.min(currentStreak, 7);
 
   const saveWidgetConfig = useCallback(async (order: WidgetId[], hidden: Set<WidgetId>) => {
     try {
-      await AsyncStorage.setItem("dashboardWidgetOrder", JSON.stringify(order));
-      await AsyncStorage.setItem("dashboardHiddenWidgets", JSON.stringify([...hidden]));
+      await AsyncStorage.setItem("dashboardWidgetOrderV2", JSON.stringify(order));
+      await AsyncStorage.setItem("dashboardHiddenWidgetsV2", JSON.stringify([...hidden]));
     } catch {}
   }, []);
 
@@ -618,212 +692,228 @@ export default function DashboardScreen() {
 
   const renderWidget = useCallback((widgetId: WidgetId) => {
     switch (widgetId) {
-      case "followUp":
+      case "hero":
         return (
-          <View key="followUp">
+          <View key="hero">
             {followUpQueueCount > 0 ? (
               <Pressable
                 onPress={() => navigation.navigate("FollowUpQueue")}
-                style={[styles.focusCard, { borderColor: dt.warningBorder }, Elevation.e3, isDark ? GlowEffects.glowWarning : {}]}
-                testID="todays-focus-card"
+                style={[s.heroCard, { borderColor: dt.warningBorder }, Elevation.e3, isDark ? GlowEffects.glowWarning : {}]}
+                testID="hero-revenue-card"
               >
                 <LinearGradient
                   colors={[dt.warningGradientTop, dt.warningGradientBottom]}
-                  style={styles.focusCardGradient}
+                  style={s.heroCardGradient}
                 >
-                  {isDark ? <View style={styles.heroCardHighlight} /> : null}
-                  <View style={styles.focusCardHeader}>
-                    <View style={[styles.focusIcon, { backgroundColor: dt.warningGlow }]}>
-                      <Feather name="alert-circle" size={16} color={theme.warning} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <ThemedText type="subtitle" style={{ fontWeight: "700" }}>
-                        {`$${amountAtRisk.toLocaleString()} ${t.dashboard.atRisk}`}
-                      </ThemedText>
-                      <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                        {followUpQueueCount === 1 ? `1 ${t.dashboard.quoteNeedsAttention}` : `${followUpQueueCount} ${t.dashboard.quotesNeedAttention}`}
-                      </ThemedText>
-                      <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 4 }}>
-                        {`${t.dashboard.oldestQuote}: ${oldestQuoteDays} ${oldestQuoteDays === 1 ? t.common.day : t.common.days}`}
-                      </ThemedText>
-                    </View>
-                    <Feather name="chevron-right" size={18} color={dt.textMuted} />
+                  {isDark ? <View style={s.heroCardHighlight} /> : null}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+                    <Feather name="dollar-sign" size={16} color={theme.warning} />
+                    <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "700", marginLeft: 4, letterSpacing: 0.5 }}>REVENUE WAITING TO CLOSE</ThemedText>
                   </View>
-                  <View style={[styles.focusCta, { borderWidth: 1, borderColor: isDark ? "rgba(248,184,74,0.5)" : dt.warningBorder, backgroundColor: isDark ? "transparent" : "rgba(248,184,74,0.10)" }]}>
-                    <Feather name="arrow-right" size={14} color={theme.warning} />
-                    <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: 6 }}>{t.dashboard.followUpNow}</ThemedText>
-                  </View>
+                  <ThemedText type="h2" style={{ fontWeight: "800", marginTop: 4 }}>
+                    ${amountAtRisk.toLocaleString()} waiting to close
+                  </ThemedText>
+                  <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: 4 }}>
+                    {followUpQueueCount} {followUpQueueCount === 1 ? "quote needs" : "quotes need"} attention  |  Oldest: {oldestQuoteDays} {oldestQuoteDays === 1 ? "day" : "days"}
+                  </ThemedText>
+                  <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 6, fontStyle: "italic" }}>
+                    Leads go cold after 24-48 hours.
+                  </ThemedText>
+                  <FollowUpHealthBar percent={followUpHealthPercent} />
+                  <PulsingCta style={{ marginTop: Spacing.md }}>
+                    <Pressable
+                      onPress={() => navigation.navigate("FollowUpQueue")}
+                      style={[s.heroCta, { backgroundColor: theme.warning }]}
+                      testID="hero-follow-up-cta"
+                    >
+                      <Feather name="arrow-right" size={16} color="#FFF" />
+                      <ThemedText type="body" style={{ color: "#FFF", fontWeight: "700", marginLeft: 6 }}>Follow Up Now</ThemedText>
+                    </Pressable>
+                  </PulsingCta>
+                  <Pressable
+                    onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })}
+                    style={{ alignSelf: "center", marginTop: Spacing.sm }}
+                    testID="hero-view-quotes"
+                  >
+                    <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600" }}>View Quotes</ThemedText>
+                  </Pressable>
                 </LinearGradient>
               </Pressable>
             ) : (
-              <View
-                style={[
-                  styles.focusCard,
-                  {
-                    backgroundColor: dt.surfacePrimary,
-                    borderColor: theme.successBorder,
-                    padding: Spacing.lg,
-                  },
-                  Elevation.e1,
-                ]}
-              >
-                <View style={styles.focusCardHeader}>
-                  <View style={[styles.focusIcon, { backgroundColor: theme.successSoft }]}>
+              <View style={[s.heroCard, { backgroundColor: dt.surfacePrimary, borderColor: theme.successBorder, padding: Spacing.lg }, Elevation.e1]}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={[s.focusIcon, { backgroundColor: theme.successSoft }]}>
                     <Feather name="check-circle" size={16} color={theme.success} />
                   </View>
-                  <ThemedText type="subtitle" style={{ fontWeight: "600", flex: 1 }}>{t.growth.allCaughtUp}</ThemedText>
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <ThemedText type="subtitle" style={{ fontWeight: "700" }}>All Caught Up</ThemedText>
+                    <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: 2 }}>No revenue at risk. Keep the momentum going.</ThemedText>
+                  </View>
                 </View>
-                <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>
-                  {t.dashboard.noRevenueAtRisk}
-                </ThemedText>
+                <FollowUpHealthBar percent={100} />
               </View>
             )}
           </View>
         );
 
+      case "quickQuote":
+        return (
+          <Pressable
+            key="quickQuote"
+            onPress={() => setQuickQuoteVisible(true)}
+            style={[s.quickQuoteCard, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceEmphasis, borderColor: dt.borderAccent }, Elevation.e2, isDark ? GlowEffects.glowBlueSubtle : {}]}
+            testID="quick-quote-card"
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={[s.quickQuoteIcon, { backgroundColor: dt.accentSoft }]}>
+                <Feather name="zap" size={18} color={dt.accent} />
+              </View>
+              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                <ThemedText type="subtitle" style={{ fontWeight: "700" }}>Quick Quote</ThemedText>
+                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                  Send a price in under 10 seconds.
+                </ThemedText>
+              </View>
+              <View style={[s.quickQuoteCta, { backgroundColor: dt.accent }]}>
+                <Feather name="plus" size={16} color="#FFF" />
+              </View>
+            </View>
+          </Pressable>
+        );
+
+      case "momentum":
+        return (
+          <View key="momentum" style={[s.sectionCard, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderSecondary }, Elevation.e1]}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.md }}>
+              <Feather name="trending-up" size={14} color={dt.accent} />
+              <ThemedText type="small" style={{ fontWeight: "700", marginLeft: 6, letterSpacing: 0.3 }}>SALES MOMENTUM</ThemedText>
+            </View>
+            <View style={{ flexDirection: "row" }}>
+              <FunnelStep label="Sent" value={sentQuotes} color={dt.accent} />
+              <FunnelStep label="Viewed" value={viewedQuotes} color={theme.warning} />
+              <FunnelStep label="Accepted" value={acceptedQuotes} color={theme.success} />
+              <FunnelStep label="Won" value={wonQuotes} color="#10B981" isLast />
+            </View>
+            {stats?.closeRate != null ? (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: Spacing.md, paddingTop: Spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: dt.borderSecondary }}>
+                <Feather name="target" size={12} color={dt.textMuted} />
+                <ThemedText type="caption" style={{ color: dt.textSecondary, marginLeft: 4 }}>
+                  Close rate: {Math.round(stats.closeRate)}%
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
+        );
+
       case "streak":
         return (
-          <View key="streak" style={[styles.streakCard, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e2]}>
-            <View style={styles.streakCardRow}>
-              <View style={currentStreak > 0 && isDark ? [styles.zapGlow] : undefined}>
-                <Feather name="zap" size={16} color={currentStreak > 0 ? theme.warning : dt.textMuted} />
-              </View>
-              <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.sm }}>
-                {currentStreak > 0 ? `${t.dashboard.followUpStreak}: ${currentStreak} ${currentStreak === 1 ? t.common.day : t.common.days}` : t.dashboard.followUpStreak}
+          <View key="streak" style={[s.sectionCard, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e2]}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Feather name="target" size={16} color={currentStreak > 0 ? theme.success : dt.textMuted} />
+              <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.sm, flex: 1 }}>
+                Follow-Up Streak: {currentStreak} {currentStreak === 1 ? "day" : "days"}
               </ThemedText>
             </View>
-            <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 4, marginLeft: 28 }}>
-              {currentStreak === 0 ? t.dashboard.startStreakToday : currentStreak >= 7 ? t.dashboard.revenueDisciplineUnlocked : currentStreak >= 3 ? t.dashboard.momentumBuilding : `${currentStreak} ${currentStreak === 1 ? t.common.day : t.common.days} ${t.dashboard.daysStrong}`}
+            <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 4 }}>
+              Top closers follow up daily.
             </ThemedText>
-            {currentStreak === 0 ? (
-              <Pressable onPress={() => navigation.navigate("FollowUpQueue")} style={styles.streakGoBtn} testID="streak-nudge-cta">
-                <View style={[styles.streakGoBtnInner, Elevation.e3]}>
-                  <ThemedText type="body" style={styles.streakGoText}>{t.dashboard.go}</ThemedText>
-                  <Feather name="arrow-right" size={18} color="#FFFFFF" style={{ marginLeft: 4 }} />
-                </View>
-              </Pressable>
-            ) : null}
+            <StreakDots days={weekDays} streak={streakDaysToShow} />
+            <Pressable
+              onPress={() => navigation.navigate("FollowUpQueue")}
+              style={[s.streakCta, { backgroundColor: currentStreak > 0 ? theme.success : dt.accent, marginTop: Spacing.md }]}
+              testID="keep-streak-cta"
+            >
+              <Feather name="zap" size={14} color="#FFF" />
+              <ThemedText type="small" style={{ color: "#FFF", fontWeight: "700", marginLeft: 6 }}>
+                {currentStreak > 0 ? "Keep streak alive" : "Start your streak"}
+              </ThemedText>
+            </Pressable>
           </View>
         );
 
-      case "aiCommand":
+      case "aiEngine":
         return (
-          <View key="aiCommand">
-            <View style={[
-              styles.commandCard,
-              {
-                backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceEmphasis,
-                borderColor: dt.borderAccent,
-              },
-              Elevation.e2,
-              isDark ? GlowEffects.glowBlueSubtle : {},
-            ]}>
-              <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm, fontWeight: "600" }}>
-                {t.dashboard.whatToDo}
-              </ThemedText>
-              <View style={[styles.inputRow, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
-                <TextInput
-                  ref={inputRef}
-                  style={[styles.commandInput, { color: dt.textPrimary }]}
-                  placeholder={t.dashboard.askPlaceholder}
-                  placeholderTextColor={dt.textMuted}
-                  value={commandText}
-                  onChangeText={setCommandText}
-                  onSubmitEditing={handleSubmit}
-                  returnKeyType="send"
-                  testID="command-input"
-                />
-                <Pressable
-                  onPress={handleSubmit}
-                  style={[
-                    styles.sendBtn,
-                    { backgroundColor: commandText.trim() ? dt.accent : dt.chipBg },
-                    commandText.trim() ? Platform.select({
-                      web: { boxShadow: `0px 2px 8px ${dt.brandGlow}` } as any,
-                      default: { shadowColor: dt.accent, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-                    }) : {},
-                  ]}
-                  testID="command-send"
-                >
-                  <Feather name="send" size={15} color={commandText.trim() ? "#FFF" : dt.textMuted} />
-                </Pressable>
-              </View>
-              <RotatingPrompts onTap={handlePromptTap} />
-            </View>
-
-            {commandResult ? (
-              <View style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
-                <ResponseCard
-                  result={commandResult}
-                  onDismiss={() => setCommandResult(null)}
-                  onAction={handleSuggestedAction}
-                />
-              </View>
-            ) : null}
-
-            {!FeatureFlags.aiEnabled ? (
-              <View style={[styles.aiBanner, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceSecondary, borderColor: dt.borderAccent }, Elevation.e2]}>
-                <View style={styles.aiBannerContent}>
-                  <View style={[styles.aiBannerIcon, { backgroundColor: dt.accentSoft }]}>
-                    <Feather name="zap" size={14} color={dt.accent} />
+          <View key="aiEngine" style={[s.sectionCard, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceEmphasis, borderColor: dt.borderAccent }, Elevation.e2]}>
+            {isPro ? (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={[s.aiIcon, { backgroundColor: "#10B98120" }]}>
+                    <Feather name="cpu" size={16} color="#10B981" />
                   </View>
                   <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                    <ThemedText type="small" style={{ fontWeight: "600", fontSize: 13 }}>
-                      {t.dashboard.unlockAI}
+                    <ThemedText type="subtitle" style={{ fontWeight: "700" }}>AI Revenue Engine: ON</ThemedText>
+                    <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                      Auto follow-ups and smart replies active.
                     </ThemedText>
-                    <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 1, fontSize: 11 }}>
-                      {t.dashboard.aiSubtitle}
+                  </View>
+                  <View style={[s.statusDot, { backgroundColor: "#10B981" }]} />
+                </View>
+                <Pressable
+                  onPress={() => navigation.navigate("AutomationsHub")}
+                  style={[s.aiCta, { borderColor: "#10B981", marginTop: Spacing.md }]}
+                  testID="manage-sequences-cta"
+                >
+                  <ThemedText type="small" style={{ color: "#10B981", fontWeight: "600" }}>Manage Sequences</ThemedText>
+                  <Feather name="chevron-right" size={14} color="#10B981" style={{ marginLeft: 4 }} />
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={[s.aiIcon, { backgroundColor: dt.chipBg }]}>
+                    <Feather name="cpu" size={16} color={dt.textMuted} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <ThemedText type="subtitle" style={{ fontWeight: "700" }}>AI Revenue Engine: OFF</ThemedText>
+                    <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                      Turn on auto follow-ups + smart replies to close more quotes.
                     </ThemedText>
                   </View>
                 </View>
+                <View style={{ marginTop: Spacing.md, marginLeft: 44 }}>
+                  {["Auto follow-ups", "Smart objection replies", "Quote descriptions that sell"].map(item => (
+                    <View key={item} style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                      <Feather name="check" size={12} color={dt.accent} />
+                      <ThemedText type="small" style={{ color: dt.textSecondary, marginLeft: 8 }}>{item}</ThemedText>
+                    </View>
+                  ))}
+                </View>
                 <Pressable
-                  style={[styles.upgradeCta, { borderColor: dt.accent, backgroundColor: dt.accentSoft }]}
                   onPress={() => navigation.navigate("Paywall")}
-                  testID="upgrade-cta"
+                  style={[s.activateBtn, { backgroundColor: dt.accent, marginTop: Spacing.md }]}
+                  testID="activate-ai-cta"
                 >
-                  <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600", fontSize: 12 }}>
-                    {t.dashboard.seeAIFeatures}
-                  </ThemedText>
-                  <Feather name="arrow-right" size={12} color={dt.accent} style={{ marginLeft: 4 }} />
+                  <Feather name="zap" size={14} color="#FFF" />
+                  <ThemedText type="body" style={{ color: "#FFF", fontWeight: "700", marginLeft: 6 }}>Activate AI Engine</ThemedText>
                 </Pressable>
-              </View>
-            ) : null}
-          </View>
-        );
-
-      case "quickActions":
-        return (
-          <View key="quickActions" style={{ marginBottom: Spacing.lg }}>
-            <QuickActionChips onAction={handleChipAction} />
+              </>
+            )}
           </View>
         );
 
       case "glance":
         return (
           <View key="glance">
-            <View style={styles.sectionHeader}>
-              <ThemedText type="subtitle" style={{ fontWeight: "600", fontSize: 15 }}>{t.dashboard.todayAtGlance}</ThemedText>
-              <Pressable onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })} testID="recent-quotes-link">
-                <ThemedText type="caption" style={{ color: dt.accentMuted, fontSize: 12 }}>{t.dashboard.recentQuotes}</ThemedText>
-              </Pressable>
+            <View style={s.sectionHeader}>
+              <ThemedText type="subtitle" style={{ fontWeight: "700", fontSize: 15 }}>Today at a Glance</ThemedText>
             </View>
-            <View style={styles.glanceRow}>
+            <View style={s.glanceRow}>
               <GlanceCard
-                title={t.dashboard.needFollowUp}
+                title="Need follow-up"
                 value={followUpQueueCount.toString()}
                 icon="phone-missed"
                 color={theme.warning}
                 onPress={() => navigation.navigate("FollowUpQueue")}
               />
               <GlanceCard
-                title={t.dashboard.jobsToday}
-                value={todayJobCount.toString()}
-                icon="calendar"
-                color={theme.primary}
-                onPress={() => navigation.navigate("Main", { screen: "JobsTab" })}
+                title="Quotes out"
+                value={sentQuotes.toString()}
+                icon="send"
+                color={dt.accent}
+                onPress={() => navigation.navigate("Main", { screen: "QuotesTab" })}
               />
               <GlanceCard
-                title={t.dashboard.thisMonth}
+                title="Won this month"
                 value={`$${monthRevenue.toLocaleString()}`}
                 icon="trending-up"
                 color={theme.success}
@@ -833,66 +923,25 @@ export default function DashboardScreen() {
           </View>
         );
 
-      case "opportunities":
-        return totalOpportunities > 0 ? (
-          <Pressable
-            key="opportunities"
-            onPress={() => navigation.navigate("Opportunities")}
-            style={[styles.opportunityCard, { backgroundColor: dt.surfacePrimary, borderColor: theme.successBorder }, Elevation.e1]}
-            testID="opportunities-card"
-          >
-            <View style={styles.focusCardHeader}>
-              <View style={[styles.focusIcon, { backgroundColor: theme.successSoft }]}>
-                <Feather name="repeat" size={16} color={theme.success} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="small" style={{ fontWeight: "600" }}>
-                  {`${t.dashboard.reactivationOpportunities}: ${totalOpportunities}`}
-                </ThemedText>
-                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                  {`${t.dashboard.estimatedRecoverable}: $${estimatedRecoverable.toLocaleString()}`}
-                </ThemedText>
-              </View>
-              <Feather name="chevron-right" size={18} color={dt.textMuted} />
-            </View>
-          </Pressable>
-        ) : null;
-
-      case "recap":
-        return (
-          <Pressable
-            key="recap"
-            onPress={() => navigation.navigate("WeeklyRecap")}
-            style={[styles.recapLink, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }, Elevation.e1]}
-            testID="weekly-recap-link"
-          >
-            <Feather name="bar-chart" size={14} color={dt.accent} />
-            <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600", marginLeft: Spacing.sm, flex: 1 }}>
-              {t.dashboard.viewWeeklyRecap}
-            </ThemedText>
-            <Feather name="chevron-right" size={16} color={dt.textMuted} />
-          </Pressable>
-        );
-
       default:
         return null;
     }
-  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, currentStreak, commandText, commandResult, dt, theme, isDark, t, navigation, handleSubmit, handlePromptTap, handleChipAction, handleSuggestedAction, todayJobCount, monthRevenue, totalOpportunities, estimatedRecoverable]);
+  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, followUpHealthPercent, currentStreak, sentQuotes, viewedQuotes, acceptedQuotes, wonQuotes, monthRevenue, dt, theme, isDark, navigation, isPro, stats]);
 
   return (
     <LinearGradient
       colors={[dt.gradientTop, dt.gradientBottom]}
-      style={styles.container}
+      style={s.container}
     >
       {isDark ? (
         <>
-          <View style={styles.vignetteTop} />
-          <View style={styles.vignetteBottom} />
+          <View style={s.vignetteTop} />
+          <View style={s.vignetteBottom} />
         </>
       ) : null}
       <ScrollView
         contentContainerStyle={[
-          styles.content,
+          s.content,
           { paddingTop: headerHeight + Spacing.md, paddingBottom: tabBarHeight + Spacing.xl },
           useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined,
         ]}
@@ -900,8 +949,8 @@ export default function DashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.greetingRow}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <View style={s.headerRow}>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
             <ProfileAvatar
               config={profile?.avatarConfig || null}
               size={44}
@@ -909,61 +958,56 @@ export default function DashboardScreen() {
               style={{ marginRight: Spacing.sm }}
             />
             <View style={{ flex: 1 }}>
-              <ThemedText type="caption" style={{ color: dt.textMuted, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: "500", fontSize: 11 }}>
-                {getGreeting()}
+              <ThemedText type="h4" numberOfLines={1} style={{ fontWeight: "800" }}>
+                QuotePro
               </ThemedText>
-              <ThemedText type="h4" numberOfLines={1} style={{ marginTop: 2 }}>
-                {profile?.companyName || "QuotePro"}
-              </ThemedText>
-            </View>
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "flex-end" }}>
-            {currentStreak > 0 ? (
-              <View style={[styles.streakBadge, { backgroundColor: dt.accentSoft }]}>
-                <Feather name="zap" size={12} color={theme.warning} />
-                <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "700", marginLeft: 3 }}>
-                  {currentStreak.toString()}
+              <View style={[s.salesBadge, { backgroundColor: dt.accentSoft }]}>
+                <Feather name="zap" size={10} color={dt.accent} />
+                <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "700", marginLeft: 3, fontSize: 10, letterSpacing: 0.3 }}>
+                  Sales-First Mode
                 </ThemedText>
               </View>
-            ) : null}
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+            <Pressable
+              onPress={() => setIsEditingWidgets(!isEditingWidgets)}
+              style={[s.headerBtn, { backgroundColor: isEditingWidgets ? dt.accentSoft : dt.chipBg, borderColor: isEditingWidgets ? dt.accent : dt.chipBorder }]}
+              testID="customize-widgets-btn"
+            >
+              <Feather name={isEditingWidgets ? "check" : "sliders"} size={14} color={isEditingWidgets ? dt.accent : dt.textSecondary} />
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate("Main", { screen: "SettingsTab" })}
+              style={[s.headerBtn, { backgroundColor: dt.chipBg, borderColor: dt.chipBorder }]}
+              testID="settings-btn"
+            >
+              <Feather name="settings" size={14} color={dt.textSecondary} />
+            </Pressable>
           </View>
         </View>
 
         <OnboardingBanner />
 
-        <View style={styles.customizeRow}>
-          <View style={{ flex: 1 }} />
-          <Pressable
-            onPress={() => setIsEditingWidgets(!isEditingWidgets)}
-            style={[styles.customizeBtn, { backgroundColor: isEditingWidgets ? dt.accentSoft : dt.chipBg, borderColor: isEditingWidgets ? dt.accent : dt.chipBorder }]}
-            testID="customize-widgets-btn"
-          >
-            <Feather name={isEditingWidgets ? "check" : "sliders"} size={13} color={isEditingWidgets ? dt.accent : dt.textSecondary} />
-            <ThemedText type="caption" style={{ color: isEditingWidgets ? dt.accent : dt.textSecondary, fontWeight: "600", marginLeft: 5 }}>
-              {isEditingWidgets ? t.common.done : t.dashboard.customizeWidgets}
-            </ThemedText>
-          </Pressable>
-        </View>
-
         {isEditingWidgets ? (
-          <View style={[styles.editorCard, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderPrimary }, Elevation.e2]}>
-            <View style={styles.editorHeader}>
+          <View style={[s.editorCard, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderPrimary }, Elevation.e2]}>
+            <View style={s.editorHeader}>
               <Feather name="layout" size={16} color={dt.accent} />
               <ThemedText type="subtitle" style={{ fontWeight: "700", marginLeft: Spacing.sm, flex: 1 }}>
-                {t.dashboard.editWidgets}
+                Customize Dashboard
               </ThemedText>
               <Pressable onPress={() => setIsEditingWidgets(false)} hitSlop={12} testID="editor-done-btn">
-                <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600" }}>{t.common.done}</ThemedText>
+                <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600" }}>Done</ThemedText>
               </Pressable>
             </View>
             {widgetOrder.map((widgetId, index) => {
               const isHidden = hiddenWidgets.has(widgetId);
               const label = WIDGET_LABELS[widgetId];
               return (
-                <View key={widgetId} style={[styles.editorRow, { borderTopColor: dt.borderSecondary }]}>
+                <View key={widgetId} style={[s.editorRow, { borderTopColor: dt.borderSecondary }]}>
                   <Pressable
                     onPress={() => toggleWidgetVisibility(widgetId)}
-                    style={[styles.editorVisibilityBtn, { backgroundColor: isHidden ? "transparent" : dt.accentSoft }]}
+                    style={[s.editorVisibilityBtn, { backgroundColor: isHidden ? "transparent" : dt.accentSoft }]}
                     testID={`toggle-${widgetId}`}
                   >
                     <Feather name={isHidden ? "eye-off" : "eye"} size={14} color={isHidden ? dt.textMuted : dt.accent} />
@@ -976,10 +1020,10 @@ export default function DashboardScreen() {
                   >
                     {label.en}
                   </ThemedText>
-                  <View style={styles.editorArrows}>
+                  <View style={s.editorArrows}>
                     <Pressable
                       onPress={() => moveWidget(widgetId, "up")}
-                      style={[styles.editorArrowBtn, { opacity: index === 0 ? 0.3 : 1 }]}
+                      style={[s.editorArrowBtn, { opacity: index === 0 ? 0.3 : 1 }]}
                       disabled={index === 0}
                       testID={`move-up-${widgetId}`}
                     >
@@ -987,7 +1031,7 @@ export default function DashboardScreen() {
                     </Pressable>
                     <Pressable
                       onPress={() => moveWidget(widgetId, "down")}
-                      style={[styles.editorArrowBtn, { opacity: index === widgetOrder.length - 1 ? 0.3 : 1 }]}
+                      style={[s.editorArrowBtn, { opacity: index === widgetOrder.length - 1 ? 0.3 : 1 }]}
                       disabled={index === widgetOrder.length - 1}
                       testID={`move-down-${widgetId}`}
                     >
@@ -1005,126 +1049,109 @@ export default function DashboardScreen() {
           return renderWidget(widgetId);
         })}
       </ScrollView>
+
+      <QuickQuoteModal
+        visible={quickQuoteVisible}
+        onClose={() => setQuickQuoteVisible(false)}
+        navigation={navigation}
+      />
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flex: 1,
   },
   content: {
     flexGrow: 1,
   },
-  greetingRow: {
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
   },
-  commandCard: {
+  salesBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    marginTop: 2,
+  },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  heroCard: {
+    marginHorizontal: Spacing.lg,
+    borderRadius: 22,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+    overflow: "hidden",
+  },
+  heroCardGradient: {
+    padding: Spacing.lg,
+    borderRadius: 21,
+    overflow: "hidden",
+  },
+  heroCardHighlight: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderTopLeftRadius: 21,
+    borderTopRightRadius: 21,
+  },
+  heroCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: BorderRadius.full,
+  },
+  focusIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickQuoteCard: {
     marginHorizontal: Spacing.lg,
     padding: Spacing.lg,
     borderRadius: 22,
     borderWidth: 1,
     marginBottom: Spacing.md,
   },
-  quoteCard: {
+  quickQuoteIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    marginBottom: Spacing.sm,
+    justifyContent: "center",
   },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  quickQuoteCta: {
+    width: 36,
+    height: 36,
     borderRadius: 18,
-    borderWidth: 1,
-    paddingLeft: Spacing.md,
-    paddingRight: 4,
-    height: 46,
-  },
-  commandInput: {
-    flex: 1,
-    fontSize: 14,
-    height: "100%",
-  },
-  sendBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
   },
-  promptContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: Spacing.sm,
-    paddingVertical: 4,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 7,
-    borderRadius: BorderRadius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  responseCard: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.lg,
-  },
-  responseHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  responseIconBg: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  suggestedRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  suggestedChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.full,
-  },
-  aiBanner: {
+  sectionCard: {
     marginHorizontal: Spacing.lg,
+    padding: Spacing.lg,
     borderRadius: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  aiBannerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  aiBannerIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  upgradeCta: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: BorderRadius.full,
     borderWidth: 1,
-    marginTop: Spacing.sm,
-    marginLeft: 40,
+    marginBottom: Spacing.md,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -1152,143 +1179,57 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  streakBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-  },
-  focusCard: {
-    marginHorizontal: Spacing.lg,
-    borderRadius: 22,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
-    overflow: "hidden",
-  },
-  focusCardGradient: {
-    padding: Spacing.lg,
-    borderRadius: 21,
-    overflow: "hidden",
-  },
-  focusCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  focusIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  focusStats: {
-    flexDirection: "row",
-    marginTop: Spacing.md,
-    alignItems: "center",
-  },
-  focusStat: {
-    flex: 1,
-    alignItems: "center",
-  },
-  focusDivider: {
-    width: 1,
-    height: 28,
-  },
-  focusCta: {
+  streakCta: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: Spacing.sm,
+    paddingVertical: 10,
     borderRadius: BorderRadius.full,
-    marginTop: Spacing.md,
   },
-  streakCard: {
-    marginHorizontal: Spacing.lg,
-    padding: Spacing.md,
-    borderRadius: 22,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
+  aiIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  streakCardRow: {
+  aiCta: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
-  streakGoBtn: {
+  activateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: BorderRadius.full,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  vignetteTop: {
     position: "absolute",
-    right: Spacing.xl,
-    top: Spacing.sm,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: "rgba(0,0,0,0.22)",
+    zIndex: 0,
   },
-  streakGoBtnInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#0088FF",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-  },
-  streakGoText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 16,
-    letterSpacing: 1,
-  },
-  opportunityCard: {
-    marginHorizontal: Spacing.lg,
-    padding: Spacing.lg,
-    borderRadius: 22,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
-  },
-  recapLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: Spacing.lg,
-    padding: Spacing.md,
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: Spacing.xl,
-  },
-  ratingsSummaryCard: {
-    marginHorizontal: Spacing.lg,
-    borderRadius: 18,
-    padding: Spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: Spacing.xl,
-  },
-  ratingsSummaryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.sm,
-  },
-  ratingsSummaryBody: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  ratingsSummaryLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  ratingsSummaryStars: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  customizeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
-  },
-  customizeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.full,
-    borderWidth: StyleSheet.hairlineWidth,
+  vignetteBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    backgroundColor: "rgba(0,0,0,0.10)",
+    zIndex: 0,
   },
   editorCard: {
     marginHorizontal: Spacing.lg,
@@ -1328,43 +1269,75 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  vignetteTop: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-    backgroundColor: "rgba(0,0,0,0.22)",
-    zIndex: 0,
+  modalContainer: {
+    flex: 1,
   },
-  vignetteBottom: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  modalInput: {
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    fontSize: 15,
+  },
+  modalTextArea: {
     height: 80,
-    backgroundColor: "rgba(0,0,0,0.10)",
-    zIndex: 0,
+    paddingTop: Spacing.sm,
+    textAlignVertical: "top",
   },
-  heroCardHighlight: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderTopLeftRadius: 21,
-    borderTopRightRadius: 21,
+  toggleBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
-  zapGlow: {
-    ...Platform.select({
-      web: { filter: "drop-shadow(0px 0px 6px rgba(248,184,74,0.5))" } as any,
-      default: {
-        shadowColor: "#F8B84A",
-        shadowOpacity: 0.5,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 0 },
-      },
-    }),
+  serviceTypeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  primaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: BorderRadius.full,
+  },
+  secondaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  previewCard: {
+    padding: Spacing.lg,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  priceInput: {
+    fontSize: 48,
+    fontWeight: "800",
+    textAlign: "center",
+    minWidth: 120,
+  },
+  aiLockedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: Spacing.md,
   },
 });
