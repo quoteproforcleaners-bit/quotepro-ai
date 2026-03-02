@@ -4,12 +4,9 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  TextInput,
   Pressable,
-  Modal,
   Platform,
   useWindowDimensions,
-  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -17,7 +14,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
@@ -38,12 +35,8 @@ import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
 import { useProGate } from "@/components/ProGate";
-import { useAIConsent } from "@/context/AIConsentContext";
 import { useTutorial } from "@/context/TutorialContext";
 import { DASHBOARD_TOUR } from "@/lib/tourDefinitions";
-import { calculateQuoteOption, getServiceTypeById } from "@/lib/quoteCalculator";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
-import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 type WidgetId = "hero" | "quickQuote" | "momentum" | "streak" | "aiEngine" | "glance";
 
@@ -191,319 +184,6 @@ function GlanceCard({ title, value, icon, color, onPress }: {
   );
 }
 
-function QuickQuoteModal({ visible, onClose, navigation }: {
-  visible: boolean;
-  onClose: () => void;
-  navigation: any;
-}) {
-  const { theme, isDark } = useTheme();
-  const dt = useDesignTokens();
-  const insets = useSafeAreaInsets();
-  const { pricingSettings } = useApp();
-  const { isPro } = useProGate();
-  const queryClient = useQueryClient();
-
-  const [customerName, setCustomerName] = useState("");
-  const [propertyType, setPropertyType] = useState<"residential" | "commercial">("residential");
-  const [sqft, setSqft] = useState("");
-  const [beds, setBeds] = useState("3");
-  const [baths, setBaths] = useState("2");
-  const [serviceType, setServiceType] = useState("standard");
-  const [notes, setNotes] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
-  const [calculatedPrice, setCalculatedPrice] = useState(0);
-  const [editablePrice, setEditablePrice] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const serviceTypes = [
-    { id: "standard", label: "Standard Clean" },
-    { id: "deep-clean", label: "Deep Clean" },
-    { id: "move-in-out", label: "Move In/Out" },
-  ];
-
-  const resetForm = () => {
-    setCustomerName("");
-    setPropertyType("residential");
-    setSqft("");
-    setBeds("3");
-    setBaths("2");
-    setServiceType("standard");
-    setNotes("");
-    setShowPreview(false);
-    setCalculatedPrice(0);
-    setEditablePrice("");
-  };
-
-  const handleCalculate = () => {
-    if (!pricingSettings) return;
-    const sqftNum = parseInt(sqft) || 2000;
-    const bedsNum = parseInt(beds) || 3;
-    const bathsNum = parseInt(baths) || 2;
-
-    const homeDetails = {
-      sqft: sqftNum,
-      beds: bedsNum,
-      baths: bathsNum,
-      halfBaths: 0,
-      homeType: "house" as const,
-      conditionScore: 7,
-      peopleCount: 2,
-      petType: "none" as const,
-      petShedding: false,
-    };
-
-    const noAddOns = {
-      insideFridge: false,
-      insideOven: false,
-      insideCabinets: false,
-      interiorWindows: false,
-      blindsDetail: false,
-      baseboardsDetail: false,
-      laundryFoldOnly: false,
-      dishes: false,
-      organizationTidy: false,
-      biannualDeepClean: false,
-    };
-
-    const svcType = getServiceTypeById(pricingSettings, serviceType) || pricingSettings.serviceTypes[0];
-    const option = calculateQuoteOption(homeDetails, noAddOns, "one-time", svcType, pricingSettings, "Quick Quote");
-    setCalculatedPrice(option.price);
-    setEditablePrice(option.price.toString());
-    setShowPreview(true);
-  };
-
-  const handleSendNow = async () => {
-    setSaving(true);
-    try {
-      const quoteData = {
-        customerName,
-        customerEmail: "",
-        customerPhone: "",
-        propertyType,
-        sqft: parseInt(sqft) || 2000,
-        beds: parseInt(beds) || 3,
-        baths: parseInt(baths) || 2,
-        serviceType,
-        total: parseFloat(editablePrice) || calculatedPrice,
-        notes,
-        status: "sent",
-        options: [{
-          name: "Quick Quote",
-          serviceTypeId: serviceType,
-          serviceTypeName: serviceTypes.find(st => st.id === serviceType)?.label || "Standard Clean",
-          scope: "",
-          price: parseFloat(editablePrice) || calculatedPrice,
-          addOnsIncluded: [],
-        }],
-      };
-      await apiRequest("POST", "/api/quotes", quoteData);
-      queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/reports/stats"] });
-      resetForm();
-      onClose();
-    } catch (e) {
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleAddDetails = () => {
-    resetForm();
-    onClose();
-    navigation.navigate("QuoteCalculator", {
-      prefillCustomer: { name: customerName, phone: "", email: "", address: "", customerId: "" },
-    });
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[s.modalContainer, { backgroundColor: isDark ? dt.gradientTop : "#FFF" }]}>
-        <View style={[s.modalHeader, { borderBottomColor: dt.borderSecondary, paddingTop: insets.top > 0 ? insets.top : Spacing.lg }]}>
-          <ThemedText type="h4" style={{ fontWeight: "700", flex: 1 }}>Quick Quote</ThemedText>
-          <Pressable onPress={() => { resetForm(); onClose(); }} hitSlop={12} testID="close-quick-quote">
-            <Feather name="x" size={22} color={dt.textPrimary} />
-          </Pressable>
-        </View>
-
-        {!showPreview ? (
-          <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: Spacing.lg, paddingBottom: insets.bottom + Spacing.xl }}>
-            <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "700", letterSpacing: 0.5, marginBottom: Spacing.md }}>
-              SEND A PRICE IN UNDER 10 SECONDS
-            </ThemedText>
-
-            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6 }}>Customer Name</ThemedText>
-            <TextInput
-              style={[s.modalInput, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
-              placeholder="Customer name"
-              placeholderTextColor={dt.textMuted}
-              value={customerName}
-              onChangeText={setCustomerName}
-              testID="quick-quote-name"
-            />
-
-            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6, marginTop: Spacing.md }}>Property Type</ThemedText>
-            <View style={{ flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.md }}>
-              {(["residential", "commercial"] as const).map(type => (
-                <Pressable
-                  key={type}
-                  onPress={() => setPropertyType(type)}
-                  style={[s.toggleBtn, {
-                    backgroundColor: propertyType === type ? dt.accent : dt.chipBg,
-                    borderColor: propertyType === type ? dt.accent : dt.chipBorder,
-                  }]}
-                  testID={`toggle-${type}`}
-                >
-                  <ThemedText type="small" style={{
-                    color: propertyType === type ? "#FFF" : dt.textPrimary,
-                    fontWeight: "600",
-                    textTransform: "capitalize",
-                  }}>{type}</ThemedText>
-                </Pressable>
-              ))}
-            </View>
-
-            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6 }}>Square Footage</ThemedText>
-            <TextInput
-              style={[s.modalInput, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
-              placeholder="e.g. 2000"
-              placeholderTextColor={dt.textMuted}
-              value={sqft}
-              onChangeText={setSqft}
-              keyboardType="numeric"
-              testID="quick-quote-sqft"
-            />
-
-            {propertyType === "residential" ? (
-              <View style={{ flexDirection: "row", gap: Spacing.md, marginTop: Spacing.md }}>
-                <View style={{ flex: 1 }}>
-                  <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6 }}>Beds</ThemedText>
-                  <TextInput
-                    style={[s.modalInput, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
-                    value={beds}
-                    onChangeText={setBeds}
-                    keyboardType="numeric"
-                    testID="quick-quote-beds"
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6 }}>Baths</ThemedText>
-                  <TextInput
-                    style={[s.modalInput, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
-                    value={baths}
-                    onChangeText={setBaths}
-                    keyboardType="numeric"
-                    testID="quick-quote-baths"
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6, marginTop: Spacing.md }}>Service Type</ThemedText>
-            <View style={{ gap: Spacing.xs }}>
-              {serviceTypes.map(st => (
-                <Pressable
-                  key={st.id}
-                  onPress={() => setServiceType(st.id)}
-                  style={[s.serviceTypeRow, {
-                    backgroundColor: serviceType === st.id ? dt.accentSoft : dt.chipBg,
-                    borderColor: serviceType === st.id ? dt.accent : dt.chipBorder,
-                  }]}
-                  testID={`service-${st.id}`}
-                >
-                  <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: serviceType === st.id ? dt.accent : dt.textMuted, alignItems: "center", justifyContent: "center" }}>
-                    {serviceType === st.id ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dt.accent }} /> : null}
-                  </View>
-                  <ThemedText type="small" style={{ fontWeight: "500", marginLeft: Spacing.sm }}>{st.label}</ThemedText>
-                </Pressable>
-              ))}
-            </View>
-
-            <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 6, marginTop: Spacing.md }}>Notes (optional)</ThemedText>
-            <TextInput
-              style={[s.modalInput, s.modalTextArea, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary, color: dt.textPrimary }]}
-              placeholder="Any special notes..."
-              placeholderTextColor={dt.textMuted}
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              testID="quick-quote-notes"
-            />
-
-            <Pressable
-              onPress={handleCalculate}
-              style={[s.primaryBtn, { backgroundColor: dt.accent, marginTop: Spacing.xl }]}
-              testID="quick-quote-calculate"
-            >
-              <Feather name="zap" size={16} color="#FFF" style={{ marginRight: 6 }} />
-              <ThemedText type="body" style={{ color: "#FFF", fontWeight: "700" }}>Calculate Quote</ThemedText>
-            </Pressable>
-          </KeyboardAwareScrollViewCompat>
-        ) : (
-          <ScrollView contentContainerStyle={{ padding: Spacing.lg, paddingBottom: insets.bottom + Spacing.xl }}>
-            <View style={[s.previewCard, { backgroundColor: dt.surfaceSecondary, borderColor: dt.borderSecondary }]}>
-              <ThemedText type="caption" style={{ color: dt.textMuted, fontWeight: "600", letterSpacing: 0.5 }}>ESTIMATED PRICE</ThemedText>
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: Spacing.sm }}>
-                <ThemedText type="body" style={{ fontSize: 18, color: dt.textMuted }}>$</ThemedText>
-                <TextInput
-                  style={[s.priceInput, { color: dt.textPrimary }]}
-                  value={editablePrice}
-                  onChangeText={setEditablePrice}
-                  keyboardType="numeric"
-                  testID="editable-price"
-                />
-              </View>
-              {customerName ? (
-                <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm }}>
-                  For: {customerName}
-                </ThemedText>
-              ) : null}
-              <ThemedText type="caption" style={{ color: dt.textMuted, marginTop: 4 }}>
-                {serviceTypes.find(st => st.id === serviceType)?.label} | {sqft || "2000"} sq ft
-              </ThemedText>
-            </View>
-
-            {!isPro ? (
-              <View style={[s.aiLockedBadge, { backgroundColor: dt.warningSoft, borderColor: dt.warningBorder }]}>
-                <Feather name="lock" size={12} color={theme.warning} />
-                <ThemedText type="caption" style={{ color: theme.warning, marginLeft: 6, flex: 1 }}>
-                  Upgrade to auto-generate persuasive descriptions.
-                </ThemedText>
-              </View>
-            ) : null}
-
-            <View style={{ flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.lg }}>
-              <Pressable
-                onPress={handleSendNow}
-                style={[s.primaryBtn, { backgroundColor: dt.accent, flex: 1 }]}
-                disabled={saving}
-                testID="quick-quote-send"
-              >
-                {saving ? <ActivityIndicator color="#FFF" size="small" /> : (
-                  <>
-                    <Feather name="send" size={14} color="#FFF" style={{ marginRight: 6 }} />
-                    <ThemedText type="body" style={{ color: "#FFF", fontWeight: "700" }}>Send Now</ThemedText>
-                  </>
-                )}
-              </Pressable>
-              <Pressable
-                onPress={handleAddDetails}
-                style={[s.secondaryBtn, { borderColor: dt.borderPrimary, flex: 1 }]}
-                testID="quick-quote-details"
-              >
-                <Feather name="edit-2" size={14} color={dt.textPrimary} style={{ marginRight: 6 }} />
-                <ThemedText type="body" style={{ fontWeight: "600" }}>Add Details</ThemedText>
-              </Pressable>
-            </View>
-
-            <Pressable onPress={() => setShowPreview(false)} style={{ alignSelf: "center", marginTop: Spacing.lg }}>
-              <ThemedText type="small" style={{ color: dt.accent, fontWeight: "600" }}>Back to Edit</ThemedText>
-            </Pressable>
-          </ScrollView>
-        )}
-      </View>
-    </Modal>
-  );
-}
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -523,7 +203,6 @@ export default function DashboardScreen() {
   const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(DEFAULT_WIDGET_ORDER);
   const [hiddenWidgets, setHiddenWidgets] = useState<Set<WidgetId>>(new Set());
   const [isEditingWidgets, setIsEditingWidgets] = useState(false);
-  const [quickQuoteVisible, setQuickQuoteVisible] = useState(false);
 
   useEffect(() => {
     trackEvent("app_open");
@@ -759,7 +438,7 @@ export default function DashboardScreen() {
         return (
           <Pressable
             key="quickQuote"
-            onPress={() => setQuickQuoteVisible(true)}
+            onPress={() => navigation.navigate("QuoteCalculator")}
             style={[s.quickQuoteCard, { backgroundColor: isDark ? dt.surfaceRaised : dt.surfaceEmphasis, borderColor: dt.borderAccent }, Elevation.e2, isDark ? GlowEffects.glowBlueSubtle : {}]}
             testID="quick-quote-card"
           >
@@ -1049,11 +728,6 @@ export default function DashboardScreen() {
         })}
       </ScrollView>
 
-      <QuickQuoteModal
-        visible={quickQuoteVisible}
-        onClose={() => setQuickQuoteVisible(false)}
-        navigation={navigation}
-      />
     </LinearGradient>
   );
 }
@@ -1267,76 +941,5 @@ const s = StyleSheet.create({
     height: 30,
     alignItems: "center",
     justifyContent: "center",
-  },
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  modalInput: {
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.md,
-    fontSize: 15,
-  },
-  modalTextArea: {
-    height: 80,
-    paddingTop: Spacing.sm,
-    textAlignVertical: "top",
-  },
-  toggleBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-  },
-  serviceTypeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: Spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  primaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: BorderRadius.full,
-  },
-  secondaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-  },
-  previewCard: {
-    padding: Spacing.lg,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  priceInput: {
-    fontSize: 48,
-    fontWeight: "800",
-    textAlign: "center",
-    minWidth: 120,
-  },
-  aiLockedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: Spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: Spacing.md,
   },
 });
