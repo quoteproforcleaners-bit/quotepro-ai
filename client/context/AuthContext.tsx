@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 
 interface AuthUser {
@@ -28,6 +29,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
@@ -119,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch {}
+    queryClient.clear();
     setUser(null);
     setNeedsOnboarding(false);
   };

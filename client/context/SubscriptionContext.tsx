@@ -183,11 +183,15 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
         try {
           const customerInfo = await RC.getCustomerInfo();
-          const hasPro = checkEntitlements(customerInfo);
-          if (!hasPro && user.subscriptionTier === "pro") {
+          const rcHasPro = ENTITLEMENT_IDS.some(id => customerInfo.entitlements.active[id] !== undefined);
+
+          if (rcHasPro && user.subscriptionTier === "pro") {
+            setIsPro(true);
+          } else if (!rcHasPro && user.subscriptionTier === "pro") {
+            setIsPro(false);
             await syncSubscriptionToServer(false);
-          } else if (hasPro && user.subscriptionTier !== "pro") {
-            console.log("RevenueCat reports pro but server says free — user should restore purchases");
+          } else {
+            setIsPro(user.subscriptionTier === "pro");
           }
         } catch (infoError: any) {
           console.warn("RevenueCat getCustomerInfo error:", infoError);
@@ -198,8 +202,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
         try {
           RC.addCustomerInfoUpdateListener((info) => {
-            const updatedPro = checkEntitlements(info);
-            if (!updatedPro) {
+            const rcUpdatedPro = ENTITLEMENT_IDS.some(id => info.entitlements.active[id] !== undefined);
+            if (!rcUpdatedPro) {
+              setIsPro(false);
               syncSubscriptionToServer(false);
             }
           });
