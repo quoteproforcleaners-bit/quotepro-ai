@@ -66,9 +66,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   const syncSubscriptionToServer = useCallback(async (hasPro: boolean) => {
     try {
-      await apiRequest("POST", "/api/subscription/sync", {
-        tier: hasPro ? "pro" : "free",
-      });
+      if (hasPro) {
+        await apiRequest("POST", "/api/subscription/upgrade");
+      } else {
+        await apiRequest("POST", "/api/subscription/sync", {
+          tier: "free",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     } catch (error) {
       console.error("Failed to sync subscription:", error);
@@ -180,7 +184,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         try {
           const customerInfo = await RC.getCustomerInfo();
           const hasPro = checkEntitlements(customerInfo);
-          await syncSubscriptionToServer(hasPro);
+          if (!hasPro && user.subscriptionTier === "pro") {
+            await syncSubscriptionToServer(false);
+          } else if (hasPro && user.subscriptionTier !== "pro") {
+            console.log("RevenueCat reports pro but server says free — user should restore purchases");
+          }
         } catch (infoError: any) {
           console.warn("RevenueCat getCustomerInfo error:", infoError);
           setIsPro(user.subscriptionTier === "pro");
@@ -191,7 +199,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         try {
           RC.addCustomerInfoUpdateListener((info) => {
             const updatedPro = checkEntitlements(info);
-            syncSubscriptionToServer(updatedPro);
+            if (!updatedPro) {
+              syncSubscriptionToServer(false);
+            }
           });
         } catch (listenerError: any) {
           console.warn("RevenueCat listener error:", listenerError);

@@ -2453,6 +2453,10 @@ th{text-align:left;padding:12px;background:#f8f9fa;border-bottom:2px solid #dee2
       if (!tier || !["free", "pro"].includes(tier)) {
         return res.status(400).json({ message: "Invalid tier" });
       }
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (tier === "pro" && currentUser?.subscriptionTier !== "pro") {
+        return res.json({ tier: currentUser?.subscriptionTier || "free", message: "Use purchase or restore to upgrade" });
+      }
       const user = await updateUser(req.session.userId!, {
         subscriptionTier: tier,
       });
