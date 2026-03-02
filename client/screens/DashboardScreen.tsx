@@ -4,9 +4,12 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  TextInput,
   Pressable,
+  Modal,
   Platform,
   useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -14,7 +17,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
@@ -35,8 +38,12 @@ import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
 import { useProGate } from "@/components/ProGate";
+import { useAIConsent } from "@/context/AIConsentContext";
 import { useTutorial } from "@/context/TutorialContext";
 import { DASHBOARD_TOUR } from "@/lib/tourDefinitions";
+import { calculateQuoteOption, getServiceTypeById } from "@/lib/quoteCalculator";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 type WidgetId = "hero" | "quickQuote" | "momentum" | "streak" | "aiEngine" | "glance";
 
