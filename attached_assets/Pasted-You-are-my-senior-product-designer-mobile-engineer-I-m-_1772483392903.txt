@@ -1,0 +1,143 @@
+You are my senior product designer + mobile engineer. I’m building QuotePro AI, a SALES-FIRST quoting + follow-up app for cleaning business owners.
+
+GOAL:
+Redesign the Home Dashboard so it feels like a revenue command center and makes traditional “operations-first” cleaning CRMs feel outdated by comparison. Do NOT mention any competitor by name anywhere in the UI. Position QuotePro with language like “Sales-first,” “Revenue engine,” “Close more quotes,” “Speed-to-lead,” and “Auto follow-ups.”
+
+This dashboard should make users feel that if they are not opening the app daily, they are losing money.
+
+DESIGN STYLE:
+- Modern premium SaaS
+- Strong visual hierarchy
+- Clean spacing
+- Subtle gradients
+- Slight motion on revenue elements
+- Clear dominant CTA buttons
+- Mobile-first, fast, iOS-native feel
+
+----------------------------------------------------
+SECTION 1: HEADER
+----------------------------------------------------
+- Title: QuotePro
+- Small badge: “Sales-First Mode”
+  Tooltip: “QuotePro is built to win quotes and increase revenue — not just manage jobs.”
+- Settings icon
+- Customize button
+
+----------------------------------------------------
+SECTION 2: HERO CARD — Revenue Waiting to Close
+----------------------------------------------------
+Title: "$X waiting to close"
+Subtitle: "Y quotes need attention • Oldest: Z days"
+Helper text: "Leads go cold after 24–48 hours."
+Primary CTA button: "Follow Up Now"
+Secondary text button: "View Quotes"
+
+Add:
+- Visual progress bar for follow-up health
+- Light urgency animation (subtle pulse on CTA)
+
+----------------------------------------------------
+SECTION 3: QUICK QUOTE ENGINE (NEW — HIGH PRIORITY)
+----------------------------------------------------
+Create a highly visible card/button just below the hero card.
+
+Name: ⚡ Quick Quote
+
+Subtitle: "Send a price in under 10 seconds."
+
+Primary CTA: "Start Quick Quote"
+
+Behavior:
+When tapped, open a streamlined modal or screen with:
+
+Fields:
+- Customer Name
+- Property Type (Residential / Commercial toggle)
+- Sq Ft OR Beds/Baths
+- Service Type (dropdown)
+- One optional notes field
+
+On submit:
+- Instantly calculate estimate using user’s saved pricing settings
+- Show price preview screen with:
+    - Editable total
+    - “Send Now” button
+    - “Add Details” button (routes to full quote builder)
+
+If AI is enabled:
+- Auto-generate persuasive quote description
+- Include urgency-based closing line
+
+If AI is not enabled:
+- Show small locked badge: “Upgrade to auto-generate persuasive descriptions.”
+
+Goal:
+This feature must feel FAST.
+No heavy UI.
+No unnecessary steps.
+Designed for answering inbound leads immediately.
+
+----------------------------------------------------
+SECTION 4: SALES MOMENTUM SNAPSHOT
+----------------------------------------------------
+Compact funnel card showing:
+- Sent
+- Viewed
+- Accepted
+- Won
+
+Add small sparkline for “Won” trend.
+
+Label section: “Sales Momentum”
+
+----------------------------------------------------
+SECTION 5: FOLLOW-UP STREAK (GAMIFIED)
+----------------------------------------------------
+Title: “Follow-Up Streak: N days”
+Subtitle: “Top closers follow up daily.”
+Add small 7-day visual dot tracker.
+CTA: “Keep streak alive”
+
+----------------------------------------------------
+SECTION 6: AI REVENUE ENGINE
+----------------------------------------------------
+If free-tier:
+Title: “AI Revenue Engine: OFF”
+Subtitle: “Turn on auto follow-ups + smart replies to close more quotes.”
+Bullet points:
+- Auto follow-ups
+- Smart objection replies
+- Quote descriptions that sell
+CTA: “Activate AI Engine”
+
+If paid-tier:
+Title: “AI Revenue Engine: ON”
+Subtitle: “Next follow-up scheduled: [date/time]”
+CTA: “Manage sequences”
+
+----------------------------------------------------
+SECTION 7: TODAY AT A GLANCE
+----------------------------------------------------
+Tiles:
+- Need follow-up
+- Quotes out
+- Won this month
+
+All tiles tappable.
+
+----------------------------------------------------
+FUNCTIONAL REQUIREMENTS:
+----------------------------------------------------
+- Quick Quote must calculate pricing using existing pricing settings.
+- Quick Quote must allow upgrading to full detailed quote builder.
+- All cards must route to real screens.
+- Use skeleton loaders while data loads.
+- Keep animations lightweight.
+- Prioritize speed.
+
+----------------------------------------------------
+VOICE:
+----------------------------------------------------
+Avoid generic CRM wording.
+Use language focused on revenue, closing, speed, and urgency.
+This app is a sales weapon, not just software.
