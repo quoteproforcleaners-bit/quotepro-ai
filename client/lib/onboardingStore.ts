@@ -68,7 +68,7 @@ export async function markSkipped(): Promise<OnboardingStatus> {
 }
 
 export async function markCompleted(): Promise<OnboardingStatus> {
-  return setOnboardingStatus({ completed: true, currentStep: 8 });
+  return setOnboardingStatus({ completed: true, currentStep: 3 });
 }
 
 export async function resetOnboarding(): Promise<void> {
@@ -77,5 +77,5 @@ export async function resetOnboarding(): Promise<void> {
 
 export function getProgressPercent(status: OnboardingStatus): number {
   if (status.completed) return 100;
-  return Math.round((status.currentStep / 8) * 100);
+  return Math.round((status.currentStep / 3) * 100);
 }

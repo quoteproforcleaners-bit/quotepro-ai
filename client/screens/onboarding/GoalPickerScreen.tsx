@@ -11,24 +11,31 @@ import OnboardingProgressBar from "@/components/OnboardingProgressBar";
 const MAX_CONTENT_WIDTH = 560;
 
 const GOALS = [
-  { id: "send_quote", label: "Send a quote today", icon: "send" as const, hint: "Most popular" },
-  { id: "convert_recurring", label: "Convert one-time clients to recurring", icon: "repeat" as const, hint: null },
-  { id: "raise_prices", label: "Raise prices without losing clients", icon: "trending-up" as const, hint: null },
-  { id: "more_repeat", label: "Get more repeat customers", icon: "users" as const, hint: null },
+  { id: "quote_faster", label: "Quote faster", icon: "zap" as const },
+  { id: "raise_prices", label: "Raise prices confidently", icon: "trending-up" as const },
+  { id: "win_more_jobs", label: "Win more jobs", icon: "award" as const },
+  { id: "follow_up_auto", label: "Follow up automatically", icon: "repeat" as const },
 ];
 
 interface Props {
-  onNext: (goal: string) => void;
-  onBack: () => void;
+  onNext: (goals: string[]) => void;
+  onSkip: () => void;
 }
 
-export default function GoalPickerScreen({ onNext, onBack }: Props) {
+export default function GoalPickerScreen({ onNext, onSkip }: Props) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
-  const [selected, setSelected] = useState("send_quote");
+  const [selected, setSelected] = useState<string[]>(["quote_faster"]);
 
   const useMaxWidth = screenWidth > MAX_CONTENT_WIDTH + 40;
+
+  const toggleGoal = (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -45,45 +52,36 @@ export default function GoalPickerScreen({ onNext, onBack }: Props) {
         bounces={false}
       >
         <View style={[styles.innerContent, useMaxWidth ? { maxWidth: MAX_CONTENT_WIDTH, width: "100%" } : undefined]}>
-          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={12}>
-            <Feather name="arrow-left" size={22} color={theme.text} />
-          </Pressable>
-
-          <OnboardingProgressBar currentStep={1} />
+          <OnboardingProgressBar currentStep={1} totalSteps={3} />
           <View style={styles.header}>
             <ThemedText type="h2">What matters most right now?</ThemedText>
             <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
-              We'll highlight tips that match your priority
+              Select all that apply
             </ThemedText>
           </View>
 
           <View style={styles.goalsList}>
             {GOALS.map((g) => {
-              const isSelected = selected === g.id;
+              const isSelected = selected.includes(g.id);
               return (
                 <Pressable
                   key={g.id}
                   testID={`goal-${g.id}`}
-                  onPress={() => { setSelected(g.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                  onPress={() => toggleGoal(g.id)}
                   style={[
-                    styles.goalCard,
+                    styles.goalChip,
                     {
-                      backgroundColor: isSelected ? theme.primary + "10" : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
+                      backgroundColor: isSelected ? theme.primary + "12" : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
                       borderColor: isSelected ? theme.primary : isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
                     },
                   ]}
                 >
-                  <View style={[styles.goalIcon, { backgroundColor: isSelected ? theme.primary + "20" : theme.backgroundSecondary }]}>
-                    <Feather name={g.icon} size={20} color={isSelected ? theme.primary : theme.textSecondary} />
+                  <View style={[styles.chipIcon, { backgroundColor: isSelected ? theme.primary + "20" : theme.backgroundSecondary }]}>
+                    <Feather name={g.icon} size={18} color={isSelected ? theme.primary : theme.textSecondary} />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText type="subtitle">{g.label}</ThemedText>
-                    {g.hint ? (
-                      <ThemedText type="caption" style={{ color: theme.primary, marginTop: 2 }}>{g.hint}</ThemedText>
-                    ) : null}
-                  </View>
-                  <View style={[styles.radio, { borderColor: isSelected ? theme.primary : theme.border }]}>
-                    {isSelected ? <View style={[styles.radioInner, { backgroundColor: theme.primary }]} /> : null}
+                  <ThemedText type="subtitle" style={{ flex: 1, fontWeight: isSelected ? "600" : "400" }}>{g.label}</ThemedText>
+                  <View style={[styles.checkbox, { borderColor: isSelected ? theme.primary : theme.border, backgroundColor: isSelected ? theme.primary : "transparent" }]}>
+                    {isSelected ? <Feather name="check" size={12} color="#FFFFFF" /> : null}
                   </View>
                 </Pressable>
               );
@@ -97,10 +95,21 @@ export default function GoalPickerScreen({ onNext, onBack }: Props) {
           <Pressable
             testID="button-goal-next"
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onNext(selected); }}
-            style={[styles.nextBtn, { backgroundColor: theme.primary }]}
+            style={[styles.nextBtn, { backgroundColor: theme.primary, opacity: selected.length > 0 ? 1 : 0.5 }]}
+            disabled={selected.length === 0}
           >
             <ThemedText type="subtitle" style={{ color: "#FFFFFF", fontWeight: "700" }}>Continue</ThemedText>
             <Feather name="arrow-right" size={18} color="#FFFFFF" />
+          </Pressable>
+
+          <Pressable
+            testID="button-onboarding-skip"
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSkip(); }}
+            style={styles.skipBtn}
+          >
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Skip setup
+            </ThemedText>
           </Pressable>
         </View>
       </View>
@@ -112,14 +121,13 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.xl },
   innerContent: { flex: 1 },
-  backBtn: { marginBottom: Spacing.lg },
   header: { marginBottom: Spacing["2xl"] },
   goalsList: { gap: Spacing.sm },
-  goalCard: { flexDirection: "row", alignItems: "center", padding: Spacing.lg, borderRadius: BorderRadius.sm, borderWidth: 1.5, gap: Spacing.md },
-  goalIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: "center", justifyContent: "center" },
-  radioInner: { width: 12, height: 12, borderRadius: 6 },
+  goalChip: { flexDirection: "row", alignItems: "center", padding: Spacing.lg, borderRadius: BorderRadius.sm, borderWidth: 1.5, gap: Spacing.md },
+  chipIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  checkbox: { width: 22, height: 22, borderRadius: 4, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   footer: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, alignItems: "center" },
   footerInner: { width: "100%" },
   nextBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: Spacing.sm, height: 56, borderRadius: BorderRadius.md },
+  skipBtn: { alignItems: "center", padding: Spacing.md },
 });

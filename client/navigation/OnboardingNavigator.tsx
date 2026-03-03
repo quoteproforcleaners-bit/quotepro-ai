@@ -1,13 +1,8 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useCallback } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import WelcomeScreen from "@/screens/onboarding/WelcomeScreen";
 import GoalPickerScreen from "@/screens/onboarding/GoalPickerScreen";
 import BusinessBasicsScreen from "@/screens/onboarding/BusinessBasicsScreen";
 import QuickQuoteScreen from "@/screens/onboarding/QuickQuoteScreen";
-import QuoteRevealScreen from "@/screens/onboarding/QuoteRevealScreen";
-import SendQuoteScreen from "@/screens/onboarding/SendQuoteScreen";
-import FollowUpSetupScreen from "@/screens/onboarding/FollowUpSetupScreen";
-import SuccessScreen from "@/screens/onboarding/SuccessScreen";
 import { useApp } from "@/context/AppContext";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import {
@@ -16,202 +11,68 @@ import {
   markSkipped,
 } from "@/lib/onboardingStore";
 import {
-  calculateAllOptions,
-  getServiceTypeById,
-} from "@/lib/quoteCalculator";
-import { apiRequest } from "@/lib/query-client";
-import { HomeDetails, AddOns, DEFAULT_PRICING_SETTINGS } from "@/types";
-import {
   scheduleOnboardingNudge,
   cancelOnboardingNudge,
-  scheduleFirstWinCelebration,
 } from "@/lib/notifications";
 import { trackEvent } from "@/lib/analytics";
 
+export let pendingPostOnboardingPaywall = false;
+export function clearPendingPaywall() {
+  pendingPostOnboardingPaywall = false;
+}
+
 export type OnboardingStackParamList = {
-  Welcome: undefined;
   GoalPicker: undefined;
   BusinessBasics: undefined;
-  QuickQuote: undefined;
-  QuoteReveal: undefined;
-  SendQuote: undefined;
-  FollowUpSetup: undefined;
-  Success: undefined;
+  DemoQuote: undefined;
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
 
 export default function OnboardingNavigator() {
   const {
-    businessProfile,
     pricingSettings,
-    updateBusinessProfile,
+    updatePricingSettings,
     completeOnboarding,
   } = useApp();
   const screenOptions = useScreenOptions();
 
-  const [goal, setGoal] = useState("send_quote");
-  const [bizName, setBizName] = useState(businessProfile.companyName || "");
-  const [logoUri, setLogoUri] = useState<string | null>(businessProfile.logoUri);
-  const [quoteInput, setQuoteInput] = useState<any>(null);
-  const [tiers, setTiers] = useState<any>(null);
-  const [selectedTier, setSelectedTier] = useState("better");
-  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
-  const [sentQuote, setSentQuote] = useState(false);
-  const [followupsEnabled, setFollowupsEnabled] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
-
-  const handleSkipAll = useCallback(async (navigation: any) => {
+  const handleSkipAll = useCallback(async () => {
     await markSkipped();
     scheduleOnboardingNudge();
     trackEvent("onboarding_skipped");
     await completeOnboarding();
   }, [completeOnboarding]);
 
-  const handleGoalNext = useCallback(async (selectedGoal: string, navigation: any) => {
-    setGoal(selectedGoal);
-    await setOnboardingStatus({ primaryGoal: selectedGoal, startedAt: new Date().toISOString(), currentStep: 1 });
-    trackEvent("onboarding_goal_selected", { goal: selectedGoal });
+  const handleGoalNext = useCallback(async (goals: string[], navigation: any) => {
+    await setOnboardingStatus({ primaryGoal: goals.join(","), startedAt: new Date().toISOString(), currentStep: 1 });
+    trackEvent("onboarding_started");
+    trackEvent("onboarding_goal_selected", { goals });
     navigation.navigate("BusinessBasics");
   }, []);
 
-  const handleBasicsNext = useCallback(async (data: { businessName: string; zipCode: string; logoUri: string | null }, navigation: any) => {
-    setBizName(data.businessName);
-    setLogoUri(data.logoUri);
-    await updateBusinessProfile({ companyName: data.businessName, logoUri: data.logoUri });
-    await setOnboardingStatus({ businessName: data.businessName, zipCode: data.zipCode, logoUri: data.logoUri, currentStep: 2 });
-    trackEvent("onboarding_business_saved");
-    navigation.navigate("QuickQuote");
-  }, [updateBusinessProfile]);
-
-  const handleQuoteGenerated = useCallback(async (input: any, navigation: any) => {
-    setQuoteInput(input);
-    const conditionScore = input.condition === "maintained" ? 8 : 4;
-    const homeDetails: HomeDetails = {
-      sqft: input.sqft,
-      beds: input.beds,
-      baths: input.baths,
-      halfBaths: 0,
-      conditionScore,
-      peopleCount: 2,
-      petType: "none",
-      petShedding: false,
+  const handleBasicsNext = useCallback(async (data: { businessType: string; hourlyTarget: number; minJobPrice: number; autoUpsells: boolean }, navigation: any) => {
+    const updatedSettings = {
+      ...pricingSettings,
+      hourlyRate: data.hourlyTarget,
+      minimumTicket: data.minJobPrice,
     };
-    const emptyAddOns: AddOns = {
-      insideFridge: false, insideOven: false, insideCabinets: false,
-      interiorWindows: false, blindsDetail: false, baseboardsDetail: false,
-      laundryFoldOnly: false, dishes: false, organizationTidy: false,
-      biannualDeepClean: false,
-    };
-    const settings = pricingSettings || DEFAULT_PRICING_SETTINGS;
-    const options = calculateAllOptions(homeDetails, emptyAddOns, input.frequency as any, settings, true);
-    setTiers(options);
-    await setOnboardingStatus({ quoteDraft: { homeDetails, options }, currentStep: 3 });
-    trackEvent("onboarding_quote_created", { serviceType: input.serviceType, sqft: input.sqft });
-    navigation.navigate("QuoteReveal");
-  }, [pricingSettings]);
+    await updatePricingSettings(updatedSettings);
+    await setOnboardingStatus({ currentStep: 2 });
+    trackEvent("onboarding_business_saved", { businessType: data.businessType, hourlyTarget: data.hourlyTarget, minJobPrice: data.minJobPrice, autoUpsells: data.autoUpsells });
+    navigation.navigate("DemoQuote");
+  }, [pricingSettings, updatePricingSettings]);
 
-  const handleTierSelected = useCallback(async (tier: string, addOns: string[], navigation: any) => {
-    setSelectedTier(tier);
-    setSelectedAddOns(addOns);
-    await setOnboardingStatus({ selectedTier: tier, selectedAddOns: addOns, currentStep: 4 });
-    navigation.navigate("SendQuote");
-  }, []);
-
-  const handleSendQuote = useCallback(async (contact: { name: string; email: string; phone: string }, navigation: any) => {
-    setIsSending(true);
-    setSendError(null);
-    try {
-      let customerId: string | undefined;
-      try {
-        const custRes = await apiRequest("POST", "/api/customers", {
-          name: contact.name,
-          email: contact.email,
-          phone: contact.phone,
-          address: "",
-        });
-        const cust = await custRes.json();
-        customerId = cust.id;
-      } catch {}
-
-      let quoteId: string | undefined;
-      try {
-        const quoteRes = await apiRequest("POST", "/api/quotes", {
-          customerId,
-          customerName: contact.name,
-          customerEmail: contact.email,
-          customerPhone: contact.phone,
-          homeDetails: quoteInput,
-          options: {
-            good: tiers.good,
-            better: tiers.better,
-            best: tiers.best,
-          },
-          selectedOption: selectedTier,
-          status: "draft",
-          frequency: quoteInput?.frequency || "one-time",
-        });
-        const quoteData = await quoteRes.json();
-        quoteId = quoteData.id;
-      } catch {}
-
-      if (quoteId && contact.email) {
-        try {
-          const sendRes = await apiRequest("POST", `/api/quotes/${quoteId}/onboarding-send`, {
-            to: contact.email,
-            subject: `Your ${bizName || "QuotePro"} Quote`,
-          });
-          const sendData = await sendRes.json();
-          if (!sendData.success) {
-            setSendError(sendData.message || "Could not send email. Your quote was saved.");
-          }
-        } catch {
-          setSendError("Could not send email right now. Your quote was saved and you can send it later.");
-        }
-      }
-
-      setSentQuote(true);
-      await setOnboardingStatus({ sentQuote: true, ownerContact: { email: contact.email, phone: contact.phone }, currentStep: 5 });
-      cancelOnboardingNudge();
-      scheduleFirstWinCelebration();
-      trackEvent("onboarding_quote_sent", { tier: selectedTier });
-
-      navigation.navigate("FollowUpSetup");
-    } catch {
-      setSendError("Something went wrong. Please try again.");
-    } finally {
-      setIsSending(false);
-    }
-  }, [selectedTier, tiers, quoteInput, bizName]);
-
-  const handleFollowUpNext = useCallback(async (data: { cadence: string; tone: string }, navigation: any) => {
-    setFollowupsEnabled(true);
-    await setOnboardingStatus({ followupsEnabled: true, cadencePreset: data.cadence as any, tone: data.tone as any, currentStep: 6 });
-    trackEvent("onboarding_followup_configured", { cadence: data.cadence, tone: data.tone });
-    navigation.navigate("Success");
-  }, []);
-
-  const handleFinish = useCallback(async () => {
+  const handleDemoComplete = useCallback(async (quoteDetails: { total: number; tierName: string; homeDetails: any; tiers: any }, navigation: any) => {
+    trackEvent("demo_quote_started");
+    trackEvent("demo_quote_completed", { total: quoteDetails.total, tierName: quoteDetails.tierName });
+    await setOnboardingStatus({ currentStep: 3, quoteDraft: quoteDetails });
     await markCompleted();
     cancelOnboardingNudge();
     trackEvent("onboarding_completed");
+    pendingPostOnboardingPaywall = true;
     await completeOnboarding();
   }, [completeOnboarding]);
-
-  const currentBizName = bizName || businessProfile.companyName || "My Cleaning Co";
-
-  const currentTierPrice = useMemo(() => {
-    if (!tiers) return 0;
-    const t = selectedTier === "good" ? tiers.good : selectedTier === "best" ? tiers.best : tiers.better;
-    return t?.price || 0;
-  }, [tiers, selectedTier]);
-
-  const currentTierName = useMemo(() => {
-    if (!tiers) return "";
-    const t = selectedTier === "good" ? tiers.good : selectedTier === "best" ? tiers.best : tiers.better;
-    return t?.serviceTypeName || t?.name || "Standard";
-  }, [tiers, selectedTier]);
 
   return (
     <Stack.Navigator
@@ -221,93 +82,28 @@ export default function OnboardingNavigator() {
         animation: "slide_from_right",
       }}
     >
-      <Stack.Screen name="Welcome">
-        {({ navigation }) => (
-          <WelcomeScreen
-            onStart={() => { trackEvent("onboarding_started"); navigation.navigate("GoalPicker"); }}
-            onSkip={() => handleSkipAll(navigation)}
-          />
-        )}
-      </Stack.Screen>
       <Stack.Screen name="GoalPicker">
         {({ navigation }) => (
           <GoalPickerScreen
-            onNext={(g) => handleGoalNext(g, navigation)}
-            onBack={() => navigation.goBack()}
+            onNext={(goals) => handleGoalNext(goals, navigation)}
+            onSkip={handleSkipAll}
           />
         )}
       </Stack.Screen>
       <Stack.Screen name="BusinessBasics">
         {({ navigation }) => (
           <BusinessBasicsScreen
-            initialName={currentBizName}
             onNext={(d) => handleBasicsNext(d, navigation)}
             onBack={() => navigation.goBack()}
           />
         )}
       </Stack.Screen>
-      <Stack.Screen name="QuickQuote">
+      <Stack.Screen name="DemoQuote">
         {({ navigation }) => (
           <QuickQuoteScreen
-            goal={goal}
-            onNext={(input) => handleQuoteGenerated(input, navigation)}
+            pricingSettings={pricingSettings}
+            onComplete={(details) => handleDemoComplete(details, navigation)}
             onBack={() => navigation.goBack()}
-          />
-        )}
-      </Stack.Screen>
-      <Stack.Screen name="QuoteReveal">
-        {({ navigation }) => (
-          tiers ? (
-            <QuoteRevealScreen
-              tiers={tiers}
-              frequency={quoteInput?.frequency || "one-time"}
-              goal={goal}
-              onNext={(tier, addOns) => handleTierSelected(tier, addOns, navigation)}
-              onBack={() => navigation.goBack()}
-            />
-          ) : null
-        )}
-      </Stack.Screen>
-      <Stack.Screen name="SendQuote">
-        {({ navigation }) => (
-          <SendQuoteScreen
-            selectedTierPrice={currentTierPrice}
-            selectedTierName={currentTierName}
-            businessName={currentBizName}
-            goal={goal}
-            tiers={tiers}
-            selectedTier={selectedTier}
-            onSend={(contact) => handleSendQuote(contact, navigation)}
-            onSkip={() => {
-              setOnboardingStatus({ currentStep: 5 });
-              navigation.navigate("FollowUpSetup");
-            }}
-            onBack={() => navigation.goBack()}
-            isSending={isSending}
-            sendError={sendError}
-          />
-        )}
-      </Stack.Screen>
-      <Stack.Screen name="FollowUpSetup">
-        {({ navigation }) => (
-          <FollowUpSetupScreen
-            onNext={(d) => handleFollowUpNext(d, navigation)}
-            onSkip={() => {
-              setOnboardingStatus({ currentStep: 6 });
-              navigation.navigate("Success");
-            }}
-            onBack={() => navigation.goBack()}
-          />
-        )}
-      </Stack.Screen>
-      <Stack.Screen name="Success">
-        {() => (
-          <SuccessScreen
-            sentQuote={sentQuote}
-            followupsEnabled={followupsEnabled}
-            businessName={currentBizName}
-            goal={goal}
-            onFinish={handleFinish}
           />
         )}
       </Stack.Screen>

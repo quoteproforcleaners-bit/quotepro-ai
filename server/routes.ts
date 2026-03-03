@@ -853,10 +853,34 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
+  app.get("/api/quotes/count", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const allQuotes = await getQuotesByBusiness(business.id);
+      const user = await getUserById(req.session.userId!);
+      const isPro = user?.subscriptionTier === "pro";
+      return res.json({ count: allQuotes.length, limit: 3, isPro });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get quote count" });
+    }
+  });
+
   app.post("/api/quotes", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const user = await getUserById(req.session.userId!);
+      if (user && user.subscriptionTier !== "pro") {
+        const existingQuotes = await getQuotesByBusiness(business.id);
+        if (existingQuotes.length >= 3) {
+          return res.status(403).json({
+            message: "You've used 3 of 3 free quotes. Upgrade to Pro for unlimited quotes.",
+            quoteLimitReached: true,
+          });
+        }
+      }
 
       const rules = await getAutomationRules(business.id);
       const qPrefs = (business as any).quotePreferences as any;

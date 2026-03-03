@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput, useWindowDimensions } from "react-native";
+import React, { useState, useCallback, useEffect } from "react";
+import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput, useWindowDimensions, Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
@@ -25,6 +25,7 @@ import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAIConsent } from "@/context/AIConsentContext";
 import { ProBadge } from "@/components/ProBadge";
+import { trackEvent } from "@/lib/analytics";
 
 type RouteParams = {
   QuoteDetail: { quoteId: string };
@@ -79,9 +80,15 @@ export default function QuoteDetailScreen() {
   const [sendingDraft, setSendingDraft] = useState(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [showFollowUpNudge, setShowFollowUpNudge] = useState(false);
+  const [nudgeChecked, setNudgeChecked] = useState(false);
 
   const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
+  });
+
+  const { data: stats } = useQuery<any>({
+    queryKey: ['/api/reports/stats'],
   });
 
   useFocusEffect(
@@ -89,6 +96,17 @@ export default function QuoteDetailScreen() {
       refetchQuote();
     }, [refetchQuote])
   );
+
+  useEffect(() => {
+    if (!nudgeChecked && quote && stats && !isPro) {
+      setNudgeChecked(true);
+      const totalQuotes = stats.totalQuotes || stats.total || 0;
+      if (totalQuotes === 1 && quote.status === "draft") {
+        setShowFollowUpNudge(true);
+        trackEvent("first_real_quote_completed", { quoteId: route.params.quoteId });
+      }
+    }
+  }, [quote, stats, nudgeChecked, isPro]);
 
   const { data: stripeStatus } = useQuery({
     queryKey: ["/api/stripe/status"],
@@ -1311,6 +1329,53 @@ export default function QuoteDetailScreen() {
         </View>
       </ScrollView>
 
+      <Modal
+        visible={showFollowUpNudge}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFollowUpNudge(false)}
+      >
+        <View style={styles.nudgeOverlay}>
+          <View style={[styles.nudgeContent, { backgroundColor: theme.cardBackground }]}>
+            <View style={[styles.nudgeIconCircle, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="message-circle" size={28} color={theme.primary} />
+            </View>
+            <ThemedText type="h4" style={{ textAlign: "center", marginTop: Spacing.lg }}>
+              Want QuotePro to generate the follow-up message that closes this job?
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
+              AI-crafted follow-ups get 3x more responses than generic templates
+            </ThemedText>
+            <Pressable
+              onPress={() => {
+                setShowFollowUpNudge(false);
+                if (!isPro) {
+                  navigation.navigate("Paywall", { trigger_source: "follow_up_nudge" });
+                } else {
+                  fetchAiDraft("email", "follow_up");
+                }
+              }}
+              style={[styles.nudgeCta, { backgroundColor: theme.primary }]}
+              testID="button-nudge-generate"
+            >
+              <Feather name="zap" size={16} color="#FFFFFF" />
+              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: Spacing.sm }}>
+                {isPro ? "Generate Follow-Up" : "Generate (Pro)"}
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setShowFollowUpNudge(false)}
+              style={styles.nudgeDismiss}
+              testID="button-nudge-dismiss"
+            >
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                Not now
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -1632,5 +1697,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 6,
     borderRadius: BorderRadius.xs,
+  },
+  nudgeOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  nudgeContent: {
+    width: "100%",
+    maxWidth: 340,
+    borderRadius: BorderRadius.md,
+    padding: Spacing["2xl"],
+    alignItems: "center",
+  },
+  nudgeIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nudgeCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.lg,
+  },
+  nudgeDismiss: {
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
 });

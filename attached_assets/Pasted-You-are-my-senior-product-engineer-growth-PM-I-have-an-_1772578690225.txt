@@ -1,0 +1,136 @@
+You are my senior product engineer + growth PM. I have an iOS app called “QuotePro for Cleaners” (QuotePro AI). We are getting App Store downloads but $0 proceeds. Your job: implement ALL conversion fixes end-to-end so we start getting paying subscribers.
+
+NON-NEGOTIABLE GOAL
+- Increase install → trial_start → subscription conversion.
+- Create a “magic moment” within 60 seconds of first open.
+- Add analytics so we can see exactly where users drop off.
+- Ensure subscriptions work flawlessly on iPhone + iPad.
+
+CONSTRAINTS
+- Do not break existing quoting flows.
+- Keep the UI simple and fast (no clutter).
+- Default to dark mode support if present.
+- Every change must be production-ready.
+
+1) ADD FUNNEL ANALYTICS (REQUIRED)
+Instrument these events (with properties) using my existing analytics stack (Firebase/Amplitude/other in project; if multiple exist, use the one already wired to production):
+
+Events:
+- app_open
+- onboarding_started
+- onboarding_completed
+- demo_quote_started
+- demo_quote_completed (include quote_total, service_type, beds, baths, sqft)
+- first_real_quote_started
+- first_real_quote_completed (include quote_total)
+- paywall_viewed (trigger_source: after_demo / feature_gate / settings / trial_expired)
+- trial_started (plan_id, price, trial_days)
+- subscription_purchase_attempted (plan_id)
+- subscription_purchase_success (plan_id)
+- subscription_purchase_failed (plan_id, error_code)
+- restore_purchases_tapped
+- restore_purchases_success / failed
+- cancel_paywall
+- ai_message_generated (language, message_type)
+- followup_queue_used
+
+Dashboard in-app (hidden dev menu) that shows counts for last 7 days is optional, but ensure events are firing.
+
+2) FIX ONBOARDING TO CREATE “WOW” IN < 60 SECONDS
+Replace current first-run experience with a tight 3-step onboarding that ends in a demo quote:
+
+Step 1: “What do you want QuotePro to do for you?”
+- Options (multi-select): Quote faster / Raise prices confidently / Win more jobs / Follow up automatically
+- Save to user profile.
+
+Step 2: “Set your basics (takes 10 seconds)”
+- Choose: Residential / Commercial / Both
+- Ask: Your hourly target ($/hr) OR margin target (%). Default $60/hr.
+- Ask: Your minimum job price. Default $179.
+- Ask: Do you want recommended upsells automatically included? Toggle default ON.
+- Save settings.
+
+Step 3: “Try it now — instant demo quote”
+- Auto-load a demo lead (editable) with: service=Deep Clean, beds=3, baths=2, sqft=2100, pets=1, last_cleaned=1 month, add-ons suggestions on.
+- Big CTA: “Generate Quote”
+- When tapped, show:
+  a) calculated quote total
+  b) line-item add-ons/upsells
+  c) estimated margin impact (“This pricing protects ~$X margin”)
+  d) a generated AI follow-up text message preview (“Hi Sarah… here’s your estimate…”)
+
+After demo is generated, show a SINGLE screen:
+“Unlock unlimited quotes + AI follow-ups”
+Buttons: Start Free Trial / Continue with limited mode (limited mode rules below).
+
+3) DEFINE A CLEAR FREEMIUM MODEL (NO CONFUSION)
+Implement these access rules:
+- Free users: can create up to 3 residential quotes total (lifetime) + view pricing dashboard (read-only) + basic calculator WITHOUT AI messaging.
+- Paid users: unlimited residential + commercial quotes, AI message generation, follow-up queue, saved templates, export/share PDF, multi-language AI, quick quote, landing page lead capture (if exists).
+- If user hits limit (3 quotes), show paywall with “You’ve hit your free limit. Start your free trial to keep quoting.”
+
+Make this explicit in-app (tiny “Free limits” link in settings and on paywall).
+
+4) PAYWALL THAT CONVERTS (IMPLEMENT, NOT MOCK)
+Create a dedicated Paywall screen that:
+- Shows 3 bullets max, benefit-first:
+  - “Quote in 10 seconds”
+  - “Protect your margin on every job”
+  - “Auto-generate follow-ups that close”
+- Shows price clearly: $19.99 / month (or pulls from RevenueCat/App Store offering)
+- Shows trial messaging (14 days or current config)
+- Has Start Free Trial CTA (primary)
+- Has “Restore purchases” and “Not now” (secondary)
+- Has terms/privacy links
+- OPTIONAL: Add social proof row (“Built by a cleaning franchise owner” + a short line)
+
+Trigger paywall only after:
+- demo quote completion, OR
+- user attempts a locked feature, OR
+- user hits free quote limit.
+
+Do NOT show paywall on first open before value.
+
+5) SUBSCRIPTION RELIABILITY (CRITICAL)
+Audit and fix the purchase flow end-to-end:
+- Ensure user gets premium entitlements immediately after purchase/trial start.
+- Handle edge cases: offline purchase, restore purchases, interrupted transactions.
+- If using RevenueCat:
+  - Confirm offerings load, handle null offerings gracefully, show fallback message.
+  - Add visible loading state and error messaging.
+- If using StoreKit directly:
+  - Ensure transaction listener is active, finish transactions, verify entitlements.
+
+Add a “Subscription Status” row in Settings:
+- Free / Trial (days left) / Active / Expired
+- A “Restore Purchases” button that works.
+
+6) IN-APP CONVERSION NUDGES (LIGHTWEIGHT)
+Implement:
+- After user generates their FIRST real quote: show a tiny modal:
+  “Want QuotePro to generate the follow-up message that closes this job?”
+  Button: “Generate (Pro)” → paywall if locked.
+- Add “Revenue Impact” microcopy below totals:
+  “Most cleaners underquote by 15–25%. QuotePro helps prevent that.”
+- Add a “Saved $X this month” style metric ONLY if you can compute from quotes; otherwise skip.
+
+7) APP STORE OPTIMIZED PRODUCT PAGE (IN-APP HELP)
+Add a Settings → “Help” section with:
+- “How to use QuotePro in 60 seconds” (mini guide)
+- “Join affiliate program” (link)
+- “Contact support” (email)
+
+8) QA CHECKLIST (MUST DO)
+Before you finish, run these tests and confirm in your output:
+- New install → onboarding → demo quote → start trial → premium unlocked
+- Free user generates 3 quotes → 4th triggers paywall
+- Restore purchases works
+- Works on iPad layouts (centered, readable)
+- Dark mode looks correct
+
+OUTPUT REQUIREMENTS
+- Implement the code changes across the app.
+- List every file changed and why.
+- Provide a short “How to test” checklist.
+- Do not leave TODOs. Do not provide only high-level advice.
+- If you need to choose between options, choose the simplest path that ships today and increases conversion.

@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useNavigation } from "@react-navigation/native";
 import MainTabNavigator from "@/navigation/MainTabNavigator";
 import OnboardingNavigator from "@/navigation/OnboardingNavigator";
 import QuoteCalculatorScreen from "@/screens/QuoteCalculatorScreen";
@@ -29,6 +30,7 @@ import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import { useTheme } from "@/hooks/useTheme";
+import { pendingPostOnboardingPaywall, clearPendingPaywall } from "@/navigation/OnboardingNavigator";
 
 export type RootStackParamList = {
   Landing: undefined;
@@ -41,7 +43,7 @@ export type RootStackParamList = {
   CustomerDetail: { customerId: string };
   JobDetail: { jobId: string };
   PricingSettings: undefined;
-  Paywall: undefined;
+  Paywall: { trigger_source?: string } | undefined;
   AIAssistant: undefined;
   FollowUpQueue: undefined;
   WeeklyRecap: undefined;
@@ -59,6 +61,26 @@ export type RootStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+function PostOnboardingPaywallTrigger() {
+  const navigation = useNavigation<any>();
+  const triggered = useRef(false);
+
+  useEffect(() => {
+    if (pendingPostOnboardingPaywall && !triggered.current) {
+      triggered.current = true;
+      clearPendingPaywall();
+      const timer = setTimeout(() => {
+        try {
+          navigation.navigate("Paywall", { trigger_source: "after_demo" });
+        } catch {}
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [navigation]);
+
+  return null;
+}
 
 export default function RootStackNavigator() {
   const screenOptions = useScreenOptions();
@@ -112,9 +134,15 @@ export default function RootStackNavigator() {
         <>
           <Stack.Screen
             name="Main"
-            component={MainTabNavigator}
             options={{ headerShown: false }}
-          />
+          >
+            {() => (
+              <>
+                <PostOnboardingPaywallTrigger />
+                <MainTabNavigator />
+              </>
+            )}
+          </Stack.Screen>
           <Stack.Screen
             name="QuoteCalculator"
             component={QuoteCalculatorScreen}

@@ -18,6 +18,7 @@ import {
 import { apiRequest } from "@/lib/query-client";
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { calculateAllOptions } from "@/lib/quoteCalculator";
 import { saveGuestDraft, loadGuestDraft, clearGuestDraft } from "@/lib/guestDraft";
 import AuthGateModal from "@/components/AuthGateModal";
@@ -26,6 +27,7 @@ import HomeDetailsScreen from "@/screens/quote/HomeDetailsScreen";
 import ServiceAddOnsScreen from "@/screens/quote/ServiceAddOnsScreen";
 import QuotePreviewScreen from "@/screens/quote/QuotePreviewScreen";
 import { FeatureFlags } from "@/lib/featureFlags";
+import { trackEvent } from "@/lib/analytics";
 
 type QuoteType = "residential" | "commercial";
 
@@ -40,6 +42,7 @@ export default function QuoteCalculatorScreen() {
   const useMaxWidth = screenWidth > 600;
   const { pricingSettings, businessProfile } = useApp();
   const { user, isGuest } = useAuth();
+  const { isPro } = useSubscription();
   const queryClient = useQueryClient();
   const routeParams = (route.params as any) || {};
   const prefill = routeParams.prefillCustomer;
@@ -211,6 +214,20 @@ export default function QuoteCalculatorScreen() {
       return;
     }
 
+    if (!isEditMode && !isPro) {
+      try {
+        const countRes = await apiRequest("GET", "/api/quotes/count");
+        const countData = await countRes.json();
+        if (!countData.isPro && countData.count >= countData.limit) {
+          trackEvent("quote_limit_hit", { count: countData.count, limit: countData.limit });
+          navigation.navigate("Paywall", { trigger_source: "quote_limit" });
+          return;
+        }
+      } catch (e) {
+        console.warn("Quote count check failed:", e);
+      }
+    }
+
     await performSave();
   };
 
@@ -270,13 +287,24 @@ export default function QuoteCalculatorScreen() {
         navigation.goBack();
       } else {
         const res = await apiRequest("POST", "/api/quotes", payload);
+        if (res.status === 403) {
+          const errData = await res.json();
+          if (errData.quoteLimitReached) {
+            navigation.navigate("Paywall", { trigger_source: "quote_limit" });
+            return;
+          }
+        }
         const newQuote = await res.json();
         queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
         queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
         await clearGuestDraft();
         navigation.replace("QuoteDetail", { quoteId: newQuote.id });
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes("403") || error?.status === 403) {
+        navigation.navigate("Paywall", { trigger_source: "quote_limit" });
+        return;
+      }
       console.error("Failed to save quote:", error);
     }
   };
@@ -299,13 +327,24 @@ export default function QuoteCalculatorScreen() {
     try {
       const payload = buildQuotePayload(priceOverrides);
       const res = await apiRequest("POST", "/api/quotes", payload);
+      if (res.status === 403) {
+        const errData = await res.json();
+        if (errData.quoteLimitReached) {
+          navigation.navigate("Paywall", { trigger_source: "quote_limit" });
+          return null;
+        }
+      }
       const newQuote = await res.json();
       savedQuoteIdRef.current = newQuote.id;
       queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/reports/stats'] });
       await clearGuestDraft();
       return newQuote.id;
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes("403") || error?.status === 403) {
+        navigation.navigate("Paywall", { trigger_source: "quote_limit" });
+        return null;
+      }
       console.error("Failed to save quote:", error);
       return null;
     }

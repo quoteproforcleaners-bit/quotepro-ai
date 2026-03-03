@@ -43,7 +43,9 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
-  const { isPro } = useSubscription();
+  const { isPro, subscriptionStatus, trialDaysLeft, restore } = useSubscription();
+  const [restoring, setRestoring] = useState(false);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
   const { preference: darkModePref, setPreference: setDarkModePref } = useDarkModePreference();
   const { hasConsented: aiConsented, requestConsent: requestAIConsent, revokeConsent: revokeAIConsent } = useAIConsent();
@@ -281,7 +283,7 @@ export default function SettingsScreen() {
     >
       <SectionHeader title={t.settings.subscription} />
 
-      {isPro ? (
+      {subscriptionStatus === "active" ? (
         <View
           style={[
             styles.proActiveCard,
@@ -305,6 +307,63 @@ export default function SettingsScreen() {
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4 }}>
             {t.settings.aiActiveDesc}
           </ThemedText>
+        </View>
+      ) : subscriptionStatus === "trial" ? (
+        <View
+          style={[
+            styles.proActiveCard,
+            { backgroundColor: `${theme.primary}10`, borderColor: `${theme.primary}30` },
+          ]}
+        >
+          <View style={styles.proActiveHeader}>
+            <View style={[styles.proBadge, { backgroundColor: theme.primary }]}>
+              <Feather name="zap" size={14} color="#FFFFFF" />
+              <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 4 }}>
+                TRIAL
+              </ThemedText>
+            </View>
+            <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600" }}>
+              {trialDaysLeft !== null ? `${trialDaysLeft} ${trialDaysLeft === 1 ? t.common.day : t.common.days} left` : "Trial"}
+            </ThemedText>
+          </View>
+          <ThemedText type="body" style={{ fontWeight: "600", marginTop: Spacing.sm }}>
+            QuotePro AI Trial
+          </ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4 }}>
+            {t.settings.aiActiveDesc}
+          </ThemedText>
+        </View>
+      ) : subscriptionStatus === "expired" ? (
+        <View
+          style={[
+            styles.proActiveCard,
+            { backgroundColor: `${theme.error}08`, borderColor: `${theme.error}30` },
+          ]}
+        >
+          <View style={styles.proActiveHeader}>
+            <View style={[styles.proBadge, { backgroundColor: theme.error }]}>
+              <Feather name="alert-circle" size={14} color="#FFFFFF" />
+              <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 4 }}>
+                EXPIRED
+              </ThemedText>
+            </View>
+          </View>
+          <ThemedText type="body" style={{ fontWeight: "600", marginTop: Spacing.sm }}>
+            Subscription Expired
+          </ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4 }}>
+            Your subscription has expired. Renew to regain access to all Pro features.
+          </ThemedText>
+          <Pressable
+            onPress={() => navigation.navigate("Paywall", { trigger_source: "settings" })}
+            style={[styles.upgradeBtn, { backgroundColor: theme.accent, marginTop: Spacing.md }]}
+            testID="button-renew-subscription"
+          >
+            <Feather name="zap" size={18} color="#FFFFFF" />
+            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 8 }}>
+              Renew Subscription
+            </ThemedText>
+          </Pressable>
         </View>
       ) : (
         <View
@@ -343,7 +402,7 @@ export default function SettingsScreen() {
           </View>
 
           <Pressable
-            onPress={() => navigation.navigate("Paywall")}
+            onPress={() => navigation.navigate("Paywall", { trigger_source: "settings" })}
             style={[
               styles.upgradeBtn,
               { backgroundColor: theme.accent },
@@ -356,11 +415,117 @@ export default function SettingsScreen() {
             </ThemedText>
           </Pressable>
 
-          <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
-            {t.paywall.freePlanNote}
-          </ThemedText>
+          <View style={[styles.freePlanInfo, { backgroundColor: `${theme.warning}10`, borderColor: `${theme.warning}25` }]}>
+            <Feather name="info" size={16} color={theme.warning} />
+            <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm, color: theme.textSecondary }}>
+              Free Plan: 3 quotes included. No AI messaging, follow-up queue, or PDF export.
+            </ThemedText>
+          </View>
         </View>
       )}
+
+      <Pressable
+        onPress={async () => {
+          setRestoring(true);
+          setRestoreMessage(null);
+          try {
+            const restored = await restore();
+            if (restored) {
+              setRestoreMessage(t.paywall.restoreSuccessMessage);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } else {
+              setRestoreMessage(t.paywall.noSubscriptionMessage);
+            }
+          } catch {
+            setRestoreMessage(t.paywall.restoreFailedMessage);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          } finally {
+            setRestoring(false);
+          }
+        }}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.sm }]}
+        testID="button-restore-purchases-settings"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="refresh-cw" size={20} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              {t.paywall.restorePurchases}
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Already subscribed? Restore your purchase
+            </ThemedText>
+          </View>
+          {restoring ? (
+            <ThemedText type="small" style={{ color: theme.primary }}>...</ThemedText>
+          ) : (
+            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+          )}
+        </View>
+      </Pressable>
+
+      {restoreMessage ? (
+        <View style={{ backgroundColor: `${theme.primary}10`, padding: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
+          <ThemedText type="small" style={{ color: theme.primary, textAlign: "center" }}>
+            {restoreMessage}
+          </ThemedText>
+        </View>
+      ) : null}
+
+      {!isPro ? (
+        <View
+          style={[
+            styles.freeLimitsCard,
+            { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+          ]}
+          testID="free-limits-info"
+        >
+          <View style={styles.freeLimitsHeader}>
+            <Feather name="info" size={16} color={theme.textSecondary} />
+            <ThemedText type="subtitle" style={{ marginLeft: Spacing.sm, fontWeight: "600" }}>
+              Free Plan Limits
+            </ThemedText>
+          </View>
+          <View style={styles.freeLimitsList}>
+            <View style={styles.freeLimitRow}>
+              <Feather name="file-text" size={14} color={theme.textSecondary} />
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
+                3 residential quotes total
+              </ThemedText>
+            </View>
+            <View style={styles.freeLimitRow}>
+              <Feather name="x-circle" size={14} color={theme.textSecondary} />
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
+                No AI messaging
+              </ThemedText>
+            </View>
+            <View style={styles.freeLimitRow}>
+              <Feather name="x-circle" size={14} color={theme.textSecondary} />
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
+                No follow-up queue
+              </ThemedText>
+            </View>
+            <View style={styles.freeLimitRow}>
+              <Feather name="x-circle" size={14} color={theme.textSecondary} />
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
+                No PDF export
+              </ThemedText>
+            </View>
+          </View>
+          <Pressable
+            onPress={() => navigation.navigate("Paywall", { trigger_source: "settings" })}
+            style={[styles.freeLimitsUpgradeLink]}
+            testID="button-upgrade-from-limits"
+          >
+            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
+              Upgrade for unlimited access
+            </ThemedText>
+            <Feather name="arrow-right" size={14} color={theme.primary} style={{ marginLeft: 4 }} />
+          </Pressable>
+        </View>
+      ) : null}
 
       <SectionHeader title={t.settings.businessProfile} />
 
@@ -1263,26 +1428,69 @@ export default function SettingsScreen() {
         </ThemedText>
       </Pressable>
 
+      <SectionHeader title="Help & Support" />
+
       <Pressable
         onPress={() => navigation.navigate("HelpGuide")}
-        style={[
-          styles.aboutCard,
-          { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.md, flexDirection: "row", alignItems: "center" },
-        ]}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-help-guide"
       >
-        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: `${theme.primary}15`, alignItems: "center", justifyContent: "center", marginRight: Spacing.sm }}>
-          <Feather name="book-open" size={18} color={theme.primary} />
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="book-open" size={20} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              How to use QuotePro
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              {t.settings.helpGuideDesc}
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
         </View>
-        <View style={{ flex: 1 }}>
-          <ThemedText type="body" style={{ fontWeight: "600" }}>
-            {t.settings.helpGuide}
-          </ThemedText>
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
-            {t.settings.helpGuideDesc}
-          </ThemedText>
+      </Pressable>
+
+      <Pressable
+        onPress={() => Linking.openURL("mailto:support@quotepro.app")}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-contact-support"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.success}15` }]}>
+            <Feather name="mail" size={20} color={theme.success} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              Contact Support
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              support@quotepro.app
+            </ThemedText>
+          </View>
+          <Feather name="external-link" size={18} color={theme.textSecondary} />
         </View>
-        <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+      </Pressable>
+
+      <Pressable
+        onPress={() => WebBrowser.openBrowserAsync("https://quotepro.app/affiliates")}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-affiliate-program"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: "#8B5CF615" }]}>
+            <Feather name="users" size={20} color="#8B5CF6" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              Join Affiliate Program
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Earn by referring cleaning businesses
+            </ThemedText>
+          </View>
+          <Feather name="external-link" size={18} color={theme.textSecondary} />
+        </View>
       </Pressable>
 
       <SectionHeader title={t.settings.legalCompliance} />
@@ -1521,6 +1729,15 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     marginTop: Spacing.lg,
   },
+  freePlanInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginTop: Spacing.md,
+    width: "100%",
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -1621,5 +1838,29 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.sm,
+  },
+  freeLimitsCard: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  freeLimitsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  freeLimitsList: {
+    gap: Spacing.sm,
+  },
+  freeLimitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  freeLimitsUpgradeLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
   },
 });

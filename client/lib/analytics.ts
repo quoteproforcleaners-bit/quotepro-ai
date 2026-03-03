@@ -34,7 +34,22 @@ type EventName =
   | "onboarding_quote_created"
   | "onboarding_quote_sent"
   | "onboarding_followup_configured"
-  | "onboarding_completed";
+  | "onboarding_completed"
+  | "demo_quote_started"
+  | "demo_quote_completed"
+  | "first_real_quote_started"
+  | "first_real_quote_completed"
+  | "paywall_viewed"
+  | "cancel_paywall"
+  | "trial_started"
+  | "subscription_purchase_attempted"
+  | "subscription_purchase_success"
+  | "subscription_purchase_failed"
+  | "restore_purchases_tapped"
+  | "restore_purchases_success"
+  | "restore_purchases_failed"
+  | "ai_message_generated"
+  | "quote_limit_hit";
 
 export async function trackEvent(
   name: EventName,

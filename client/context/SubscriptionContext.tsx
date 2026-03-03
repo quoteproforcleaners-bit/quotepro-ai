@@ -28,6 +28,7 @@ function getPurchases() {
 }
 
 type OfferingsStatus = "idle" | "loading" | "ready" | "error";
+type SubscriptionStatus = "free" | "trial" | "active" | "expired";
 
 interface SubscriptionContextType {
   isPro: boolean;
@@ -36,6 +37,8 @@ interface SubscriptionContextType {
   offeringsStatus: OfferingsStatus;
   offeringsError: string | null;
   isConfigured: boolean;
+  subscriptionStatus: SubscriptionStatus;
+  trialDaysLeft: number | null;
   purchase: () => Promise<boolean>;
   restore: () => Promise<boolean>;
   retryLoadOfferings: () => Promise<void>;
@@ -56,13 +59,51 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [revenueCatReady, setRevenueCatReady] = useState(false);
   const [offeringsStatus, setOfferingsStatus] = useState<OfferingsStatus>("idle");
   const [offeringsError, setOfferingsError] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>("free");
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
   const configuredRef = useRef(false);
+
+  const deriveSubscriptionStatus = useCallback((customerInfo: CustomerInfo) => {
+    for (const id of ENTITLEMENT_IDS) {
+      const ent = customerInfo.entitlements.active[id];
+      if (ent) {
+        const periodType = (ent as any).periodType;
+        if (periodType === "trial" || periodType === "TRIAL") {
+          setSubscriptionStatus("trial");
+          const expDate = ent.expirationDate ? new Date(ent.expirationDate) : null;
+          if (expDate) {
+            const now = new Date();
+            const diffMs = expDate.getTime() - now.getTime();
+            const diffDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+            setTrialDaysLeft(diffDays);
+          } else {
+            setTrialDaysLeft(null);
+          }
+        } else {
+          setSubscriptionStatus("active");
+          setTrialDaysLeft(null);
+        }
+        return;
+      }
+    }
+    for (const id of ENTITLEMENT_IDS) {
+      const allEnts = customerInfo.entitlements.all;
+      if (allEnts && allEnts[id]) {
+        setSubscriptionStatus("expired");
+        setTrialDaysLeft(null);
+        return;
+      }
+    }
+    setSubscriptionStatus("free");
+    setTrialDaysLeft(null);
+  }, []);
 
   const checkEntitlements = useCallback((customerInfo: CustomerInfo) => {
     const hasEntitlement = ENTITLEMENT_IDS.some(id => customerInfo.entitlements.active[id] !== undefined);
     setIsPro(hasEntitlement);
+    deriveSubscriptionStatus(customerInfo);
     return hasEntitlement;
-  }, []);
+  }, [deriveSubscriptionStatus]);
 
   const syncSubscriptionToServer = useCallback(async (hasPro: boolean) => {
     try {
@@ -131,7 +172,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       try {
         if (Platform.OS === "web" || isExpoGo()) {
           console.log(isExpoGo() ? "Expo Go detected — RevenueCat Browser Mode" : "Web platform — RevenueCat Browser Mode", "appOwnership:", Constants.appOwnership, "executionEnvironment:", Constants.executionEnvironment);
-          setIsPro(user.subscriptionTier === "pro");
+          const dbPro = user.subscriptionTier === "pro";
+          setIsPro(dbPro);
+          setSubscriptionStatus(dbPro ? "active" : "free");
           setIsLoading(false);
           return;
         }
@@ -184,6 +227,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         try {
           const customerInfo = await RC.getCustomerInfo();
           const rcHasPro = ENTITLEMENT_IDS.some(id => customerInfo.entitlements.active[id] !== undefined);
+          deriveSubscriptionStatus(customerInfo);
 
           if (rcHasPro && user.subscriptionTier === "pro") {
             setIsPro(true);
@@ -195,7 +239,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           }
         } catch (infoError: any) {
           console.warn("RevenueCat getCustomerInfo error:", infoError);
-          setIsPro(user.subscriptionTier === "pro");
+          const dbPro = user.subscriptionTier === "pro";
+          setIsPro(dbPro);
+          setSubscriptionStatus(dbPro ? "active" : "free");
         }
 
         await loadOfferings();
@@ -203,6 +249,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         try {
           RC.addCustomerInfoUpdateListener((info) => {
             const rcUpdatedPro = ENTITLEMENT_IDS.some(id => info.entitlements.active[id] !== undefined);
+            deriveSubscriptionStatus(info);
             if (!rcUpdatedPro) {
               setIsPro(false);
               syncSubscriptionToServer(false);
@@ -327,6 +374,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         offeringsStatus,
         offeringsError,
         isConfigured: revenueCatReady,
+        subscriptionStatus,
+        trialDaysLeft,
         purchase,
         restore,
         retryLoadOfferings: loadOfferings,

@@ -641,6 +641,13 @@ export default function QuotePreviewScreen({
           </View>
         </View>
 
+        <View style={[styles.microcopyCard, { backgroundColor: `${theme.warning}08`, borderColor: `${theme.warning}20` }]}>
+          <Feather name="trending-up" size={14} color={theme.warning} />
+          <ThemedText type="caption" style={{ color: theme.textSecondary, flex: 1, marginLeft: Spacing.sm }}>
+            Most cleaners underquote by 15-25%. QuotePro helps prevent that.
+          </ThemedText>
+        </View>
+
         {(() => {
           const po = getPaymentOptions(businessProfile.paymentOptions);
           const enabled = getEnabledPaymentMethods(po);
@@ -1181,5 +1188,13 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+  },
+  microcopyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
   },
 });

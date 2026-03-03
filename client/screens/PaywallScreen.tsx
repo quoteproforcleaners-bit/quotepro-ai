@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, StyleSheet, Pressable, ActivityIndicator, Platform, Modal, ScrollView, Linking, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
@@ -9,6 +9,11 @@ import { useTheme } from "@/hooks/useTheme";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
+import { trackEvent } from "@/lib/analytics";
+
+type PaywallParams = {
+  Paywall: { trigger_source?: string } | undefined;
+};
 
 const PRIVACY_POLICY_URL = "https://www.freeprivacypolicy.com/live/9ac71f0a-aa27-477d-98b2-5f8c103f766a";
 const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
@@ -23,6 +28,8 @@ type ModalState = {
 export default function PaywallScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<PaywallParams, "Paywall">>();
+  const triggerSource = route.params?.trigger_source || "settings";
   const { theme } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const {
@@ -37,14 +44,23 @@ export default function PaywallScreen() {
   } = useSubscription();
   const { t } = useLanguage();
 
-  const FEATURES = [
-    { icon: "edit-3" as const, title: t.paywall.aiMessages, description: t.paywall.aiMessagesDesc },
-    { icon: "send" as const, title: t.paywall.directSending, description: t.paywall.directSendingDesc },
-    { icon: "zap" as const, title: t.paywall.smartDescriptions, description: t.paywall.smartDescriptionsDesc },
-    { icon: "refresh-cw" as const, title: t.paywall.regeneration, description: t.paywall.regenerationDesc },
-    { icon: "users" as const, title: t.paywall.crmAccess, description: t.paywall.crmAccessDesc },
-    { icon: "calendar" as const, title: t.paywall.jobScheduling, description: t.paywall.jobSchedulingDesc },
+  useEffect(() => {
+    trackEvent("paywall_viewed", { trigger_source: triggerSource });
+  }, [triggerSource]);
+
+  const BENEFITS = [
+    { icon: "clock" as const, label: "Quote in 10 seconds" },
+    { icon: "shield" as const, label: "Protect your margin on every job" },
+    { icon: "repeat" as const, label: "Auto-generate follow-ups that close" },
   ];
+
+  const contextualHeader = triggerSource === "quote_limit"
+    ? "You've hit your free limit"
+    : triggerSource === "after_demo"
+    ? "Unlock unlimited quotes + AI follow-ups"
+    : triggerSource === "feature_gate"
+    ? "This feature requires Pro"
+    : "Upgrade to QuotePro Pro";
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -79,6 +95,7 @@ export default function PaywallScreen() {
     if (subscriptionLoading || purchasing) return;
 
     setPurchasing(true);
+    trackEvent("subscription_purchase_attempted", { trigger_source: triggerSource });
     try {
       if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -91,6 +108,8 @@ export default function PaywallScreen() {
 
       const success = await purchase();
       if (success) {
+        trackEvent("subscription_purchase_success", { trigger_source: triggerSource });
+        trackEvent("trial_started", { trigger_source: triggerSource });
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
@@ -98,8 +117,11 @@ export default function PaywallScreen() {
       }
     } catch (error: any) {
       if (!error?.userCancelled && !error?.message?.includes("userCancelled")) {
+        trackEvent("subscription_purchase_failed", { trigger_source: triggerSource, error: error?.message });
         const message = error?.message || t.paywall.purchaseFailedMessage;
         showModal("error", t.paywall.purchaseFailed, message);
+      } else {
+        trackEvent("cancel_paywall", { trigger_source: triggerSource });
       }
     } finally {
       setPurchasing(false);
@@ -108,9 +130,11 @@ export default function PaywallScreen() {
 
   const handleRestore = async () => {
     setRestoring(true);
+    trackEvent("restore_purchases_tapped", { trigger_source: triggerSource });
     try {
       const success = await restore();
       if (success) {
+        trackEvent("restore_purchases_success");
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
@@ -119,10 +143,16 @@ export default function PaywallScreen() {
         showModal("info", t.paywall.noSubscription, t.paywall.noSubscriptionMessage);
       }
     } catch {
+      trackEvent("restore_purchases_failed");
       showModal("error", t.paywall.restoreFailed, t.paywall.restoreFailedMessage);
     } finally {
       setRestoring(false);
     }
+  };
+
+  const handleDismiss = () => {
+    trackEvent("cancel_paywall", { trigger_source: triggerSource });
+    navigation.goBack();
   };
 
   const modalIcon = modal.type === "success" ? "check-circle" : modal.type === "error" ? "alert-circle" : "info";
@@ -139,7 +169,7 @@ export default function PaywallScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={handleDismiss}
           style={[styles.closeBtn, { backgroundColor: theme.backgroundSecondary }]}
           testID="button-close-paywall"
         >
@@ -151,40 +181,45 @@ export default function PaywallScreen() {
         </View>
 
         <ThemedText type="h2" style={styles.title}>
-          QuotePro AI
+          {contextualHeader}
         </ThemedText>
 
-        <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {t.paywall.subtitle}
-        </ThemedText>
+        {triggerSource === "quote_limit" ? (
+          <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
+            You've used 3 of 3 free quotes. Start your free trial to keep quoting.
+          </ThemedText>
+        ) : (
+          <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Everything you need to quote faster, earn more, and close jobs.
+          </ThemedText>
+        )}
 
-        <View style={styles.featuresList}>
-          {FEATURES.map((feature, i) => (
-            <View key={i} style={[styles.featureRow, { borderBottomColor: theme.border }]} testID={`feature-row-${i}`}>
-              <View style={[styles.featureIcon, { backgroundColor: `${theme.accent}12` }]}>
-                <Feather name={feature.icon} size={18} color={theme.accent} />
+        <View style={styles.benefitsList}>
+          {BENEFITS.map((benefit, i) => (
+            <View key={i} style={styles.benefitRow} testID={`benefit-row-${i}`}>
+              <View style={[styles.benefitCheck, { backgroundColor: `${theme.success}15` }]}>
+                <Feather name="check" size={16} color={theme.success} />
               </View>
-              <View style={styles.featureText}>
-                <ThemedText type="body" style={{ fontWeight: "600" }}>
-                  {feature.title}
-                </ThemedText>
-                <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
-                  {feature.description}
-                </ThemedText>
-              </View>
+              <ThemedText type="body" style={{ flex: 1, fontWeight: "500" }}>
+                {benefit.label}
+              </ThemedText>
             </View>
           ))}
         </View>
 
-        <View style={styles.pricingContainer}>
-          <ThemedText type="body" style={{ color: theme.textSecondary, fontWeight: "600", marginBottom: 2 }}>
-            QuotePro Pro
+        <View style={[styles.socialProofCard, { backgroundColor: theme.backgroundSecondary }]}>
+          <Feather name="star" size={14} color={theme.accent} />
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 6, fontStyle: "italic" }}>
+            Built by a cleaning franchise owner
           </ThemedText>
+        </View>
+
+        <View style={styles.pricingContainer}>
           <ThemedText type="h3" style={styles.price}>
             {monthlyPrice}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>
-            Monthly Auto-Renewing Subscription
+            per month
           </ThemedText>
         </View>
 
@@ -254,30 +289,40 @@ export default function PaywallScreen() {
               <ThemedText type="body" style={styles.purchaseBtnText}>
                 {offeringsStatus === "loading" && Platform.OS !== "web"
                   ? "Loading..."
-                  : t.paywall.subscribeNow}
+                  : "Start Free Trial"}
               </ThemedText>
             </>
           )}
         </Pressable>
 
-        <Pressable
-          onPress={handleRestore}
-          disabled={purchasing || restoring}
-          style={styles.restoreBtn}
-          testID="button-restore"
-        >
-          {restoring ? (
-            <ActivityIndicator size="small" color={theme.primary} />
-          ) : (
-            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-              {t.paywall.restorePurchases}
-            </ThemedText>
-          )}
-        </Pressable>
+        <View style={styles.secondaryActions}>
+          <Pressable
+            onPress={handleRestore}
+            disabled={purchasing || restoring}
+            style={styles.restoreBtn}
+            testID="button-restore"
+          >
+            {restoring ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
+                {t.paywall.restorePurchases}
+              </ThemedText>
+            )}
+          </Pressable>
 
-        <ThemedText type="caption" style={[styles.freeNote, { color: theme.textSecondary }]}>
-          {t.paywall.freePlanNote}
-        </ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary }}> | </ThemedText>
+
+          <Pressable
+            onPress={handleDismiss}
+            style={styles.restoreBtn}
+            testID="button-not-now"
+          >
+            <ThemedText type="small" style={{ color: theme.textSecondary, fontWeight: "600" }}>
+              Not now
+            </ThemedText>
+          </Pressable>
+        </View>
 
         <View style={styles.legalFooter}>
           <Pressable onPress={() => Linking.openURL(PRIVACY_POLICY_URL)} testID="link-privacy-policy">
@@ -371,25 +416,36 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: Spacing.md,
   },
-  featuresList: {
+  benefitsList: {
     width: "100%",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
-  featureRow: {
+  benefitRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 6,
     gap: Spacing.sm,
   },
-  featureIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  benefitCheck: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
-  featureText: {
-    flex: 1,
+  socialProofCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.xs,
+    marginBottom: Spacing.lg,
+  },
+  secondaryActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: Spacing.md,
   },
   pricingContainer: {
     alignItems: "center",

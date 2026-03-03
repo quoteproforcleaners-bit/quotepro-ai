@@ -19,23 +19,17 @@ interface Props {
 
 const STEP_ICONS: (keyof typeof Feather.glyphMap)[] = [
   "target",
-  "briefcase",
+  "settings",
   "file-text",
-  "layers",
-  "send",
-  "repeat",
 ];
 
 const STEP_LABELS = [
-  "Goal",
-  "Business",
-  "Quote",
-  "Options",
-  "Send",
-  "Follow-Up",
+  "Goals",
+  "Basics",
+  "Demo Quote",
 ];
 
-export default function OnboardingProgressBar({ currentStep, totalSteps = 6 }: Props) {
+export default function OnboardingProgressBar({ currentStep, totalSteps = 3 }: Props) {
   const { theme, isDark } = useTheme();
   const progressWidth = useSharedValue(0);
   const pulseScale = useSharedValue(1);
@@ -79,7 +73,6 @@ export default function OnboardingProgressBar({ currentStep, totalSteps = 6 }: P
           const stepNum = i + 1;
           const isCompleted = stepNum < currentStep;
           const isCurrent = stepNum === currentStep;
-          const isFuture = stepNum > currentStep;
 
           return (
             <View key={i} style={styles.stepItem}>
