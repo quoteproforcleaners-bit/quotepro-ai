@@ -65,7 +65,7 @@ export function TypeFilterBar<T extends string>({
     }
   };
 
-  const outerBg = isDark ? "#101B2D" : "#F1F5F9";
+  const outerBg = isDark ? "#1C1C1E" : "#F1F5F9";
 
   return (
     <View style={styles.wrapper}>
@@ -75,7 +75,7 @@ export function TypeFilterBar<T extends string>({
           {
             backgroundColor: outerBg,
             borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-            shadowColor: isDark ? "#000" : "#0F172A",
+            shadowColor: isDark ? "#000000" : "#0F172A",
           },
         ]}
       >

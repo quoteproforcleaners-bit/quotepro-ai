@@ -1,5 +1,5 @@
 import { useColorScheme as useSystemColorScheme } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type DarkModePreference = "system" | "light" | "dark" | "auto";
@@ -11,17 +11,34 @@ function isEveningHours(): boolean {
   return hour >= 19 || hour < 6;
 }
 
+type Listener = (pref: DarkModePreference) => void;
+const listeners = new Set<Listener>();
+let cachedPreference: DarkModePreference | null = null;
+
+AsyncStorage.getItem(STORAGE_KEY).then((value) => {
+  if (value === "system" || value === "light" || value === "dark" || value === "auto") {
+    cachedPreference = value;
+    listeners.forEach((l) => l(value));
+  }
+});
+
+function notifyListeners(pref: DarkModePreference) {
+  cachedPreference = pref;
+  listeners.forEach((l) => l(pref));
+}
+
 export function useColorScheme() {
   const systemScheme = useSystemColorScheme();
-  const [preference, setPreference] = useState<DarkModePreference>("light");
+  const [preference, setPreference] = useState<DarkModePreference>(cachedPreference ?? "system");
   const [timeBasedDark, setTimeBasedDark] = useState(isEveningHours());
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((value) => {
-      if (value === "system" || value === "light" || value === "dark" || value === "auto") {
-        setPreference(value);
-      }
-    });
+    const listener: Listener = (pref) => setPreference(pref);
+    listeners.add(listener);
+    if (cachedPreference && cachedPreference !== preference) {
+      setPreference(cachedPreference);
+    }
+    return () => { listeners.delete(listener); };
   }, []);
 
   useEffect(() => {
@@ -42,20 +59,22 @@ export function useColorScheme() {
 }
 
 export function useDarkModePreference() {
-  const [preference, setPreferenceState] = useState<DarkModePreference>("light");
+  const [preference, setPreferenceState] = useState<DarkModePreference>(cachedPreference ?? "system");
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((value) => {
-      if (value === "system" || value === "light" || value === "dark" || value === "auto") {
-        setPreferenceState(value);
-      }
-    });
+    const listener: Listener = (pref) => setPreferenceState(pref);
+    listeners.add(listener);
+    if (cachedPreference && cachedPreference !== preference) {
+      setPreferenceState(cachedPreference);
+    }
+    return () => { listeners.delete(listener); };
   }, []);
 
-  const setPreference = async (value: DarkModePreference) => {
+  const setPreference = useCallback(async (value: DarkModePreference) => {
     setPreferenceState(value);
     await AsyncStorage.setItem(STORAGE_KEY, value);
-  };
+    notifyListeners(value);
+  }, []);
 
   return { preference, setPreference };
 }

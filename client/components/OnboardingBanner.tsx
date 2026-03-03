@@ -65,7 +65,7 @@ export default function OnboardingBanner({ onResume }: Props) {
   const nextStep = status.currentStep < STEP_LABELS.length ? STEP_LABELS[status.currentStep] : "Complete setup";
 
   return (
-    <View style={[styles.banner, { backgroundColor: isDark ? "#101B2D" : "#EFF6FF", borderColor: theme.primary + "18" }]}>
+    <View style={[styles.banner, { backgroundColor: isDark ? "#1C1C1E" : "#EFF6FF", borderColor: theme.primary + "18" }]}>
       <View style={styles.topRow}>
         <View style={[styles.iconCircle, { backgroundColor: theme.primary + "15" }]}>
           <Feather name="target" size={16} color={theme.primary} />

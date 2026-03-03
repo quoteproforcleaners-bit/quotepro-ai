@@ -54,8 +54,8 @@ function useSemanticTokens() {
   return useMemo(() => {
     const t = theme as any;
     return {
-      pageBg: t.colorPageBg || (isDark ? "#0B1220" : "#F6F8FB"),
-      cardBg: t.colorCardBg || (isDark ? "#141E30" : "#FFFFFF"),
+      pageBg: t.colorPageBg || (isDark ? "#000000" : "#F6F8FB"),
+      cardBg: t.colorCardBg || (isDark ? "#1C1C1E" : "#FFFFFF"),
       primary: t.colorPrimary || theme.primary,
       primaryText: t.colorPrimaryText || theme.primaryText,
       urgency: t.colorUrgency || theme.warning,
@@ -71,7 +71,7 @@ function useSemanticTokens() {
       divider: t.colorDivider || theme.border,
       border: theme.border,
       primarySoft: theme.primarySoft,
-      surface: isDark ? (t.surface2 || "#1E293B") : (t.surface1 || "#F6F8FB"),
+      surface: isDark ? (t.surface2 || "#3A3A3C") : (t.surface1 || "#F6F8FB"),
       isDark,
     };
   }, [theme, isDark]);

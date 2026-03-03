@@ -102,7 +102,7 @@ export default function SuccessScreen({ sentQuote, followupsEnabled, businessNam
             ))}
           </View>
 
-          <View style={[styles.tipCard, { backgroundColor: isDark ? "#101B2D" : "#EFF6FF", borderColor: theme.primary + "30" }]}>
+          <View style={[styles.tipCard, { backgroundColor: isDark ? "#1C1C1E" : "#EFF6FF", borderColor: theme.primary + "30" }]}>
             <View style={styles.tipHeader}>
               <Feather name="info" size={16} color={theme.primary} />
               <ThemedText type="subtitle" style={{ color: theme.primary, fontWeight: "600" }}>Pro Tip</ThemedText>

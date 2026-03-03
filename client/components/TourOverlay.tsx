@@ -104,7 +104,7 @@ export function TourOverlay() {
   };
 
   const overlayColor = isDark ? "rgba(0,0,0,0.82)" : "rgba(15,23,42,0.45)";
-  const cardBg = isDark ? "#101B2D" : "#FFFFFF";
+  const cardBg = isDark ? "#1C1C1E" : "#FFFFFF";
   const cardBorder = isDark ? "rgba(59,130,246,0.2)" : "rgba(37,99,235,0.12)";
 
   return (
@@ -168,7 +168,7 @@ export function TourOverlay() {
               </Pressable>
             </View>
 
-            <ThemedText type="h3" style={[styles.title, { color: isDark ? "#F8FAFC" : "#0F172A" }]}>
+            <ThemedText type="h3" style={[styles.title, { color: isDark ? "#F2F2F7" : "#0F172A" }]}>
               {step.title}
             </ThemedText>
             <ThemedText
