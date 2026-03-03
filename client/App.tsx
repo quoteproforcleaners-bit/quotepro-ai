@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { StyleSheet, LogBox, Platform, Alert } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -18,6 +18,7 @@ import { TourOverlay } from "@/components/TourOverlay";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary, sendCrashReport } from "@/components/ErrorBoundary";
 import { setupNotificationHandler, registerForPushNotificationsAsync, savePushTokenToServer } from "@/lib/notifications";
+import { useTheme } from "@/hooks/useTheme";
 
 function SafeKeyboardProvider({ children }: { children: React.ReactNode }) {
   try {
@@ -67,6 +68,30 @@ try {
   console.warn("Notification handler setup failed:", e);
 }
 
+function ThemedNavigation() {
+  const { theme, isDark } = useTheme();
+  const navTheme = useMemo(() => ({
+    dark: isDark,
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      primary: theme.primary,
+      background: theme.backgroundRoot,
+      card: theme.backgroundDefault,
+      text: theme.text,
+      border: theme.border,
+      notification: theme.error,
+    },
+    fonts: (isDark ? DarkTheme : DefaultTheme).fonts,
+  }), [isDark, theme]);
+
+  return (
+    <NavigationContainer theme={navTheme}>
+      <RootStackNavigator />
+      <TourOverlay />
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   useEffect(() => {
     registerForPushNotificationsAsync()
@@ -89,10 +114,7 @@ export default function App() {
                     <SubscriptionProvider>
                       <AIConsentProvider>
                         <TutorialProvider>
-                          <NavigationContainer>
-                            <RootStackNavigator />
-                            <TourOverlay />
-                          </NavigationContainer>
+                          <ThemedNavigation />
                         </TutorialProvider>
                       </AIConsentProvider>
                     </SubscriptionProvider>

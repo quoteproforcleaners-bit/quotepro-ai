@@ -45,8 +45,8 @@ function AIConsentBlockingOverlay() {
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top + 60, paddingBottom: insets.bottom + Spacing.xl }]}>
       <View style={styles.content}>
-        <View style={[styles.iconContainer, { backgroundColor: "#FEF3C7" }]}>
-          <Feather name="alert-triangle" size={32} color="#D97706" />
+        <View style={[styles.iconContainer, { backgroundColor: isDark ? "rgba(217, 119, 6, 0.15)" : "#FEF3C7" }]}>
+          <Feather name="alert-triangle" size={32} color={theme.warning} />
         </View>
 
         <ThemedText type="h2" style={styles.title}>
@@ -68,7 +68,7 @@ function AIConsentBlockingOverlay() {
             consent.dataItem4,
           ].map((item, i) => (
             <View key={i} style={styles.dataRow}>
-              <View style={[styles.bullet, { backgroundColor: "#D97706" }]} />
+              <View style={[styles.bullet, { backgroundColor: theme.warning }]} />
               <ThemedText type="body" style={{ flex: 1, color: theme.textSecondary }}>
                 {item}
               </ThemedText>

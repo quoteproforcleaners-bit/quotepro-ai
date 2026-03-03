@@ -160,7 +160,7 @@ export default function GrowthDashboardScreen() {
               </View>
               <ThemedText type="caption" style={{ color: dt.textPrimary, fontWeight: "700", marginTop: Spacing.xs }} numberOfLines={1}>{a.label}</ThemedText>
               {a.screen === "TasksQueue" && pending.length > 0 ? (
-                <View style={s.redBadge}>
+                <View style={[s.redBadge, { borderColor: dt.gradientTop }]}>
                   <ThemedText type="caption" style={s.redBadgeText}>
                     {pending.length > 99 ? "99+" : String(pending.length)}
                   </ThemedText>
@@ -295,6 +295,6 @@ const s = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   quickAction: { flex: 1, alignItems: "center", paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.xl, borderWidth: 1.5, position: "relative" as const },
   quickActionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  redBadge: { position: "absolute" as const, top: -6, right: -4, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#FF3B30", alignItems: "center" as const, justifyContent: "center" as const, paddingHorizontal: 5, borderWidth: 2, borderColor: "#FFFFFF" },
+  redBadge: { position: "absolute" as const, top: -6, right: -4, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#FF3B30", alignItems: "center" as const, justifyContent: "center" as const, paddingHorizontal: 5, borderWidth: 2 },
   redBadgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" as const, lineHeight: 13 },
 });

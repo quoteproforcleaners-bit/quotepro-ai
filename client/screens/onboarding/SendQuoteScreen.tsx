@@ -144,9 +144,9 @@ export default function SendQuoteScreen({
         />
 
         {sendError ? (
-          <View style={[styles.errorBanner, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
-            <Feather name="alert-circle" size={16} color="#DC2626" />
-            <ThemedText type="small" style={{ color: "#DC2626", flex: 1, marginLeft: Spacing.sm }}>
+          <View style={[styles.errorBanner, { backgroundColor: isDark ? "rgba(220, 38, 38, 0.12)" : "#FEF2F2", borderColor: isDark ? "rgba(220, 38, 38, 0.25)" : "#FECACA" }]}>
+            <Feather name="alert-circle" size={16} color={theme.error} />
+            <ThemedText type="small" style={{ color: theme.error, flex: 1, marginLeft: Spacing.sm }}>
               {sendError}
             </ThemedText>
           </View>

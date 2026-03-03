@@ -93,3 +93,8 @@ Key files:
 
 ### iPad Layout Compatibility
 All onboarding screens use ScrollView with sticky footer buttons and 560px max-width centering for iPad compatibility. The pattern: content wraps in `<View style={{ maxWidth: 560, width: "100%" }}>` inside a ScrollView with `contentContainerStyle={{ alignItems: "center" }}` when `screenWidth > 600`.
+
+### Dark Mode
+- `NavigationContainer` receives a dynamic theme (App.tsx `ThemedNavigation` component) synced with `useTheme()` so all navigation surfaces (headers, screen backgrounds, modals) respect dark mode.
+- `useColorScheme` hook (`client/hooks/useColorScheme.ts`) supports system/light/dark/auto-evening preferences stored in AsyncStorage.
+- All screens use `theme.backgroundRoot`, `theme.text`, etc. from `client/constants/theme.ts`. No hardcoded light-only background colors.
