@@ -26,6 +26,9 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useAIConsent } from "@/context/AIConsentContext";
 import { ProBadge } from "@/components/ProBadge";
 import { trackEvent } from "@/lib/analytics";
+import FounderModal from "@/components/FounderModal";
+import ReviewPromptModal from "@/components/ReviewPromptModal";
+import { shouldShowFounderModal, shouldPromptReview, triggerNativeReview, markReviewPrompted } from "@/lib/growthLoop";
 
 type RouteParams = {
   QuoteDetail: { quoteId: string };
@@ -82,6 +85,9 @@ export default function QuoteDetailScreen() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [showFollowUpNudge, setShowFollowUpNudge] = useState(false);
   const [nudgeChecked, setNudgeChecked] = useState(false);
+  const [showFounderModal, setShowFounderModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [growthChecked, setGrowthChecked] = useState(false);
 
   const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
@@ -107,6 +113,45 @@ export default function QuoteDetailScreen() {
       }
     }
   }, [quote, stats, nudgeChecked, isPro]);
+
+  useEffect(() => {
+    if (!growthChecked && quote && stats) {
+      setGrowthChecked(true);
+      const isDemo = quote.isDemo === true;
+      const totalQuotes = stats.totalQuotes || stats.total || 0;
+
+      trackEvent("quote_completed", {
+        quote_type: quote.quoteType || "residential",
+        total: quote.selectedTotal || quote.totalPrice || 0,
+        is_demo: isDemo,
+        quote_number_for_user: totalQuotes,
+      });
+
+      if (isDemo) return;
+
+      (async () => {
+        if (totalQuotes === 1) {
+          const showFounder = await shouldShowFounderModal();
+          if (showFounder) {
+            setTimeout(() => setShowFounderModal(true), 800);
+          }
+        }
+        if (totalQuotes >= 3) {
+          trackEvent("review_eligible", { quote_count: totalQuotes });
+          const showReview = await shouldPromptReview(totalQuotes);
+          if (showReview) {
+            const nativeWorked = await triggerNativeReview();
+            if (nativeWorked) {
+              trackEvent("review_prompt_shown", { type: "native" });
+              await markReviewPrompted();
+            } else {
+              setTimeout(() => setShowReviewModal(true), 800);
+            }
+          }
+        }
+      })();
+    }
+  }, [quote, stats, growthChecked]);
 
   const { data: stripeStatus } = useQuery({
     queryKey: ["/api/stripe/status"],
@@ -1375,6 +1420,17 @@ export default function QuoteDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <FounderModal
+        visible={showFounderModal}
+        onDismiss={() => setShowFounderModal(false)}
+        trigger="first_quote"
+      />
+
+      <ReviewPromptModal
+        visible={showReviewModal}
+        onDismiss={() => setShowReviewModal(false)}
+      />
 
     </View>
   );

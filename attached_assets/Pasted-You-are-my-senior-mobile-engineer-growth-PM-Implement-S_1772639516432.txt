@@ -1,0 +1,130 @@
+You are my senior mobile engineer + growth PM. Implement Steps 1–6 of the “Built by a Cleaner” Growth Loop inside my iOS app (QuotePro / QuotePro AI). This is NOT a mock—ship production-ready code.
+
+PRIMARY GOAL
+Increase trial starts, referrals, and App Store reviews by adding:
+1) Post-quote founder credibility screen
+2) One-tap referral sharing (SMS/WhatsApp/etc.)
+3) Lightweight social proof banner
+4) Smart review prompt after value (3 quotes)
+5) Analytics instrumentation for the entire loop
+
+CONSTRAINTS
+- Do NOT break existing quoting flows.
+- Do NOT add clutter or slow screens.
+- Must work on iPhone + iPad.
+- Must respect Apple guidelines for review prompts (use in-app SKStoreReviewController; do not spam).
+- Use existing design system/components in the codebase.
+- Use existing analytics stack already in production (Firebase/Amplitude/etc.). If multiple exist, prefer the one already used for events.
+
+DEFINITIONS
+- "Quote Completed" = user reaches the final quote result screen where a total price is shown and/or a quote is saved.
+- “3 quotes created” = 3 completed quotes (demo quotes do NOT count unless explicitly marked as real quotes).
+
+STEP 1 — ADD “BUILT BY A CLEANER” POST-QUOTE SCREEN (Activation + Trust)
+After the FIRST real quote is completed, show a single full-screen (or bottom-sheet) modal:
+Title: “Built by a Cleaning Business Owner”
+Body copy (editable but close to this):
+“I built QuotePro AI because quoting jobs and protecting margin was one of the hardest parts of running my cleaning business.
+If this app helps you, sharing it with another cleaning business owner helps a ton.”
+Buttons:
+- Primary: “Share with another cleaner”
+- Secondary: “Join the QuotePro community” (link)
+- Tertiary: “Not now” (dismiss)
+
+Rules:
+- Show only once per user (unless they reset app data).
+- If user taps “Not now”, do not show again for at least 14 days.
+- If user taps “Share”, show confirmation toast: “Share link copied / sent”.
+
+STEP 2 — ONE-TAP SHARE (Referral)
+Implement share functionality using the native iOS share sheet so the user can share via:
+iMessage, WhatsApp, Messenger, Email, etc.
+
+Share payload:
+- Title: “QuotePro AI — quoting built for cleaners”
+- Message template:
+“I’ve been testing this quoting app built by a cleaning franchise owner.
+It creates quotes fast and generates follow-ups.
+Worth checking out: https://getquotepro.ai”
+- Include App Store link too if available. If we have an App Store URL, include it; otherwise include https://getquotepro.ai and the app name.
+
+Also add a “Copy share message” option.
+
+STEP 3 — SOCIAL PROOF BANNER (Lightweight)
+On the main dashboard/home screen add a small, tasteful banner (dismissible):
+“Used by cleaning businesses across the United States 🇺🇸”
+Subtext (small):
+“Join the early adopters building faster quoting + better margins.”
+CTA button: “Share QuotePro” -> triggers share sheet above.
+- Banner should appear for all users, but once dismissed, stay dismissed for 30 days.
+- Keep it visually minimal (no huge cards).
+
+STEP 4 — REVIEW PROMPT AFTER VALUE (3 QUOTES)
+Implement an App Store review request flow that triggers after the user completes 3 real quotes:
+- Use SKStoreReviewController.requestReview (or equivalent supported method).
+- Trigger only if:
+  - user has completed 3 real quotes
+  - AND it has been at least 7 days since install OR at least 2 sessions (choose the safest rule)
+  - AND user has not been prompted in the last 90 days
+- If review prompt is not available, fallback to a custom modal:
+  “Would you mind leaving a quick review? It helps cleaners find QuotePro.”
+  Buttons: “Leave a Review” (open App Store review page), “Not now”.
+
+STEP 5 — ADD “JOIN COMMUNITY” DESTINATION
+Implement the “Join the QuotePro community” button as:
+- If there is already a community URL: open it in in-app browser.
+- If none exists, create a placeholder route that opens:
+https://getquotepro.ai (or a /community path if present).
+Make it easy to change later (single config constant).
+
+STEP 6 — ANALYTICS (MUST)
+Instrument these events with properties:
+
+- quote_completed (quote_type: residential/commercial, total, is_demo, quote_number_for_user)
+- founder_modal_viewed (trigger: first_quote / manual)
+- founder_modal_share_tapped
+- founder_modal_community_tapped
+- founder_modal_dismissed
+- share_sheet_opened (source: founder_modal / banner / settings)
+- share_completed (activity_type if available)
+- banner_viewed
+- banner_dismissed
+- banner_share_tapped
+- review_eligible (when user reaches 3 quotes)
+- review_prompt_shown (native_or_custom)
+- review_prompt_dismissed
+- review_prompt_leave_review_tapped
+
+Make sure analytics calls do not crash if analytics is unavailable.
+
+IMPLEMENTATION DETAILS
+- Add persistent user flags/state:
+  - hasSeenFounderModal
+  - founderModalLastDismissedAt
+  - bannerDismissedUntil
+  - quotesCompletedCount (real quotes only)
+  - lastReviewPromptAt
+  - installDate (if not already tracked)
+- If your app already tracks quotes, use the existing model/store. Do not create duplicate quote storage.
+- If “first quote” is hard to detect, use quotesCompletedCount == 1 (real) at completion.
+
+UI/UX REQUIREMENTS
+- Use existing typography and spacing.
+- The founder modal should feel premium and calm.
+- No aggressive language.
+- Keep it short.
+
+QA CHECKLIST (REQUIRED)
+Before finishing, verify:
+- After first real quote: founder modal appears once.
+- Share opens native share sheet with correct message + link.
+- Banner shows on dashboard; dismiss persists 30 days.
+- Review prompt triggers after 3 real quotes and respects cooldown.
+- All works on iPad layouts.
+- Analytics events fire (log in debug console if needed).
+
+OUTPUT REQUIREMENTS
+- Implement code changes (not pseudocode).
+- List all files changed and summarize why.
+- Provide “How to test” steps.
+- Do not leave TODOs or placeholders except the community URL constant (must still point somewhere real).

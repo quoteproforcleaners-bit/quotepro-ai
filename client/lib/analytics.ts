@@ -49,7 +49,21 @@ type EventName =
   | "restore_purchases_success"
   | "restore_purchases_failed"
   | "ai_message_generated"
-  | "quote_limit_hit";
+  | "quote_completed"
+  | "quote_limit_hit"
+  | "founder_modal_viewed"
+  | "founder_modal_share_tapped"
+  | "founder_modal_community_tapped"
+  | "founder_modal_dismissed"
+  | "share_sheet_opened"
+  | "share_completed"
+  | "banner_viewed"
+  | "banner_dismissed"
+  | "banner_share_tapped"
+  | "review_eligible"
+  | "review_prompt_shown"
+  | "review_prompt_dismissed"
+  | "review_prompt_leave_review_tapped";
 
 export async function trackEvent(
   name: EventName,

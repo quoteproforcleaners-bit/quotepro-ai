@@ -32,7 +32,9 @@ import { useApp } from "@/context/AppContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
+import { ensureInstallDate, incrementSessionCount } from "@/lib/growthLoop";
 import OnboardingBanner from "@/components/OnboardingBanner";
+import SocialProofBanner from "@/components/SocialProofBanner";
 import { useProGate } from "@/components/ProGate";
 import { useTutorial } from "@/context/TutorialContext";
 import { DASHBOARD_TOUR } from "@/lib/tourDefinitions";
@@ -255,6 +257,8 @@ export default function DashboardScreen() {
   const showSetupCard = setupLoaded && isPro && !setupCompleted && !setupSkipped;
 
   useEffect(() => {
+    ensureInstallDate().catch(() => {});
+    incrementSessionCount().catch(() => {});
     trackEvent("app_open");
     trackEvent("home_view");
     (async () => {
@@ -764,6 +768,8 @@ export default function DashboardScreen() {
             </View>
           </Pressable>
         ) : null}
+
+        <SocialProofBanner />
 
         {isEditingWidgets ? (
           <View style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}>
