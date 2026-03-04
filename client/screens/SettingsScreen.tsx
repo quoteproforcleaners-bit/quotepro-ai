@@ -32,6 +32,7 @@ import { useAIConsent } from "@/context/AIConsentContext";
 import { FeatureFlags } from "@/lib/featureFlags";
 import { useTutorial } from "@/context/TutorialContext";
 import { DASHBOARD_TOUR, SETTINGS_TOUR } from "@/lib/tourDefinitions";
+import { trackEvent } from "@/lib/analytics";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -56,6 +57,44 @@ export default function SettingsScreen() {
   const hasCompletedTour = tutorialCtx?.hasCompletedTour || (() => false);
   const tourActive = tutorialCtx?.isActive || false;
   const [commercialEnabled, setCommercialEnabled] = useState(FeatureFlags.commercialQuotingEnabled);
+
+  const { data: growthSettings, refetch: refetchGrowthSettings } = useQuery<any>({
+    queryKey: ["/api/growth-automation-settings"],
+  });
+  const [reviewLinkInput, setReviewLinkInput] = useState("");
+  const [referralAmountInput, setReferralAmountInput] = useState("25");
+  const [referralLinkInput, setReferralLinkInput] = useState("");
+  const [reviewLinkSaving, setReviewLinkSaving] = useState(false);
+
+  useEffect(() => {
+    if (growthSettings) {
+      setReviewLinkInput(growthSettings.googleReviewLink || "");
+      setReferralAmountInput(String(growthSettings.referralOfferAmount || 25));
+      setReferralLinkInput(growthSettings.referralBookingLink || "");
+    }
+  }, [growthSettings]);
+
+  const isValidUrl = (url: string) => {
+    try {
+      const parsed = new URL(url.trim());
+      return parsed.protocol === "https:" || parsed.protocol === "http:";
+    } catch { return false; }
+  };
+
+  const hasValidReviewLink = isValidUrl(reviewLinkInput);
+
+  const updateGrowthSetting = useCallback(async (updates: Record<string, any>) => {
+    try {
+      setReviewLinkSaving(true);
+      await apiRequest("PUT", "/api/growth-automation-settings", { ...growthSettings, ...updates });
+      queryClient.invalidateQueries({ queryKey: ["/api/growth-automation-settings"] });
+      Haptics.selectionAsync();
+    } catch (e) {
+      console.warn("Failed to update growth setting:", e);
+    } finally {
+      setReviewLinkSaving(false);
+    }
+  }, [growthSettings, queryClient]);
 
   useEffect(() => {
     try {
@@ -1214,6 +1253,177 @@ export default function SettingsScreen() {
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
         </View>
       </Pressable>
+
+      <SectionHeader title={t.reviewSettings.sectionTitle} subtitle={t.reviewSettings.sectionSubtitle} />
+
+      <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.reviewSettings.googleReviewLink}</ThemedText>
+            <RNTextInput
+              value={reviewLinkInput}
+              onChangeText={setReviewLinkInput}
+              onBlur={() => {
+                const trimmed = reviewLinkInput.trim();
+                if (trimmed === (growthSettings?.googleReviewLink || "")) return;
+                if (trimmed.length === 0) {
+                  updateGrowthSetting({ googleReviewLink: "" });
+                  return;
+                }
+                if (!isValidUrl(trimmed)) return;
+                updateGrowthSetting({ googleReviewLink: trimmed });
+                trackEvent("review_link_saved", { has_link: true });
+              }}
+              placeholder={t.reviewSettings.googleReviewLinkPlaceholder}
+              placeholderTextColor={theme.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              style={{
+                marginTop: Spacing.sm,
+                paddingHorizontal: Spacing.md,
+                paddingVertical: Spacing.sm,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: BorderRadius.sm,
+                color: theme.text,
+                fontSize: 14,
+                backgroundColor: theme.backgroundSecondary,
+              }}
+              testID="input-google-review-link"
+            />
+            {!hasValidReviewLink && reviewLinkInput.trim().length === 0 ? (
+              <ThemedText type="caption" style={{ color: theme.textMuted, marginTop: 4 }}>
+                {t.reviewSettings.googleReviewLinkHelper}
+              </ThemedText>
+            ) : null}
+            {reviewLinkInput.trim().length > 0 && !hasValidReviewLink ? (
+              <ThemedText type="caption" style={{ color: theme.error, marginTop: 4 }}>
+                Please enter a valid URL starting with https://
+              </ThemedText>
+            ) : null}
+          </View>
+        </View>
+
+        <View style={[styles.prefRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: Spacing.md }]}>
+          <View style={{ flex: 1, opacity: hasValidReviewLink ? 1 : 0.5 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.reviewSettings.includeOnPdf}</ThemedText>
+          </View>
+          <Switch
+            value={growthSettings?.includeReviewOnPdf ?? false}
+            disabled={!hasValidReviewLink}
+            onValueChange={(val) => {
+              updateGrowthSetting({ includeReviewOnPdf: val });
+              trackEvent("review_link_toggle_changed", { surface: "pdf", enabled: val });
+            }}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-review-on-pdf"
+          />
+        </View>
+
+        <View style={[styles.prefRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: Spacing.md }]}>
+          <View style={{ flex: 1, opacity: hasValidReviewLink ? 1 : 0.5 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.reviewSettings.includeInMessages}</ThemedText>
+          </View>
+          <Switch
+            value={growthSettings?.includeReviewInMessages ?? false}
+            disabled={!hasValidReviewLink}
+            onValueChange={(val) => {
+              updateGrowthSetting({ includeReviewInMessages: val });
+              trackEvent("review_link_toggle_changed", { surface: "messages", enabled: val });
+            }}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-review-in-messages"
+          />
+        </View>
+
+        <View style={[styles.prefRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: Spacing.md }]}>
+          <View style={{ flex: 1, opacity: hasValidReviewLink ? 1 : 0.5 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.reviewSettings.askAfterComplete}</ThemedText>
+          </View>
+          <Switch
+            value={growthSettings?.askReviewAfterComplete ?? true}
+            disabled={!hasValidReviewLink}
+            onValueChange={(val) => {
+              updateGrowthSetting({ askReviewAfterComplete: val });
+              trackEvent("review_link_toggle_changed", { surface: "post_service", enabled: val });
+            }}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-review-after-complete"
+          />
+        </View>
+      </View>
+
+      <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border, marginTop: Spacing.md }]}>
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>{t.reviewSettings.referralSection}</ThemedText>
+          </View>
+        </View>
+        <View style={[styles.prefRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: Spacing.md }]}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body">{t.reviewSettings.referralOfferAmount}</ThemedText>
+            <RNTextInput
+              value={referralAmountInput}
+              onChangeText={setReferralAmountInput}
+              onBlur={() => {
+                const num = parseInt(referralAmountInput, 10);
+                if (!isNaN(num) && num !== (growthSettings?.referralOfferAmount || 25)) {
+                  updateGrowthSetting({ referralOfferAmount: num });
+                }
+              }}
+              keyboardType="number-pad"
+              style={{
+                marginTop: Spacing.sm,
+                paddingHorizontal: Spacing.md,
+                paddingVertical: Spacing.sm,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: BorderRadius.sm,
+                color: theme.text,
+                fontSize: 14,
+                backgroundColor: theme.backgroundSecondary,
+                width: 100,
+              }}
+              testID="input-referral-amount"
+            />
+          </View>
+        </View>
+        <View style={[styles.prefRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: Spacing.md }]}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body">{t.reviewSettings.referralBookingLink}</ThemedText>
+            <RNTextInput
+              value={referralLinkInput}
+              onChangeText={setReferralLinkInput}
+              onBlur={() => {
+                if (referralLinkInput.trim() !== (growthSettings?.referralBookingLink || "")) {
+                  updateGrowthSetting({ referralBookingLink: referralLinkInput.trim() });
+                }
+              }}
+              placeholder={t.reviewSettings.referralBookingLinkPlaceholder}
+              placeholderTextColor={theme.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              style={{
+                marginTop: Spacing.sm,
+                paddingHorizontal: Spacing.md,
+                paddingVertical: Spacing.sm,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: BorderRadius.sm,
+                color: theme.text,
+                fontSize: 14,
+                backgroundColor: theme.backgroundSecondary,
+              }}
+              testID="input-referral-booking-link"
+            />
+          </View>
+        </View>
+      </View>
 
       <SectionHeader title="Features" subtitle="Enable or disable app features" />
 

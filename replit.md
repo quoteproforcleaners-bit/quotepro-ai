@@ -24,6 +24,15 @@ v1.0.7 (build 19) conversion overhaul: 3-step onboarding (Goals → Basics → D
 - **Analytics**: `quote_completed` (with quote_type, total, is_demo, quote_number_for_user), `founder_modal_viewed/share_tapped/community_tapped/dismissed`, `share_sheet_opened/completed`, `banner_viewed/dismissed/share_tapped`, `review_eligible/prompt_shown/dismissed/leave_review_tapped`.
 - **Settings**: "Join the QuotePro Community" link in Help & Support section.
 
+**Google Review Link Integration** (v1.0.9):
+- **Settings "Reviews & Referrals" section**: Google Review Link URL input with validation, three toggles (include on PDF, include in messages, ask after job complete), referral offer amount/booking link settings. Stored in `growth_automation_settings` table (new columns: `include_review_on_pdf`, `include_review_in_messages`, `ask_review_after_complete`, `referral_offer_amount`, `referral_booking_link`).
+- **Quote PDF "Review Us" section**: When `includeReviewOnPdf` enabled, both residential and commercial PDFs include a styled "Review Us" block with clickable link near the bottom.
+- **Message review append**: When `includeReviewInMessages` enabled, SMS and email copy messages append a deterministic review request line in the user's communication language (EN/ES/PT/RU translations in `REVIEW_REQUEST_LINES` maps). Email sent via SendGrid also includes the review CTA in the footer.
+- **QuoteDetailScreen**: "Send Review Request" and "Send Referral Offer" buttons appear for accepted/sent quotes when Google Review link is configured. Uses native SMS or clipboard fallback.
+- **JobDetailScreen**: "Send Review Request" button appears on completed jobs when `askReviewAfterComplete` is enabled and review link exists.
+- **Analytics**: `review_link_saved`, `review_link_toggle_changed` (surface: pdf/messages/post_service), `review_link_included_in_quote`, `review_request_sent` (channel, language), `review_request_copy_tapped`, `referral_offer_sent`.
+- **i18n**: All review settings labels translated in EN/ES/PT/RU.
+
 The frontend is built with **React Native (Expo SDK 54)**, using **React Navigation** for native stack and bottom tab navigation. **React Native Reanimated** and **React Native Gesture Handler** manage animations and touch. State management utilizes **React Context (AppContext)** for global state and **React Query (TanStack Query)** for server state. Styling adheres to a centralized theme (`/constants/theme.ts`) supporting light/dark modes and platform adaptations. The navigation structure includes a Root Stack Navigator with conditional rendering for authentication and onboarding, leading to a Main Tab Navigator with Home, Customers, Quotes, Jobs, Growth, and Settings tabs, as well as various modal and stack screens for detailed functionalities.
 
 ### Backend Architecture

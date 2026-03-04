@@ -721,6 +721,25 @@ const ru: Translations = {
     totalReviews: "отзывов",
     customerSatisfaction: "Удовлетворённость Клиентов",
   },
+
+  reviewSettings: {
+    sectionTitle: "Отзывы и Рекомендации",
+    sectionSubtitle: "Управляйте запросами отзывов и настройками рекомендаций",
+    googleReviewLink: "Ссылка на Отзыв Google",
+    googleReviewLinkPlaceholder: "https://g.page/r/ваш-бизнес/review",
+    googleReviewLinkHelper: "Добавьте ссылку на отзыв Google для активации.",
+    includeOnPdf: "Включить ссылку на отзыв в PDF предложения",
+    includeInMessages: "Включить ссылку на отзыв в сообщения",
+    askAfterComplete: "Запрашивать отзыв после завершения работы",
+    referralSection: "Настройки Рекомендаций",
+    referralOfferAmount: "Сумма скидки за рекомендацию ($)",
+    referralBookingLink: "Ссылка для бронирования рекомендаций",
+    referralBookingLinkPlaceholder: "https://ваша-ссылка-бронирования.com",
+    sendReviewRequest: "Отправить Запрос на Отзыв",
+    sendReferralOffer: "Отправить Предложение о Рекомендации",
+    reviewRequestLine: "После обслуживания, не могли бы вы оставить быстрый отзыв?",
+    referralOfferMessage: "Если у вас есть друг, которому нужна уборка, мы дадим вам скидку ${amount} на следующую уборку. Вот наша ссылка для бронирования: {link}",
+  },
 };
 
 export default ru;

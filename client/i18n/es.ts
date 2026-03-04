@@ -721,6 +721,25 @@ const es: Translations = {
     totalReviews: "rese\u00f1as",
     customerSatisfaction: "Satisfacci\u00f3n del Cliente",
   },
+
+  reviewSettings: {
+    sectionTitle: "Rese\u00f1as y Referidos",
+    sectionSubtitle: "Administra solicitudes de rese\u00f1as y configuraci\u00f3n de referidos",
+    googleReviewLink: "Enlace de Rese\u00f1a de Google",
+    googleReviewLinkPlaceholder: "https://g.page/r/tu-negocio/review",
+    googleReviewLinkHelper: "Agrega tu enlace de rese\u00f1a de Google para habilitar.",
+    includeOnPdf: "Incluir enlace de rese\u00f1a en el PDF de cotizaci\u00f3n",
+    includeInMessages: "Incluir enlace de rese\u00f1a en mensajes de cotizaci\u00f3n",
+    askAfterComplete: "Solicitar rese\u00f1a despu\u00e9s de completar el trabajo",
+    referralSection: "Configuraci\u00f3n de Referidos",
+    referralOfferAmount: "Monto de descuento por referido ($)",
+    referralBookingLink: "Enlace de reserva para referidos",
+    referralBookingLinkPlaceholder: "https://tu-enlace-de-reserva.com",
+    sendReviewRequest: "Enviar Solicitud de Rese\u00f1a",
+    sendReferralOffer: "Enviar Oferta de Referido",
+    reviewRequestLine: "Despu\u00e9s de su servicio, \u00bfle importar\u00eda dejarnos una rese\u00f1a r\u00e1pida?",
+    referralOfferMessage: "Si tiene un amigo que necesita limpieza, le daremos ${amount} de descuento en su pr\u00f3xima limpieza. Aqu\u00ed est\u00e1 nuestro enlace de reserva: {link}",
+  },
 };
 
 export default es;

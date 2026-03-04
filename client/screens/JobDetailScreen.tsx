@@ -29,6 +29,9 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Elevation } from "@/constants/theme";
 import { ProGate } from "@/components/ProGate";
 import { useLanguage } from "@/context/LanguageContext";
+import * as Clipboard from "expo-clipboard";
+import * as SMS from "expo-sms";
+import { trackEvent } from "@/lib/analytics";
 
 type RouteParams = {
   JobDetail: { jobId: string };
@@ -139,7 +142,7 @@ export default function JobDetailScreen() {
   const queryClient = useQueryClient();
   const jobId = route.params.jobId;
 
-  const { t } = useLanguage();
+  const { t, communicationLanguage } = useLanguage();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
 
@@ -154,9 +157,14 @@ export default function JobDetailScreen() {
   const [selectedRating, setSelectedRating] = useState(0);
   const [ratingComment, setRatingComment] = useState("");
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [reviewSending, setReviewSending] = useState(false);
 
   const { data: job, isLoading: jobLoading, isError: jobError } = useQuery<Job>({
     queryKey: ["/api/jobs", jobId],
+  });
+
+  const { data: growthSettings } = useQuery<any>({
+    queryKey: ["/api/growth-automation-settings"],
   });
 
   const { data: photos = [] } = useQuery<JobPhoto[]>({
@@ -298,6 +306,41 @@ export default function JobDetailScreen() {
         },
       ]
     );
+  };
+
+  const REVIEW_REQUEST_LINES: Record<string, string> = {
+    en: "After your service, would you mind leaving a quick review?",
+    es: "Despu\u00e9s de su servicio, \u00bfle importar\u00eda dejarnos una rese\u00f1a r\u00e1pida?",
+    pt: "Ap\u00f3s o servi\u00e7o, voc\u00ea se importaria de deixar uma avalia\u00e7\u00e3o r\u00e1pida?",
+    ru: "\u041f\u043e\u0441\u043b\u0435 \u043e\u0431\u0441\u043b\u0443\u0436\u0438\u0432\u0430\u043d\u0438\u044f, \u043d\u0435 \u043c\u043e\u0433\u043b\u0438 \u0431\u044b \u0432\u044b \u043e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u0431\u044b\u0441\u0442\u0440\u044b\u0439 \u043e\u0442\u0437\u044b\u0432?",
+  };
+
+  const handleSendJobReviewRequest = async () => {
+    if (!job || !growthSettings?.googleReviewLink?.trim()) return;
+    const customerName = job.customer ? `${job.customer.firstName || ""} ${job.customer.lastName || ""}`.trim() : "there";
+    const reviewLink = growthSettings.googleReviewLink.trim();
+    const line = REVIEW_REQUEST_LINES[communicationLanguage] || REVIEW_REQUEST_LINES.en;
+    const msg = `Hi ${customerName}! ${line} ${reviewLink}`;
+
+    setReviewSending(true);
+    try {
+      const phone = job.customer?.phone;
+      const isAvailable = await SMS.isAvailableAsync();
+      if (isAvailable && phone) {
+        await SMS.sendSMSAsync([phone], msg);
+        trackEvent("review_request_sent", { channel: "sms", language: communicationLanguage });
+      } else {
+        await Clipboard.setStringAsync(msg);
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        trackEvent("review_request_copy_tapped", {});
+      }
+    } catch {
+      await Clipboard.setStringAsync(msg);
+      trackEvent("review_request_copy_tapped", {});
+    }
+    setReviewSending(false);
   };
 
   const handleToggleChecklist = (item: ChecklistItem) => {
@@ -523,6 +566,25 @@ export default function JobDetailScreen() {
                 <Feather name="check-circle" size={20} color="#FFFFFF" />
                 <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.sm }}>
                   Complete Job
+                </ThemedText>
+              </>
+            )}
+          </Pressable>
+        ) : null}
+
+        {isCompleted && growthSettings?.askReviewAfterComplete && growthSettings?.googleReviewLink?.trim() ? (
+          <Pressable
+            testID="send-review-request-job-btn"
+            onPress={handleSendJobReviewRequest}
+            style={[styles.completeButton, { backgroundColor: theme.warning, marginBottom: Spacing.md }]}
+          >
+            {reviewSending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Feather name="star" size={20} color="#FFFFFF" />
+                <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.sm }}>
+                  Send Review Request
                 </ThemedText>
               </>
             )}

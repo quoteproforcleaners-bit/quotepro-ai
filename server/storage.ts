@@ -1751,6 +1751,11 @@ export async function upsertGrowthAutomationSettings(
     rebookNudgeDaysMax: number;
     deepCleanIntervalMonths: number;
     googleReviewLink: string;
+    includeReviewOnPdf: boolean;
+    includeReviewInMessages: boolean;
+    askReviewAfterComplete: boolean;
+    referralOfferAmount: number;
+    referralBookingLink: string;
     connectedSendingEnabled: boolean;
   }>
 ): Promise<GrowthAutomationSetting> {

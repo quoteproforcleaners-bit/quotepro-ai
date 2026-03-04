@@ -721,6 +721,25 @@ const pt: Translations = {
     totalReviews: "avaliações",
     customerSatisfaction: "Satisfação do Cliente",
   },
+
+  reviewSettings: {
+    sectionTitle: "Avaliações e Indicações",
+    sectionSubtitle: "Gerencie solicitações de avaliações e configurações de indicações",
+    googleReviewLink: "Link de Avaliação do Google",
+    googleReviewLinkPlaceholder: "https://g.page/r/seu-negocio/review",
+    googleReviewLinkHelper: "Adicione seu link de avaliação do Google para habilitar.",
+    includeOnPdf: "Incluir link de avaliação no PDF da cotação",
+    includeInMessages: "Incluir link de avaliação nas mensagens de cotação",
+    askAfterComplete: "Solicitar avaliação após conclusão do trabalho",
+    referralSection: "Configurações de Indicação",
+    referralOfferAmount: "Valor do desconto por indicação ($)",
+    referralBookingLink: "Link de reserva para indicações",
+    referralBookingLinkPlaceholder: "https://seu-link-de-reserva.com",
+    sendReviewRequest: "Enviar Solicitação de Avaliação",
+    sendReferralOffer: "Enviar Oferta de Indicação",
+    reviewRequestLine: "Após o serviço, você se importaria de deixar uma avaliação rápida?",
+    referralOfferMessage: "Se você tem um amigo que precisa de limpeza, daremos ${amount} de desconto na sua próxima limpeza. Aqui está nosso link de reserva: {link}",
+  },
 };
 
 export default pt;

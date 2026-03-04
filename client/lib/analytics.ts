@@ -63,7 +63,13 @@ type EventName =
   | "review_eligible"
   | "review_prompt_shown"
   | "review_prompt_dismissed"
-  | "review_prompt_leave_review_tapped";
+  | "review_prompt_leave_review_tapped"
+  | "review_link_saved"
+  | "review_link_toggle_changed"
+  | "review_link_included_in_quote"
+  | "review_request_sent"
+  | "review_request_copy_tapped"
+  | "referral_offer_sent";
 
 export async function trackEvent(
   name: EventName,

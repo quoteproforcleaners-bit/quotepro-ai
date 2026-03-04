@@ -719,6 +719,25 @@ const en = {
     totalReviews: "reviews",
     customerSatisfaction: "Customer Satisfaction",
   },
+
+  reviewSettings: {
+    sectionTitle: "Reviews & Referrals",
+    sectionSubtitle: "Manage review requests and referral settings",
+    googleReviewLink: "Google Review Link",
+    googleReviewLinkPlaceholder: "https://g.page/r/your-business/review",
+    googleReviewLinkHelper: "Add your Google review link to enable.",
+    includeOnPdf: "Include review link on quote PDF",
+    includeInMessages: "Include review link in quote messages",
+    askAfterComplete: "Ask for review after job is marked complete",
+    referralSection: "Referral Settings",
+    referralOfferAmount: "Referral discount amount ($)",
+    referralBookingLink: "Booking link for referrals",
+    referralBookingLinkPlaceholder: "https://your-booking-link.com",
+    sendReviewRequest: "Send Review Request",
+    sendReferralOffer: "Send Referral Offer",
+    reviewRequestLine: "After your service, would you mind leaving a quick review?",
+    referralOfferMessage: "If you have a friend who needs a cleaner, we'll give you ${amount} off your next cleaning. Here's our booking link: {link}",
+  },
 };
 
 export default en;

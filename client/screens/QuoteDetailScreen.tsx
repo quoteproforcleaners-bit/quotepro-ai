@@ -88,6 +88,7 @@ export default function QuoteDetailScreen() {
   const [showFounderModal, setShowFounderModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [growthChecked, setGrowthChecked] = useState(false);
+  const [reviewRequestSending, setReviewRequestSending] = useState(false);
 
   const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
@@ -95,6 +96,10 @@ export default function QuoteDetailScreen() {
 
   const { data: stats } = useQuery<any>({
     queryKey: ['/api/reports/stats'],
+  });
+
+  const { data: growthSettings } = useQuery<any>({
+    queryKey: ['/api/growth-automation-settings'],
   });
 
   useFocusEffect(
@@ -439,6 +444,19 @@ export default function QuoteDetailScreen() {
     }
   };
 
+  const REVIEW_REQUEST_LINES: Record<string, string> = {
+    en: "After your service, would you mind leaving a quick review?",
+    es: "Despu\u00e9s de su servicio, \u00bfle importar\u00eda dejarnos una rese\u00f1a r\u00e1pida?",
+    pt: "Ap\u00f3s o servi\u00e7o, voc\u00ea se importaria de deixar uma avalia\u00e7\u00e3o r\u00e1pida?",
+    ru: "\u041f\u043e\u0441\u043b\u0435 \u043e\u0431\u0441\u043b\u0443\u0436\u0438\u0432\u0430\u043d\u0438\u044f, \u043d\u0435 \u043c\u043e\u0433\u043b\u0438 \u0431\u044b \u0432\u044b \u043e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u0431\u044b\u0441\u0442\u0440\u044b\u0439 \u043e\u0442\u0437\u044b\u0432?",
+  };
+
+  const getReviewAppendLine = () => {
+    if (!growthSettings?.includeReviewInMessages || !growthSettings?.googleReviewLink?.trim()) return "";
+    const line = REVIEW_REQUEST_LINES[communicationLanguage] || REVIEW_REQUEST_LINES.en;
+    return `\n\n${line} ${growthSettings.googleReviewLink.trim()}`;
+  };
+
   const handleCopyEmail = async () => {
     if (!quote) return;
     const name = quote.propertyDetails?.customerName || "Customer";
@@ -447,11 +465,13 @@ export default function QuoteDetailScreen() {
     const po = getPaymentOptions(businessProfile?.paymentOptions);
     const enabled = getEnabledPaymentMethods(po);
     const pmLine = enabled.length > 0 ? `\n\nWe accept: ${enabled.map(({ label }) => label).join(", ")}.` : "";
-    const email = `Hi ${name},\n\nThank you for your interest in ${company}!\n\nBased on your property details, we've prepared a cleaning quote for $${price.toFixed(0)}.${pmLine}\n\nPlease let us know if you'd like to proceed or have any questions.\n\nBest regards,\n${businessProfile?.senderName || company}`;
+    const reviewLine = getReviewAppendLine();
+    const email = `Hi ${name},\n\nThank you for your interest in ${company}!\n\nBased on your property details, we've prepared a cleaning quote for $${price.toFixed(0)}.${pmLine}\n\nPlease let us know if you'd like to proceed or have any questions.${reviewLine}\n\nBest regards,\n${businessProfile?.senderName || company}`;
     await Clipboard.setStringAsync(email);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+    if (reviewLine) trackEvent("review_link_included_in_quote", { quote_id: route.params.quoteId });
   };
 
   const handleSendNativeSms = async () => {
@@ -461,6 +481,11 @@ export default function QuoteDetailScreen() {
     const company = businessProfile?.companyName || "us";
     const price = quote.total || 0;
     let sms = `Hi ${name}! This is ${company}. Your cleaning quote is ready: $${price.toFixed(0)}. Reply YES to book or let us know if you have questions!`;
+    const reviewLine = getReviewAppendLine();
+    if (reviewLine) {
+      sms += reviewLine;
+      trackEvent("review_link_included_in_quote", { quote_id: route.params.quoteId });
+    }
     if (businessProfile?.smsSignature) {
       sms += `\n\n${businessProfile.smsSignature}`;
     }
@@ -481,6 +506,63 @@ export default function QuoteDetailScreen() {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+    }
+  };
+
+  const handleSendReviewRequest = async () => {
+    if (!quote || !growthSettings?.googleReviewLink?.trim()) return;
+    const phone = quote.propertyDetails?.customerPhone;
+    const name = quote.propertyDetails?.customerName || "there";
+    const company = businessProfile?.companyName || "us";
+    const reviewLink = growthSettings.googleReviewLink.trim();
+    const line = REVIEW_REQUEST_LINES[communicationLanguage] || REVIEW_REQUEST_LINES.en;
+    const msg = `Hi ${name}! Thank you for choosing ${company}. ${line} ${reviewLink}`;
+
+    setReviewRequestSending(true);
+    try {
+      const isAvailable = await SMS.isAvailableAsync();
+      if (isAvailable && phone) {
+        await SMS.sendSMSAsync([phone], msg);
+        trackEvent("review_request_sent", { channel: "sms", language: communicationLanguage });
+      } else {
+        await Clipboard.setStringAsync(msg);
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        trackEvent("review_request_copy_tapped", {});
+        setSendSuccess("Review request copied!");
+        setTimeout(() => setSendSuccess(null), 3000);
+      }
+    } catch {
+      await Clipboard.setStringAsync(msg);
+      trackEvent("review_request_copy_tapped", {});
+    }
+    setReviewRequestSending(false);
+  };
+
+  const handleSendReferralOffer = async () => {
+    if (!quote) return;
+    const phone = quote.propertyDetails?.customerPhone;
+    const name = quote.propertyDetails?.customerName || "there";
+    const amount = growthSettings?.referralOfferAmount || 25;
+    const bookingLink = growthSettings?.referralBookingLink?.trim() || businessProfile?.bookingLink || "";
+    const msg = `Hi ${name}! If you have a friend who needs a cleaner, we'll give you $${amount} off your next cleaning.${bookingLink ? ` Here's our booking link: ${bookingLink}` : ""}`;
+
+    try {
+      const isAvailable = await SMS.isAvailableAsync();
+      if (isAvailable && phone) {
+        await SMS.sendSMSAsync([phone], msg);
+        trackEvent("referral_offer_sent", { channel: "sms" });
+      } else {
+        await Clipboard.setStringAsync(msg);
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        setSendSuccess("Referral offer copied!");
+        setTimeout(() => setSendSuccess(null), 3000);
+      }
+    } catch {
+      await Clipboard.setStringAsync(msg);
     }
   };
 
@@ -1290,6 +1372,34 @@ export default function QuoteDetailScreen() {
             </Pressable>
           ))}
         </View>
+
+        {growthSettings?.googleReviewLink?.trim() && (status === "accepted" || status === "sent") ? (
+          <>
+            <SectionHeader title="Review & Referral" />
+            <View style={{ flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.md }}>
+              <Pressable
+                onPress={handleSendReviewRequest}
+                style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary, flex: 1, paddingVertical: Spacing.md }]}
+                testID="send-review-request-btn"
+              >
+                {reviewRequestSending ? (
+                  <ActivityIndicator size="small" color={theme.warning} />
+                ) : (
+                  <Feather name="star" size={20} color={theme.warning} />
+                )}
+                <ThemedText type="small" style={{ marginTop: 4, textAlign: "center" }}>Send Review Request</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={handleSendReferralOffer}
+                style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary, flex: 1, paddingVertical: Spacing.md }]}
+                testID="send-referral-offer-btn"
+              >
+                <Feather name="gift" size={20} color={theme.primary} />
+                <ThemedText type="small" style={{ marginTop: 4, textAlign: "center" }}>Send Referral Offer</ThemedText>
+              </Pressable>
+            </View>
+          </>
+        ) : null}
 
         <SectionHeader title="Activity Timeline" />
 
