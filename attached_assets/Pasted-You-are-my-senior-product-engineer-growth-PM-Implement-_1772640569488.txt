@@ -1,0 +1,241 @@
+You are my senior product engineer + growth PM. Implement ALL of the following stickiness features in QuotePro AI end-to-end with production-ready code. Do not mock. Do not provide only high-level advice. Ship it.
+
+PRIMARY GOAL
+Increase daily active use, retention, and paid conversions by making QuotePro AI a daily workflow tool for cleaning business owners (quoting + follow-up + margin protection + reviews).
+
+CONSTRAINTS
+- Do NOT break existing quoting flows.
+- Must work on iPhone + iPad.
+- Keep UI clean and fast (minimal taps).
+- Use existing design system/components already in the app.
+- Use existing backend/storage patterns (Firebase/SQLite/local store/etc.)—do not create a parallel system unless absolutely necessary.
+- Use existing analytics stack already wired to production.
+- If a dependency/library is needed, choose the simplest widely-used option and add it safely.
+
+FEATURES TO IMPLEMENT (ALL)
+
+========================================================
+1) FOLLOW-UP AUTOPILOT (Follow-Up Queue + One-Tap Send)
+========================================================
+A) Data Model
+- Ensure there is a Lead/Customer entity (or Quote entity) with:
+  - customer_name
+  - phone/email (at least one contact method)
+  - last_contacted_at
+  - quote_total
+  - quote_created_at
+  - status: new / quoted / won / lost
+  - next_followup_at (computed)
+  - followup_count
+  - notes (string)
+  - tags (list)
+
+If the app already has these fields, extend the existing model rather than creating a new one.
+
+B) Follow-Up Rules
+- Default follow-up cadence after quote is sent:
+  - +1 day: “Just checking in…”
+  - +3 days: “Any questions / want to get you booked?”
+  - +7 days: “Last call / spots filling”
+- Allow user to edit cadence in Settings.
+
+C) Follow-Up Queue Screen
+- Add a “Follow-Up” tab (or dashboard card) that shows:
+  - Due Today
+  - Upcoming
+  - Overdue
+Each row shows:
+  - customer name
+  - status
+  - quote total
+  - “last contacted X days ago”
+  - CTA: “Send Follow-Up”
+- One tap “Send Follow-Up” opens a message composer with:
+  - pre-filled message (template)
+  - channel selector: SMS / WhatsApp / Email (based on available contact info)
+- When sent, update last_contacted_at, followup_count, compute next_followup_at.
+
+D) Follow-Up Streak
+- Show a small streak counter:
+  - “Follow-up streak: X days”
+- Increment streak when user sends at least 1 follow-up in a day.
+- Store streak history locally.
+
+========================================================
+2) QUOTE TEMPLATES BY PROPERTY TYPE
+========================================================
+A) Template Types
+- Residential: Standard Maintenance / Deep Clean / Move In-Out / Airbnb Turnover
+- Commercial: Office / Retail / Medical (if commercial exists)
+
+B) Save/Load Templates
+- Allow user to create a template from any completed quote:
+  - “Save as Template”
+- Template should store:
+  - service type
+  - pricing settings used
+  - typical time estimate if tracked
+  - add-ons selected
+  - language preference (optional)
+- On “New Quote”, allow:
+  - “Start from Template”
+- Make it fast: max 2 taps from New Quote -> Template -> Generate.
+
+========================================================
+3) PRICING AUDIT ALERT (MARGIN/HOURLY PROTECTION)
+========================================================
+A) Settings
+Add “Pricing Guardrails” in Settings:
+- Target $/hr (default $60)
+- Target margin % (optional)
+- Minimum job price (default $179)
+- Typical travel buffer (minutes) optional
+- Toggle: “Show pricing audit warnings” default ON
+
+B) Audit Logic
+On quote results screen, compute:
+- estimated hours (if app collects time estimate; if not, infer based on sqft/beds/baths using a simple baseline table and allow user override)
+- implied $/hr = quote_total / estimated_hours
+If implied $/hr < target:
+- show warning banner:
+  “⚠️ This quote puts you at ~$42/hr (target $60/hr).”
+Provide 1-tap fixes:
+- “Raise to Minimum” (sets to min price if below)
+- “Add common upsell bundle (+$X)”
+- “Adjust time estimate” (opens quick edit)
+Also flag if quote_total < minimum job price:
+- “⚠️ Below your minimum job price ($179).”
+
+========================================================
+4) AUTO UPSELL BUNDLES (REVENUE BOOST)
+========================================================
+A) Default Bundles
+Create default upsell bundles that user can customize:
+- Kitchen Boost: Oven + Fridge + Microwave
+- Detail Boost: Baseboards + Blinds + Fans
+- Pet Hair Boost: Pet hair + Extra vacuum time
+Each bundle has a price and line items.
+
+B) In Quote Flow
+On quote results screen:
+- Show “Recommended Add-ons” area:
+  - “Most customers add: Kitchen Boost (+$85)”
+  - “Add Bundle” button
+- If user toggles “auto-include recommended upsells” in Settings, include bundles by default but allow removal.
+
+========================================================
+5) REVIEW + REFERRAL ENGINE (POST-SERVICE LOOP)
+========================================================
+A) Google Review Link (Per Business)
+Add Settings -> “Reviews”
+- Field: Google Review Link (URL)
+- Toggles:
+  - Include review link on quote PDF (default OFF)
+  - Include review link in quote messages (default OFF)
+  - Ask for review after job marked complete (default ON if job lifecycle exists; otherwise implement a “Mark Complete” action on a quote)
+Validation:
+- full URL required; show helper text if invalid.
+
+B) Review Request Sending
+- Add “Send Review Request” action available on:
+  - Quote detail screen
+  - Job/Completed screen (if exists)
+It sends a short message with the review link.
+Make this message available in EN/ES/PT/RU via a deterministic translation map (do not rely on AI for this one line).
+
+C) Referral Offer (Optional but recommended)
+After sending review request, show:
+- “Send Referral Offer”
+Default message:
+  “If you have a friend who needs a cleaner, we’ll give you $25 off your next cleaning. Here’s our booking link: {your link}”
+Allow user to configure referral offer amount and booking link in Settings.
+
+D) Quote PDF / Message Inclusion
+If enabled, append to quote PDF:
+- “Review Us” + clickable link (and QR code only if easy and safe to add).
+If enabled, append to outgoing quote message:
+- “After your service, would you mind leaving a quick review? {ReviewLink}”
+
+========================================================
+6) LIGHTWEIGHT CRM: NOTES + TAGS
+========================================================
+A) Notes & Tags UI
+- On lead/customer/quote detail:
+  - Notes field
+  - Tags (multi-select + create new)
+Default tags:
+- Price sensitive
+- Has dog
+- Weekly prospect
+- Airbnb
+- Move-out
+
+B) Search/Filter
+- In Follow-Up Queue and Customer List:
+  - search by name/phone
+  - filter by tag
+
+========================================================
+7) “TODAY’S MONEY” HOME WIDGET / DASH CARD
+========================================================
+If iOS home widgets are already implemented in the app:
+- Add a “Today’s Money” widget showing:
+  - Quotes sent today (count)
+  - Total quoted today (sum)
+  - Follow-ups due today (count)
+If iOS widgets are NOT currently implemented:
+- Add a dashboard card called “Today’s Money” with the same metrics (must ship this even if widget is skipped).
+
+========================================================
+8) ANALYTICS (REQUIRED)
+Instrument events with properties:
+
+- followup_queue_viewed
+- followup_sent (channel, template_step, quote_id, language)
+- followup_streak_updated (streak_days)
+- template_created (template_type)
+- template_used (template_id)
+- pricing_audit_warning_shown (type: below_target_hourly / below_min_price)
+- pricing_audit_fix_applied (fix_type, delta_amount)
+- upsell_bundle_added (bundle_id, amount)
+- upsell_bundle_removed (bundle_id)
+- review_link_saved
+- review_request_sent (channel, language)
+- referral_offer_sent (channel)
+- notes_updated
+- tag_added / tag_removed
+- todays_money_card_viewed
+
+Make analytics resilient (no crashes if analytics unavailable).
+
+========================================================
+UI/UX REQUIREMENTS
+========================================================
+- Everything must be accessible within 1–2 taps from the dashboard.
+- Make “Follow-Up” and “New Quote” the primary actions.
+- Keep copy simple and “blue collar entrepreneur friendly.”
+- Do not use aggressive sales language.
+- Ensure iPad layout is centered/readable.
+
+========================================================
+QA CHECKLIST (MUST COMPLETE BEFORE FINISHING)
+========================================================
+- Create quote -> pricing audit shows correctly
+- Add upsell bundle -> total updates and saves
+- Save quote as template -> start new quote from template works
+- Follow-Up Queue shows due items and sends message updates timestamps
+- Streak increments correctly once per day
+- Add Google review link -> included in PDF/message only when enabled
+- “Send Review Request” works and uses correct language line
+- Notes/tags persist and filter works
+- Today’s Money card updates correctly
+- All screens work on iPhone + iPad and in dark mode
+
+========================================================
+OUTPUT REQUIREMENTS
+========================================================
+- Implement the changes (not pseudocode).
+- List every file changed and why.
+- Provide a short “How to test” checklist.
+- Do not leave TODOs.
+- Choose the simplest architecture that ships today.

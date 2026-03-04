@@ -1,0 +1,65 @@
+You are my senior mobile engineer. Implement a feature in QuotePro AI that allows each business user to add their Google Review link to quotes and outgoing messages.
+
+GOAL
+- Make it effortless for cleaners to request reviews after a job.
+- Let the app include the user’s Google Review link automatically in:
+  1) Quote PDF/summary
+  2) Customer follow-up message templates (SMS/WhatsApp/email text)
+  3) Optional “After job” message (if that flow exists)
+
+SCOPE
+A) SETTINGS: Store Google Review Link per business
+- Add a Settings section called “Reviews”
+- Fields:
+  - Google Review Link (required to enable review features)
+  - Toggle: “Include review link on quote PDF” (default OFF)
+  - Toggle: “Include review link in quote follow-up messages” (default OFF)
+  - Toggle: “Ask for a review after job is marked complete” (default ON if job/status exists; otherwise hide)
+- Validation:
+  - Accept full URLs only.
+  - If the link is missing or invalid, toggles should be disabled and show helper text: “Add your Google review link to enable.”
+- Persist this setting to the user’s existing profile/business settings store (do not create a new parallel store).
+
+B) QUOTE OUTPUT: Add “Review Us” section when enabled
+- When user generates or shares a quote, if “Include review link on quote” is ON:
+  - Add a small section near the bottom of the quote summary/PDF:
+    Title: “Review Us”
+    Body: “If you loved our service, please leave a quick review:”
+    Then the clickable link (and optionally a QR code if QR generation library already exists; if not, skip QR code for now).
+- Keep it visually clean and not spammy.
+
+C) MESSAGE GENERATION: Add link when enabled
+- Wherever the app generates or sends the quote message to the customer, if “Include review link in messages” is ON:
+  - Append a short line at the end:
+    “After your service, would you mind leaving a quick review? {GoogleReviewLink}”
+- Ensure it respects language settings:
+  - If the app is generating messages in Spanish/Portuguese/Russian/etc., translate the review request line accordingly.
+  - Store translations for this one line in a simple map (EN/ES/PT/RU) so it’s deterministic and not reliant on AI.
+
+D) OPTIONAL: “POST-SERVICE REVIEW REQUEST” (if jobs/status exist)
+- If there is a job lifecycle (scheduled/completed):
+  - After marking a job complete, show a one-tap button:
+    “Send Review Request”
+  - This sends the customer a short message with the review link.
+- If job lifecycle doesn’t exist, add a lightweight “Completed” toggle on a quote/customer record to trigger the same.
+
+E) ANALYTICS
+Add events:
+- review_link_saved (has_link: true)
+- review_link_toggle_changed (surface: pdf/messages/post_service, enabled: true/false)
+- review_link_included_in_quote (quote_id)
+- review_request_sent (channel, language)
+- review_request_copy_tapped
+
+QA CHECKLIST
+- User can paste review link and it persists across sessions
+- Quote PDF shows “Review Us” section only when enabled
+- Messages append review request line only when enabled
+- Translations render correctly for EN/ES/PT/RU
+- Works on iPhone + iPad layouts
+- No crashes if link is missing
+
+OUTPUT REQUIREMENTS
+- Implement the code changes (not pseudocode)
+- List files changed and why
+- Provide how-to-test steps
