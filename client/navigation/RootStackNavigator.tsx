@@ -24,6 +24,7 @@ import QuotePreferencesScreen from "@/screens/QuotePreferencesScreen";
 import HelpGuideScreen from "@/screens/HelpGuideScreen";
 import AvatarBuilderScreen from "@/screens/AvatarBuilderScreen";
 import CommercialQuoteCalculatorScreen from "@/screens/CommercialQuoteCalculatorScreen";
+import ProSetupChecklistScreen from "@/screens/ProSetupChecklistScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -57,6 +58,7 @@ export type RootStackParamList = {
   QuotePreferences: undefined;
   HelpGuide: undefined;
   AvatarBuilder: undefined;
+  ProSetupChecklist: undefined;
   CommercialQuote: { customerName?: string; customerAddress?: string } | undefined;
 };
 
@@ -286,6 +288,14 @@ export default function RootStackNavigator() {
             component={AvatarBuilderScreen}
             options={{
               headerTitle: "Profile Avatar",
+            }}
+          />
+          <Stack.Screen
+            name="ProSetupChecklist"
+            component={ProSetupChecklistScreen}
+            options={{
+              headerShown: false,
+              animation: "slide_from_bottom",
             }}
           />
         </>

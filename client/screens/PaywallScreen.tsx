@@ -78,7 +78,12 @@ export default function PaywallScreen() {
     const wasSuccess = modal.type === "success";
     setModal((m) => ({ ...m, visible: false }));
     if (wasSuccess) {
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
+      setTimeout(() => {
+        navigation.navigate("ProSetupChecklist" as any);
+      }, 400);
     }
   };
 

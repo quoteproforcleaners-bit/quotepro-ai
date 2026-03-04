@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +29,7 @@ import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, Elevation } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 import OnboardingBanner from "@/components/OnboardingBanner";
@@ -221,12 +222,37 @@ export default function DashboardScreen() {
   const { businessProfile: profile } = useApp();
   const { t } = useLanguage();
   const { isPro, requirePro } = useProGate();
+  const { subscriptionStatus, trialDaysLeft } = useSubscription();
   const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [setupSkipped, setSetupSkipped] = useState(false);
+  const [setupCompleted, setSetupCompleted] = useState(false);
+  const [setupLoaded, setSetupLoaded] = useState(false);
   const [widgetOrder, setWidgetOrder] = useState<WidgetId[]>(DEFAULT_WIDGET_ORDER);
   const [hiddenWidgets, setHiddenWidgets] = useState<Set<WidgetId>>(new Set());
   const [isEditingWidgets, setIsEditingWidgets] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        try {
+          const skipped = await AsyncStorage.getItem("@quotepro_setup_skipped");
+          const checklistData = await AsyncStorage.getItem("@quotepro_setup_checklist");
+          setSetupSkipped(skipped === "true");
+          if (checklistData) {
+            const items = JSON.parse(checklistData);
+            setSetupCompleted(items.length >= 8);
+          }
+          setSetupLoaded(true);
+        } catch {
+          setSetupLoaded(true);
+        }
+      })();
+    }, [])
+  );
+
+  const showSetupCard = setupLoaded && isPro && !setupCompleted && !setupSkipped;
 
   useEffect(() => {
     trackEvent("app_open");
@@ -713,6 +739,31 @@ export default function DashboardScreen() {
         </View>
 
         <OnboardingBanner />
+
+        {showSetupCard ? (
+          <Pressable
+            onPress={() => navigation.navigate("ProSetupChecklist" as any)}
+            style={[s.card, { backgroundColor: st.cardBg, borderColor: st.primary + "30", borderWidth: 1 }, Elevation.e1]}
+            testID="button-pro-setup"
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: st.primarySoft, alignItems: "center", justifyContent: "center" }}>
+                <Feather name="clipboard" size={20} color={st.primary} />
+              </View>
+              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                <ThemedText type="subtitle" style={{ fontWeight: "700" }}>
+                  Complete Your Pro Setup
+                </ThemedText>
+                <ThemedText type="small" style={{ color: st.textSecondary, marginTop: 2 }}>
+                  {subscriptionStatus === "trial" && trialDaysLeft != null
+                    ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} left in trial — get set up now`
+                    : "Follow our guided setup to start quoting like a pro"}
+                </ThemedText>
+              </View>
+              <Feather name="chevron-right" size={20} color={st.primary} />
+            </View>
+          </Pressable>
+        ) : null}
 
         {isEditingWidgets ? (
           <View style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}>
