@@ -1451,7 +1451,7 @@ export default function SettingsScreen() {
       <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
         <View style={styles.prefRow}>
           <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>Enable Commercial Quoting (Beta)</ThemedText>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Enable Commercial Quoting</ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
               Create quotes for commercial facilities with labor estimates, tiered pricing, and proposals
             </ThemedText>

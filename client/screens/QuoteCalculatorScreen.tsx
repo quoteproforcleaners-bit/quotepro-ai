@@ -472,11 +472,6 @@ export default function QuoteCalculatorScreen() {
               <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
                 Full walkthrough with labor estimates, tiered pricing, and professional proposals
               </ThemedText>
-              <View style={[styles.betaBadge, { backgroundColor: `${theme.primary}15`, marginTop: Spacing.sm }]}>
-                <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
-                  BETA
-                </ThemedText>
-              </View>
             </>
           )}
         </View>
