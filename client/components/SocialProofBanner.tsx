@@ -62,12 +62,12 @@ export default function SocialProofBanner() {
         <Feather name="x" size={16} color={theme.textMuted} />
       </Pressable>
 
-      <ThemedText type="subtitle" style={{ fontWeight: "600" }}>
-        Used by cleaning businesses across the United States
+      <ThemedText type="body" style={{ fontWeight: "600" }}>
+        Enjoying QuotePro?
       </ThemedText>
 
       <ThemedText type="small" style={[styles.subtext, { color: theme.textSecondary }]}>
-        Join the early adopters building faster quoting + better margins.
+        Share it with a fellow cleaner and help them quote smarter.
       </ThemedText>
 
       <Pressable
@@ -86,9 +86,10 @@ export default function SocialProofBanner() {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.sm,
+    paddingRight: Spacing.lg,
     marginBottom: Spacing.md,
     position: "relative",
   },

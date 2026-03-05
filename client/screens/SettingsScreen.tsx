@@ -1683,7 +1683,7 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Pressable
-        onPress={() => Linking.openURL("mailto:support@quotepro.app")}
+        onPress={() => Linking.openURL("mailto:quoteproforcleaners@gmail.com")}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-contact-support"
       >
@@ -1696,7 +1696,7 @@ export default function SettingsScreen() {
               Contact Support
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              support@quotepro.app
+              quoteproforcleaners@gmail.com
             </ThemedText>
           </View>
           <Feather name="external-link" size={18} color={theme.textSecondary} />

@@ -3096,27 +3096,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
         ? `Business stats: ${businessHistory.totalQuotes || 0} quotes sent, ${businessHistory.acceptRate || 0}% acceptance rate, avg quote $${businessHistory.avgQuote || 0}, hourly rate $${ps?.hourlyRate || 55}. ${businessHistory.recentAccepted ? `Recent accepted quotes ranged $${businessHistory.recentAcceptedMin}-$${businessHistory.recentAcceptedMax}.` : ""}`
         : `Hourly rate: $${ps?.hourlyRate || 55}. No historical data available.`;
 
-      const systemPrompt = `You are a pricing strategist for residential cleaning businesses. Analyze a property and suggest optimal pricing for Good/Better/Best tiers.
-
-Rules:
-- Consider property size, condition, complexity (pets, people), add-ons, and frequency
-- Account for market positioning: not too cheap (undervalues work), not too high (loses bids)
-- Provide a suggested price for each tier with brief reasoning
-- Include a confidence level (low/medium/high) based on data available
-- If the current price seems appropriate, say so. Only suggest changes when there's a real opportunity
-- Identify if the user is underpricing or overpricing
-- Round suggestions to nearest $5
-- Be specific and actionable, not generic
-
-Respond with JSON:
-{
-  "good": {"suggestedPrice": number, "reasoning": string},
-  "better": {"suggestedPrice": number, "reasoning": string},
-  "best": {"suggestedPrice": number, "reasoning": string},
-  "overallAssessment": string,
-  "confidence": "low" | "medium" | "high",
-  "keyInsight": string
-}`;
+      const systemPrompt = `You are a pricing strategist for residential cleaning. Suggest optimal Good/Better/Best prices. Be concise. Round to nearest $5. Respond with JSON: {"good":{"suggestedPrice":number,"reasoning":"1 sentence"},"better":{"suggestedPrice":number,"reasoning":"1 sentence"},"best":{"suggestedPrice":number,"reasoning":"1 sentence"},"overallAssessment":"1-2 sentences","confidence":"low"|"medium"|"high","keyInsight":"1 sentence"}`;
 
       const userPrompt = `Property: ${propertyDesc}
 Frequency: ${frequency || "one-time"}
@@ -3136,6 +3116,7 @@ ${historyContext}`;
           { role: "user", content: userPrompt },
         ],
         response_format: { type: "json_object" },
+        max_completion_tokens: 300,
       });
 
       const content = completion.choices[0]?.message?.content;
