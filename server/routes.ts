@@ -6039,16 +6039,21 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
       const keyPrefix = rawKey.slice(-8);
       const label = req.body.label || "API Key";
 
+      const user = await getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "User not found" });
+      const business = await getBusinessByOwner(user.id);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+
       const apiKey = await createApiKey({
         userId: req.session.userId!,
-        businessId: req.businessId,
+        businessId: business.id,
         keyHash,
         keyPrefix,
         label,
         isActive: true,
       });
 
-      res.json({ success: true, apiKey: { ...apiKey, rawKey } });
+      res.json({ success: true, rawKey, apiKey });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
