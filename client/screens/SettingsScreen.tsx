@@ -1683,28 +1683,7 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Pressable
-        onPress={() => WebBrowser.openBrowserAsync("https://getquotepro.ai/community")}
-        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
-        testID="button-join-community"
-      >
-        <View style={styles.settingsLinkContent}>
-          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
-            <Feather name="message-circle" size={20} color={theme.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Join the QuotePro Community
-            </ThemedText>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              Connect with other cleaning business owners
-            </ThemedText>
-          </View>
-          <Feather name="external-link" size={18} color={theme.textSecondary} />
-        </View>
-      </Pressable>
-
-      <Pressable
-        onPress={() => WebBrowser.openBrowserAsync("https://quotepro.app/affiliates")}
+        onPress={() => WebBrowser.openBrowserAsync("https://getquotepro.ai/affiliate-kit")}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-affiliate-program"
       >
