@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
+import crypto from "node:crypto";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
@@ -6033,7 +6034,6 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
 
   app.post("/api/api-keys", requireAuth, async (req: any, res) => {
     try {
-      const crypto = await import("node:crypto");
       const rawKey = `qp_${crypto.randomBytes(32).toString("hex")}`;
       const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
       const keyPrefix = rawKey.slice(-8);
@@ -6131,7 +6131,6 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
       const ep = endpoints.find((e: any) => e.id === req.params.id);
       if (!ep) return res.status(404).json({ error: "Not found" });
 
-      const crypto = await import("node:crypto");
       const testPayload = {
         event_type: "test",
         event_id: crypto.randomUUID(),
@@ -6244,7 +6243,6 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
 
 async function dispatchWebhook(businessId: string, userId: string, eventType: string, data: any) {
   try {
-    const crypto = await import("node:crypto");
     const endpoints = await getActiveWebhookEndpointsForBusiness(businessId);
     if (endpoints.length === 0) return;
 

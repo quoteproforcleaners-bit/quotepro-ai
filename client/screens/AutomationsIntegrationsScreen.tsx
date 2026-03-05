@@ -9,6 +9,7 @@ import {
   Switch,
   ActivityIndicator,
   useWindowDimensions,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -61,6 +62,44 @@ interface WebhookEventItem {
   }[];
 }
 
+interface QuickConnectService {
+  id: string;
+  name: string;
+  icon: "zap" | "cpu" | "globe";
+  description: string;
+  setupSteps: string[];
+  urlPlaceholder: string;
+}
+
+const QUICK_CONNECT_SERVICES: QuickConnectService[] = [
+  {
+    id: "zapier",
+    name: "Zapier",
+    icon: "zap",
+    description: "Automatically send quote info to your other apps when things happen — like getting a new quote accepted.",
+    setupSteps: [
+      "Go to zapier.com and create a free account",
+      "Create a new Zap and choose 'Webhooks by Zapier' as the trigger",
+      "Select 'Catch Hook' and copy the webhook URL",
+      "Paste the URL below and tap Connect",
+    ],
+    urlPlaceholder: "https://hooks.zapier.com/hooks/catch/...",
+  },
+  {
+    id: "make",
+    name: "Make (Integromat)",
+    icon: "globe",
+    description: "Connect QuotePro to hundreds of apps. Great for sending data to your CRM or accounting software.",
+    setupSteps: [
+      "Go to make.com and create a free account",
+      "Create a new Scenario and add a 'Webhooks' module",
+      "Select 'Custom webhook' and copy the URL",
+      "Paste the URL below and tap Connect",
+    ],
+    urlPlaceholder: "https://hook.us1.make.com/...",
+  },
+];
+
 export default function AutomationsIntegrationsScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -84,6 +123,12 @@ export default function AutomationsIntegrationsScreen() {
   const [selectedEvent, setSelectedEvent] = useState<WebhookEventItem | null>(null);
   const [testingEndpointId, setTestingEndpointId] = useState<string | null>(null);
 
+  const [showQuickConnect, setShowQuickConnect] = useState<string | null>(null);
+  const [quickConnectUrl, setQuickConnectUrl] = useState("");
+  const [quickConnecting, setQuickConnecting] = useState(false);
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const { data: apiKeys = [], refetch: refetchKeys } = useQuery<ApiKeyItem[]>({
     queryKey: ["/api/api-keys"],
   });
@@ -104,10 +149,10 @@ export default function AutomationsIntegrationsScreen() {
       setNewKeyRaw(data.rawKey);
       setShowNewKeyModal(true);
       refetchKeys();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       console.warn("Failed to generate API key:", e);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setGeneratingKey(false);
     }
@@ -117,7 +162,7 @@ export default function AutomationsIntegrationsScreen() {
     try {
       await apiRequest("DELETE", `/api/api-keys/${id}`);
       refetchKeys();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       console.warn("Failed to deactivate key:", e);
     }
@@ -126,65 +171,43 @@ export default function AutomationsIntegrationsScreen() {
   const handleCopyKey = useCallback(async () => {
     if (newKeyRaw) {
       await Clipboard.setStringAsync(newKeyRaw);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   }, [newKeyRaw]);
 
   const validateWebhookUrl = (url: string) => {
-    try {
-      const parsed = new URL(url.trim());
-      if (parsed.protocol === "http:") {
-        setWebhookUrlWarning(t.automations.httpWarning);
-        return true;
-      }
-      if (parsed.protocol === "https:") {
-        setWebhookUrlWarning(null);
-        return true;
-      }
-      return false;
-    } catch {
-      return false;
+    if (url.startsWith("http://")) {
+      setWebhookUrlWarning(t.automations.httpWarning);
+    } else {
+      setWebhookUrlWarning(null);
     }
   };
 
   const handleAddWebhook = useCallback(async () => {
-    const trimmed = webhookUrlInput.trim();
-    if (!validateWebhookUrl(trimmed)) return;
+    if (!webhookUrlInput.trim()) return;
     setAddingWebhook(true);
     try {
       await apiRequest("POST", "/api/webhook-endpoints", {
-        url: trimmed,
+        url: webhookUrlInput.trim(),
         enabledEvents: webhookEvents,
       });
-      refetchEndpoints();
       setShowAddWebhookModal(false);
       setWebhookUrlInput("");
       setWebhookEvents([...WEBHOOK_EVENT_TYPES]);
       setWebhookUrlWarning(null);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      refetchEndpoints();
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       console.warn("Failed to add webhook:", e);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setAddingWebhook(false);
     }
-  }, [webhookUrlInput, webhookEvents, refetchEndpoints]);
-
-  const handleDeleteEndpoint = useCallback(async (id: string) => {
-    try {
-      await apiRequest("DELETE", `/api/webhook-endpoints/${id}`);
-      refetchEndpoints();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
-      console.warn("Failed to delete endpoint:", e);
-    }
-  }, [refetchEndpoints]);
+  }, [webhookUrlInput, webhookEvents, refetchEndpoints, t]);
 
   const handleToggleEndpoint = useCallback(async (id: string, isActive: boolean) => {
     try {
-      await apiRequest("PUT", `/api/webhook-endpoints/${id}`, { isActive: !isActive });
+      await apiRequest("PATCH", `/api/webhook-endpoints/${id}`, { isActive: !isActive });
       refetchEndpoints();
-      Haptics.selectionAsync();
     } catch (e) {
       console.warn("Failed to toggle endpoint:", e);
     }
@@ -195,30 +218,70 @@ export default function AutomationsIntegrationsScreen() {
     try {
       await apiRequest("POST", `/api/webhook-endpoints/${id}/test`);
       refetchEvents();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       console.warn("Failed to test endpoint:", e);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setTestingEndpointId(null);
     }
   }, [refetchEvents]);
 
-  const handleViewEventDetail = useCallback(async (event: WebhookEventItem) => {
+  const handleDeleteEndpoint = useCallback(async (id: string) => {
     try {
-      const res = await apiRequest("GET", `/api/webhook-events/${event.id}`);
-      const data = await res.json();
-      setSelectedEvent(data);
-      setShowEventDetailModal(true);
-    } catch {
-      setSelectedEvent(event);
-      setShowEventDetailModal(true);
+      await apiRequest("DELETE", `/api/webhook-endpoints/${id}`);
+      refetchEndpoints();
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.warn("Failed to delete endpoint:", e);
     }
-  }, []);
+  }, [refetchEndpoints]);
 
-  const getDeliveryStatus = (event: WebhookEventItem) => {
-    if (!event.deliveries || event.deliveries.length === 0) return "pending";
-    const latest = event.deliveries[0];
+  const handleViewEventDetail = (ev: WebhookEventItem) => {
+    setSelectedEvent(ev);
+    setShowEventDetailModal(true);
+  };
+
+  const handleQuickConnect = useCallback(async (service: QuickConnectService) => {
+    const url = quickConnectUrl.trim();
+    if (!url) return;
+    if (!url.startsWith("https://") && !url.startsWith("http://")) return;
+    setQuickConnecting(true);
+    try {
+      const hasKey = apiKeys.some((k) => k.isActive);
+      if (!hasKey) {
+        await apiRequest("POST", "/api/api-keys", { label: `${service.name} Connection` });
+        await refetchKeys();
+      }
+
+      await apiRequest("POST", "/api/webhook-endpoints", {
+        url,
+        enabledEvents: [...WEBHOOK_EVENT_TYPES],
+      });
+      refetchEndpoints();
+      setShowQuickConnect(null);
+      setQuickConnectUrl("");
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.warn("Failed to quick connect:", e);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setQuickConnecting(false);
+    }
+  }, [quickConnectUrl, apiKeys, refetchKeys, refetchEndpoints]);
+
+  const formatDate = (d: string) => {
+    const date = new Date(d);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (diffMs < 60_000) return t.automations.justNow;
+    if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`;
+    if (diffMs < 86_400_000) return `${Math.floor(diffMs / 3_600_000)}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getDeliveryStatus = (ev: WebhookEventItem) => {
+    if (!ev.deliveries || ev.deliveries.length === 0) return "pending";
+    const latest = ev.deliveries[ev.deliveries.length - 1];
     if (latest.deliveredAt && latest.statusCode && latest.statusCode >= 200 && latest.statusCode < 300) return "delivered";
     if (latest.nextRetryAt) return "retrying";
     return "failed";
@@ -242,18 +305,16 @@ export default function AutomationsIntegrationsScreen() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return t.automations.justNow;
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d ago`;
+  const isServiceConnected = (serviceId: string) => {
+    return endpoints.some((ep) => {
+      const url = ep.url.toLowerCase();
+      if (serviceId === "zapier") return url.includes("zapier.com") || url.includes("hooks.zapier");
+      if (serviceId === "make") return url.includes("make.com") || url.includes("integromat");
+      return false;
+    });
   };
+
+  const activeConnections = endpoints.filter((ep) => ep.isActive).length;
 
   return (
     <ScrollView
@@ -269,201 +330,401 @@ export default function AutomationsIntegrationsScreen() {
       scrollIndicatorInsets={{ bottom: insets.bottom }}
       keyboardShouldPersistTaps="handled"
     >
-      <SectionHeader
-        title={t.automations.apiKeysTitle}
-        rightAction={
-          <Pressable
-            onPress={handleGenerateKey}
-            style={[styles.headerAction, { backgroundColor: `${theme.primary}15` }]}
-            testID="button-generate-api-key"
-          >
-            {generatingKey ? (
-              <ActivityIndicator size="small" color={theme.primary} />
-            ) : (
-              <>
-                <Feather name="plus" size={14} color={theme.primary} />
-                <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600", marginLeft: 4 }}>
-                  {t.automations.generateKey}
-                </ThemedText>
-              </>
-            )}
-          </Pressable>
-        }
-      />
-
-      {apiKeys.length > 0 ? (
-        <View style={[styles.listCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          {apiKeys.map((key, idx) => (
-            <View
-              key={key.id}
-              style={[
-                styles.listRow,
-                idx < apiKeys.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border } : undefined,
-              ]}
-            >
-              <View style={[styles.keyIcon, { backgroundColor: key.isActive ? `${theme.success}15` : `${theme.textSecondary}15` }]}>
-                <Feather name="key" size={16} color={key.isActive ? theme.success : theme.textSecondary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="body" style={{ fontWeight: "600", fontFamily: "monospace" }}>
-                  {"****" + key.keyPrefix}
-                </ThemedText>
-                <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                  {key.isActive ? t.automations.active : t.automations.inactive} {formatDate(key.createdAt)}
-                </ThemedText>
-              </View>
-              {key.isActive ? (
-                <Pressable
-                  onPress={() => handleDeactivateKey(key.id)}
-                  testID={`button-deactivate-key-${key.id}`}
-                >
-                  <ThemedText type="small" style={{ color: theme.error }}>
-                    {t.automations.revoke}
-                  </ThemedText>
-                </Pressable>
-              ) : null}
-            </View>
-          ))}
+      <View style={[styles.statusCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        <View style={[styles.statusIcon, { backgroundColor: activeConnections > 0 ? `${theme.success}15` : `${theme.textSecondary}15` }]}>
+          <Feather name={activeConnections > 0 ? "check-circle" : "link"} size={20} color={activeConnections > 0 ? theme.success : theme.textSecondary} />
         </View>
-      ) : (
-        <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          <Feather name="key" size={24} color={theme.textSecondary} />
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
-            {t.automations.noApiKeys}
+        <View style={{ flex: 1 }}>
+          <ThemedText type="body" style={{ fontWeight: "600" }}>
+            {activeConnections > 0 ? t.automations.connectionsActive.replace("{{count}}", String(activeConnections)) : t.automations.noConnectionsYet}
+          </ThemedText>
+          <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
+            {activeConnections > 0 ? t.automations.connectionsActiveDesc : t.automations.noConnectionsYetDesc}
           </ThemedText>
         </View>
-      )}
+      </View>
 
-      <SectionHeader
-        title={t.automations.webhookEndpointsTitle}
-        rightAction={
-          <Pressable
-            onPress={() => setShowAddWebhookModal(true)}
-            style={[styles.headerAction, { backgroundColor: `${theme.primary}15` }]}
-            testID="button-add-webhook"
-          >
-            <Feather name="plus" size={14} color={theme.primary} />
-            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600", marginLeft: 4 }}>
-              {t.automations.addEndpoint}
-            </ThemedText>
-          </Pressable>
-        }
-      />
+      <SectionHeader title={t.automations.quickConnectTitle} />
 
-      {endpoints.length > 0 ? (
-        <View style={[styles.listCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          {endpoints.map((ep, idx) => (
-            <View
-              key={ep.id}
-              style={[
-                styles.endpointRow,
-                idx < endpoints.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border } : undefined,
-              ]}
+      {QUICK_CONNECT_SERVICES.map((service) => {
+        const connected = isServiceConnected(service.id);
+        const isExpanded = showQuickConnect === service.id;
+
+        return (
+          <View key={service.id} style={[styles.serviceCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+            <Pressable
+              onPress={() => {
+                if (connected) return;
+                setShowQuickConnect(isExpanded ? null : service.id);
+                setQuickConnectUrl("");
+              }}
+              style={styles.serviceHeader}
+              testID={`button-connect-${service.id}`}
             >
+              <View style={[styles.serviceIcon, { backgroundColor: connected ? `${theme.success}15` : `${theme.primary}15` }]}>
+                <Feather name={connected ? "check" : service.icon} size={20} color={connected ? theme.success : theme.primary} />
+              </View>
               <View style={{ flex: 1 }}>
-                <ThemedText type="small" style={{ fontWeight: "600" }} numberOfLines={1}>
-                  {ep.url}
+                <ThemedText type="body" style={{ fontWeight: "600" }}>
+                  {service.name}
                 </ThemedText>
                 <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
-                  {(ep.enabledEvents || []).length} {t.automations.eventsEnabled}
+                  {connected ? t.automations.connected : service.description}
                 </ThemedText>
               </View>
-              <View style={styles.endpointActions}>
-                <Switch
-                  value={ep.isActive}
-                  onValueChange={() => handleToggleEndpoint(ep.id, ep.isActive)}
-                  trackColor={{ false: theme.border, true: theme.primary }}
-                  thumbColor="#FFFFFF"
-                  testID={`switch-endpoint-${ep.id}`}
+              {connected ? (
+                <View style={[styles.connectedBadge, { backgroundColor: `${theme.success}15` }]}>
+                  <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600" }}>
+                    {t.automations.connected}
+                  </ThemedText>
+                </View>
+              ) : (
+                <Feather name={isExpanded ? "chevron-up" : "chevron-right"} size={20} color={theme.textSecondary} />
+              )}
+            </Pressable>
+
+            {isExpanded ? (
+              <View style={[styles.setupArea, { borderTopColor: theme.border }]}>
+                <ThemedText type="small" style={{ fontWeight: "600", marginBottom: Spacing.sm }}>
+                  {t.automations.howToSetUp}
+                </ThemedText>
+                {service.setupSteps.map((step, idx) => (
+                  <View key={idx} style={styles.stepRow}>
+                    <View style={[styles.stepNumber, { backgroundColor: `${theme.primary}15` }]}>
+                      <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700" }}>
+                        {idx + 1}
+                      </ThemedText>
+                    </View>
+                    <ThemedText type="small" style={{ flex: 1, color: theme.textSecondary }}>
+                      {step}
+                    </ThemedText>
+                  </View>
+                ))}
+
+                <RNTextInput
+                  value={quickConnectUrl}
+                  onChangeText={setQuickConnectUrl}
+                  placeholder={service.urlPlaceholder}
+                  placeholderTextColor={theme.textSecondary}
+                  style={[styles.urlInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.backgroundDefault }]}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  testID={`input-quick-connect-${service.id}`}
                 />
+
                 <Pressable
-                  onPress={() => handleTestEndpoint(ep.id)}
-                  style={[styles.testBtn, { borderColor: theme.border }]}
-                  testID={`button-test-endpoint-${ep.id}`}
+                  onPress={() => handleQuickConnect(service)}
+                  style={[styles.connectBtn, { backgroundColor: theme.primary, opacity: quickConnectUrl.trim().length > 0 ? 1 : 0.5 }]}
+                  disabled={quickConnectUrl.trim().length === 0 || quickConnecting}
+                  testID={`button-save-quick-connect-${service.id}`}
                 >
-                  {testingEndpointId === ep.id ? (
-                    <ActivityIndicator size="small" color={theme.primary} />
+                  {quickConnecting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
-                      {t.automations.test}
+                    <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                      {t.automations.connectNow}
                     </ThemedText>
                   )}
                 </Pressable>
-                <Pressable
-                  onPress={() => handleDeleteEndpoint(ep.id)}
-                  testID={`button-delete-endpoint-${ep.id}`}
-                >
-                  <Feather name="trash-2" size={16} color={theme.error} />
-                </Pressable>
               </View>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          <Feather name="globe" size={24} color={theme.textSecondary} />
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
-            {t.automations.noWebhooks}
-          </ThemedText>
-        </View>
-      )}
+            ) : null}
+          </View>
+        );
+      })}
 
       <View style={[styles.helpCard, { backgroundColor: `${theme.primary}08`, borderColor: `${theme.primary}20` }]}>
         <Feather name="info" size={16} color={theme.primary} />
         <View style={{ flex: 1, marginLeft: Spacing.sm }}>
           <ThemedText type="small" style={{ fontWeight: "600", marginBottom: 4 }}>
-            {t.automations.howToConnectTitle}
+            {t.automations.whatHappensTitle}
           </ThemedText>
           <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-            {t.automations.howToConnectBody}
+            {t.automations.whatHappensBody}
           </ThemedText>
         </View>
       </View>
 
-      <SectionHeader title={t.automations.eventLogTitle} />
-
-      {events.length > 0 ? (
-        <View style={[styles.listCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          {events.map((ev, idx) => {
-            const status = getDeliveryStatus(ev);
-            const statusColor = getStatusColor(status);
-            return (
-              <Pressable
-                key={ev.id}
-                onPress={() => handleViewEventDetail(ev)}
+      {endpoints.length > 0 ? (
+        <>
+          <SectionHeader title={t.automations.yourConnectionsTitle} />
+          <View style={[styles.listCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+            {endpoints.map((ep, idx) => (
+              <View
+                key={ep.id}
                 style={[
-                  styles.eventRow,
-                  idx < events.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border } : undefined,
+                  styles.endpointRow,
+                  idx < endpoints.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border } : undefined,
                 ]}
-                testID={`button-event-${ev.id}`}
               >
                 <View style={{ flex: 1 }}>
-                  <ThemedText type="small" style={{ fontWeight: "600" }}>
-                    {ev.eventType}
+                  <ThemedText type="small" style={{ fontWeight: "600" }} numberOfLines={1}>
+                    {ep.url}
                   </ThemedText>
-                  <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                    {formatDate(ev.createdAt)}
-                  </ThemedText>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
-                  <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-                  <ThemedText type="caption" style={{ color: statusColor, fontWeight: "600" }}>
-                    {getStatusLabel(status)}
+                  <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                    {(ep.enabledEvents || []).length} {t.automations.eventsEnabled}
                   </ThemedText>
                 </View>
-                <Feather name="chevron-right" size={16} color={theme.textSecondary} style={{ marginLeft: Spacing.sm }} />
+                <View style={styles.endpointActions}>
+                  <Switch
+                    value={ep.isActive}
+                    onValueChange={() => handleToggleEndpoint(ep.id, ep.isActive)}
+                    trackColor={{ false: theme.border, true: theme.primary }}
+                    thumbColor="#FFFFFF"
+                    testID={`switch-endpoint-${ep.id}`}
+                  />
+                  <Pressable
+                    onPress={() => handleTestEndpoint(ep.id)}
+                    style={[styles.testBtn, { borderColor: theme.border }]}
+                    testID={`button-test-endpoint-${ep.id}`}
+                  >
+                    {testingEndpointId === ep.id ? (
+                      <ActivityIndicator size="small" color={theme.primary} />
+                    ) : (
+                      <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
+                        {t.automations.test}
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleDeleteEndpoint(ep.id)}
+                    testID={`button-delete-endpoint-${ep.id}`}
+                  >
+                    <Feather name="trash-2" size={16} color={theme.error} />
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      {events.length > 0 ? (
+        <>
+          <SectionHeader title={t.automations.recentActivityTitle} />
+          <View style={[styles.listCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+            {events.slice(0, 5).map((ev, idx) => {
+              const status = getDeliveryStatus(ev);
+              const statusColor = getStatusColor(status);
+              return (
+                <Pressable
+                  key={ev.id}
+                  onPress={() => handleViewEventDetail(ev)}
+                  style={[
+                    styles.eventRow,
+                    idx < Math.min(events.length, 5) - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border } : undefined,
+                  ]}
+                  testID={`button-event-${ev.id}`}
+                >
+                  <View style={{ flex: 1 }}>
+                    <ThemedText type="small" style={{ fontWeight: "600" }}>
+                      {ev.eventType}
+                    </ThemedText>
+                    <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                      {formatDate(ev.createdAt)}
+                    </ThemedText>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
+                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                    <ThemedText type="caption" style={{ color: statusColor, fontWeight: "600" }}>
+                      {getStatusLabel(status)}
+                    </ThemedText>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={theme.textSecondary} style={{ marginLeft: Spacing.sm }} />
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+
+      <Pressable
+        onPress={() => setShowAdvanced(!showAdvanced)}
+        style={[styles.advancedToggle, { borderColor: theme.border }]}
+        testID="button-toggle-advanced"
+      >
+        <ThemedText type="small" style={{ color: theme.textSecondary, fontWeight: "600" }}>
+          {t.automations.advancedSettings}
+        </ThemedText>
+        <Feather name={showAdvanced ? "chevron-up" : "chevron-down"} size={16} color={theme.textSecondary} />
+      </Pressable>
+
+      {showAdvanced ? (
+        <View style={styles.advancedSection}>
+          <SectionHeader
+            title={t.automations.apiKeysTitle}
+            rightAction={
+              <Pressable
+                onPress={handleGenerateKey}
+                style={[styles.headerAction, { backgroundColor: `${theme.primary}15` }]}
+                testID="button-generate-api-key"
+              >
+                {generatingKey ? (
+                  <ActivityIndicator size="small" color={theme.primary} />
+                ) : (
+                  <>
+                    <Feather name="plus" size={14} color={theme.primary} />
+                    <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600", marginLeft: 4 }}>
+                      {t.automations.generateKey}
+                    </ThemedText>
+                  </>
+                )}
               </Pressable>
-            );
-          })}
+            }
+          />
+
+          {apiKeys.length > 0 ? (
+            <View style={[styles.listCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+              {apiKeys.map((key, idx) => (
+                <View
+                  key={key.id}
+                  style={[
+                    styles.listRow,
+                    idx < apiKeys.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border } : undefined,
+                  ]}
+                >
+                  <View style={[styles.keyIcon, { backgroundColor: key.isActive ? `${theme.success}15` : `${theme.textSecondary}15` }]}>
+                    <Feather name="key" size={16} color={key.isActive ? theme.success : theme.textSecondary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText type="body" style={{ fontWeight: "600", fontFamily: "monospace" }}>
+                      {"****" + key.keyPrefix}
+                    </ThemedText>
+                    <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                      {key.isActive ? t.automations.active : t.automations.inactive} {formatDate(key.createdAt)}
+                    </ThemedText>
+                  </View>
+                  {key.isActive ? (
+                    <Pressable
+                      onPress={() => handleDeactivateKey(key.id)}
+                      testID={`button-deactivate-key-${key.id}`}
+                    >
+                      <ThemedText type="small" style={{ color: theme.error }}>
+                        {t.automations.revoke}
+                      </ThemedText>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+              <Feather name="key" size={24} color={theme.textSecondary} />
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
+                {t.automations.noApiKeys}
+              </ThemedText>
+            </View>
+          )}
+
+          <SectionHeader
+            title={t.automations.webhookEndpointsTitle}
+            rightAction={
+              <Pressable
+                onPress={() => setShowAddWebhookModal(true)}
+                style={[styles.headerAction, { backgroundColor: `${theme.primary}15` }]}
+                testID="button-add-webhook"
+              >
+                <Feather name="plus" size={14} color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600", marginLeft: 4 }}>
+                  {t.automations.addEndpoint}
+                </ThemedText>
+              </Pressable>
+            }
+          />
+
+          {endpoints.length > 0 ? (
+            <View style={[styles.listCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+              {endpoints.map((ep, idx) => (
+                <View
+                  key={ep.id}
+                  style={[
+                    styles.endpointRow,
+                    idx < endpoints.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border } : undefined,
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <ThemedText type="small" style={{ fontWeight: "600" }} numberOfLines={1}>
+                      {ep.url}
+                    </ThemedText>
+                    <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                      {(ep.enabledEvents || []).length} {t.automations.eventsEnabled}
+                    </ThemedText>
+                  </View>
+                  <View style={styles.endpointActions}>
+                    <Switch
+                      value={ep.isActive}
+                      onValueChange={() => handleToggleEndpoint(ep.id, ep.isActive)}
+                      trackColor={{ false: theme.border, true: theme.primary }}
+                      thumbColor="#FFFFFF"
+                    />
+                    <Pressable
+                      onPress={() => handleTestEndpoint(ep.id)}
+                      style={[styles.testBtn, { borderColor: theme.border }]}
+                    >
+                      {testingEndpointId === ep.id ? (
+                        <ActivityIndicator size="small" color={theme.primary} />
+                      ) : (
+                        <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
+                          {t.automations.test}
+                        </ThemedText>
+                      )}
+                    </Pressable>
+                    <Pressable onPress={() => handleDeleteEndpoint(ep.id)}>
+                      <Feather name="trash-2" size={16} color={theme.error} />
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+              <Feather name="globe" size={24} color={theme.textSecondary} />
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
+                {t.automations.noWebhooks}
+              </ThemedText>
+            </View>
+          )}
+
+          {events.length > 0 ? (
+            <>
+              <SectionHeader title={t.automations.eventLogTitle} />
+              <View style={[styles.listCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                {events.map((ev, idx) => {
+                  const status = getDeliveryStatus(ev);
+                  const statusColor = getStatusColor(status);
+                  return (
+                    <Pressable
+                      key={ev.id}
+                      onPress={() => handleViewEventDetail(ev)}
+                      style={[
+                        styles.eventRow,
+                        idx < events.length - 1 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border } : undefined,
+                      ]}
+                      testID={`button-event-adv-${ev.id}`}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <ThemedText type="small" style={{ fontWeight: "600" }}>
+                          {ev.eventType}
+                        </ThemedText>
+                        <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                          {formatDate(ev.createdAt)}
+                        </ThemedText>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
+                        <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                        <ThemedText type="caption" style={{ color: statusColor, fontWeight: "600" }}>
+                          {getStatusLabel(status)}
+                        </ThemedText>
+                      </View>
+                      <Feather name="chevron-right" size={16} color={theme.textSecondary} style={{ marginLeft: Spacing.sm }} />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
         </View>
-      ) : (
-        <View style={[styles.emptyCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          <Feather name="activity" size={24} color={theme.textSecondary} />
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
-            {t.automations.noEvents}
-          </ThemedText>
-        </View>
-      )}
+      ) : null}
 
       <Modal visible={showNewKeyModal} transparent animationType="fade" onRequestClose={() => { setShowNewKeyModal(false); setNewKeyRaw(null); }}>
         <View style={styles.modalOverlay}>
@@ -660,6 +921,88 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.lg,
   },
+  statusCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+    gap: Spacing.md,
+  },
+  statusIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  serviceCard: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginBottom: Spacing.md,
+  },
+  serviceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  serviceIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  connectedBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  setupArea: {
+    padding: Spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  stepNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  connectBtn: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+    marginTop: Spacing.md,
+  },
+  helpCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  advancedToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    marginTop: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  advancedSection: {
+    marginTop: Spacing.sm,
+  },
   headerAction: {
     flexDirection: "row",
     alignItems: "center",
@@ -709,14 +1052,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
-  },
-  helpCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    marginBottom: Spacing.md,
   },
   eventRow: {
     flexDirection: "row",
@@ -779,6 +1114,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     fontSize: 14,
+    marginTop: Spacing.sm,
   },
   eventToggleRow: {
     flexDirection: "row",
