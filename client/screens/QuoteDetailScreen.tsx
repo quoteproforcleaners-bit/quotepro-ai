@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput, useWindowDimensions, Modal } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput, useWindowDimensions, Modal, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
@@ -11,6 +11,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as SMS from "expo-sms";
 import * as WebBrowser from "expo-web-browser";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl, getPublicBaseUrl } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
@@ -89,6 +90,20 @@ export default function QuoteDetailScreen() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [growthChecked, setGrowthChecked] = useState(false);
   const [reviewRequestSending, setReviewRequestSending] = useState(false);
+
+  const [showInvoicePacketModal, setShowInvoicePacketModal] = useState(false);
+  const [invoicePacketLoading, setInvoicePacketLoading] = useState(false);
+  const [invoicePacketData, setInvoicePacketData] = useState<any>(null);
+
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarDuration, setCalendarDuration] = useState(120);
+  const [calendarLocation, setCalendarLocation] = useState("");
+  const [calendarTitle, setCalendarTitle] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [calendarResult, setCalendarResult] = useState<{ icsContent: string; googleCalendarUrl: string } | null>(null);
 
   const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
@@ -565,6 +580,216 @@ export default function QuoteDetailScreen() {
       await Clipboard.setStringAsync(msg);
     }
   };
+
+  const handleGenerateInvoicePacket = async () => {
+    if (!quote) return;
+    setInvoicePacketLoading(true);
+    setInvoicePacketData(null);
+    setShowInvoicePacketModal(true);
+    try {
+      const res = await apiRequest("POST", `/api/quotes/${quote.id}/invoice-packet`);
+      const data = await res.json();
+      if (data.success && data.packet) {
+        setInvoicePacketData(data.packet);
+      }
+    } catch (err) {
+      Alert.alert("Error", "Could not generate invoice packet. Please try again.");
+      setShowInvoicePacketModal(false);
+    } finally {
+      setInvoicePacketLoading(false);
+    }
+  };
+
+  const handleInvoiceDownloadPdf = async () => {
+    if (!invoicePacketData?.pdfHtml) return;
+    try {
+      if (Platform.OS === "web") {
+        const win = window.open("", "_blank");
+        if (win) {
+          win.document.write(invoicePacketData.pdfHtml);
+          win.document.close();
+          win.print();
+        }
+      } else {
+        const { uri } = await Print.printToFileAsync({ html: invoicePacketData.pdfHtml });
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: `Invoice ${invoicePacketData.invoiceNumber || ""}`,
+          UTI: "com.adobe.pdf",
+        });
+      }
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch {
+      Alert.alert("Error", "Could not generate PDF.");
+    }
+  };
+
+  const handleInvoiceDownloadCsv = async () => {
+    if (!invoicePacketData?.csvText) return;
+    try {
+      await Clipboard.setStringAsync(invoicePacketData.csvText);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      setSendSuccess("CSV copied to clipboard!");
+      setTimeout(() => setSendSuccess(null), 3000);
+    } catch {
+      Alert.alert("Error", "Could not copy CSV.");
+    }
+  };
+
+  const handleInvoiceCopyText = async () => {
+    if (!invoicePacketData?.plainText) return;
+    await Clipboard.setStringAsync(invoicePacketData.plainText);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setSendSuccess("Invoice text copied!");
+    setTimeout(() => setSendSuccess(null), 3000);
+  };
+
+  const handleInvoiceEmailSelf = async () => {
+    if (!invoicePacketData?.plainText || !businessProfile?.email) {
+      Alert.alert("No Email", "Please add your business email in Settings first.");
+      return;
+    }
+    try {
+      const payload = {
+        to: businessProfile.email,
+        subject: `Invoice ${invoicePacketData.invoiceNumber || ""} - ${quote?.propertyDetails?.customerName || "Customer"}`,
+        body: invoicePacketData.plainText,
+      };
+      const res = await apiRequest("POST", "/api/send/email", payload);
+      const data = await res.json();
+      if (data.success) {
+        setSendSuccess("Invoice emailed to you!");
+        setTimeout(() => setSendSuccess(null), 3000);
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      } else {
+        Alert.alert("Send Failed", data.message || "Could not send email.");
+      }
+    } catch {
+      Alert.alert("Error", "Could not send email. You can copy the text and send manually.");
+    }
+  };
+
+  const handleOpenCalendarModal = () => {
+    if (!quote) return;
+    const customerName = quote.propertyDetails?.customerName || "Customer";
+    setCalendarTitle(`Cleaning - ${customerName}`);
+    setCalendarLocation(quote.propertyDetails?.address || "");
+    setCalendarDate(new Date());
+    setCalendarDuration(120);
+    setCalendarResult(null);
+    setShowCalendarModal(true);
+  };
+
+  const handleCreateCalendarEvent = async () => {
+    if (!quote) return;
+    setCalendarLoading(true);
+    try {
+      const res = await apiRequest("POST", `/api/quotes/${quote.id}/calendar-event`, {
+        startDatetime: calendarDate.toISOString(),
+        durationMinutes: calendarDuration,
+        title: calendarTitle,
+        location: calendarLocation,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCalendarResult({
+          icsContent: data.icsContent,
+          googleCalendarUrl: data.googleCalendarUrl,
+        });
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      }
+    } catch {
+      Alert.alert("Error", "Could not create calendar event. Please try again.");
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
+
+  const handleOpenGoogleCalendar = async () => {
+    if (!calendarResult?.googleCalendarUrl) return;
+    try {
+      if (Platform.OS === "web") {
+        window.open(calendarResult.googleCalendarUrl, "_blank");
+      } else {
+        await WebBrowser.openBrowserAsync(calendarResult.googleCalendarUrl);
+      }
+    } catch {
+      await Clipboard.setStringAsync(calendarResult.googleCalendarUrl);
+      setSendSuccess("Google Calendar link copied!");
+      setTimeout(() => setSendSuccess(null), 3000);
+    }
+  };
+
+  const handleCopyIcs = async () => {
+    if (!calendarResult?.icsContent) return;
+    await Clipboard.setStringAsync(calendarResult.icsContent);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setSendSuccess("ICS content copied!");
+    setTimeout(() => setSendSuccess(null), 3000);
+  };
+
+  const reminderTemplates = [
+    {
+      label: "Confirmation",
+      icon: "check-circle" as const,
+      getMessage: () => {
+        const name = quote?.propertyDetails?.customerName || "there";
+        const company = businessProfile?.companyName || "us";
+        const dateStr = calendarDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+        const timeStr = calendarDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+        return `Hi ${name}! This is ${company} confirming your cleaning appointment on ${dateStr} at ${timeStr}. Please let us know if you need to make any changes. See you then!`;
+      },
+    },
+    {
+      label: "24hr Reminder",
+      icon: "clock" as const,
+      getMessage: () => {
+        const name = quote?.propertyDetails?.customerName || "there";
+        const company = businessProfile?.companyName || "us";
+        const timeStr = calendarDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+        return `Hi ${name}! Just a friendly reminder from ${company} - your cleaning is scheduled for tomorrow at ${timeStr}. Please make sure the space is accessible. See you soon!`;
+      },
+    },
+    {
+      label: "On My Way",
+      icon: "navigation" as const,
+      getMessage: () => {
+        const name = quote?.propertyDetails?.customerName || "there";
+        const company = businessProfile?.companyName || "us";
+        return `Hi ${name}! This is ${company} - I'm on my way to your place now and should arrive in about 15 minutes. See you shortly!`;
+      },
+    },
+  ];
+
+  const handleCopyReminder = async (message: string) => {
+    await Clipboard.setStringAsync(message);
+    if (Platform.OS !== "web") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setSendSuccess("Reminder copied!");
+    setTimeout(() => setSendSuccess(null), 3000);
+  };
+
+  const DURATION_OPTIONS = [
+    { label: "1 hr", value: 60 },
+    { label: "1.5 hr", value: 90 },
+    { label: "2 hr", value: 120 },
+    { label: "2.5 hr", value: 150 },
+    { label: "3 hr", value: 180 },
+    { label: "4 hr", value: 240 },
+  ];
 
   if (isLoading) {
     return (
@@ -1332,6 +1557,33 @@ export default function QuoteDetailScreen() {
           </Pressable>
 
           <Pressable
+            onPress={handleGenerateInvoicePacket}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="invoice-packet-btn"
+          >
+            <Feather name="file-text" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Invoice</ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={handleOpenCalendarModal}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="add-to-calendar-btn"
+          >
+            <Feather name="calendar" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Calendar</ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => navigation.navigate("AutomationsIntegrations" as any)}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="automations-btn"
+          >
+            <Feather name="zap" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Automations</ThemedText>
+          </Pressable>
+
+          <Pressable
             onPress={handleDelete}
             style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
             testID="delete-quote-btn"
@@ -1528,6 +1780,321 @@ export default function QuoteDetailScreen() {
               </ThemedText>
             </Pressable>
           </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showInvoicePacketModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowInvoicePacketModal(false)}
+      >
+        <View style={styles.invoiceOverlay}>
+          <View style={[styles.invoiceContent, { backgroundColor: theme.cardBackground }]}>
+            <View style={styles.invoiceHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                <View style={[styles.invoiceIconCircle, { backgroundColor: `${theme.primary}15` }]}>
+                  <Feather name="file-text" size={20} color={theme.primary} />
+                </View>
+                <ThemedText type="h4">Invoice Packet</ThemedText>
+              </View>
+              <Pressable onPress={() => setShowInvoicePacketModal(false)} testID="close-invoice-modal">
+                <Feather name="x" size={22} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+
+            {invoicePacketLoading ? (
+              <View style={styles.invoiceLoading}>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.md }}>
+                  Generating invoice packet...
+                </ThemedText>
+              </View>
+            ) : invoicePacketData ? (
+              <View style={{ gap: Spacing.sm }}>
+                <View style={[styles.invoiceInfoRow, { backgroundColor: `${theme.success}10`, borderColor: `${theme.success}25` }]}>
+                  <Feather name="check-circle" size={16} color={theme.success} />
+                  <ThemedText type="small" style={{ color: theme.success, marginLeft: Spacing.sm, fontWeight: "600" }}>
+                    Invoice {invoicePacketData.invoiceNumber} generated
+                  </ThemedText>
+                </View>
+
+                <Pressable
+                  onPress={handleInvoiceDownloadPdf}
+                  style={[styles.invoiceActionBtn, { backgroundColor: theme.primary }]}
+                  testID="invoice-download-pdf"
+                >
+                  <Feather name="download" size={18} color="#FFFFFF" />
+                  <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.sm }}>
+                    Download PDF
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleInvoiceDownloadCsv}
+                  style={[styles.invoiceActionBtn, { backgroundColor: theme.backgroundSecondary, borderWidth: 1, borderColor: theme.border }]}
+                  testID="invoice-download-csv"
+                >
+                  <Feather name="grid" size={18} color={theme.text} />
+                  <ThemedText type="body" style={{ fontWeight: "600", marginLeft: Spacing.sm }}>
+                    Copy CSV (QuickBooks)
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleInvoiceCopyText}
+                  style={[styles.invoiceActionBtn, { backgroundColor: theme.backgroundSecondary, borderWidth: 1, borderColor: theme.border }]}
+                  testID="invoice-copy-text"
+                >
+                  <Feather name="copy" size={18} color={theme.text} />
+                  <ThemedText type="body" style={{ fontWeight: "600", marginLeft: Spacing.sm }}>
+                    Copy Text
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleInvoiceEmailSelf}
+                  style={[styles.invoiceActionBtn, { backgroundColor: theme.backgroundSecondary, borderWidth: 1, borderColor: theme.border }]}
+                  testID="invoice-email-self"
+                >
+                  <Feather name="mail" size={18} color={theme.text} />
+                  <ThemedText type="body" style={{ fontWeight: "600", marginLeft: Spacing.sm }}>
+                    Email to Myself
+                  </ThemedText>
+                </Pressable>
+
+                <View style={[styles.invoiceDisclaimer, { backgroundColor: `${theme.warning}10` }]}>
+                  <Feather name="info" size={14} color={theme.warning} />
+                  <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: Spacing.xs, flex: 1 }}>
+                    Designed for easy entry/import into QuickBooks. Not a live sync.
+                  </ThemedText>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showCalendarModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCalendarModal(false)}
+      >
+        <View style={styles.invoiceOverlay}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: Spacing.xl }}>
+            <View style={[styles.calendarContent, { backgroundColor: theme.cardBackground }]}>
+              <View style={styles.invoiceHeader}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                  <View style={[styles.invoiceIconCircle, { backgroundColor: `${theme.primary}15` }]}>
+                    <Feather name="calendar" size={20} color={theme.primary} />
+                  </View>
+                  <ThemedText type="h4">Add to Calendar</ThemedText>
+                </View>
+                <Pressable onPress={() => setShowCalendarModal(false)} testID="close-calendar-modal">
+                  <Feather name="x" size={22} color={theme.textSecondary} />
+                </Pressable>
+              </View>
+
+              {calendarResult ? (
+                <View style={{ gap: Spacing.sm }}>
+                  <View style={[styles.invoiceInfoRow, { backgroundColor: `${theme.success}10`, borderColor: `${theme.success}25` }]}>
+                    <Feather name="check-circle" size={16} color={theme.success} />
+                    <ThemedText type="small" style={{ color: theme.success, marginLeft: Spacing.sm, fontWeight: "600" }}>
+                      Calendar event created
+                    </ThemedText>
+                  </View>
+
+                  <Pressable
+                    onPress={handleOpenGoogleCalendar}
+                    style={[styles.invoiceActionBtn, { backgroundColor: theme.primary }]}
+                    testID="open-google-calendar"
+                  >
+                    <Feather name="external-link" size={18} color="#FFFFFF" />
+                    <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.sm }}>
+                      Open in Google Calendar
+                    </ThemedText>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={handleCopyIcs}
+                    style={[styles.invoiceActionBtn, { backgroundColor: theme.backgroundSecondary, borderWidth: 1, borderColor: theme.border }]}
+                    testID="copy-ics"
+                  >
+                    <Feather name="copy" size={18} color={theme.text} />
+                    <ThemedText type="body" style={{ fontWeight: "600", marginLeft: Spacing.sm }}>
+                      Copy ICS Data
+                    </ThemedText>
+                  </Pressable>
+
+                  <View style={{ marginTop: Spacing.md }}>
+                    <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm }}>
+                      Reminder Templates
+                    </ThemedText>
+                    {reminderTemplates.map((tmpl) => (
+                      <Pressable
+                        key={tmpl.label}
+                        onPress={() => handleCopyReminder(tmpl.getMessage())}
+                        style={[styles.reminderCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+                        testID={`reminder-${tmpl.label.toLowerCase().replace(/\s/g, "-")}`}
+                      >
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                          <View style={[styles.reminderIcon, { backgroundColor: `${theme.primary}15` }]}>
+                            <Feather name={tmpl.icon} size={14} color={theme.primary} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <ThemedText type="small" style={{ fontWeight: "600" }}>{tmpl.label}</ThemedText>
+                            <ThemedText type="caption" style={{ color: theme.textSecondary }} numberOfLines={2}>
+                              {tmpl.getMessage()}
+                            </ThemedText>
+                          </View>
+                          <Feather name="copy" size={16} color={theme.textSecondary} />
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <View style={{ gap: Spacing.md }}>
+                  <View>
+                    <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+                      Title
+                    </ThemedText>
+                    <TextInput
+                      value={calendarTitle}
+                      onChangeText={setCalendarTitle}
+                      style={[styles.calendarInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
+                      placeholderTextColor={theme.textMuted}
+                      testID="calendar-title-input"
+                    />
+                  </View>
+
+                  <View>
+                    <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+                      Date
+                    </ThemedText>
+                    <Pressable
+                      onPress={() => setShowDatePicker(true)}
+                      style={[styles.calendarInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, justifyContent: "center" }]}
+                      testID="calendar-date-picker"
+                    >
+                      <ThemedText type="body">
+                        {calendarDate.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                      </ThemedText>
+                    </Pressable>
+                    {showDatePicker ? (
+                      <DateTimePicker
+                        value={calendarDate}
+                        mode="date"
+                        display={Platform.OS === "ios" ? "spinner" : "default"}
+                        onChange={(event: any, date?: Date) => {
+                          setShowDatePicker(Platform.OS === "ios");
+                          if (date) {
+                            const updated = new Date(calendarDate);
+                            updated.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+                            setCalendarDate(updated);
+                          }
+                        }}
+                        testID="calendar-date-picker-native"
+                      />
+                    ) : null}
+                  </View>
+
+                  <View>
+                    <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+                      Time
+                    </ThemedText>
+                    <Pressable
+                      onPress={() => setShowTimePicker(true)}
+                      style={[styles.calendarInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, justifyContent: "center" }]}
+                      testID="calendar-time-picker"
+                    >
+                      <ThemedText type="body">
+                        {calendarDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                      </ThemedText>
+                    </Pressable>
+                    {showTimePicker ? (
+                      <DateTimePicker
+                        value={calendarDate}
+                        mode="time"
+                        display={Platform.OS === "ios" ? "spinner" : "default"}
+                        onChange={(event: any, date?: Date) => {
+                          setShowTimePicker(Platform.OS === "ios");
+                          if (date) {
+                            const updated = new Date(calendarDate);
+                            updated.setHours(date.getHours(), date.getMinutes());
+                            setCalendarDate(updated);
+                          }
+                        }}
+                        testID="calendar-time-picker-native"
+                      />
+                    ) : null}
+                  </View>
+
+                  <View>
+                    <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+                      Duration
+                    </ThemedText>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: Spacing.xs }}>
+                      {DURATION_OPTIONS.map((opt) => (
+                        <Pressable
+                          key={opt.value}
+                          onPress={() => setCalendarDuration(opt.value)}
+                          style={[
+                            styles.durationChip,
+                            {
+                              backgroundColor: calendarDuration === opt.value ? theme.primary : theme.backgroundSecondary,
+                            },
+                          ]}
+                          testID={`duration-${opt.value}`}
+                        >
+                          <ThemedText
+                            type="caption"
+                            style={{
+                              color: calendarDuration === opt.value ? "#FFFFFF" : theme.text,
+                              fontWeight: calendarDuration === opt.value ? "600" : "400",
+                            }}
+                          >
+                            {opt.label}
+                          </ThemedText>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+
+                  <View>
+                    <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
+                      Location
+                    </ThemedText>
+                    <TextInput
+                      value={calendarLocation}
+                      onChangeText={setCalendarLocation}
+                      style={[styles.calendarInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
+                      placeholder="Service address"
+                      placeholderTextColor={theme.textMuted}
+                      testID="calendar-location-input"
+                    />
+                  </View>
+
+                  <Pressable
+                    onPress={handleCreateCalendarEvent}
+                    disabled={calendarLoading}
+                    style={[styles.invoiceActionBtn, { backgroundColor: theme.primary, opacity: calendarLoading ? 0.7 : 1 }]}
+                    testID="create-calendar-event-btn"
+                  >
+                    {calendarLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Feather name="calendar" size={18} color="#FFFFFF" />
+                    )}
+                    <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.sm }}>
+                      {calendarLoading ? "Creating..." : "Create Event"}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -1897,5 +2464,89 @@ const styles = StyleSheet.create({
   nudgeDismiss: {
     marginTop: Spacing.md,
     paddingVertical: Spacing.sm,
+  },
+  invoiceOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  invoiceContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.xl,
+  },
+  invoiceHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  invoiceIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  invoiceLoading: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing["3xl"],
+  },
+  invoiceInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.xs,
+    borderWidth: 1,
+  },
+  invoiceActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xs,
+  },
+  invoiceDisclaimer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+    marginTop: Spacing.xs,
+  },
+  calendarContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.xl,
+    alignSelf: "center",
+  },
+  calendarInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 16,
+  },
+  durationChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+  },
+  reminderCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.xs,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  reminderIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

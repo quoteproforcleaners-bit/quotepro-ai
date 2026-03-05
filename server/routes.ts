@@ -137,6 +137,26 @@ import {
   rateJob,
   getRatingsSummary,
   getJobByRatingToken,
+  createInvoicePacket,
+  getInvoicePacketsByQuoteId,
+  getInvoicePacketById,
+  createCalendarEventStub,
+  getCalendarEventStubsByQuoteId,
+  createApiKey,
+  getApiKeysByUserId,
+  deactivateApiKey,
+  getApiKeyByHash,
+  createWebhookEndpoint,
+  getWebhookEndpointsByUserId,
+  updateWebhookEndpoint,
+  deleteWebhookEndpoint,
+  getActiveWebhookEndpointsForBusiness,
+  createWebhookEvent,
+  getWebhookEventsByUserId,
+  getWebhookEventById,
+  createWebhookDelivery,
+  getWebhookDeliveriesByEventId,
+  updateWebhookDelivery,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -899,6 +919,8 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         }
       }
 
+      dispatchWebhook(business.id, req.session.userId!, "quote.created", { quoteId: q.id, total: q.total, status: q.status }).catch(() => {});
+
       return res.json(q);
     } catch (error: any) {
       console.error("Create quote error:", error);
@@ -915,12 +937,22 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
           data[field] = new Date(data[field]);
         }
       }
+
+      const oldQuote = await getQuoteById(req.params.id);
       const q = await updateQuote(req.params.id, data);
 
       if (lineItems) {
         await deleteLineItemsByQuote(q.id);
         for (const li of lineItems) {
           await createLineItem({ ...li, quoteId: q.id });
+        }
+      }
+
+      if (data.status && oldQuote && data.status !== oldQuote.status) {
+        const eventMap: Record<string, string> = { sent: "quote.sent", accepted: "quote.accepted", declined: "quote.declined" };
+        const eventType = eventMap[data.status];
+        if (eventType && q.businessId) {
+          dispatchWebhook(q.businessId, req.session.userId!, eventType, { quoteId: q.id, total: q.total, status: q.status }).catch(() => {});
         }
       }
 
@@ -5731,6 +5763,399 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     }
   });
 
+  // ==================== INVOICE PACKET ====================
+
+  app.post("/api/quotes/:id/invoice-packet", requireAuth, async (req: any, res) => {
+    try {
+      const quote = await getQuoteById(req.params.id);
+      if (!quote || quote.businessId !== req.businessId) return res.status(404).json({ error: "Quote not found" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+      const lineItems = await getLineItemsByQuote(quote.id);
+      const options = (quote as any).options as any[] || [];
+      const selectedOpt = options.find((o: any) => o.id === (quote as any).selectedOption) || options[0];
+
+      const customerInfo = {
+        displayName: customer ? `${customer.firstName || ""} ${customer.lastName || ""}`.trim() : "Walk-in Customer",
+        email: customer?.email || "",
+        phone: customer?.phone || "",
+        address: customer?.address || "",
+        serviceAddress: (quote as any).propertyDetails?.address || customer?.address || "",
+      };
+
+      const items = lineItems.length > 0
+        ? lineItems.map((li: any) => ({
+            name: li.name || li.description || "Service",
+            description: li.description || "",
+            quantity: li.quantity || 1,
+            unitPrice: parseFloat(li.unitPrice || li.price || "0"),
+            amount: parseFloat(li.amount || li.total || "0"),
+          }))
+        : selectedOpt
+          ? [{
+              name: selectedOpt.name || "Cleaning Service",
+              description: selectedOpt.description || "",
+              quantity: 1,
+              unitPrice: parseFloat(selectedOpt.price || selectedOpt.total || "0"),
+              amount: parseFloat(selectedOpt.price || selectedOpt.total || "0"),
+            }]
+          : [{
+              name: "Cleaning Service",
+              description: "",
+              quantity: 1,
+              unitPrice: parseFloat(String(quote.total || "0")),
+              amount: parseFloat(String(quote.total || "0")),
+            }];
+
+      const subtotal = parseFloat(String(quote.subtotal || quote.total || "0"));
+      const tax = parseFloat(String(quote.tax || "0"));
+      const total = parseFloat(String(quote.total || "0"));
+      const invoiceNumber = `INV-${quote.id.slice(0, 8).toUpperCase()}`;
+
+      const totals = { subtotal, tax, total };
+
+      const csvHeader = "customer_display_name,customer_email,customer_phone,billing_address_line1,billing_city,billing_state,billing_zip,service_date,item_name,item_description,item_qty,item_rate,item_amount,tax_amount,total_amount,memo";
+      const csvRows = items.map((item: any) => {
+        const addr = customerInfo.serviceAddress || customerInfo.address;
+        return `"${customerInfo.displayName}","${customerInfo.email}","${customerInfo.phone}","${addr}","","","","","${item.name}","${item.description}",${item.quantity},${item.unitPrice.toFixed(2)},${item.amount.toFixed(2)},${tax.toFixed(2)},${total.toFixed(2)},"${(quote as any).notes || ""}"`;
+      });
+      const csvText = [csvHeader, ...csvRows].join("\n");
+
+      const plainLines = [
+        `INVOICE ${invoiceNumber}`,
+        `Date: ${new Date().toLocaleDateString()}`,
+        ``,
+        `Bill To: ${customerInfo.displayName}`,
+        customerInfo.email ? `Email: ${customerInfo.email}` : "",
+        customerInfo.phone ? `Phone: ${customerInfo.phone}` : "",
+        customerInfo.address ? `Address: ${customerInfo.address}` : "",
+        ``,
+        `---`,
+        ...items.map((item: any) => `${item.name} (x${item.quantity}) - $${item.amount.toFixed(2)}`),
+        `---`,
+        `Subtotal: $${subtotal.toFixed(2)}`,
+        tax > 0 ? `Tax: $${tax.toFixed(2)}` : "",
+        `Total: $${total.toFixed(2)}`,
+        ``,
+        (quote as any).notes ? `Notes: ${(quote as any).notes}` : "",
+      ].filter(Boolean).join("\n");
+
+      const primaryColor = business?.primaryColor || "#2563EB";
+      const pdfHtml = generateInvoicePdfHtml({
+        invoiceNumber,
+        business: business!,
+        customerInfo,
+        items,
+        totals,
+        notes: (quote as any).notes || "",
+        primaryColor,
+        quoteDate: quote.createdAt ? new Date(quote.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+      });
+
+      const packet = await createInvoicePacket({
+        quoteId: quote.id,
+        businessId: req.businessId,
+        userId: req.session.userId!,
+        status: "generated",
+        lineItemsJson: items,
+        customerInfoJson: customerInfo,
+        totalsJson: totals,
+        invoiceNumber,
+        pdfHtml,
+        csvText,
+        plainText: plainLines,
+      });
+
+      await dispatchWebhook(req.businessId, req.session.userId!, "invoice_packet.created", { invoicePacketId: packet.id, quoteId: quote.id, invoiceNumber });
+
+      res.json({ success: true, packet });
+    } catch (e: any) {
+      console.error("Invoice packet error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/invoice-packets/:id", requireAuth, async (req: any, res) => {
+    try {
+      const packet = await getInvoicePacketById(req.params.id);
+      if (!packet || packet.businessId !== req.businessId) return res.status(404).json({ error: "Not found" });
+      res.json(packet);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ==================== CALENDAR EVENT STUBS ====================
+
+  app.post("/api/quotes/:id/calendar-event", requireAuth, async (req: any, res) => {
+    try {
+      const quote = await getQuoteById(req.params.id);
+      if (!quote || quote.businessId !== req.businessId) return res.status(404).json({ error: "Quote not found" });
+
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+      const { startDatetime, durationMinutes = 120 } = req.body;
+
+      if (!startDatetime) return res.status(400).json({ error: "startDatetime required" });
+
+      const start = new Date(startDatetime);
+      const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+      const customerName = customer ? `${customer.firstName || ""} ${customer.lastName || ""}`.trim() : "Customer";
+      const title = req.body.title || `Cleaning - ${customerName}`;
+      const location = req.body.location || (quote as any).propertyDetails?.address || customer?.address || "";
+
+      const lineItems = await getLineItemsByQuote(quote.id);
+      const options = (quote as any).options as any[] || [];
+      const selectedOpt = options.find((o: any) => o.id === (quote as any).selectedOption) || options[0];
+
+      const descParts = [
+        `Quote #${quote.id.slice(0, 8).toUpperCase()}`,
+        `Total: $${parseFloat(String(quote.total || "0")).toFixed(2)}`,
+        ``,
+        `Customer: ${customerName}`,
+        customer?.phone ? `Phone: ${customer.phone}` : "",
+        customer?.email ? `Email: ${customer.email}` : "",
+        ``,
+      ];
+      if (lineItems.length > 0) {
+        descParts.push("Services:");
+        lineItems.forEach((li: any) => descParts.push(`- ${li.name || li.description || "Service"}`));
+      } else if (selectedOpt) {
+        descParts.push(`Service: ${selectedOpt.name || "Cleaning"}`);
+      }
+      if ((quote as any).notes) {
+        descParts.push("", `Notes: ${(quote as any).notes}`);
+      }
+      const description = descParts.filter(Boolean).join("\n");
+
+      const stub = await createCalendarEventStub({
+        quoteId: quote.id,
+        userId: req.session.userId!,
+        businessId: req.businessId,
+        startDatetime: start,
+        endDatetime: end,
+        location,
+        title,
+        description,
+      });
+
+      const icsContent = generateICS({ title, description, location, start, end, id: stub.id });
+
+      const gcalUrl = buildGoogleCalendarUrl({ title, description, location, start, end });
+
+      await dispatchWebhook(req.businessId, req.session.userId!, "calendar_stub.created", { calendarEventId: stub.id, quoteId: quote.id });
+
+      res.json({ success: true, stub, icsContent, googleCalendarUrl: gcalUrl });
+    } catch (e: any) {
+      console.error("Calendar event error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/calendar-events/quote/:id", requireAuth, async (req: any, res) => {
+    try {
+      const stubs = await getCalendarEventStubsByQuoteId(req.params.id);
+      res.json(stubs);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ==================== API KEYS ====================
+
+  app.post("/api/api-keys", requireAuth, async (req: any, res) => {
+    try {
+      const crypto = await import("node:crypto");
+      const rawKey = `qp_${crypto.randomBytes(32).toString("hex")}`;
+      const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
+      const keyPrefix = rawKey.slice(-8);
+      const label = req.body.label || "API Key";
+
+      const apiKey = await createApiKey({
+        userId: req.session.userId!,
+        businessId: req.businessId,
+        keyHash,
+        keyPrefix,
+        label,
+        isActive: true,
+      });
+
+      res.json({ success: true, apiKey: { ...apiKey, rawKey } });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/api-keys", requireAuth, async (req: any, res) => {
+    try {
+      const keys = await getApiKeysByUserId(req.session.userId!);
+      res.json(keys.map((k: any) => ({ id: k.id, keyPrefix: k.keyPrefix, label: k.label, isActive: k.isActive, createdAt: k.createdAt })));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.delete("/api/api-keys/:id", requireAuth, async (req: any, res) => {
+    try {
+      await deactivateApiKey(req.params.id, req.session.userId!);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ==================== WEBHOOK ENDPOINTS ====================
+
+  app.post("/api/webhook-endpoints", requireAuth, async (req: any, res) => {
+    try {
+      const { url, enabledEvents = [] } = req.body;
+      if (!url) return res.status(400).json({ error: "url required" });
+      const endpoint = await createWebhookEndpoint({
+        userId: req.session.userId!,
+        businessId: req.businessId,
+        url,
+        isActive: true,
+        enabledEvents,
+      });
+      res.json({ success: true, endpoint });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/webhook-endpoints", requireAuth, async (req: any, res) => {
+    try {
+      const endpoints = await getWebhookEndpointsByUserId(req.session.userId!);
+      res.json(endpoints);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.put("/api/webhook-endpoints/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { url, isActive, enabledEvents } = req.body;
+      const updated = await updateWebhookEndpoint(req.params.id, req.session.userId!, { url, isActive, enabledEvents });
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      res.json({ success: true, endpoint: updated });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.delete("/api/webhook-endpoints/:id", requireAuth, async (req: any, res) => {
+    try {
+      await deleteWebhookEndpoint(req.params.id, req.session.userId!);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/webhook-endpoints/:id/test", requireAuth, async (req: any, res) => {
+    try {
+      const endpoints = await getWebhookEndpointsByUserId(req.session.userId!);
+      const ep = endpoints.find((e: any) => e.id === req.params.id);
+      if (!ep) return res.status(404).json({ error: "Not found" });
+
+      const crypto = await import("node:crypto");
+      const testPayload = {
+        event_type: "test",
+        event_id: crypto.randomUUID(),
+        occurred_at: new Date().toISOString(),
+        account_id: req.businessId,
+        data: { message: "This is a test webhook from QuotePro" },
+      };
+
+      const keys = await getApiKeysByUserId(req.session.userId!);
+      const activeKey = keys[0];
+      const body = JSON.stringify(testPayload);
+      const signature = activeKey
+        ? crypto.createHmac("sha256", activeKey.keyHash).update(body).digest("hex")
+        : "no-api-key";
+
+      try {
+        const response = await fetch(ep.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-QP-Signature": signature },
+          body,
+          signal: AbortSignal.timeout(10000),
+        });
+        res.json({ success: true, statusCode: response.status, statusText: response.statusText });
+      } catch (fetchErr: any) {
+        res.json({ success: false, error: fetchErr.message });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ==================== WEBHOOK EVENTS + DELIVERIES ====================
+
+  app.get("/api/webhook-events", requireAuth, async (req: any, res) => {
+    try {
+      const events = await getWebhookEventsByUserId(req.session.userId!);
+      const eventsWithStatus = await Promise.all(
+        events.map(async (evt: any) => {
+          const deliveries = await getWebhookDeliveriesByEventId(evt.id);
+          const allDelivered = deliveries.length > 0 && deliveries.every((d: any) => d.deliveredAt);
+          const anyRetrying = deliveries.some((d: any) => d.nextRetryAt && !d.deliveredAt);
+          const status = allDelivered ? "delivered" : anyRetrying ? "retrying" : deliveries.length > 0 ? "failed" : "pending";
+          return { ...evt, deliveryStatus: status, deliveryCount: deliveries.length };
+        })
+      );
+      res.json(eventsWithStatus);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/webhook-events/:id", requireAuth, async (req: any, res) => {
+    try {
+      const evt = await getWebhookEventById(req.params.id);
+      if (!evt || evt.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+      const deliveries = await getWebhookDeliveriesByEventId(evt.id);
+      res.json({ ...evt, deliveries });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ==================== REMINDER TEMPLATES ====================
+
+  app.get("/api/reminder-templates/:quoteId", requireAuth, async (req: any, res) => {
+    try {
+      const quote = await getQuoteById(req.params.quoteId);
+      if (!quote || quote.businessId !== req.businessId) return res.status(404).json({ error: "Quote not found" });
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+      const customerName = customer ? (customer.firstName || "there") : "there";
+      const business = await getBusinessByOwner(req.session.userId!);
+      const bName = business?.companyName || "us";
+
+      const templates = [
+        {
+          id: "confirmation",
+          label: "Confirmation",
+          message: `Hi ${customerName}! This is ${bName} confirming your cleaning appointment. We look forward to seeing you! Please let us know if you have any questions.`,
+        },
+        {
+          id: "reminder_24h",
+          label: "24-Hour Reminder",
+          message: `Hi ${customerName}! Just a friendly reminder that your cleaning with ${bName} is scheduled for tomorrow. Please make sure the space is accessible. See you soon!`,
+        },
+        {
+          id: "on_my_way",
+          label: "On My Way",
+          message: `Hi ${customerName}! This is ${bName} - I'm on my way to your location now. I should arrive shortly. See you soon!`,
+        },
+      ];
+
+      res.json(templates);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   setInterval(async () => {
@@ -5742,6 +6167,175 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
   }, 60 * 60 * 1000);
 
   return httpServer;
+}
+
+async function dispatchWebhook(businessId: string, userId: string, eventType: string, data: any) {
+  try {
+    const crypto = await import("node:crypto");
+    const endpoints = await getActiveWebhookEndpointsForBusiness(businessId);
+    if (endpoints.length === 0) return;
+
+    const matchingEndpoints = endpoints.filter((ep: any) => {
+      const enabled = ep.enabledEvents as string[] || [];
+      return enabled.length === 0 || enabled.includes(eventType);
+    });
+    if (matchingEndpoints.length === 0) return;
+
+    const event = await createWebhookEvent({ userId, businessId, eventType, payloadJson: data });
+
+    const payload = {
+      event_type: eventType,
+      event_id: event.id,
+      occurred_at: new Date().toISOString(),
+      account_id: businessId,
+      data,
+    };
+    const body = JSON.stringify(payload);
+
+    const keys = await getApiKeysByUserId(userId);
+    const activeKey = keys[0];
+    const signature = activeKey
+      ? crypto.createHmac("sha256", activeKey.keyHash).update(body).digest("hex")
+      : "no-api-key";
+
+    for (const ep of matchingEndpoints) {
+      deliverWebhook(ep, event.id, body, signature, 1);
+    }
+  } catch (e) {
+    console.error("Webhook dispatch error:", e);
+  }
+}
+
+async function deliverWebhook(endpoint: any, eventId: string, body: string, signature: string, attempt: number) {
+  const delivery = await createWebhookDelivery({
+    webhookEventId: eventId,
+    endpointId: endpoint.id,
+    attemptNumber: attempt,
+    statusCode: null,
+    responseBodyExcerpt: null,
+    nextRetryAt: null,
+    deliveredAt: null,
+  });
+
+  try {
+    const response = await fetch(endpoint.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-QP-Signature": signature },
+      body,
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const responseText = await response.text().catch(() => "");
+    const excerpt = responseText.slice(0, 500);
+
+    if (response.ok) {
+      await updateWebhookDelivery(delivery.id, { statusCode: response.status, responseBodyExcerpt: excerpt, deliveredAt: new Date() });
+    } else {
+      const retryDelays = [60000, 300000, 900000];
+      const nextRetry = attempt < 3 ? new Date(Date.now() + retryDelays[attempt - 1]) : null;
+      await updateWebhookDelivery(delivery.id, { statusCode: response.status, responseBodyExcerpt: excerpt, nextRetryAt: nextRetry });
+      if (nextRetry) {
+        setTimeout(() => deliverWebhook(endpoint, eventId, body, signature, attempt + 1), retryDelays[attempt - 1]);
+      }
+    }
+  } catch (err: any) {
+    const retryDelays = [60000, 300000, 900000];
+    const nextRetry = attempt < 3 ? new Date(Date.now() + retryDelays[attempt - 1]) : null;
+    await updateWebhookDelivery(delivery.id, { statusCode: 0, responseBodyExcerpt: err.message?.slice(0, 500), nextRetryAt: nextRetry });
+    if (nextRetry) {
+      setTimeout(() => deliverWebhook(endpoint, eventId, body, signature, attempt + 1), retryDelays[attempt - 1]);
+    }
+  }
+}
+
+function generateICS(opts: { title: string; description: string; location: string; start: Date; end: Date; id: string }): string {
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const escapeICS = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//QuotePro//EN",
+    "BEGIN:VEVENT",
+    `UID:${opts.id}@quotepro.app`,
+    `DTSTART:${fmt(opts.start)}`,
+    `DTEND:${fmt(opts.end)}`,
+    `SUMMARY:${escapeICS(opts.title)}`,
+    `DESCRIPTION:${escapeICS(opts.description)}`,
+    `LOCATION:${escapeICS(opts.location)}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+}
+
+function buildGoogleCalendarUrl(opts: { title: string; description: string; location: string; start: Date; end: Date }): string {
+  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: opts.title,
+    dates: `${fmt(opts.start)}/${fmt(opts.end)}`,
+    details: opts.description,
+    location: opts.location,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function generateInvoicePdfHtml(opts: {
+  invoiceNumber: string;
+  business: any;
+  customerInfo: any;
+  items: any[];
+  totals: { subtotal: number; tax: number; total: number };
+  notes: string;
+  primaryColor: string;
+  quoteDate: string;
+}): string {
+  const { invoiceNumber, business, customerInfo, items, totals, notes, primaryColor, quoteDate } = opts;
+  const itemRows = items.map(
+    (item: any) =>
+      `<tr><td style="padding:10px 12px;border-bottom:1px solid #E2E8F0">${item.name}</td><td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;text-align:center">${item.quantity}</td><td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;text-align:right">$${item.unitPrice.toFixed(2)}</td><td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;text-align:right">$${item.amount.toFixed(2)}</td></tr>`
+  ).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:40px;color:#1E293B;font-size:14px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px}
+.company{font-size:20px;font-weight:700;color:${primaryColor}}
+.invoice-label{font-size:28px;font-weight:700;color:#0F172A;text-align:right}
+.invoice-meta{text-align:right;color:#64748B;font-size:13px;margin-top:4px}
+.section{margin-bottom:24px}
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#64748B;margin-bottom:8px;font-weight:600}
+table{width:100%;border-collapse:collapse}
+th{background:${primaryColor};color:#fff;padding:10px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.5px}
+th:nth-child(2),th:nth-child(3),th:nth-child(4){text-align:right}
+th:nth-child(2){text-align:center}
+.totals{margin-top:20px;text-align:right}
+.totals .row{display:flex;justify-content:flex-end;gap:40px;padding:4px 12px}
+.totals .total-row{font-weight:700;font-size:18px;color:${primaryColor};border-top:2px solid ${primaryColor};padding-top:8px;margin-top:4px}
+.notes{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:16px;margin-top:24px;font-size:13px;color:#475569}
+.disclaimer{margin-top:32px;text-align:center;color:#94A3B8;font-size:11px;border-top:1px solid #E2E8F0;padding-top:16px}
+</style></head><body>
+<div class="header">
+<div><div class="company">${business.companyName || "QuotePro"}</div>
+${business.email ? `<div style="color:#64748B;font-size:13px;margin-top:4px">${business.email}</div>` : ""}
+${business.phone ? `<div style="color:#64748B;font-size:13px">${business.phone}</div>` : ""}
+${business.address ? `<div style="color:#64748B;font-size:13px">${business.address}</div>` : ""}
+</div>
+<div><div class="invoice-label">INVOICE</div><div class="invoice-meta">${invoiceNumber}<br>Date: ${quoteDate}</div></div>
+</div>
+<div class="section"><div class="section-title">Bill To</div>
+<div style="font-weight:600">${customerInfo.displayName}</div>
+${customerInfo.email ? `<div style="color:#64748B">${customerInfo.email}</div>` : ""}
+${customerInfo.phone ? `<div style="color:#64748B">${customerInfo.phone}</div>` : ""}
+${customerInfo.serviceAddress ? `<div style="color:#64748B">${customerInfo.serviceAddress}</div>` : ""}
+</div>
+<table><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${itemRows}</tbody></table>
+<div class="totals">
+<div class="row"><span>Subtotal:</span><span>$${totals.subtotal.toFixed(2)}</span></div>
+${totals.tax > 0 ? `<div class="row"><span>Tax:</span><span>$${totals.tax.toFixed(2)}</span></div>` : ""}
+<div class="row total-row"><span>Total:</span><span>$${totals.total.toFixed(2)}</span></div>
+</div>
+${notes ? `<div class="notes"><strong>Notes:</strong> ${notes}</div>` : ""}
+<div class="disclaimer">Designed for easy entry/import into QuickBooks. Not a live sync.<br>Generated by QuotePro</div>
+</body></html>`;
 }
 
 async function db_getBusinessById(businessId: string) {

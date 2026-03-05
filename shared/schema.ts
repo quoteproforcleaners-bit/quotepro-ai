@@ -672,3 +672,94 @@ export type GrowthAutomationSetting = typeof growthAutomationSettings.$inferSele
 export type SalesStrategySetting = typeof salesStrategySettings.$inferSelect;
 export type Campaign = typeof campaigns.$inferSelect;
 export type SalesRecommendation = typeof salesRecommendations.$inferSelect;
+
+export const invoicePackets = pgTable("invoice_packets", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id").references(() => quotes.id),
+  businessId: varchar("business_id").references(() => businesses.id),
+  userId: varchar("user_id").references(() => users.id),
+  status: text("status").notNull().default("generated"),
+  lineItemsJson: jsonb("line_items_json"),
+  customerInfoJson: jsonb("customer_info_json"),
+  totalsJson: jsonb("totals_json"),
+  invoiceNumber: text("invoice_number"),
+  pdfHtml: text("pdf_html"),
+  csvText: text("csv_text"),
+  plainText: text("plain_text"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const calendarEventStubs = pgTable("calendar_event_stubs", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id").references(() => quotes.id),
+  userId: varchar("user_id").references(() => users.id),
+  businessId: varchar("business_id").references(() => businesses.id),
+  startDatetime: timestamp("start_datetime").notNull(),
+  endDatetime: timestamp("end_datetime").notNull(),
+  location: text("location"),
+  title: text("title").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const apiKeys = pgTable("api_keys", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  keyHash: text("key_hash").notNull(),
+  keyPrefix: text("key_prefix").notNull(),
+  label: text("label"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  rotatedAt: timestamp("rotated_at"),
+});
+
+export const webhookEndpoints = pgTable("webhook_endpoints", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  url: text("url").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  enabledEvents: jsonb("enabled_events").default(sql`'[]'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const webhookEvents = pgTable("webhook_events", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  eventType: text("event_type").notNull(),
+  payloadJson: jsonb("payload_json"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const webhookDeliveries = pgTable("webhook_deliveries", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  webhookEventId: varchar("webhook_event_id").notNull().references(() => webhookEvents.id),
+  endpointId: varchar("endpoint_id").notNull().references(() => webhookEndpoints.id),
+  attemptNumber: integer("attempt_number").notNull().default(1),
+  statusCode: integer("status_code"),
+  responseBodyExcerpt: text("response_body_excerpt"),
+  nextRetryAt: timestamp("next_retry_at"),
+  deliveredAt: timestamp("delivered_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type InvoicePacket = typeof invoicePackets.$inferSelect;
+export type CalendarEventStub = typeof calendarEventStubs.$inferSelect;
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;

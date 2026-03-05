@@ -1234,6 +1234,27 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Pressable
+        onPress={() => navigation.navigate("AutomationsIntegrations" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-automations-integrations"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="code" size={20} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              {t.settings.apiWebhooksLabel}
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              {t.settings.apiWebhooksDesc}
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
         onPress={() => navigation.navigate("SalesStrategy" as any)}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-sales-strategy"

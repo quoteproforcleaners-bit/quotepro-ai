@@ -56,6 +56,18 @@ import {
   type GrowthAutomationSetting,
   type SalesStrategySetting,
   type Campaign,
+  invoicePackets,
+  calendarEventStubs,
+  apiKeys,
+  webhookEndpoints,
+  webhookEvents,
+  webhookDeliveries,
+  type InvoicePacket,
+  type CalendarEventStub,
+  type ApiKey,
+  type WebhookEndpoint,
+  type WebhookEvent,
+  type WebhookDelivery,
 } from "@shared/schema";
 
 export async function getUserById(id: string): Promise<User | undefined> {
@@ -2102,4 +2114,94 @@ export async function getRatingsSummary(businessId: string): Promise<{
   const average = total > 0 ? Math.round((sum / total) * 10) / 10 : 0;
 
   return { average, total, distribution };
+}
+
+export async function createInvoicePacket(data: Omit<InvoicePacket, "id" | "createdAt">): Promise<InvoicePacket> {
+  const [r] = await db.insert(invoicePackets).values(data).returning();
+  return r;
+}
+
+export async function getInvoicePacketsByQuoteId(quoteId: string): Promise<InvoicePacket[]> {
+  return db.select().from(invoicePackets).where(eq(invoicePackets.quoteId, quoteId)).orderBy(desc(invoicePackets.createdAt));
+}
+
+export async function getInvoicePacketById(id: string): Promise<InvoicePacket | undefined> {
+  const [r] = await db.select().from(invoicePackets).where(eq(invoicePackets.id, id));
+  return r;
+}
+
+export async function createCalendarEventStub(data: Omit<CalendarEventStub, "id" | "createdAt">): Promise<CalendarEventStub> {
+  const [r] = await db.insert(calendarEventStubs).values(data).returning();
+  return r;
+}
+
+export async function getCalendarEventStubsByQuoteId(quoteId: string): Promise<CalendarEventStub[]> {
+  return db.select().from(calendarEventStubs).where(eq(calendarEventStubs.quoteId, quoteId)).orderBy(desc(calendarEventStubs.createdAt));
+}
+
+export async function createApiKey(data: Omit<ApiKey, "id" | "createdAt" | "rotatedAt">): Promise<ApiKey> {
+  const [r] = await db.insert(apiKeys).values(data).returning();
+  return r;
+}
+
+export async function getApiKeysByUserId(userId: string): Promise<ApiKey[]> {
+  return db.select().from(apiKeys).where(and(eq(apiKeys.userId, userId), eq(apiKeys.isActive, true))).orderBy(desc(apiKeys.createdAt));
+}
+
+export async function deactivateApiKey(id: string, userId: string): Promise<void> {
+  await db.update(apiKeys).set({ isActive: false }).where(and(eq(apiKeys.id, id), eq(apiKeys.userId, userId)));
+}
+
+export async function getApiKeyByHash(keyHash: string): Promise<ApiKey | undefined> {
+  const [r] = await db.select().from(apiKeys).where(and(eq(apiKeys.keyHash, keyHash), eq(apiKeys.isActive, true)));
+  return r;
+}
+
+export async function createWebhookEndpoint(data: Omit<WebhookEndpoint, "id" | "createdAt">): Promise<WebhookEndpoint> {
+  const [r] = await db.insert(webhookEndpoints).values(data).returning();
+  return r;
+}
+
+export async function getWebhookEndpointsByUserId(userId: string): Promise<WebhookEndpoint[]> {
+  return db.select().from(webhookEndpoints).where(eq(webhookEndpoints.userId, userId)).orderBy(desc(webhookEndpoints.createdAt));
+}
+
+export async function updateWebhookEndpoint(id: string, userId: string, data: Partial<Pick<WebhookEndpoint, "url" | "isActive" | "enabledEvents">>): Promise<WebhookEndpoint | undefined> {
+  const [r] = await db.update(webhookEndpoints).set(data).where(and(eq(webhookEndpoints.id, id), eq(webhookEndpoints.userId, userId))).returning();
+  return r;
+}
+
+export async function deleteWebhookEndpoint(id: string, userId: string): Promise<void> {
+  await db.delete(webhookEndpoints).where(and(eq(webhookEndpoints.id, id), eq(webhookEndpoints.userId, userId)));
+}
+
+export async function getActiveWebhookEndpointsForBusiness(businessId: string): Promise<WebhookEndpoint[]> {
+  return db.select().from(webhookEndpoints).where(and(eq(webhookEndpoints.businessId, businessId), eq(webhookEndpoints.isActive, true)));
+}
+
+export async function createWebhookEvent(data: Omit<WebhookEvent, "id" | "createdAt">): Promise<WebhookEvent> {
+  const [r] = await db.insert(webhookEvents).values(data).returning();
+  return r;
+}
+
+export async function getWebhookEventsByUserId(userId: string, limit = 50): Promise<WebhookEvent[]> {
+  return db.select().from(webhookEvents).where(eq(webhookEvents.userId, userId)).orderBy(desc(webhookEvents.createdAt)).limit(limit);
+}
+
+export async function getWebhookEventById(id: string): Promise<WebhookEvent | undefined> {
+  const [r] = await db.select().from(webhookEvents).where(eq(webhookEvents.id, id));
+  return r;
+}
+
+export async function createWebhookDelivery(data: Omit<WebhookDelivery, "id" | "createdAt">): Promise<WebhookDelivery> {
+  const [r] = await db.insert(webhookDeliveries).values(data).returning();
+  return r;
+}
+
+export async function getWebhookDeliveriesByEventId(eventId: string): Promise<WebhookDelivery[]> {
+  return db.select().from(webhookDeliveries).where(eq(webhookDeliveries.webhookEventId, eventId)).orderBy(asc(webhookDeliveries.attemptNumber));
+}
+
+export async function updateWebhookDelivery(id: string, data: Partial<Pick<WebhookDelivery, "statusCode" | "responseBodyExcerpt" | "nextRetryAt" | "deliveredAt">>): Promise<void> {
+  await db.update(webhookDeliveries).set(data).where(eq(webhookDeliveries.id, id));
 }

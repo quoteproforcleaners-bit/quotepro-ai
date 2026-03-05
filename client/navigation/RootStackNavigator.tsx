@@ -19,6 +19,7 @@ import ReviewsReferralsScreen from "@/screens/ReviewsReferralsScreen";
 import UpsellOpportunitiesScreen from "@/screens/UpsellOpportunitiesScreen";
 import ReactivationScreen from "@/screens/ReactivationScreen";
 import AutomationsHubScreen from "@/screens/AutomationsHubScreen";
+import AutomationsIntegrationsScreen from "@/screens/AutomationsIntegrationsScreen";
 import SalesStrategyScreen from "@/screens/SalesStrategyScreen";
 import QuotePreferencesScreen from "@/screens/QuotePreferencesScreen";
 import HelpGuideScreen from "@/screens/HelpGuideScreen";
@@ -54,6 +55,7 @@ export type RootStackParamList = {
   UpsellOpportunities: undefined;
   ReactivationCampaigns: undefined;
   AutomationsHub: undefined;
+  AutomationsIntegrations: undefined;
   SalesStrategy: undefined;
   QuotePreferences: undefined;
   HelpGuide: undefined;
@@ -260,6 +262,13 @@ export default function RootStackNavigator() {
             component={AutomationsHubScreen}
             options={{
               headerTitle: "Automations",
+            }}
+          />
+          <Stack.Screen
+            name="AutomationsIntegrations"
+            component={AutomationsIntegrationsScreen}
+            options={{
+              headerTitle: "API & Webhooks",
             }}
           />
           <Stack.Screen
