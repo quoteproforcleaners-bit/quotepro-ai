@@ -91,14 +91,29 @@ export default function QBOSettingsScreen() {
       const data = await res.json();
       if (data.url) {
         await WebBrowser.openBrowserAsync(data.url);
+        queryClient.invalidateQueries({ queryKey: ["/api/integrations/qbo/status"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/integrations/qbo/logs"] });
         refetch();
+      } else if (data.error) {
+        Alert.alert("Connection Error", data.error);
       }
-    } catch (e) {
-      console.error("QBO connect error:", e);
+    } catch (e: any) {
+      const raw = e?.message || "Failed to connect to QuickBooks";
+      let msg = raw;
+      try {
+        const jsonPart = raw.substring(raw.indexOf("{"));
+        const parsed = JSON.parse(jsonPart);
+        msg = parsed.error || raw;
+      } catch {}
+      if (msg.includes("not configured")) {
+        Alert.alert("Not Configured", "QuickBooks integration credentials have not been set up yet. Contact support or check your server configuration.");
+      } else {
+        Alert.alert("Connection Error", msg);
+      }
     } finally {
       setConnecting(false);
     }
-  }, [refetch]);
+  }, [refetch, queryClient]);
 
   const handleDisconnect = useCallback(() => {
     Alert.alert(
@@ -117,8 +132,8 @@ export default function QBOSettingsScreen() {
               queryClient.invalidateQueries({ queryKey: ["/api/integrations/qbo/logs"] });
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               refetch();
-            } catch (e) {
-              console.error("QBO disconnect error:", e);
+            } catch (e: any) {
+              Alert.alert("Error", "Failed to disconnect QuickBooks. Please try again.");
             } finally {
               setDisconnecting(false);
             }
@@ -150,8 +165,8 @@ export default function QBOSettingsScreen() {
       await apiRequest("PUT", "/api/integrations/qbo/settings", { autoCreateInvoice: value });
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/qbo/status"] });
       Haptics.selectionAsync();
-    } catch (e) {
-      console.error("QBO settings error:", e);
+    } catch (e: any) {
+      Alert.alert("Error", "Failed to update QuickBooks settings.");
     } finally {
       setSettingsSaving(false);
     }
