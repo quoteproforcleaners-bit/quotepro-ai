@@ -3071,6 +3071,93 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
     }
   });
 
+  app.post("/api/ai/pricing-suggestion", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { homeDetails, addOns, frequency, currentPrices, pricingSettings: ps, businessHistory } = req.body;
+      if (!homeDetails || !currentPrices) return res.status(400).json({ message: "homeDetails and currentPrices required" });
+
+      const propertyDesc = [
+        homeDetails.sqft ? `${homeDetails.sqft} sqft` : null,
+        homeDetails.beds ? `${homeDetails.beds} bed` : null,
+        homeDetails.baths ? `${homeDetails.baths} bath` : null,
+        homeDetails.halfBaths ? `${homeDetails.halfBaths} half bath` : null,
+        homeDetails.homeType || null,
+        homeDetails.conditionScore ? `condition ${homeDetails.conditionScore}/10` : null,
+        homeDetails.peopleCount ? `${homeDetails.peopleCount} people` : null,
+        homeDetails.petType && homeDetails.petType !== "none" ? `pet: ${homeDetails.petType}${homeDetails.petShedding ? " (shedding)" : ""}` : null,
+      ].filter(Boolean).join(", ");
+
+      const addOnsList: string[] = [];
+      if (addOns) {
+        Object.entries(addOns).forEach(([k, v]) => { if (v) addOnsList.push(k.replace(/([A-Z])/g, " $1").toLowerCase().trim()); });
+      }
+
+      const historyContext = businessHistory
+        ? `Business stats: ${businessHistory.totalQuotes || 0} quotes sent, ${businessHistory.acceptRate || 0}% acceptance rate, avg quote $${businessHistory.avgQuote || 0}, hourly rate $${ps?.hourlyRate || 55}. ${businessHistory.recentAccepted ? `Recent accepted quotes ranged $${businessHistory.recentAcceptedMin}-$${businessHistory.recentAcceptedMax}.` : ""}`
+        : `Hourly rate: $${ps?.hourlyRate || 55}. No historical data available.`;
+
+      const systemPrompt = `You are a pricing strategist for residential cleaning businesses. Analyze a property and suggest optimal pricing for Good/Better/Best tiers.
+
+Rules:
+- Consider property size, condition, complexity (pets, people), add-ons, and frequency
+- Account for market positioning: not too cheap (undervalues work), not too high (loses bids)
+- Provide a suggested price for each tier with brief reasoning
+- Include a confidence level (low/medium/high) based on data available
+- If the current price seems appropriate, say so. Only suggest changes when there's a real opportunity
+- Identify if the user is underpricing or overpricing
+- Round suggestions to nearest $5
+- Be specific and actionable, not generic
+
+Respond with JSON:
+{
+  "good": {"suggestedPrice": number, "reasoning": string},
+  "better": {"suggestedPrice": number, "reasoning": string},
+  "best": {"suggestedPrice": number, "reasoning": string},
+  "overallAssessment": string,
+  "confidence": "low" | "medium" | "high",
+  "keyInsight": string
+}`;
+
+      const userPrompt = `Property: ${propertyDesc}
+Frequency: ${frequency || "one-time"}
+Add-ons: ${addOnsList.length > 0 ? addOnsList.join(", ") : "none"}
+
+Current prices:
+- Good: $${currentPrices.good}
+- Better: $${currentPrices.better}
+- Best: $${currentPrices.best}
+
+${historyContext}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      let parsed: any;
+      try { parsed = JSON.parse(content); } catch { return res.status(500).json({ message: "Invalid AI response" }); }
+
+      return res.json({
+        good: { suggestedPrice: parsed.good?.suggestedPrice || currentPrices.good, reasoning: parsed.good?.reasoning || "" },
+        better: { suggestedPrice: parsed.better?.suggestedPrice || currentPrices.better, reasoning: parsed.better?.reasoning || "" },
+        best: { suggestedPrice: parsed.best?.suggestedPrice || currentPrices.best, reasoning: parsed.best?.reasoning || "" },
+        overallAssessment: parsed.overallAssessment || "",
+        confidence: parsed.confidence || "medium",
+        keyInsight: parsed.keyInsight || "",
+      });
+    } catch (error: any) {
+      console.error("AI pricing suggestion error:", error);
+      return res.status(500).json({ message: "Failed to generate pricing suggestion" });
+    }
+  });
+
   app.post("/api/ai/communication-draft", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;
