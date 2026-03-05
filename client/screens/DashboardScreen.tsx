@@ -37,9 +37,8 @@ import { useApp } from "@/context/AppContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
-import { ensureInstallDate, incrementSessionCount } from "@/lib/growthLoop";
+import { ensureInstallDate, incrementSessionCount, openShareSheet } from "@/lib/growthLoop";
 import OnboardingBanner from "@/components/OnboardingBanner";
-import SocialProofBanner from "@/components/SocialProofBanner";
 import { useProGate } from "@/components/ProGate";
 import { useTutorial } from "@/context/TutorialContext";
 import { DASHBOARD_TOUR } from "@/lib/tourDefinitions";
@@ -734,6 +733,17 @@ export default function DashboardScreen() {
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
             <Pressable
+              onPress={async () => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                trackEvent("share_sheet_opened", { source: "header" });
+                await openShareSheet("header");
+              }}
+              style={[s.headerBtn, { backgroundColor: st.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)", borderColor: st.divider }]}
+              testID="share-btn"
+            >
+              <Feather name="share" size={14} color={st.textSecondary} />
+            </Pressable>
+            <Pressable
               onPress={() => setIsEditingWidgets(!isEditingWidgets)}
               style={[s.headerBtn, { backgroundColor: isEditingWidgets ? st.primarySoft : (st.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"), borderColor: isEditingWidgets ? st.primary : st.divider }]}
               testID="customize-widgets-btn"
@@ -777,7 +787,6 @@ export default function DashboardScreen() {
           </Pressable>
         ) : null}
 
-        <SocialProofBanner />
 
         {isEditingWidgets ? (
           <View style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}>
