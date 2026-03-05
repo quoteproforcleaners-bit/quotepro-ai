@@ -1244,6 +1244,27 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Pressable
+        onPress={() => navigation.navigate("QBOSettings" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-qbo-settings"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: "#16a34a15" }]}>
+            <Feather name="book-open" size={20} color="#16a34a" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              QuickBooks Online
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Sync invoices and customers
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
         onPress={() => navigation.navigate("SalesStrategy" as any)}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-sales-strategy"

@@ -10,6 +10,7 @@ import { pool } from "./db";
 import { google } from "googleapis";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableGoogleCalendarClient, isGoogleCalendarConnected } from "./googleCalendarClient";
+import { QBOClient, encryptToken, logSync } from "./qbo-client";
 
 let stripe: Stripe | null = null;
 
@@ -954,6 +955,20 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         const eventType = eventMap[data.status];
         if (eventType && q.businessId) {
           dispatchWebhook(q.businessId, req.session.userId!, eventType, { quoteId: q.id, total: q.total, status: q.status }).catch(() => {});
+        }
+
+        if (data.status === "accepted") {
+          pool.query(
+            `SELECT auto_create_invoice FROM qbo_connections WHERE user_id = $1 AND status = 'connected'`,
+            [req.session.userId]
+          ).then((connResult) => {
+            if (connResult.rows.length > 0 && connResult.rows[0].auto_create_invoice) {
+              createQBOInvoiceForQuote(req.session.userId!, q.id).catch((err) => {
+                console.error("Auto QBO invoice creation failed:", err.message);
+                logSync(req.session.userId!, q.id, "create_invoice", { auto: true }, { error: err.message }, "failed", err.message);
+              });
+            }
+          }).catch(() => {});
         }
       }
 
@@ -6228,6 +6243,224 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     }
   });
 
+  // ==================== QBO INTEGRATION ====================
+
+  app.get("/api/integrations/qbo/status", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT status, company_name as "companyName", realm_id as "realmId", environment,
+                last_error as "lastError", auto_create_invoice as "autoCreateInvoice"
+         FROM qbo_connections WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      if (result.rows.length === 0) {
+        return res.json({ status: "not_connected", companyName: null, realmId: null, environment: "production", lastError: null, autoCreateInvoice: false });
+      }
+      res.json(result.rows[0]);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/integrations/qbo/connect", requireAuth, async (req: any, res) => {
+    try {
+      const clientId = process.env.INTUIT_CLIENT_ID;
+      if (!clientId) return res.status(500).json({ error: "QuickBooks integration not configured" });
+
+      const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const redirectUri = `${protocol}://${host}/api/integrations/qbo/callback`;
+
+      const state = crypto.randomBytes(16).toString("hex") + ":" + req.session.userId;
+      req.session.qboOAuthState = state;
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: "com.intuit.quickbooks.accounting",
+        state,
+      });
+
+      const url = `https://appcenter.intuit.com/connect/oauth2?${params.toString()}`;
+      res.json({ url });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/integrations/qbo/callback", async (req: any, res) => {
+    try {
+      const { code, state, realmId } = req.query;
+      if (!code || !state || !realmId) {
+        return res.status(400).send("Missing required OAuth parameters");
+      }
+
+      const stateParts = (state as string).split(":");
+      if (stateParts.length < 2) return res.status(400).send("Invalid state parameter");
+      const userId = stateParts.slice(1).join(":");
+
+      const storedState = req.session?.qboOAuthState;
+      if (!storedState || storedState !== state) {
+        return res.status(403).send("Invalid or expired OAuth state. Please try connecting again.");
+      }
+      req.session.qboOAuthState = null;
+
+      const clientId = process.env.INTUIT_CLIENT_ID;
+      const clientSecret = process.env.INTUIT_CLIENT_SECRET;
+      if (!clientId || !clientSecret) return res.status(500).send("QuickBooks not configured");
+
+      const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const redirectUri = `${protocol}://${host}/api/integrations/qbo/callback`;
+
+      const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+      const tokenResponse = await fetch("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${basicAuth}`,
+          "Accept": "application/json",
+        },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code: code as string,
+          redirect_uri: redirectUri,
+        }).toString(),
+      });
+
+      if (!tokenResponse.ok) {
+        const errBody = await tokenResponse.text();
+        console.error("QBO token exchange failed:", tokenResponse.status, errBody);
+        await logSync(userId, null, "connect", {}, { error: errBody }, "failed", "Token exchange failed");
+        return res.status(400).send("Failed to exchange authorization code");
+      }
+
+      const tokens = await tokenResponse.json();
+      const accessToken = tokens.access_token;
+      const refreshToken = tokens.refresh_token;
+      const expiresIn = tokens.expires_in || 3600;
+      const expiresAt = new Date(Date.now() + expiresIn * 1000);
+
+      let companyName: string | null = null;
+      try {
+        const infoRes = await fetch(
+          `https://quickbooks.api.intuit.com/v3/company/${realmId}/companyinfo/${realmId}`,
+          { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } }
+        );
+        if (infoRes.ok) {
+          const infoData = await infoRes.json();
+          companyName = infoData?.CompanyInfo?.CompanyName || null;
+        }
+      } catch {}
+
+      await pool.query(
+        `INSERT INTO qbo_connections (id, user_id, realm_id, access_token_encrypted, refresh_token_encrypted,
+           access_token_expires_at, connected_at, scopes, environment, status, company_name)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW(), $6, 'production', 'connected', $7)
+         ON CONFLICT (user_id) DO UPDATE SET
+           realm_id = $2, access_token_encrypted = $3, refresh_token_encrypted = $4,
+           access_token_expires_at = $5, connected_at = NOW(), scopes = $6,
+           status = 'connected', company_name = $7, last_error = NULL, disconnected_at = NULL`,
+        [userId, realmId, encryptToken(accessToken), encryptToken(refreshToken), expiresAt, "com.intuit.quickbooks.accounting", companyName]
+      );
+
+      await logSync(userId, null, "connect", { realmId }, { companyName, success: true }, "ok");
+
+      res.send(`<!DOCTYPE html><html><head><title>QuickBooks Connected</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8f9fa;margin:0}.card{text-align:center;padding:40px;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,0.1);max-width:400px}h1{color:#16a34a;margin-bottom:8px}p{color:#64748b}</style></head><body><div class="card"><h1>Connected!</h1><p>QuickBooks is now connected${companyName ? ` to ${companyName}` : ""}. You can close this window and return to QuotePro.</p></div></body></html>`);
+    } catch (e: any) {
+      console.error("QBO callback error:", e);
+      res.status(500).send("An error occurred during QuickBooks connection");
+    }
+  });
+
+  app.post("/api/integrations/qbo/disconnect", requireAuth, async (req: any, res) => {
+    try {
+      await pool.query(
+        `UPDATE qbo_connections SET status = 'disconnected', disconnected_at = NOW(),
+                access_token_encrypted = NULL, refresh_token_encrypted = NULL
+         WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      await logSync(req.session.userId, null, "disconnect", {}, { success: true }, "ok");
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/integrations/qbo/test", requireAuth, async (req: any, res) => {
+    try {
+      const client = new QBOClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No QuickBooks connection found" });
+
+      const info = await client.getCompanyInfo();
+      await logSync(req.session.userId, null, "test_connection", {}, { companyName: info.CompanyName }, "ok");
+      res.json({ success: true, companyName: info.CompanyName });
+    } catch (e: any) {
+      await logSync(req.session.userId, null, "test_connection", {}, { error: e.message }, "failed", e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/integrations/qbo/create-invoice", requireAuth, async (req: any, res) => {
+    try {
+      const { quoteId } = req.body;
+      if (!quoteId) return res.status(400).json({ error: "quoteId is required" });
+
+      const result = await createQBOInvoiceForQuote(req.session.userId, quoteId);
+      if (!result) return res.status(400).json({ error: "QuickBooks not connected or quote not found" });
+
+      res.json(result);
+    } catch (e: any) {
+      await logSync(req.session.userId, req.body?.quoteId || null, "create_invoice", { quoteId: req.body?.quoteId }, { error: e.message }, "failed", e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/integrations/qbo/logs", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, user_id as "userId", quote_id as "quoteId", action,
+                request_summary as "requestSummary", response_summary as "responseSummary",
+                status, error_message as "errorMessage", created_at as "createdAt"
+         FROM qbo_sync_log WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [req.session.userId]
+      );
+      res.json(result.rows);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.put("/api/integrations/qbo/settings", requireAuth, async (req: any, res) => {
+    try {
+      const { autoCreateInvoice } = req.body;
+      await pool.query(
+        `UPDATE qbo_connections SET auto_create_invoice = $1 WHERE user_id = $2`,
+        [!!autoCreateInvoice, req.session.userId]
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/integrations/qbo/invoice-link/:quoteId", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT qbo_invoice_id as "qboInvoiceId", qbo_doc_number as "qboDocNumber", created_at as "createdAt"
+         FROM qbo_invoice_links WHERE user_id = $1 AND quote_id = $2`,
+        [req.session.userId, req.params.quoteId]
+      );
+      if (result.rows.length === 0) return res.json(null);
+      res.json(result.rows[0]);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   setInterval(async () => {
@@ -6317,6 +6550,167 @@ async function deliverWebhook(endpoint: any, eventId: string, body: string, sign
       setTimeout(() => deliverWebhook(endpoint, eventId, body, signature, attempt + 1), retryDelays[attempt - 1]);
     }
   }
+}
+
+// ============ QBO INTEGRATION ENDPOINTS ============
+
+async function initQBOTables() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS qbo_connections (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL UNIQUE REFERENCES users(id),
+        realm_id TEXT,
+        access_token_encrypted TEXT,
+        refresh_token_encrypted TEXT,
+        access_token_expires_at TIMESTAMP,
+        refresh_token_last_rotated_at TIMESTAMP,
+        connected_at TIMESTAMP,
+        disconnected_at TIMESTAMP,
+        scopes TEXT,
+        environment TEXT NOT NULL DEFAULT 'production',
+        status TEXT NOT NULL DEFAULT 'disconnected',
+        last_error TEXT,
+        company_name TEXT,
+        auto_create_invoice BOOLEAN NOT NULL DEFAULT false
+      );
+      CREATE TABLE IF NOT EXISTS qbo_customer_mappings (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL REFERENCES users(id),
+        qp_customer_id VARCHAR NOT NULL REFERENCES customers(id),
+        qbo_customer_id TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS qbo_invoice_links (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL REFERENCES users(id),
+        quote_id VARCHAR NOT NULL REFERENCES quotes(id),
+        qbo_invoice_id TEXT NOT NULL,
+        qbo_doc_number TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id, quote_id)
+      );
+      CREATE TABLE IF NOT EXISTS qbo_sync_log (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL REFERENCES users(id),
+        quote_id VARCHAR,
+        action TEXT NOT NULL,
+        request_summary JSONB,
+        response_summary JSONB,
+        status TEXT NOT NULL,
+        error_message TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+  } catch (e) {
+    console.warn("QBO tables init:", (e as Error).message);
+  }
+}
+
+initQBOTables();
+
+async function createQBOInvoiceForQuote(userId: string, quoteId: string): Promise<{ qboInvoiceId: string; docNumber: string | null } | null> {
+  const existingLink = await pool.query(
+    `SELECT qbo_invoice_id, qbo_doc_number FROM qbo_invoice_links WHERE user_id = $1 AND quote_id = $2`,
+    [userId, quoteId]
+  );
+  if (existingLink.rows.length > 0) {
+    return { qboInvoiceId: existingLink.rows[0].qbo_invoice_id, docNumber: existingLink.rows[0].qbo_doc_number };
+  }
+
+  const client = new QBOClient(userId);
+  const conn = await client.loadConnection();
+  if (!conn || conn.status !== "connected") return null;
+
+  const quote = await getQuoteById(quoteId);
+  if (!quote) throw new Error("Quote not found");
+
+  let customer: any = null;
+  if (quote.customerId) {
+    customer = await getCustomerById(quote.customerId);
+  }
+
+  let qboCustomerId: string | null = null;
+
+  if (customer) {
+    const mapping = await pool.query(
+      `SELECT qbo_customer_id FROM qbo_customer_mappings WHERE user_id = $1 AND qp_customer_id = $2`,
+      [userId, customer.id]
+    );
+    if (mapping.rows.length > 0) {
+      qboCustomerId = mapping.rows[0].qbo_customer_id;
+    } else {
+      let found = null;
+      if (customer.email) {
+        found = await client.queryCustomer(customer.email);
+      }
+      if (!found && customer.name) {
+        found = await client.queryCustomer(undefined, customer.name);
+      }
+
+      if (found) {
+        qboCustomerId = found.Id;
+      } else {
+        const newCust = await client.createCustomer(
+          customer.name || "Unknown Customer",
+          customer.email || undefined,
+          customer.phone || undefined,
+          customer.address || undefined
+        );
+        qboCustomerId = newCust.Id;
+        await logSync(userId, quoteId, "create_customer", { name: customer.name }, { qboId: newCust.Id }, "ok");
+      }
+
+      await pool.query(
+        `INSERT INTO qbo_customer_mappings (id, user_id, qp_customer_id, qbo_customer_id) VALUES (gen_random_uuid(), $1, $2, $3)`,
+        [userId, customer.id, qboCustomerId]
+      );
+    }
+  } else {
+    const defaultCust = await client.queryCustomer(undefined, "QuotePro Customer");
+    if (defaultCust) {
+      qboCustomerId = defaultCust.Id;
+    } else {
+      const newCust = await client.createCustomer("QuotePro Customer");
+      qboCustomerId = newCust.Id;
+    }
+  }
+
+  if (!qboCustomerId) throw new Error("Could not resolve QBO customer");
+
+  const lineItems = await pool.query(`SELECT * FROM line_items WHERE quote_id = $1`, [quoteId]);
+  const lines: Array<{ description: string; amount: number }> = [];
+
+  if (lineItems.rows.length > 0) {
+    for (const li of lineItems.rows) {
+      lines.push({
+        description: `${li.label || li.type || "Cleaning Service"}${li.description ? " - " + li.description : ""}`,
+        amount: parseFloat(li.price) || 0,
+      });
+    }
+  } else {
+    const totalAmount = parseFloat(quote.total as any) || 0;
+    const desc = quote.propertyDetails
+      ? `Cleaning Services - ${(quote.propertyDetails as any)?.sqft || ""} sqft`
+      : "Cleaning Services";
+    lines.push({ description: desc, amount: totalAmount });
+  }
+
+  const privateNote = `QuotePro Quote #${quote.quoteNumber || quoteId}`;
+  const txnDate = new Date().toISOString().split("T")[0];
+
+  const invoice = await client.createInvoice(qboCustomerId, lines, privateNote, txnDate);
+
+  await pool.query(
+    `INSERT INTO qbo_invoice_links (id, user_id, quote_id, qbo_invoice_id, qbo_doc_number)
+     VALUES (gen_random_uuid(), $1, $2, $3, $4)
+     ON CONFLICT (user_id, quote_id) DO NOTHING`,
+    [userId, quoteId, invoice.Id, invoice.DocNumber || null]
+  );
+
+  await logSync(userId, quoteId, "create_invoice", { quoteId, lines: lines.length }, { invoiceId: invoice.Id, docNumber: invoice.DocNumber }, "ok");
+
+  return { qboInvoiceId: invoice.Id, docNumber: invoice.DocNumber || null };
 }
 
 function generateICS(opts: { title: string; description: string; location: string; start: Date; end: Date; id: string }): string {

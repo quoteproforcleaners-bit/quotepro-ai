@@ -757,9 +757,81 @@ export const webhookDeliveries = pgTable("webhook_deliveries", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const qboConnections = pgTable("qbo_connections", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id),
+  realmId: text("realm_id"),
+  accessTokenEncrypted: text("access_token_encrypted"),
+  refreshTokenEncrypted: text("refresh_token_encrypted"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at"),
+  refreshTokenLastRotatedAt: timestamp("refresh_token_last_rotated_at"),
+  connectedAt: timestamp("connected_at"),
+  disconnectedAt: timestamp("disconnected_at"),
+  scopes: text("scopes"),
+  environment: text("environment").notNull().default("production"),
+  status: text("status").notNull().default("disconnected"),
+  lastError: text("last_error"),
+  companyName: text("company_name"),
+  autoCreateInvoice: boolean("auto_create_invoice").notNull().default(false),
+});
+
+export const qboCustomerMappings = pgTable("qbo_customer_mappings", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id),
+  qpCustomerId: varchar("qp_customer_id")
+    .notNull()
+    .references(() => customers.id),
+  qboCustomerId: text("qbo_customer_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const qboInvoiceLinks = pgTable("qbo_invoice_links", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id),
+  quoteId: varchar("quote_id")
+    .notNull()
+    .references(() => quotes.id),
+  qboInvoiceId: text("qbo_invoice_id").notNull(),
+  qboDocNumber: text("qbo_doc_number"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const qboSyncLog = pgTable("qbo_sync_log", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id),
+  quoteId: varchar("quote_id"),
+  action: text("action").notNull(),
+  requestSummary: jsonb("request_summary"),
+  responseSummary: jsonb("response_summary"),
+  status: text("status").notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export type InvoicePacket = typeof invoicePackets.$inferSelect;
 export type CalendarEventStub = typeof calendarEventStubs.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
 export type WebhookEvent = typeof webhookEvents.$inferSelect;
 export type WebhookDelivery = typeof webhookDeliveries.$inferSelect;
+export type QboConnection = typeof qboConnections.$inferSelect;
+export type QboCustomerMapping = typeof qboCustomerMappings.$inferSelect;
+export type QboInvoiceLink = typeof qboInvoiceLinks.$inferSelect;
+export type QboSyncLogEntry = typeof qboSyncLog.$inferSelect;

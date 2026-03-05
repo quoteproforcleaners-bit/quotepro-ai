@@ -116,6 +116,15 @@ Key files:
 - **Webhooks & API Keys**: Webhook endpoints for Zapier/Make with HMAC-SHA256 signing, 3-attempt retry with exponential backoff. Events: quote.created/sent/accepted/declined, invoice_packet.created, calendar_stub.created. DB tables: `api_keys`, `webhook_endpoints`, `webhook_events`, `webhook_deliveries`. AutomationsIntegrationsScreen with full API key lifecycle and event log.
 - **QuoteDetailScreen**: 3 new action buttons (Invoice Packet, Calendar, Automations) with modal UIs.
 
+### QuickBooks Online Integration
+- **OAuth2 Flow**: Connect via Intuit OAuth2 (env: `INTUIT_CLIENT_ID`, `INTUIT_CLIENT_SECRET`). Tokens encrypted with AES-256-GCM (env: `QBO_ENCRYPTION_KEY`). Auto-refresh on expiry.
+- **QBO Client**: `server/qbo-client.ts` — token encrypt/decrypt, auto-refresh, exponential retry, customer query/create, invoice create, company info test.
+- **DB Tables**: `qbo_connections` (OAuth state, encrypted tokens, company info, auto-invoice flag), `qbo_customer_mappings` (QuotePro customer → QBO customer), `qbo_invoice_links` (quote → QBO invoice, unique constraint on user_id+quote_id), `qbo_sync_log` (audit trail).
+- **API Endpoints**: `/api/integrations/qbo/status`, `/connect`, `/callback` (OAuth redirect, state-validated), `/disconnect`, `/test`, `/create-invoice` (idempotent), `/logs`, `/settings`, `/invoice-link/:quoteId`.
+- **Auto-Invoice**: When quote status changes to "accepted" and `autoCreateInvoice` is enabled, QBO invoice is created fire-and-forget.
+- **UI Screens**: `QBOSettingsScreen` (connect/disconnect/test/auto-invoice toggle/recent logs), `QBOLogsScreen` (full sync history with pull-to-refresh).
+- **Navigation**: Settings → "QuickBooks Online" row → QBOSettings. QuoteDetailScreen shows "QuickBooks" action button (create invoice or linked badge).
+
 ### AI Dynamic Pricing Suggestions
 - Server endpoint: `POST /api/ai/pricing-suggestion` (Pro-only, gpt-5-nano) analyzes property details, add-ons, frequency, current prices, and business history to suggest optimal Good/Better/Best tier pricing.
 - Frontend: "AI Price Check" button on QuotePreviewScreen between quote cards and breakdown. Shows per-tier price comparison (current → suggested), reasoning, confidence badge, overall assessment, individual "Apply" buttons and "Apply All" button that updates priceOverrides.

@@ -1,0 +1,242 @@
+You are the senior engineer for QuotePro AI. Implement a “Seamless QuickBooks Online (QBO) Integration” that feels one-click for users.
+
+PRODUCT GOAL
+- User goes to Settings → QuickBooks → clicks “Connect QuickBooks”
+- Completes Intuit OAuth
+- After a quote is accepted, QuotePro can create:
+  1) Customer (find-or-create)
+  2) Invoice with line items
+- UX must be frictionless: after initial connection, defaults take over.
+- V1 is outbound only: QuotePro → QBO. No bi-directional sync, no payments, no reconciliation.
+
+REFERENCES / REQUIRED BEHAVIOR
+- Use Intuit OAuth 2.0 authorization code flow for QBO. (Official Intuit docs). 
+- Use QBO Accounting API REST patterns: POST baseURL/v3/company/{realmId}/{resourceName}. 
+- Create invoice workflow should follow Intuit’s invoice creation patterns (Line with SalesItemLineDetail).
+- Refresh token expiration handling must exist (auto refresh; if refresh fails, prompt user to reconnect).
+(Do not hardcode tokens; store securely; use refresh flow.)
+These requirements align with Intuit documentation. 
+
+========================
+ARCHITECTURE
+========================
+Backend services needed:
+1) OAuth connect + callback endpoints
+2) Token storage (encrypted at rest)
+3) QBO API client with:
+   - automatic token refresh
+   - retry/backoff for 429/5xx
+   - idempotency protections on our side
+4) Mapping layer:
+   - QuotePro Quote -> QBO Customer + Invoice
+5) QBO status UI + logs
+
+Assume current stack:
+- Node/TypeScript backend (or implement in the backend language already present)
+- Existing DB available (Postgres or similar)
+- Existing auth/userId
+
+========================
+DATA MODEL (DB MIGRATIONS)
+========================
+Create tables:
+
+qbo_connections
+- id (uuid)
+- user_id (string/uuid) UNIQUE
+- realm_id (string)            // Intuit company ID (realmId)
+- access_token_encrypted (text)
+- refresh_token_encrypted (text)
+- access_token_expires_at (timestamp)
+- refresh_token_last_rotated_at (timestamp)
+- connected_at (timestamp)
+- disconnected_at (timestamp nullable)
+- scopes (text)
+- environment (text)           // sandbox | production
+- status (text)                // connected | needs_reauth | error
+- last_error (text nullable)
+
+qbo_mappings_customers
+- id (uuid)
+- user_id
+- qp_customer_id
+- qbo_customer_id
+- created_at
+
+qbo_mappings_items (optional but recommended)
+- id (uuid)
+- user_id
+- qp_service_key (e.g., “standard_clean”, “deep_clean”, “add_on_oven”)
+- qbo_item_id
+- created_at
+
+qbo_invoice_links
+- id (uuid)
+- user_id
+- quote_id
+- qbo_invoice_id
+- qbo_doc_number (nullable)
+- created_at
+
+qbo_sync_log
+- id (uuid)
+- user_id
+- quote_id (nullable)
+- action (text)      // connect, refresh, create_customer, create_invoice
+- request_summary (json)
+- response_summary (json)
+- status (text)      // ok | failed
+- error_message (text nullable)
+- created_at
+
+========================
+OAUTH FLOW (INTUIT)
+========================
+Implement:
+- GET /api/integrations/qbo/connect
+  - Generates Intuit OAuth URL with state, redirect_uri, scopes
+  - Stores state in DB/session with user_id
+- GET /api/integrations/qbo/callback
+  - Validate state
+  - Exchange code for tokens (access + refresh)
+  - Store encrypted tokens + realmId + scope
+  - Set status=connected
+- POST /api/integrations/qbo/disconnect
+  - Marks disconnected_at, status=disconnected, clears tokens safely
+
+Scopes:
+- Use the minimum needed to create customers + invoices (accounting scope).
+(Choose appropriate QBO scopes per Intuit’s scope model; keep minimal.)
+
+Token refresh:
+- Centralize in QBO client:
+  - If access token expired or near-expiry, refresh using refresh token
+  - Update DB with new tokens and expiry
+  - If refresh fails due to invalid_grant, set status=needs_reauth and surface UI prompt to reconnect
+
+IMPORTANT:
+- NEVER log raw tokens.
+- Encrypt tokens at rest.
+- Use server-side secret management.
+
+========================
+QBO API CLIENT
+========================
+Implement a QBOClient that:
+- Computes base URL per environment (sandbox vs production)
+- Uses endpoints:
+  - Create customer: POST /v3/company/{realmId}/customer
+  - Query customer by email/displayname: GET /v3/company/{realmId}/query?query=...
+  - Create item (optional): POST /v3/company/{realmId}/item
+  - Create invoice: POST /v3/company/{realmId}/invoice
+These follow QBO REST patterns where POST baseURL/v3/company/realmId/resourceName creates a resource.
+
+Add:
+- Retry policy for 429 and 5xx with exponential backoff (max 3 retries)
+- Guardrail: if rate-limited, mark sync log with “retryable” and surface “Try again” UI
+
+========================
+QUOTE → QBO MAPPING RULES (SEAMLESS UX)
+========================
+On “Quote Accepted” event:
+1) Ensure QBO connection exists and status=connected
+2) Ensure a QBO Customer exists:
+   - If qp_customer_id has mapping -> use qbo_customer_id
+   - Else: query QBO for customer by email (preferred) or display name
+   - If not found: create customer with:
+       DisplayName, PrimaryEmailAddr, PrimaryPhone, BillAddr
+   - Save mapping
+
+3) Ensure line items map cleanly:
+   V1 approach (fast + reliable):
+   - Use ONE generic QBO Item if specific ones aren’t mapped yet:
+       “Cleaning Services”
+   - Put detail into Description (e.g., “Deep Clean + Oven + Fridge”)
+   - Amount = Quote total, or split into multiple lines if desired
+   Optional upgrade:
+   - Create/find QBO Items per service type and save mappings
+
+4) Create invoice:
+   - CustomerRef = qbo_customer_id
+   - Line[] using SalesItemLineDetail (or correct invoice line structure)
+   - TxnDate = today (or service date if present)
+   - PrivateNote includes QuotePro Quote ID and link back to QuotePro
+   - EmailStatus can remain default (we are not sending invoice email in V1)
+
+5) Store qbo_invoice_id in qbo_invoice_links to prevent duplicates.
+
+Idempotency:
+- If quote_id already has a qbo_invoice_link, do not create a new invoice.
+- Provide UI option: “Create another invoice anyway” (advanced) but default OFF.
+
+========================
+UI/UX (MAKE IT FEEL EASY)
+========================
+Create Settings → Integrations → QuickBooks:
+- Card shows status:
+  - Connected to {CompanyName if available} (realmId)
+  - Last sync
+  - Button: Disconnect
+  - Button: Test Connection (calls lightweight endpoint and logs result)
+
+Quote Details screen:
+- If QBO connected:
+  - Button: “Create QuickBooks Invoice”
+  - Toggle (in Settings): “Auto-create invoice when quote accepted”
+  - Show last invoice link: “View in QuickBooks” (if URL is derivable; otherwise show invoice id)
+- If QBO not connected:
+  - Show “Connect QuickBooks to create invoices automatically” CTA
+
+Error handling:
+- If status=needs_reauth, show “Reconnect QuickBooks” banner and do NOT attempt writes.
+
+Logs:
+- Add an “Integration Log” screen showing last 50 entries from qbo_sync_log with details.
+
+========================
+ENDPOINTS (BACKEND)
+========================
+- GET  /api/integrations/qbo/status
+- GET  /api/integrations/qbo/connect
+- GET  /api/integrations/qbo/callback
+- POST /api/integrations/qbo/disconnect
+- POST /api/integrations/qbo/test
+- POST /api/integrations/qbo/create-invoice?quoteId=...
+
+Event hook:
+- When Quote status changes to ACCEPTED:
+   - If setting autoCreateInvoice=true, enqueue create-invoice
+   - Use a background job queue if available; otherwise run synchronously but with timeouts.
+
+========================
+SECURITY + COMPLIANCE
+========================
+- Use OAuth 2.0 authorization code flow, verify state, use PKCE if supported by current stack.
+- Encrypt tokens at rest.
+- Never expose realmId/tokens to client.
+- Rate limit integration endpoints.
+- Ensure multi-tenant isolation (user_id scoping on every query).
+
+========================
+TESTING
+========================
+- Unit tests:
+  - token refresh logic
+  - signature/state validation
+  - idempotency (quote -> one invoice)
+- Integration test (sandbox):
+  - connect
+  - create customer
+  - create invoice
+
+========================
+DELIVERABLES
+========================
+- DB migrations + models
+- OAuth endpoints
+- QBOClient with refresh + retry
+- Quote Accepted -> create invoice pipeline
+- UI screens: QuickBooks settings card, quote button, logs screen
+- Minimal docs inside app: “What gets created in QuickBooks”
+
+Build this now. Keep it minimal, reliable, and truly seamless after the first connect.

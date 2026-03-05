@@ -110,6 +110,8 @@ export default function QuoteDetailScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [calendarResult, setCalendarResult] = useState<{ icsContent: string; googleCalendarUrl: string } | null>(null);
 
+  const [qboCreating, setQboCreating] = useState(false);
+
   const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
   });
@@ -120,6 +122,15 @@ export default function QuoteDetailScreen() {
 
   const { data: growthSettings } = useQuery<any>({
     queryKey: ['/api/growth-automation-settings'],
+  });
+
+  const { data: qboStatus } = useQuery<any>({
+    queryKey: ['/api/integrations/qbo/status'],
+  });
+
+  const { data: qboInvoiceLink, refetch: refetchQboLink } = useQuery<any>({
+    queryKey: ['/api/integrations/qbo/invoice-link', route.params.quoteId],
+    enabled: qboStatus?.status === "connected",
   });
 
   useFocusEffect(
@@ -612,6 +623,23 @@ export default function QuoteDetailScreen() {
       }
     } catch {
       await Clipboard.setStringAsync(msg);
+    }
+  };
+
+  const handleCreateQboInvoice = async () => {
+    if (!quote || qboCreating) return;
+    setQboCreating(true);
+    try {
+      const res = await apiRequest("POST", "/api/integrations/qbo/create-invoice", { quoteId: quote.id });
+      const data = await res.json();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      refetchQboLink();
+      Alert.alert("Invoice Created", `QuickBooks Invoice${data.docNumber ? ` #${data.docNumber}` : ""} created successfully.`);
+    } catch (e: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Error", e.message || "Failed to create QuickBooks invoice");
+    } finally {
+      setQboCreating(false);
     }
   };
 
@@ -1682,6 +1710,34 @@ export default function QuoteDetailScreen() {
             <Feather name="zap" size={20} color={theme.primary} />
             <ThemedText type="small" style={{ marginTop: 4 }}>Automations</ThemedText>
           </Pressable>
+
+          {qboStatus?.status === "connected" ? (
+            qboInvoiceLink ? (
+              <View
+                style={[styles.actionButton, { backgroundColor: "#16a34a15" }]}
+                testID="qbo-invoice-linked"
+              >
+                <Feather name="check-circle" size={20} color="#16a34a" />
+                <ThemedText type="small" style={{ marginTop: 4, color: "#16a34a" }}>
+                  QB #{qboInvoiceLink.qboDocNumber || "Synced"}
+                </ThemedText>
+              </View>
+            ) : (
+              <Pressable
+                onPress={handleCreateQboInvoice}
+                style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+                testID="qbo-create-invoice-btn"
+                disabled={qboCreating}
+              >
+                {qboCreating ? (
+                  <ActivityIndicator size={20} color={theme.primary} />
+                ) : (
+                  <Feather name="book-open" size={20} color={theme.primary} />
+                )}
+                <ThemedText type="small" style={{ marginTop: 4 }}>QuickBooks</ThemedText>
+              </Pressable>
+            )
+          ) : null}
 
           <Pressable
             onPress={handleDelete}

@@ -26,6 +26,8 @@ import HelpGuideScreen from "@/screens/HelpGuideScreen";
 import AvatarBuilderScreen from "@/screens/AvatarBuilderScreen";
 import CommercialQuoteCalculatorScreen from "@/screens/CommercialQuoteCalculatorScreen";
 import ProSetupChecklistScreen from "@/screens/ProSetupChecklistScreen";
+import QBOSettingsScreen from "@/screens/QBOSettingsScreen";
+import QBOLogsScreen from "@/screens/QBOLogsScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -62,6 +64,8 @@ export type RootStackParamList = {
   AvatarBuilder: undefined;
   ProSetupChecklist: undefined;
   CommercialQuote: { customerName?: string; customerAddress?: string } | undefined;
+  QBOSettings: undefined;
+  QBOLogs: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -305,6 +309,20 @@ export default function RootStackNavigator() {
             options={{
               headerShown: false,
               animation: "slide_from_bottom",
+            }}
+          />
+          <Stack.Screen
+            name="QBOSettings"
+            component={QBOSettingsScreen}
+            options={{
+              headerTitle: "QuickBooks",
+            }}
+          />
+          <Stack.Screen
+            name="QBOLogs"
+            component={QBOLogsScreen}
+            options={{
+              headerTitle: "Sync History",
             }}
           />
         </>
