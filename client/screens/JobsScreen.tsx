@@ -50,6 +50,8 @@ interface Job {
   internalNotes: string;
   address: string;
   total: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
   customer?: { firstName: string; lastName: string } | null;
 }
 
@@ -171,6 +173,7 @@ export default function JobsScreen() {
   };
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [selectedDayFilter, setSelectedDayFilter] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -374,19 +377,101 @@ export default function JobsScreen() {
     });
   };
 
+  const dayStrip = useMemo(() => {
+    const today = new Date();
+    const days: { key: string; label: string; dayOfWeek: string; dayNum: number; isToday: boolean }[] = [];
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      days.push({
+        key,
+        label: i === 0 ? "Today" : i === 1 ? "Tmrw" : dayNames[d.getDay()],
+        dayOfWeek: dayNames[d.getDay()],
+        dayNum: d.getDate(),
+        isToday: i === 0,
+      });
+    }
+    return days;
+  }, []);
+
   const sortedJobs = [...jobs].sort(
     (a, b) =>
       new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime()
   );
 
   const filteredJobs = sortedJobs.filter((job) => {
-    if (statusFilter === "all") return true;
-    return job.status === statusFilter;
+    if (statusFilter !== "all" && job.status !== statusFilter) return false;
+    if (selectedDayFilter) {
+      const jobDate = new Date(job.startDatetime);
+      const jobKey = `${jobDate.getFullYear()}-${String(jobDate.getMonth() + 1).padStart(2, "0")}-${String(jobDate.getDate()).padStart(2, "0")}`;
+      if (jobKey !== selectedDayFilter) return false;
+    }
+    return true;
   });
 
   const renderHeader = () => (
     <View>
       <ProBanner message={t.jobs.automateReminders} />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.dayStripContainer}
+      >
+        <Pressable
+          testID="day-filter-all"
+          onPress={() => setSelectedDayFilter(null)}
+          style={[
+            styles.dayChip,
+            { backgroundColor: selectedDayFilter === null ? theme.primary : theme.backgroundElevated },
+          ]}
+        >
+          <ThemedText
+            type="caption"
+            style={{
+              color: selectedDayFilter === null ? "#FFFFFF" : theme.textSecondary,
+              fontWeight: "600",
+            }}
+          >
+            All
+          </ThemedText>
+        </Pressable>
+        {dayStrip.map((day) => (
+          <Pressable
+            key={day.key}
+            testID={`day-filter-${day.key}`}
+            onPress={() => setSelectedDayFilter(day.key === selectedDayFilter ? null : day.key)}
+            style={[
+              styles.dayChip,
+              {
+                backgroundColor: selectedDayFilter === day.key ? theme.primary : theme.backgroundElevated,
+              },
+            ]}
+          >
+            <ThemedText
+              type="caption"
+              style={{
+                color: selectedDayFilter === day.key ? "#FFFFFF" : theme.textSecondary,
+                fontWeight: "500",
+                fontSize: 10,
+              }}
+            >
+              {day.label}
+            </ThemedText>
+            <ThemedText
+              type="caption"
+              style={{
+                color: selectedDayFilter === day.key ? "#FFFFFF" : theme.text,
+                fontWeight: "700",
+                fontSize: 16,
+              }}
+            >
+              {day.dayNum}
+            </ThemedText>
+          </Pressable>
+        ))}
+      </ScrollView>
       <View style={styles.filterContainer}>
         <SegmentedControl
           options={filterOptions}
@@ -945,6 +1030,19 @@ const styles = StyleSheet.create({
   },
   emptyContent: {
     flexGrow: 1,
+  },
+  dayStripContainer: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    gap: Spacing.xs,
+  },
+  dayChip: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    minWidth: 48,
   },
   filterContainer: {
     marginBottom: Spacing.lg,

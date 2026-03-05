@@ -49,6 +49,8 @@ interface Job {
   internalNotes: string;
   address: string;
   total: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
   satisfactionRating: number | null;
   ratingComment: string | null;
   customer?: { firstName: string; lastName: string } | null;
@@ -207,6 +209,20 @@ export default function JobDetailScreen() {
     },
   });
 
+  const startMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/jobs/${jobId}/start`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId] });
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    },
+  });
+
   const completeMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/jobs/${jobId}/complete`);
@@ -294,6 +310,20 @@ export default function JobDetailScreen() {
     );
   };
 
+  const handleStartJob = () => {
+    Alert.alert(
+      "Start Job",
+      "Start the clock for this job?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Start",
+          onPress: () => startMutation.mutate(),
+        },
+      ]
+    );
+  };
+
   const handleCompleteJob = () => {
     Alert.alert(
       "Complete Job",
@@ -376,6 +406,22 @@ export default function JobDetailScreen() {
     : null;
   const isCompleted = job.status === "completed";
   const isCanceled = job.status === "canceled";
+  const isInProgress = job.status === "in_progress";
+  const isScheduled = job.status === "scheduled";
+
+  const jobDuration = (() => {
+    if (job.startedAt && job.completedAt) {
+      const startMs = new Date(job.startedAt).getTime();
+      const endMs = new Date(job.completedAt).getTime();
+      if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) return null;
+      const totalMin = Math.round((endMs - startMs) / 60000);
+      const hrs = Math.floor(totalMin / 60);
+      const mins = totalMin % 60;
+      if (hrs > 0) return `${hrs}h ${mins}m`;
+      return `${mins}m`;
+    }
+    return null;
+  })();
 
   return (
     <ProGate featureName="Job Details">
@@ -553,7 +599,26 @@ export default function JobDetailScreen() {
           </>
         ) : null}
 
-        {!isCompleted && !isCanceled ? (
+        {isScheduled ? (
+          <Pressable
+            testID="start-job-btn"
+            onPress={handleStartJob}
+            style={[styles.completeButton, { backgroundColor: theme.primary }]}
+          >
+            {startMutation.isPending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Feather name="play-circle" size={20} color="#FFFFFF" />
+                <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.sm }}>
+                  Start Job
+                </ThemedText>
+              </>
+            )}
+          </Pressable>
+        ) : null}
+
+        {isInProgress ? (
           <Pressable
             testID="complete-job-btn"
             onPress={handleCompleteJob}
@@ -565,11 +630,39 @@ export default function JobDetailScreen() {
               <>
                 <Feather name="check-circle" size={20} color="#FFFFFF" />
                 <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.sm }}>
-                  Complete Job
+                  End Job
                 </ThemedText>
               </>
             )}
           </Pressable>
+        ) : null}
+
+        {isInProgress && job.startedAt ? (
+          <Card style={[styles.notesCard, { marginTop: Spacing.sm }]}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Feather name="clock" size={16} color={theme.warning} />
+              <ThemedText type="small" style={{ color: theme.warning, fontWeight: "600", marginLeft: Spacing.sm }}>
+                In Progress
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
+                Started {formatDate(job.startedAt)}
+              </ThemedText>
+            </View>
+          </Card>
+        ) : null}
+
+        {jobDuration ? (
+          <Card style={[styles.notesCard, { marginTop: Spacing.sm }]}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Feather name="clock" size={16} color={theme.success} />
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
+                Duration:
+              </ThemedText>
+              <ThemedText type="body" style={{ fontWeight: "700", marginLeft: Spacing.xs }}>
+                {jobDuration}
+              </ThemedText>
+            </View>
+          </Card>
         ) : null}
 
         {isCompleted && growthSettings?.askReviewAfterComplete && growthSettings?.googleReviewLink?.trim() ? (

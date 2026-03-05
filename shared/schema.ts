@@ -209,6 +209,8 @@ export const jobs = pgTable("jobs", {
   internalNotes: text("internal_notes").notNull().default(""),
   address: text("address").notNull().default(""),
   total: real("total"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
   satisfactionRating: integer("satisfaction_rating"),
   ratingComment: text("rating_comment"),
   ratingToken: varchar("rating_token").default(sql`gen_random_uuid()`),

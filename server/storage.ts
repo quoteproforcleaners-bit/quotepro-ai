@@ -537,6 +537,8 @@ export async function updateJob(
     internalNotes: string;
     address: string;
     total: number | null;
+    startedAt: Date | null;
+    completedAt: Date | null;
   }>
 ): Promise<Job> {
   const [j] = await db

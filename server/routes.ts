@@ -1300,14 +1300,41 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
 
   // ─── Recurring Job Automation ───
 
+  app.post("/api/jobs/:id/start", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      if (job.status !== "scheduled") {
+        return res.status(409).json({ message: `Cannot start a job that is ${job.status}` });
+      }
+
+      const updatedJob = await updateJob(req.params.id, {
+        status: "in_progress",
+        startedAt: new Date(),
+      });
+
+      return res.json(updatedJob);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to start job" });
+    }
+  });
+
   app.post("/api/jobs/:id/complete", requireAuth, async (req: Request, res: Response) => {
     try {
       const job = await getJobById(req.params.id);
       if (!job) return res.status(404).json({ message: "Job not found" });
 
+      if (job.status === "completed" || job.status === "canceled") {
+        return res.status(409).json({ message: `Cannot complete a job that is ${job.status}` });
+      }
+
+      const now = new Date();
       const updatedJob = await updateJob(req.params.id, {
         status: "completed",
-        endDatetime: new Date(),
+        startedAt: (job as any).startedAt || now,
+        completedAt: now,
+        endDatetime: now,
       });
 
       let nextJob = null;
@@ -6608,6 +6635,15 @@ async function initQBOTables() {
 }
 
 initQBOTables();
+
+(async () => {
+  try {
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS started_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
+  } catch (e) {
+    console.warn("Job columns migration:", (e as Error).message);
+  }
+})();
 
 async function createQBOInvoiceForQuote(userId: string, quoteId: string): Promise<{ qboInvoiceId: string; docNumber: string | null } | null> {
   const existingLink = await pool.query(

@@ -125,6 +125,13 @@ Key files:
 - **UI Screens**: `QBOSettingsScreen` (connect/disconnect/test/auto-invoice toggle/recent logs), `QBOLogsScreen` (full sync history with pull-to-refresh).
 - **Navigation**: Settings → "QuickBooks Online" row → QBOSettings. QuoteDetailScreen shows "QuickBooks" action button (create invoice or linked badge).
 
+### Job Scheduling Enhancements
+- **Start/End Clock**: Jobs have `startedAt`/`completedAt` timestamp columns. `POST /api/jobs/:id/start` transitions scheduled→in_progress, `POST /api/jobs/:id/complete` transitions in_progress→completed with duration tracking.
+- **Status Guards**: Start only allowed from "scheduled"; complete blocked if already completed/canceled (409 response).
+- **Duration Display**: JobDetailScreen shows elapsed duration (Xh Ym) after completion, with NaN/invalid date guards. In-progress jobs show "Started at..." timestamp.
+- **Day Filter Strip**: JobsScreen has a horizontal scrollable 14-day date strip (Today, Tmrw, Mon, Tue...) above the status segmented control. Tap to filter jobs by day; tap again or "All" to clear.
+- **UI Flow**: Scheduled jobs show "Start Job" button (blue); in-progress jobs show "End Job" button (green).
+
 ### AI Dynamic Pricing Suggestions
 - Server endpoint: `POST /api/ai/pricing-suggestion` (Pro-only, gpt-5-nano) analyzes property details, add-ons, frequency, current prices, and business history to suggest optimal Good/Better/Best tier pricing.
 - Frontend: "AI Price Check" button on QuotePreviewScreen between quote cards and breakdown. Shows per-tier price comparison (current → suggested), reasoning, confidence badge, overall assessment, individual "Apply" buttons and "Apply All" button that updates priceOverrides.
