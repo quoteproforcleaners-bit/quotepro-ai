@@ -121,6 +121,16 @@ export default function QuotePreviewScreen({
   const [includeQuoteLink, setIncludeQuoteLink] = useState(true);
   const [priceOverrides, setPriceOverrides] = useState<{ good?: number; better?: number; best?: number }>({});
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [aiPricing, setAiPricing] = useState<{
+    good: { suggestedPrice: number; reasoning: string };
+    better: { suggestedPrice: number; reasoning: string };
+    best: { suggestedPrice: number; reasoning: string };
+    overallAssessment: string;
+    confidence: "low" | "medium" | "high";
+    keyInsight: string;
+  } | null>(null);
+  const [aiPricingLoading, setAiPricingLoading] = useState(false);
+  const [showAiPricing, setShowAiPricing] = useState(false);
 
   const baseOptions = useMemo(() => {
     return calculateAllOptions(
@@ -225,6 +235,50 @@ export default function QuotePreviewScreen({
       setAiDescLoading(false);
     }
   }, [homeDetails, options, addOns, businessProfile, isPro]);
+
+  const fetchAiPricing = useCallback(async () => {
+    if (!isPro) {
+      navigation.navigate("Paywall");
+      return;
+    }
+    const consented = await requestConsent();
+    if (!consented) return;
+    setAiPricingLoading(true);
+    setShowAiPricing(true);
+    try {
+      const res = await apiRequest("POST", "/api/ai/pricing-suggestion", {
+        homeDetails: {
+          sqft: homeDetails.sqft,
+          beds: homeDetails.beds,
+          baths: homeDetails.baths,
+          halfBaths: homeDetails.halfBaths,
+          homeType: homeDetails.homeType,
+          conditionScore: homeDetails.conditionScore,
+          peopleCount: homeDetails.peopleCount,
+          petType: homeDetails.petType,
+          petShedding: homeDetails.petShedding,
+        },
+        addOns,
+        frequency,
+        currentPrices: {
+          good: options.good.price,
+          better: options.better.price,
+          best: options.best.price,
+        },
+        pricingSettings: {
+          hourlyRate: pricingSettings.hourlyRate,
+        },
+      });
+      const data = await res.json();
+      if (data.good && data.better && data.best) {
+        setAiPricing(data);
+      }
+    } catch (err) {
+      console.log("AI pricing suggestion unavailable");
+    } finally {
+      setAiPricingLoading(false);
+    }
+  }, [homeDetails, addOns, frequency, options, pricingSettings, isPro]);
 
   const paymentMethodsText = useMemo(() => {
     const po = getPaymentOptions(businessProfile.paymentOptions);
@@ -620,6 +674,137 @@ export default function QuotePreviewScreen({
           onSetRecommended={() => onSetRecommended("best")}
           onPriceChange={(p) => setPriceOverrides((prev) => ({ ...prev, best: p }))}
         />
+
+        <Pressable
+          onPress={() => {
+            if (!isPro) {
+              navigation.navigate("Paywall");
+              return;
+            }
+            if (aiPricing) {
+              setShowAiPricing(!showAiPricing);
+            } else {
+              fetchAiPricing();
+            }
+          }}
+          style={[styles.aiPricingButton, { backgroundColor: `${theme.primary}12`, borderColor: `${theme.primary}25` }]}
+          testID="ai-price-check-btn"
+        >
+          <Feather name={isPro ? "cpu" : "lock"} size={16} color={theme.primary} />
+          <ThemedText type="small" style={{ color: theme.primary, marginLeft: 8, fontWeight: "600", flex: 1 }}>
+            AI Price Check
+          </ThemedText>
+          {aiPricingLoading ? (
+            <ActivityIndicator size="small" color={theme.primary} />
+          ) : (
+            <Feather name={showAiPricing ? "chevron-up" : "chevron-down"} size={16} color={theme.primary} />
+          )}
+        </Pressable>
+
+        {showAiPricing ? (
+          aiPricingLoading ? (
+            <View style={[styles.aiPricingCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.lg }}>
+                <ActivityIndicator size="small" color={theme.primary} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 8 }}>
+                  Analyzing pricing...
+                </ThemedText>
+              </View>
+            </View>
+          ) : aiPricing ? (
+            <View style={[styles.aiPricingCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+              <ThemedText type="small" style={{ color: theme.text, marginBottom: Spacing.sm }}>
+                {aiPricing.overallAssessment}
+              </ThemedText>
+
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.sm, gap: 8 }}>
+                <View style={[
+                  styles.aiPricingConfidence,
+                  {
+                    backgroundColor: aiPricing.confidence === "high"
+                      ? `${theme.success}15`
+                      : aiPricing.confidence === "medium"
+                        ? `${theme.primary}15`
+                        : `${theme.warning}15`,
+                  },
+                ]}>
+                  <ThemedText type="caption" style={{
+                    color: aiPricing.confidence === "high"
+                      ? theme.success
+                      : aiPricing.confidence === "medium"
+                        ? theme.primary
+                        : theme.warning,
+                    fontWeight: "600",
+                    textTransform: "capitalize",
+                  }}>
+                    {aiPricing.confidence} confidence
+                  </ThemedText>
+                </View>
+              </View>
+
+              <ThemedText type="small" style={{ color: theme.textSecondary, fontStyle: "italic", marginBottom: Spacing.md }}>
+                {aiPricing.keyInsight}
+              </ThemedText>
+
+              {(["good", "better", "best"] as const).map((tier) => {
+                const current = options[tier].price;
+                const suggested = aiPricing[tier].suggestedPrice;
+                const diff = suggested - current;
+                const diffColor = diff > 0 ? theme.success : diff < 0 ? theme.warning : theme.textSecondary;
+                return (
+                  <View key={tier} style={[styles.aiPricingRow, { borderBottomColor: theme.border }]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <ThemedText type="small" style={{ fontWeight: "600", textTransform: "capitalize" }}>
+                        {tier}
+                      </ThemedText>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                          {"$"}{current.toFixed(2)}
+                        </ThemedText>
+                        <Feather name="arrow-right" size={12} color={diffColor} />
+                        <ThemedText type="small" style={{ color: diffColor, fontWeight: "700" }}>
+                          {"$"}{suggested.toFixed(2)}
+                        </ThemedText>
+                        <Pressable
+                          onPress={() => setPriceOverrides((prev) => ({ ...prev, [tier]: suggested }))}
+                          style={[styles.aiPricingApply, { backgroundColor: `${theme.primary}12` }]}
+                          testID={`apply-ai-price-${tier}`}
+                        >
+                          <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
+                            Apply
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    </View>
+                    <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 4 }}>
+                      {aiPricing[tier].reasoning}
+                    </ThemedText>
+                  </View>
+                );
+              })}
+
+              <Pressable
+                onPress={() => {
+                  setPriceOverrides({
+                    good: aiPricing.good.suggestedPrice,
+                    better: aiPricing.better.suggestedPrice,
+                    best: aiPricing.best.suggestedPrice,
+                  });
+                  if (Platform.OS !== "web") {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }
+                }}
+                style={[styles.aiPricingApplyAll, { backgroundColor: theme.primary }]}
+                testID="apply-all-ai-prices"
+              >
+                <Feather name="check-circle" size={14} color="#FFFFFF" />
+                <ThemedText type="small" style={{ color: "#FFFFFF", marginLeft: 6, fontWeight: "600" }}>
+                  Apply All Suggestions
+                </ThemedText>
+              </Pressable>
+            </View>
+          ) : null
+        ) : null}
 
         <View style={[styles.breakdownCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
           <View style={styles.breakdownRow}>
@@ -1196,5 +1381,42 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     marginBottom: Spacing.md,
+  },
+  aiPricingButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  aiPricingCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  aiPricingRow: {
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    marginBottom: Spacing.xs,
+  },
+  aiPricingApply: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  aiPricingConfidence: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  aiPricingApplyAll: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+    marginTop: Spacing.md,
   },
 });

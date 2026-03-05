@@ -110,6 +110,26 @@ Key files:
 - **Expo-notifications**: Push notification support.
 - **Expo-print**, **expo-sharing**: For quote PDF export.
 
+### Integrations Lite (v1.0.8+)
+- **Invoice Packets**: Generate QuickBooks-compatible invoice packets (PDF/CSV/text) from quotes. Server endpoints at `/api/quotes/:id/invoice-packet` and `/api/invoice-packets/:id`. DB table: `invoice_packets`.
+- **Calendar Integration**: Create calendar event stubs with ICS download and Google Calendar deep links. Reminder templates (Confirmation, 24hr, On-my-way). DB table: `calendar_event_stubs`. Endpoints: `/api/quotes/:id/calendar-event`, `/api/calendar-events/quote/:id`.
+- **Webhooks & API Keys**: Webhook endpoints for Zapier/Make with HMAC-SHA256 signing, 3-attempt retry with exponential backoff. Events: quote.created/sent/accepted/declined, invoice_packet.created, calendar_stub.created. DB tables: `api_keys`, `webhook_endpoints`, `webhook_events`, `webhook_deliveries`. AutomationsIntegrationsScreen with full API key lifecycle and event log.
+- **QuoteDetailScreen**: 3 new action buttons (Invoice Packet, Calendar, Automations) with modal UIs.
+
+### AI Dynamic Pricing Suggestions
+- Server endpoint: `POST /api/ai/pricing-suggestion` (Pro-only, gpt-5-nano) analyzes property details, add-ons, frequency, current prices, and business history to suggest optimal Good/Better/Best tier pricing.
+- Frontend: "AI Price Check" button on QuotePreviewScreen between quote cards and breakdown. Shows per-tier price comparison (current → suggested), reasoning, confidence badge, overall assessment, individual "Apply" buttons and "Apply All" button that updates priceOverrides.
+
+### Tutorial Tours
+- Interactive tutorial overlays using TutorialContext + TourOverlay component system.
+- Tours: Dashboard, Quotes, Customers, Growth, Commercial, Quote Detail (Integrations), Settings.
+- Each tour triggers once on first visit, can be replayed from Settings.
+- Quote Detail tour covers Invoice Packet, Calendar, Automations, and AI features.
+
+### Centralized Haptic Feedback
+- Button component (`client/components/Button.tsx`) includes built-in haptic feedback (Light impact) on press, guarded by Platform.OS !== "web".
+- Dashboard widget editor has haptic feedback on reorder (Light impact) and visibility toggle (selection haptic).
+
 ### iPad Layout Compatibility
 All onboarding screens use ScrollView with sticky footer buttons and 560px max-width centering for iPad compatibility. The pattern: content wraps in `<View style={{ maxWidth: 560, width: "100%" }}>` inside a ScrollView with `contentContainerStyle={{ alignItems: "center" }}` when `screenWidth > 600`.
 

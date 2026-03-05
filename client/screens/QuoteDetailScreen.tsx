@@ -30,6 +30,8 @@ import { trackEvent } from "@/lib/analytics";
 import FounderModal from "@/components/FounderModal";
 import ReviewPromptModal from "@/components/ReviewPromptModal";
 import { shouldShowFounderModal, shouldPromptReview, triggerNativeReview, markReviewPrompted } from "@/lib/growthLoop";
+import { useTutorial } from "@/context/TutorialContext";
+import { QUOTE_DETAIL_TOUR } from "@/lib/tourDefinitions";
 
 type RouteParams = {
   QuoteDetail: { quoteId: string };
@@ -75,6 +77,7 @@ export default function QuoteDetailScreen() {
   const { communicationLanguage } = useLanguage();
   const { requestConsent } = useAIConsent();
   const queryClient = useQueryClient();
+  const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
 
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const [aiDraftType, setAiDraftType] = useState<"email" | "sms">("email");
@@ -172,6 +175,13 @@ export default function QuoteDetailScreen() {
       })();
     }
   }, [quote, stats, growthChecked]);
+
+  useEffect(() => {
+    if (quote && !tourActive && !hasCompletedTour(QUOTE_DETAIL_TOUR.id)) {
+      const timer = setTimeout(() => startTour(QUOTE_DETAIL_TOUR), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [quote, tourActive, startTour, hasCompletedTour]);
 
   const { data: stripeStatus } = useQuery({
     queryKey: ["/api/stripe/status"],

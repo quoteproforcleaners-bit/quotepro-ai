@@ -8,6 +8,7 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -401,6 +402,9 @@ export default function DashboardScreen() {
   }, []);
 
   const moveWidget = useCallback((widgetId: WidgetId, direction: "up" | "down") => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     setWidgetOrder((prev) => {
       const idx = prev.indexOf(widgetId);
       if (idx < 0) return prev;
@@ -787,8 +791,14 @@ export default function DashboardScreen() {
               const label = WIDGET_LABELS[widgetId];
               return (
                 <View key={widgetId} style={[s.editorRow, { borderTopColor: st.divider }]}>
+                  <Feather name="menu" size={14} color={st.textMuted} style={{ marginRight: Spacing.xs }} />
                   <Pressable
-                    onPress={() => toggleWidgetVisibility(widgetId)}
+                    onPress={() => {
+                      if (Platform.OS !== "web") {
+                        Haptics.selectionAsync();
+                      }
+                      toggleWidgetVisibility(widgetId);
+                    }}
                     style={[s.editorVisibilityBtn, { backgroundColor: isHidden ? "transparent" : st.primarySoft }]}
                     testID={`toggle-${widgetId}`}
                   >

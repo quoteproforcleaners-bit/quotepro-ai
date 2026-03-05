@@ -161,6 +161,49 @@ export const COMMERCIAL_TOUR: TourDefinition = {
   ],
 };
 
+export const QUOTE_DETAIL_TOUR: TourDefinition = {
+  id: "quote_detail_tour",
+  name: "Quote Detail Tour",
+  triggerOnce: true,
+  steps: [
+    {
+      id: "quote_actions",
+      title: "Quote Actions",
+      description: "From here you can send quotes, export PDFs, update status, and access powerful integrations to streamline your workflow.",
+      position: "center",
+      icon: "zap",
+    },
+    {
+      id: "invoice_packets",
+      title: "Invoice Packets",
+      description: "Generate QuickBooks-compatible invoice packets with line items, tax info, and payment terms - ready to import or send.",
+      position: "center",
+      icon: "file-text",
+    },
+    {
+      id: "calendar_integration",
+      title: "Calendar Integration",
+      description: "Schedule jobs right from your quote. Create calendar events with reminder templates so you never miss an appointment.",
+      position: "center",
+      icon: "calendar",
+    },
+    {
+      id: "automations",
+      title: "Automations",
+      description: "Connect your quotes to webhooks, Zapier, and Make. Automate follow-ups, notifications, and data sync with your other tools.",
+      position: "center",
+      icon: "link",
+    },
+    {
+      id: "ai_features",
+      title: "AI Features",
+      description: "Use AI to draft personalized emails and texts, generate professional descriptions, and get smart pricing suggestions.",
+      position: "center",
+      icon: "cpu",
+    },
+  ],
+};
+
 export const SETTINGS_TOUR: TourDefinition = {
   id: "settings_tour",
   name: "Settings Tour",
@@ -217,5 +260,6 @@ export const ALL_TOURS = [
   CUSTOMERS_TOUR,
   GROWTH_TOUR,
   COMMERCIAL_TOUR,
+  QUOTE_DETAIL_TOUR,
   SETTINGS_TOUR,
 ];
