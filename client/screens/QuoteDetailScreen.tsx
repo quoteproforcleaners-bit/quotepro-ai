@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput, useWindowDimensions, Modal, Linking } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput, TextInput as RNTextInput, useWindowDimensions, Modal, Linking } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
@@ -86,6 +86,8 @@ export default function QuoteDetailScreen() {
   const [showAiDraft, setShowAiDraft] = useState(false);
   const [sendingDraft, setSendingDraft] = useState(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
+  const [showReviewLinkPrompt, setShowReviewLinkPrompt] = useState(false);
+  const [reviewLinkDraftInput, setReviewLinkDraftInput] = useState("");
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [showFollowUpNudge, setShowFollowUpNudge] = useState(false);
   const [nudgeChecked, setNudgeChecked] = useState(false);
@@ -347,6 +349,28 @@ export default function QuoteDetailScreen() {
       setAiDraftLoading(false);
     }
   }, [quote, businessProfile, isPro]);
+
+  const handleSaveReviewLink = useCallback(async () => {
+    const trimmed = reviewLinkDraftInput.trim();
+    if (!trimmed) return;
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
+    } catch { return; }
+    try {
+      await apiRequest("PUT", "/api/growth-automation-settings", {
+        ...(growthSettings || {}),
+        googleReviewLink: trimmed,
+        includeReviewInMessages: true,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/growth-automation-settings"] });
+      setShowReviewLinkPrompt(false);
+      setReviewLinkDraftInput("");
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.warn("Failed to save review link:", e);
+    }
+  }, [reviewLinkDraftInput, growthSettings, queryClient]);
 
   const handleCopyDraft = async () => {
     if (!aiDraft) return;
@@ -1479,6 +1503,72 @@ export default function QuoteDetailScreen() {
                     </ThemedText>
                   </Pressable>
                 </View>
+
+                {aiDraftPurpose === "thank_you" && !growthSettings?.googleReviewLink?.trim() ? (
+                  showReviewLinkPrompt ? (
+                    <View style={[styles.reviewLinkPrompt, { backgroundColor: `${theme.primary}08`, borderColor: `${theme.primary}20` }]}>
+                      <ThemedText type="small" style={{ fontWeight: "600", marginBottom: Spacing.sm }}>
+                        Add Your Google Review Link
+                      </ThemedText>
+                      <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+                        Paste your Google Business review URL so customers can leave reviews after you thank them.
+                      </ThemedText>
+                      <RNTextInput
+                        value={reviewLinkDraftInput}
+                        onChangeText={setReviewLinkDraftInput}
+                        placeholder="https://g.page/r/your-business/review"
+                        placeholderTextColor={theme.textSecondary}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                        style={{
+                          borderWidth: 1,
+                          borderColor: theme.border,
+                          borderRadius: BorderRadius.sm,
+                          paddingHorizontal: Spacing.md,
+                          paddingVertical: Spacing.sm,
+                          fontSize: 14,
+                          color: theme.text,
+                          backgroundColor: theme.backgroundSecondary,
+                        }}
+                        testID="input-review-link-draft"
+                      />
+                      <View style={{ flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.sm }}>
+                        <Pressable
+                          onPress={() => { setShowReviewLinkPrompt(false); setReviewLinkDraftInput(""); }}
+                          style={[styles.reviewLinkBtn, { backgroundColor: theme.backgroundSecondary }]}
+                        >
+                          <ThemedText type="small" style={{ color: theme.textSecondary }}>Later</ThemedText>
+                        </Pressable>
+                        <Pressable
+                          onPress={handleSaveReviewLink}
+                          style={[styles.reviewLinkBtn, { backgroundColor: theme.primary, flex: 1, opacity: reviewLinkDraftInput.trim().length > 0 ? 1 : 0.5 }]}
+                          disabled={reviewLinkDraftInput.trim().length === 0}
+                          testID="button-save-review-link"
+                        >
+                          <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600" }}>Save</ThemedText>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <Pressable
+                      onPress={() => setShowReviewLinkPrompt(true)}
+                      style={[styles.reviewLinkSuggestion, { backgroundColor: `${theme.primary}08`, borderColor: `${theme.primary}20` }]}
+                      testID="button-add-review-link-prompt"
+                    >
+                      <Feather name="star" size={16} color={theme.primary} />
+                      <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                        <ThemedText type="small" style={{ fontWeight: "600" }}>
+                          Add a Google Review link?
+                        </ThemedText>
+                        <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                          Include it in thank you messages to collect more reviews
+                        </ThemedText>
+                      </View>
+                      <Feather name="chevron-right" size={16} color={theme.primary} />
+                    </Pressable>
+                  )
+                ) : null}
               </>
             ) : (
               <ThemedText type="small" style={{ color: theme.textSecondary }}>
@@ -2556,6 +2646,27 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reviewLinkPrompt: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginTop: Spacing.sm,
+  },
+  reviewLinkSuggestion: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginTop: Spacing.sm,
+  },
+  reviewLinkBtn: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.xs,
     alignItems: "center",
     justifyContent: "center",
   },

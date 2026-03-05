@@ -23,7 +23,11 @@ import Animated, {
   withTiming,
   withRepeat,
   withSequence,
+  withSpring,
   Easing,
+  FadeIn,
+  FadeOut,
+  Layout,
 } from "react-native-reanimated";
 import { ThemedText } from "@/components/ThemedText";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
@@ -403,7 +407,7 @@ export default function DashboardScreen() {
 
   const moveWidget = useCallback((widgetId: WidgetId, direction: "up" | "down") => {
     if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     setWidgetOrder((prev) => {
       const idx = prev.indexOf(widgetId);
@@ -790,7 +794,12 @@ export default function DashboardScreen() {
               const isHidden = hiddenWidgets.has(widgetId);
               const label = WIDGET_LABELS[widgetId];
               return (
-                <View key={widgetId} style={[s.editorRow, { borderTopColor: st.divider }]}>
+                <Animated.View
+                  key={widgetId}
+                  layout={Layout.springify().damping(18).stiffness(140)}
+                  entering={FadeIn.duration(200)}
+                  style={[s.editorRow, { borderTopColor: st.divider }]}
+                >
                   <Feather name="menu" size={14} color={st.textMuted} style={{ marginRight: Spacing.xs }} />
                   <Pressable
                     onPress={() => {
@@ -830,7 +839,7 @@ export default function DashboardScreen() {
                       <Feather name="chevron-down" size={16} color={st.textSecondary} />
                     </Pressable>
                   </View>
-                </View>
+                </Animated.View>
               );
             })}
           </View>

@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Platform, Modal, ScrollView, useWindowDimensions } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, StyleSheet, Pressable, Platform, Modal, ScrollView, Switch, useWindowDimensions, TextInput as RNTextInput } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { v4 as uuidv4 } from "uuid";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Input } from "@/components/Input";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -14,16 +15,49 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { ServiceTypeConfig, PricingSettings } from "@/types";
 import { useApp } from "@/context/AppContext";
+import { apiRequest } from "@/lib/query-client";
 
 export default function PricingScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const { pricingSettings: settings, updatePricingSettings } = useApp();
+  const queryClient = useQueryClient();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
   const [editingService, setEditingService] = useState<ServiceTypeConfig | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
+
+  const { data: growthSettings, refetch: refetchGrowthSettings } = useQuery<any>({
+    queryKey: ["/api/growth-automation-settings"],
+  });
+  const [reviewLinkInput, setReviewLinkInput] = useState("");
+  const [reviewEnabled, setReviewEnabled] = useState(false);
+
+  useEffect(() => {
+    if (growthSettings) {
+      const link = growthSettings.googleReviewLink || "";
+      setReviewLinkInput(link);
+      setReviewEnabled(link.trim().length > 0);
+    }
+  }, [growthSettings]);
+
+  const isValidUrl = (url: string) => {
+    try {
+      const parsed = new URL(url.trim());
+      return parsed.protocol === "https:" || parsed.protocol === "http:";
+    } catch { return false; }
+  };
+
+  const updateGrowthSetting = useCallback(async (updates: Record<string, any>) => {
+    try {
+      await apiRequest("PUT", "/api/growth-automation-settings", { ...(growthSettings || {}), ...updates });
+      queryClient.invalidateQueries({ queryKey: ["/api/growth-automation-settings"] });
+      if (Platform.OS !== "web") Haptics.selectionAsync();
+    } catch (e) {
+      console.warn("Failed to update growth setting:", e);
+    }
+  }, [growthSettings, queryClient]);
 
   const updateSetting = async <K extends keyof PricingSettings>(
     key: K,
@@ -389,6 +423,95 @@ export default function PricingScreen() {
           keyboardType="decimal-pad"
           leftIcon="percent"
         />
+
+        <SectionHeader title="Google Reviews" />
+
+        <View style={[styles.reviewCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <View style={styles.reviewToggleRow}>
+            <View style={[styles.reviewIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="star" size={18} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                Include Google Review Link
+              </ThemedText>
+              <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                Add your review link to quotes and messages
+              </ThemedText>
+            </View>
+            <Switch
+              value={reviewEnabled}
+              onValueChange={(val) => {
+                setReviewEnabled(val);
+                if (!val) {
+                  setReviewLinkInput("");
+                  updateGrowthSetting({ googleReviewLink: "", includeReviewOnPdf: false, includeReviewInMessages: false });
+                }
+              }}
+              trackColor={{ false: theme.border, true: theme.primary }}
+              thumbColor="#FFFFFF"
+              testID="switch-review-enabled"
+            />
+          </View>
+
+          {reviewEnabled ? (
+            <View style={[styles.reviewInputArea, { borderTopColor: theme.border }]}>
+              <ThemedText type="small" style={{ fontWeight: "600", marginBottom: Spacing.xs }}>
+                Google Review URL
+              </ThemedText>
+              <RNTextInput
+                value={reviewLinkInput}
+                onChangeText={setReviewLinkInput}
+                onBlur={() => {
+                  const trimmed = reviewLinkInput.trim();
+                  if (trimmed === (growthSettings?.googleReviewLink || "")) return;
+                  if (trimmed.length === 0) {
+                    updateGrowthSetting({ googleReviewLink: "" });
+                    return;
+                  }
+                  if (!isValidUrl(trimmed)) return;
+                  updateGrowthSetting({ googleReviewLink: trimmed });
+                }}
+                placeholder="https://g.page/r/your-business/review"
+                placeholderTextColor={theme.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                style={[styles.reviewInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
+                testID="input-google-review-link"
+              />
+              {reviewLinkInput.trim().length > 0 && !isValidUrl(reviewLinkInput) ? (
+                <ThemedText type="caption" style={{ color: theme.error, marginTop: 4 }}>
+                  Please enter a valid URL starting with https://
+                </ThemedText>
+              ) : null}
+              {isValidUrl(reviewLinkInput) ? (
+                <>
+                  <View style={[styles.reviewSubToggle, { borderTopColor: theme.border }]}>
+                    <ThemedText type="small" style={{ flex: 1 }}>Include on quote PDFs</ThemedText>
+                    <Switch
+                      value={growthSettings?.includeReviewOnPdf ?? false}
+                      onValueChange={(val) => updateGrowthSetting({ includeReviewOnPdf: val })}
+                      trackColor={{ false: theme.border, true: theme.primary }}
+                      thumbColor="#FFFFFF"
+                      testID="switch-review-on-pdf"
+                    />
+                  </View>
+                  <View style={[styles.reviewSubToggle, { borderTopColor: theme.border }]}>
+                    <ThemedText type="small" style={{ flex: 1 }}>Include in messages</ThemedText>
+                    <Switch
+                      value={growthSettings?.includeReviewInMessages ?? false}
+                      onValueChange={(val) => updateGrowthSetting({ includeReviewInMessages: val })}
+                      trackColor={{ false: theme.border, true: theme.primary }}
+                      thumbColor="#FFFFFF"
+                      testID="switch-review-in-messages"
+                    />
+                  </View>
+                </>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       </KeyboardAwareScrollViewCompat>
 
       <Modal
@@ -546,5 +669,42 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.sm,
     marginTop: Spacing.xl,
+  },
+  reviewCard: {
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginBottom: Spacing.lg,
+  },
+  reviewToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  reviewIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reviewInputArea: {
+    padding: Spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  reviewInput: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: 14,
+  },
+  reviewSubToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: Spacing.md,
+    marginTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

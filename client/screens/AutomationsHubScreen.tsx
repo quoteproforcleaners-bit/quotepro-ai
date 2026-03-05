@@ -47,7 +47,6 @@ interface AutomationSettings {
   rebookNudgeDaysMin: number;
   rebookNudgeDaysMax: number;
   deepCleanIntervalMonths: number;
-  googleReviewLink: string;
 }
 
 const defaultSettings: AutomationSettings = {
@@ -65,7 +64,6 @@ const defaultSettings: AutomationSettings = {
   rebookNudgeDaysMin: 14,
   rebookNudgeDaysMax: 45,
   deepCleanIntervalMonths: 6,
-  googleReviewLink: "",
 };
 
 const automations: { key: keyof AutomationSettings; icon: keyof typeof Feather.glyphMap; label: string; description: string }[] = [
@@ -100,7 +98,7 @@ export default function AutomationsHubScreen() {
     const updated = { ...settings, [key]: value };
     setSettings(updated);
     try {
-      await apiRequest("PUT", "/api/growth-automation-settings", updated);
+      await apiRequest("PUT", "/api/growth-automation-settings", { ...(serverSettings || {}), ...updated });
     } catch (e) {
       setSettings(settings);
     }
@@ -169,22 +167,6 @@ export default function AutomationsHubScreen() {
         </Card>
       ))}
 
-      <ThemedText type="h4" style={styles.sectionTitle}>Google Review Link</ThemedText>
-      <Card>
-        <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>
-          Paste your Google Business review URL so customers can leave reviews easily.
-        </ThemedText>
-        <TextInput
-          testID="input-google-review-link"
-          value={settings.googleReviewLink}
-          onChangeText={(t) => updateSetting("googleReviewLink", t)}
-          placeholder="https://g.page/r/your-business/review"
-          placeholderTextColor={dt.textSecondary}
-          autoCapitalize="none"
-          keyboardType="url"
-          style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border }]}
-        />
-      </Card>
     </KeyboardAwareScrollViewCompat>
     </ProGate>
   );
