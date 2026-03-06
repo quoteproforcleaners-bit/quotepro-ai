@@ -3241,18 +3241,26 @@ Rules:
 - addOns should be an array of strings like ["oven cleaning", "inside fridge", "window cleaning", "laundry", "organizing", "garage", "baseboards", "blinds", "carpet cleaning", "wall washing"].
 - NEVER include any pricing, cost estimates, hourly rates, or dollar amounts in your response.`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: description },
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 800,
-      });
+      let completion;
+      try {
+        completion = await openai.chat.completions.create({
+          model: "gpt-5-nano",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: description.trim() },
+          ],
+          response_format: { type: "json_object" },
+        });
+      } catch (aiError: any) {
+        console.error("Walkthrough AI call failed:", aiError?.message || aiError);
+        return res.status(500).json({ message: "AI service temporarily unavailable. Please try again." });
+      }
 
       const content = completion.choices[0]?.message?.content;
-      if (!content) return res.status(500).json({ message: "No response from AI" });
+      if (!content) {
+        console.error("Walkthrough AI empty response:", JSON.stringify(completion.choices[0]));
+        return res.status(500).json({ message: "AI returned an empty response. Please try again." });
+      }
 
       let parsed: any;
       try {
