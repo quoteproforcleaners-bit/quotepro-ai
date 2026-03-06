@@ -69,7 +69,15 @@ type EventName =
   | "review_link_included_in_quote"
   | "review_request_sent"
   | "review_request_copy_tapped"
-  | "referral_offer_sent";
+  | "referral_offer_sent"
+  | "walkthrough_ai_selected"
+  | "walkthrough_voice_started"
+  | "walkthrough_voice_completed"
+  | "walkthrough_analysis_started"
+  | "walkthrough_analysis_completed"
+  | "walkthrough_quote_generated"
+  | "walkthrough_create_quote_clicked"
+  | "walkthrough_closing_message_generated";
 
 export async function trackEvent(
   name: EventName,

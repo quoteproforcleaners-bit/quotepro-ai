@@ -132,6 +132,17 @@ Key files:
 - **Day Filter Strip**: JobsScreen has a horizontal scrollable 14-day date strip (Today, Tmrw, Mon, Tue...) above the status segmented control. Tap to filter jobs by day; tap again or "All" to clear.
 - **UI Flow**: Scheduled jobs show "Start Job" button (blue); in-progress jobs show "End Job" button (green).
 
+### Walkthrough AI Quoting
+- **Third quoting path**: New Quote screen shows Residential, Commercial, and Walkthrough AI as three card options. Walkthrough AI has "AI-Powered" badge.
+- **Input screen** (`client/screens/WalkthroughAIScreen.tsx`): Large textarea with placeholder example, microphone button for voice-to-text (Web Speech API on web, graceful fallback on native), recording state indicator, Clear/Analyze buttons.
+- **AI Extraction** (`POST /api/ai/walkthrough-extract`): gpt-5-nano extracts structured fields (property type, beds, baths, sqft, frequency, service type, pets, add-ons, condition, etc.) from natural language. Returns extractedFields + assumptions + confidence. AI never sets prices.
+- **Pricing Recommendation Service** (`client/lib/pricingRecommendationService.ts`): Takes extracted fields + user's saved pricing settings. Reuses `quoteCalculator.ts` for residential and `laborModel.ts` for commercial. Returns Good/Better/Best options with breakdown, labor estimate, crew size, upsell suggestions.
+- **Results screen** (`client/screens/WalkthroughResultsScreen.tsx`): 6 sections — Detected Job Details, Recommended Quote Options, Pricing Breakdown, Estimated Labor, Assumptions & Confidence, AI Recommendations. Action buttons: Create Quote, Edit Details, Closing Message, Copy Summary.
+- **Edit Details screen** (`client/screens/WalkthroughEditScreen.tsx`): Editable form for all extracted fields with pickers/steppers/toggles. Recalculates and returns to results.
+- **Create Quote conversion**: Pushes extracted fields into existing QuoteCalculator (residential) or CommercialQuote (commercial) with proper field mapping (beds, baths, sqft, condition, pets, frequency, add-ons).
+- **AI Closing Assistant** (`client/screens/ClosingAssistantScreen.tsx`, `POST /api/ai/closing-message`): Generates customer-facing messages (text, email, follow-up, objection handling, upsell, deep-clean explanation) in 4 tones and 4 languages. Copy/regenerate buttons.
+- **Analytics**: walkthrough_ai_selected, walkthrough_voice_started/completed, walkthrough_analysis_started/completed, walkthrough_quote_generated, walkthrough_create_quote_clicked, walkthrough_closing_message_generated.
+
 ### AI Dynamic Pricing Suggestions
 - Server endpoint: `POST /api/ai/pricing-suggestion` (Pro-only, gpt-5-nano) analyzes property details, add-ons, frequency, current prices, and business history to suggest optimal Good/Better/Best tier pricing.
 - Frontend: "AI Price Check" button on QuotePreviewScreen between quote cards and breakdown. Shows per-tier price comparison (current → suggested), reasoning, confidence badge, overall assessment, individual "Apply" buttons and "Apply All" button that updates priceOverrides.

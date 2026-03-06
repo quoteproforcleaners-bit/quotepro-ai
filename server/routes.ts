@@ -3182,6 +3182,205 @@ ${historyContext}`;
     }
   });
 
+  app.post("/api/ai/walkthrough-extract", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { description } = req.body;
+      if (!description || typeof description !== "string" || description.trim().length === 0) {
+        return res.status(400).json({ message: "A job description is required" });
+      }
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (business) {
+        try {
+          await createAnalyticsEvent({
+            businessId: business.id,
+            eventName: "walkthrough_analysis_started",
+            properties: { descriptionLength: description.length },
+          });
+        } catch (_e) {}
+      }
+
+      const systemPrompt = `You are a cleaning job detail extractor. Given a natural language description of a cleaning job, extract structured fields. You must NEVER return any prices, costs, rates, or dollar amounts — only physical property attributes and job characteristics.
+
+Return a JSON object with these fields:
+{
+  "extractedFields": {
+    "propertyType": "house" | "apartment" | "condo" | "townhouse" | "office" | "retail" | "warehouse" | "medical" | "restaurant" | "gym" | "school" | "church" | "other" | null,
+    "serviceCategory": "standard" | "deep" | "move-in-out" | "post-construction" | "recurring" | "one-time" | null,
+    "isCommercial": boolean,
+    "bedrooms": number | null,
+    "bathrooms": number | null,
+    "sqft": number | null,
+    "frequency": "one-time" | "weekly" | "bi-weekly" | "monthly" | null,
+    "isFirstTimeClean": boolean | null,
+    "isDeepClean": boolean | null,
+    "isMoveInOut": boolean | null,
+    "petCount": number | null,
+    "petType": "dog" | "cat" | "both" | "other" | "none" | null,
+    "addOns": string[],
+    "conditionLevel": "light" | "moderate" | "heavy" | "extreme" | null,
+    "kitchenCondition": "light" | "moderate" | "heavy" | null,
+    "floors": number | null,
+    "stairs": number | null,
+    "officeCount": number | null,
+    "officeBathrooms": number | null,
+    "breakrooms": number | null,
+    "heavySoil": boolean | null,
+    "urgency": "normal" | "rush" | "flexible" | null,
+    "notes": string | null
+  },
+  "assumptions": string[],
+  "confidence": "high" | "medium" | "low"
+}
+
+Rules:
+- Only extract information explicitly stated or strongly implied in the description.
+- For any field not mentioned or inferable, use null.
+- List assumptions you made (e.g., "Assumed standard residential since no commercial indicators mentioned").
+- Set confidence based on how much detail was provided: high = most fields filled, medium = some gaps, low = very sparse description.
+- addOns should be an array of strings like ["oven cleaning", "inside fridge", "window cleaning", "laundry", "organizing", "garage", "baseboards", "blinds", "carpet cleaning", "wall washing"].
+- NEVER include any pricing, cost estimates, hourly rates, or dollar amounts in your response.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: description },
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 800,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        return res.status(500).json({ message: "Invalid AI response format" });
+      }
+
+      const extractedFields = parsed.extractedFields || {};
+      const assumptions = Array.isArray(parsed.assumptions) ? parsed.assumptions : [];
+      const confidence = ["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low";
+
+      if (business) {
+        try {
+          await createAnalyticsEvent({
+            businessId: business.id,
+            eventName: "walkthrough_analysis_completed",
+            properties: {
+              confidence,
+              isCommercial: extractedFields.isCommercial || false,
+              propertyType: extractedFields.propertyType || "unknown",
+              assumptionCount: assumptions.length,
+            },
+          });
+        } catch (_e) {}
+      }
+
+      return res.json({
+        extractedFields,
+        assumptions,
+        confidence,
+      });
+    } catch (error: any) {
+      console.error("AI walkthrough extract error:", error);
+      return res.status(500).json({ message: "Failed to analyze job description" });
+    }
+  });
+
+  app.post("/api/ai/closing-message", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const {
+        quoteAmount,
+        serviceType,
+        frequency,
+        addOns,
+        customerName,
+        notes,
+        pricingSummary,
+        messageType,
+        tone,
+        language: msgLanguage,
+      } = req.body;
+
+      if (!messageType || !tone) {
+        return res.status(400).json({ message: "Message type and tone are required" });
+      }
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (business) {
+        try {
+          await createAnalyticsEvent({
+            businessId: business.id,
+            eventName: "walkthrough_closing_message_generated",
+            properties: { messageType, tone, language: msgLanguage || "en" },
+          });
+        } catch (_e) {}
+      }
+
+      const businessName = business?.companyName || "our company";
+
+      const languageMap: Record<string, string> = {
+        en: "English",
+        es: "Spanish",
+        pt: "Portuguese",
+        ru: "Russian",
+      };
+      const targetLanguage = languageMap[msgLanguage || "en"] || "English";
+
+      const systemPrompt = `You are an expert sales copywriter for cleaning service businesses. Generate a closing message based on the given context.
+
+Rules:
+- Write in ${targetLanguage}.
+- Tone: ${tone}.
+- Message type: ${messageType.replace(/_/g, " ")}.
+- Keep the message concise and action-oriented.
+- For text messages, keep under 300 characters.
+- For emails, include a subject line on the first line prefixed with "Subject: ".
+- For follow-ups, reference the previous quote gently.
+- For objection handling, address common price concerns with value framing.
+- For recurring upsell, highlight savings and convenience of regular service.
+- For deep-clean-first, explain why an initial deep clean leads to better recurring results.
+- Never use placeholder brackets like [Name] — use the actual customer name if provided, or write naturally without a name.
+- Be genuine and human, not salesy or pushy.
+- Do NOT include any emojis.`;
+
+      const contextParts: string[] = [];
+      if (customerName) contextParts.push(`Customer: ${customerName}`);
+      if (quoteAmount) contextParts.push(`Quote amount: $${Number(quoteAmount).toFixed(2)}`);
+      if (serviceType) contextParts.push(`Service: ${serviceType}`);
+      if (frequency) contextParts.push(`Frequency: ${frequency}`);
+      if (addOns && Array.isArray(addOns) && addOns.length > 0) contextParts.push(`Add-ons: ${addOns.join(", ")}`);
+      if (notes) contextParts.push(`Notes: ${notes}`);
+      if (pricingSummary) contextParts.push(`Pricing summary: ${pricingSummary}`);
+      contextParts.push(`Business name: ${businessName}`);
+
+      const userMessage = contextParts.length > 0
+        ? `Generate a ${messageType.replace(/_/g, " ")} with a ${tone} tone for this quote:\n\n${contextParts.join("\n")}`
+        : `Generate a generic ${messageType.replace(/_/g, " ")} with a ${tone} tone for a cleaning service quote.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-nano",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+        max_completion_tokens: 600,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      return res.json({ message: content.trim() });
+    } catch (error: any) {
+      console.error("AI closing message error:", error);
+      return res.status(500).json({ message: "Failed to generate closing message" });
+    }
+  });
+
   app.post("/api/ai/communication-draft", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;

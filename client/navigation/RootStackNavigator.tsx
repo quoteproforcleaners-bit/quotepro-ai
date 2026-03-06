@@ -28,6 +28,10 @@ import CommercialQuoteCalculatorScreen from "@/screens/CommercialQuoteCalculator
 import ProSetupChecklistScreen from "@/screens/ProSetupChecklistScreen";
 import QBOSettingsScreen from "@/screens/QBOSettingsScreen";
 import QBOLogsScreen from "@/screens/QBOLogsScreen";
+import WalkthroughAIScreen from "@/screens/WalkthroughAIScreen";
+import WalkthroughResultsScreen from "@/screens/WalkthroughResultsScreen";
+import WalkthroughEditScreen from "@/screens/WalkthroughEditScreen";
+import ClosingAssistantScreen from "@/screens/ClosingAssistantScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -66,6 +70,10 @@ export type RootStackParamList = {
   CommercialQuote: { customerName?: string; customerAddress?: string } | undefined;
   QBOSettings: undefined;
   QBOLogs: undefined;
+  WalkthroughAI: undefined;
+  WalkthroughResults: { extractedFields: any; assumptions: string[]; confidence: string; description: string };
+  WalkthroughEdit: { extractedFields: any; assumptions: string[]; confidence: string; description: string };
+  ClosingAssistant: { quoteAmount?: number; serviceType?: string; frequency?: string; addOns?: string[]; customerName?: string; notes?: string; pricingSummary?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -323,6 +331,34 @@ export default function RootStackNavigator() {
             component={QBOLogsScreen}
             options={{
               headerTitle: "Sync History",
+            }}
+          />
+          <Stack.Screen
+            name="WalkthroughAI"
+            component={WalkthroughAIScreen}
+            options={{
+              headerTitle: "Walkthrough AI",
+            }}
+          />
+          <Stack.Screen
+            name="WalkthroughResults"
+            component={WalkthroughResultsScreen}
+            options={{
+              headerTitle: "Quote Results",
+            }}
+          />
+          <Stack.Screen
+            name="WalkthroughEdit"
+            component={WalkthroughEditScreen}
+            options={{
+              headerTitle: "Edit Details",
+            }}
+          />
+          <Stack.Screen
+            name="ClosingAssistant"
+            component={ClosingAssistantScreen}
+            options={{
+              headerTitle: "Closing Assistant",
             }}
           />
         </>
