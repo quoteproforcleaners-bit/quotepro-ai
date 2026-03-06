@@ -1138,7 +1138,12 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const j = await getJobById(req.params.id);
       if (!j) return res.status(404).json({ message: "Job not found" });
       const checklist = await getChecklistByJob(j.id);
-      return res.json({ ...j, checklist });
+      let customer = null;
+      if (j.customerId) {
+        const c = await getCustomerById(j.customerId);
+        if (c) customer = { firstName: c.firstName, lastName: c.lastName, phone: c.phone, email: c.email };
+      }
+      return res.json({ ...j, checklist, customer });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get job" });
     }
@@ -1434,6 +1439,493 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       return res.status(500).json({ message: "Failed to get ratings summary" });
     }
   });
+
+  // ─── Live Job Updates ───
+
+  app.post("/api/jobs/:id/generate-update-token", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+      const existing = await pool.query(`SELECT update_token FROM jobs WHERE id = $1`, [req.params.id]);
+      if (existing.rows[0]?.update_token) {
+        return res.json({ token: existing.rows[0].update_token });
+      }
+      const { v4: uuidv4 } = await import("uuid");
+      const token = uuidv4();
+      await pool.query(`UPDATE jobs SET update_token = $1 WHERE id = $2`, [token, req.params.id]);
+      return res.json({ token });
+    } catch (error: any) {
+      console.error("Generate update token error:", error);
+      return res.status(500).json({ message: "Failed to generate update token" });
+    }
+  });
+
+  app.get("/api/jobs/:id/update-token", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await pool.query(`SELECT update_token FROM jobs WHERE id = $1`, [req.params.id]);
+      return res.json({ token: result.rows[0]?.update_token || null });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get update token" });
+    }
+  });
+
+  app.post("/api/jobs/:id/update-status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { status, note } = req.body;
+      if (!status) return res.status(400).json({ message: "Status is required" });
+      const validStatuses = ["scheduled", "en_route", "service_started", "in_progress", "final_touches", "completed"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      await pool.query(`UPDATE jobs SET detailed_status = $1, updated_at = NOW() WHERE id = $2`, [status, req.params.id]);
+
+      const coreStatus = status === "completed" ? "completed" : (status === "scheduled" ? "scheduled" : "in_progress");
+      await pool.query(`UPDATE jobs SET status = $1 WHERE id = $2`, [coreStatus, req.params.id]);
+
+      if (status === "en_route" || status === "service_started") {
+        await pool.query(`UPDATE jobs SET started_at = COALESCE(started_at, NOW()) WHERE id = $1`, [req.params.id]);
+      }
+      if (status === "completed") {
+        await pool.query(`UPDATE jobs SET completed_at = COALESCE(completed_at, NOW()) WHERE id = $1`, [req.params.id]);
+      }
+
+      await pool.query(
+        `INSERT INTO job_status_history (id, job_id, status, note, created_at) VALUES (gen_random_uuid(), $1, $2, $3, NOW())`,
+        [req.params.id, status, note || ""]
+      );
+
+      const updated = await getJobById(req.params.id);
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Update job status error:", error);
+      return res.status(500).json({ message: "Failed to update status" });
+    }
+  });
+
+  app.get("/api/jobs/:id/timeline", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await pool.query(
+        `SELECT * FROM job_status_history WHERE job_id = $1 ORDER BY created_at ASC`,
+        [req.params.id]
+      );
+      return res.json(result.rows);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get timeline" });
+    }
+  });
+
+  app.post("/api/jobs/:id/notes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { content, customerVisible } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Content is required" });
+      const result = await pool.query(
+        `INSERT INTO job_notes (id, job_id, content, customer_visible, created_at) VALUES (gen_random_uuid(), $1, $2, $3, NOW()) RETURNING *`,
+        [req.params.id, content.trim(), customerVisible || false]
+      );
+      return res.json(result.rows[0]);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to create note" });
+    }
+  });
+
+  app.get("/api/jobs/:id/notes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await pool.query(
+        `SELECT * FROM job_notes WHERE job_id = $1 ORDER BY created_at DESC`,
+        [req.params.id]
+      );
+      return res.json(result.rows);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get notes" });
+    }
+  });
+
+  app.delete("/api/jobs/:id/notes/:noteId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await pool.query(`DELETE FROM job_notes WHERE id = $1 AND job_id = $2`, [req.params.noteId, req.params.id]);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete note" });
+    }
+  });
+
+  app.post("/api/ai/job-update-message", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { type, customerName, companyName, senderName, updateLink, language: commLang } = req.body;
+      if (!type || !updateLink) return res.status(400).json({ message: "type and updateLink are required" });
+
+      const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
+
+      let systemPrompt: string;
+      let userPrompt: string;
+
+      if (type === "sms") {
+        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No emojis. Be friendly but brief. Include this link: ${updateLink}${langInstruction}`;
+        userPrompt = `SMS telling ${customerName || "Customer"} their live service update page is ready. They can view job progress, checklist updates, and completion photos there. Reply with ONLY the message text, nothing else.`;
+      } else {
+        systemPrompt = `Write a short professional email (under 120 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No emojis. Include this link: ${updateLink}. Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+        userPrompt = `Email telling ${customerName || "Customer"} their live service update page is ready. They can view real-time service details, progress updates, checklist items, and completion photos. Reply with ONLY the email, nothing else.`;
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_completion_tokens: type === "sms" ? 100 : 250,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+      return res.json({ draft: content.trim() });
+    } catch (error: any) {
+      console.error("Job update message error:", error);
+      return res.status(500).json({ message: "Failed to generate message" });
+    }
+  });
+
+  // ─── Public Job Updates Page ───
+
+  app.get("/api/public/job-updates/:token", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.params;
+      const jobResult = await pool.query(
+        `SELECT j.*, c.first_name as customer_first_name, c.last_name as customer_last_name,
+                b.id as bid, b.owner_id
+         FROM jobs j
+         LEFT JOIN customers c ON j.customer_id = c.id
+         LEFT JOIN businesses b ON j.business_id = b.id
+         WHERE j.update_token = $1`,
+        [token]
+      );
+      if (jobResult.rows.length === 0) return res.status(404).json({ message: "Not found" });
+      const job = jobResult.rows[0];
+
+      const businessProfile = await pool.query(
+        `SELECT * FROM business_profiles WHERE user_id = $1`,
+        [job.owner_id]
+      );
+      const profile = businessProfile.rows[0] || {};
+
+      const timeline = await pool.query(
+        `SELECT * FROM job_status_history WHERE job_id = $1 ORDER BY created_at ASC`,
+        [job.id]
+      );
+
+      const checklist = await pool.query(
+        `SELECT * FROM job_checklist_items WHERE job_id = $1 AND customer_visible = true ORDER BY room_group, sort_order`,
+        [job.id]
+      );
+
+      const photos = await pool.query(
+        `SELECT * FROM job_photos WHERE job_id = $1 AND customer_visible = true ORDER BY created_at DESC`,
+        [job.id]
+      );
+
+      const notes = await pool.query(
+        `SELECT * FROM job_notes WHERE job_id = $1 AND customer_visible = true ORDER BY created_at DESC`,
+        [job.id]
+      );
+
+      return res.json({
+        jobType: job.job_type,
+        status: job.status,
+        detailedStatus: job.detailed_status || job.status,
+        startDatetime: job.start_datetime,
+        endDatetime: job.end_datetime,
+        address: job.address,
+        total: job.total,
+        startedAt: job.started_at,
+        completedAt: job.completed_at,
+        companyName: profile.company_name || "Cleaning Service",
+        companyLogo: profile.logo_url || null,
+        brandColor: profile.brand_color || "#2563EB",
+        customerName: `${job.customer_first_name || ""} ${job.customer_last_name || ""}`.trim() || "Customer",
+        timeline: timeline.rows,
+        checklist: checklist.rows,
+        photos: photos.rows.map((p: any) => ({
+          ...p,
+          photo_url: p.photo_url,
+        })),
+        notes: notes.rows,
+      });
+    } catch (error: any) {
+      console.error("Public job update error:", error);
+      return res.status(500).json({ message: "Failed to load job update" });
+    }
+  });
+
+  app.get("/job-updates/:token", async (req: Request, res: Response) => {
+    try {
+      const { token } = req.params;
+      const jobResult = await pool.query(
+        `SELECT j.id FROM jobs j WHERE j.update_token = $1`,
+        [token]
+      );
+      if (jobResult.rows.length === 0) {
+        return res.status(404).send("<html><body><h1>Update page not found</h1></body></html>");
+      }
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const apiUrl = `${baseUrl}/api/public/job-updates/${token}`;
+      const assetsBase = baseUrl;
+
+      res.send(generateJobUpdatePageHtml(apiUrl, assetsBase, token));
+    } catch (error: any) {
+      console.error("Job update page error:", error);
+      return res.status(500).send("<html><body><h1>Error loading update page</h1></body></html>");
+    }
+  });
+
+  function generateJobUpdatePageHtml(apiUrl: string, assetsBase: string, token: string): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Service Update</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F8FAFC; color: #1E293B; min-height: 100vh; }
+    .header { padding: 24px 20px 20px; text-align: center; color: white; position: relative; }
+    .header::after { content: ''; position: absolute; bottom: -20px; left: 0; right: 0; height: 40px; background: inherit; border-radius: 0 0 24px 24px; }
+    .logo-container { width: 56px; height: 56px; border-radius: 16px; background: rgba(255,255,255,0.2); margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; backdrop-filter: blur(10px); }
+    .logo-container img { width: 100%; height: 100%; object-fit: cover; }
+    .logo-placeholder { font-size: 24px; font-weight: 700; color: white; }
+    .company-name { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    .container { max-width: 480px; margin: 0 auto; padding: 8px 16px 40px; }
+    .card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94A3B8; margin-bottom: 12px; }
+    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .progress-bar-bg { width: 100%; height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; margin-top: 12px; }
+    .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+    .progress-pct { font-size: 28px; font-weight: 700; margin-top: 4px; }
+    .detail-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #F1F5F9; }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .detail-label { font-size: 12px; color: #94A3B8; }
+    .detail-value { font-size: 14px; font-weight: 500; }
+    .timeline-item { display: flex; gap: 12px; padding-bottom: 16px; position: relative; }
+    .timeline-item:not(:last-child)::after { content: ''; position: absolute; left: 15px; top: 32px; bottom: 0; width: 2px; background: #E2E8F0; }
+    .timeline-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; }
+    .timeline-content { flex: 1; padding-top: 4px; }
+    .timeline-status { font-size: 14px; font-weight: 600; }
+    .timeline-time { font-size: 12px; color: #94A3B8; margin-top: 2px; }
+    .timeline-note { font-size: 13px; color: #64748B; margin-top: 4px; }
+    .checklist-group { margin-bottom: 16px; }
+    .checklist-group-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .checklist-count { font-size: 12px; color: #94A3B8; font-weight: 400; }
+    .checklist-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+    .check-icon { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+    .check-done { background: #10B981; color: white; }
+    .check-pending { background: #E2E8F0; color: #94A3B8; }
+    .checklist-label { font-size: 14px; }
+    .checklist-label.done { text-decoration: line-through; color: #94A3B8; }
+    .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .photo-item { border-radius: 12px; overflow: hidden; aspect-ratio: 1; position: relative; }
+    .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-badge { position: absolute; bottom: 6px; left: 6px; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; color: white; }
+    .note-item { padding: 12px; background: #F8FAFC; border-radius: 10px; margin-bottom: 8px; font-size: 14px; line-height: 1.5; }
+    .note-time { font-size: 11px; color: #94A3B8; margin-top: 4px; }
+    .completed-banner { text-align: center; padding: 24px; background: linear-gradient(135deg, #10B981, #059669); color: white; border-radius: 16px; margin-bottom: 12px; }
+    .completed-banner h2 { font-size: 20px; margin-bottom: 4px; }
+    .completed-banner p { font-size: 14px; opacity: 0.9; }
+    .pulse { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .loading { text-align: center; padding: 40px; color: #94A3B8; }
+    .empty-state { text-align: center; padding: 20px; color: #94A3B8; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading"><p>Loading service update...</p></div>
+  </div>
+  <script>
+    const API_URL = "${apiUrl}";
+    const ASSETS_BASE = "${assetsBase}";
+
+    const STATUS_LABELS = {
+      scheduled: "Scheduled",
+      en_route: "En Route",
+      service_started: "Service Started",
+      in_progress: "In Progress",
+      final_touches: "Final Touches",
+      completed: "Completed"
+    };
+
+    const STATUS_COLORS = {
+      scheduled: { bg: "#EFF6FF", text: "#2563EB", dot: "#2563EB" },
+      en_route: { bg: "#FFF7ED", text: "#EA580C", dot: "#EA580C" },
+      service_started: { bg: "#F0FDF4", text: "#16A34A", dot: "#16A34A" },
+      in_progress: { bg: "#FFFBEB", text: "#D97706", dot: "#D97706" },
+      final_touches: { bg: "#FAF5FF", text: "#9333EA", dot: "#9333EA" },
+      completed: { bg: "#F0FDF4", text: "#16A34A", dot: "#16A34A" }
+    };
+
+    const STATUS_ICONS = {
+      scheduled: "&#128197;",
+      en_route: "&#128663;",
+      service_started: "&#9989;",
+      in_progress: "&#128736;",
+      final_touches: "&#10024;",
+      completed: "&#127937;"
+    };
+
+    function getProgress(status) {
+      const map = { scheduled: 0, en_route: 15, service_started: 30, in_progress: 55, final_touches: 80, completed: 100 };
+      return map[status] || 0;
+    }
+
+    function formatTime(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+      return d.toLocaleDateString(undefined, opts);
+    }
+
+    function formatDateTime(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' at ' + formatTime(dateStr);
+    }
+
+    function render(data) {
+      const status = data.detailedStatus || data.status || "scheduled";
+      const sc = STATUS_COLORS[status] || STATUS_COLORS.scheduled;
+      const progress = getProgress(status);
+      const brandColor = data.brandColor || "#2563EB";
+      const isComplete = status === "completed";
+
+      let html = '<div class="header" style="background:' + brandColor + '">';
+      if (data.companyLogo) {
+        html += '<div class="logo-container"><img src="' + ASSETS_BASE + data.companyLogo + '" alt="Logo"></div>';
+      } else {
+        html += '<div class="logo-container"><span class="logo-placeholder">' + (data.companyName || "C").charAt(0) + '</span></div>';
+      }
+      html += '<div class="company-name">' + (data.companyName || "Cleaning Service") + '</div>';
+      html += '</div><div class="container">';
+
+      if (isComplete) {
+        html += '<div class="completed-banner"><h2>Service Complete</h2><p>Your cleaning has been finished</p></div>';
+      }
+
+      // Status & Progress
+      html += '<div class="card">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+      html += '<div><div class="card-title">Status</div>';
+      html += '<div class="status-badge" style="background:' + sc.bg + ';color:' + sc.text + '">';
+      if (!isComplete) html += '<span class="status-dot pulse" style="background:' + sc.dot + '"></span>';
+      html += (STATUS_LABELS[status] || status) + '</div></div>';
+      html += '<div style="text-align:right"><div class="progress-pct" style="color:' + brandColor + '">' + progress + '%</div></div>';
+      html += '</div>';
+      html += '<div class="progress-bar-bg"><div class="progress-bar-fill" style="width:' + progress + '%;background:' + brandColor + '"></div></div>';
+      html += '</div>';
+
+      // Details
+      html += '<div class="card"><div class="card-title">Service Details</div>';
+      const jobTypes = { regular: "Standard Cleaning", deep_clean: "Deep Clean", move_in_out: "Move In/Out", post_construction: "Post Construction", airbnb_turnover: "Airbnb Turnover" };
+      html += '<div class="detail-row"><div class="detail-icon" style="background:#EFF6FF">&#128466;</div><div><div class="detail-label">Service</div><div class="detail-value">' + (jobTypes[data.jobType] || data.jobType) + '</div></div></div>';
+      if (data.startDatetime) {
+        html += '<div class="detail-row"><div class="detail-icon" style="background:#F0FDF4">&#128197;</div><div><div class="detail-label">Date</div><div class="detail-value">' + formatDate(data.startDatetime) + '</div></div></div>';
+        html += '<div class="detail-row"><div class="detail-icon" style="background:#FFFBEB">&#128337;</div><div><div class="detail-label">Arrival Window</div><div class="detail-value">' + formatTime(data.startDatetime) + (data.endDatetime ? ' - ' + formatTime(data.endDatetime) : '') + '</div></div></div>';
+      }
+      if (data.customerName) {
+        html += '<div class="detail-row"><div class="detail-icon" style="background:#FAF5FF">&#128100;</div><div><div class="detail-label">Customer</div><div class="detail-value">' + data.customerName + '</div></div></div>';
+      }
+      html += '</div>';
+
+      // Timeline
+      if (data.timeline && data.timeline.length > 0) {
+        html += '<div class="card"><div class="card-title">Timeline</div>';
+        data.timeline.forEach(function(t) {
+          const tsc = STATUS_COLORS[t.status] || STATUS_COLORS.scheduled;
+          html += '<div class="timeline-item">';
+          html += '<div class="timeline-dot" style="background:' + tsc.bg + '">' + (STATUS_ICONS[t.status] || "&#9679;") + '</div>';
+          html += '<div class="timeline-content">';
+          html += '<div class="timeline-status">' + (STATUS_LABELS[t.status] || t.status) + '</div>';
+          html += '<div class="timeline-time">' + formatDateTime(t.created_at) + '</div>';
+          if (t.note) html += '<div class="timeline-note">' + t.note + '</div>';
+          html += '</div></div>';
+        });
+        html += '</div>';
+      }
+
+      // Checklist
+      if (data.checklist && data.checklist.length > 0) {
+        html += '<div class="card"><div class="card-title">Checklist</div>';
+        var groups = {};
+        data.checklist.forEach(function(item) {
+          var g = item.room_group || "General";
+          if (!groups[g]) groups[g] = [];
+          groups[g].push(item);
+        });
+        Object.keys(groups).forEach(function(groupName) {
+          var items = groups[groupName];
+          var doneCount = items.filter(function(i) { return i.completed; }).length;
+          html += '<div class="checklist-group">';
+          html += '<div class="checklist-group-title">' + groupName + '<span class="checklist-count">' + doneCount + '/' + items.length + '</span></div>';
+          items.forEach(function(item) {
+            html += '<div class="checklist-item">';
+            html += '<div class="check-icon ' + (item.completed ? 'check-done' : 'check-pending') + '">' + (item.completed ? '&#10003;' : '') + '</div>';
+            html += '<span class="checklist-label ' + (item.completed ? 'done' : '') + '">' + item.label + '</span>';
+            html += '</div>';
+          });
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+
+      // Photos
+      if (data.photos && data.photos.length > 0) {
+        html += '<div class="card"><div class="card-title">Photos</div>';
+        html += '<div class="photo-grid">';
+        data.photos.forEach(function(p) {
+          html += '<div class="photo-item">';
+          html += '<img src="' + ASSETS_BASE + p.photo_url + '" alt="Job photo" loading="lazy">';
+          html += '<div class="photo-badge" style="background:' + (p.photo_type === 'before' ? '#D97706' : '#16A34A') + '">' + (p.photo_type === 'before' ? 'Before' : 'After') + '</div>';
+          if (p.caption) html += '<div style="position:absolute;bottom:28px;left:6px;right:6px;font-size:11px;color:white;text-shadow:0 1px 2px rgba(0,0,0,0.8)">' + p.caption + '</div>';
+          html += '</div>';
+        });
+        html += '</div></div>';
+      }
+
+      // Notes
+      if (data.notes && data.notes.length > 0) {
+        html += '<div class="card"><div class="card-title">Notes</div>';
+        data.notes.forEach(function(n) {
+          html += '<div class="note-item">' + n.content + '<div class="note-time">' + formatDateTime(n.created_at) + '</div></div>';
+        });
+        html += '</div>';
+      }
+
+      html += '<div style="text-align:center;padding:20px;color:#CBD5E1;font-size:12px">Powered by QuotePro</div>';
+      html += '</div>';
+      document.getElementById('app').innerHTML = html;
+    }
+
+    function fetchData() {
+      fetch(API_URL)
+        .then(function(r) { return r.json(); })
+        .then(function(data) { render(data); })
+        .catch(function(e) {
+          document.getElementById('app').innerHTML = '<div class="loading"><p>Unable to load update. Please try again.</p></div>';
+        });
+    }
+
+    fetchData();
+    setInterval(fetchData, 10000);
+  </script>
+</body>
+</html>`;
+  }
 
   // ─── Push Notifications ───
 
@@ -6848,6 +7340,29 @@ initQBOTables();
   try {
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS started_at TIMESTAMP`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS update_token VARCHAR UNIQUE`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS detailed_status TEXT NOT NULL DEFAULT 'scheduled'`);
+    await pool.query(`ALTER TABLE job_checklist_items ADD COLUMN IF NOT EXISTS room_group TEXT NOT NULL DEFAULT 'General'`);
+    await pool.query(`ALTER TABLE job_checklist_items ADD COLUMN IF NOT EXISTS customer_visible BOOLEAN NOT NULL DEFAULT true`);
+    await pool.query(`ALTER TABLE job_photos ADD COLUMN IF NOT EXISTS customer_visible BOOLEAN NOT NULL DEFAULT true`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS job_status_history (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id VARCHAR NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        status TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS job_notes (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        job_id VARCHAR NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        customer_visible BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
   } catch (e) {
     console.warn("Job columns migration:", (e as Error).message);
   }

@@ -214,6 +214,8 @@ export const jobs = pgTable("jobs", {
   satisfactionRating: integer("satisfaction_rating"),
   ratingComment: text("rating_comment"),
   ratingToken: varchar("rating_token").default(sql`gen_random_uuid()`),
+  updateToken: varchar("update_token").unique(),
+  detailedStatus: text("detailed_status").notNull().default("scheduled"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -228,6 +230,8 @@ export const jobChecklistItems = pgTable("job_checklist_items", {
   label: text("label").notNull(),
   completed: boolean("completed").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
+  roomGroup: text("room_group").notNull().default("General"),
+  customerVisible: boolean("customer_visible").notNull().default(true),
 });
 
 export const jobPhotos = pgTable("job_photos", {
@@ -236,6 +240,23 @@ export const jobPhotos = pgTable("job_photos", {
   photoUrl: text("photo_url").notNull(),
   photoType: text("photo_type").notNull().default("after"),
   caption: text("caption").notNull().default(""),
+  customerVisible: boolean("customer_visible").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const jobStatusHistory = pgTable("job_status_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  status: text("status").notNull(),
+  note: text("note").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const jobNotes = pgTable("job_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  customerVisible: boolean("customer_visible").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -143,6 +143,19 @@ Key files:
 - **AI Closing Assistant** (`client/screens/ClosingAssistantScreen.tsx`, `POST /api/ai/closing-message`): Generates customer-facing messages (text, email, follow-up, objection handling, upsell, deep-clean explanation) in 4 tones and 4 languages. Copy/regenerate buttons.
 - **Analytics**: walkthrough_ai_selected, walkthrough_voice_started/completed, walkthrough_analysis_started/completed, walkthrough_quote_generated, walkthrough_create_quote_clicked, walkthrough_closing_message_generated.
 
+### Live Job Updates
+- **Premium customer-facing update page** for any job, accessible via secure token-based URL at `/job-updates/:token`.
+- **JobDetailScreen tabbed interface**: Overview, Progress, Checklist, Photos & Notes tabs.
+- **Detailed status flow**: Scheduled → En Route → Service Started → In Progress → Final Touches → Completed. Quick-action buttons in Progress tab update status and add timeline entries.
+- **Timeline**: All status changes logged with timestamps in `job_status_history` table, displayed in both app and customer-facing page.
+- **Enhanced checklist**: Items grouped by `room_group` column (Kitchen, Bathrooms, etc.), with `customer_visible` toggle.
+- **Notes system**: `job_notes` table with `customer_visible` toggle. Internal notes stay private, customer-visible notes appear on public page.
+- **Photo visibility**: `customer_visible` column on `job_photos` table controls which photos appear on public page.
+- **Send Update Page**: Modal with Copy Link, AI-generated SMS/Email message drafts (via `POST /api/ai/job-update-message`). Pro-only feature.
+- **Customer-facing page**: Server-rendered HTML at `/job-updates/:token`, polls `/api/public/job-updates/:token` every 10 seconds. Shows company branding, status badge, progress bar, timeline, grouped checklist, photo gallery, customer-visible notes.
+- **Database**: New columns on `jobs` (`update_token`, `detailed_status`), `job_checklist_items` (`room_group`, `customer_visible`), `job_photos` (`customer_visible`). New tables: `job_status_history`, `job_notes`.
+- **Analytics**: `live_update_page_generated`, `live_update_sent` (method: copy/sms/email), `live_update_status_changed`.
+
 ### AI Dynamic Pricing Suggestions
 - Server endpoint: `POST /api/ai/pricing-suggestion` (Pro-only, gpt-5-nano) analyzes property details, add-ons, frequency, current prices, and business history to suggest optimal Good/Better/Best tier pricing.
 - Frontend: "AI Price Check" button on QuotePreviewScreen between quote cards and breakdown. Shows per-tier price comparison (current → suggested), reasoning, confidence badge, overall assessment, individual "Apply" buttons and "Apply All" button that updates priceOverrides.
