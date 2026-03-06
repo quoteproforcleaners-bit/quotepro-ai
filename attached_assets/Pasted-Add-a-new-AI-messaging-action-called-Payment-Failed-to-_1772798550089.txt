@@ -1,0 +1,90 @@
+Add a new AI messaging action called “Payment Failed” to the Quote Details screen so users can quickly send a professional message when a customer’s payment fails.
+This should match the design and architecture used for the existing AI prompts:
+Send Quote
+Follow Up
+Thank You
+Confirm Booking
+Reschedule
+The new action should appear alongside these options.
+1. UI Changes
+Inside the Send This Quote action row, add a new button:
+Payment Failed
+Design requirements:
+• Same style as the other action chips
+• Icon: credit card error or warning symbol
+• Same spacing and interaction behavior
+Example layout:
+Send Quote | Follow Up | Thank You
+Confirm Booking | Reschedule | Payment Failed
+2. AI Prompt Logic
+When the user taps Payment Failed, generate a professional message notifying the customer that their payment could not be processed.
+The AI should automatically pull from the quote object:
+Customer name
+Service type
+Service date (if booked)
+Quoted amount
+Company name
+Payment link (if available)
+3. AI System Prompt
+Create a new prompt template:
+System Role:
+You are a professional customer service assistant for a home service company.
+
+Task:
+Generate a polite message informing a customer that their payment attempt failed and asking them to retry.
+
+Guidelines:
+• Be polite and professional
+• Avoid blaming the customer
+• Keep the tone helpful
+• Encourage quick resolution
+• Keep message under 120 words
+• Suitable for SMS or email
+4. Example Output
+Example message the AI should generate:
+SMS Example
+Hi Sarah — it looks like the payment for your scheduled cleaning didn't go through.
+No worries, this sometimes happens with card providers.
+You can retry the payment using the link below to secure your appointment.
+[Payment Link]
+Let me know if you need any help!
+— Mike
+Two Maids of Malvern
+5. Channel Support
+The generated message should be compatible with:
+• Write Email
+• Write SMS
+Just like the other AI message prompts.
+6. Optional Smart Enhancements
+If available in the quote data, the AI should include:
+Payment link
+Invoice link
+Service date
+Quote number
+Example:
+Quote #1034
+7. Internal Tagging
+Add message type identifier:
+messageType: PAYMENT_FAILED
+This allows future automation triggers.
+8. Future Automation Hook
+Prepare the system so this message can later be triggered automatically when:
+• Stripe payment fails
+• Invoice payment fails
+• Subscription payment fails
+Do not implement automation yet, just structure the event type.
+9. Analytics Tracking
+Track event:
+ai_message_payment_failed_sent
+Include metadata:
+Quote ID
+Customer ID
+Delivery method (SMS / Email)
+10. UX Goal
+The entire workflow should allow the user to:
+Open quote
+Tap Payment Failed
+AI generates message
+Tap Write SMS or Email
+Send
+Total time: under 5 seconds

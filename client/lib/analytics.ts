@@ -77,7 +77,8 @@ type EventName =
   | "walkthrough_analysis_completed"
   | "walkthrough_quote_generated"
   | "walkthrough_create_quote_clicked"
-  | "walkthrough_closing_message_generated";
+  | "walkthrough_closing_message_generated"
+  | "ai_message_payment_failed_sent";
 
 export async function trackEvent(
   name: EventName,

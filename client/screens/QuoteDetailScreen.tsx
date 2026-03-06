@@ -37,7 +37,7 @@ type RouteParams = {
   QuoteDetail: { quoteId: string };
 };
 
-type DraftPurpose = "initial_quote" | "follow_up" | "thank_you" | "booking_confirmation" | "reschedule";
+type DraftPurpose = "initial_quote" | "follow_up" | "thank_you" | "booking_confirmation" | "reschedule" | "payment_failed";
 
 function FormattedDraftText({ text, style }: { text: string; style?: any }) {
   const paragraphs = text.split(/\n\n+/);
@@ -349,6 +349,13 @@ export default function QuoteDetailScreen() {
       const data = await res.json();
       if (data.draft) {
         setAiDraft(data.draft);
+        if (purpose === "payment_failed") {
+          trackEvent("ai_message_payment_failed_sent", {
+            quoteId: quote.id,
+            customerId: quote.customerId || "",
+            deliveryMethod: type,
+          });
+        }
       }
     } catch (err: any) {
       if (err?.message?.includes("403") || err?.status === 403) {
@@ -907,6 +914,7 @@ export default function QuoteDetailScreen() {
     thank_you: "Thank You",
     booking_confirmation: "Confirm Booking",
     reschedule: "Reschedule",
+    payment_failed: "Payment Failed",
   };
 
   const purposeIcons: Record<DraftPurpose, string> = {
@@ -915,6 +923,7 @@ export default function QuoteDetailScreen() {
     thank_you: "heart",
     booking_confirmation: "check-circle",
     reschedule: "calendar",
+    payment_failed: "alert-circle",
   };
 
   return (
@@ -1393,7 +1402,7 @@ export default function QuoteDetailScreen() {
         )}
 
         <View style={styles.purposeRow}>
-          {(["initial_quote", "follow_up", "thank_you", "booking_confirmation", "reschedule"] as DraftPurpose[]).map((purpose) => (
+          {(["initial_quote", "follow_up", "thank_you", "booking_confirmation", "reschedule", "payment_failed"] as DraftPurpose[]).map((purpose) => (
             <Pressable
               key={purpose}
               onPress={() => setAiDraftPurpose(purpose)}

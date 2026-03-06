@@ -3403,6 +3403,7 @@ Rules:
         thank_you: "thanking the customer for their business - be grateful and warm",
         booking_confirmation: "confirming a booking - be professional and include key details",
         reschedule: "requesting or confirming a reschedule - be understanding and accommodating",
+        payment_failed: "notifying the customer that their payment could not be processed - be polite and professional, avoid blaming the customer, keep the tone helpful, encourage quick resolution, mention they can retry the payment. If a payment link or quote link is available include it. Keep under 120 words",
       };
 
       const purposeInstruction = purposeDescriptions[purpose] || `purpose: ${purpose}`;
