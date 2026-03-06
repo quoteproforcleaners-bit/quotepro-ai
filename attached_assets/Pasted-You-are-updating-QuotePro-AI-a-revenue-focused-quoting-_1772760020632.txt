@@ -1,0 +1,511 @@
+You are updating QuotePro AI, a revenue-focused quoting app for cleaning business owners.
+
+I want you to redesign the New Quote entry flow so that Walkthrough AI becomes a core quoting option inside the app.
+
+IMPORTANT:
+This feature should NOT live as a separate buried tool or isolated AI screen.
+It should live directly inside the existing quote creation flow.
+
+==================================================
+PRIMARY PRODUCT CHANGE
+==================================================
+
+Right now, when the app user taps “New Quote,” they reach a selection screen with:
+- Residential
+- Commercial
+
+I want you to update this screen so it now has THREE options:
+
+1. Residential
+2. Commercial
+3. Walkthrough AI
+
+Walkthrough AI should feel like a flagship, premium, AI-native quoting path.
+
+The purpose is to let the user:
+- type a description of the job, OR
+- speak the job details using their microphone
+
+Then QuotePro AI should interpret the job and return smart quote recommendations.
+
+CRITICAL RULE:
+The AI must NEVER invent random prices.
+All quote recommendations must be calculated from the user’s saved pricing settings already in the app.
+The AI only interprets the job details and maps them to pricing variables.
+The pricing engine calculates the final recommendation.
+
+==================================================
+NEW QUOTE SELECTION SCREEN UPDATE
+==================================================
+
+Update the existing “New Quote” selection screen.
+
+Current options:
+- Residential
+- Commercial
+
+New options:
+- Residential
+- Commercial
+- Walkthrough AI
+
+Design requirements for this screen:
+- Keep the existing visual style modern, premium, and mobile-first
+- Make all three cards feel intentional and balanced
+- Walkthrough AI should stand out visually as a premium AI option, but should still match the app’s design system
+- Include a short description under each option
+
+Suggested copy:
+
+Residential
+“Create a quote for homes and recurring residential service.”
+
+Commercial
+“Build a quote for offices, retail, and commercial spaces.”
+
+Walkthrough AI
+“Describe the job by voice or text and get a smart quote recommendation.”
+
+Optional badge on Walkthrough AI:
+- AI-Powered
+or
+- Fastest Way to Quote
+
+When user taps Walkthrough AI, take them into the new AI quoting flow.
+
+==================================================
+WALKTHROUGH AI FLOW
+==================================================
+
+After selecting Walkthrough AI, take the user to a dedicated screen called:
+
+Walkthrough AI
+
+Subtitle:
+“Describe the job. Get a smart quote recommendation.”
+
+Trust line:
+“Built from your pricing settings.”
+
+This flow should allow the user to:
+- type the job description into a large text field
+- tap a microphone button and speak naturally
+- review the transcript before analysis
+- tap Analyze
+- receive structured quote recommendations
+
+==================================================
+WALKTHROUGH AI INPUT REQUIREMENTS
+==================================================
+
+Create a polished input experience with:
+
+1. Header
+- Title: Walkthrough AI
+- Subtitle: Describe the house, space, condition, frequency, and extras to generate a smart quote recommendation.
+- Trust text: Built from your pricing settings
+
+2. Main input card
+- Large textarea
+- Placeholder text:
+  “Example: 4 bed, 3 bath home, first-time clean, two dogs, customer wants biweekly service.”
+- Microphone button for speech-to-text
+- Clear button
+- Analyze button
+
+3. Helper text below input
+- “The AI interprets the job details. QuotePro calculates pricing using your saved settings.”
+
+Voice support requirements:
+- tap to start recording
+- tap to stop recording
+- show recording state
+- request microphone permission gracefully
+- populate transcript into the same editable text box
+- if speech fails, allow manual typing with no disruption
+
+==================================================
+AI BEHAVIOR RULES
+==================================================
+
+The AI should NOT act like a freeform chatbot that invents prices.
+
+Its job is to:
+1. extract structured quote details from messy text or voice input
+2. infer likely service type and quote variables
+3. identify assumptions
+4. return confidence level
+5. pass structured data into the pricing engine
+
+The pricing engine then calculates recommendations using the user’s saved settings.
+
+This is a hard product rule:
+- AI interprets
+- QuotePro calculates
+
+==================================================
+FIELDS THE AI SHOULD TRY TO EXTRACT
+==================================================
+
+Extract as many of these as possible:
+- property type
+- service category
+- residential vs commercial indicators
+- bedrooms
+- bathrooms
+- square footage
+- frequency
+- first-time clean
+- deep clean indicators
+- move-in / move-out indicators
+- pet count
+- pet type
+- add-ons
+- condition level
+- kitchen condition
+- number of floors
+- stairs
+- office count
+- bathrooms in office
+- breakroom / kitchenette
+- heavy soil indicators
+- urgency
+- notes
+
+If some details are missing:
+- make only reasonable assumptions
+- clearly label assumptions
+- reduce confidence
+- still return a helpful result when possible
+
+==================================================
+PRICING ENGINE REQUIREMENTS
+==================================================
+
+CRITICAL:
+Final pricing recommendations must come from the user’s saved pricing settings and existing quote logic.
+
+Use or expand user-configurable settings such as:
+- base rate
+- price per bedroom
+- price per bathroom
+- square footage tiers
+- deep clean multiplier or fixed uplift
+- move-in / move-out adjustment
+- recurring discounts
+- pet fee
+- add-on pricing
+- minimum job charge
+- travel fee
+- condition adjustment
+- custom surcharges
+
+If some pricing factors do not yet exist in app settings, add support for them cleanly in the pricing settings model.
+
+Do NOT hardcode prices in the UI.
+Do NOT let the language model set final dollar amounts directly.
+Create a reusable pricingRecommendationService that calculates outputs from structured fields + saved settings.
+
+==================================================
+WALKTHROUGH AI RESULTS SCREEN
+==================================================
+
+After analysis, show a premium structured result screen.
+
+Do NOT show raw chatbot paragraphs as the main output.
+This should feel like a polished product workflow.
+
+Include these sections:
+
+1. Detected Job Details
+- Property type
+- Bedrooms
+- Bathrooms
+- Square footage
+- Frequency
+- Service type
+- Pets
+- Add-ons
+- Condition
+- Special notes
+
+2. Recommended Quote Options
+Examples:
+- Standard Clean: $X
+- Deep Clean: $Y
+- Move-Out Clean: $Z
+- Biweekly Recurring: $A
+- Monthly Recurring: $B
+
+Show only options that make sense based on extracted details and pricing settings.
+
+3. Pricing Breakdown
+Examples:
+- Base price
+- Bedroom adjustment
+- Bathroom adjustment
+- Deep clean adjustment
+- Pet fee
+- Add-ons
+- Frequency discount
+- Travel fee
+- Minimum charge applied
+- Condition adjustment
+
+4. Estimated Labor Range
+- Estimated hours
+- Suggested crew size if helpful
+
+5. Assumptions + Confidence
+Examples:
+- “Assumed average square footage because none was provided.”
+- “Detected first-time clean based on language used.”
+- “Confidence: Medium”
+
+6. AI Recommendations
+Examples:
+- Recommend initial deep clean before recurring service
+- Recommend oven/fridge upsell
+- Recommend biweekly over monthly
+- Recommend user review before sending if confidence is low
+
+==================================================
+RESULT SCREEN ACTION BUTTONS
+==================================================
+
+At the bottom of the Walkthrough AI result, include strong action buttons:
+
+Primary:
+- Create Quote
+
+Secondary:
+- Edit Details
+- Generate Closing Message
+- Save Draft
+- Copy Summary
+
+Behavior:
+- Create Quote should convert the structured Walkthrough AI result into the existing editable quote builder flow
+- Edit Details should allow the user to correct extracted fields before quote creation
+- Generate Closing Message should launch AI Closing Assistant using the quote context
+- Save Draft should preserve the session
+- Copy Summary should copy a clean internal summary
+
+==================================================
+CONVERT TO QUOTE FLOW
+==================================================
+
+This is very important.
+
+When user taps Create Quote:
+- push all extracted and calculated fields into the normal quote creation flow
+- allow the user to review / edit before final save
+- preserve compatibility with both residential and commercial quote structures where possible
+
+If Walkthrough AI detects a residential-type job:
+- map output into the residential quote builder
+
+If Walkthrough AI detects a commercial-type job:
+- map output into the commercial quote builder
+
+If ambiguity exists:
+- ask the user to choose which quote structure to continue with, but preserve all extracted fields
+
+==================================================
+AI CLOSING ASSISTANT
+==================================================
+
+Build AI Closing Assistant as the next step after a recommendation is generated.
+
+This should be launched from the Walkthrough AI result screen via:
+“Generate Closing Message”
+
+Feature name:
+AI Closing Assistant
+
+Subtitle:
+“Turn your quote into a message that wins more jobs.”
+
+Inputs should include:
+- quote amount
+- service type
+- frequency
+- add-ons
+- customer name if available
+- notes from Walkthrough AI
+- pricing summary
+- business tone settings
+- preferred language
+
+User should be able to select:
+- Text message
+- Email
+- Follow-up message
+- Objection handling response
+- Recurring upsell message
+- Deep-clean-first explanation
+
+Tone options:
+- Professional
+- Friendly
+- Premium
+- Warm
+- Direct
+- Confident
+
+Languages:
+- English
+- Spanish
+- Portuguese
+- Russian
+
+Generated messages must:
+- sound natural
+- be concise
+- not sound robotic
+- clearly communicate value
+- reduce friction
+- help close the job
+
+Include:
+- Copy button
+- Regenerate button
+- Save template button
+- Send through existing messaging flow if supported
+
+==================================================
+MANUAL EDIT LAYER
+==================================================
+
+Before finalizing any recommendation, allow user to manually edit extracted fields such as:
+- bedrooms
+- bathrooms
+- square footage
+- service type
+- frequency
+- add-ons
+- pets
+- condition
+- property type
+
+This builds trust and keeps the user in control.
+
+==================================================
+ARCHITECTURE REQUIREMENTS
+==================================================
+
+Implement this cleanly with modular services.
+
+Suggested service structure:
+
+1. aiExtractionService
+Purpose:
+- convert text or speech input into structured quote attributes
+
+2. pricingRecommendationService
+Purpose:
+- calculate quote outputs from extracted fields + user pricing settings
+
+3. closingAssistantService
+Purpose:
+- generate customer-facing communication using quote context
+
+4. walkthroughSessionModel
+Purpose:
+- store raw input, transcript, extracted details, assumptions, confidence, recommendation output, and selected quote option
+
+Do not mix AI parsing logic with pricing calculation logic.
+Keep this clean, modular, and reusable.
+
+==================================================
+ANALYTICS / TELEMETRY
+==================================================
+
+Add event tracking for:
+- new_quote_screen_viewed
+- walkthrough_ai_selected
+- walkthrough_voice_started
+- walkthrough_voice_completed
+- walkthrough_analysis_started
+- walkthrough_analysis_completed
+- walkthrough_quote_generated
+- walkthrough_create_quote_clicked
+- walkthrough_closing_message_generated
+
+==================================================
+ERROR / EMPTY / LOADING STATES
+==================================================
+
+Add polished states for:
+- no input entered
+- microphone permission denied
+- speech transcription failure
+- AI extraction failure
+- incomplete pricing settings
+- low confidence results
+- loading / analyzing
+- empty result fallback
+
+If AI extraction fails:
+- guide the user to edit or enter details manually
+
+If pricing settings are incomplete:
+- still return best effort, but clearly show what was excluded
+
+==================================================
+DESIGN DIRECTION
+==================================================
+
+This should feel like a premium flagship QuotePro AI feature.
+
+Use:
+- Material 3 design language
+- mobile-first layout
+- excellent iPad responsiveness
+- strong card hierarchy
+- subtle icons
+- clean spacing
+- polished empty states
+- premium AI feel without clutter
+
+Walkthrough AI should feel like:
+“The fastest way to quote in the app.”
+
+==================================================
+COPY / POSITIONING
+==================================================
+
+Use product copy like:
+- Describe the job. Get a smart quote recommendation.
+- Built from your pricing settings.
+- Quote faster with voice or text.
+- AI interprets. QuotePro calculates.
+- Turn a walkthrough into revenue.
+
+==================================================
+DELIVERABLES
+==================================================
+
+Implement all of the following:
+
+1. Update New Quote selection screen to include Walkthrough AI as the third option
+2. Build the Walkthrough AI input screen
+3. Add voice-to-text support
+4. Build AI extraction pipeline
+5. Build pricingRecommendationService using saved pricing settings
+6. Build structured results UI
+7. Add edit-details layer
+8. Add Create Quote conversion flow into existing quote builders
+9. Build AI Closing Assistant
+10. Add analytics hooks
+11. Add loading, error, and empty states
+12. Keep all existing Residential and Commercial quote flows intact
+
+When complete, provide:
+- summary of what was built
+- list of files created or changed
+- architecture overview
+- recommended next improvements
+
+Do not make this feel like a side feature.
+Make it feel like a core part of the QuotePro AI quoting experience.
