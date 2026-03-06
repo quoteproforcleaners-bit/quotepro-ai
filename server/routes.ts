@@ -1447,11 +1447,11 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const job = await getJobById(req.params.id);
       if (!job) return res.status(404).json({ message: "Job not found" });
       const existing = await pool.query(`SELECT update_token FROM jobs WHERE id = $1`, [req.params.id]);
-      if (existing.rows[0]?.update_token) {
+      if (existing.rows[0]?.update_token && existing.rows[0].update_token.length <= 16) {
         return res.json({ token: existing.rows[0].update_token });
       }
-      const { v4: uuidv4 } = await import("uuid");
-      const token = uuidv4();
+      const crypto = await import("crypto");
+      const token = crypto.randomBytes(8).toString("hex");
       await pool.query(`UPDATE jobs SET update_token = $1 WHERE id = $2`, [token, req.params.id]);
       return res.json({ token });
     } catch (error: any) {
@@ -1563,10 +1563,10 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       let userPrompt: string;
 
       if (type === "sms") {
-        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No emojis. Be friendly but brief. Include this link: ${updateLink}${langInstruction}`;
+        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No emojis. Be friendly but brief. Include this link: ${updateLink}. IMPORTANT: The message MUST start with "Hi [customer name], this is [sender name] from ${companyName || "our company"}"${langInstruction}`;
         userPrompt = `SMS telling ${customerName || "Customer"} their live service update page is ready. They can view job progress, checklist updates, and completion photos there. Reply with ONLY the message text, nothing else.`;
       } else {
-        systemPrompt = `Write a short professional email (under 120 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No emojis. Include this link: ${updateLink}. Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+        systemPrompt = `Write a short professional email (under 120 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No emojis. Include this link: ${updateLink}. Start with "Subject: " on line 1, blank line, then body. IMPORTANT: The greeting MUST introduce the sender and company name, e.g. "Hi [name], this is [sender] from ${companyName || "our company"}"${langInstruction}`;
         userPrompt = `Email telling ${customerName || "Customer"} their live service update page is ready. They can view real-time service details, progress updates, checklist items, and completion photos. Reply with ONLY the email, nothing else.`;
       }
 
@@ -1631,10 +1631,14 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         [job.id]
       );
 
+      const effectiveDetailedStatus = (job.detailed_status && job.detailed_status !== "scheduled")
+        ? job.detailed_status
+        : (job.status === "in_progress" ? "in_progress" : (job.status === "completed" ? "completed" : job.detailed_status || job.status));
+
       return res.json({
         jobType: job.job_type,
         status: job.status,
-        detailedStatus: job.detailed_status || job.status,
+        detailedStatus: effectiveDetailedStatus,
         startDatetime: job.start_datetime,
         endDatetime: job.end_datetime,
         address: job.address,
@@ -1831,8 +1835,9 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
 
       // Details
       html += '<div class="card"><div class="card-title">Service Details</div>';
-      const jobTypes = { regular: "Standard Cleaning", deep_clean: "Deep Clean", move_in_out: "Move In/Out", post_construction: "Post Construction", airbnb_turnover: "Airbnb Turnover" };
-      html += '<div class="detail-row"><div class="detail-icon" style="background:#EFF6FF">&#128466;</div><div><div class="detail-label">Service</div><div class="detail-value">' + (jobTypes[data.jobType] || data.jobType) + '</div></div></div>';
+      var jobTypes = { regular: "Standard Cleaning", deep_clean: "Deep Clean", move_in_out: "Move In/Out", post_construction: "Post Construction", airbnb_turnover: "Airbnb Turnover" };
+      var serviceLabel = data.jobType ? (jobTypes[data.jobType] || data.jobType) : "Cleaning Service";
+      html += '<div class="detail-row"><div class="detail-icon" style="background:#EFF6FF">&#128466;</div><div><div class="detail-label">Service</div><div class="detail-value">' + serviceLabel + '</div></div></div>';
       if (data.startDatetime) {
         html += '<div class="detail-row"><div class="detail-icon" style="background:#F0FDF4">&#128197;</div><div><div class="detail-label">Date</div><div class="detail-value">' + formatDate(data.startDatetime) + '</div></div></div>';
         html += '<div class="detail-row"><div class="detail-icon" style="background:#FFFBEB">&#128337;</div><div><div class="detail-label">Arrival Window</div><div class="detail-value">' + formatTime(data.startDatetime) + (data.endDatetime ? ' - ' + formatTime(data.endDatetime) : '') + '</div></div></div>';

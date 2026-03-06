@@ -195,7 +195,7 @@ export default function JobDetailScreen() {
   const [reviewSending, setReviewSending] = useState(false);
   const [sendUpdateModalVisible, setSendUpdateModalVisible] = useState(false);
   const [updateLink, setUpdateLink] = useState<string | null>(null);
-  const [aiDraft, setAiDraft] = useState<string | null>(null);
+  const [aiDraft, setAiDraft] = useState("");
   const [aiDraftType, setAiDraftType] = useState<"sms" | "email">("sms");
   const [aiDraftLoading, setAiDraftLoading] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
@@ -392,7 +392,7 @@ export default function JobDetailScreen() {
     if (!updateLink || !job) return;
     setAiDraftType(type);
     setAiDraftLoading(true);
-    setAiDraft(null);
+    setAiDraft("");
     try {
       const customerName = job.customer ? `${job.customer.firstName || ""}`.trim() : "Customer";
       const res = await apiRequest("POST", "/api/ai/job-update-message", {
@@ -1018,7 +1018,7 @@ export default function JobDetailScreen() {
         <Modal visible={sendUpdateModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSendUpdateModalVisible(false)}>
           <View style={[styles.modalContainer, { backgroundColor: theme.backgroundRoot }]}>
             <View style={styles.modalHeader}>
-              <Pressable testID="close-update-modal" onPress={() => { setSendUpdateModalVisible(false); setAiDraft(null); }}>
+              <Pressable testID="close-update-modal" onPress={() => { setSendUpdateModalVisible(false); setAiDraft(""); }}>
                 <ThemedText type="body" style={{ color: theme.primary }}>Close</ThemedText>
               </Pressable>
               <ThemedText type="h4">Send Update Page</ThemedText>
@@ -1079,7 +1079,14 @@ export default function JobDetailScreen() {
                       {aiDraftType === "sms" ? "SMS Draft" : "Email Draft"}
                     </ThemedText>
                   </View>
-                  <ThemedText type="body" style={{ lineHeight: 22, color: theme.text }}>{aiDraft}</ThemedText>
+                  <TextInput
+                    testID="input-ai-draft"
+                    value={aiDraft}
+                    onChangeText={setAiDraft}
+                    style={[styles.draftInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
+                    multiline
+                    scrollEnabled={false}
+                  />
                   <View style={[styles.aiButtonRow, { marginTop: Spacing.md }]}>
                     <Pressable testID="copy-draft-btn" onPress={handleCopyDraft} style={[styles.aiBtn, { backgroundColor: theme.primary, flex: 1 }]}>
                       <Feather name="copy" size={14} color="#FFFFFF" />
@@ -1303,4 +1310,5 @@ const styles = StyleSheet.create({
   previewImage: { width: "100%", height: 250, borderRadius: BorderRadius.lg, marginBottom: Spacing.xl },
   photoTypeRow: { flexDirection: "row", gap: Spacing.sm },
   photoTypeChip: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: BorderRadius.full, borderWidth: 1 },
+  draftInput: { borderWidth: 1, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, fontSize: 15, lineHeight: 22, minHeight: 100, textAlignVertical: "top" },
 });
