@@ -539,10 +539,17 @@ export default function QuotePreviewScreen({
       handleSave();
       return;
     }
-    if (!aiDraft && !aiDraftLoading) {
-      await fetchAiDraft("email", "initial_quote");
+    if (isEditMode && onSaveForSend) {
+      await onSaveForSend(priceOverrides);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } else {
+      handleSave();
     }
-    handleSave();
+    if (!aiDraft && !aiDraftLoading) {
+      await fetchAiDraft("email", aiDraftPurpose);
+    }
   };
 
   const purposeLabels: Record<DraftPurpose, string> = {
