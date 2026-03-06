@@ -1563,8 +1563,8 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       let userPrompt: string;
 
       if (type === "sms") {
-        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No emojis. Be friendly but brief. Include this link: ${updateLink}. IMPORTANT: The message MUST start with "Hi [customer name], this is [sender name] from ${companyName || "our company"}"${langInstruction}`;
-        userPrompt = `SMS telling ${customerName || "Customer"} their live service update page is ready. They can view job progress, checklist updates, and completion photos there. Reply with ONLY the message text, nothing else.`;
+        systemPrompt = `Write a very short SMS (2-3 sentences max) for a cleaning company. No emojis. Be warm but extremely brief. IMPORTANT: Start with "Hi ${customerName || "there"}, this is ${senderName || "your team"} from ${companyName || "our company"}." Then one short sentence about tracking their service, then the link. Nothing else.${langInstruction}`;
+        userPrompt = `SMS with this link: ${updateLink}. Reply with ONLY the message text. Keep it under 200 characters excluding the link.`;
       } else {
         systemPrompt = `Write a short professional email (under 120 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No emojis. Include this link: ${updateLink}. Start with "Subject: " on line 1, blank line, then body. IMPORTANT: The greeting MUST introduce the sender and company name, e.g. "Hi [name], this is [sender] from ${companyName || "our company"}"${langInstruction}`;
         userPrompt = `Email telling ${customerName || "Customer"} their live service update page is ready. They can view real-time service details, progress updates, checklist items, and completion photos. Reply with ONLY the email, nothing else.`;
@@ -1595,7 +1595,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const { token } = req.params;
       const jobResult = await pool.query(
         `SELECT j.*, c.first_name as customer_first_name, c.last_name as customer_last_name,
-                b.id as bid, b.owner_id
+                b.id as bid, b.owner_user_id
          FROM jobs j
          LEFT JOIN customers c ON j.customer_id = c.id
          LEFT JOIN businesses b ON j.business_id = b.id
@@ -1605,11 +1605,23 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       if (jobResult.rows.length === 0) return res.status(404).json({ message: "Not found" });
       const job = jobResult.rows[0];
 
-      const businessProfile = await pool.query(
-        `SELECT * FROM business_profiles WHERE user_id = $1`,
-        [job.owner_id]
-      );
-      const profile = businessProfile.rows[0] || {};
+      let profile: any = {};
+      try {
+        const businessProfile = await pool.query(
+          `SELECT * FROM business_profiles WHERE user_id = $1`,
+          [job.owner_user_id]
+        );
+        profile = businessProfile.rows[0] || {};
+      } catch (profileErr: any) {
+        if (profileErr.code !== "42P01") throw profileErr;
+      }
+
+      if (!profile.company_name && job.bid) {
+        try {
+          const biz = await pool.query(`SELECT company_name FROM businesses WHERE id = $1`, [job.bid]);
+          if (biz.rows[0]?.company_name) profile.company_name = biz.rows[0].company_name;
+        } catch (_) {}
+      }
 
       const timeline = await pool.query(
         `SELECT * FROM job_status_history WHERE job_id = $1 ORDER BY created_at ASC`,
@@ -1663,7 +1675,11 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
-  app.get("/job-updates/:token", async (req: Request, res: Response) => {
+  app.get("/job-updates/:token", (req: Request, res: Response) => {
+    res.redirect(301, `/j/${req.params.token}`);
+  });
+
+  app.get("/j/:token", async (req: Request, res: Response) => {
     try {
       const { token } = req.params;
       const jobResult = await pool.query(
@@ -1675,7 +1691,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       }
 
       const baseUrl = `${req.protocol}://${req.get("host")}`;
-      const apiUrl = `${baseUrl}/api/public/job-updates/${token}`;
+      const apiUrl = `${baseUrl}/api/public/job-updates/${token}`; // API path stays the same
       const assetsBase = baseUrl;
 
       res.send(generateJobUpdatePageHtml(apiUrl, assetsBase, token));

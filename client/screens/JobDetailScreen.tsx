@@ -378,7 +378,7 @@ export default function JobDetailScreen() {
       const res = await apiRequest("POST", `/api/jobs/${jobId}/generate-update-token`);
       const data = await res.json();
       if (data.token) {
-        const link = `${getPublicBaseUrl()}/job-updates/${data.token}`;
+        const link = `${getPublicBaseUrl()}/j/${data.token}`;
         setUpdateLink(link);
         setSendUpdateModalVisible(true);
         trackEvent("live_update_page_generated", { jobId });
