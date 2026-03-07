@@ -1,0 +1,294 @@
+You are a senior full-stack engineer. I need you to build a production-ready V1 Jobber integration inside my existing app, QuotePro AI.
+
+GOAL
+Build the first version of a Jobber integration so QuotePro can:
+1. Let a QuotePro user connect their Jobber account via OAuth
+2. Store Jobber access + refresh tokens securely
+3. Let the user choose whether accepted quotes should auto-create a Jobber client + request/job
+4. Create the Jobber record automatically when a QuotePro quote is accepted
+5. Show sync status and errors inside the QuotePro UI
+6. Be architected cleanly so I can later add more Jobber workflows like estimate sync, follow-ups, and review requests
+
+IMPORTANT PRODUCT STRATEGY
+This integration should position QuotePro as the revenue layer on top of Jobber, not as a Jobber replacement.
+
+TECHNICAL REQUIREMENTS
+Use Jobber OAuth 2.0 flow and Jobber GraphQL API.
+Use environment variables for all secrets.
+Do not hardcode tokens or credentials.
+Build this in a modular way with a dedicated Jobber integration service layer.
+
+ASSUMPTIONS
+- QuotePro already has authenticated users
+- QuotePro already has quote records in the database
+- There is already a quote acceptance event or quote status update that can trigger sync
+- We can add DB fields/tables as needed
+- We should support one Jobber connection per QuotePro account for V1
+
+WHAT TO BUILD
+
+1) DATABASE / DATA MODEL
+Create whatever schema changes are needed, including something like:
+- integrations_jobber
+  - id
+  - user_id or account_id
+  - jobber_account_id
+  - connected_by_jobber_user_id
+  - access_token_encrypted
+  - refresh_token_encrypted
+  - access_token_expires_at
+  - scopes
+  - is_connected
+  - auto_create_jobber_job_on_quote_accept (boolean)
+  - default_sync_mode (enum: off, manual, automatic)
+  - created_at
+  - updated_at
+
+- quote_jobber_syncs
+  - id
+  - quote_id
+  - user_id or account_id
+  - jobber_client_id
+  - jobber_request_or_job_id
+  - sync_status (pending, success, failed)
+  - sync_trigger (manual, automatic)
+  - error_message
+  - raw_response_json
+  - created_at
+  - updated_at
+
+If there is already an integrations table pattern in the codebase, follow that pattern instead of inventing a new one.
+
+2) BACKEND / SERVER
+Build these backend routes or server actions:
+
+A. Start OAuth
+- GET or POST /api/integrations/jobber/connect
+- Generates Jobber OAuth authorization URL
+- Includes secure state param
+- Redirects user to Jobber OAuth page
+
+B. OAuth Callback
+- GET /api/integrations/jobber/callback
+- Validates state
+- Exchanges auth code for access + refresh tokens
+- Encrypts and stores tokens
+- Uses Jobber API to fetch the connected account and the user who installed the app
+- Persists those IDs
+- Marks integration connected
+- Redirects back into QuotePro with success/failure notice
+
+C. Integration Status
+- GET /api/integrations/jobber/status
+- Returns whether connected, connection metadata, sync preferences, and last sync info
+
+D. Disconnect
+- POST /api/integrations/jobber/disconnect
+- Soft disconnects in QuotePro
+- Clears or revokes local token usage safely
+- Leaves audit trail
+
+E. Update Preferences
+- POST /api/integrations/jobber/preferences
+- Save:
+  - auto_create_jobber_job_on_quote_accept
+  - default_sync_mode
+
+F. Manual Sync Endpoint
+- POST /api/integrations/jobber/sync-quote/:quoteId
+- Creates the Jobber entities for a specific quote
+- Returns success/failure plus created Jobber IDs
+
+G. Automatic Sync Hook
+- Hook into the quote acceptance flow
+- When a quote becomes accepted:
+  - check if Jobber connected
+  - check if auto sync is enabled
+  - if yes, create Jobber record automatically
+  - save sync result
+  - do not break quote acceptance if Jobber sync fails
+  - surface non-blocking error to logs and UI
+
+3) JOBBER SERVICE LAYER
+Create a dedicated service module, for example:
+- services/jobber/client.ts
+- services/jobber/oauth.ts
+- services/jobber/graphql.ts
+- services/jobber/mappers.ts
+- services/jobber/syncQuoteToJobber.ts
+
+Responsibilities:
+
+A. OAuth utilities
+- Build authorization URL
+- Exchange code for tokens
+- Refresh access token when expired
+- Centralize token refresh logic
+
+B. GraphQL client
+- Single reusable Jobber GraphQL request function
+- Adds auth header
+- Handles token refresh automatically
+- Handles GraphQL errors gracefully
+- Logs request IDs / errors safely
+
+C. Mapping layer
+Map a QuotePro quote into Jobber-compatible data:
+- customer/client full name
+- email
+- phone
+- address
+- service title
+- notes
+- line items or summary
+- quote total
+- requested service date if available
+
+D. Sync orchestration
+- Check if client already exists in Jobber if feasible in V1; if not feasible, create client directly and document limitation
+- Create the next logical Jobber object after client creation
+- Save all returned external IDs
+- Make sync idempotent:
+  - prevent duplicate creation if the same accepted quote is synced twice
+  - if already synced successfully, return existing sync result unless force=true
+
+4) WHAT V1 SHOULD SYNC
+Keep V1 narrow and useful.
+
+When a quote is accepted in QuotePro, sync:
+- Client / customer
+- Property or address details if supported by available schema
+- A service request, job, or closest appropriate Jobber work object
+- Notes that indicate this came from QuotePro
+- Quote total or pricing context in notes/description if direct field mapping is unclear
+
+IMPORTANT:
+Before coding, inspect the current Jobber GraphQL docs/schema integration points already available in the project or configuration and choose the correct object(s) for V1 creation.
+Do not guess blindly if Jobber uses “request”, “job”, “client”, “property”, etc. Use the correct supported GraphQL mutations and types based on the implementation path you can verify in code comments/config/docs.
+Abstract this well so we can swap request->job or add estimate sync later.
+
+5) FRONTEND UI
+Build a clean Integration Settings screen/card inside QuotePro:
+
+Section title:
+Jobber Integration
+
+States:
+A. Disconnected
+- Short explanation:
+  “Connect Jobber to automatically turn accepted QuotePro quotes into Jobber records.”
+- Button:
+  “Connect Jobber”
+
+B. Connected
+Show:
+- Connected badge
+- Jobber account ID or business identifier if available
+- Connected date
+- Auto-sync toggle:
+  “Automatically create Jobber record when a quote is accepted”
+- Sync mode dropdown if useful
+- Disconnect button
+- Test sync button if we have a safe quote to test with
+
+C. Manual sync from quote detail page
+On Quote Detail page, if Jobber is connected:
+- Add button:
+  “Send to Jobber”
+- If already synced:
+  “View Sync Status”
+- Show last sync result:
+  - Success
+  - Failed
+  - Pending
+- Show friendly error message if sync fails
+
+6) USER EXPERIENCE REQUIREMENTS
+- Do not block quote acceptance if Jobber API is down
+- Show friendly copy, not developer jargon
+- If sync fails, say something like:
+  “The quote was accepted successfully, but we couldn’t create the Jobber record. You can retry from this screen.”
+- Add loading states
+- Add success toasts
+- Add retry action for failed syncs
+
+7) SECURITY REQUIREMENTS
+- Encrypt tokens at rest
+- Validate OAuth state
+- Use least-privilege scopes possible
+- Never expose raw tokens to frontend
+- Add server-side auth checks so users can only manage their own integration
+- Add rate limiting or basic abuse protection to sync endpoints if the app already supports it
+
+8) LOGGING + OBSERVABILITY
+Add structured logs for:
+- OAuth connect started
+- OAuth callback success/failure
+- Token refresh attempts
+- Quote sync started
+- Quote sync succeeded
+- Quote sync failed
+
+Do not log secrets.
+Store helpful error payloads in a safe way.
+
+9) TESTING
+Add tests for:
+- OAuth state validation
+- Callback handling
+- Token refresh path
+- Successful quote sync
+- Duplicate sync prevention / idempotency
+- Failure handling when Jobber API returns errors
+- UI rendering for connected vs disconnected states
+
+If the app already has a testing framework, use it.
+If not, add lightweight coverage without overengineering.
+
+10) FEATURE FLAG
+Wrap this integration behind a feature flag if the codebase supports flags.
+Something like:
+ENABLE_JOBBER_INTEGRATION=true
+
+11) SEED / DEV HELPERS
+Create a safe dev-only helper so I can test a quote sync quickly with an existing quote in my dev environment.
+
+12) DOCUMENTATION
+Create a markdown file like:
+docs/jobber-integration-v1.md
+
+Include:
+- environment variables needed
+- OAuth redirect URI requirements
+- how to connect a Jobber developer app
+- how to test locally
+- current V1 limitations
+- future roadmap items
+
+V1 LIMITATIONS TO DOCUMENT
+- One-way sync only: QuotePro -> Jobber
+- No webhook back-sync yet
+- No ZenMaid integration yet
+- No estimate import from Jobber yet
+- No two-way status sync yet
+
+13) CODE QUALITY
+- Keep code clean, typed, modular, and maintainable
+- Reuse existing UI/design patterns in the app
+- Do not break existing quote acceptance logic
+- If the current codebase structure differs, adapt intelligently instead of forcing a new architecture
+
+DELIVERABLES
+When done, provide:
+1. A summary of what was built
+2. Any DB migrations added
+3. New environment variables required
+4. Exact places in the app where I can test it
+5. Any Jobber app setup steps I must complete in the Jobber developer console
+6. Known limitations or follow-up recommendations
+
+IF YOU HIT JOBBER OBJECT MODEL UNCERTAINTY
+Do not stall. Implement the integration with the cleanest verified V1 object path available and leave a small TODO section documenting the alternative object models that can be added next.
+
+START NOW
+Please inspect the current codebase first, identify the auth stack, database layer, quote acceptance flow, and UI structure, then implement the integration end-to-end.
