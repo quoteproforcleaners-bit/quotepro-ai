@@ -1268,6 +1268,27 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Pressable
+        onPress={() => navigation.navigate("JobberSettings" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-jobber-settings"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: "#2563eb15" }]}>
+            <Feather name="briefcase" size={20} color="#2563eb" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              Jobber
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Sync clients and jobs
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
         onPress={() => navigation.navigate("SalesStrategy" as any)}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-sales-strategy"

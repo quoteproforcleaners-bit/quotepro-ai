@@ -10,7 +10,8 @@ import { pool } from "./db";
 import { google } from "googleapis";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableGoogleCalendarClient, isGoogleCalendarConnected } from "./googleCalendarClient";
-import { QBOClient, encryptToken, logSync } from "./qbo-client";
+import { QBOClient, encryptToken, decryptToken, logSync } from "./qbo-client";
+import { JobberClient, buildJobberAuthUrl, exchangeJobberCode, logJobberSync, syncQuoteToJobber } from "./jobber-client";
 
 let stripe: Stripe | null = null;
 
@@ -1033,6 +1034,17 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
               createQBOInvoiceForQuote(req.session.userId!, q.id).catch((err) => {
                 console.error("Auto QBO invoice creation failed:", err.message);
                 logSync(req.session.userId!, q.id, "create_invoice", { auto: true }, { error: err.message }, "failed", err.message);
+              });
+            }
+          }).catch(() => {});
+
+          pool.query(
+            `SELECT auto_create_job_on_quote_accept FROM jobber_connections WHERE user_id = $1 AND status = 'connected'`,
+            [req.session.userId]
+          ).then((jobberResult) => {
+            if (jobberResult.rows.length > 0 && jobberResult.rows[0].auto_create_job_on_quote_accept) {
+              syncQuoteToJobber(req.session.userId!, q.id, "automatic").catch((err) => {
+                console.error("Auto Jobber sync failed:", err.message);
               });
             }
           }).catch(() => {});
@@ -6609,6 +6621,33 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
         }
       } catch (_notifErr) {}
 
+      try {
+        const business = q.businessId ? await db_getBusinessById(q.businessId) : null;
+        if (business?.userId) {
+          pool.query(
+            `SELECT auto_create_job_on_quote_accept FROM jobber_connections WHERE user_id = $1 AND status = 'connected'`,
+            [business.userId]
+          ).then((jobberResult) => {
+            if (jobberResult.rows.length > 0 && jobberResult.rows[0].auto_create_job_on_quote_accept) {
+              syncQuoteToJobber(business.userId, q.id, "automatic").catch((err) => {
+                console.error("Auto Jobber sync (public accept) failed:", err.message);
+              });
+            }
+          }).catch(() => {});
+
+          pool.query(
+            `SELECT auto_create_invoice FROM qbo_connections WHERE user_id = $1 AND status = 'connected'`,
+            [business.userId]
+          ).then((connResult) => {
+            if (connResult.rows.length > 0 && connResult.rows[0].auto_create_invoice) {
+              createQBOInvoiceForQuote(business.userId, q.id).catch((err) => {
+                console.error("Auto QBO invoice (public accept) failed:", err.message);
+              });
+            }
+          }).catch(() => {});
+        }
+      } catch (_syncErr) {}
+
       return res.json({ success: true });
     } catch (error: any) {
       console.error("Accept quote error:", error);
@@ -7276,6 +7315,187 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     }
   });
 
+  // ============ JOBBER INTEGRATION ENDPOINTS ============
+
+  app.get("/api/integrations/jobber/connect", requireAuth, async (req: any, res) => {
+    try {
+      const clientId = process.env.JOBBER_CLIENT_ID;
+      if (!clientId) return res.status(500).json({ error: "Jobber integration not configured" });
+
+      const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const redirectUri = `${protocol}://${host}/api/integrations/jobber/callback`;
+
+      const state = crypto.randomBytes(32).toString("hex");
+      req.session.jobberOAuthState = state;
+      req.session.jobberOAuthUserId = req.session.userId;
+
+      const url = buildJobberAuthUrl(redirectUri, state);
+      res.json({ url });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/integrations/jobber/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        return res.status(400).send("Missing required OAuth parameters");
+      }
+
+      const storedState = req.session?.jobberOAuthState;
+      const userId = req.session?.jobberOAuthUserId;
+      if (!storedState || storedState !== state || !userId) {
+        return res.status(403).send("Invalid or expired OAuth state. Please try connecting again.");
+      }
+      req.session.jobberOAuthState = null;
+      req.session.jobberOAuthUserId = null;
+
+      const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const redirectUri = `${protocol}://${host}/api/integrations/jobber/callback`;
+
+      const tokens = await exchangeJobberCode(code as string, redirectUri);
+      const expiresAt = new Date(Date.now() + tokens.expiresIn * 1000);
+
+      await pool.query(
+        `INSERT INTO jobber_connections (id, user_id, access_token_encrypted, refresh_token_encrypted,
+           access_token_expires_at, connected_at, scopes, status)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW(), $5, 'connected')
+         ON CONFLICT (user_id) DO UPDATE SET
+           access_token_encrypted = $2, refresh_token_encrypted = $3,
+           access_token_expires_at = $4, connected_at = NOW(), scopes = $5,
+           status = 'connected', last_error = NULL, disconnected_at = NULL`,
+        [userId, encryptToken(tokens.accessToken), encryptToken(tokens.refreshToken), expiresAt, "read:clients,write:clients,read:jobs,write:jobs"]
+      );
+
+      await logJobberSync(userId, null, "connect", {}, { success: true }, "ok");
+
+      res.send(`<!DOCTYPE html><html><head><title>Jobber Connected</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8f9fa;margin:0}.card{text-align:center;padding:40px;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,0.1);max-width:400px}h1{color:#16a34a;margin-bottom:8px}p{color:#64748b}</style></head><body><div class="card"><h1>Connected!</h1><p>Jobber is now connected to QuotePro. You can close this window and return to the app.</p></div></body></html>`);
+    } catch (e: any) {
+      console.error("Jobber callback error:", e);
+      await logJobberSync("unknown", null, "connect", {}, { error: e.message }, "failed", e.message);
+      res.status(500).send("An error occurred during Jobber connection");
+    }
+  });
+
+  app.get("/api/integrations/jobber/status", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, status, connected_at as "connectedAt", scopes,
+                auto_create_job_on_quote_accept as "autoCreateJobOnQuoteAccept",
+                last_error as "lastError"
+         FROM jobber_connections WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      if (result.rows.length === 0) {
+        return res.json({ connected: false });
+      }
+      const conn = result.rows[0];
+      res.json({
+        connected: conn.status === "connected",
+        status: conn.status,
+        connectedAt: conn.connectedAt,
+        autoCreateJobOnQuoteAccept: conn.autoCreateJobOnQuoteAccept,
+        lastError: conn.lastError,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/integrations/jobber/disconnect", requireAuth, async (req: any, res) => {
+    try {
+      await pool.query(
+        `UPDATE jobber_connections SET status = 'disconnected', disconnected_at = NOW(),
+                access_token_encrypted = NULL, refresh_token_encrypted = NULL
+         WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      await logJobberSync(req.session.userId, null, "disconnect", {}, { success: true }, "ok");
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.put("/api/integrations/jobber/settings", requireAuth, async (req: any, res) => {
+    try {
+      const { autoCreateJobOnQuoteAccept } = req.body;
+      await pool.query(
+        `UPDATE jobber_connections SET auto_create_job_on_quote_accept = $1 WHERE user_id = $2`,
+        [!!autoCreateJobOnQuoteAccept, req.session.userId]
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/integrations/jobber/sync-quote/:quoteId", requireAuth, async (req: any, res) => {
+    try {
+      const { quoteId } = req.params;
+      const force = req.body?.force === true;
+      const result = await syncQuoteToJobber(req.session.userId, quoteId, "manual", force);
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get("/api/integrations/jobber/sync-status/:quoteId", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT jobber_client_id as "jobberClientId", jobber_job_id as "jobberJobId",
+                jobber_job_number as "jobberJobNumber", sync_status as "syncStatus",
+                sync_trigger as "syncTrigger", error_message as "errorMessage",
+                created_at as "createdAt"
+         FROM jobber_job_links WHERE user_id = $1 AND quote_id = $2
+         ORDER BY created_at DESC LIMIT 1`,
+        [req.session.userId, req.params.quoteId]
+      );
+      if (result.rows.length === 0) return res.json(null);
+      res.json(result.rows[0]);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/integrations/jobber/logs", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, user_id as "userId", quote_id as "quoteId", action,
+                request_summary as "requestSummary", response_summary as "responseSummary",
+                status, error_message as "errorMessage", created_at as "createdAt"
+         FROM jobber_sync_log WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [req.session.userId]
+      );
+      res.json(result.rows);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/integrations/jobber/test", requireAuth, async (req: any, res) => {
+    try {
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No Jobber connection found" });
+
+      await client.ensureValidToken();
+      await logJobberSync(req.session.userId, null, "test_connection", {}, { success: true }, "ok");
+      res.json({ success: true });
+    } catch (e: any) {
+      await logJobberSync(req.session.userId, null, "test_connection", {}, { error: e.message }, "failed", e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   setInterval(async () => {
@@ -7423,6 +7643,62 @@ async function initQBOTables() {
 }
 
 initQBOTables();
+
+async function initJobberTables() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS jobber_connections (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL UNIQUE REFERENCES users(id),
+        access_token_encrypted TEXT,
+        refresh_token_encrypted TEXT,
+        access_token_expires_at TIMESTAMP,
+        connected_at TIMESTAMP,
+        disconnected_at TIMESTAMP,
+        scopes TEXT,
+        status TEXT NOT NULL DEFAULT 'disconnected',
+        last_error TEXT,
+        auto_create_job_on_quote_accept BOOLEAN NOT NULL DEFAULT false
+      );
+      CREATE TABLE IF NOT EXISTS jobber_client_mappings (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL REFERENCES users(id),
+        qp_customer_id VARCHAR NOT NULL REFERENCES customers(id),
+        jobber_client_id TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id, qp_customer_id)
+      );
+      CREATE TABLE IF NOT EXISTS jobber_job_links (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL REFERENCES users(id),
+        quote_id VARCHAR NOT NULL REFERENCES quotes(id),
+        jobber_client_id TEXT NOT NULL,
+        jobber_job_id TEXT NOT NULL,
+        jobber_job_number TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'success',
+        sync_trigger TEXT NOT NULL DEFAULT 'manual',
+        error_message TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id, quote_id)
+      );
+      CREATE TABLE IF NOT EXISTS jobber_sync_log (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL REFERENCES users(id),
+        quote_id VARCHAR,
+        action TEXT NOT NULL,
+        request_summary JSONB,
+        response_summary JSONB,
+        status TEXT NOT NULL,
+        error_message TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+  } catch (e) {
+    console.warn("Jobber tables init:", (e as Error).message);
+  }
+}
+
+initJobberTables();
 
 (async () => {
   try {

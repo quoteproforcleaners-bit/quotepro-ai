@@ -125,6 +125,16 @@ Key files:
 - **UI Screens**: `QBOSettingsScreen` (connect/disconnect/test/auto-invoice toggle/recent logs), `QBOLogsScreen` (full sync history with pull-to-refresh).
 - **Navigation**: Settings → "QuickBooks Online" row → QBOSettings. QuoteDetailScreen shows "QuickBooks" action button (create invoice or linked badge).
 
+### Jobber Integration
+- **OAuth2 Flow**: Connect via Jobber OAuth2 (env: `JOBBER_CLIENT_ID`, `JOBBER_CLIENT_SECRET`). Tokens encrypted with AES-256-GCM (reuses QBO encryption utils). Auto-refresh on expiry.
+- **Jobber Client**: `server/jobber-client.ts` — GraphQL API client (version `2023-11-15`), OAuth token management, client/job creation, quote sync orchestration.
+- **DB Tables**: `jobber_connections` (OAuth state, encrypted tokens, auto-sync flag, unique per user), `jobber_client_mappings` (QuotePro customer → Jobber client, unique on user_id+qp_customer_id), `jobber_job_links` (quote → Jobber job, unique on user_id+quote_id), `jobber_sync_log` (audit trail with JSONB summaries).
+- **API Endpoints**: `/api/integrations/jobber/status`, `/connect`, `/callback` (OAuth redirect, server-side state validation), `/disconnect`, `/settings`, `/sync-quote/:quoteId` (manual sync), `/logs`, `/sync-status/:quoteId`.
+- **Auto-Sync**: When quote status changes to "accepted" and `auto_create_job_on_quote_accept` is enabled, Jobber client+job created fire-and-forget. Hooks in both `PUT /api/quotes/:id` and `POST /q/:token/accept`.
+- **UI Screens**: `JobberSettingsScreen` (connect/disconnect/test/auto-sync toggle/activity feed), `JobberLogsScreen` (full sync history).
+- **Navigation**: Settings → "Jobber" row → JobberSettings. QuoteDetailScreen shows "Jobber" action button (sync, synced badge, or retry on failure).
+- **Feature Flag**: `jobberIntegrationEnabled` in `client/lib/featureFlags.ts`, env `ENABLE_JOBBER_INTEGRATION=true`.
+
 ### Job Scheduling Enhancements
 - **Start/End Clock**: Jobs have `startedAt`/`completedAt` timestamp columns. `POST /api/jobs/:id/start` transitions scheduled→in_progress, `POST /api/jobs/:id/complete` transitions in_progress→completed with duration tracking.
 - **Status Guards**: Start only allowed from "scheduled"; complete blocked if already completed/canceled (409 response).

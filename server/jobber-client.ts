@@ -1,0 +1,498 @@
+import { pool } from "./db";
+import { encryptToken, decryptToken } from "./qbo-client";
+
+const JOBBER_AUTH_URL = "https://api.getjobber.com/api/oauth/authorize";
+const JOBBER_TOKEN_URL = "https://api.getjobber.com/api/oauth/token";
+const JOBBER_GRAPHQL_URL = "https://api.getjobber.com/api/graphql";
+const JOBBER_GRAPHQL_VERSION = "2023-11-15";
+
+export async function logJobberSync(
+  userId: string,
+  quoteId: string | null,
+  action: string,
+  requestSummary: any,
+  responseSummary: any,
+  status: "ok" | "failed",
+  errorMessage?: string
+) {
+  try {
+    await pool.query(
+      `INSERT INTO jobber_sync_log (id, user_id, quote_id, action, request_summary, response_summary, status, error_message, created_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW())`,
+      [userId, quoteId, action, requestSummary || null, responseSummary || null, status, errorMessage || null]
+    );
+  } catch (e) {
+    console.error("Failed to log Jobber sync:", e);
+  }
+}
+
+export function buildJobberAuthUrl(redirectUri: string, state: string): string {
+  const clientId = process.env.JOBBER_CLIENT_ID;
+  if (!clientId) throw new Error("JOBBER_CLIENT_ID is not configured");
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    state,
+  });
+
+  return `${JOBBER_AUTH_URL}?${params.toString()}`;
+}
+
+export async function exchangeJobberCode(code: string, redirectUri: string): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}> {
+  const clientId = process.env.JOBBER_CLIENT_ID;
+  const clientSecret = process.env.JOBBER_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("Jobber credentials not configured");
+
+  const response = await fetch(JOBBER_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+    }).toString(),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`Jobber token exchange failed (${response.status}): ${errBody}`);
+  }
+
+  const tokens = await response.json();
+  return {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresIn: tokens.expires_in || 3600,
+  };
+}
+
+interface JobberConnection {
+  id: string;
+  userId: string;
+  accessTokenEncrypted: string;
+  refreshTokenEncrypted: string;
+  accessTokenExpiresAt: Date;
+  status: string;
+  autoCreateJobOnQuoteAccept: boolean;
+}
+
+export class JobberClient {
+  private userId: string;
+  private connection: JobberConnection | null = null;
+
+  constructor(userId: string) {
+    this.userId = userId;
+  }
+
+  async loadConnection(): Promise<JobberConnection | null> {
+    const result = await pool.query(
+      `SELECT id, user_id as "userId",
+              access_token_encrypted as "accessTokenEncrypted",
+              refresh_token_encrypted as "refreshTokenEncrypted",
+              access_token_expires_at as "accessTokenExpiresAt",
+              status,
+              auto_create_job_on_quote_accept as "autoCreateJobOnQuoteAccept"
+       FROM jobber_connections WHERE user_id = $1 AND status != 'disconnected'`,
+      [this.userId]
+    );
+    this.connection = result.rows[0] || null;
+    return this.connection;
+  }
+
+  getConnection() {
+    return this.connection;
+  }
+
+  async ensureValidToken(): Promise<string> {
+    if (!this.connection) throw new Error("No Jobber connection loaded");
+
+    const now = new Date();
+    const expiresAt = new Date(this.connection.accessTokenExpiresAt);
+    const fiveMinFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+
+    if (expiresAt > fiveMinFromNow) {
+      return decryptToken(this.connection.accessTokenEncrypted);
+    }
+
+    const clientId = process.env.JOBBER_CLIENT_ID;
+    const clientSecret = process.env.JOBBER_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      throw new Error("JOBBER_CLIENT_ID and JOBBER_CLIENT_SECRET must be set");
+    }
+
+    const refreshToken = decryptToken(this.connection.refreshTokenEncrypted);
+
+    const response = await fetch(JOBBER_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+      }).toString(),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("Jobber token refresh failed:", response.status, errorBody);
+      await pool.query(
+        `UPDATE jobber_connections SET status = 'needs_reauth', last_error = $1 WHERE user_id = $2`,
+        [`Token refresh failed: ${response.status}`, this.userId]
+      );
+      await logJobberSync(this.userId, null, "refresh", {}, { status: response.status }, "failed", "Token refresh failed");
+      throw new Error("Jobber token refresh failed - user needs to reconnect");
+    }
+
+    const tokens = await response.json();
+    const newAccessToken = tokens.access_token;
+    const newRefreshToken = tokens.refresh_token || refreshToken;
+    const expiresIn = tokens.expires_in || 3600;
+    const newExpiresAt = new Date(now.getTime() + expiresIn * 1000);
+
+    await pool.query(
+      `UPDATE jobber_connections
+       SET access_token_encrypted = $1,
+           refresh_token_encrypted = $2,
+           access_token_expires_at = $3,
+           status = 'connected',
+           last_error = NULL
+       WHERE user_id = $4`,
+      [encryptToken(newAccessToken), encryptToken(newRefreshToken), newExpiresAt, this.userId]
+    );
+
+    this.connection.accessTokenEncrypted = encryptToken(newAccessToken);
+    this.connection.refreshTokenEncrypted = encryptToken(newRefreshToken);
+    this.connection.accessTokenExpiresAt = newExpiresAt;
+    this.connection.status = "connected";
+
+    await logJobberSync(this.userId, null, "refresh", {}, { success: true }, "ok");
+    return newAccessToken;
+  }
+
+  async graphql(query: string, variables?: Record<string, any>, retryCount = 0): Promise<any> {
+    const maxRetries = 2;
+    const accessToken = await this.ensureValidToken();
+
+    const response = await fetch(JOBBER_GRAPHQL_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        "X-JOBBER-GRAPHQL-VERSION": JOBBER_GRAPHQL_VERSION,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+
+    if (response.status === 401 && retryCount === 0) {
+      this.connection!.accessTokenExpiresAt = new Date(0);
+      return this.graphql(query, variables, retryCount + 1);
+    }
+
+    if ((response.status === 429 || response.status >= 500) && retryCount < maxRetries) {
+      const delay = Math.pow(2, retryCount) * 1000 + Math.random() * 500;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return this.graphql(query, variables, retryCount + 1);
+    }
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Jobber GraphQL error ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+
+    if (data.errors && data.errors.length > 0) {
+      throw new Error(`Jobber GraphQL errors: ${data.errors.map((e: any) => e.message).join(", ")}`);
+    }
+
+    return data.data;
+  }
+
+  async createClient(input: {
+    firstName: string;
+    lastName: string;
+    companyName?: string;
+    email?: string;
+    phone?: string;
+    address?: { street1?: string; street2?: string; city?: string; province?: string; postalCode?: string; country?: string };
+  }): Promise<{ id: string; firstName: string; lastName: string }> {
+    const mutation = `
+      mutation CreateClient($input: ClientCreateInput!) {
+        clientCreate(input: $input) {
+          client {
+            id
+            firstName
+            lastName
+          }
+          userErrors {
+            message
+            path
+          }
+        }
+      }
+    `;
+
+    const clientInput: any = {
+      firstName: input.firstName,
+      lastName: input.lastName,
+    };
+
+    if (input.companyName) clientInput.companyName = input.companyName;
+
+    if (input.email) {
+      clientInput.emails = [{
+        description: "MAIN",
+        primary: true,
+        address: input.email,
+      }];
+    }
+
+    if (input.phone) {
+      clientInput.phones = [{
+        description: "MAIN",
+        primary: true,
+        number: input.phone,
+      }];
+    }
+
+    if (input.address) {
+      clientInput.billingAddress = {
+        street1: input.address.street1 || "",
+        city: input.address.city || "",
+        province: input.address.province || "",
+        postalCode: input.address.postalCode || "",
+        country: input.address.country || "US",
+      };
+      if (input.address.street2) {
+        clientInput.billingAddress.street2 = input.address.street2;
+      }
+    }
+
+    const data = await this.graphql(mutation, { input: clientInput });
+    const result = data.clientCreate;
+
+    if (result.userErrors && result.userErrors.length > 0) {
+      throw new Error(`Jobber client creation failed: ${result.userErrors.map((e: any) => e.message).join(", ")}`);
+    }
+
+    return result.client;
+  }
+
+  async createJob(input: {
+    clientId: string;
+    title: string;
+    instructions?: string;
+  }): Promise<{ id: string; jobNumber: number | null; title: string }> {
+    const mutation = `
+      mutation CreateJob($input: JobCreateInput!) {
+        jobCreate(input: $input) {
+          job {
+            id
+            jobNumber
+            title
+          }
+          userErrors {
+            message
+            path
+          }
+        }
+      }
+    `;
+
+    const jobInput: any = {
+      clientId: input.clientId,
+      title: input.title,
+    };
+
+    if (input.instructions) jobInput.instructions = input.instructions;
+
+    const data = await this.graphql(mutation, { input: jobInput });
+    const result = data.jobCreate;
+
+    if (result.userErrors && result.userErrors.length > 0) {
+      throw new Error(`Jobber job creation failed: ${result.userErrors.map((e: any) => e.message).join(", ")}`);
+    }
+
+    return result.job;
+  }
+}
+
+export async function syncQuoteToJobber(
+  userId: string,
+  quoteId: string,
+  trigger: "manual" | "automatic" = "manual",
+  force = false
+): Promise<{ success: boolean; jobberClientId?: string; jobberJobId?: string; jobberJobNumber?: string; error?: string }> {
+  const existingLink = await pool.query(
+    `SELECT id, jobber_client_id as "jobberClientId", jobber_job_id as "jobberJobId",
+            jobber_job_number as "jobberJobNumber", sync_status as "syncStatus"
+     FROM jobber_job_links WHERE user_id = $1 AND quote_id = $2`,
+    [userId, quoteId]
+  );
+
+  if (existingLink.rows.length > 0 && existingLink.rows[0].syncStatus === "success" && !force) {
+    return {
+      success: true,
+      jobberClientId: existingLink.rows[0].jobberClientId,
+      jobberJobId: existingLink.rows[0].jobberJobId,
+      jobberJobNumber: existingLink.rows[0].jobberJobNumber,
+    };
+  }
+
+  const client = new JobberClient(userId);
+  const conn = await client.loadConnection();
+  if (!conn) {
+    return { success: false, error: "Jobber is not connected" };
+  }
+
+  const quoteResult = await pool.query(
+    `SELECT q.id, q.customer_id as "customerId", q.total, q.status, q.frequency,
+            q.service_type as "serviceType", q.beds, q.baths, q.sqft,
+            q.selected_option as "selectedOption", q.options,
+            q.add_ons as "addOns", q.property_details as "propertyDetails",
+            c.first_name as "firstName", c.last_name as "lastName",
+            c.email, c.phone, c.address, c.city, c.state, c.zip,
+            c.company as "company"
+     FROM quotes q
+     LEFT JOIN customers c ON q.customer_id = c.id
+     WHERE q.id = $1`,
+    [quoteId]
+  );
+
+  if (quoteResult.rows.length === 0) {
+    return { success: false, error: "Quote not found" };
+  }
+
+  const quote = quoteResult.rows[0];
+  const firstName = quote.firstName || "Unknown";
+  const lastName = quote.lastName || "Customer";
+  const total = quote.total ? Number(quote.total).toFixed(2) : "0.00";
+
+  try {
+    let jobberClientId: string;
+
+    const existingMapping = await pool.query(
+      `SELECT jobber_client_id as "jobberClientId" FROM jobber_client_mappings
+       WHERE user_id = $1 AND qp_customer_id = $2`,
+      [userId, quote.customerId]
+    );
+
+    if (existingMapping.rows.length > 0) {
+      jobberClientId = existingMapping.rows[0].jobberClientId;
+    } else {
+      const addressParts: any = {};
+      if (quote.address) addressParts.street1 = quote.address;
+      if (quote.city) addressParts.city = quote.city;
+      if (quote.state) addressParts.province = quote.state;
+      if (quote.zip) addressParts.postalCode = quote.zip;
+
+      const jobberClient = await client.createClient({
+        firstName,
+        lastName,
+        companyName: quote.company || undefined,
+        email: quote.email || undefined,
+        phone: quote.phone || undefined,
+        address: Object.keys(addressParts).length > 0 ? addressParts : undefined,
+      });
+
+      jobberClientId = jobberClient.id;
+
+      if (quote.customerId) {
+        await pool.query(
+          `INSERT INTO jobber_client_mappings (id, user_id, qp_customer_id, jobber_client_id, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+           ON CONFLICT (user_id, qp_customer_id) DO UPDATE SET jobber_client_id = $3`,
+          [userId, quote.customerId, jobberClientId]
+        );
+      }
+
+      await logJobberSync(userId, quoteId, "create_client", { firstName, lastName }, { jobberClientId }, "ok");
+    }
+
+    const serviceType = quote.serviceType || "Cleaning";
+    const frequency = quote.frequency || "one-time";
+    const title = `${serviceType} - ${firstName} ${lastName}`;
+
+    const noteLines: string[] = [
+      `Synced from QuotePro`,
+      `Quote Total: $${total}`,
+      `Frequency: ${frequency}`,
+    ];
+    if (quote.beds) noteLines.push(`Bedrooms: ${quote.beds}`);
+    if (quote.baths) noteLines.push(`Bathrooms: ${quote.baths}`);
+    if (quote.sqft) noteLines.push(`Sq Ft: ${quote.sqft}`);
+    if (quote.selectedOption) noteLines.push(`Selected Option: ${quote.selectedOption}`);
+
+    const addOns = quote.addOns as any;
+    if (addOns && typeof addOns === "object") {
+      const activeAddOns = Object.entries(addOns)
+        .filter(([_, v]) => v === true)
+        .map(([k]) => k.replace(/_/g, " "));
+      if (activeAddOns.length > 0) {
+        noteLines.push(`Add-ons: ${activeAddOns.join(", ")}`);
+      }
+    }
+
+    const jobberJob = await client.createJob({
+      clientId: jobberClientId,
+      title,
+      instructions: noteLines.join("\n"),
+    });
+
+    if (existingLink.rows.length > 0) {
+      await pool.query(
+        `UPDATE jobber_job_links SET jobber_client_id = $1, jobber_job_id = $2, jobber_job_number = $3,
+                sync_status = 'success', sync_trigger = $4, error_message = NULL, created_at = NOW()
+         WHERE id = $5`,
+        [jobberClientId, jobberJob.id, jobberJob.jobNumber?.toString() || null, trigger, existingLink.rows[0].id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO jobber_job_links (id, user_id, quote_id, jobber_client_id, jobber_job_id, jobber_job_number, sync_status, sync_trigger, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'success', $6, NOW())`,
+        [userId, quoteId, jobberClientId, jobberJob.id, jobberJob.jobNumber?.toString() || null, trigger]
+      );
+    }
+
+    await logJobberSync(userId, quoteId, "sync_quote", { trigger, quoteId }, {
+      jobberClientId,
+      jobberJobId: jobberJob.id,
+      jobberJobNumber: jobberJob.jobNumber,
+    }, "ok");
+
+    return {
+      success: true,
+      jobberClientId,
+      jobberJobId: jobberJob.id,
+      jobberJobNumber: jobberJob.jobNumber?.toString() || undefined,
+    };
+  } catch (error: any) {
+    console.error("Jobber sync failed:", error.message);
+
+    if (existingLink.rows.length > 0) {
+      await pool.query(
+        `UPDATE jobber_job_links SET sync_status = 'failed', error_message = $1 WHERE id = $2`,
+        [error.message, existingLink.rows[0].id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO jobber_job_links (id, user_id, quote_id, jobber_client_id, jobber_job_id, jobber_job_number, sync_status, sync_trigger, error_message, created_at)
+         VALUES (gen_random_uuid(), $1, $2, '', '', NULL, 'failed', $3, $4, NOW())`,
+        [userId, quoteId, trigger, error.message]
+      );
+    }
+
+    await logJobberSync(userId, quoteId, "sync_quote", { trigger, quoteId }, { error: error.message }, "failed", error.message);
+
+    return { success: false, error: error.message };
+  }
+}

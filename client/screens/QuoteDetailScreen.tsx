@@ -111,6 +111,7 @@ export default function QuoteDetailScreen() {
   const [calendarResult, setCalendarResult] = useState<{ icsContent: string; googleCalendarUrl: string } | null>(null);
 
   const [qboCreating, setQboCreating] = useState(false);
+  const [jobberSyncing, setJobberSyncing] = useState(false);
 
   const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
@@ -131,6 +132,15 @@ export default function QuoteDetailScreen() {
   const { data: qboInvoiceLink, refetch: refetchQboLink } = useQuery<any>({
     queryKey: ['/api/integrations/qbo/invoice-link', route.params.quoteId],
     enabled: qboStatus?.status === "connected",
+  });
+
+  const { data: jobberStatus } = useQuery<any>({
+    queryKey: ['/api/integrations/jobber/status'],
+  });
+
+  const { data: jobberSyncStatus, refetch: refetchJobberSync } = useQuery<any>({
+    queryKey: ['/api/integrations/jobber/sync-status', route.params.quoteId],
+    enabled: jobberStatus?.connected === true,
   });
 
   useFocusEffect(
@@ -647,6 +657,25 @@ export default function QuoteDetailScreen() {
       Alert.alert("Error", e.message || "Failed to create QuickBooks invoice");
     } finally {
       setQboCreating(false);
+    }
+  };
+
+  const handleJobberSync = async () => {
+    if (!quote || jobberSyncing) return;
+    setJobberSyncing(true);
+    try {
+      const res = await apiRequest("POST", `/api/integrations/jobber/sync-quote/${quote.id}`);
+      const data = await res.json();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      refetchJobberSync();
+      setSendSuccess(`Synced to Jobber${data.jobberJobNumber ? ` #${data.jobberJobNumber}` : ""}`);
+      setTimeout(() => setSendSuccess(null), 3000);
+    } catch (e: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setSendSuccess("Jobber sync failed — tap Retry");
+      setTimeout(() => setSendSuccess(null), 4000);
+    } finally {
+      setJobberSyncing(false);
     }
   };
 
@@ -1744,6 +1773,48 @@ export default function QuoteDetailScreen() {
                   <Feather name="book-open" size={20} color={theme.primary} />
                 )}
                 <ThemedText type="small" style={{ marginTop: 4 }}>QuickBooks</ThemedText>
+              </Pressable>
+            )
+          ) : null}
+
+          {jobberStatus?.connected === true ? (
+            jobberSyncStatus?.syncStatus === "success" ? (
+              <View
+                style={[styles.actionButton, { backgroundColor: "#16a34a15" }]}
+                testID="jobber-synced"
+              >
+                <Feather name="check-circle" size={20} color="#16a34a" />
+                <ThemedText type="small" style={{ marginTop: 4, color: "#16a34a" }}>
+                  Jobber {jobberSyncStatus.jobberJobNumber ? `#${jobberSyncStatus.jobberJobNumber}` : "Synced"}
+                </ThemedText>
+              </View>
+            ) : jobberSyncStatus?.syncStatus === "failed" ? (
+              <Pressable
+                onPress={handleJobberSync}
+                style={[styles.actionButton, { backgroundColor: `${theme.error}10` }]}
+                testID="jobber-retry-btn"
+                disabled={jobberSyncing}
+              >
+                {jobberSyncing ? (
+                  <ActivityIndicator size={20} color={theme.error} />
+                ) : (
+                  <Feather name="refresh-cw" size={20} color={theme.error} />
+                )}
+                <ThemedText type="small" style={{ marginTop: 4, color: theme.error }}>Retry Jobber</ThemedText>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={handleJobberSync}
+                style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+                testID="jobber-sync-btn"
+                disabled={jobberSyncing}
+              >
+                {jobberSyncing ? (
+                  <ActivityIndicator size={20} color={theme.primary} />
+                ) : (
+                  <Feather name="briefcase" size={20} color={theme.primary} />
+                )}
+                <ThemedText type="small" style={{ marginTop: 4 }}>Jobber</ThemedText>
               </Pressable>
             )
           ) : null}
