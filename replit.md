@@ -106,7 +106,7 @@ Key files:
 - **SendGrid**: Email integration (env: SENDGRID_API_KEY, SENDGRID_FROM_EMAIL).
 - **Google Calendar**: OAuth2-based calendar sync (env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).
 - **Stripe Connect**: Online payments via Stripe Express and Stripe Checkout (env: STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY).
-- **RevenueCat**: In-app subscription management ($19.99/mo Pro tier). Configured via `SubscriptionContext` with retry logic for offerings loading, inline error states on paywall, and `offerings.current` usage (not hardcoded identifiers). API key fetched from server `/api/subscription/config`. Entitlement IDs: `["Pro", "QuotePro for Cleaners Pro", "pro"]`.
+- **RevenueCat**: In-app subscription management ($19.99/mo Pro tier). Configured via `SubscriptionContext` with retry logic for offerings loading, inline error states on paywall, and `offerings.current` usage (not hardcoded identifiers). API key fetched from server `/api/subscription/config`. Entitlement IDs: `["Pro", "QuotePro for Cleaners Pro", "pro"]`. Dynamic CTA text on paywall reads trial/intro offer from RevenueCat product data (no hardcoded "Start Free Trial"). `trialInfo` state with `extractTrialInfo` helper detects free trials from iOS/Android product fields. RevenueCat is source of truth for native entitlements (DB never overrides active RC entitlement). Real-time listener handles both upgrades and downgrades. Analytics: `offerings_load_success/failed`, `revenuecat_init_failed`, `premium_feature_blocked`, `trial_started` (only fires when real trial detected).
 - **Expo-notifications**: Push notification support.
 - **Expo-print**, **expo-sharing**: For quote PDF export.
 

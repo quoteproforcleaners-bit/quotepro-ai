@@ -41,6 +41,7 @@ export default function PaywallScreen() {
     offeringsError,
     isConfigured,
     retryLoadOfferings,
+    trialInfo,
   } = useSubscription();
   const { t } = useLanguage();
 
@@ -69,6 +70,24 @@ export default function PaywallScreen() {
   const monthlyPrice = currentOffering?.monthly?.product?.priceString || "$19.99";
   const useMaxWidth = screenWidth > 600;
   const canPurchase = offeringsStatus === "ready" || Platform.OS === "web";
+
+  const ctaText = (() => {
+    if (offeringsStatus === "loading" && Platform.OS !== "web") return "Loading...";
+    if (trialInfo.hasFreeTrial && trialInfo.trialDurationText) {
+      return `Try free for ${trialInfo.trialDurationText}`;
+    }
+    return `Subscribe for ${monthlyPrice}/mo`;
+  })();
+
+  const subtitleText = (() => {
+    if (triggerSource === "quote_limit") {
+      if (trialInfo.hasFreeTrial && trialInfo.trialDurationText) {
+        return `You've used 3 of 3 free quotes. Try Pro free for ${trialInfo.trialDurationText} to keep quoting.`;
+      }
+      return "You've used 3 of 3 free quotes. Upgrade to Pro for unlimited quotes.";
+    }
+    return "Everything you need to quote faster, earn more, and close jobs.";
+  })();
 
   const showModal = (type: ModalState["type"], title: string, message: string) => {
     setModal({ visible: true, type, title, message });
@@ -114,7 +133,9 @@ export default function PaywallScreen() {
       const success = await purchase();
       if (success) {
         trackEvent("subscription_purchase_success", { trigger_source: triggerSource });
-        trackEvent("trial_started", { trigger_source: triggerSource });
+        if (trialInfo.hasFreeTrial) {
+          trackEvent("trial_started", { trigger_source: triggerSource, trial_duration: trialInfo.trialDurationText });
+        }
         if (Platform.OS !== "web") {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
@@ -163,6 +184,10 @@ export default function PaywallScreen() {
   const modalIcon = modal.type === "success" ? "check-circle" : modal.type === "error" ? "alert-circle" : "info";
   const modalColor = modal.type === "success" ? theme.success : modal.type === "error" ? theme.error : theme.primary;
 
+  const pricingSubtext = trialInfo.hasFreeTrial && trialInfo.trialDurationText
+    ? `per month after ${trialInfo.trialDurationText} free trial`
+    : "per month";
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
@@ -189,15 +214,9 @@ export default function PaywallScreen() {
           {contextualHeader}
         </ThemedText>
 
-        {triggerSource === "quote_limit" ? (
-          <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-            You've used 3 of 3 free quotes. Start your free trial to keep quoting.
-          </ThemedText>
-        ) : (
-          <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Everything you need to quote faster, earn more, and close jobs.
-          </ThemedText>
-        )}
+        <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
+          {subtitleText}
+        </ThemedText>
 
         <View style={styles.benefitsList}>
           {BENEFITS.map((benefit, i) => (
@@ -224,7 +243,7 @@ export default function PaywallScreen() {
             {monthlyPrice}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary }}>
-            per month
+            {pricingSubtext}
           </ThemedText>
         </View>
 
@@ -292,9 +311,7 @@ export default function PaywallScreen() {
             <>
               <Feather name="zap" size={20} color="#FFFFFF" />
               <ThemedText type="body" style={styles.purchaseBtnText}>
-                {offeringsStatus === "loading" && Platform.OS !== "web"
-                  ? "Loading..."
-                  : "Start Free Trial"}
+                {ctaText}
               </ThemedText>
             </>
           )}
@@ -346,7 +363,7 @@ export default function PaywallScreen() {
         {__DEV__ ? (
           <View style={[styles.debugCard, { backgroundColor: theme.backgroundSecondary }]}>
             <ThemedText type="caption" style={{ color: theme.textSecondary, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}>
-              {`RC: ${isConfigured ? "configured" : "not configured"}\nOfferings: ${offeringsStatus}\nPackages: ${currentOffering?.availablePackages?.length || 0}`}
+              {`RC: ${isConfigured ? "configured" : "not configured"}\nOfferings: ${offeringsStatus}\nPackages: ${currentOffering?.availablePackages?.length || 0}\nTrial: ${trialInfo.hasFreeTrial ? trialInfo.trialDurationText : "none"}`}
             </ThemedText>
           </View>
         ) : null}

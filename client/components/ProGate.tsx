@@ -11,6 +11,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
+import { trackEvent } from "@/lib/analytics";
 
 interface ProGateProps {
   children: React.ReactNode;
@@ -38,6 +39,10 @@ function ProGateOverlay({ featureName }: { featureName?: string }) {
   const { t } = useLanguage();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
+
+  React.useEffect(() => {
+    trackEvent("premium_feature_blocked", { feature: featureName || "unknown" });
+  }, [featureName]);
 
   let tabBarHeight = 0;
   try {

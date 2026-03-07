@@ -81,7 +81,11 @@ type EventName =
   | "ai_message_payment_failed_sent"
   | "live_update_page_generated"
   | "live_update_sent"
-  | "live_update_status_changed";
+  | "live_update_status_changed"
+  | "offerings_load_success"
+  | "offerings_load_failed"
+  | "revenuecat_init_failed"
+  | "premium_feature_blocked";
 
 export async function trackEvent(
   name: EventName,

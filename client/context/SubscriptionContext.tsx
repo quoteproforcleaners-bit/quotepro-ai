@@ -5,6 +5,7 @@ import Constants from "expo-constants";
 import { useAuth } from "@/context/AuthContext";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useQueryClient } from "@tanstack/react-query";
+import { trackEvent } from "@/lib/analytics";
 
 function isExpoGo(): boolean {
   try {
@@ -30,6 +31,12 @@ function getPurchases() {
 type OfferingsStatus = "idle" | "loading" | "ready" | "error";
 type SubscriptionStatus = "free" | "trial" | "active" | "expired";
 
+interface TrialInfo {
+  hasFreeTrial: boolean;
+  trialDurationDays: number | null;
+  trialDurationText: string | null;
+}
+
 interface SubscriptionContextType {
   isPro: boolean;
   isLoading: boolean;
@@ -39,6 +46,7 @@ interface SubscriptionContextType {
   isConfigured: boolean;
   subscriptionStatus: SubscriptionStatus;
   trialDaysLeft: number | null;
+  trialInfo: TrialInfo;
   purchase: () => Promise<boolean>;
   restore: () => Promise<boolean>;
   retryLoadOfferings: () => Promise<void>;
@@ -49,6 +57,96 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 const ENTITLEMENT_IDS = ["Pro", "QuotePro for Cleaners Pro", "pro"];
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function extractTrialInfo(offering: PurchasesOffering | null): TrialInfo {
+  const noTrial: TrialInfo = { hasFreeTrial: false, trialDurationDays: null, trialDurationText: null };
+  if (!offering) return noTrial;
+
+  const pkg = offering.monthly || (offering.availablePackages?.length ? offering.availablePackages[0] : null);
+  if (!pkg?.product) return noTrial;
+
+  const product = pkg.product as any;
+
+  let priceAmount: number | null = null;
+  let unit: string | number | null = null;
+  let count: number = 1;
+
+  const intro = product.introPrice;
+  if (intro && typeof intro === "object") {
+    const rawPrice = intro.price ?? intro.priceAmountMicros;
+    if (rawPrice !== undefined && rawPrice !== null) {
+      priceAmount = typeof rawPrice === "string" ? parseFloat(rawPrice) : Number(rawPrice);
+    }
+    unit = intro.periodUnit ?? intro.subscriptionPeriod ?? null;
+    count = intro.periodNumberOfUnits || intro.cycles || 1;
+  }
+
+  if (priceAmount === null && product.introPriceAmountMicros !== undefined) {
+    const micros = Number(product.introPriceAmountMicros);
+    priceAmount = isNaN(micros) ? null : micros;
+    if (typeof product.introPricePeriod === "string" && product.introPricePeriod.length > 0) {
+      const iso = product.introPricePeriod;
+      if (iso.includes("D")) {
+        const match = iso.match(/(\d+)D/);
+        unit = "DAY";
+        count = match ? parseInt(match[1], 10) : 1;
+      } else if (iso.includes("W")) {
+        const match = iso.match(/(\d+)W/);
+        unit = "WEEK";
+        count = match ? parseInt(match[1], 10) : 1;
+      } else if (iso.includes("M")) {
+        const match = iso.match(/(\d+)M/);
+        unit = "MONTH";
+        count = match ? parseInt(match[1], 10) : 1;
+      } else if (iso.includes("Y")) {
+        const match = iso.match(/(\d+)Y/);
+        unit = "YEAR";
+        count = match ? parseInt(match[1], 10) : 1;
+      }
+    }
+    if (product.introPriceCycles) {
+      count = Number(product.introPriceCycles) || count;
+    }
+  }
+
+  const introductory = product.introductoryPrice;
+  if (priceAmount === null && introductory && typeof introductory === "object") {
+    const rawPrice = introductory.price ?? introductory.priceAmountMicros;
+    if (rawPrice !== undefined && rawPrice !== null) {
+      priceAmount = typeof rawPrice === "string" ? parseFloat(rawPrice) : Number(rawPrice);
+    }
+    unit = unit ?? introductory.periodUnit ?? introductory.subscriptionPeriod ?? null;
+    count = introductory.periodNumberOfUnits || introductory.cycles || count;
+  }
+
+  if (priceAmount === null || isNaN(priceAmount) || priceAmount > 0) return noTrial;
+
+  let days: number | null = null;
+  let text: string | null = null;
+
+  if (unit === "DAY" || unit === "day" || unit === 0) {
+    days = count;
+    text = count === 1 ? "1 day" : `${count} days`;
+  } else if (unit === "WEEK" || unit === "week" || unit === 1) {
+    days = count * 7;
+    text = count === 1 ? "1 week" : `${count} weeks`;
+  } else if (unit === "MONTH" || unit === "month" || unit === 2) {
+    days = count * 30;
+    text = count === 1 ? "1 month" : `${count} months`;
+  } else if (unit === "YEAR" || unit === "year" || unit === 3) {
+    days = count * 365;
+    text = count === 1 ? "1 year" : `${count} years`;
+  } else if (typeof unit === "string" && unit.length > 0) {
+    days = count;
+    text = `${count} ${unit.toLowerCase()}`;
+  }
+
+  if (days !== null) {
+    return { hasFreeTrial: true, trialDurationDays: days, trialDurationText: text };
+  }
+
+  return noTrial;
+}
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -61,6 +159,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [offeringsError, setOfferingsError] = useState<string | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>("free");
   const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
+  const [trialInfo, setTrialInfo] = useState<TrialInfo>({ hasFreeTrial: false, trialDurationDays: null, trialDurationText: null });
   const configuredRef = useRef(false);
 
   const deriveSubscriptionStatus = useCallback((customerInfo: CustomerInfo) => {
@@ -141,8 +240,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
         if (offerings.current && offerings.current.availablePackages.length > 0) {
           setCurrentOffering(offerings.current);
+          setTrialInfo(extractTrialInfo(offerings.current));
           setOfferingsStatus("ready");
           setOfferingsError(null);
+          trackEvent("offerings_load_success", {
+            offeringId: offerings.current.identifier,
+            packageCount: offerings.current.availablePackages.length,
+          });
           return;
         }
 
@@ -150,12 +254,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           setOfferingsStatus("error");
           setOfferingsError("No subscription packages found. Please try again.");
           console.warn("RevenueCat: No packages in current offering after retries");
+          trackEvent("offerings_load_failed", { reason: "no_packages" });
         }
       } catch (err: any) {
         console.warn(`RevenueCat getOfferings attempt ${attempt + 1} failed:`, err?.message);
         if (attempt === maxRetries) {
           setOfferingsStatus("error");
           setOfferingsError("Couldn't load subscription options. Please try again.");
+          trackEvent("offerings_load_failed", { reason: err?.message });
         }
       }
     }
@@ -185,6 +291,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         });
 
         if (!configRes.ok) {
+          trackEvent("revenuecat_init_failed", { reason: "config_fetch_failed", status: configRes.status });
           setIsPro(user.subscriptionTier === "pro");
           setIsLoading(false);
           return;
@@ -197,6 +304,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
         if (!apiKey) {
           console.warn("RevenueCat: No API key available");
+          trackEvent("revenuecat_init_failed", { reason: "no_api_key" });
           setIsPro(user.subscriptionTier === "pro");
           setIsLoading(false);
           return;
@@ -205,6 +313,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         const RC = getPurchases();
         if (!RC) {
           console.warn("RevenueCat native module not available, using database status");
+          trackEvent("revenuecat_init_failed", { reason: "native_module_unavailable" });
           setIsPro(user.subscriptionTier === "pro");
           setIsLoading(false);
           return;
@@ -218,6 +327,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
             console.log("RevenueCat configured with key:", apiKey.slice(0, 8) + "...");
           } catch (configError: any) {
             console.warn("RevenueCat configure error:", configError);
+            trackEvent("revenuecat_init_failed", { reason: "configure_error", error: configError?.message });
             setIsPro(user.subscriptionTier === "pro");
             setIsLoading(false);
             return;
@@ -229,13 +339,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           const rcHasPro = ENTITLEMENT_IDS.some(id => customerInfo.entitlements.active[id] !== undefined);
           deriveSubscriptionStatus(customerInfo);
 
-          if (rcHasPro && user.subscriptionTier === "pro") {
+          if (rcHasPro) {
             setIsPro(true);
+            if (user.subscriptionTier !== "pro") {
+              await syncSubscriptionToServer(true);
+            }
           } else if (!rcHasPro && user.subscriptionTier === "pro") {
             setIsPro(false);
             await syncSubscriptionToServer(false);
           } else {
-            setIsPro(user.subscriptionTier === "pro");
+            setIsPro(false);
           }
         } catch (infoError: any) {
           console.warn("RevenueCat getCustomerInfo error:", infoError);
@@ -250,7 +363,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           RC.addCustomerInfoUpdateListener((info) => {
             const rcUpdatedPro = ENTITLEMENT_IDS.some(id => info.entitlements.active[id] !== undefined);
             deriveSubscriptionStatus(info);
-            if (!rcUpdatedPro) {
+            if (rcUpdatedPro) {
+              setIsPro(true);
+              syncSubscriptionToServer(true);
+            } else {
               setIsPro(false);
               syncSubscriptionToServer(false);
             }
@@ -260,6 +376,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.warn("Subscription init error:", error);
+        trackEvent("revenuecat_init_failed", { reason: "init_error" });
         setIsPro(user.subscriptionTier === "pro");
       } finally {
         setIsLoading(false);
@@ -312,6 +429,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         console.log("Purchase: Offerings fetched, current:", offerings.current?.identifier, "packages:", offerings.current?.availablePackages?.length);
         if (offerings.current && offerings.current.availablePackages.length > 0) {
           setCurrentOffering(offerings.current);
+          setTrialInfo(extractTrialInfo(offerings.current));
           setOfferingsStatus("ready");
           offering = offerings.current;
         }
@@ -376,6 +494,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         isConfigured: revenueCatReady,
         subscriptionStatus,
         trialDaysLeft,
+        trialInfo,
         purchase,
         restore,
         retryLoadOfferings: loadOfferings,
