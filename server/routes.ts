@@ -7337,10 +7337,14 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
 
   // ============ JOBBER INTEGRATION ENDPOINTS ============
 
-  app.get("/api/integrations/jobber/connect", requireAuth, async (req: any, res) => {
+  app.get("/api/integrations/jobber/connect", requireAuth, requirePro as any, async (req: any, res) => {
     try {
       const clientId = process.env.JOBBER_CLIENT_ID;
-      if (!clientId) return res.status(500).json({ error: "Jobber integration not configured" });
+      const clientSecret = process.env.JOBBER_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        console.error("Jobber connect: missing credentials", { hasClientId: !!clientId, hasClientSecret: !!clientSecret });
+        return res.status(500).json({ error: "Jobber integration not configured" });
+      }
 
       const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
       const protocol = host.includes("localhost") ? "http" : "https";
@@ -7361,6 +7365,7 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
   });
 
   app.get("/api/integrations/jobber/callback", async (req: any, res) => {
+    let resolvedUserId: string | null = null;
     try {
       const { code, state } = req.query;
       if (!code || !state) {
@@ -7375,7 +7380,7 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
       if (stateResult.rows.length === 0) {
         return res.status(403).send("Invalid or expired OAuth state. Please try connecting again.");
       }
-      const userId = stateResult.rows[0].user_id;
+      resolvedUserId = stateResult.rows[0].user_id;
 
       const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
       const protocol = host.includes("localhost") ? "http" : "https";
@@ -7392,15 +7397,21 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
            access_token_encrypted = $2, refresh_token_encrypted = $3,
            access_token_expires_at = $4, connected_at = NOW(), scopes = $5,
            status = 'connected', last_error = NULL, disconnected_at = NULL`,
-        [userId, encryptToken(tokens.accessToken), encryptToken(tokens.refreshToken), expiresAt, "read:clients,write:clients,read:jobs,write:jobs"]
+        [resolvedUserId, encryptToken(tokens.accessToken), encryptToken(tokens.refreshToken), expiresAt, "read:clients,write:clients,read:jobs,write:jobs"]
       );
 
-      await logJobberSync(userId, null, "connect", {}, { success: true }, "ok");
+      await logJobberSync(resolvedUserId, null, "connect", {}, { success: true }, "ok");
 
       res.send(`<!DOCTYPE html><html><head><title>Jobber Connected</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8f9fa;margin:0}.card{text-align:center;padding:40px;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,0.1);max-width:400px}h1{color:#16a34a;margin-bottom:8px}p{color:#64748b}</style></head><body><div class="card"><h1>Connected!</h1><p>Jobber is now connected to QuotePro. You can close this window and return to the app.</p></div></body></html>`);
     } catch (e: any) {
       console.error("Jobber callback error:", e);
-      await logJobberSync("unknown", null, "connect", {}, { error: e.message }, "failed", e.message);
+      if (resolvedUserId) {
+        try {
+          await logJobberSync(resolvedUserId, null, "connect", {}, { error: e.message }, "failed", e.message);
+        } catch (logErr) {
+          console.error("Failed to log Jobber sync:", logErr);
+        }
+      }
       res.status(500).send("An error occurred during Jobber connection");
     }
   });
@@ -7430,7 +7441,7 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     }
   });
 
-  app.post("/api/integrations/jobber/disconnect", requireAuth, async (req: any, res) => {
+  app.post("/api/integrations/jobber/disconnect", requireAuth, requirePro as any, async (req: any, res) => {
     try {
       await pool.query(
         `UPDATE jobber_connections SET status = 'disconnected', disconnected_at = NOW(),
@@ -7445,7 +7456,7 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     }
   });
 
-  app.put("/api/integrations/jobber/settings", requireAuth, async (req: any, res) => {
+  app.put("/api/integrations/jobber/settings", requireAuth, requirePro as any, async (req: any, res) => {
     try {
       const { autoCreateJobOnQuoteAccept } = req.body;
       await pool.query(
@@ -7458,7 +7469,7 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     }
   });
 
-  app.post("/api/integrations/jobber/sync-quote/:quoteId", requireAuth, async (req: any, res) => {
+  app.post("/api/integrations/jobber/sync-quote/:quoteId", requireAuth, requirePro as any, async (req: any, res) => {
     try {
       const { quoteId } = req.params;
       const force = req.body?.force === true;
@@ -7556,7 +7567,7 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     }
   });
 
-  app.get("/api/integrations/jobber/clients", requireAuth, async (req: any, res) => {
+  app.get("/api/integrations/jobber/clients", requireAuth, requirePro as any, async (req: any, res) => {
     try {
       const client = new JobberClient(req.session.userId);
       const conn = await client.loadConnection();
@@ -7628,7 +7639,7 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     }
   });
 
-  app.post("/api/integrations/jobber/import-clients", requireAuth, async (req: any, res) => {
+  app.post("/api/integrations/jobber/import-clients", requireAuth, requirePro as any, async (req: any, res) => {
     try {
       const { clientIds } = req.body;
       if (!clientIds || !Array.isArray(clientIds) || clientIds.length === 0) {

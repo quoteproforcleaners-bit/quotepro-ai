@@ -47,7 +47,10 @@ export async function exchangeJobberCode(code: string, redirectUri: string): Pro
 }> {
   const clientId = process.env.JOBBER_CLIENT_ID;
   const clientSecret = process.env.JOBBER_CLIENT_SECRET;
-  if (!clientId || !clientSecret) throw new Error("Jobber credentials not configured");
+  if (!clientId || !clientSecret) {
+    console.error("Jobber token exchange: missing credentials", { hasClientId: !!clientId, hasClientSecret: !!clientSecret });
+    throw new Error(`Jobber credentials not configured (id: ${!!clientId}, secret: ${!!clientSecret})`);
+  }
 
   const response = await fetch(JOBBER_TOKEN_URL, {
     method: "POST",

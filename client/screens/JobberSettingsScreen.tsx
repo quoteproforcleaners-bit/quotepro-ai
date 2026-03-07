@@ -101,6 +101,10 @@ export default function JobberSettingsScreen() {
       try {
         const jsonPart = raw.substring(raw.indexOf("{"));
         const parsed = JSON.parse(jsonPart);
+        if (parsed.requiresUpgrade) {
+          navigation.navigate("Paywall" as any, { triggerSource: "jobber_connect" });
+          return;
+        }
         msg = parsed.error || raw;
       } catch {}
       if (msg.includes("not configured")) {
@@ -111,7 +115,7 @@ export default function JobberSettingsScreen() {
     } finally {
       setConnecting(false);
     }
-  }, [refetch, queryClient]);
+  }, [refetch, queryClient, navigation]);
 
   const handleDisconnect = useCallback(() => {
     Alert.alert(
