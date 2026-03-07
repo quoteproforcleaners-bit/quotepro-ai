@@ -188,6 +188,10 @@ function configureExpoAndLanding(app: express.Application) {
     }
 
     if (req.path === "/") {
+      const host = req.hostname || req.headers.host || "";
+      if (host.startsWith("app.")) {
+        return res.redirect("/app");
+      }
       return serveLandingPage({
         req,
         res,
