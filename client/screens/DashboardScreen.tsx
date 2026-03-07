@@ -43,9 +43,9 @@ import { useProGate } from "@/components/ProGate";
 import { useTutorial } from "@/context/TutorialContext";
 import { DASHBOARD_TOUR } from "@/lib/tourDefinitions";
 
-type WidgetId = "hero" | "quickQuote" | "momentum" | "streak" | "aiEngine" | "glance";
+type WidgetId = "hero" | "quickQuote" | "momentum" | "streak" | "aiEngine" | "glance" | "jobber";
 
-const DEFAULT_WIDGET_ORDER: WidgetId[] = ["hero", "quickQuote", "momentum", "streak", "aiEngine", "glance"];
+const DEFAULT_WIDGET_ORDER: WidgetId[] = ["hero", "quickQuote", "momentum", "streak", "aiEngine", "glance", "jobber"];
 
 const WIDGET_LABELS: Record<WidgetId, { en: string; icon: keyof typeof Feather.glyphMap }> = {
   hero: { en: "Revenue Leak Detector", icon: "alert-triangle" },
@@ -54,6 +54,7 @@ const WIDGET_LABELS: Record<WidgetId, { en: string; icon: keyof typeof Feather.g
   streak: { en: "Follow-Up Streak", icon: "target" },
   aiEngine: { en: "AI Revenue Engine", icon: "cpu" },
   glance: { en: "Today at a Glance", icon: "eye" },
+  jobber: { en: "Jobber Integration", icon: "briefcase" },
 };
 
 function useSemanticTokens() {
@@ -339,9 +340,16 @@ export default function DashboardScreen() {
     queryKey: ["/api/ratings/summary"],
   });
 
+  const { data: jobberDashStats, refetch: refetchJobberStats } = useQuery<{
+    connected: boolean;
+    jobsCreated?: number;
+    totalSyncs?: number;
+    autoSyncEnabled?: boolean;
+  }>({ queryKey: ["/api/integrations/jobber/dashboard-stats"] });
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchJobs(), refetchFollowUpQueue(), refetchStreak(), refetchDormant(), refetchLost()]);
+    await Promise.all([refetchStats(), refetchQuotes(), refetchCustomers(), refetchJobs(), refetchFollowUpQueue(), refetchStreak(), refetchDormant(), refetchLost(), refetchJobberStats()]);
     setRefreshing(false);
   };
 
@@ -694,10 +702,79 @@ export default function DashboardScreen() {
           </View>
         );
 
+      case "jobber":
+        return (
+          <View key="jobber" style={[s.card, { backgroundColor: st.cardBg, borderColor: st.divider }, Elevation.e1]}>
+            {jobberDashStats?.connected ? (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.md }}>
+                  <View style={[s.iconCircle, { backgroundColor: st.successBg }]}>
+                    <Feather name="briefcase" size={16} color={st.success} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <ThemedText type="subtitle" style={{ fontWeight: "700" }}>Jobber</ThemedText>
+                  </View>
+                  <View style={[s.riskPill, { backgroundColor: st.successBg, borderColor: `${st.success}30` }]}>
+                    <ThemedText type="caption" style={{ color: st.success, fontWeight: "700", fontSize: 10 }}>Connected</ThemedText>
+                  </View>
+                </View>
+                <View style={{ flexDirection: "row", marginBottom: Spacing.md }}>
+                  <View style={{ flex: 1, alignItems: "center" }}>
+                    <ThemedText type="h3" style={{ fontWeight: "800" }}>{jobberDashStats.jobsCreated ?? 0}</ThemedText>
+                    <ThemedText type="caption" style={{ color: st.textMuted, marginTop: 2 }}>Jobs Created</ThemedText>
+                  </View>
+                  <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: st.divider }} />
+                  <View style={{ flex: 1, alignItems: "center" }}>
+                    <ThemedText type="h3" style={{ fontWeight: "800" }}>{jobberDashStats.totalSyncs ?? 0}</ThemedText>
+                    <ThemedText type="caption" style={{ color: st.textMuted, marginTop: 2 }}>Total Syncs</ThemedText>
+                  </View>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", paddingTop: Spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: st.divider }}>
+                  <View style={[s.statusDot, { backgroundColor: jobberDashStats.autoSyncEnabled ? st.success : st.textMuted }]} />
+                  <ThemedText type="caption" style={{ color: st.textSecondary, marginLeft: 6, flex: 1 }}>
+                    Auto-sync {jobberDashStats.autoSyncEnabled ? "enabled" : "disabled"}
+                  </ThemedText>
+                  <Pressable
+                    onPress={() => navigation.navigate("JobberSettings")}
+                    testID="jobber-manage-btn"
+                  >
+                    <ThemedText type="small" style={{ color: st.primary, fontWeight: "600" }}>Manage</ThemedText>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.sm }}>
+                  <View style={[s.iconCircle, { backgroundColor: st.isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }]}>
+                    <Feather name="briefcase" size={16} color={st.textMuted} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <ThemedText type="subtitle" style={{ fontWeight: "700" }}>Jobber Integration</ThemedText>
+                  </View>
+                </View>
+                <ThemedText type="small" style={{ color: st.textSecondary, marginBottom: Spacing.md }}>
+                  Connect Jobber to automatically turn accepted quotes into jobs.
+                </ThemedText>
+                <Pressable
+                  onPress={() => {
+                    trackEvent("jobber_connect_cta_clicked", { source: "dashboard" });
+                    navigation.navigate("JobberSettings");
+                  }}
+                  style={[s.ctaButton, { backgroundColor: st.primary }]}
+                  testID="jobber-connect-dashboard-btn"
+                >
+                  <Feather name="briefcase" size={14} color="#FFF" />
+                  <ThemedText type="small" style={{ color: "#FFF", fontWeight: "700", marginLeft: 6 }}>Connect Jobber</ThemedText>
+                </Pressable>
+              </>
+            )}
+          </View>
+        );
+
       default:
         return null;
     }
-  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, followUpHealthPercent, currentStreak, sentQuotes, viewedQuotes, acceptedQuotes, wonQuotes, monthRevenue, st, isDark, navigation, isPro, stats, closeRate, estimatedLoss, protectionScore, riskState, riskBorderColor, riskPillColor, riskPillBg, streakDaysToShow, weekDays]);
+  }, [followUpQueueCount, amountAtRisk, oldestQuoteDays, followUpHealthPercent, currentStreak, sentQuotes, viewedQuotes, acceptedQuotes, wonQuotes, monthRevenue, st, isDark, navigation, isPro, stats, closeRate, estimatedLoss, protectionScore, riskState, riskBorderColor, riskPillColor, riskPillBg, streakDaysToShow, weekDays, jobberDashStats]);
 
   return (
     <View style={[s.container, { backgroundColor: st.pageBg }]}>

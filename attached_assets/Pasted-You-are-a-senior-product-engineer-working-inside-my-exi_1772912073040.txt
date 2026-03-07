@@ -1,0 +1,356 @@
+You are a senior product engineer working inside my existing QuotePro AI codebase.
+
+CONTEXT
+We have already completed the V1 Jobber integration:
+- users can connect Jobber
+- quotes can sync to Jobber
+- auto-sync exists
+- manual sync exists
+
+Now I need you to build the NEXT LAYER of in-app UX so the integration is visible, useful, and sticky.
+
+GOAL
+Implement these 5 product improvements:
+
+1. Add “Send to Jobber” / “Created in Jobber” inside the quote acceptance flow
+2. Add a “Jobber Sync Status” module on the Quote Detail page
+3. Add a Jobber integration badge + quick stats on the dashboard
+4. Add “Import Jobber Clients” functionality
+5. Add a “Works with Jobber” marketing hook inside onboarding/settings
+
+IMPORTANT
+Do not break any existing quote flow, dashboard behavior, or Jobber integration logic.
+Reuse the existing design system, card styles, spacing, buttons, toggles, toasts, and status badges already in the app.
+Keep everything production-ready, typed, modular, and clean.
+
+--------------------------------------------------
+FEATURE 1: QUOTE ACCEPTANCE FLOW UPGRADE
+--------------------------------------------------
+
+When a customer accepts a quote, enhance the success state.
+
+REQUIREMENTS
+After quote acceptance, show a success screen / success card / post-accept modal area with:
+
+Primary heading:
+“Quote Accepted”
+
+If Jobber is connected AND auto-sync is enabled:
+- show a success card:
+  “Job created in Jobber”
+- include supporting text like:
+  “This quote was automatically sent to Jobber.”
+- show a green success badge/icon
+- if a Jobber ID or external record reference is available, display it in a subtle way
+
+If Jobber is connected BUT auto-sync is OFF:
+- show a card:
+  “Create Job in Jobber”
+- supporting text:
+  “Send this accepted quote to Jobber to create the customer and job record.”
+- button:
+  “Send to Jobber”
+
+If Jobber is NOT connected:
+- do not show the send card
+- optionally show a subtle info line in admin/internal UI only if appropriate, but do not confuse end users
+
+If auto-sync was attempted and failed:
+- do NOT break quote acceptance
+- show:
+  “Quote accepted successfully, but we couldn’t create the Jobber record.”
+- include retry button:
+  “Retry Jobber Sync”
+
+UX REQUIREMENTS
+- loading state while sending
+- success toast
+- failure toast
+- friendly copy, no technical jargon
+- ensure quote acceptance always succeeds even if Jobber fails
+
+--------------------------------------------------
+FEATURE 2: JOBBER SYNC STATUS MODULE ON QUOTE DETAIL PAGE
+--------------------------------------------------
+
+On the internal Quote Detail page, add a dedicated module/card called:
+
+“Jobber Sync”
+
+This module should intelligently display one of these states:
+
+A. NOT CONNECTED
+- message:
+  “Connect Jobber to send accepted quotes into your operations workflow.”
+- button:
+  “Connect Jobber”
+
+B. CONNECTED, NEVER SYNCED
+- status badge:
+  “Not Synced”
+- button:
+  “Send to Jobber”
+
+C. SYNC IN PROGRESS
+- status badge:
+  “Syncing”
+- disabled/loading button if needed
+
+D. SYNC SUCCESS
+- status badge:
+  “Synced”
+- message:
+  “This quote has been sent to Jobber successfully.”
+- show synced timestamp if available
+- show Jobber client/job/request reference if available
+- optionally show a “Resync” or “Sync Again” secondary action only if it is safe and idempotent
+
+E. SYNC FAILED
+- status badge:
+  “Sync Failed”
+- message:
+  “We couldn’t create the Jobber record for this quote.”
+- show friendly error summary
+- button:
+  “Retry Sync”
+
+TECHNICAL REQUIREMENTS
+- read from existing Jobber sync records if available
+- remain idempotent
+- do not create duplicate Jobber records accidentally
+- if force-resync is risky, hide it and only allow retry when safe
+
+--------------------------------------------------
+FEATURE 3: DASHBOARD JOBBER BADGE + QUICK STATS
+--------------------------------------------------
+
+On the main dashboard, add a small but visible “Integrations” or “Jobber Connected” section.
+
+If Jobber is connected:
+Show a connected badge and a lightweight stats card.
+
+Suggested content:
+Title:
+“Jobber Integration”
+
+Badge:
+“Connected”
+
+Quick stats:
+- Quotes Sent
+- Quotes Accepted
+- Jobs Created in Jobber
+
+If exact stats already exist elsewhere in the app, reuse the source of truth.
+If “Jobs Created in Jobber” requires counting successful syncs, use successful sync records.
+
+If Jobber is not connected:
+Show:
+Title:
+“Jobber Integration”
+Message:
+“Connect Jobber to automatically turn accepted quotes into Jobber records.”
+Button:
+“Connect Jobber”
+
+IMPORTANT
+Keep this dashboard block visually clean and compact.
+Do not overcrowd the dashboard.
+It should reinforce the value of the integration without taking over the page.
+
+--------------------------------------------------
+FEATURE 4: IMPORT JOBBER CLIENTS
+--------------------------------------------------
+
+Build a first version of “Import Jobber Clients”.
+
+GOAL
+Allow a connected user to import existing Jobber clients into QuotePro so they can create quotes faster.
+
+SCOPE FOR V1
+- only import core client data
+- no overengineering
+- make it safe and understandable
+
+UI
+Add an “Import from Jobber” action in an appropriate place such as:
+- CRM / Customers page
+- Contacts page
+- or Integration settings screen
+
+Flow:
+1. user clicks “Import Jobber Clients”
+2. system fetches Jobber clients
+3. show simple review/import UI:
+   - client name
+   - email
+   - phone
+   - address
+4. user can:
+   - import all
+   - import selected
+5. show results summary:
+   - imported count
+   - skipped duplicates
+   - failed count if any
+
+DATA HANDLING
+Map Jobber client data into QuotePro customer/contact records.
+
+At minimum import:
+- full name / display name
+- email
+- phone
+- address if available
+- Jobber external ID for future sync reference
+
+DEDUPLICATION
+Implement safe duplicate handling.
+Before creating a new QuotePro customer, attempt to detect duplicates using a reasonable strategy such as:
+- existing external Jobber ID match
+- email match
+- phone match
+- fallback name/address similarity if already supported
+
+If duplicate found:
+- skip duplicate
+- mark as skipped
+- do not create messy duplicate records
+
+TECHNICAL
+Create a dedicated import service module if needed.
+Paginate if Jobber clients can be large.
+Handle token refresh automatically using the existing Jobber integration layer.
+
+DOCUMENT LIMITATIONS
+If full pagination/import-all is too large for one pass, implement a sensible first page / batch import with a clean structure that can be expanded later.
+
+--------------------------------------------------
+FEATURE 5: “WORKS WITH JOBBER” MARKETING HOOK
+--------------------------------------------------
+
+Add a lightweight but polished marketing/positioning component inside the app.
+
+GOAL
+Reinforce that QuotePro is a revenue layer that works with existing tools.
+
+Place this in one or more appropriate internal surfaces such as:
+- onboarding
+- integrations settings
+- settings home
+- empty states
+
+Suggested copy direction:
+
+Headline:
+“Works with Jobber”
+
+Body:
+“Keep your operations in Jobber and use QuotePro to win more work, send smarter quotes, and move accepted jobs into your workflow faster.”
+
+Optional supporting bullets:
+- Turn accepted quotes into Jobber records
+- Sync work into your existing process
+- Keep revenue and operations connected
+
+CTA options:
+- “Connect Jobber”
+- “Manage Integration”
+
+DESIGN
+This should feel like a polished SaaS value prop, not a tacky ad.
+Use existing UI patterns.
+Consider a small integration badge/icon treatment if the app already uses those.
+
+--------------------------------------------------
+BACKEND / API / DATA REQUIREMENTS
+--------------------------------------------------
+
+Build any backend endpoints / server actions required for the above.
+
+Possible needs include:
+- fetch quote sync status
+- trigger manual sync
+- fetch dashboard Jobber stats
+- fetch Jobber clients for import
+- import selected/all Jobber clients
+
+Follow existing auth and permission patterns.
+Users must only access their own account data.
+Never expose tokens to the frontend.
+Reuse the current Jobber service layer.
+
+--------------------------------------------------
+ERROR HANDLING
+--------------------------------------------------
+
+Handle these cases gracefully:
+- Jobber disconnected mid-session
+- expired token requiring refresh
+- Jobber API error
+- partial import failure
+- duplicate import attempts
+- quote already synced
+- missing required fields from Jobber data
+
+Always show user-friendly messaging.
+
+--------------------------------------------------
+ANALYTICS / EVENTS
+--------------------------------------------------
+
+If the app already uses analytics, add event tracking for:
+- jobber_sync_manual_clicked
+- jobber_sync_success
+- jobber_sync_failed
+- jobber_import_started
+- jobber_import_completed
+- jobber_connect_cta_clicked
+
+Reuse the existing analytics pattern.
+
+--------------------------------------------------
+TESTING
+--------------------------------------------------
+
+Add or update tests for:
+- quote acceptance UI states
+- quote detail sync states
+- dashboard connected/disconnected states
+- client import flow
+- duplicate prevention
+- retry sync behavior
+- non-blocking failure handling
+
+If there is an existing test setup, follow it.
+If not, add lightweight tests only where practical.
+
+--------------------------------------------------
+DELIVERABLES
+--------------------------------------------------
+
+When finished, provide:
+1. summary of what was built
+2. files/components/routes created or updated
+3. any DB changes added
+4. any new environment variables if needed
+5. exact places in the app where I can test each of the 5 features
+6. any known limitations or recommended next steps
+
+IMPORTANT IMPLEMENTATION NOTES
+- Keep the UX clean, modern, and confidence-building
+- Make Jobber feel like a serious, high-value integration
+- Do not overcomplicate V1
+- Prioritize speed, clarity, and stickiness
+- If the existing codebase structure differs from these assumptions, inspect and adapt intelligently
+
+START NOW
+First inspect the current codebase and identify:
+- quote acceptance UI
+- quote detail page
+- dashboard structure
+- customer/CRM data model
+- onboarding/settings screens
+- current Jobber integration service
+
+Then implement all 5 features end-to-end.

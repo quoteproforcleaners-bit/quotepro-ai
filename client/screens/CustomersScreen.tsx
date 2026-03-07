@@ -296,6 +296,10 @@ export default function CustomersScreen() {
     );
   };
 
+  const { data: jobberStatus } = useQuery<{ connected: boolean }>({
+    queryKey: ["/api/integrations/jobber/status"],
+  });
+
   const renderHeader = () => (
     <View>
       <ProBanner message={t.customers.aiFollowUpBanner} />
@@ -315,6 +319,25 @@ export default function CustomersScreen() {
           onChange={setStatusFilter}
         />
       </View>
+      {jobberStatus?.connected === true ? (
+        <Pressable
+          testID="button-import-jobber"
+          onPress={() => navigation.navigate("JobberImport")}
+          style={[
+            styles.jobberImportRow,
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.border,
+            },
+          ]}
+        >
+          <Feather name="briefcase" size={18} color={theme.primary} />
+          <ThemedText type="subtitle" style={{ flex: 1, marginLeft: Spacing.md }}>
+            Import from Jobber
+          </ThemedText>
+          <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+        </Pressable>
+      ) : null}
     </View>
   );
 
@@ -463,6 +486,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   filterContainer: {
+    marginBottom: Spacing.lg,
+  },
+  jobberImportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
     marginBottom: Spacing.lg,
   },
   customerCard: {

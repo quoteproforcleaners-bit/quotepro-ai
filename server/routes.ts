@@ -7496,6 +7496,257 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     }
   });
 
+  app.get("/api/integrations/jobber/dashboard-stats", requireAuth, async (req: any, res) => {
+    try {
+      const connResult = await pool.query(
+        `SELECT status, connected_at as "connectedAt", auto_create_job_on_quote_accept as "autoSync"
+         FROM jobber_connections WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      const conn = connResult.rows[0];
+      if (!conn || conn.status === "disconnected") {
+        return res.json({ connected: false });
+      }
+
+      const statsResult = await pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE sync_status = 'success') as "jobsCreated",
+           COUNT(*) as "totalSyncs",
+           COUNT(*) FILTER (WHERE sync_status = 'failed') as "failedSyncs"
+         FROM jobber_job_links WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      const s = statsResult.rows[0];
+
+      res.json({
+        connected: true,
+        connectedAt: conn.connectedAt,
+        autoSyncEnabled: conn.autoSync,
+        jobsCreated: parseInt(s.jobsCreated) || 0,
+        totalSyncs: parseInt(s.totalSyncs) || 0,
+        failedSyncs: parseInt(s.failedSyncs) || 0,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/integrations/jobber/clients", requireAuth, async (req: any, res) => {
+    try {
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No Jobber connection found" });
+
+      const cursor = req.query.cursor as string | undefined;
+      const limit = Math.min(parseInt(req.query.limit as string) || 25, 50);
+
+      const query = `
+        query FetchClients($first: Int!, $after: String) {
+          clients(first: $first, after: $after) {
+            nodes {
+              id
+              firstName
+              lastName
+              companyName
+              isCompany
+              emails { address description primary }
+              phones { number description primary }
+              billingAddress { street1 street2 city province postalCode country }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            totalCount
+          }
+        }
+      `;
+
+      const variables: any = { first: limit };
+      if (cursor) variables.after = cursor;
+
+      const data = await client.graphql(query, variables);
+      const clients = data.clients;
+
+      const existingMappings = await pool.query(
+        `SELECT jobber_client_id as "jobberClientId" FROM jobber_client_mappings WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      const importedIds = new Set(existingMappings.rows.map((r: any) => r.jobberClientId));
+
+      const mapped = clients.nodes.map((c: any) => {
+        const primaryEmail = c.emails?.find((e: any) => e.primary)?.address || c.emails?.[0]?.address || null;
+        const primaryPhone = c.phones?.find((p: any) => p.primary)?.number || c.phones?.[0]?.number || null;
+        const addr = c.billingAddress;
+        const address = addr ? [addr.street1, addr.street2, addr.city, addr.province, addr.postalCode].filter(Boolean).join(", ") : null;
+
+        return {
+          jobberId: c.id,
+          firstName: c.firstName || "",
+          lastName: c.lastName || "",
+          companyName: c.companyName || null,
+          email: primaryEmail,
+          phone: primaryPhone,
+          address,
+          alreadyImported: importedIds.has(c.id),
+        };
+      });
+
+      res.json({
+        clients: mapped,
+        hasNextPage: clients.pageInfo.hasNextPage,
+        endCursor: clients.pageInfo.endCursor,
+        totalCount: clients.totalCount,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/integrations/jobber/import-clients", requireAuth, async (req: any, res) => {
+    try {
+      const { clientIds } = req.body;
+      if (!clientIds || !Array.isArray(clientIds) || clientIds.length === 0) {
+        return res.status(400).json({ error: "clientIds array required" });
+      }
+      if (clientIds.length > 100) {
+        return res.status(400).json({ error: "Maximum 100 clients per import" });
+      }
+
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No Jobber connection found" });
+
+      const businessResult = await pool.query(
+        `SELECT id FROM businesses WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      if (businessResult.rows.length === 0) {
+        return res.status(400).json({ error: "Business not found" });
+      }
+      const businessId = businessResult.rows[0].id;
+
+      const query = `
+        query FetchClientsById($ids: [EncodedId!]!) {
+          clients(filter: { ids: $ids }, first: 100) {
+            nodes {
+              id
+              firstName
+              lastName
+              companyName
+              isCompany
+              emails { address description primary }
+              phones { number description primary }
+              billingAddress { street1 street2 city province postalCode country }
+            }
+          }
+        }
+      `;
+
+      const data = await client.graphql(query, { ids: clientIds });
+      const jobberClients = data.clients.nodes;
+
+      let imported = 0;
+      let skipped = 0;
+      let failed = 0;
+      const results: any[] = [];
+
+      for (const jc of jobberClients) {
+        try {
+          const firstName = jc.firstName || "";
+          const lastName = jc.lastName || jc.companyName || "Unknown";
+          const email = jc.emails?.find((e: any) => e.primary)?.address || jc.emails?.[0]?.address || null;
+          const phone = jc.phones?.find((p: any) => p.primary)?.number || jc.phones?.[0]?.number || null;
+          const addr = jc.billingAddress;
+
+          const existingMapping = await pool.query(
+            `SELECT qp_customer_id FROM jobber_client_mappings WHERE user_id = $1 AND jobber_client_id = $2`,
+            [req.session.userId, jc.id]
+          );
+          if (existingMapping.rows.length > 0) {
+            skipped++;
+            results.push({ jobberId: jc.id, name: `${firstName} ${lastName}`, status: "skipped", reason: "Already imported" });
+            continue;
+          }
+
+          if (email) {
+            const emailMatch = await pool.query(
+              `SELECT id FROM customers WHERE business_id = $1 AND LOWER(email) = LOWER($2)`,
+              [businessId, email]
+            );
+            if (emailMatch.rows.length > 0) {
+              await pool.query(
+                `INSERT INTO jobber_client_mappings (id, user_id, qp_customer_id, jobber_client_id, created_at)
+                 VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+                 ON CONFLICT (user_id, qp_customer_id) DO NOTHING`,
+                [req.session.userId, emailMatch.rows[0].id, jc.id]
+              );
+              skipped++;
+              results.push({ jobberId: jc.id, name: `${firstName} ${lastName}`, status: "skipped", reason: "Email match found" });
+              continue;
+            }
+          }
+
+          if (phone) {
+            const normalizedPhone = phone.replace(/\D/g, "").slice(-10);
+            if (normalizedPhone.length >= 10) {
+              const phoneMatch = await pool.query(
+                `SELECT id FROM customers WHERE business_id = $1 AND REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), '(', ''), ')', ''), ' ', '') LIKE $2`,
+                [businessId, `%${normalizedPhone}`]
+              );
+              if (phoneMatch.rows.length > 0) {
+                await pool.query(
+                  `INSERT INTO jobber_client_mappings (id, user_id, qp_customer_id, jobber_client_id, created_at)
+                   VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+                   ON CONFLICT (user_id, qp_customer_id) DO NOTHING`,
+                  [req.session.userId, phoneMatch.rows[0].id, jc.id]
+                );
+                skipped++;
+                results.push({ jobberId: jc.id, name: `${firstName} ${lastName}`, status: "skipped", reason: "Phone match found" });
+                continue;
+              }
+            }
+          }
+
+          const address = addr ? addr.street1 || "" : "";
+          const city = addr?.city || "";
+          const state = addr?.province || "";
+          const zip = addr?.postalCode || "";
+
+          const insertResult = await pool.query(
+            `INSERT INTO customers (id, business_id, first_name, last_name, email, phone, address, city, state, zip, company, status, lead_source, created_at, updated_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'lead', 'jobber_import', NOW(), NOW())
+             RETURNING id`,
+            [businessId, firstName, lastName, email, phone, address, city, state, zip, jc.companyName || null]
+          );
+
+          await pool.query(
+            `INSERT INTO jobber_client_mappings (id, user_id, qp_customer_id, jobber_client_id, created_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+             ON CONFLICT (user_id, qp_customer_id) DO NOTHING`,
+            [req.session.userId, insertResult.rows[0].id, jc.id]
+          );
+
+          imported++;
+          results.push({ jobberId: jc.id, name: `${firstName} ${lastName}`, status: "imported" });
+        } catch (err: any) {
+          failed++;
+          results.push({ jobberId: jc.id, name: `${jc.firstName || ""} ${jc.lastName || ""}`, status: "failed", reason: err.message });
+        }
+      }
+
+      await logJobberSync(req.session.userId, null, "import_clients",
+        { clientCount: clientIds.length },
+        { imported, skipped, failed },
+        failed === clientIds.length ? "failed" : "ok"
+      );
+
+      res.json({ imported, skipped, failed, results });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   setInterval(async () => {
