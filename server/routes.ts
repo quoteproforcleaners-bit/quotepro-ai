@@ -4565,6 +4565,12 @@ Respond with JSON: {"reply": string}`
       if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         return res.status(503).json({ message: "Google Calendar is not set up yet. Contact support to enable calendar sync." });
       }
+      const state = crypto.randomBytes(32).toString("hex");
+      await pool.query(
+        `INSERT INTO oauth_states (state, user_id, provider, created_at)
+         VALUES ($1, $2, 'google_calendar', NOW())`,
+        [state, req.session.userId]
+      );
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
@@ -4574,7 +4580,7 @@ Respond with JSON: {"reply": string}`
         access_type: "offline",
         scope: ["https://www.googleapis.com/auth/calendar.events"],
         prompt: "consent",
-        state: req.session.userId,
+        state,
       });
       return res.json({ url });
     } catch (error: any) {
@@ -4590,6 +4596,16 @@ Respond with JSON: {"reply": string}`
         return res.status(400).send("Missing code or state");
       }
 
+      const stateResult = await pool.query(
+        `DELETE FROM oauth_states WHERE state = $1 AND provider = 'google_calendar'
+         AND created_at > NOW() - INTERVAL '10 minutes' RETURNING user_id`,
+        [state]
+      );
+      if (stateResult.rows.length === 0) {
+        return res.status(403).send("Invalid or expired OAuth state. Please try connecting again.");
+      }
+      const userId = stateResult.rows[0].user_id;
+
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
@@ -4598,7 +4614,7 @@ Respond with JSON: {"reply": string}`
 
       const { tokens } = await oauth2Client.getToken(code);
 
-      await upsertGoogleCalendarToken(state, {
+      await upsertGoogleCalendarToken(userId, {
         accessToken: tokens.access_token!,
         refreshToken: tokens.refresh_token!,
         expiresAt: new Date(tokens.expiry_date!),
@@ -7125,8 +7141,12 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
       const protocol = host.includes("localhost") ? "http" : "https";
       const redirectUri = `${protocol}://${host}/api/integrations/qbo/callback`;
 
-      const state = crypto.randomBytes(16).toString("hex") + ":" + req.session.userId;
-      req.session.qboOAuthState = state;
+      const state = crypto.randomBytes(32).toString("hex");
+      await pool.query(
+        `INSERT INTO oauth_states (state, user_id, provider, created_at)
+         VALUES ($1, $2, 'qbo', NOW())`,
+        [state, req.session.userId]
+      );
 
       const params = new URLSearchParams({
         client_id: clientId,
@@ -7150,15 +7170,15 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
         return res.status(400).send("Missing required OAuth parameters");
       }
 
-      const stateParts = (state as string).split(":");
-      if (stateParts.length < 2) return res.status(400).send("Invalid state parameter");
-      const userId = stateParts.slice(1).join(":");
-
-      const storedState = req.session?.qboOAuthState;
-      if (!storedState || storedState !== state) {
+      const stateResult = await pool.query(
+        `DELETE FROM oauth_states WHERE state = $1 AND provider = 'qbo'
+         AND created_at > NOW() - INTERVAL '10 minutes' RETURNING user_id`,
+        [state]
+      );
+      if (stateResult.rows.length === 0) {
         return res.status(403).send("Invalid or expired OAuth state. Please try connecting again.");
       }
-      req.session.qboOAuthState = null;
+      const userId = stateResult.rows[0].user_id;
 
       const clientId = process.env.INTUIT_CLIENT_ID;
       const clientSecret = process.env.INTUIT_CLIENT_SECRET;
@@ -7327,8 +7347,11 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
       const redirectUri = `${protocol}://${host}/api/integrations/jobber/callback`;
 
       const state = crypto.randomBytes(32).toString("hex");
-      req.session.jobberOAuthState = state;
-      req.session.jobberOAuthUserId = req.session.userId;
+      await pool.query(
+        `INSERT INTO oauth_states (state, user_id, provider, created_at)
+         VALUES ($1, $2, 'jobber', NOW())`,
+        [state, req.session.userId]
+      );
 
       const url = buildJobberAuthUrl(redirectUri, state);
       res.json({ url });
@@ -7344,13 +7367,15 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
         return res.status(400).send("Missing required OAuth parameters");
       }
 
-      const storedState = req.session?.jobberOAuthState;
-      const userId = req.session?.jobberOAuthUserId;
-      if (!storedState || storedState !== state || !userId) {
+      const stateResult = await pool.query(
+        `DELETE FROM oauth_states WHERE state = $1 AND provider = 'jobber'
+         AND created_at > NOW() - INTERVAL '10 minutes' RETURNING user_id`,
+        [state]
+      );
+      if (stateResult.rows.length === 0) {
         return res.status(403).send("Invalid or expired OAuth state. Please try connecting again.");
       }
-      req.session.jobberOAuthState = null;
-      req.session.jobberOAuthUserId = null;
+      const userId = stateResult.rows[0].user_id;
 
       const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
       const protocol = host.includes("localhost") ? "http" : "https";
@@ -7950,6 +7975,24 @@ async function initJobberTables() {
 }
 
 initJobberTables();
+
+async function initOAuthStatesTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS oauth_states (
+        state VARCHAR PRIMARY KEY,
+        user_id VARCHAR NOT NULL,
+        provider VARCHAR NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    await pool.query(`DELETE FROM oauth_states WHERE created_at < NOW() - INTERVAL '1 hour'`);
+  } catch (e) {
+    console.warn("OAuth states table init:", (e as Error).message);
+  }
+}
+
+initOAuthStatesTable();
 
 (async () => {
   try {
