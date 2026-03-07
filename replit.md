@@ -216,3 +216,50 @@ All onboarding screens use ScrollView with sticky footer buttons and 560px max-w
 - `NavigationContainer` receives a dynamic theme (App.tsx `ThemedNavigation` component) synced with `useTheme()` so all navigation surfaces (headers, screen backgrounds, modals) respect dark mode.
 - `useColorScheme` hook (`client/hooks/useColorScheme.ts`) supports system/light/dark/auto-evening preferences stored in AsyncStorage.
 - All screens use `theme.backgroundRoot`, `theme.text`, etc. from `client/constants/theme.ts`. No hardcoded light-only background colors.
+
+### Web App (Desktop/Browser Interface)
+QuotePro also has a full web app served at `/app` from the Express backend, coexisting with the mobile app.
+
+**Architecture**: React SPA built with Vite + Tailwind CSS + React Router, output to `web/dist/`, served by Express static middleware. Uses the same backend APIs, same session auth, same database as the mobile app.
+
+**Tech Stack**:
+- React 19 + TypeScript
+- Vite (build tool)
+- Tailwind CSS v4 (styling)
+- React Router DOM (client-side routing)
+- TanStack React Query (data fetching, shared with mobile)
+- Lucide React (icons, matches Feather style from mobile)
+
+**Directory**: `web/`
+- `web/src/main.tsx` — Entry point
+- `web/src/App.tsx` — Router + route definitions
+- `web/src/lib/auth.tsx` — Auth context (login, register, logout, session)
+- `web/src/lib/api.ts` — Fetch wrapper with credentials
+- `web/src/lib/queryClient.ts` — TanStack Query client with default fetcher
+- `web/src/components/Layout.tsx` — Sidebar + header shell
+- `web/src/components/ProtectedRoute.tsx` — Auth guard
+- `web/src/pages/` — All page components
+
+**Pages**:
+- `/app/login` — Login page
+- `/app/register` — Register page
+- `/app/dashboard` — Stats, recent quotes, quick actions
+- `/app/quotes` — Quote list with status filters + search
+- `/app/quotes/new` — 4-step quote creation (Customer → Property → Services → Review)
+- `/app/quotes/:id` — Quote detail with preview, copy link, send, PDF download, status management
+- `/app/customers` — Customer list with search
+- `/app/customers/new` — Add customer form
+- `/app/customers/:id` — Customer detail with edit, VIP toggle, related quotes
+- `/app/jobs` — Jobs list with status filters
+- `/app/settings` — Business profile, integrations status, account management
+
+**Build**: Run `npx vite build web/` to rebuild. Output goes to `web/dist/`. Express serves it automatically on restart.
+
+**Routing**: Express serves `web/dist/` static files at `/app` prefix. SPA catch-all middleware returns `index.html` for any `/app/*` path that isn't a static asset.
+
+**Coexistence**: The web app does NOT interfere with:
+- `/` — Expo landing page / manifest serving
+- `/api/*` — Backend API routes
+- `/q/:token` — Public quote pages
+- `/static-build` — Expo static builds
+- Port 8081 — Expo dev server (mobile)

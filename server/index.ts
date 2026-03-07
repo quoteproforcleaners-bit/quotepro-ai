@@ -203,6 +203,21 @@ function configureExpoAndLanding(app: express.Application) {
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
+  const webDistPath = path.resolve(process.cwd(), "web", "dist");
+  if (fs.existsSync(webDistPath)) {
+    app.use("/app", express.static(webDistPath));
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      if (req.path.startsWith("/app")) {
+        const indexPath = path.join(webDistPath, "index.html");
+        if (fs.existsSync(indexPath)) {
+          return res.sendFile(indexPath);
+        }
+      }
+      next();
+    });
+    log("Web app: serving from /app");
+  }
+
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 
