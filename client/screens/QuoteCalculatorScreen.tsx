@@ -452,35 +452,39 @@ export default function QuoteCalculatorScreen() {
                 ]}
                 testID={`button-type-${card.key}`}
               >
+                {isSelected ? (
+                  <View style={[styles.selectedIndicator, { backgroundColor: card.color }]}>
+                    <Feather name="check" size={12} color="#fff" />
+                  </View>
+                ) : null}
                 {card.badge ? (
                   <View style={[styles.aiBadge, { backgroundColor: `${card.color}15` }]}>
-                    <ThemedText type="caption" style={{ color: card.color, fontWeight: "700" }}>
+                    <ThemedText type="caption" style={{ color: card.color, fontWeight: "700", fontSize: 11 }}>
                       {card.badge}
                     </ThemedText>
                   </View>
                 ) : null}
-                <View style={[styles.typeCardIcon, { backgroundColor: `${card.color}15` }]}>
-                  <Feather name={card.icon} size={28} color={card.color} />
-                </View>
-                <ThemedText type="h4" style={{ textAlign: "center", marginTop: Spacing.md }}>
-                  {card.title}
-                </ThemedText>
-                {!card.enabled ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: Spacing.xs }}>
-                    <Feather name="lock" size={12} color={theme.textSecondary} />
-                    <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                      Coming Soon
+                <View style={styles.typeCardRow}>
+                  <View style={[styles.typeCardIcon, { backgroundColor: `${card.color}15` }]}>
+                    <Feather name={card.icon} size={22} color={card.color} />
+                  </View>
+                  <View style={styles.typeCardText}>
+                    <ThemedText type="body" style={{ fontWeight: "700" }}>
+                      {card.title}
+                    </ThemedText>
+                    {!card.enabled ? (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Feather name="lock" size={11} color={theme.textSecondary} />
+                        <ThemedText type="caption" style={{ color: theme.textSecondary, fontSize: 12 }}>
+                          Coming Soon
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                    <ThemedText type="caption" style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 16 }}>
+                      {card.description}
                     </ThemedText>
                   </View>
-                ) : null}
-                <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
-                  {card.description}
-                </ThemedText>
-                {isSelected ? (
-                  <View style={[styles.selectedIndicator, { backgroundColor: card.color }]}>
-                    <Feather name="check" size={14} color="#fff" />
-                  </View>
-                ) : null}
+                </View>
               </Pressable>
             );
           })}
@@ -632,49 +636,59 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   typeSelector: {
-    padding: Spacing.xl,
-    paddingTop: Spacing["3xl"],
-    paddingBottom: Spacing.xl,
+    padding: Spacing.lg,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.lg,
     alignItems: "center",
     flexGrow: 1,
+    justifyContent: "center",
   },
   typeSelectorTitle: {
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
     textAlign: "center",
   },
   typeCardsContainer: {
     width: "100%",
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
   typeCard: {
     width: "100%",
-    alignItems: "center",
-    padding: Spacing.xl,
-    borderRadius: 20,
+    padding: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: 16,
     position: "relative",
   },
+  typeCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  typeCardText: {
+    flex: 1,
+    gap: 2,
+  },
   typeCardIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   aiBadge: {
     position: "absolute",
-    top: Spacing.md,
+    top: Spacing.sm,
     right: Spacing.md,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   selectedIndicator: {
     position: "absolute",
-    top: Spacing.md,
-    left: Spacing.md,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    top: Spacing.sm,
+    left: Spacing.sm,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
