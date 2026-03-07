@@ -1735,6 +1735,18 @@ export default function QuoteDetailScreen() {
           </Pressable>
 
           <Pressable
+            onPress={async () => {
+              const link = `${getPublicBaseUrl()}/q/${quote.publicToken}`;
+              await WebBrowser.openBrowserAsync(link);
+            }}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="preview-quote-btn"
+          >
+            <Feather name="eye" size={20} color={theme.primary} />
+            <ThemedText type="small" style={{ marginTop: 4 }}>Preview</ThemedText>
+          </Pressable>
+
+          <Pressable
             onPress={handleGenerateInvoicePacket}
             style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
             testID="invoice-packet-btn"
@@ -2007,6 +2019,117 @@ export default function QuoteDetailScreen() {
           </>
         ) : null}
 
+        <SectionHeader title="Quote Settings" />
+        <View style={[styles.timelineCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <View style={{ gap: Spacing.md }}>
+            <View>
+              <ThemedText type="small" style={{ fontWeight: "700", marginBottom: Spacing.xs, color: theme.textSecondary }}>Expiration</ThemedText>
+              <View style={{ flexDirection: "row", gap: Spacing.sm, flexWrap: "wrap" }}>
+                {[
+                  { label: "No Expiry", value: "none" },
+                  { label: "3 Days", value: "3" },
+                  { label: "7 Days", value: "7" },
+                  { label: "14 Days", value: "14" },
+                  { label: "30 Days", value: "30" },
+                ].map((opt) => {
+                  const currentDays = quote.expiresAt
+                    ? Math.round((new Date(quote.expiresAt).getTime() - new Date(quote.createdAt).getTime()) / 86400000)
+                    : 0;
+                  const isSelected = opt.value === "none" ? !quote.expiresAt : String(currentDays) === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => {
+                        const expiresAt = opt.value === "none" ? null : new Date(Date.now() + parseInt(opt.value) * 86400000).toISOString();
+                        updateMutation.mutate({ expiresAt });
+                      }}
+                      style={{
+                        paddingHorizontal: Spacing.md,
+                        paddingVertical: Spacing.sm,
+                        borderRadius: BorderRadius.lg,
+                        borderWidth: 2,
+                        borderColor: isSelected ? theme.primary : theme.border,
+                        backgroundColor: isSelected ? theme.primary + "10" : "transparent",
+                      }}
+                      testID={`expiry-option-${opt.value}`}
+                    >
+                      <ThemedText type="small" style={{ fontWeight: "600", color: isSelected ? theme.primary : theme.text }}>{opt.label}</ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {quote.expiresAt ? (
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
+                  Expires {new Date(quote.expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
+                </ThemedText>
+              ) : null}
+            </View>
+
+            <View style={{ height: 1, backgroundColor: theme.border }} />
+
+            <View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <ThemedText type="small" style={{ fontWeight: "700", color: theme.textSecondary }}>Require Deposit</ThemedText>
+                <Pressable
+                  onPress={() => {
+                    updateMutation.mutate({
+                      depositRequired: !quote.depositRequired,
+                      depositAmount: quote.depositRequired ? 0 : (quote.depositAmount || Math.round((quote.total || 0) * 0.25)),
+                    });
+                  }}
+                  style={{
+                    width: 48,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: quote.depositRequired ? theme.primary : theme.border,
+                    justifyContent: "center",
+                    paddingHorizontal: 2,
+                  }}
+                  testID="deposit-toggle"
+                >
+                  <View style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    backgroundColor: "#fff",
+                    alignSelf: quote.depositRequired ? "flex-end" : "flex-start",
+                  }} />
+                </Pressable>
+              </View>
+              {quote.depositRequired ? (
+                <View style={{ marginTop: Spacing.sm }}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: 4 }}>Deposit Amount ($)</ThemedText>
+                  <TextInput
+                    value={String(quote.depositAmount || "")}
+                    onChangeText={(text) => {
+                      const num = parseFloat(text) || 0;
+                      updateMutation.mutate({ depositAmount: num });
+                    }}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    style={{
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                      borderRadius: BorderRadius.md,
+                      padding: Spacing.sm,
+                      fontSize: 15,
+                      color: theme.text,
+                      backgroundColor: theme.background,
+                    }}
+                    testID="deposit-amount-input"
+                  />
+                  {quote.depositPaid ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: Spacing.xs }}>
+                      <Feather name="check-circle" size={14} color="#16A34A" />
+                      <ThemedText type="small" style={{ color: "#16A34A", fontWeight: "600" }}>Deposit Paid</ThemedText>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </View>
+
         <SectionHeader title="Activity Timeline" />
 
         <View style={[styles.timelineCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
@@ -2030,12 +2153,11 @@ export default function QuoteDetailScreen() {
               });
             }
 
-            if (quote.aiNotes && typeof quote.aiNotes === "string" && quote.aiNotes.includes("viewed_at:")) {
-              const viewMatch = quote.aiNotes.match(/viewed_at:\s*(.+?)(?:\n|$)/);
+            if (quote.viewedAt) {
               events.push({
                 icon: "eye",
-                title: "Viewed",
-                date: viewMatch ? new Date(viewMatch[1].trim()).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "Viewed",
+                title: "Viewed by Customer",
+                date: new Date(quote.viewedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
                 color: theme.success,
               });
             }

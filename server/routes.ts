@@ -4876,6 +4876,92 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  app.post("/api/public/quote/:token/pay-deposit", async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).json({ message: "Payments not available" });
+      const quote = await getQuoteByToken(req.params.token);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      if (quote.depositPaid) return res.status(400).json({ message: "Deposit already paid" });
+      if (!quote.depositRequired || !quote.depositAmount) return res.status(400).json({ message: "No deposit required" });
+
+      const business = await db_getBusinessById(quote.businessId);
+      if (!business || !business.stripeAccountId || !business.stripeOnboardingComplete) {
+        return res.status(400).json({ message: "Payments not enabled", noStripe: true });
+      }
+
+      const amount = Math.round(Number(quote.depositAmount) * 100);
+
+      const checkoutSession = await stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: [{
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Deposit - ${business.companyName || "Quote"}`,
+              description: `Deposit for cleaning service`,
+            },
+            unit_amount: amount,
+          },
+          quantity: 1,
+        }],
+        success_url: `https://${req.get("host")}/api/stripe/deposit-success?quoteId=${quote.id}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://${req.get("host")}/q/${quote.publicToken}`,
+        metadata: { quoteId: quote.id, businessId: business.id, type: "deposit" },
+      }, {
+        stripeAccount: business.stripeAccountId,
+      });
+
+      return res.json({ url: checkoutSession.url });
+    } catch (error: any) {
+      console.error("Public deposit payment error:", error);
+      return res.status(500).json({ message: "Failed to create deposit payment" });
+    }
+  });
+
+  app.get("/api/stripe/deposit-success", async (req: Request, res: Response) => {
+    try {
+      const { quoteId, session_id } = req.query as { quoteId: string; session_id: string };
+      if (!quoteId || !session_id || !stripe) {
+        return res.redirect("/");
+      }
+
+      const quote = await getQuoteById(quoteId);
+      if (!quote) return res.redirect("/");
+
+      const business = await db_getBusinessById(quote.businessId);
+      const stripeOpts = business?.stripeAccountId ? { stripeAccount: business.stripeAccountId } : undefined;
+
+      const checkoutSession = await stripe.checkout.sessions.retrieve(session_id as string, stripeOpts);
+      if (!checkoutSession || checkoutSession.payment_status !== "paid") {
+        return res.redirect(`/q/${quote.publicToken}?payment=failed`);
+      }
+
+      if (checkoutSession.metadata?.quoteId !== quoteId || checkoutSession.metadata?.type !== "deposit") {
+        return res.redirect(`/q/${quote.publicToken}?payment=failed`);
+      }
+
+      const expectedAmountCents = Math.round(Number(quote.depositAmount || 0) * 100);
+      if (expectedAmountCents > 0 && checkoutSession.amount_total !== expectedAmountCents) {
+        return res.redirect(`/q/${quote.publicToken}?payment=failed`);
+      }
+
+      await updateQuote(quoteId, {
+        depositPaid: true,
+        status: "accepted",
+        acceptedAt: new Date(),
+        paymentIntentId: checkoutSession.payment_intent as string || undefined,
+        paymentAmount: (checkoutSession.amount_total || 0) / 100,
+      } as any);
+
+      await cancelPendingCommunicationsForQuote(quoteId);
+
+      return res.redirect(`/q/${quote.publicToken}`);
+    } catch (error: any) {
+      console.error("Deposit success error:", error);
+      return res.redirect("/");
+    }
+  });
+
   app.get("/api/stripe/payment-success", async (req: Request, res: Response) => {
     try {
       const { quoteId, session_id } = req.query as { quoteId: string; session_id: string };
@@ -6083,42 +6169,55 @@ init();
     try {
       const q = await getQuoteByToken(req.params.token);
       if (!q) {
-        return res.status(404).send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Not Found</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 1px 3px rgba(0,0,0,0.08)}.icon{font-size:48px;margin-bottom:16px}h1{font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}</style></head><body><div class="card"><div class="icon">&#128269;</div><h1>Quote Not Found</h1><p>This quote link is invalid or has been removed. Please contact the business for a new quote.</p></div></body></html>`);
+        return res.status(404).send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Not Found</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.08)}.icon{font-size:48px;margin-bottom:16px}h1{font-size:22px;font-weight:700;color:#0F172A;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}</style></head><body><div class="card"><div class="icon">&#128269;</div><h1>Quote Not Found</h1><p>This quote link is invalid or has been removed. Please contact the business for a new quote.</p></div></body></html>`);
       }
+
+      const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
       const business = await db_getBusinessById(q.businessId);
       const customer = q.customerId ? await getCustomerById(q.customerId) : null;
       const lineItems = await getLineItemsByQuote(q.id);
       const qpPublic = (business as any)?.quotePreferences;
-      const brandColor = qpPublic?.brandColor || business?.primaryColor || "#2563EB";
-      const companyName = business?.companyName || "Our Company";
-      const logoUri = business?.logoUri || "";
+      const brandColor = (qpPublic?.brandColor || business?.primaryColor || "#2563EB").replace(/[^#a-fA-F0-9]/g, "");
+      const companyName = escHtml(business?.companyName || "Our Company");
+      const logoUri = escHtml(business?.logoUri || "");
 
       try {
-        await pool.query(`UPDATE quotes SET updated_at = NOW() WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM quotes WHERE id = $1 AND ai_notes LIKE '%viewed_at%')`, [q.id]);
-        if (!q.aiNotes || !q.aiNotes.includes("viewed_at")) {
-          const existingNotes = q.aiNotes || "";
-          const viewedNote = `viewed_at:${new Date().toISOString()}`;
-          const newNotes = existingNotes ? `${existingNotes}\n${viewedNote}` : viewedNote;
-          await updateQuote(q.id, { aiNotes: newNotes });
+        if (!q.viewedAt) {
+          await updateQuote(q.id, { viewedAt: new Date() } as any);
+          const existingFollowUps = await getFollowUpsByQuote(q.id);
+          const hasPendingFollowUp = existingFollowUps.some((f: any) => f.status === "scheduled");
+          if (!hasPendingFollowUp && q.status !== "accepted" && q.status !== "declined") {
+            const followUpDelay = 24 * 60 * 60 * 1000;
+            const scheduledFor = new Date(Date.now() + followUpDelay);
+            await createFollowUp({
+              quoteId: q.id,
+              businessId: q.businessId,
+              scheduledFor,
+              channel: "sms",
+              message: "",
+              status: "scheduled",
+            });
+          }
         }
       } catch (_e) {}
 
       if (q.expiresAt && new Date(q.expiresAt) < new Date()) {
-        return res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Expired</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 1px 3px rgba(0,0,0,0.08)}.icon{font-size:48px;margin-bottom:16px}h1{font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}.brand{color:${brandColor};font-weight:600}</style></head><body><div class="card"><div class="icon">&#9203;</div><h1>Quote Expired</h1><p>This quote from <span class="brand">${companyName}</span> has expired. Please contact us for an updated quote.</p>${business?.phone ? `<p style="margin-top:16px"><a href="tel:${business.phone}" style="color:${brandColor}">${business.phone}</a></p>` : ""}</div></body></html>`);
+        return res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Expired</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.08)}.icon{width:72px;height:72px;border-radius:50%;background:#FEF3C7;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:32px}h1{font-size:22px;font-weight:800;color:#0F172A;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}.brand{color:${brandColor};font-weight:600}</style></head><body><div class="card"><div class="icon">&#9203;</div><h1>Quote Expired</h1><p>This quote from <span class="brand">${companyName}</span> has expired. Please contact us for an updated quote.</p>${business?.phone ? `<p style="margin-top:16px"><a href="tel:${business.phone}" style="color:${brandColor};text-decoration:none;font-weight:600">${business.phone}</a></p>` : ""}</div></body></html>`);
       }
 
       if (q.status === "accepted") {
         const acceptedDate = q.acceptedAt ? new Date(q.acceptedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
-        return res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Accepted</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 1px 3px rgba(0,0,0,0.08)}.check{width:64px;height:64px;border-radius:50%;background:#DCFCE7;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px}h1{font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}.brand{color:${brandColor};font-weight:600}.total{font-size:28px;font-weight:700;color:#16A34A;margin:16px 0}</style></head><body><div class="card"><div class="check">&#10003;</div><h1>Quote Accepted</h1><p>You accepted this quote from <span class="brand">${companyName}</span>${acceptedDate ? ` on ${acceptedDate}` : ""}.</p><div class="total">$${Number(q.total).toFixed(2)}</div><p>We'll be in touch to schedule your service.</p>${business?.phone ? `<p style="margin-top:16px"><a href="tel:${business.phone}" style="color:${brandColor}">${business.phone}</a></p>` : ""}</div></body></html>`);
+        return res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Accepted</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.08)}.icon{width:72px;height:72px;border-radius:50%;background:#DCFCE7;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:32px;color:#16A34A}h1{font-size:22px;font-weight:800;color:#0F172A;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}.brand{color:${brandColor};font-weight:600}.total{font-size:32px;font-weight:800;color:#16A34A;margin:16px 0;letter-spacing:-1px}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>You're All Set!</h1><p>You accepted this quote from <span class="brand">${companyName}</span>${acceptedDate ? ` on ${acceptedDate}` : ""}.</p><div class="total">$${Number(q.total).toFixed(2)}</div><p>We'll be in touch to confirm your appointment.</p>${business?.phone ? `<p style="margin-top:16px"><a href="tel:${business.phone}" style="color:${brandColor};text-decoration:none;font-weight:600">${business.phone}</a></p>` : ""}</div></body></html>`);
       }
 
       const opts = (q.options || {}) as any;
       const addOns = (q.addOns || {}) as any;
       const details = (q.propertyDetails || {}) as any;
-      const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : "";
-      const customerAddress = customer?.address || details?.address || "";
-      const preselectedOption = (req.query.option as string) || q.selectedOption || "";
+      const customerName = escHtml(customer ? `${customer.firstName} ${customer.lastName}`.trim() : "");
+      const customerAddress = escHtml(customer?.address || details?.address || "");
+      const rawOption = (req.query.option as string) || q.selectedOption || q.recommendedOption || "";
+      const preselectedOption = ["good", "better", "best", ""].includes(rawOption) ? rawOption : "";
 
       const oneTimeAddOnKeys = ["insideFridge", "insideOven", "insideCabinets", "interiorWindows", "blindsDetail", "baseboardsDetail", "laundryFoldOnly", "dishes", "organizationTidy"];
       const builtInServiceTypes = ["deep-clean", "move-in-out", "post-construction"];
@@ -6129,10 +6228,10 @@ init();
       });
 
       let oneTimeAddOnTotal = 0;
+      let pricingSettings: any = null;
+      try { pricingSettings = await getPricingByBusiness(q.businessId); } catch (_e) {}
+      const addOnPrices = pricingSettings?.addOnPrices || {};
       if (isRecurring && hasOneTimeAddOns) {
-        let pricingSettings: any = null;
-        try { pricingSettings = await getPricingByBusiness(q.businessId); } catch (_e) {}
-        const addOnPrices = pricingSettings?.addOnPrices || {};
         for (const k of oneTimeAddOnKeys) {
           const v = addOns[k];
           const isEnabled = v && (typeof v === "object" ? v.selected : v);
@@ -6157,382 +6256,228 @@ init();
         if (optVal === undefined) continue;
         const price = typeof optVal === "object" ? optVal.price : optVal;
         if (price === undefined) continue;
-        const name = (typeof optVal === "object" && optVal.name) ? optVal.name : (optionLabels[key] || key);
-        const scope = (typeof optVal === "object" && optVal.scope) ? optVal.scope : (optionDescriptions[key] || "");
+        const name = escHtml((typeof optVal === "object" && optVal.name) ? optVal.name : (optionLabels[key] || key));
+        const scope = escHtml((typeof optVal === "object" && optVal.scope) ? optVal.scope : (optionDescriptions[key] || ""));
         const serviceTypeId = (typeof optVal === "object" && optVal.serviceTypeId) ? optVal.serviceTypeId : "";
         const isBuiltIn = builtInServiceTypes.includes(serviceTypeId);
         const showRecurring = isRecurring && hasOneTimeAddOns && !isBuiltIn && oneTimeAddOnTotal > 0;
         const recurringPrice = showRecurring ? Math.max(0, Number(price) - oneTimeAddOnTotal) : null;
         optionDataItems.push({ key, price: Number(price), name, scope, recurringPrice });
         const isSelected = preselectedOption === key;
-        const publicRecommended = (q as any).recommendedOption || 'better';
+        const publicRecommended = q.recommendedOption || "better";
         const isRecommendedPublic = key === publicRecommended;
-        const recurringHtml = recurringPrice !== null ? `<div style="font-size:12px;color:#64748B;margin-top:2px;text-align:right;white-space:nowrap">(then $${recurringPrice.toFixed(2)}/visit)</div>` : "";
-        const recommendedBadgeHtml = isRecommendedPublic ? `<div style="position:absolute;top:0;right:0;background:${brandColor};color:white;padding:4px 12px;border-radius:0 12px 0 8px;font-size:11px;font-weight:600;letter-spacing:0.5px">RECOMMENDED</div>` : "";
-        optionsHtml += `<div class="option-card${isSelected ? " selected" : ""}${isRecommendedPublic ? " recommended" : ""}" data-key="${key}" data-price="${Number(price).toFixed(2)}" onclick="selectOption('${key}')" style="cursor:pointer;position:relative">
+        const recurringHtml = recurringPrice !== null ? `<div class="option-recurring">Then $${recurringPrice.toFixed(2)}/visit</div>` : "";
+        const recommendedBadgeHtml = isRecommendedPublic ? `<div class="recommended-badge">MOST POPULAR</div>` : "";
+        optionsHtml += `<div class="option-card${isSelected ? " selected" : ""}" data-key="${key}" onclick="selectOption('${key}')">
           ${recommendedBadgeHtml}
-          <div class="option-badge" style="display:${isSelected ? "block" : "none"}">SELECTED</div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;gap:10px">
-                <div class="option-radio${isSelected ? " checked" : ""}" id="radio-${key}"><div class="option-radio-dot"></div></div>
-                <div>
-                  <div style="font-size:16px;font-weight:700;color:#1E293B">${name}</div>
-                  <div style="font-size:13px;color:#64748B;margin-top:2px">${scope}</div>
-                </div>
-              </div>
+          <div class="option-row">
+            <div class="option-radio"><div class="option-radio-inner"></div></div>
+            <div class="option-info">
+              <div class="option-name">${name}</div>
+              <div class="option-scope">${scope}</div>
             </div>
-            <div>
-              <div class="option-price" style="color:${isSelected ? brandColor : "#1E293B"}">$${Number(price).toFixed(2)}</div>
+            <div class="option-price-col">
+              <div class="option-price">$${Number(price).toFixed(2)}</div>
               ${recurringHtml}
             </div>
           </div>
         </div>`;
       }
 
+      const addonDataItems: { key: string; name: string; price: number; selected: boolean }[] = [];
       let addOnsHtml = "";
-      const addOnEntries = Object.entries(addOns).filter(([_, v]: any) => v && (typeof v === "object" ? v.selected : v));
-      if (addOnEntries.length > 0) {
-        addOnsHtml = `<div style="margin-top:24px"><h3 style="font-size:15px;font-weight:600;color:#475569;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Add-Ons Included</h3>`;
-        for (const [name, val] of addOnEntries) {
-          const price = typeof val === "object" ? (val as any).price || 0 : 0;
-          const label = name.replace(/([A-Z])/g, " $1").replace(/^./, (s: string) => s.toUpperCase()).replace(/_/g, " ");
-          addOnsHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F1F5F9"><span style="font-size:14px;color:#334155">${label}</span>${price ? `<span style="font-size:14px;font-weight:600;color:#1E293B">+$${Number(price).toFixed(2)}</span>` : `<span style="font-size:13px;color:#16A34A;font-weight:500">Included</span>`}</div>`;
-          if (name === "biannualDeepClean") {
-            addOnsHtml += `<div style="padding:8px 12px;background:#F0FDF4;border-radius:8px;margin:6px 0 4px"><span style="font-size:13px;color:#16A34A">A deep clean will be automatically scheduled 6 months from your service start date. You may opt out at any time by contacting us.</span></div>`;
-          }
+      const allAddonKeys = Object.keys(addOns);
+      if (allAddonKeys.length > 0) {
+        for (const key of allAddonKeys) {
+          const v = addOns[key];
+          if (!v) continue;
+          const isEnabled = typeof v === "object" ? v.selected : v;
+          const price = typeof v === "object" && v.price ? Number(v.price) : (addOnPrices[key] ? Number(addOnPrices[key]) : 0);
+          const label = escHtml(key.replace(/([A-Z])/g, " $1").replace(/^./, (s: string) => s.toUpperCase()).replace(/_/g, " "));
+          addonDataItems.push({ key, name: label, price, selected: !!isEnabled });
+          const checkedClass = isEnabled ? " checked" : "";
+          addOnsHtml += `<div class="addon-row" onclick="toggleAddon(this,'${key}')">
+            <div class="addon-left">
+              <div class="addon-check${checkedClass}"><svg viewBox="0 0 12 12"><path d="M10 3L4.5 8.5 2 6"/></svg></div>
+              <span class="addon-name">${label}</span>
+            </div>
+            ${price > 0 ? `<span class="addon-price">+$${price.toFixed(2)}</span>` : `<span class="addon-included">Included</span>`}
+          </div>`;
         }
-        addOnsHtml += `</div>`;
       }
 
       let lineItemsHtml = "";
       if (lineItems.length > 0) {
-        lineItemsHtml = `<div style="margin-top:24px"><h3 style="font-size:15px;font-weight:600;color:#475569;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">Service Details</h3>`;
         for (const li of lineItems) {
-          lineItemsHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F1F5F9"><span style="font-size:14px;color:#334155">${li.name}${li.quantity > 1 ? ` x${li.quantity}` : ""}</span><span style="font-size:14px;font-weight:600;color:#1E293B">$${Number(li.totalPrice).toFixed(2)}</span></div>`;
+          lineItemsHtml += `<div class="line-item-row"><span class="line-item-name">${escHtml(li.name)}${li.quantity > 1 ? ` x${li.quantity}` : ""}</span><span class="line-item-price">$${Number(li.totalPrice).toFixed(2)}</span></div>`;
         }
-        lineItemsHtml += `</div>`;
       }
 
-      const propertyInfo = [];
-      if (q.propertyBeds) propertyInfo.push(`${q.propertyBeds} Bed`);
-      if (q.propertyBaths) propertyInfo.push(`${q.propertyBaths} Bath`);
-      if (q.propertySqft) propertyInfo.push(`${q.propertySqft.toLocaleString()} sq ft`);
+      const propertyPills: string[] = [];
+      if (q.propertyBeds) propertyPills.push(`${q.propertyBeds} Bed`);
+      if (q.propertyBaths) propertyPills.push(`${q.propertyBaths} Bath`);
+      if (q.propertySqft) propertyPills.push(`${q.propertySqft.toLocaleString()} sq ft`);
+      if (customerAddress) propertyPills.push(customerAddress);
 
-      const expiresText = q.expiresAt ? `Valid until ${new Date(q.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : "";
+      const firstName = customerName ? customerName.split(" ")[0] : "";
+      const greeting = firstName ? `Hi ${firstName},` : "Your Cleaning Quote";
+      const subtitleText = firstName ? "Here's your personalized quote. Review your options and accept when ready." : "Review the details below and accept when ready.";
 
-      const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Quote from ${companyName}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#F1F5F9;color:#1E293B;-webkit-font-smoothing:antialiased}
-.top-bar{background:${brandColor};padding:16px 20px;text-align:center}
-.top-bar img{max-height:40px;margin-bottom:4px}
-.top-bar .co-name{color:#fff;font-size:18px;font-weight:700}
-.container{max-width:520px;margin:0 auto;padding:0 16px 40px}
-.quote-card{background:#fff;border-radius:16px;margin-top:-8px;padding:28px 24px;box-shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04)}
-.greeting{font-size:20px;font-weight:700;color:#1E293B;margin-bottom:4px}
-.sub{font-size:14px;color:#64748B;margin-bottom:20px}
-.prop-info{display:flex;gap:16px;flex-wrap:wrap;padding:14px 16px;background:#F8FAFC;border-radius:10px;margin-bottom:24px}
-.prop-chip{font-size:13px;color:#475569;font-weight:500}
-.section-title{font-size:15px;font-weight:600;color:#475569;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px}
-.total-row{display:flex;justify-content:space-between;align-items:center;padding:20px 0;border-top:2px solid #E2E8F0;margin-top:24px}
-.total-label{font-size:18px;font-weight:600;color:#475569}
-.total-price{font-size:32px;font-weight:800;color:${brandColor}}
-.freq{display:inline-block;background:${brandColor}12;color:${brandColor};font-size:13px;font-weight:600;padding:4px 12px;border-radius:20px;margin-top:4px}
-.actions{margin-top:24px;display:flex;flex-direction:column;gap:10px}
-.btn-accept{display:block;width:100%;padding:16px;background:#16A34A;color:#fff;font-size:16px;font-weight:700;border:none;border-radius:12px;cursor:pointer;text-align:center;transition:background 0.2s}
-.btn-accept:hover{background:#15803D}
-.btn-changes{display:block;width:100%;padding:14px;background:transparent;color:${brandColor};font-size:15px;font-weight:600;border:2px solid ${brandColor};border-radius:12px;cursor:pointer;text-align:center;transition:all 0.2s}
-.btn-changes:hover{background:${brandColor}08}
-.btn-decline{display:block;text-align:center;margin-top:8px;color:#94A3B8;font-size:13px;cursor:pointer;text-decoration:none;transition:color 0.2s}
-.btn-decline:hover{color:#64748B}
-.option-card{border:2px solid #E2E8F0;border-radius:12px;padding:20px;margin-bottom:12px;background:#fff;position:relative;transition:all 0.2s}
-.option-card:hover{border-color:${brandColor}80;background:${brandColor}04}
-.option-card.selected{border-color:${brandColor};background:${brandColor}08}
-.option-card.recommended{border-color:${brandColor}60;background:${brandColor}04}
-.option-badge{position:absolute;top:-10px;right:16px;background:${brandColor};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px}
-.option-radio{width:22px;height:22px;border-radius:50%;border:2px solid #CBD5E1;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
-.option-radio.checked{border-color:${brandColor};background:${brandColor}}
-.option-radio-dot{width:8px;height:8px;border-radius:50%;background:#fff;opacity:0;transition:opacity 0.2s}
-.option-radio.checked .option-radio-dot{opacity:1}
-.option-price{font-size:22px;font-weight:700;margin-left:12px;white-space:nowrap}
-.select-hint{text-align:center;font-size:13px;color:#94A3B8;margin-bottom:16px;font-style:italic}
-.expires{text-align:center;margin-top:16px;font-size:12px;color:#94A3B8}
-.footer{text-align:center;padding:24px;font-size:12px;color:#94A3B8}
-.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px}
-.modal-overlay.active{display:flex}
-.modal{background:#fff;border-radius:16px;padding:32px 24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.15)}
-.modal h2{font-size:20px;font-weight:700;color:#1E293B;margin-bottom:4px}
-.modal p{font-size:14px;color:#64748B;margin-bottom:20px}
-.modal input{width:100%;padding:14px 16px;border:2px solid #E2E8F0;border-radius:10px;font-size:16px;outline:none;transition:border-color 0.2s}
-.modal input:focus{border-color:${brandColor}}
-.modal .modal-actions{display:flex;gap:10px;margin-top:16px}
-.modal .modal-actions button{flex:1;padding:12px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;border:none}
-.modal .btn-confirm{background:#16A34A;color:#fff}
-.modal .btn-cancel{background:#F1F5F9;color:#475569}
-.changes-modal textarea{width:100%;padding:14px 16px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;outline:none;resize:vertical;min-height:100px;font-family:inherit;transition:border-color 0.2s}
-.changes-modal textarea:focus{border-color:${brandColor}}
-.success-state{display:none;text-align:center;padding:40px 20px}
-.success-state.active{display:block}
-.success-icon{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px}
-.main-content{}
-.main-content.hidden{display:none}
-@media(max-width:480px){.quote-card{padding:20px 16px}.total-price{font-size:28px}}
-</style>
-</head>
-<body>
-<div class="top-bar">
-  ${logoUri ? `<img src="${logoUri}" alt="${companyName}" onerror="this.style.display='none'"><br>` : ""}
-  <span class="co-name">${companyName}</span>
-</div>
-<div class="container">
-  <div class="quote-card">
-    <div class="main-content" id="mainContent">
-      <div class="greeting">${customerName ? `Hi ${customerName.split(" ")[0]},` : "Your Quote"}</div>
-      <div class="sub">${customerName ? "Here's your personalized quote." : "Review the details below."}</div>
+      const freqLabels: Record<string, string> = { weekly: "Weekly", biweekly: "Bi-weekly", monthly: "Monthly", quarterly: "Quarterly" };
+      const frequencyLabel = q.frequencySelected && q.frequencySelected !== "one-time" ? (freqLabels[q.frequencySelected] || q.frequencySelected) : "";
 
-      ${propertyInfo.length > 0 || customerAddress ? `<div class="prop-info">
-        ${propertyInfo.map(p => `<span class="prop-chip">${p}</span>`).join("")}
-        ${customerAddress ? `<span class="prop-chip">${customerAddress}</span>` : ""}
-      </div>` : ""}
+      const freqOptions = ["one-time", "weekly", "biweekly", "monthly", "quarterly"];
+      const freqOptionLabels: Record<string, string> = { "one-time": "One-time", weekly: "Weekly", biweekly: "Bi-weekly", monthly: "Monthly", quarterly: "Quarterly" };
+      let frequencyOptionsHtml = "";
+      for (const f of freqOptions) {
+        const selected = q.frequencySelected === f || (!q.frequencySelected && f === "one-time") ? " selected" : "";
+        frequencyOptionsHtml += `<option value="${f}"${selected}>${freqOptionLabels[f]}</option>`;
+      }
 
-      ${optionsHtml ? `<div><h3 class="section-title">Choose Your Service</h3><p class="select-hint">Tap an option to select it</p>${optionsHtml}</div>` : ""}
+      const depositRequired = q.depositRequired || false;
+      const depositAmount = Number(q.depositAmount) || 0;
+      const totalNum = Number(q.total) || 0;
+      const depositFormatted = depositAmount.toFixed(2);
+      const balanceFormatted = Math.max(0, totalNum - depositAmount).toFixed(2);
 
-      ${addOnsHtml}
-      ${lineItemsHtml}
+      const expiresAtMs = q.expiresAt ? new Date(q.expiresAt).getTime() : 0;
+      const hasExpiry = !!q.expiresAt;
+      const expiryText = q.expiresAt ? `Valid until ${new Date(q.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}` : "";
+      const expiryUrgentClass = q.expiresAt && (new Date(q.expiresAt).getTime() - Date.now()) < 172800000 ? "urgent" : "";
 
-      <div class="total-row">
-        <div>
-          <div class="total-label">Total</div>
-          ${q.frequencySelected && q.frequencySelected !== "one-time" ? `<span class="freq">${q.frequencySelected}</span>` : ""}
-        </div>
-        <div>
-          <div class="total-price">$${Number(q.total).toFixed(2)}</div>
-          <div id="totalRecurring" style="font-size:13px;color:#64748B;text-align:right;display:none"></div>
-        </div>
-      </div>
+      let reviewsData: any[] = [];
+      let avgRating = 0;
+      try {
+        const reviewResult = await pool.query(
+          `SELECT rating, feedback_text as "feedbackText", 
+            (SELECT first_name FROM customers WHERE id = rr.customer_id) as "firstName"
+           FROM review_requests rr
+           WHERE business_id = $1 AND rating >= 4 AND feedback_text IS NOT NULL AND feedback_text != ''
+           ORDER BY created_at DESC LIMIT 3`,
+          [q.businessId]
+        );
+        reviewsData = reviewResult.rows;
+        if (reviewsData.length > 0) {
+          avgRating = Math.round((reviewsData.reduce((sum: number, r: any) => sum + r.rating, 0) / reviewsData.length) * 10) / 10;
+        }
+      } catch (_e) {}
 
-      <div class="actions">
-        <button type="button" class="btn-accept" onclick="showAcceptModal()">Accept Quote &mdash; <span id="acceptTotal">$${Number(q.total).toFixed(2)}</span><span id="acceptRecurring" style="font-size:13px;font-weight:400;display:none"></span></button>
-        <button type="button" class="btn-changes" onclick="showChangesModal()">Request Changes</button>
-        <a class="btn-decline" onclick="handleDecline();return false" href="javascript:void(0)">No thanks, decline this quote</a>
-      </div>
+      let testimonialsHtml = "";
+      for (const r of reviewsData) {
+        const authorName = escHtml(r.firstName ? `${r.firstName}` : "Customer");
+        const stars = "&#9733;".repeat(r.rating);
+        const safeText = escHtml(r.feedbackText || "");
+        testimonialsHtml += `<div class="testimonial-card"><div style="color:#F59E0B;font-size:14px;margin-bottom:4px">${stars}</div><div class="testimonial-text">"${safeText}"</div><div class="testimonial-author">&mdash; ${authorName}</div></div>`;
+      }
 
-      ${expiresText ? `<div class="expires">${expiresText}</div>` : ""}
-    </div>
+      const trustStarsHtml = Array(5).fill(0).map((_, i) => `<svg class="trust-star" viewBox="0 0 20 20"${i < Math.round(avgRating) ? '' : ' style="fill:#E2E8F0"'}><path d="M10 1l2.39 4.84L17.5 6.7l-3.75 3.66.89 5.14L10 13.09l-4.64 2.41.89-5.14L2.5 6.7l5.11-.86z"/></svg>`).join("");
 
-    <div class="success-state" id="acceptedState">
-      <div class="success-icon" style="background:#DCFCE7;color:#16A34A">&#10003;</div>
-      <h2 style="font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px">Quote Accepted!</h2>
-      <p style="font-size:15px;color:#64748B">Thank you! We'll reach out shortly to schedule your service.</p>
-      <div id="acceptedTotal" style="font-size:28px;font-weight:700;color:#16A34A;margin:16px 0">$${Number(q.total).toFixed(2)}</div>
-    </div>
+      let trustBadgesHtml = "";
+      if (business?.phone || business?.email) {
+        trustBadgesHtml += `<span class="trust-badge-item"><svg viewBox="0 0 20 20"><path d="M10 1a9 9 0 100 18 9 9 0 000-18zm1 13H9v-2h2v2zm0-4H9V5h2v5z"/></svg>Licensed &amp; Insured</span>`;
+      }
 
-    <div class="success-state" id="declinedState">
-      <div class="success-icon" style="background:#FEF2F2;color:#EF4444">&#10005;</div>
-      <h2 style="font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px">Quote Declined</h2>
-      <p style="font-size:15px;color:#64748B">We understand. Feel free to reach out if you change your mind or need a new quote.</p>
-    </div>
+      const trustNote = "";
+      const hasTrust = reviewsData.length > 0 || trustBadgesHtml.length > 0;
+      const acceptButtonText = depositRequired && depositAmount > 0 ? "Accept &amp; Pay Deposit" : "Accept Quote";
+      const acceptModalTitle = depositRequired && depositAmount > 0 ? "Accept & Pay Deposit" : "Accept Quote";
+      const todayDate = new Date().toISOString().split("T")[0];
 
-    <div class="success-state" id="changesState">
-      <div class="success-icon" style="background:#FEF3C7;color:#F59E0B">&#9998;</div>
-      <h2 style="font-size:22px;font-weight:700;color:#1E293B;margin-bottom:8px">Changes Requested</h2>
-      <p style="font-size:15px;color:#64748B">We've received your message and will get back to you with an updated quote.</p>
-    </div>
-  </div>
-</div>
+      const fs = await import("fs");
+      const path = await import("path");
+      let template = fs.readFileSync(path.join(process.cwd(), "server/templates/instant-quote.html"), "utf-8");
 
-<div class="footer">
-  ${business?.phone ? `<a href="tel:${business.phone}" style="color:${brandColor};text-decoration:none">${business.phone}</a> &middot; ` : ""}
-  ${business?.email ? `<a href="mailto:${business.email}" style="color:${brandColor};text-decoration:none">${business.email}</a><br>` : ""}
-  Powered by QuotePro
-</div>
+      const replacements: Record<string, string> = {
+        "{{brandColor}}": brandColor,
+        "{{companyName}}": companyName,
+        "{{greeting}}": greeting,
+        "{{subtitleText}}": subtitleText,
+        "{{totalFormatted}}": totalNum.toFixed(2),
+        "{{publicToken}}": q.publicToken || "",
+        "{{preselectedOption}}": preselectedOption,
+        "{{optionDataJson}}": JSON.stringify(optionDataItems),
+        "{{addonDataJson}}": JSON.stringify(addonDataItems),
+        "{{optionsHtml}}": optionsHtml,
+        "{{addOnsHtml}}": addOnsHtml,
+        "{{lineItemsHtml}}": lineItemsHtml,
+        "{{frequencyOptionsHtml}}": frequencyOptionsHtml,
+        "{{depositFormatted}}": depositFormatted,
+        "{{balanceFormatted}}": balanceFormatted,
+        "{{depositRequired}}": String(depositRequired),
+        "{{depositAmountNum}}": String(depositAmount),
+        "{{expiresAtMs}}": String(expiresAtMs),
+        "{{expiryText}}": expiryText,
+        "{{expiryUrgentClass}}": expiryUrgentClass,
+        "{{testimonialsHtml}}": testimonialsHtml,
+        "{{trustStarsHtml}}": trustStarsHtml,
+        "{{avgRating}}": String(avgRating),
+        "{{reviewCount}}": String(reviewsData.length),
+        "{{trustBadgesHtml}}": trustBadgesHtml,
+        "{{trustNote}}": trustNote,
+        "{{acceptButtonText}}": acceptButtonText,
+        "{{acceptModalTitle}}": acceptModalTitle,
+        "{{todayDate}}": todayDate,
+        "{{businessPhone}}": escHtml(business?.phone || ""),
+        "{{businessEmail}}": escHtml(business?.email || ""),
+        "{{frequencyLabel}}": frequencyLabel,
+      };
 
-<div class="modal-overlay" id="acceptModal">
-  <div class="modal" style="max-width:440px;max-height:90vh;overflow-y:auto">
-    <h2>Accept Quote</h2>
-    <p>Confirm your acceptance and share any preferences to help us schedule your service.</p>
-    <div id="modalSelectedOption" style="background:#F8FAFC;padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:14px;color:#475569"></div>
-    <div id="modalTotal" style="font-size:24px;font-weight:700;color:#16A34A;text-align:center;margin-bottom:4px">$${Number(q.total).toFixed(2)}</div>
-    <div id="modalRecurring" style="font-size:13px;color:#64748B;text-align:center;margin-bottom:16px;display:none"></div>
-    
-    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Your Full Name *</label>
-    <input type="text" id="signatureName" placeholder="Your full name" autocomplete="name" style="margin-bottom:12px">
-    
-    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Phone Number</label>
-    <input type="tel" id="acceptPhone" placeholder="(555) 123-4567" autocomplete="tel" style="margin-bottom:12px">
-    
-    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Preferred Frequency</label>
-    <select id="acceptFrequency" style="width:100%;padding:14px 16px;border:2px solid #E2E8F0;border-radius:10px;font-size:16px;outline:none;background:#fff;margin-bottom:12px;appearance:auto">
-      <option value="one-time"${!q.frequencySelected || q.frequencySelected === 'one-time' ? ' selected' : ''}>One-time</option>
-      <option value="weekly"${q.frequencySelected === 'weekly' ? ' selected' : ''}>Weekly</option>
-      <option value="biweekly"${q.frequencySelected === 'biweekly' ? ' selected' : ''}>Bi-weekly</option>
-      <option value="monthly"${q.frequencySelected === 'monthly' ? ' selected' : ''}>Monthly</option>
-      <option value="quarterly"${q.frequencySelected === 'quarterly' ? ' selected' : ''}>Quarterly</option>
-    </select>
-    
-    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:8px">Preferred Days</label>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
-      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Mon" style="width:20px;height:20px;margin:0"> Mon</label>
-      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Tue" style="width:20px;height:20px;margin:0"> Tue</label>
-      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Wed" style="width:20px;height:20px;margin:0"> Wed</label>
-      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Thu" style="width:20px;height:20px;margin:0"> Thu</label>
-      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Fri" style="width:20px;height:20px;margin:0"> Fri</label>
-      <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:#334155;cursor:pointer;padding:8px 4px"><input type="checkbox" class="pref-day" value="Sat" style="width:20px;height:20px;margin:0"> Sat</label>
-    </div>
-    
-    <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px">Notes for Your Cleaner</label>
-    <textarea id="acceptNotes" placeholder="Gate codes, parking info, pets, special instructions..." style="width:100%;padding:14px 16px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;outline:none;resize:vertical;min-height:70px;font-family:inherit;margin-bottom:4px"></textarea>
-    
-    <div class="modal-actions">
-      <button type="button" class="btn-cancel" onclick="closeModals()">Cancel</button>
-      <button type="button" class="btn-confirm" onclick="handleAccept()">Confirm</button>
-    </div>
-    <div id="acceptError" style="color:#EF4444;font-size:13px;margin-top:8px;display:none"></div>
-  </div>
-</div>
+      for (const [key, val] of Object.entries(replacements)) {
+        template = template.split(key).join(val);
+      }
 
-<div class="modal-overlay" id="changesModal">
-  <div class="modal changes-modal">
-    <h2>Request Changes</h2>
-    <p>Let us know what you'd like adjusted and we'll send an updated quote.</p>
-    <textarea id="changesMessage" placeholder="Tell us what changes you'd like..."></textarea>
-    <div class="modal-actions">
-      <button type="button" class="btn-cancel" onclick="closeModals()">Cancel</button>
-      <button type="button" class="btn-confirm" style="background:${brandColor}" onclick="handleChanges()">Send Request</button>
-    </div>
-    <div id="changesError" style="color:#EF4444;font-size:13px;margin-top:8px;display:none"></div>
-  </div>
-</div>
+      const conditionalSections: Record<string, boolean> = {
+        "logoUri": !!logoUri,
+        "hasPropertyInfo": propertyPills.length > 0,
+        "hasMultipleOptions": optionDataItems.length > 1,
+        "hasSingleOption": optionDataItems.length === 1,
+        "hasAddOns": addonDataItems.length > 0,
+        "hasLineItems": lineItems.length > 0,
+        "hasDeposit": depositRequired && depositAmount > 0,
+        "hasExpiry": hasExpiry,
+        "hasTrust": hasTrust,
+        "hasReviews": reviewsData.length > 0,
+        "hasTrustBadges": trustBadgesHtml.length > 0,
+        "frequencyLabel": !!frequencyLabel,
+        "businessPhone": !!business?.phone,
+        "businessEmail": !!business?.email,
+        "trustNote": !!trustNote,
+      };
 
-<script>
-var selectedOption="${q.selectedOption || ""}";
-var optionData=${JSON.stringify(optionDataItems)};
-var brandColor="${brandColor}";
-var token="${q.publicToken}";
+      for (const [key, show] of Object.entries(conditionalSections)) {
+        const openTag = `{{#${key}}}`;
+        const closeTag = `{{/${key}}}`;
+        if (show) {
+          template = template.split(openTag).join("").split(closeTag).join("");
+        } else {
+          const regex = new RegExp(`\\{\\{#${key}\\}\\}[\\s\\S]*?\\{\\{\\/${key}\\}\\}`, "g");
+          template = template.replace(regex, "");
+        }
+      }
 
-function selectOption(key){
-  selectedOption=key;
-  var cards=document.querySelectorAll(".option-card");
-  cards.forEach(function(c){
-    var k=c.getAttribute("data-key");
-    var badge=c.querySelector(".option-badge");
-    var radio=c.querySelector(".option-radio");
-    var price=c.querySelector(".option-price");
-    if(k===key){
-      c.classList.add("selected");
-      badge.style.display="block";
-      radio.classList.add("checked");
-      price.style.color=brandColor;
-    }else{
-      c.classList.remove("selected");
-      badge.style.display="none";
-      radio.classList.remove("checked");
-      price.style.color="#1E293B";
-    }
-  });
-  var opt=optionData.find(function(o){return o.key===key});
-  if(opt){
-    var total="$"+parseFloat(opt.price).toFixed(2);
-    document.getElementById("acceptTotal").textContent=total;
-    document.querySelector(".total-price").textContent=total;
-    document.getElementById("modalTotal").textContent=total;
-    var info=document.getElementById("modalSelectedOption");
-    info.textContent="Selected: "+opt.name+" ("+opt.scope+")";
-    info.style.display="block";
-    var acceptedTotal=document.getElementById("acceptedTotal");
-    if(acceptedTotal)acceptedTotal.textContent=total;
-    var totalRecEl=document.getElementById("totalRecurring");
-    var acceptRecEl=document.getElementById("acceptRecurring");
-    var modalRecEl=document.getElementById("modalRecurring");
-    if(opt.recurringPrice!==null&&opt.recurringPrice!==undefined){
-      var recText="(then $"+parseFloat(opt.recurringPrice).toFixed(2)+"/visit)";
-      if(totalRecEl){totalRecEl.textContent=recText;totalRecEl.style.display="block"}
-      if(acceptRecEl){acceptRecEl.textContent=" "+recText;acceptRecEl.style.display="inline"}
-      if(modalRecEl){modalRecEl.textContent=recText;modalRecEl.style.display="block"}
-    }else{
-      if(totalRecEl)totalRecEl.style.display="none";
-      if(acceptRecEl)acceptRecEl.style.display="none";
-      if(modalRecEl)modalRecEl.style.display="none";
-    }
-  }
-}
+      if (logoUri) {
+        template = template.replace("{{logoUri}}", logoUri);
+      }
+      if (propertyPills.length > 0) {
+        const pillsHtml = propertyPills.map(p => `<span class="property-pill">${p}</span>`).join("");
+        template = template.replace(/\{\{#propertyPills\}\}[\s\S]*?\{\{\/propertyPills\}\}/g, pillsHtml);
+      }
 
-function showAcceptModal(){
-  if(!selectedOption && optionData.length>1){alert("Please select a service option first.");return}
-  var info=document.getElementById("modalSelectedOption");
-  var opt=optionData.find(function(o){return o.key===selectedOption});
-  if(opt){info.textContent="Selected: "+opt.name+" ("+opt.scope+")";info.style.display="block"}
-  else{info.style.display="none"}
-  document.getElementById("acceptModal").classList.add("active");
-  document.getElementById("signatureName").focus();
-}
-function showChangesModal(){document.getElementById("changesModal").classList.add("active");document.getElementById("changesMessage").focus()}
-function closeModals(){document.querySelectorAll(".modal-overlay").forEach(function(m){m.classList.remove("active")})}
-function showState(id){document.getElementById("mainContent").classList.add("hidden");document.getElementById(id).classList.add("active")}
+      if (optionDataItems.length === 1) {
+        const singleOpt = optionDataItems[0];
+        const singleHtml = `<div class="single-option-card">
+          <div class="option-row">
+            <div class="option-info"><div class="option-name">${singleOpt.name}</div><div class="option-scope">${singleOpt.scope}</div></div>
+            <div class="option-price-col"><div class="option-price">$${singleOpt.price.toFixed(2)}</div>${singleOpt.recurringPrice !== null ? `<div class="option-recurring">Then $${singleOpt.recurringPrice.toFixed(2)}/visit</div>` : ""}</div>
+          </div>
+        </div>`;
+        template = template.replace("{{singleOptionHtml}}", singleHtml);
+      }
 
-async function handleAccept(){
-  var name=document.getElementById("signatureName").value.trim();
-  if(!name){document.getElementById("acceptError").textContent="Please enter your name.";document.getElementById("acceptError").style.display="block";return}
-  var phone=document.getElementById("acceptPhone").value.trim();
-  var frequency=document.getElementById("acceptFrequency").value;
-  var days=[];
-  document.querySelectorAll(".pref-day:checked").forEach(function(cb){days.push(cb.value)});
-  var notes=document.getElementById("acceptNotes").value.trim();
-  try{
-    var body={acceptedName:name,phone:phone,acceptedFrequency:frequency,acceptedNotes:notes,acceptedPreferences:{preferredDays:days}};
-    if(selectedOption)body.selectedOption=selectedOption;
-    var r=await fetch("/q/"+token+"/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    var d=await r.json();
-    if(d.success){closeModals();showState("acceptedState")}
-    else{document.getElementById("acceptError").textContent=d.message||"Something went wrong.";document.getElementById("acceptError").style.display="block"}
-  }catch(e){document.getElementById("acceptError").textContent="Network error. Please try again.";document.getElementById("acceptError").style.display="block"}
-}
-
-async function handleDecline(){
-  if(!confirm("Are you sure you want to decline this quote?"))return;
-  try{
-    var r=await fetch("/q/"+token+"/decline",{method:"POST",headers:{"Content-Type":"application/json"}});
-    var d=await r.json();
-    if(d.success){showState("declinedState")}
-  }catch(e){alert("Something went wrong. Please try again.")}
-}
-
-async function handleChanges(){
-  var msg=document.getElementById("changesMessage").value.trim();
-  if(!msg){document.getElementById("changesError").textContent="Please describe the changes you'd like.";document.getElementById("changesError").style.display="block";return}
-  try{
-    var r=await fetch("/q/"+token+"/request-changes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg})});
-    var d=await r.json();
-    if(d.success){closeModals();showState("changesState")}
-    else{document.getElementById("changesError").textContent=d.message||"Something went wrong.";document.getElementById("changesError").style.display="block"}
-  }catch(e){document.getElementById("changesError").textContent="Network error. Please try again.";document.getElementById("changesError").style.display="block"}
-}
-
-(function(){
-  var params=new URLSearchParams(window.location.search);
-  var opt=params.get("option");
-  if(opt && ["good","better","best"].indexOf(opt)!==-1){
-    selectOption(opt);
-  } else if(selectedOption){
-    selectOption(selectedOption);
-  }
-})();
-
-document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListener("click",function(e){if(e.target===m)closeModals()})});
-</script>
-</body>
-</html>`;
-
-      return res.send(html);
+      return res.send(template);
     } catch (error: any) {
       console.error("Public quote page error:", error);
-      return res.status(500).send(`<!DOCTYPE html><html><head><title>Error</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F8FAFC}.card{text-align:center;padding:40px;background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}h1{color:#1E293B;margin-bottom:8px}p{color:#64748B}</style></head><body><div class="card"><h1>Something went wrong</h1><p>Please try again or contact the business directly.</p></div></body></html>`);
+      return res.status(500).send(`<!DOCTYPE html><html><head><title>Error</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Inter',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F8FAFC}.card{text-align:center;padding:48px 32px;background:#fff;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,0.08);max-width:420px}h1{font-size:22px;font-weight:800;color:#0F172A;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}</style></head><body><div class="card"><h1>Something went wrong</h1><p>Please try again or contact the business directly.</p></div></body></html>`);
     }
   });
 
@@ -6554,7 +6499,7 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
         return res.status(400).json({ success: false, message: "This quote has been declined" });
       }
 
-      const { acceptedName, selectedOption, phone, acceptedFrequency, acceptedNotes, acceptedPreferences } = req.body;
+      const { acceptedName, selectedOption, phone, acceptedFrequency, acceptedNotes, acceptedPreferences, selectedAddons } = req.body;
       if (!acceptedName || typeof acceptedName !== "string" || !acceptedName.trim()) {
         return res.status(400).json({ success: false, message: "Please provide your name" });
       }
@@ -6577,6 +6522,10 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
       if (acceptedFrequency) updateData.acceptedFrequency = acceptedFrequency;
       if (acceptedNotes) updateData.acceptedNotes = acceptedNotes;
       if (acceptedPreferences) updateData.acceptedPreferences = acceptedPreferences;
+      if (phone) {
+        updatedDetails.acceptedPhone = phone;
+        updateData.propertyDetails = updatedDetails;
+      }
 
       if (selectedOption && ["good", "better", "best"].includes(selectedOption)) {
         updateData.selectedOption = selectedOption;
@@ -6588,6 +6537,29 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
             updateData.total = Number(price);
           }
         }
+      }
+
+      if (selectedAddons && typeof selectedAddons === "object") {
+        const existingAddOns = (q.addOns || {}) as any;
+        const validatedAddOns: any = {};
+        for (const [key, val] of Object.entries(selectedAddons as any)) {
+          if (existingAddOns[key]) {
+            const storedPrice = typeof existingAddOns[key] === "object" && existingAddOns[key].price ? Number(existingAddOns[key].price) : 0;
+            validatedAddOns[key] = {
+              selected: !!(val as any)?.selected,
+              price: storedPrice,
+              name: (val as any)?.name || key,
+            };
+          }
+        }
+        updateData.addOns = validatedAddOns;
+
+        let addOnsTotal = 0;
+        for (const val of Object.values(validatedAddOns) as any[]) {
+          if (val.selected && val.price) addOnsTotal += Number(val.price);
+        }
+        const basePrice = updateData.total || Number(q.total) || 0;
+        updateData.total = basePrice + addOnsTotal;
       }
 
       await updateQuote(q.id, updateData);
@@ -6714,6 +6686,21 @@ document.querySelectorAll(".modal-overlay").forEach(function(m){m.addEventListen
     } catch (error: any) {
       console.error("Request changes error:", error);
       return res.status(500).json({ success: false, message: "Failed to submit change request" });
+    }
+  });
+
+  app.post("/q/:token/track", async (req: Request, res: Response) => {
+    try {
+      const q = await getQuoteByToken(req.params.token);
+      if (!q) return res.status(404).json({ ok: false });
+      const { event, data } = req.body;
+      const existing = q.aiNotes || "";
+      const entry = `[Analytics ${new Date().toISOString()}] ${event}${data ? " " + JSON.stringify(data) : ""}`;
+      const notes = existing ? `${existing}\n${entry}` : entry;
+      await updateQuote(q.id, { aiNotes: notes });
+      return res.json({ ok: true });
+    } catch (_e) {
+      return res.json({ ok: true });
     }
   });
 
@@ -8034,6 +8021,13 @@ initOAuthStatesTable();
     `);
   } catch (e) {
     console.warn("Job columns migration:", (e as Error).message);
+  }
+  try {
+    await pool.query(`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS viewed_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS deposit_type TEXT NOT NULL DEFAULT 'fixed'`);
+    await pool.query(`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS deposit_paid_at TIMESTAMP`);
+  } catch (e) {
+    console.warn("Quote columns migration:", (e as Error).message);
   }
 })();
 

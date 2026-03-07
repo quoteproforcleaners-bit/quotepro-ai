@@ -74,6 +74,30 @@ Key files:
 - Screens: `client/features/commercial/screens/` (CommercialQuoteScreen, WalkthroughScreen, LaborEstimateScreen, PricingEngineScreen, TierBuilderScreen, ProposalPreviewScreen)
 - Components: `client/features/commercial/components/` (SiteBasicsStep, AreasCountsStep, FloorsSurfacesStep, FrequencyTimingStep, SuppliesEquipmentStep, NotesPhotosStep, TierCard, MarginBadge)
 
+### Instant Quote Page (Public Customer-Facing)
+The public quote page at `/q/:token` is a conversion-focused, premium customer-facing sales experience.
+- **Template**: `server/templates/instant-quote.html` — a 620-line external template loaded and rendered with placeholder interpolation
+- **Route handler**: `GET /q/:token` in `server/routes.ts` — loads template, populates data, handles conditional sections
+- **Features**:
+  - Google Fonts (Inter), CSS custom properties, mobile-first responsive design
+  - Company branding (logo, name, brand color, trust badges)
+  - Good/Better/Best interactive tier selection cards with "Most Popular" badge
+  - Live add-on toggling with real-time total recalculation
+  - Accept modal with: name, phone, frequency, preferred date/time/days, notes
+  - Request Changes modal, Decline flow
+  - Expiration countdown timer (live updating every 60s, urgent styling within 48h)
+  - Deposit section with Stripe Checkout integration (`/api/public/quote/:token/pay-deposit`)
+  - Trust/testimonials section pulling real 4-5 star reviews from `review_requests` table
+  - Analytics tracking events (viewed, option selected, addon toggled, accept clicked, accepted)
+  - Bottom-sheet modal animation, backdrop blur
+  - States: main, accepted (with detail summary), declined, changes-requested, expired
+- **Accept endpoint**: `POST /q/:token/accept` — saves selectedOption, selectedAddons, phone, frequency, preferences
+- **Deposit endpoint**: `POST /api/public/quote/:token/pay-deposit` → Stripe Checkout → `/api/stripe/deposit-success`
+- **Analytics endpoint**: `POST /q/:token/track` — logs events to quote's aiNotes
+- **Admin UI**: QuoteDetailScreen has "Quote Settings" section with expiration picker (None/3/7/14/30 days) and deposit toggle with amount input
+- **Preview**: "Preview" button in QuoteDetailScreen opens public quote page in browser
+- **Schema additions**: `viewed_at`, `deposit_type`, `deposit_paid_at` columns on quotes table
+
 ## External Dependencies
 
 ### Core Framework

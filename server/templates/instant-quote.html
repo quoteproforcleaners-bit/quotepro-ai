@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Quote from {{companyName}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--brand:{{brandColor}};--brand-light:{{brandColor}}10;--brand-medium:{{brandColor}}20;--brand-border:{{brandColor}}40;--text-primary:#0F172A;--text-secondary:#475569;--text-muted:#94A3B8;--bg-page:#F8FAFC;--bg-card:#FFFFFF;--bg-surface:#F1F5F9;--border:#E2E8F0;--success:#16A34A;--success-bg:#DCFCE7;--warning:#F59E0B;--warning-bg:#FEF3C7;--error:#EF4444;--error-bg:#FEE2E2;--radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:20px;--shadow-sm:0 1px 2px rgba(0,0,0,0.05);--shadow-md:0 4px 12px rgba(0,0,0,0.08);--shadow-lg:0 8px 30px rgba(0,0,0,0.12)}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-page);color:var(--text-primary);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;line-height:1.5}
+
+.header{background:linear-gradient(135deg,var(--brand),color-mix(in srgb,var(--brand) 80%,#000));padding:24px 20px 28px;text-align:center;position:relative;overflow:hidden}
+.header::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:20px;background:var(--bg-page);border-radius:20px 20px 0 0}
+.header-logo{max-height:48px;margin-bottom:8px;filter:brightness(0) invert(1);opacity:0.9}
+.header-company{color:#fff;font-size:20px;font-weight:700;letter-spacing:-0.3px}
+.header-trust{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px;color:rgba(255,255,255,0.85);font-size:12px;font-weight:500}
+.header-trust svg{width:14px;height:14px;fill:currentColor}
+
+.container{max-width:540px;margin:0 auto;padding:0 16px 32px}
+
+.quote-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:28px 24px;box-shadow:var(--shadow-md);margin-top:-8px;position:relative}
+.greeting{font-size:22px;font-weight:800;color:var(--text-primary);letter-spacing:-0.5px}
+.subtitle{font-size:14px;color:var(--text-secondary);margin-top:4px;margin-bottom:20px}
+
+.property-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+.property-pill{display:flex;align-items:center;gap:5px;background:var(--bg-surface);padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;color:var(--text-secondary)}
+.property-pill svg{width:13px;height:13px;opacity:0.6}
+
+.section-label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+
+.option-card{border:2px solid var(--border);border-radius:var(--radius-md);padding:18px;margin-bottom:10px;cursor:pointer;position:relative;transition:all 0.2s ease;background:var(--bg-card)}
+.option-card:hover{border-color:var(--brand-border);background:var(--brand-light)}
+.option-card.selected{border-color:var(--brand);background:var(--brand-light);box-shadow:0 0 0 1px var(--brand)}
+.option-card .recommended-badge{position:absolute;top:-1px;right:-1px;background:var(--brand);color:#fff;font-size:10px;font-weight:700;padding:4px 12px;border-radius:0 var(--radius-md) 0 var(--radius-sm);letter-spacing:0.5px;text-transform:uppercase}
+.option-row{display:flex;align-items:center;gap:12px}
+.option-radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s}
+.option-card.selected .option-radio{border-color:var(--brand);background:var(--brand)}
+.option-radio-inner{width:7px;height:7px;border-radius:50%;background:#fff;opacity:0;transition:opacity 0.2s}
+.option-card.selected .option-radio-inner{opacity:1}
+.option-info{flex:1;min-width:0}
+.option-name{font-size:16px;font-weight:700;color:var(--text-primary)}
+.option-scope{font-size:13px;color:var(--text-secondary);margin-top:2px;line-height:1.4}
+.option-price-col{text-align:right;flex-shrink:0}
+.option-price{font-size:20px;font-weight:800;color:var(--text-primary);white-space:nowrap;transition:color 0.2s}
+.option-card.selected .option-price{color:var(--brand)}
+.option-recurring{font-size:11px;color:var(--text-muted);margin-top:2px;white-space:nowrap}
+.single-option-card{border:2px solid var(--brand);border-radius:var(--radius-md);padding:20px;background:var(--brand-light)}
+.single-option-card .option-name{font-size:18px}
+.single-option-card .option-price{font-size:24px;color:var(--brand)}
+
+.addons-section{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.addon-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--bg-surface)}
+.addon-row:last-child{border-bottom:none}
+.addon-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.addon-check{width:20px;height:20px;border-radius:6px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all 0.2s}
+.addon-check.checked{background:var(--brand);border-color:var(--brand)}
+.addon-check svg{width:12px;height:12px;fill:#fff;opacity:0;transition:opacity 0.15s}
+.addon-check.checked svg{opacity:1}
+.addon-name{font-size:14px;font-weight:500;color:var(--text-primary)}
+.addon-price{font-size:14px;font-weight:600;color:var(--text-secondary);white-space:nowrap}
+.addon-included{font-size:12px;font-weight:600;color:var(--success)}
+
+.line-items-section{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.line-item-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0}
+.line-item-name{font-size:14px;color:var(--text-secondary)}
+.line-item-price{font-size:14px;font-weight:600;color:var(--text-primary)}
+
+.total-section{margin-top:24px;padding-top:20px;border-top:2px solid var(--border)}
+.total-row{display:flex;justify-content:space-between;align-items:flex-end}
+.total-label{font-size:14px;font-weight:600;color:var(--text-secondary)}
+.total-amount{font-size:32px;font-weight:800;color:var(--brand);letter-spacing:-1px;line-height:1}
+.total-frequency{display:inline-block;background:var(--brand-medium);color:var(--brand);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-top:6px}
+.total-recurring-note{font-size:12px;color:var(--text-muted);margin-top:4px;text-align:right}
+.total-addons-note{font-size:12px;color:var(--text-muted);margin-top:2px;text-align:right}
+
+.deposit-section{margin-top:16px;padding:16px;background:var(--warning-bg);border-radius:var(--radius-md);border:1px solid #FDE68A}
+.deposit-title{font-size:13px;font-weight:700;color:#92400E;margin-bottom:4px}
+.deposit-detail{font-size:14px;color:#78350F}
+.deposit-breakdown{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #FDE68A}
+.deposit-breakdown span{font-size:13px;color:#92400E}
+.deposit-breakdown strong{font-weight:700}
+
+.expiry-section{margin-top:16px;text-align:center}
+.expiry-badge{display:inline-flex;align-items:center;gap:6px;background:var(--bg-surface);padding:8px 16px;border-radius:20px;font-size:12px;font-weight:600;color:var(--text-secondary)}
+.expiry-badge.urgent{background:var(--warning-bg);color:#92400E}
+.expiry-badge svg{width:14px;height:14px}
+
+.trust-section{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.trust-header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.trust-stars{display:flex;gap:2px}
+.trust-star{width:16px;height:16px;fill:var(--warning)}
+.trust-rating{font-size:14px;font-weight:700;color:var(--text-primary)}
+.trust-count{font-size:12px;color:var(--text-muted)}
+.testimonial-card{background:var(--bg-surface);border-radius:var(--radius-sm);padding:14px;margin-bottom:8px}
+.testimonial-text{font-size:13px;color:var(--text-secondary);font-style:italic;line-height:1.5}
+.testimonial-author{font-size:12px;font-weight:600;color:var(--text-primary);margin-top:6px}
+.trust-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.trust-badge-item{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--success);background:var(--success-bg);padding:4px 10px;border-radius:20px}
+.trust-badge-item svg{width:12px;height:12px;fill:var(--success)}
+
+.actions{margin-top:24px;display:flex;flex-direction:column;gap:10px}
+.btn-accept{display:block;width:100%;padding:16px;background:var(--success);color:#fff;font-size:16px;font-weight:700;border:none;border-radius:var(--radius-md);cursor:pointer;text-align:center;transition:all 0.2s;letter-spacing:-0.2px}
+.btn-accept:hover{background:#15803D;transform:translateY(-1px);box-shadow:0 4px 12px rgba(22,163,74,0.3)}
+.btn-accept:active{transform:translateY(0)}
+.btn-accept:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+.btn-changes{display:block;width:100%;padding:14px;background:transparent;color:var(--brand);font-size:15px;font-weight:600;border:2px solid var(--brand);border-radius:var(--radius-md);cursor:pointer;text-align:center;transition:all 0.2s}
+.btn-changes:hover{background:var(--brand-light)}
+.btn-decline-link{display:block;text-align:center;margin-top:4px;color:var(--text-muted);font-size:13px;cursor:pointer;text-decoration:none;transition:color 0.2s}
+.btn-decline-link:hover{color:var(--text-secondary)}
+
+.state-view{display:none;text-align:center;padding:40px 20px}
+.state-view.active{display:block}
+.state-icon{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:32px}
+.state-title{font-size:22px;font-weight:800;color:var(--text-primary);margin-bottom:8px;letter-spacing:-0.5px}
+.state-desc{font-size:15px;color:var(--text-secondary);line-height:1.6;max-width:320px;margin:0 auto}
+.state-total{font-size:32px;font-weight:800;color:var(--success);margin:16px 0;letter-spacing:-1px}
+.state-details{text-align:left;background:var(--bg-surface);border-radius:var(--radius-md);padding:16px;margin-top:20px;max-width:320px;margin-left:auto;margin-right:auto}
+.state-detail-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px}
+.state-detail-label{color:var(--text-secondary)}
+.state-detail-value{font-weight:600;color:var(--text-primary)}
+
+.main-content{}
+.main-content.hidden{display:none}
+
+.footer{text-align:center;padding:24px 16px;font-size:12px;color:var(--text-muted)}
+.footer a{color:var(--brand);text-decoration:none;font-weight:500}
+.footer a:hover{text-decoration:underline}
+.footer-powered{margin-top:8px;opacity:0.6}
+
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:1000;align-items:flex-end;justify-content:center;padding:0}
+.modal-overlay.active{display:flex}
+.modal{background:var(--bg-card);border-radius:var(--radius-xl) var(--radius-xl) 0 0;padding:28px 24px 32px;max-width:540px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:slideUp 0.3s ease}
+@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px}
+.modal h2{font-size:20px;font-weight:800;color:var(--text-primary);letter-spacing:-0.3px}
+.modal .modal-subtitle{font-size:14px;color:var(--text-secondary);margin-top:4px;margin-bottom:20px}
+.modal-summary{background:var(--bg-surface);padding:14px;border-radius:var(--radius-sm);margin-bottom:16px}
+.modal-summary-option{font-size:14px;font-weight:600;color:var(--text-primary)}
+.modal-summary-total{font-size:24px;font-weight:800;color:var(--success);text-align:center;margin:8px 0}
+.modal-summary-recurring{font-size:12px;color:var(--text-muted);text-align:center}
+.form-label{display:block;font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px}
+.form-input{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;font-family:inherit;outline:none;transition:border-color 0.2s;background:var(--bg-card);color:var(--text-primary)}
+.form-input:focus{border-color:var(--brand)}
+.form-group{margin-bottom:14px}
+.form-select{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;font-family:inherit;outline:none;background:var(--bg-card);color:var(--text-primary);appearance:auto}
+.day-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px}
+.day-chip{display:flex;align-items:center;justify-content:center;gap:4px;padding:8px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:600;color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none}
+.day-chip.checked{border-color:var(--brand);background:var(--brand-light);color:var(--brand)}
+.form-textarea{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;outline:none;resize:vertical;min-height:70px;transition:border-color 0.2s;background:var(--bg-card);color:var(--text-primary)}
+.form-textarea:focus{border-color:var(--brand)}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.modal-actions button{flex:1;padding:14px;border-radius:var(--radius-sm);font-size:15px;font-weight:700;cursor:pointer;border:none;font-family:inherit;transition:all 0.15s}
+.btn-modal-cancel{background:var(--bg-surface);color:var(--text-secondary)}
+.btn-modal-cancel:hover{background:var(--border)}
+.btn-modal-confirm{background:var(--success);color:#fff}
+.btn-modal-confirm:hover{background:#15803D}
+.form-error{color:var(--error);font-size:13px;margin-top:8px;display:none}
+
+@media(max-width:480px){
+  .quote-card{padding:22px 18px;border-radius:var(--radius-md)}
+  .total-amount{font-size:28px}
+  .greeting{font-size:20px}
+  .option-price{font-size:18px}
+  .header{padding:20px 16px 24px}
+}
+@media(min-width:768px){
+  .modal-overlay{align-items:center;padding:20px}
+  .modal{border-radius:var(--radius-xl);max-height:85vh}
+  @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  {{#logoUri}}<img src="{{logoUri}}" alt="{{companyName}}" class="header-logo" onerror="this.style.display='none'"><br>{{/logoUri}}
+  <div class="header-company">{{companyName}}</div>
+  {{#trustNote}}<div class="header-trust"><svg viewBox="0 0 20 20"><path d="M10 1l2.39 4.84L17.5 6.7l-3.75 3.66.89 5.14L10 13.09l-4.64 2.41.89-5.14L2.5 6.7l5.11-.86z"/></svg>{{trustNote}}</div>{{/trustNote}}
+</div>
+
+<div class="container">
+  <div class="quote-card">
+    <div class="main-content" id="mainContent">
+      <div class="greeting">{{greeting}}</div>
+      <div class="subtitle">{{subtitleText}}</div>
+
+      {{#hasPropertyInfo}}
+      <div class="property-pills">
+        {{#propertyPills}}
+        <span class="property-pill">{{.}}</span>
+        {{/propertyPills}}
+      </div>
+      {{/hasPropertyInfo}}
+
+      {{#hasMultipleOptions}}
+      <div class="section-label">Choose Your Package</div>
+      {{optionsHtml}}
+      {{/hasMultipleOptions}}
+
+      {{#hasSingleOption}}
+      {{singleOptionHtml}}
+      {{/hasSingleOption}}
+
+      {{#hasAddOns}}
+      <div class="addons-section">
+        <div class="section-label">Customize Your Service</div>
+        {{addOnsHtml}}
+      </div>
+      {{/hasAddOns}}
+
+      {{#hasLineItems}}
+      <div class="line-items-section">
+        <div class="section-label">Service Details</div>
+        {{lineItemsHtml}}
+      </div>
+      {{/hasLineItems}}
+
+      <div class="total-section">
+        <div class="total-row">
+          <div>
+            <div class="total-label">Total</div>
+            {{#frequencyLabel}}<span class="total-frequency">{{frequencyLabel}}</span>{{/frequencyLabel}}
+          </div>
+          <div>
+            <div class="total-amount" id="totalAmount">${{totalFormatted}}</div>
+            <div class="total-recurring-note" id="totalRecurring" style="display:none"></div>
+            <div class="total-addons-note" id="totalAddonsNote" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+
+      {{#hasDeposit}}
+      <div class="deposit-section">
+        <div class="deposit-title">Deposit Required to Book</div>
+        <div class="deposit-detail">Pay ${{depositFormatted}} now to secure your spot</div>
+        <div class="deposit-breakdown">
+          <span>Deposit: <strong>${{depositFormatted}}</strong></span>
+          <span>Balance: <strong>${{balanceFormatted}}</strong></span>
+        </div>
+      </div>
+      {{/hasDeposit}}
+
+      {{#hasExpiry}}
+      <div class="expiry-section">
+        <div class="expiry-badge {{expiryUrgentClass}}" id="expiryBadge">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.414L11 9.586V6z" clip-rule="evenodd"/></svg>
+          <span id="expiryText">{{expiryText}}</span>
+        </div>
+      </div>
+      {{/hasExpiry}}
+
+      {{#hasTrust}}
+      <div class="trust-section">
+        {{#hasReviews}}
+        <div class="trust-header">
+          <div class="trust-stars">{{trustStarsHtml}}</div>
+          <span class="trust-rating">{{avgRating}}</span>
+          <span class="trust-count">({{reviewCount}} reviews)</span>
+        </div>
+        {{/hasReviews}}
+        {{testimonialsHtml}}
+        {{#hasTrustBadges}}
+        <div class="trust-badges">{{trustBadgesHtml}}</div>
+        {{/hasTrustBadges}}
+      </div>
+      {{/hasTrust}}
+
+      <div class="actions">
+        <button type="button" class="btn-accept" id="btnAccept" onclick="showAcceptModal()">
+          {{acceptButtonText}} &mdash; <span id="acceptTotal">${{totalFormatted}}</span>
+          <span id="acceptRecurring" style="font-size:13px;font-weight:400;display:none"></span>
+        </button>
+        <button type="button" class="btn-changes" onclick="showChangesModal()">Request Changes</button>
+        <a class="btn-decline-link" onclick="handleDecline();return false" href="javascript:void(0)">No thanks, decline this quote</a>
+      </div>
+    </div>
+
+    <div class="state-view" id="acceptedState">
+      <div class="state-icon" style="background:var(--success-bg);color:var(--success)">&#10003;</div>
+      <div class="state-title">You're All Set!</div>
+      <div class="state-desc">Thank you for choosing <strong>{{companyName}}</strong>. We'll reach out shortly to confirm your appointment.</div>
+      <div class="state-total" id="acceptedTotal">${{totalFormatted}}</div>
+      <div class="state-details" id="acceptedDetails"></div>
+    </div>
+
+    <div class="state-view" id="declinedState">
+      <div class="state-icon" style="background:var(--error-bg);color:var(--error)">&#10005;</div>
+      <div class="state-title">Quote Declined</div>
+      <div class="state-desc">We understand. Feel free to reach out anytime if you change your mind or need a new quote.</div>
+    </div>
+
+    <div class="state-view" id="changesState">
+      <div class="state-icon" style="background:var(--warning-bg);color:var(--warning)">&#9998;</div>
+      <div class="state-title">Changes Requested</div>
+      <div class="state-desc">We've received your message and will send an updated quote shortly.</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  {{#businessPhone}}<a href="tel:{{businessPhone}}">{{businessPhone}}</a>{{/businessPhone}}
+  {{#businessPhone}}{{#businessEmail}} &middot; {{/businessEmail}}{{/businessPhone}}
+  {{#businessEmail}}<a href="mailto:{{businessEmail}}">{{businessEmail}}</a>{{/businessEmail}}
+  <div class="footer-powered">Powered by QuotePro</div>
+</div>
+
+<!-- Accept Modal -->
+<div class="modal-overlay" id="acceptModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>{{acceptModalTitle}}</h2>
+    <p class="modal-subtitle">Confirm your details and we'll get you scheduled.</p>
+
+    <div class="modal-summary">
+      <div class="modal-summary-option" id="modalSelectedOption"></div>
+      <div class="modal-summary-total" id="modalTotal">${{totalFormatted}}</div>
+      <div class="modal-summary-recurring" id="modalRecurring" style="display:none"></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Your Full Name *</label>
+      <input type="text" class="form-input" id="signatureName" placeholder="Your full name" autocomplete="name">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Phone Number</label>
+      <input type="tel" class="form-input" id="acceptPhone" placeholder="(555) 123-4567" autocomplete="tel">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Preferred Frequency</label>
+      <select class="form-select" id="acceptFrequency">
+        {{frequencyOptionsHtml}}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Preferred Date</label>
+      <input type="date" class="form-input" id="acceptDate" min="{{todayDate}}">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Preferred Time</label>
+      <select class="form-select" id="acceptTime">
+        <option value="">No preference</option>
+        <option value="morning">Morning (8am - 12pm)</option>
+        <option value="afternoon">Afternoon (12pm - 4pm)</option>
+        <option value="evening">Evening (4pm - 7pm)</option>
+      </select>
+    </div>
+
+    <label class="form-label">Preferred Days</label>
+    <div class="day-grid">
+      <div class="day-chip" data-day="Mon" onclick="toggleDay(this)">Mon</div>
+      <div class="day-chip" data-day="Tue" onclick="toggleDay(this)">Tue</div>
+      <div class="day-chip" data-day="Wed" onclick="toggleDay(this)">Wed</div>
+      <div class="day-chip" data-day="Thu" onclick="toggleDay(this)">Thu</div>
+      <div class="day-chip" data-day="Fri" onclick="toggleDay(this)">Fri</div>
+      <div class="day-chip" data-day="Sat" onclick="toggleDay(this)">Sat</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notes for Your Cleaner</label>
+      <textarea class="form-textarea" id="acceptNotes" placeholder="Gate codes, parking info, pets, special instructions..."></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" onclick="closeModals()">Cancel</button>
+      <button type="button" class="btn-modal-confirm" id="btnConfirmAccept" onclick="handleAccept()">Confirm</button>
+    </div>
+    <div class="form-error" id="acceptError"></div>
+  </div>
+</div>
+
+<!-- Changes Modal -->
+<div class="modal-overlay" id="changesModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>Request Changes</h2>
+    <p class="modal-subtitle">Let us know what you'd like adjusted and we'll send an updated quote.</p>
+    <div class="form-group">
+      <textarea class="form-textarea" id="changesMessage" placeholder="Tell us what changes you'd like..." style="min-height:120px"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" onclick="closeModals()">Cancel</button>
+      <button type="button" class="btn-modal-confirm" style="background:var(--brand)" onclick="handleChanges()">Send Request</button>
+    </div>
+    <div class="form-error" id="changesError"></div>
+  </div>
+</div>
+
+<script>
+var selectedOption="{{preselectedOption}}";
+var optionData={{optionDataJson}};
+var addonData={{addonDataJson}};
+var token="{{publicToken}}";
+var expiresAt={{expiresAtMs}};
+var depositRequired={{depositRequired}};
+var depositAmount={{depositAmountNum}};
+
+function selectOption(key){
+  selectedOption=key;
+  document.querySelectorAll(".option-card").forEach(function(c){
+    var k=c.getAttribute("data-key");
+    if(k===key){c.classList.add("selected")}
+    else{c.classList.remove("selected")}
+  });
+  updateTotals();
+  trackEvent("quote_option_selected",{option:key});
+}
+
+function toggleAddon(el,key){
+  var addon=addonData.find(function(a){return a.key===key});
+  if(!addon)return;
+  addon.selected=!addon.selected;
+  var check=el.querySelector(".addon-check");
+  if(addon.selected){check.classList.add("checked")}
+  else{check.classList.remove("checked")}
+  updateTotals();
+  trackEvent("addon_toggled",{addon:key,selected:addon.selected});
+}
+
+function getSelectedAddonsTotal(){
+  var total=0;
+  addonData.forEach(function(a){if(a.selected&&a.price)total+=a.price});
+  return total;
+}
+
+function getSelectedAddons(){
+  var result={};
+  addonData.forEach(function(a){
+    result[a.key]={selected:a.selected,price:a.price,name:a.name};
+  });
+  return result;
+}
+
+function updateTotals(){
+  var opt=optionData.find(function(o){return o.key===selectedOption});
+  var basePrice=opt?opt.price:optionData.length===1?optionData[0].price:0;
+  var addonsTotal=getSelectedAddonsTotal();
+  var total=basePrice+addonsTotal;
+  var totalEl=document.getElementById("totalAmount");
+  var acceptTotalEl=document.getElementById("acceptTotal");
+  var modalTotalEl=document.getElementById("modalTotal");
+  var acceptedTotalEl=document.getElementById("acceptedTotal");
+  var totalAddonsNote=document.getElementById("totalAddonsNote");
+  if(totalEl)totalEl.textContent="$"+total.toFixed(2);
+  if(acceptTotalEl)acceptTotalEl.textContent="$"+total.toFixed(2);
+  if(modalTotalEl)modalTotalEl.textContent="$"+total.toFixed(2);
+  if(acceptedTotalEl)acceptedTotalEl.textContent="$"+total.toFixed(2);
+  if(addonsTotal>0&&totalAddonsNote){
+    totalAddonsNote.textContent="Includes $"+addonsTotal.toFixed(2)+" in add-ons";
+    totalAddonsNote.style.display="block";
+  }else if(totalAddonsNote){
+    totalAddonsNote.style.display="none";
+  }
+  var info=document.getElementById("modalSelectedOption");
+  if(opt&&info){info.textContent="Package: "+opt.name;info.style.display="block"}
+  else if(info&&optionData.length===1){info.textContent="Package: "+optionData[0].name;info.style.display="block"}
+  var totalRecEl=document.getElementById("totalRecurring");
+  var acceptRecEl=document.getElementById("acceptRecurring");
+  var modalRecEl=document.getElementById("modalRecurring");
+  if(opt&&opt.recurringPrice!==null&&opt.recurringPrice!==undefined){
+    var recPrice=parseFloat(opt.recurringPrice)+addonsTotal;
+    var recText="Then $"+recPrice.toFixed(2)+"/visit";
+    if(totalRecEl){totalRecEl.textContent=recText;totalRecEl.style.display="block"}
+    if(acceptRecEl){acceptRecEl.textContent=" ("+recText+")";acceptRecEl.style.display="inline"}
+    if(modalRecEl){modalRecEl.textContent=recText;modalRecEl.style.display="block"}
+  }else{
+    if(totalRecEl)totalRecEl.style.display="none";
+    if(acceptRecEl)acceptRecEl.style.display="none";
+    if(modalRecEl)modalRecEl.style.display="none";
+  }
+}
+
+function toggleDay(el){
+  el.classList.toggle("checked");
+}
+
+function showAcceptModal(){
+  if(!selectedOption&&optionData.length>1){
+    var cards=document.querySelectorAll(".option-card");
+    if(cards.length>0){cards[0].scrollIntoView({behavior:"smooth",block:"center"})}
+    return;
+  }
+  trackEvent("quote_accept_clicked",{option:selectedOption});
+  updateTotals();
+  document.getElementById("acceptModal").classList.add("active");
+  document.body.style.overflow="hidden";
+  setTimeout(function(){document.getElementById("signatureName").focus()},300);
+}
+
+function showChangesModal(){
+  document.getElementById("changesModal").classList.add("active");
+  document.body.style.overflow="hidden";
+  setTimeout(function(){document.getElementById("changesMessage").focus()},300);
+}
+
+function closeModals(){
+  document.querySelectorAll(".modal-overlay").forEach(function(m){m.classList.remove("active")});
+  document.body.style.overflow="";
+}
+
+function showState(id){
+  document.getElementById("mainContent").classList.add("hidden");
+  document.getElementById(id).classList.add("active");
+}
+
+function showAccepted(frequency,prefDate,prefTime,days){
+  var details=document.getElementById("acceptedDetails");
+  var html="";
+  var opt=optionData.find(function(o){return o.key===selectedOption});
+  if(opt)html+='<div class="state-detail-row"><span class="state-detail-label">Package</span><span class="state-detail-value">'+opt.name+'</span></div>';
+  if(frequency&&frequency!=="one-time")html+='<div class="state-detail-row"><span class="state-detail-label">Frequency</span><span class="state-detail-value">'+frequency+'</span></div>';
+  if(prefDate)html+='<div class="state-detail-row"><span class="state-detail-label">Preferred Date</span><span class="state-detail-value">'+prefDate+'</span></div>';
+  if(prefTime)html+='<div class="state-detail-row"><span class="state-detail-label">Preferred Time</span><span class="state-detail-value">'+prefTime+'</span></div>';
+  if(days&&days.length)html+='<div class="state-detail-row"><span class="state-detail-label">Preferred Days</span><span class="state-detail-value">'+days.join(", ")+'</span></div>';
+  var enabledAddons=addonData.filter(function(a){return a.selected});
+  if(enabledAddons.length>0){
+    html+='<div class="state-detail-row"><span class="state-detail-label">Add-Ons</span><span class="state-detail-value">'+enabledAddons.map(function(a){return a.name}).join(", ")+'</span></div>';
+  }
+  if(html){details.innerHTML=html}else{details.style.display="none"}
+  showState("acceptedState");
+}
+
+async function handleAccept(){
+  var errEl=document.getElementById("acceptError");
+  if(!selectedOption&&optionData.length>1){
+    errEl.textContent="Please select a service package first.";errEl.style.display="block";return;
+  }
+  var name=document.getElementById("signatureName").value.trim();
+  if(!name){errEl.textContent="Please enter your name to accept.";errEl.style.display="block";return}
+  errEl.style.display="none";
+  var btn=document.getElementById("btnConfirmAccept");
+  btn.disabled=true;btn.textContent="Accepting...";
+  var phone=document.getElementById("acceptPhone").value.trim();
+  var frequency=document.getElementById("acceptFrequency").value;
+  var prefDate=document.getElementById("acceptDate").value;
+  var prefTime=document.getElementById("acceptTime").value;
+  var days=[];
+  document.querySelectorAll(".day-chip.checked").forEach(function(c){days.push(c.getAttribute("data-day"))});
+  var notes=document.getElementById("acceptNotes").value.trim();
+  var selectedAddons=getSelectedAddons();
+  try{
+    var body={acceptedName:name,phone:phone,acceptedFrequency:frequency,acceptedNotes:notes,acceptedPreferences:{preferredDays:days,preferredDate:prefDate,preferredTime:prefTime},selectedAddons:selectedAddons};
+    if(selectedOption)body.selectedOption=selectedOption;
+    var r=await fetch("/q/"+token+"/accept",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    var d=await r.json();
+    if(d.success){
+      trackEvent("quote_accepted",{option:selectedOption});
+      if(depositRequired&&depositAmount>0){
+        btn.textContent="Redirecting to payment...";
+        try{
+          var pr=await fetch("/api/public/quote/"+token+"/pay-deposit",{method:"POST",headers:{"Content-Type":"application/json"}});
+          var pd=await pr.json();
+          if(pd.url){window.location.href=pd.url;return}
+          if(pd.noStripe){closeModals();showAccepted(frequency,prefDate,prefTime,days);return}
+        }catch(pe){}
+      }
+      closeModals();
+      showAccepted(frequency,prefDate,prefTime,days);
+    }else{
+      errEl.textContent=d.message||"Something went wrong. Please try again.";
+      errEl.style.display="block";
+      btn.disabled=false;btn.textContent="Confirm";
+    }
+  }catch(e){
+    errEl.textContent="Network error. Please check your connection and try again.";
+    errEl.style.display="block";
+    btn.disabled=false;btn.textContent="Confirm";
+  }
+}
+
+async function handleDecline(){
+  if(!confirm("Are you sure you want to decline this quote?"))return;
+  try{
+    var r=await fetch("/q/"+token+"/decline",{method:"POST",headers:{"Content-Type":"application/json"}});
+    var d=await r.json();
+    if(d.success)showState("declinedState");
+  }catch(e){alert("Something went wrong. Please try again.")}
+}
+
+async function handleChanges(){
+  var errEl=document.getElementById("changesError");
+  var msg=document.getElementById("changesMessage").value.trim();
+  if(!msg){errEl.textContent="Please describe the changes you'd like.";errEl.style.display="block";return}
+  errEl.style.display="none";
+  try{
+    var r=await fetch("/q/"+token+"/request-changes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg})});
+    var d=await r.json();
+    if(d.success){closeModals();showState("changesState")}
+    else{errEl.textContent=d.message||"Something went wrong.";errEl.style.display="block"}
+  }catch(e){errEl.textContent="Network error. Please try again.";errEl.style.display="block"}
+}
+
+// Expiration countdown
+function updateExpiry(){
+  if(!expiresAt)return;
+  var now=Date.now();
+  var diff=expiresAt-now;
+  if(diff<=0){
+    var el=document.getElementById("expiryText");
+    if(el)el.textContent="This quote has expired";
+    var btn=document.getElementById("btnAccept");
+    if(btn){btn.disabled=true;btn.textContent="Quote Expired"}
+    return;
+  }
+  var badge=document.getElementById("expiryBadge");
+  var el=document.getElementById("expiryText");
+  if(!el)return;
+  var days=Math.floor(diff/86400000);
+  var hours=Math.floor((diff%86400000)/3600000);
+  var mins=Math.floor((diff%3600000)/60000);
+  if(days>7){return}
+  else if(days>0){el.textContent="Expires in "+days+" day"+(days>1?"s":"")+", "+hours+" hour"+(hours!==1?"s":"")}
+  else if(hours>0){el.textContent="Expires in "+hours+" hour"+(hours!==1?"s":"")+", "+mins+" min"+(mins!==1?"s":"");if(badge)badge.classList.add("urgent")}
+  else{el.textContent="Expires in "+mins+" minute"+(mins!==1?"s":"");if(badge)badge.classList.add("urgent")}
+}
+if(expiresAt){updateExpiry();setInterval(updateExpiry,60000)}
+
+function trackEvent(name,data){
+  try{fetch("/q/"+token+"/track",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event:name,data:data||{}})})}catch(e){}
+}
+
+// Init
+(function(){
+  if(selectedOption){selectOption(selectedOption)}
+  else if(optionData.length===1){selectedOption=optionData[0].key;updateTotals()}
+  else{updateTotals()}
+  trackEvent("quote_page_viewed");
+})();
+
+// Close modal on backdrop click
+document.querySelectorAll(".modal-overlay").forEach(function(m){
+  m.addEventListener("click",function(e){if(e.target===m)closeModals()});
+});
+</script>
+</body>
+</html>
