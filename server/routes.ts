@@ -712,6 +712,73 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     });
   });
 
+  app.post("/api/auth/delete-account", requireAuth, async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      const userId = req.session.userId!;
+      await client.query("BEGIN");
+      const business = await getBusinessByOwner(userId);
+      const bid = business?.id;
+      if (bid) {
+        const jobIds = (await client.query(`SELECT id FROM jobs WHERE business_id = $1`, [bid])).rows.map((r: any) => r.id);
+        if (jobIds.length > 0) {
+          await client.query(`DELETE FROM job_photos WHERE job_id = ANY($1)`, [jobIds]);
+          await client.query(`DELETE FROM job_checklist_items WHERE job_id = ANY($1)`, [jobIds]);
+          await client.query(`DELETE FROM job_status_history WHERE job_id = ANY($1)`, [jobIds]);
+          await client.query(`DELETE FROM job_notes WHERE job_id = ANY($1)`, [jobIds]);
+        }
+        await client.query(`DELETE FROM jobs WHERE business_id = $1`, [bid]);
+        const quoteIds = (await client.query(`SELECT id FROM quotes WHERE business_id = $1`, [bid])).rows.map((r: any) => r.id);
+        if (quoteIds.length > 0) {
+          await client.query(`DELETE FROM sales_recommendations WHERE quote_id = ANY($1)`, [quoteIds]);
+          await client.query(`DELETE FROM quote_follow_ups WHERE quote_id = ANY($1)`, [quoteIds]);
+          await client.query(`DELETE FROM quote_line_items WHERE quote_id = ANY($1)`, [quoteIds]);
+          await client.query(`DELETE FROM invoice_packets WHERE quote_id = ANY($1)`, [quoteIds]);
+        }
+        await client.query(`DELETE FROM quotes WHERE business_id = $1`, [bid]);
+        const custIds = (await client.query(`SELECT id FROM customers WHERE business_id = $1`, [bid])).rows.map((r: any) => r.id);
+        if (custIds.length > 0) {
+          await client.query(`DELETE FROM communications WHERE customer_id = ANY($1)`, [custIds]);
+          await client.query(`DELETE FROM review_requests WHERE customer_id = ANY($1)`, [custIds]);
+          await client.query(`DELETE FROM customer_marketing_prefs WHERE customer_id = ANY($1)`, [custIds]);
+          await client.query(`DELETE FROM follow_up_touches WHERE customer_id = ANY($1)`, [custIds]);
+        }
+        await client.query(`DELETE FROM customers WHERE business_id = $1`, [bid]);
+        const safeDeletes = [
+          "pricing_settings", "automation_rules", "tasks", "channel_connections",
+          "social_conversations", "social_messages", "social_leads", "attribution_events",
+          "social_automation_settings", "social_opt_outs", "growth_tasks", "growth_task_events",
+          "growth_automation_settings", "sales_strategy_settings", "campaigns",
+          "calendar_event_stubs", "api_keys", "webhook_endpoints", "webhook_events",
+          "webhook_deliveries", "qbo_connections", "qbo_customer_mappings",
+          "qbo_invoice_links", "qbo_sync_log",
+        ];
+        for (const table of safeDeletes) {
+          try { await client.query(`DELETE FROM ${table} WHERE business_id = $1`, [bid]); } catch (_) {}
+        }
+        await client.query(`DELETE FROM businesses WHERE id = $1`, [bid]);
+      }
+      const userTables = [
+        "push_tokens", "google_calendar_tokens", "streaks", "user_preferences",
+        "analytics_events", "badges", "business_profiles",
+      ];
+      for (const table of userTables) {
+        try { await client.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]); } catch (_) {}
+      }
+      await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
+      await client.query("COMMIT");
+      req.session.destroy(() => {});
+      res.clearCookie("connect.sid");
+      return res.json({ message: "Account deleted" });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      console.error("Delete account error:", error);
+      return res.status(500).json({ message: "Failed to delete account" });
+    } finally {
+      client.release();
+    }
+  });
+
   app.get("/api/business", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);

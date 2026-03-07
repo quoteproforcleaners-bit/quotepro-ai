@@ -134,7 +134,7 @@ export default function RootStackNavigator() {
             name="GuestQuoteCalculator"
             component={QuoteCalculatorScreen}
             options={{
-              presentation: "modal",
+              presentation: "fullScreenModal",
               animation: "slide_from_bottom",
               headerShown: false,
             }}
@@ -163,7 +163,7 @@ export default function RootStackNavigator() {
             name="QuoteCalculator"
             component={QuoteCalculatorScreen}
             options={{
-              presentation: "modal",
+              presentation: "fullScreenModal",
               animation: "slide_from_bottom",
               headerShown: false,
             }}
@@ -208,7 +208,7 @@ export default function RootStackNavigator() {
             name="Paywall"
             component={PaywallScreen}
             options={{
-              presentation: "modal",
+              presentation: "fullScreenModal",
               animation: "slide_from_bottom",
               headerShown: false,
             }}

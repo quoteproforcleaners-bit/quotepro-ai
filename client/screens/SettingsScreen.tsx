@@ -57,6 +57,9 @@ export default function SettingsScreen() {
   const hasCompletedTour = tutorialCtx?.hasCompletedTour || (() => false);
   const tourActive = tutorialCtx?.isActive || false;
   const [commercialEnabled, setCommercialEnabled] = useState(FeatureFlags.commercialQuotingEnabled);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const { data: growthSettings, refetch: refetchGrowthSettings } = useQuery<any>({
     queryKey: ["/api/growth-automation-settings"],
@@ -1563,6 +1566,86 @@ export default function SettingsScreen() {
         </ThemedText>
       </Pressable>
 
+      <SectionHeader title="Account" />
+
+      <Pressable
+        onPress={() => setDeleteModalVisible(true)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-delete-account"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.error}15` }]}>
+            <Feather name="trash-2" size={20} color={theme.error} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600", color: theme.error }}>
+              Delete Account
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Permanently delete your account and all data
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={18} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Modal visible={deleteModalVisible} animationType="fade" transparent onRequestClose={() => setDeleteModalVisible(false)}>
+        <View style={styles.deleteModalOverlay}>
+          <View style={[styles.deleteModalContent, { backgroundColor: theme.cardBackground }]}>
+            <View style={[styles.deleteModalIconWrap, { backgroundColor: `${theme.error}15` }]}>
+              <Feather name="alert-triangle" size={32} color={theme.error} />
+            </View>
+            <ThemedText type="h4" style={{ textAlign: "center", marginTop: Spacing.md }}>
+              Delete Your Account?
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm, lineHeight: 20 }}>
+              This will permanently delete your account, all quotes, customers, jobs, and business data. This action cannot be undone.
+            </ThemedText>
+            <ThemedText type="small" style={{ fontWeight: "600", marginTop: Spacing.lg, marginBottom: Spacing.xs }}>
+              Type DELETE to confirm
+            </ThemedText>
+            <RNTextInput
+              testID="input-delete-confirm"
+              value={deleteConfirmText}
+              onChangeText={setDeleteConfirmText}
+              placeholder="DELETE"
+              placeholderTextColor={theme.textSecondary}
+              autoCapitalize="characters"
+              style={[styles.deleteConfirmInput, { backgroundColor: theme.inputBackground, borderColor: theme.border, color: theme.text }]}
+            />
+            <Pressable
+              testID="button-confirm-delete"
+              onPress={async () => {
+                if (deleteConfirmText !== "DELETE") return;
+                setDeleting(true);
+                try {
+                  await apiRequest("POST", "/api/auth/delete-account");
+                  if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                  setDeleteModalVisible(false);
+                  logout();
+                } catch (e) {
+                  console.error("Delete account failed:", e);
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              disabled={deleteConfirmText !== "DELETE" || deleting}
+              style={[styles.deleteConfirmBtn, { backgroundColor: deleteConfirmText === "DELETE" ? theme.error : theme.textSecondary, opacity: deleting ? 0.6 : 1 }]}
+            >
+              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700" }}>
+                {deleting ? "Deleting..." : "Permanently Delete Account"}
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => { setDeleteModalVisible(false); setDeleteConfirmText(""); }}
+              style={styles.deleteCancelBtn}
+            >
+              <ThemedText type="body" style={{ color: theme.primary, fontWeight: "600" }}>Cancel</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <SectionHeader title="Help & Support" />
 
       <Pressable
@@ -1681,7 +1764,7 @@ export default function SettingsScreen() {
           type="small"
           style={[styles.version, { color: theme.textSecondary }]}
         >
-          {t.settings.version} 1.0.0
+          {t.settings.version} 1.1.1
         </ThemedText>
         <ThemedText
           type="small"
@@ -1997,5 +2080,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
+  },
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  deleteModalContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing["2xl"],
+    alignItems: "center",
+  },
+  deleteModalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteConfirmInput: {
+    width: "100%",
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.md,
+    fontSize: 16,
+    textAlign: "center",
+    fontWeight: "700" as const,
+    letterSpacing: 4,
+  },
+  deleteConfirmBtn: {
+    width: "100%",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+    marginTop: Spacing.lg,
+  },
+  deleteCancelBtn: {
+    marginTop: Spacing.md,
+    padding: Spacing.sm,
   },
 });
