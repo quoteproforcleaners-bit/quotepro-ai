@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable, Platform, useWindowDimensions } from "react-native";
+import { View, ScrollView, StyleSheet, Pressable, Platform, useWindowDimensions } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
@@ -420,7 +420,11 @@ export default function QuoteCalculatorScreen() {
     ];
 
     return (
-      <View style={styles.typeSelector}>
+      <ScrollView
+        style={styles.typeSelectorScroll}
+        contentContainerStyle={styles.typeSelector}
+        showsVerticalScrollIndicator={false}
+      >
         <ThemedText type="h2" style={styles.typeSelectorTitle}>
           What are you quoting?
         </ThemedText>
@@ -481,7 +485,7 @@ export default function QuoteCalculatorScreen() {
             );
           })}
         </View>
-      </View>
+      </ScrollView>
     );
   };
 
@@ -624,11 +628,15 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  typeSelector: {
+  typeSelectorScroll: {
     flex: 1,
+  },
+  typeSelector: {
     padding: Spacing.xl,
     paddingTop: Spacing["3xl"],
+    paddingBottom: Spacing.xl,
     alignItems: "center",
+    flexGrow: 1,
   },
   typeSelectorTitle: {
     marginBottom: Spacing.xl,
