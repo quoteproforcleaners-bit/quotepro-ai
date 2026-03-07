@@ -577,6 +577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         return res.status(500).json({ message: "Google OAuth not configured" });
       }
+      const platform = req.query.platform === "web" ? "web" : "mobile";
       const redirectUri = `https://${req.get("host")}/api/auth/google/callback`;
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
@@ -587,6 +588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         access_type: "offline",
         scope: ["openid", "email", "profile"],
         prompt: "select_account",
+        state: platform,
       });
       return res.json({ url });
     } catch (error: any) {
@@ -597,7 +599,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/google/callback", async (req: Request, res: Response) => {
     try {
-      const { code } = req.query as { code: string };
+      const { code, state } = req.query as { code: string; state?: string };
+      const isWeb = state === "web";
       if (!code) {
         return res.status(400).send("Missing authorization code");
       }
@@ -624,6 +627,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         user = await getUserByEmail(email);
         if (user) {
+          if (isWeb) {
+            return res.redirect("/app/login?error=account_exists");
+          }
           return res.send(`<!DOCTYPE html><html><head><title>Sign In Error</title>
 <style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
 .card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-width:400px;}
@@ -637,6 +643,17 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         const business = await getBusinessByOwner(user.id);
         needsOnboarding = !business?.onboardingComplete;
       }
+
+      if (isWeb) {
+        req.session.userId = user.id;
+        return new Promise<void>((resolve) => {
+          req.session.save(() => {
+            res.redirect("/app/dashboard");
+            resolve();
+          });
+        });
+      }
+
       const authToken = generateAuthToken(user.id, needsOnboarding);
       const callbackUrl = `quotepro://auth-callback?token=${authToken}`;
       return res.send(`<!DOCTYPE html><html><head><title>Signed In</title>
