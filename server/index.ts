@@ -109,7 +109,7 @@ function getAppName(): string {
   }
 }
 
-function serveExpoManifest(platform: string, res: Response) {
+function serveExpoManifest(platform: string, req: Request, res: Response) {
   const manifestPath = path.resolve(
     process.cwd(),
     "static-build",
@@ -127,8 +127,32 @@ function serveExpoManifest(platform: string, res: Response) {
   res.setHeader("expo-sfv-version", "0");
   res.setHeader("content-type", "application/json");
 
-  const manifest = fs.readFileSync(manifestPath, "utf-8");
-  res.send(manifest);
+  const forwardedProto = req.header("x-forwarded-proto");
+  const protocol = forwardedProto || req.protocol || "https";
+  const forwardedHost = req.header("x-forwarded-host");
+  const host = forwardedHost || req.get("host") || "";
+  const currentBaseUrl = `${protocol}://${host}`;
+
+  let manifest = fs.readFileSync(manifestPath, "utf-8");
+  manifest = manifest.replace(/https?:\/\/[^/"]+/g, (match) => {
+    try {
+      const url = new URL(match);
+      if (url.hostname.includes("replit") || url.hostname.includes("picard")) {
+        return currentBaseUrl;
+      }
+    } catch {}
+    return match;
+  });
+
+  const parsed = JSON.parse(manifest);
+  if (parsed.extra?.expoClient?.hostUri) {
+    parsed.extra.expoClient.hostUri = host + "/" + platform;
+  }
+  if (parsed.extra?.expoGo?.debuggerHost) {
+    parsed.extra.expoGo.debuggerHost = host + "/" + platform;
+  }
+
+  res.send(JSON.stringify(parsed));
 }
 
 function serveLandingPage({
@@ -184,7 +208,7 @@ function configureExpoAndLanding(app: express.Application) {
 
     const platform = req.header("expo-platform");
     if (platform && (platform === "ios" || platform === "android")) {
-      return serveExpoManifest(platform, res);
+      return serveExpoManifest(platform, req, res);
     }
 
     if (req.path === "/") {
