@@ -12,9 +12,11 @@ import CustomersListPage from "./pages/CustomersListPage";
 import CustomerDetailPage from "./pages/CustomerDetailPage";
 import CustomerCreatePage from "./pages/CustomerCreatePage";
 import JobsPage from "./pages/JobsPage";
+import JobDetailPage from "./pages/JobDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 import FollowUpsPage from "./pages/FollowUpsPage";
 import OpportunitiesPage from "./pages/OpportunitiesPage";
+import GrowthDashboardPage from "./pages/GrowthDashboardPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import WalkthroughAIPage from "./pages/WalkthroughAIPage";
 
@@ -63,6 +65,8 @@ export default function App() {
         <Route path="/customers/new" element={<CustomerCreatePage />} />
         <Route path="/customers/:id" element={<CustomerDetailPage />} />
         <Route path="/jobs" element={<JobsPage />} />
+        <Route path="/jobs/:id" element={<JobDetailPage />} />
+        <Route path="/growth" element={<GrowthDashboardPage />} />
         <Route path="/follow-ups" element={<FollowUpsPage />} />
         <Route path="/opportunities" element={<OpportunitiesPage />} />
         <Route path="/ai-assistant" element={<AIAssistantPage />} />

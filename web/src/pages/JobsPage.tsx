@@ -118,7 +118,7 @@ export default function JobsPage() {
                 {filtered.map((j: any) => (
                   <tr
                     key={j.id}
-                    onClick={() => setSelectedJob(j)}
+                    onClick={() => navigate(`/jobs/${j.id}`)}
                     className="border-b border-slate-50 hover:bg-slate-50/80 cursor-pointer transition-colors"
                   >
                     <td className="px-5 lg:px-6 py-3.5">

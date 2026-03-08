@@ -245,19 +245,21 @@ QuotePro also has a full web app served at `/app` from the Express backend, coex
 **Pages**:
 - `/app/login` — Premium login page with Google OAuth + email/password, split layout with marketing panel
 - `/app/register` — Premium registration page with Google OAuth, matching login design
-- `/app/dashboard` — Sales funnel bars, close rate, follow-up alert, stat cards, recent quotes table, today-at-a-glance
-- `/app/quotes` — Sortable quote list with status tabs (all/draft/sent/viewed/accepted/declined/expired), search, column sorting
-- `/app/quotes/new` — 4-step wizard (Customer → Property → Services → Review) with full calculator parity, stepper buttons, polished step indicator
-- `/app/quotes/:id` — Full detail: property grid, Good/Better/Best cards, add-ons, AI comms (follow-up + message generation), integrations panel (Jobber/QBO), status management, PDF download, public link
-- `/app/customers` — Customer list with status tabs (all/active/lead/inactive), avatar initials, VIP badges, search
-- `/app/customers/new` — Add customer form with design system inputs
-- `/app/customers/:id` — Full CRM: editable profile, VIP toggle, DNC toggle, AI draft messages, related quotes table, job history, customer summary card
-- `/app/jobs` — Jobs list with status tabs, modal detail view with start/complete actions, calendar sync
-- `/app/follow-ups` — Follow-up queue: urgency scoring, revenue at risk, AI follow-up generation per quote
-- `/app/opportunities` — Dormant customers, lost quotes, growth tasks tabs with revenue recovery metrics
-- `/app/ai-assistant` — Chat interface for AI sales assistant with suggestion cards
-- `/app/walkthrough-ai` — Paste notes → AI extraction → create quote from extracted details
-- `/app/settings` — Tabbed settings: business profile, pricing config (rate/minimum/service types/frequency discounts), integrations (Stripe/QBO/Jobber/Google Calendar), account management, developer (API keys/webhooks)
+- `/app/dashboard` — Revenue Leak Detector hero card (risk scoring, protection score bar, estimated loss), Sales Momentum funnel (Sent→Viewed→Accepted→Won), follow-up streak gamification, weekly recap, revenue chart, today at a glance, stat cards, recent quotes table
+- `/app/quotes` — Sortable quote list with status tabs, search, column sorting
+- `/app/quotes/new` — 4-step wizard (Customer → Property → Services → Review) with full calculator parity
+- `/app/quotes/:id` — Full detail: activity timeline, property grid, Good/Better/Best cards, add-ons, deposit management, payment links (Stripe/Venmo/CashApp), review request, referral offer, AI Revenue Playbook recommendations, AI communication drafts (6 purposes x 2 channels), invoice packet, calendar integration (ICS/Google Cal), integrations (Jobber/QBO), status management, PDF download
+- `/app/customers` — Customer list with status tabs, avatar initials, VIP badges, search
+- `/app/customers/new` — Add customer form
+- `/app/customers/:id` — Full CRM: editable profile, VIP/DNC toggles, AI draft messages, related quotes, job history
+- `/app/jobs` — Jobs list with status tabs, click-through to job detail
+- `/app/jobs/:id` — Full job detail with 4 tabs: Overview (info, progress, notes, ratings), Progress (status flow, timeline, live updates, AI messages), Checklist (grouped by room, toggle completion), Photos (before/after gallery, notes)
+- `/app/growth` — Growth Hub: growth score ring, pipeline snapshot, tasks queue (SMS/Email/Snooze/Done actions), reviews management, reactivation campaigns (AI content generation), upsell opportunities, rebook candidates
+- `/app/follow-ups` — Follow-up queue: urgency scoring, revenue at risk, AI follow-up generation
+- `/app/opportunities` — Dormant customers, lost quotes, growth tasks
+- `/app/ai-assistant` — Chat interface for AI sales assistant
+- `/app/walkthrough-ai` — Paste notes → AI extraction → create quote
+- `/app/settings` — 9 tabs: Business (profile+pricing+service types+frequency discounts), Branding (sender name/title/booking link/signatures), Payments (Venmo/CashApp/accepted methods), Automations (daily pulse/weekly recap/quiet hours/dormant threshold), Reviews (Google review URL/PDF toggle/referral settings), Features (commercial quoting/language), Integrations (Stripe/QBO/Jobber/Google Calendar), Account (details/subscription/sign out/delete), Developer (API keys/webhooks)
 
 **Build**: Run `npx vite build web/` to rebuild. Output goes to `web/dist/`. Express serves it automatically on restart.
 

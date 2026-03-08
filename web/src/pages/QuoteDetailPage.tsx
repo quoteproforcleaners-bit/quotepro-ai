@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "../lib/queryClient";
-import { apiPut, apiDelete, apiPost } from "../lib/api";
+import { apiPut, apiDelete, apiPost, apiGet } from "../lib/api";
 import {
   ExternalLink,
   Copy,
@@ -22,7 +22,20 @@ import {
   FileText,
   Link2,
   RefreshCw,
-  AlertCircle,
+  DollarSign,
+  Star,
+  Gift,
+  Calendar,
+  Mail,
+  Phone,
+  Eye,
+  CreditCard,
+  TrendingUp,
+  Lightbulb,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  Receipt,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -34,8 +47,13 @@ import {
   ConfirmModal,
   Spinner,
   EmptyState,
-  Alert,
+  Timeline,
+  Toggle,
+  ProgressBar,
 } from "../components/ui";
+
+type MessagePurpose = "follow_up" | "thank_you" | "reminder" | "upsell" | "review_request" | "payment_failed";
+type MessageChannel = "email" | "sms";
 
 export default function QuoteDetailPage() {
   const { id } = useParams();
@@ -43,18 +61,33 @@ export default function QuoteDetailPage() {
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [aiFollowUp, setAiFollowUp] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiMessage, setAiMessage] = useState("");
-  const [aiMsgLoading, setAiMsgLoading] = useState(false);
+  const [aiDrafts, setAiDrafts] = useState<Record<string, string>>({});
+  const [aiDraftLoading, setAiDraftLoading] = useState<string | null>(null);
+  const [depositEditing, setDepositEditing] = useState(false);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositRequired, setDepositRequired] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [expandedRec, setExpandedRec] = useState<number | null>(null);
+  const [msgChannel, setMsgChannel] = useState<MessageChannel>("sms");
+  const [msgPurpose, setMsgPurpose] = useState<MessagePurpose>("follow_up");
 
   const { data: quote, isLoading } = useQuery<any>({
     queryKey: [`/api/quotes/${id}`],
   });
 
-  const { data: recommendations } = useQuery<any>({
+  const { data: recommendations } = useQuery<any[]>({
     queryKey: [`/api/quotes/${id}/recommendations`],
     enabled: !!quote,
+  });
+
+  const { data: calendarEvents } = useQuery<any[]>({
+    queryKey: [`/api/calendar-events/quote/${id}`],
+    enabled: !!quote,
+  });
+
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/settings"],
   });
 
   const statusMutation = useMutation({
@@ -70,6 +103,23 @@ export default function QuoteDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
       navigate("/quotes");
+    },
+  });
+
+  const depositMutation = useMutation({
+    mutationFn: (data: { depositRequired: boolean; depositAmount: number; depositPaid?: boolean }) =>
+      apiPut(`/api/quotes/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
+      setDepositEditing(false);
+    },
+  });
+
+  const recMutation = useMutation({
+    mutationFn: ({ recId, status }: { recId: number; status: string }) =>
+      apiPut(`/api/recommendations/${recId}`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}/recommendations`] });
     },
   });
 
@@ -121,36 +171,72 @@ export default function QuoteDetailPage() {
     window.open(pdfUrl, "_blank");
   };
 
-  const generateFollowUp = async () => {
-    setAiLoading(true);
+  const generateDraft = async (purpose: MessagePurpose, channel: MessageChannel) => {
+    const key = `${purpose}_${channel}`;
+    setAiDraftLoading(key);
     try {
-      const res = await apiPost(`/api/ai/generate-followup`, {
+      const res = await apiPost(`/api/ai/generate-message`, {
+        context: "quote",
+        purpose,
+        channel,
         quoteId: id,
         customerName: quote.customerName,
         total: quote.total,
         status: quote.status,
       });
-      setAiFollowUp((res as any).message || (res as any).followUp || "");
+      setAiDrafts((prev) => ({ ...prev, [key]: (res as any).message || "" }));
     } catch {
-      setAiFollowUp("Unable to generate follow-up at this time.");
+      setAiDrafts((prev) => ({ ...prev, [key]: "Unable to generate message." }));
     }
-    setAiLoading(false);
+    setAiDraftLoading(null);
   };
 
-  const generateMessage = async () => {
-    setAiMsgLoading(true);
+  const generateInvoicePacket = async () => {
+    setInvoiceLoading(true);
     try {
-      const res = await apiPost(`/api/ai/generate-message`, {
-        context: "quote",
-        quoteId: id,
-        customerName: quote.customerName,
-        total: quote.total,
+      await apiPost(`/api/quotes/${id}/invoice-packet`, {});
+      queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
+    } catch {}
+    setInvoiceLoading(false);
+  };
+
+  const createCalendarEvent = async () => {
+    setCalendarLoading(true);
+    try {
+      const res = await apiPost(`/api/quotes/${id}/calendar-event`, {
+        title: `Cleaning - ${quote.customerName}`,
+        description: `Quote #${id} - $${Number(quote.total || 0).toLocaleString()}`,
+        location: details.customerAddress || "",
+        startDate: new Date(Date.now() + 86400000).toISOString(),
+        durationMinutes: 120,
       });
-      setAiMessage((res as any).message || "");
-    } catch {
-      setAiMessage("Unable to generate message.");
-    }
-    setAiMsgLoading(false);
+      const result = res as any;
+      if (result.icsContent) {
+        const blob = new Blob([result.icsContent], { type: "text/calendar" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `cleaning-${quote.customerName?.replace(/\s+/g, "-")}.ics`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      if (result.googleCalendarUrl) {
+        window.open(result.googleCalendarUrl, "_blank");
+      }
+      queryClient.invalidateQueries({ queryKey: [`/api/calendar-events/quote/${id}`] });
+    } catch {}
+    setCalendarLoading(false);
+  };
+
+  const sendReviewRequest = async () => {
+    try {
+      await apiPost(`/api/review-requests`, {
+        quoteId: Number(id),
+        customerName: quote.customerName,
+        customerEmail: quote.customerEmail,
+        customerPhone: quote.customerPhone,
+      });
+    } catch {}
   };
 
   const syncJobber = async () => {
@@ -201,6 +287,86 @@ export default function QuoteDetailPage() {
     ? Math.floor((Date.now() - new Date(quote.sentAt).getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
+  const statusOrder = ["draft", "sent", "viewed", "accepted"];
+  const currentStatusIndex = statusOrder.indexOf(quote.status);
+
+  const timelineItems = [
+    {
+      icon: FileText,
+      title: "Created",
+      time: new Date(quote.createdAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      active: true,
+      iconBg: "bg-slate-100",
+      iconColor: "text-slate-600",
+    },
+    {
+      icon: Send,
+      title: "Sent",
+      time: quote.sentAt
+        ? new Date(quote.sentAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })
+        : undefined,
+      active: currentStatusIndex >= 1,
+      iconBg: "bg-blue-100",
+      iconColor: "text-blue-600",
+    },
+    {
+      icon: Eye,
+      title: "Viewed",
+      time: quote.viewedAt
+        ? new Date(quote.viewedAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })
+        : undefined,
+      active: currentStatusIndex >= 2,
+      iconBg: "bg-violet-100",
+      iconColor: "text-violet-600",
+    },
+    {
+      icon: CheckCircle,
+      title: quote.status === "declined" ? "Declined" : "Accepted",
+      time: quote.acceptedAt
+        ? new Date(quote.acceptedAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })
+        : undefined,
+      active: currentStatusIndex >= 3 || quote.status === "declined",
+      iconBg: quote.status === "declined" ? "bg-red-100" : "bg-emerald-100",
+      iconColor: quote.status === "declined" ? "text-red-600" : "text-emerald-600",
+    },
+  ];
+
+  const messagePurposes: Array<{ value: MessagePurpose; label: string; icon: typeof Send }> = [
+    { value: "follow_up", label: "Follow Up", icon: MessageSquare },
+    { value: "thank_you", label: "Thank You", icon: Star },
+    { value: "reminder", label: "Reminder", icon: Clock },
+    { value: "upsell", label: "Upsell", icon: TrendingUp },
+    { value: "review_request", label: "Review Ask", icon: Star },
+    { value: "payment_failed", label: "Payment Issue", icon: CreditCard },
+  ];
+
+  const venmoHandle = settings?.venmoHandle;
+  const cashAppTag = settings?.cashAppTag;
+  const googleReviewUrl = settings?.googleReviewUrl;
+  const referralAmount = settings?.referralOfferAmount;
+
+  const currentDraftKey = `${msgPurpose}_${msgChannel}`;
+
   return (
     <div>
       <PageHeader
@@ -231,7 +397,7 @@ export default function QuoteDetailPage() {
         }
       />
 
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
         <Badge status={quote.status} dot />
         <span className="text-sm text-slate-500">
           Created {new Date(quote.createdAt).toLocaleDateString()}
@@ -248,6 +414,11 @@ export default function QuoteDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader title="Activity Timeline" icon={Clock} />
+            <Timeline items={timelineItems} />
+          </Card>
+
           {propertyRows.length > 0 ? (
             <Card>
               <CardHeader title="Property Details" icon={Home} />
@@ -387,61 +558,135 @@ export default function QuoteDetailPage() {
             </Card>
           ) : null}
 
+          {recommendations && recommendations.length > 0 ? (
+            <Card>
+              <CardHeader title="AI Revenue Playbook" icon={Lightbulb} badge={<Badge status="pro" label={`${recommendations.length} plays`} size="sm" />} />
+              <div className="space-y-3">
+                {recommendations.map((rec: any, i: number) => (
+                  <div key={rec.id || i} className={`rounded-xl border transition-all ${rec.status === "done" ? "border-emerald-200 bg-emerald-50/30" : rec.status === "dismissed" ? "border-slate-100 bg-slate-50/50 opacity-60" : "border-slate-200 hover:border-primary-200"}`}>
+                    <button
+                      onClick={() => setExpandedRec(expandedRec === i ? null : i)}
+                      className="w-full flex items-center justify-between p-4 text-left"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${rec.status === "done" ? "bg-emerald-100 text-emerald-600" : "bg-primary-50 text-primary-600"}`}>
+                          <Zap className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-900 truncate">{rec.title}</p>
+                          <p className="text-xs text-slate-500">{rec.type?.replace(/_/g, " ")}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {rec.status ? <Badge status={rec.status} size="sm" /> : null}
+                        {expandedRec === i ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                      </div>
+                    </button>
+                    {expandedRec === i ? (
+                      <div className="px-4 pb-4 space-y-3">
+                        <p className="text-sm text-slate-600">{rec.rationale || rec.description}</p>
+                        {rec.suggestedDate ? (
+                          <p className="text-xs text-slate-400">
+                            Suggested: {new Date(rec.suggestedDate).toLocaleDateString()}
+                          </p>
+                        ) : null}
+                        {rec.status !== "done" && rec.status !== "dismissed" ? (
+                          <div className="flex gap-2">
+                            <Button
+                              size="xs"
+                              variant="success"
+                              icon={CheckCircle}
+                              onClick={() => recMutation.mutate({ recId: rec.id, status: "done" })}
+                            >
+                              Done
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              icon={XCircle}
+                              onClick={() => recMutation.mutate({ recId: rec.id, status: "dismissed" })}
+                            >
+                              Dismiss
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader title="AI Communications" icon={Sparkles} />
             <div className="space-y-4">
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  icon={MessageSquare}
-                  onClick={generateFollowUp}
-                  loading={aiLoading}
-                  size="sm"
-                >
-                  Generate Follow-up
-                </Button>
-                <Button
-                  variant="secondary"
-                  icon={Sparkles}
-                  onClick={generateMessage}
-                  loading={aiMsgLoading}
-                  size="sm"
-                >
-                  Draft Message
-                </Button>
-              </div>
-              {aiFollowUp ? (
-                <div className="bg-blue-50 rounded-xl p-4">
-                  <p className="text-xs font-medium text-blue-700 mb-1">
-                    AI Follow-up
-                  </p>
-                  <p className="text-sm text-blue-900 whitespace-pre-wrap">
-                    {aiFollowUp}
-                  </p>
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="inline-flex items-center bg-slate-100 rounded-lg p-0.5">
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(aiFollowUp);
-                    }}
-                    className="text-xs text-blue-600 font-medium mt-2 hover:text-blue-800"
+                    onClick={() => setMsgChannel("sms")}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      msgChannel === "sms" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                    }`}
                   >
-                    Copy to clipboard
+                    <Phone className="w-3 h-3" />
+                    SMS
+                  </button>
+                  <button
+                    onClick={() => setMsgChannel("email")}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      msgChannel === "email" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
+                    }`}
+                  >
+                    <Mail className="w-3 h-3" />
+                    Email
                   </button>
                 </div>
-              ) : null}
-              {aiMessage ? (
-                <div className="bg-violet-50 rounded-xl p-4">
-                  <p className="text-xs font-medium text-violet-700 mb-1">
-                    AI Draft
-                  </p>
-                  <p className="text-sm text-violet-900 whitespace-pre-wrap">
-                    {aiMessage}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {messagePurposes.map((mp) => (
+                  <button
+                    key={mp.value}
+                    onClick={() => setMsgPurpose(mp.value)}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      msgPurpose === mp.value
+                        ? "bg-primary-50 text-primary-700 ring-1 ring-primary-200"
+                        : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <mp.icon className="w-3 h-3" />
+                    {mp.label}
+                  </button>
+                ))}
+              </div>
+
+              <Button
+                variant="secondary"
+                icon={Sparkles}
+                onClick={() => generateDraft(msgPurpose, msgChannel)}
+                loading={aiDraftLoading === currentDraftKey}
+                size="sm"
+              >
+                Generate {messagePurposes.find((m) => m.value === msgPurpose)?.label} ({msgChannel.toUpperCase()})
+              </Button>
+
+              {aiDrafts[currentDraftKey] ? (
+                <div className="bg-gradient-to-br from-violet-50 to-blue-50 rounded-xl p-4 border border-violet-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-600" />
+                    <p className="text-xs font-semibold text-violet-700">
+                      AI {msgChannel === "email" ? "Email" : "SMS"} Draft
+                    </p>
+                  </div>
+                  <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                    {aiDrafts[currentDraftKey]}
                   </p>
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(aiMessage);
-                    }}
-                    className="text-xs text-violet-600 font-medium mt-2 hover:text-violet-800"
+                    onClick={() => navigator.clipboard.writeText(aiDrafts[currentDraftKey])}
+                    className="text-xs text-violet-600 font-medium mt-3 hover:text-violet-800 flex items-center gap-1"
                   >
+                    <Copy className="w-3 h-3" />
                     Copy to clipboard
                   </button>
                 </div>
@@ -466,19 +711,149 @@ export default function QuoteDetailPage() {
                   Expires {new Date(quote.expiresAt).toLocaleDateString()}
                 </div>
               ) : null}
-              {quote.depositRequired ? (
-                <div className="pt-2 border-t border-slate-100">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Deposit</span>
-                    <span className="font-medium text-slate-900">
-                      ${Number(quote.depositAmount || 0).toLocaleString()}
-                    </span>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader
+              title="Deposit"
+              icon={DollarSign}
+              actions={
+                !depositEditing ? (
+                  <button
+                    onClick={() => {
+                      setDepositRequired(!!quote.depositRequired);
+                      setDepositAmount(String(quote.depositAmount || ""));
+                      setDepositEditing(true);
+                    }}
+                    className="text-xs text-primary-600 font-medium hover:text-primary-700"
+                  >
+                    Edit
+                  </button>
+                ) : null
+              }
+            />
+            {depositEditing ? (
+              <div className="space-y-3">
+                <Toggle
+                  checked={depositRequired}
+                  onChange={setDepositRequired}
+                  label="Require deposit"
+                  description="Customer pays upfront before service"
+                />
+                {depositRequired ? (
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1 block">Amount ($)</label>
+                    <input
+                      type="number"
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                      className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                      placeholder="50"
+                    />
                   </div>
-                  <Badge
-                    status={quote.depositPaid ? "accepted" : "sent"}
-                    label={quote.depositPaid ? "Paid" : "Pending"}
-                  />
+                ) : null}
+                <div className="flex gap-2">
+                  <Button
+                    size="xs"
+                    onClick={() =>
+                      depositMutation.mutate({
+                        depositRequired,
+                        depositAmount: Number(depositAmount) || 0,
+                      })
+                    }
+                    loading={depositMutation.isPending}
+                  >
+                    Save
+                  </Button>
+                  <Button size="xs" variant="ghost" onClick={() => setDepositEditing(false)}>
+                    Cancel
+                  </Button>
                 </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {quote.depositRequired ? (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-500">Deposit</span>
+                      <span className="text-sm font-semibold text-slate-900">
+                        ${Number(quote.depositAmount || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-500">Status</span>
+                      <Badge
+                        status={quote.depositPaid ? "accepted" : "pending"}
+                        label={quote.depositPaid ? "Paid" : "Pending"}
+                        size="sm"
+                      />
+                    </div>
+                    {!quote.depositPaid ? (
+                      <Button
+                        size="xs"
+                        variant="success"
+                        icon={CheckCircle}
+                        className="w-full mt-2"
+                        onClick={() =>
+                          depositMutation.mutate({
+                            depositRequired: true,
+                            depositAmount: Number(quote.depositAmount || 0),
+                            depositPaid: true,
+                          })
+                        }
+                        loading={depositMutation.isPending}
+                      >
+                        Mark as Paid
+                      </Button>
+                    ) : null}
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                      <span className="text-sm text-slate-500">Balance Due</span>
+                      <span className="text-sm font-semibold text-slate-900">
+                        ${Math.max(0, Number(quote.total || 0) - Number(quote.depositAmount || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-400">No deposit required</p>
+                )}
+              </div>
+            )}
+          </Card>
+
+          <Card>
+            <CardHeader title="Payment Links" icon={CreditCard} />
+            <div className="space-y-2">
+              <Button
+                variant="secondary"
+                icon={CreditCard}
+                onClick={() => window.open(quoteUrl, "_blank")}
+                className="w-full justify-start"
+                size="sm"
+              >
+                Stripe Checkout
+              </Button>
+              {venmoHandle ? (
+                <Button
+                  variant="secondary"
+                  icon={DollarSign}
+                  onClick={() => window.open(`https://venmo.com/${venmoHandle}?txn=pay&amount=${quote.depositRequired ? quote.depositAmount : quote.total}`, "_blank")}
+                  className="w-full justify-start"
+                  size="sm"
+                >
+                  Venmo ({venmoHandle})
+                </Button>
+              ) : null}
+              {cashAppTag ? (
+                <Button
+                  variant="secondary"
+                  icon={DollarSign}
+                  onClick={() => window.open(`https://cash.app/${cashAppTag}/${quote.depositRequired ? quote.depositAmount : quote.total}`, "_blank")}
+                  className="w-full justify-start"
+                  size="sm"
+                >
+                  Cash App ({cashAppTag})
+                </Button>
               ) : null}
             </div>
           </Card>
@@ -529,6 +904,16 @@ export default function QuoteDetailPage() {
                 Download PDF
               </Button>
               <Button
+                variant="secondary"
+                icon={Receipt}
+                onClick={generateInvoicePacket}
+                loading={invoiceLoading}
+                className="w-full justify-start"
+                size="sm"
+              >
+                Generate Invoice Packet
+              </Button>
+              <Button
                 variant="ghost"
                 icon={Trash2}
                 onClick={() => setDeleteOpen(true)}
@@ -537,6 +922,82 @@ export default function QuoteDetailPage() {
               >
                 Delete Quote
               </Button>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Calendar" icon={Calendar} />
+            <div className="space-y-2">
+              <Button
+                variant="secondary"
+                icon={Calendar}
+                onClick={createCalendarEvent}
+                loading={calendarLoading}
+                className="w-full justify-start"
+                size="sm"
+              >
+                Add to Calendar
+              </Button>
+              {calendarEvents && calendarEvents.length > 0 ? (
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-xs text-slate-400 mb-2">Scheduled events</p>
+                  {calendarEvents.map((ev: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 py-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-xs text-slate-600 truncate">{ev.title}</span>
+                      {ev.startDate ? (
+                        <span className="text-xs text-slate-400 shrink-0">
+                          {new Date(ev.startDate).toLocaleDateString()}
+                        </span>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Reviews & Referrals" icon={Star} />
+            <div className="space-y-2">
+              {quote.status === "accepted" ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    icon={Star}
+                    onClick={sendReviewRequest}
+                    className="w-full justify-start"
+                    size="sm"
+                  >
+                    Request Review
+                  </Button>
+                  {googleReviewUrl ? (
+                    <Button
+                      variant="ghost"
+                      icon={ExternalLink}
+                      onClick={() => window.open(googleReviewUrl, "_blank")}
+                      className="w-full justify-start"
+                      size="sm"
+                    >
+                      Google Review Link
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant="secondary"
+                    icon={Gift}
+                    onClick={() => {
+                      const msg = `Thanks for choosing us! Refer a friend and ${referralAmount ? `get $${referralAmount} off` : "earn a discount on"} your next clean.`;
+                      navigator.clipboard.writeText(msg);
+                    }}
+                    className="w-full justify-start"
+                    size="sm"
+                  >
+                    Copy Referral Offer
+                  </Button>
+                </>
+              ) : (
+                <p className="text-xs text-slate-400">Available after quote is accepted</p>
+              )}
             </div>
           </Card>
 

@@ -37,6 +37,7 @@ const navSections = [
   {
     label: "Grow",
     items: [
+      { to: "/growth", label: "Growth Hub", icon: TrendingUp },
       { to: "/follow-ups", label: "Follow-ups", icon: Bell },
       { to: "/opportunities", label: "Opportunities", icon: Target },
     ],
