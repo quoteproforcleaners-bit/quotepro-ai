@@ -187,6 +187,7 @@ import {
 declare module "express-session" {
   interface SessionData {
     userId: string;
+    appleOAuthState?: string;
   }
 }
 
@@ -423,6 +424,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Login error:", error);
       return res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.get("/api/auth/apple/start", async (req: Request, res: Response) => {
+    try {
+      const clientId = process.env.APPLE_SERVICE_ID;
+      if (!clientId) {
+        return res.status(500).json({ message: "Apple Sign In not configured for web" });
+      }
+      const baseUrl = getPublicBaseUrl(req);
+      const redirectUri = `${baseUrl}/api/auth/apple/callback`;
+      const state = crypto.randomBytes(32).toString("hex");
+      req.session.appleOAuthState = state;
+      await new Promise<void>((resolve) => req.session.save(() => resolve()));
+      const url = `https://appleid.apple.com/auth/authorize?` +
+        `client_id=${encodeURIComponent(clientId)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&response_type=code%20id_token` +
+        `&scope=name%20email` +
+        `&response_mode=form_post` +
+        `&state=${encodeURIComponent(state)}`;
+      return res.json({ url });
+    } catch (error: any) {
+      console.error("Apple auth start error:", error);
+      return res.status(500).json({ message: "Failed to start Apple sign-in" });
+    }
+  });
+
+  app.post("/api/auth/apple/callback", async (req: Request, res: Response) => {
+    try {
+      const { id_token, user: userJson, state } = req.body;
+
+      const expectedState = req.session.appleOAuthState;
+      if (!state || !expectedState || state !== expectedState) {
+        console.error("Apple callback: state mismatch");
+        return res.redirect("/app/login?error=apple_failed");
+      }
+      delete req.session.appleOAuthState;
+
+      if (!id_token) {
+        return res.redirect("/app/login?error=apple_failed");
+      }
+
+      const parts = id_token.split(".");
+      if (parts.length !== 3) {
+        return res.redirect("/app/login?error=apple_failed");
+      }
+
+      let payload: any;
+      try {
+        payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf8"));
+      } catch {
+        return res.redirect("/app/login?error=apple_failed");
+      }
+
+      if (payload.iss !== "https://appleid.apple.com") {
+        console.error("Apple callback: invalid issuer", payload.iss);
+        return res.redirect("/app/login?error=apple_failed");
+      }
+      const clientId = process.env.APPLE_SERVICE_ID;
+      if (payload.aud !== clientId) {
+        console.error("Apple callback: audience mismatch", payload.aud, clientId);
+        return res.redirect("/app/login?error=apple_failed");
+      }
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        console.error("Apple callback: token expired");
+        return res.redirect("/app/login?error=apple_failed");
+      }
+
+      const email = payload.email;
+      const providerId = payload.sub;
+      if (!email || !providerId) {
+        return res.redirect("/app/login?error=apple_failed");
+      }
+
+      let parsedUser: any = null;
+      if (userJson) {
+        try { parsedUser = typeof userJson === "string" ? JSON.parse(userJson) : userJson; } catch {}
+      }
+      const name = parsedUser?.name
+        ? `${parsedUser.name.firstName || ""} ${parsedUser.name.lastName || ""}`.trim()
+        : undefined;
+
+      let user = await getUserByProviderId("apple", providerId);
+      if (!user) {
+        user = await getUserByEmail(email);
+        if (user) {
+          return res.redirect("/app/login?error=account_exists");
+        }
+        user = await createUser({ email, name, authProvider: "apple", providerId });
+        await createBusiness(user.id);
+      }
+
+      req.session.userId = user.id;
+      return new Promise<void>((resolve) => {
+        req.session.save(() => {
+          res.redirect("/app/dashboard");
+          resolve();
+        });
+      });
+    } catch (error: any) {
+      console.error("Apple callback error:", error);
+      return res.redirect("/app/login?error=apple_failed");
     }
   });
 

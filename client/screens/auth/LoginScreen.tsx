@@ -212,13 +212,15 @@ export default function LoginScreen() {
         ) : null}
 
         {Platform.OS === "ios" ? (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-            cornerRadius={BorderRadius.lg}
-            style={styles.appleButton}
-            onPress={handleAppleSignIn}
-          />
+          <View style={[styles.appleButtonContainer, { borderColor: theme.border }]}>
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={BorderRadius.lg - 1}
+              style={styles.appleButton}
+              onPress={handleAppleSignIn}
+            />
+          </View>
         ) : null}
 
         <Pressable
@@ -343,10 +345,16 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.sm,
   },
+  appleButtonContainer: {
+    width: "100%",
+    borderWidth: 1,
+    borderRadius: BorderRadius.lg,
+    overflow: "hidden",
+    marginBottom: Spacing.sm,
+  },
   appleButton: {
     width: "100%",
     height: 48,
-    marginBottom: Spacing.sm,
   },
   googleButton: {
     width: "100%",
