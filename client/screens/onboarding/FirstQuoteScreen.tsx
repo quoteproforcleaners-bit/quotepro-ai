@@ -207,7 +207,7 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
             <Feather name="minus" size={18} color={num <= min ? theme.textSecondary + "40" : theme.text} />
           </Pressable>
           <View style={styles.stepperValue}>
-            <ThemedText type="h3">{num}</ThemedText>
+            <ThemedText style={{ fontSize: 18, fontWeight: "700" }}>{num}</ThemedText>
           </View>
           <Pressable
             onPress={() => {
@@ -604,16 +604,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   compactStepperBtn: {
-    width: 44,
+    width: 40,
     alignItems: "center",
     justifyContent: "center",
   },
   stepperValue: {
     flex: 1,
+    minWidth: 36,
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    gap: Spacing.xs,
   },
   twoCol: { flexDirection: "row", gap: Spacing.md },
   typeGrid: { gap: Spacing.sm },
