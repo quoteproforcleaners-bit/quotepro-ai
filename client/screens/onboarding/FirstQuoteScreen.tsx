@@ -192,7 +192,7 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
   }) => {
     const num = parseInt(value) || min;
     return (
-      <View style={[styles.stepperContainer, { flex: 1 }]}>
+      <View style={styles.stepperContainer}>
         <ThemedText type="subtitle" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
           {label}
         </ThemedText>
@@ -202,21 +202,21 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
               if (num > min) onValueChange(String(num - 1));
               if (Platform.OS !== "web") Haptics.selectionAsync();
             }}
-            style={[styles.compactStepperBtn, { borderRightWidth: 1, borderColor: theme.border }]}
+            style={[styles.stepperBtn, { borderRightWidth: 1, borderColor: theme.border }]}
           >
-            <Feather name="minus" size={18} color={num <= min ? theme.textSecondary + "40" : theme.text} />
+            <Feather name="minus" size={20} color={num <= min ? theme.textSecondary + "40" : theme.text} />
           </Pressable>
           <View style={styles.stepperValue}>
-            <ThemedText style={{ fontSize: 18, fontWeight: "700" }}>{num}</ThemedText>
+            <ThemedText type="h3">{num}</ThemedText>
           </View>
           <Pressable
             onPress={() => {
               if (num < max) onValueChange(String(num + 1));
               if (Platform.OS !== "web") Haptics.selectionAsync();
             }}
-            style={[styles.compactStepperBtn, { borderLeftWidth: 1, borderColor: theme.border }]}
+            style={[styles.stepperBtn, { borderLeftWidth: 1, borderColor: theme.border }]}
           >
-            <Feather name="plus" size={18} color={num >= max ? theme.textSecondary + "40" : theme.text} />
+            <Feather name="plus" size={20} color={num >= max ? theme.textSecondary + "40" : theme.text} />
           </Pressable>
         </View>
       </View>
@@ -354,10 +354,8 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
 
             <SqftStepper />
 
-            <View style={styles.twoCol}>
-              <NumberStepper value={beds} onValueChange={setBeds} min={1} max={10} label="Bedrooms" />
-              <NumberStepper value={baths} onValueChange={setBaths} min={1} max={10} label="Bathrooms" />
-            </View>
+            <NumberStepper value={beds} onValueChange={setBeds} min={1} max={10} label="Bedrooms" />
+            <NumberStepper value={baths} onValueChange={setBaths} min={1} max={10} label="Bathrooms" />
 
             <ThemedText type="subtitle" style={{ color: theme.textSecondary, marginBottom: Spacing.sm, marginTop: Spacing.lg }}>
               Cleaning Type
