@@ -192,7 +192,7 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
   }) => {
     const num = parseInt(value) || min;
     return (
-      <View style={styles.stepperContainer}>
+      <View style={[styles.stepperContainer, { flex: 1 }]}>
         <ThemedText type="subtitle" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
           {label}
         </ThemedText>
@@ -202,9 +202,9 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
               if (num > min) onValueChange(String(num - 1));
               if (Platform.OS !== "web") Haptics.selectionAsync();
             }}
-            style={[styles.stepperBtn, { borderRightWidth: 1, borderColor: theme.border }]}
+            style={[styles.compactStepperBtn, { borderRightWidth: 1, borderColor: theme.border }]}
           >
-            <Feather name="minus" size={20} color={num <= min ? theme.textSecondary + "40" : theme.text} />
+            <Feather name="minus" size={18} color={num <= min ? theme.textSecondary + "40" : theme.text} />
           </Pressable>
           <View style={styles.stepperValue}>
             <ThemedText type="h3">{num}</ThemedText>
@@ -214,9 +214,9 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
               if (num < max) onValueChange(String(num + 1));
               if (Platform.OS !== "web") Haptics.selectionAsync();
             }}
-            style={[styles.stepperBtn, { borderLeftWidth: 1, borderColor: theme.border }]}
+            style={[styles.compactStepperBtn, { borderLeftWidth: 1, borderColor: theme.border }]}
           >
-            <Feather name="plus" size={20} color={num >= max ? theme.textSecondary + "40" : theme.text} />
+            <Feather name="plus" size={18} color={num >= max ? theme.textSecondary + "40" : theme.text} />
           </Pressable>
         </View>
       </View>
@@ -600,6 +600,11 @@ const styles = StyleSheet.create({
   },
   stepperBtn: {
     width: 56,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  compactStepperBtn: {
+    width: 44,
     alignItems: "center",
     justifyContent: "center",
   },
