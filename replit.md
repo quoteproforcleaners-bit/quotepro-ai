@@ -259,7 +259,23 @@ QuotePro also has a full web app served at `/app` from the Express backend, coex
 - `/app/opportunities` — Dormant customers, lost quotes, growth tasks
 - `/app/ai-assistant` — Chat interface for AI sales assistant
 - `/app/walkthrough-ai` — Paste notes → AI extraction → create quote
-- `/app/settings` — 9 tabs: Business (profile+pricing+service types+frequency discounts), Branding (sender name/title/booking link/signatures), Payments (Venmo/CashApp/accepted methods), Automations (daily pulse/weekly recap/quiet hours/dormant threshold), Reviews (Google review URL/PDF toggle/referral settings), Features (commercial quoting/language), Integrations (Stripe/QBO/Jobber/Google Calendar), Account (details/subscription/sign out/delete), Developer (API keys/webhooks)
+- `/app/upgrade` — Paywall page with Pro plan benefits, pricing ($19.99/mo), 7-day trial, Stripe Checkout integration, testimonials
+- `/app/subscription/success` — Post-checkout verification and welcome screen
+- `/app/settings` — 9 tabs: Business (profile+pricing+service types+frequency discounts+add-on pricing), Branding (sender name/title/booking link/signatures), Payments (Venmo/CashApp/accepted methods), Automations (daily pulse/weekly recap/quiet hours/dormant threshold), Reviews (Google review URL/PDF toggle/referral settings), Features (commercial quoting/language), Integrations (Stripe/QBO/Jobber/Google Calendar with connect/disconnect buttons), Account (details/subscription with upgrade/manage/Pro status+sign out/delete), Developer (API keys/webhooks)
+
+**Subscription & Paywall**:
+- Free tier: 3 quotes, basic features
+- Pro tier ($19.99/mo): Unlimited quotes, CRM, Jobs, Growth Hub, AI tools, Opportunities
+- Stripe Checkout for web subscriptions, RevenueCat for iOS
+- Feature gating: Client-side ProGate component wraps protected routes
+- Backend endpoints: `/api/subscription/create-checkout`, `/api/subscription/verify-session`, `/api/subscription/create-portal`, `/api/subscription/webhook`
+- Stripe webhook handles checkout.session.completed, customer.subscription.deleted/updated
+
+**Integrations (Settings)**:
+- Stripe Connect: POST `/api/stripe/connect` → opens Stripe onboarding; DELETE `/api/stripe/disconnect`
+- QuickBooks Online: GET `/api/integrations/qbo/connect` → OAuth redirect; POST `/api/integrations/qbo/disconnect`
+- Jobber: GET `/api/integrations/jobber/connect` → OAuth redirect; POST `/api/integrations/jobber/disconnect`
+- Google Calendar: GET `/api/google-calendar/connect` → OAuth redirect; DELETE `/api/google-calendar/disconnect`
 
 **Build**: Run `npx vite build web/` to rebuild. Output goes to `web/dist/`. Express serves it automatically on restart.
 

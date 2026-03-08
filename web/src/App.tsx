@@ -1,9 +1,12 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./lib/auth";
+import { SubscriptionProvider } from "./lib/subscription";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ProGate } from "./components/ProGate";
 import { Layout } from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import PaywallPage from "./pages/PaywallPage";
 import DashboardPage from "./pages/DashboardPage";
 import QuotesListPage from "./pages/QuotesListPage";
 import QuoteDetailPage from "./pages/QuoteDetailPage";
@@ -32,49 +35,57 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          isAuthenticated ? (
-            <Navigate to="/dashboard" replace />
-          ) : (
-            <RegisterPage />
-          )
-        }
-      />
+    <SubscriptionProvider>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <RegisterPage />
+            )
+          }
+        />
+        <Route path="/upgrade" element={
+          isAuthenticated ? <PaywallPage /> : <Navigate to="/login" replace />
+        } />
+        <Route path="/subscription/success" element={
+          isAuthenticated ? <PaywallPage /> : <Navigate to="/login" replace />
+        } />
 
-      <Route
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/quotes" element={<QuotesListPage />} />
-        <Route path="/quotes/new" element={<QuoteCreatePage />} />
-        <Route path="/quotes/:id" element={<QuoteDetailPage />} />
-        <Route path="/customers" element={<CustomersListPage />} />
-        <Route path="/customers/new" element={<CustomerCreatePage />} />
-        <Route path="/customers/:id" element={<CustomerDetailPage />} />
-        <Route path="/jobs" element={<JobsPage />} />
-        <Route path="/jobs/:id" element={<JobDetailPage />} />
-        <Route path="/growth" element={<GrowthDashboardPage />} />
-        <Route path="/follow-ups" element={<FollowUpsPage />} />
-        <Route path="/opportunities" element={<OpportunitiesPage />} />
-        <Route path="/ai-assistant" element={<AIAssistantPage />} />
-        <Route path="/walkthrough-ai" element={<WalkthroughAIPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-      </Route>
+        <Route
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/quotes" element={<QuotesListPage />} />
+          <Route path="/quotes/new" element={<QuoteCreatePage />} />
+          <Route path="/quotes/:id" element={<QuoteDetailPage />} />
+          <Route path="/customers" element={<ProGate feature="Customer Management"><CustomersListPage /></ProGate>} />
+          <Route path="/customers/new" element={<ProGate feature="Customer Management"><CustomerCreatePage /></ProGate>} />
+          <Route path="/customers/:id" element={<ProGate feature="Customer Management"><CustomerDetailPage /></ProGate>} />
+          <Route path="/jobs" element={<ProGate feature="Job Management"><JobsPage /></ProGate>} />
+          <Route path="/jobs/:id" element={<ProGate feature="Job Management"><JobDetailPage /></ProGate>} />
+          <Route path="/growth" element={<ProGate feature="Growth Dashboard"><GrowthDashboardPage /></ProGate>} />
+          <Route path="/follow-ups" element={<FollowUpsPage />} />
+          <Route path="/opportunities" element={<ProGate feature="Opportunities"><OpportunitiesPage /></ProGate>} />
+          <Route path="/ai-assistant" element={<ProGate feature="AI Sales Assistant"><AIAssistantPage /></ProGate>} />
+          <Route path="/walkthrough-ai" element={<WalkthroughAIPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </SubscriptionProvider>
   );
 }

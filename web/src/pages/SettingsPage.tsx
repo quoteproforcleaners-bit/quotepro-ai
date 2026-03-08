@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "../lib/auth";
+import { useSubscription } from "../lib/subscription";
 import { apiPut, apiPost, apiGet, apiDelete } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import {
@@ -60,28 +61,78 @@ function IntegrationCard({
   icon: Icon,
   statusUrl,
   connectUrl,
-  onConnect,
-  onDisconnect,
+  disconnectUrl,
+  connectMethod = "POST",
+  disconnectMethod = "POST",
+  color = "slate",
 }: {
   name: string;
   description: string;
   icon: any;
   statusUrl: string;
   connectUrl?: string;
-  onConnect?: () => void;
-  onDisconnect?: () => void;
+  disconnectUrl?: string;
+  connectMethod?: string;
+  disconnectMethod?: string;
+  color?: string;
 }) {
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, refetch } = useQuery<any>({
     queryKey: [statusUrl],
     retry: false,
   });
   const connected = data?.connected || data?.status === "connected";
+  const [loading, setLoading] = useState(false);
+
+  const handleConnect = async () => {
+    if (!connectUrl) return;
+    setLoading(true);
+    try {
+      if (connectMethod === "GET") {
+        window.location.href = connectUrl;
+        return;
+      }
+      const res: any = await apiPost(connectUrl);
+      if (res.url) {
+        window.open(res.url, "_blank");
+      }
+      setTimeout(() => refetch(), 3000);
+    } catch (err) {
+      console.error("Connect error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!disconnectUrl) return;
+    setLoading(true);
+    try {
+      if (disconnectMethod === "DELETE") {
+        await apiDelete(disconnectUrl);
+      } else {
+        await apiPost(disconnectUrl);
+      }
+      refetch();
+    } catch (err) {
+      console.error("Disconnect error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const colorMap: Record<string, string> = {
+    violet: "from-violet-500 to-violet-600",
+    blue: "from-blue-500 to-blue-600",
+    green: "from-emerald-500 to-emerald-600",
+    orange: "from-orange-500 to-orange-600",
+    slate: "from-slate-500 to-slate-600",
+  };
 
   return (
     <div className="flex items-center justify-between py-4 border-b border-slate-100 last:border-0">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center">
-          <Icon className="w-5 h-5 text-slate-500" />
+        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colorMap[color] || colorMap.slate} flex items-center justify-center shadow-sm`}>
+          <Icon className="w-5 h-5 text-white" />
         </div>
         <div>
           <h3 className="text-sm font-medium text-slate-900">{name}</h3>
@@ -91,12 +142,36 @@ function IntegrationCard({
       <div className="flex items-center gap-2">
         {isLoading ? (
           <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        ) : connected ? (
+          <>
+            <Badge status="accepted" label="Connected" dot />
+            {disconnectUrl ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDisconnect}
+                loading={loading}
+                className="text-red-500 hover:bg-red-50 text-xs"
+              >
+                Disconnect
+              </Button>
+            ) : null}
+          </>
         ) : (
-          <Badge
-            status={connected ? "accepted" : "draft"}
-            label={connected ? "Connected" : "Not connected"}
-            dot
-          />
+          <>
+            <Badge status="draft" label="Not connected" dot />
+            {connectUrl ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleConnect}
+                loading={loading}
+                className="text-xs"
+              >
+                Connect
+              </Button>
+            ) : null}
+          </>
         )}
       </div>
     </div>
@@ -163,6 +238,7 @@ const LANGUAGE_OPTIONS = [
 
 export default function SettingsPage() {
   const { user, business, logout, refresh } = useAuth();
+  const { isPro, startCheckout, openPortal, checkoutLoading } = useSubscription();
   const navigate = useNavigate();
   const [tab, setTab] = useState("business");
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -569,6 +645,49 @@ export default function SettingsPage() {
               </div>
             </Card>
           ) : null}
+
+          <Card>
+            <CardHeader title="Add-on Pricing" icon={Plus} />
+            <p className="text-xs text-slate-500 mb-4">Set default prices for add-on services included in quotes.</p>
+            <div className="space-y-3">
+              {[
+                { key: "insideFridge", label: "Inside Fridge" },
+                { key: "insideOven", label: "Inside Oven" },
+                { key: "insideWindows", label: "Inside Windows" },
+                { key: "insideCabinets", label: "Inside Cabinets" },
+                { key: "laundry", label: "Laundry" },
+                { key: "dishes", label: "Dishes" },
+                { key: "organizing", label: "Organizing" },
+                { key: "garage", label: "Garage" },
+                { key: "baseboards", label: "Baseboards" },
+                { key: "blinds", label: "Blinds" },
+                { key: "carpetCleaning", label: "Carpet Cleaning" },
+                { key: "wallWashing", label: "Wall Washing" },
+              ].map((addon) => (
+                <div key={addon.key} className="flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0">
+                  <span className="text-sm font-medium text-slate-700">{addon.label}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-slate-400">$</span>
+                    <input
+                      type="number"
+                      className="w-20 px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
+                      value={pricing?.addOnPrices?.[addon.key] || ""}
+                      placeholder="0"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        updatePricing.mutate({
+                          addOnPrices: {
+                            ...(pricing?.addOnPrices || {}),
+                            [addon.key]: val ? Number(val) : 0,
+                          },
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
         </div>
       ) : null}
 
@@ -991,33 +1110,59 @@ export default function SettingsPage() {
       ) : null}
 
       {tab === "integrations" ? (
-        <div className="max-w-2xl">
+        <div className="max-w-2xl space-y-6">
           <Card>
-            <CardHeader title="Connected Services" icon={Link2} />
+            <CardHeader title="Payment & Accounting" icon={CreditCard} />
             <IntegrationCard
               name="Stripe"
-              description="Accept online payments and process deposits"
+              description="Accept online payments, process deposits, and manage subscriptions"
               icon={CreditCard}
               statusUrl="/api/stripe/status"
+              connectUrl="/api/stripe/connect"
+              disconnectUrl="/api/stripe/disconnect"
+              disconnectMethod="DELETE"
+              color="violet"
             />
             <IntegrationCard
               name="QuickBooks Online"
               description="Auto-create invoices and sync financial data"
               icon={FileText}
               statusUrl="/api/integrations/qbo/status"
+              connectUrl="/api/integrations/qbo/connect"
+              connectMethod="GET"
+              disconnectUrl="/api/integrations/qbo/disconnect"
+              color="green"
             />
+          </Card>
+          <Card>
+            <CardHeader title="Operations & Scheduling" icon={Calendar} />
             <IntegrationCard
               name="Jobber"
               description="Sync jobs, clients, and schedules"
               icon={Zap}
               statusUrl="/api/integrations/jobber/status"
+              connectUrl="/api/integrations/jobber/connect"
+              connectMethod="GET"
+              disconnectUrl="/api/integrations/jobber/disconnect"
+              color="orange"
             />
             <IntegrationCard
               name="Google Calendar"
-              description="Sync jobs to your Google Calendar"
+              description="Sync jobs and appointments to your Google Calendar"
               icon={Calendar}
               statusUrl="/api/google-calendar/status"
+              connectUrl="/api/google-calendar/connect"
+              connectMethod="GET"
+              disconnectUrl="/api/google-calendar/disconnect"
+              disconnectMethod="DELETE"
+              color="blue"
             />
+          </Card>
+          <Card className="bg-slate-50 border-dashed border-slate-300">
+            <div className="text-center py-6">
+              <p className="text-sm text-slate-500 mb-1">More integrations coming soon</p>
+              <p className="text-xs text-slate-400">ServiceTitan, Housecall Pro, Square, and more</p>
+            </div>
           </Card>
         </div>
       ) : null}
@@ -1044,18 +1189,50 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader title="Subscription" icon={Zap} />
-            <div className="p-4 bg-primary-50 rounded-xl border border-primary-100">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-white" />
+            {isPro ? (
+              <div className="p-4 bg-gradient-to-br from-primary-50 to-violet-50 rounded-xl border border-primary-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center shadow-sm">
+                    <Zap className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">QuotePro AI Pro</span>
+                  <Badge status="accepted" label="Active" dot size="sm" />
                 </div>
-                <span className="text-sm font-semibold text-slate-900">QuotePro AI</span>
-                <Badge status="active" label="Active" dot size="sm" />
+                <p className="text-xs text-slate-500 mb-3">
+                  Full access to AI messaging, CRM, growth dashboard, and all Pro features.
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={openPortal}
+                >
+                  Manage Subscription
+                </Button>
               </div>
-              <p className="text-xs text-slate-500">
-                Full access to AI messaging, follow-up queue, PDF export, and all Pro features.
-              </p>
-            </div>
+            ) : (
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-slate-400 flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">Free Plan</span>
+                  <Badge status="draft" label="Limited" dot size="sm" />
+                </div>
+                <p className="text-xs text-slate-500 mb-3">
+                  3 quotes included. Upgrade for unlimited quotes, CRM, AI tools, and more.
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={Zap}
+                  onClick={startCheckout}
+                  loading={checkoutLoading}
+                  className="bg-gradient-to-r from-primary-600 to-primary-700"
+                >
+                  Upgrade to Pro - $19.99/mo
+                </Button>
+              </div>
+            )}
           </Card>
 
           <Card>

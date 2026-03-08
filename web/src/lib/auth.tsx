@@ -13,6 +13,8 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
+  subscriptionTier?: string;
+  name?: string;
 }
 
 interface Business {

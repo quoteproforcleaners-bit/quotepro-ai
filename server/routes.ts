@@ -3181,6 +3181,167 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
     }
   });
 
+  // ─── Stripe Subscription Checkout (Web) ───
+
+  app.post("/api/subscription/create-checkout", requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
+      const user = await getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Not found" });
+      if (user.subscriptionTier === "pro") return res.json({ alreadyPro: true });
+
+      let stripeCustomerId = (user as any).stripeCustomerId;
+      if (!stripeCustomerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: { userId: String(user.id) },
+        });
+        stripeCustomerId = customer.id;
+        await updateUser(user.id, { stripeCustomerId: customer.id } as any);
+      }
+
+      const host = req.get("host")!;
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const session = await stripe.checkout.sessions.create({
+        customer: stripeCustomerId,
+        mode: "subscription",
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: "QuotePro AI Pro",
+                description: "Unlimited quotes, CRM, AI tools, growth dashboard, and all Pro features",
+              },
+              recurring: { interval: "month" },
+              unit_amount: 1999,
+            },
+            quantity: 1,
+          },
+        ],
+        success_url: `${protocol}://${host}/app/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${protocol}://${host}/app/settings`,
+        subscription_data: {
+          metadata: { userId: String(user.id) },
+          trial_period_days: 7,
+        },
+        allow_promotion_codes: true,
+      });
+
+      return res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Subscription checkout error:", error?.message || error);
+      return res.status(500).json({ message: "Failed to create checkout session" });
+    }
+  });
+
+  app.get("/api/subscription/verify-session", requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
+      const { session_id } = req.query as { session_id: string };
+      if (!session_id) return res.status(400).json({ message: "Missing session_id" });
+
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+
+      const sessionUserId = session.subscription_data?.metadata?.userId
+        || session.metadata?.userId
+        || (session.customer ? undefined : undefined);
+      const user = await getUserById(req.session.userId!);
+      if (sessionUserId && sessionUserId !== String(req.session.userId)) {
+        return res.status(403).json({ message: "Session does not belong to this user" });
+      }
+      if (user && (user as any).stripeCustomerId && session.customer !== (user as any).stripeCustomerId) {
+        return res.status(403).json({ message: "Session customer mismatch" });
+      }
+
+      if (session.payment_status === "paid" || session.status === "complete") {
+        await updateUser(req.session.userId!, {
+          subscriptionTier: "pro",
+          subscriptionExpiresAt: null,
+        });
+        return res.json({ success: true, tier: "pro" });
+      }
+      return res.json({ success: false, status: session.status });
+    } catch (error: any) {
+      console.error("Verify session error:", error);
+      return res.status(500).json({ message: "Failed to verify session" });
+    }
+  });
+
+  app.post("/api/subscription/webhook", async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).send("Stripe not configured");
+      const sig = req.headers["stripe-signature"];
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+      let event: any;
+      if (sig && webhookSecret) {
+        try {
+          event = stripe.webhooks.constructEvent(req.body, sig as string, webhookSecret);
+        } catch (err: any) {
+          console.error("Webhook signature verification failed:", err.message);
+          return res.status(400).send(`Webhook Error: ${err.message}`);
+        }
+      } else {
+        event = req.body;
+      }
+
+      switch (event.type) {
+        case "checkout.session.completed": {
+          const session = event.data.object;
+          const userId = session.subscription_data?.metadata?.userId || session.metadata?.userId;
+          if (userId && session.mode === "subscription") {
+            await updateUser(userId, { subscriptionTier: "pro", subscriptionExpiresAt: null });
+            console.log(`Subscription activated for user ${userId}`);
+          }
+          break;
+        }
+        case "customer.subscription.deleted":
+        case "customer.subscription.updated": {
+          const subscription = event.data.object;
+          const userId = subscription.metadata?.userId;
+          if (userId) {
+            const isActive = subscription.status === "active" || subscription.status === "trialing";
+            await updateUser(userId, {
+              subscriptionTier: isActive ? "pro" : "free",
+              subscriptionExpiresAt: isActive ? null : new Date(),
+            });
+            console.log(`Subscription ${isActive ? "active" : "cancelled"} for user ${userId}`);
+          }
+          break;
+        }
+      }
+
+      return res.json({ received: true });
+    } catch (error: any) {
+      console.error("Webhook error:", error);
+      return res.status(500).json({ message: "Webhook processing failed" });
+    }
+  });
+
+  app.post("/api/subscription/create-portal", requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
+      const user = await getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Not found" });
+
+      const stripeCustomerId = (user as any).stripeCustomerId;
+      if (!stripeCustomerId) return res.status(400).json({ message: "No billing account found" });
+
+      const host = req.get("host")!;
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: stripeCustomerId,
+        return_url: `${protocol}://${host}/app/settings`,
+      });
+
+      return res.json({ url: portalSession.url });
+    } catch (error: any) {
+      console.error("Portal session error:", error);
+      return res.status(500).json({ message: "Failed to create portal session" });
+    }
+  });
+
   // ─── AI Revenue Features ───
 
   app.post("/api/ai/analyze-quote", requireAuth, requirePro as any, async (req: Request, res: Response) => {
@@ -8011,6 +8172,7 @@ initOAuthStatesTable();
 
 (async () => {
   try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS started_at TIMESTAMP`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS update_token VARCHAR UNIQUE`);

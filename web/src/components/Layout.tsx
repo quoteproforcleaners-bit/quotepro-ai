@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { useSubscription } from "../lib/subscription";
 import {
   LayoutDashboard,
   FileText,
@@ -16,8 +17,12 @@ import {
   TrendingUp,
   Target,
   Wand2,
-  ChevronDown,
+  Crown,
+  Lock,
+  ArrowUpRight,
 } from "lucide-react";
+
+const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant"];
 
 const navSections = [
   {
@@ -30,22 +35,22 @@ const navSections = [
     label: "Manage",
     items: [
       { to: "/quotes", label: "Quotes", icon: FileText },
-      { to: "/customers", label: "Customers", icon: Users },
-      { to: "/jobs", label: "Jobs", icon: Briefcase },
+      { to: "/customers", label: "Customers", icon: Users, pro: true },
+      { to: "/jobs", label: "Jobs", icon: Briefcase, pro: true },
     ],
   },
   {
     label: "Grow",
     items: [
-      { to: "/growth", label: "Growth Hub", icon: TrendingUp },
+      { to: "/growth", label: "Growth Hub", icon: TrendingUp, pro: true },
       { to: "/follow-ups", label: "Follow-ups", icon: Bell },
-      { to: "/opportunities", label: "Opportunities", icon: Target },
+      { to: "/opportunities", label: "Opportunities", icon: Target, pro: true },
     ],
   },
   {
     label: "AI Tools",
     items: [
-      { to: "/ai-assistant", label: "Sales Assistant", icon: Bot },
+      { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true },
       { to: "/walkthrough-ai", label: "Quote from Notes", icon: Wand2 },
     ],
   },
@@ -53,6 +58,7 @@ const navSections = [
 
 export function Layout() {
   const { user, business, logout } = useAuth();
+  const { isPro } = useSubscription();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -87,6 +93,9 @@ export function Layout() {
             <Zap className="w-4 h-4 text-white" />
           </div>
           <span className="font-bold text-lg text-slate-900 tracking-tight">QuotePro</span>
+          {isPro ? (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white uppercase tracking-wider">Pro</span>
+          ) : null}
           <button
             onClick={() => setSidebarOpen(false)}
             className="ml-auto lg:hidden p-1 text-slate-400 hover:text-slate-600"
@@ -110,7 +119,7 @@ export function Layout() {
                     to={item.to}
                     onClick={() => setSidebarOpen(false)}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+                      `flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 group ${
                         isActive
                           ? "bg-primary-50 text-primary-700 shadow-sm shadow-primary-600/5"
                           : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -118,13 +127,42 @@ export function Layout() {
                     }
                   >
                     <item.icon className="w-[18px] h-[18px] shrink-0" />
-                    {item.label}
+                    <span className="flex-1">{item.label}</span>
+                    {item.pro && !isPro ? (
+                      <Lock className="w-3.5 h-3.5 text-slate-300 group-hover:text-primary-400 transition-colors" />
+                    ) : null}
                   </NavLink>
                 ))}
               </div>
             </div>
           ))}
         </nav>
+
+        {!isPro ? (
+          <div className="mx-3 mb-3">
+            <button
+              onClick={() => navigate("/upgrade?source=sidebar")}
+              className="w-full p-3 rounded-xl bg-gradient-to-br from-primary-600 via-primary-700 to-violet-700 text-white text-left relative overflow-hidden group"
+            >
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.15),transparent_50%)] group-hover:opacity-75 transition-opacity" />
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-1">
+                  <Crown className="w-4 h-4 text-amber-300" />
+                  <span className="text-sm font-bold">Upgrade to Pro</span>
+                </div>
+                <p className="text-[11px] text-primary-200 leading-tight">
+                  Unlimited quotes, AI tools, CRM, and more
+                </p>
+                <div className="flex items-center gap-1 mt-2 text-xs text-primary-200 font-medium">
+                  <span>$19.99/mo</span>
+                  <span className="text-primary-300">&middot;</span>
+                  <span>7-day free trial</span>
+                  <ArrowUpRight className="w-3 h-3 ml-auto" />
+                </div>
+              </div>
+            </button>
+          </div>
+        ) : null}
 
         <div className="p-3 border-t border-slate-100 shrink-0">
           <NavLink
