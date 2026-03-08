@@ -8208,6 +8208,78 @@ initOAuthStatesTable();
   } catch (e) {
     console.warn("Quote columns migration:", (e as Error).message);
   }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS invoice_packets (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_id VARCHAR REFERENCES quotes(id),
+        business_id VARCHAR REFERENCES businesses(id),
+        user_id VARCHAR REFERENCES users(id),
+        status TEXT NOT NULL DEFAULT 'generated',
+        line_items_json JSONB,
+        customer_info_json JSONB,
+        totals_json JSONB,
+        invoice_number TEXT,
+        pdf_html TEXT,
+        csv_text TEXT,
+        plain_text TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS calendar_event_stubs (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        quote_id VARCHAR REFERENCES quotes(id),
+        user_id VARCHAR REFERENCES users(id),
+        business_id VARCHAR REFERENCES businesses(id),
+        start_datetime TIMESTAMP NOT NULL,
+        end_datetime TIMESTAMP NOT NULL,
+        location TEXT,
+        title TEXT NOT NULL,
+        description TEXT,
+        ics_data TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL REFERENCES users(id),
+        key_hash TEXT NOT NULL,
+        key_prefix TEXT,
+        label TEXT NOT NULL DEFAULT 'API Key',
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        last_used_at TIMESTAMP,
+        rotated_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS webhook_endpoints (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR NOT NULL REFERENCES users(id),
+        url TEXT NOT NULL,
+        events TEXT[] NOT NULL DEFAULT '{}',
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        secret TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS webhook_events (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        endpoint_id VARCHAR NOT NULL REFERENCES webhook_endpoints(id) ON DELETE CASCADE,
+        event_type TEXT NOT NULL,
+        payload JSONB,
+        status TEXT NOT NULL DEFAULT 'pending',
+        response_code INTEGER,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+  } catch (e) {
+    console.warn("Additional tables migration:", (e as Error).message);
+  }
 })();
 
 async function createQBOInvoiceForQuote(userId: string, quoteId: string): Promise<{ qboInvoiceId: string; docNumber: string | null } | null> {
