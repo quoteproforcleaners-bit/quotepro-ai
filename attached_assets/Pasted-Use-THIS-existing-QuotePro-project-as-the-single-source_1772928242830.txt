@@ -1,0 +1,326 @@
+Use THIS existing QuotePro project as the single source of truth.
+
+IMPORTANT:
+Stop building the web app piecemeal.
+Stop making partial/basic web screens.
+Stop creating placeholder-level UI.
+
+I need you to do a full product-level parity and design overhaul so QuotePro has:
+1. the existing iOS/mobile app
+2. a full web app
+with true feature parity and a polished premium SaaS UI.
+
+NON-NEGOTIABLE GOAL
+I want 100% feature parity between the current app and the web app.
+Anything the current app can do should also be available in the web app unless there is a truly unavoidable platform limitation.
+If there is any limitation, document it explicitly instead of silently skipping functionality.
+
+I also want the web UI to look polished, modern, premium, and conversion-worthy.
+Right now it looks too basic, too generic, too plain, and too incomplete.
+Fix that.
+
+==================================================
+MASTER OBJECTIVE
+==================================================
+
+Audit the entire existing QuotePro codebase and identify the real current feature set.
+Then build or finish the web experience so it achieves:
+- full feature parity
+- unified architecture
+- high-quality desktop UX
+- strong responsive behavior
+- premium SaaS design quality
+- consistent visual language across the entire web app
+
+Do not continue with fragmented one-off implementation.
+Do not only build isolated screens.
+Do not stop at rough/basic functionality.
+
+I want a cohesive, production-ready web application layer added to this existing product.
+
+==================================================
+PHASE 1: FULL PRODUCT AUDIT
+==================================================
+
+Before implementing, inspect the current project and produce an internal implementation audit of the REAL existing product.
+
+Identify all currently implemented features, including but not limited to:
+- auth / login / signup / onboarding
+- dashboard
+- quote builder
+- residential quote flows
+- commercial quote flows
+- quote history
+- quote detail views
+- Instant Quote Page functionality
+- quote acceptance logic
+- Good / Better / Best quote options
+- add-ons
+- CRM / customers / leads
+- AI features
+- follow-up features
+- Jobber integration
+- sync states and controls
+- settings
+- subscription/paywall/entitlements
+- account/company branding
+- analytics/reporting
+- any hidden admin/product flows already in the codebase
+
+Then use this actual audit as the parity checklist.
+Do not guess.
+Do not invent a smaller feature scope.
+
+==================================================
+PHASE 2: PARITY EXECUTION
+==================================================
+
+Using the audit, finish the web app so every major feature in the current app is also available on web.
+
+This means:
+- matching workflows
+- matching data behavior
+- matching permissions
+- matching entitlements
+- matching statuses
+- matching quote logic
+- matching integrations
+- matching AI/business logic
+
+If some mobile screens cannot map 1:1 to web layouts, redesign them intelligently for desktop while preserving the same underlying functionality.
+
+Do not simply mirror mobile screens awkwardly.
+Web should be optimized for desktop use.
+
+==================================================
+PHASE 3: PREMIUM UI / DESIGN SYSTEM OVERHAUL
+==================================================
+
+The current web UI is too basic and unattractive.
+I want a serious premium SaaS look and feel.
+
+Redesign the web layer to feel like a high-quality vertical SaaS product.
+
+TARGET UI QUALITY
+The web app should feel:
+- modern
+- premium
+- clean
+- confident
+- founder-led
+- revenue-focused
+- tailored to cleaning business owners
+- better than generic template UI
+- not amateur
+- not plain
+- not “mobile screen stretched onto desktop”
+
+VISUAL DESIGN REQUIREMENTS
+Implement a strong and consistent visual system across the web app:
+- refined spacing scale
+- clear typography hierarchy
+- stronger card design
+- better visual grouping
+- elegant shadows
+- modern border treatments
+- consistent rounded corners
+- premium empty states
+- polished badges/status indicators
+- cleaner tables/lists
+- tasteful color usage
+- stronger CTA hierarchy
+- improved navigation structure
+- excellent alignment and white space
+- polished form layouts
+- high-end dashboard feel
+
+If the current project lacks a strong design system, create one and apply it consistently.
+
+==================================================
+WEB APP UX REQUIREMENTS
+==================================================
+
+The web app should be desktop-first and feel like a real SaaS dashboard.
+
+Implement or improve:
+- left sidebar navigation or strong hybrid nav
+- top header with context/actions where useful
+- dashboard summaries/cards that look polished
+- strong page headers
+- actions placed consistently
+- more spacious layouts for desktop
+- intuitive list/detail flows
+- better quote management workflow on desktop
+- better CRM/customer workflow on desktop
+- polished settings and integrations pages
+- consistent loading states
+- polished empty states
+- improved toasts/alerts/messages
+- professional modals/drawers/dialogs
+
+If tables are appropriate for web, use them elegantly.
+If cards are better, use cards.
+Choose the best pattern per workflow.
+
+==================================================
+DESIGN DIRECTION
+==================================================
+
+Design this like a serious B2B SaaS product for service business owners.
+
+Style references for feel only:
+- polished vertical SaaS
+- premium admin dashboards
+- modern CRM UX
+- strong conversion product design
+
+Do NOT create:
+- childish UI
+- over-colorful UI
+- cluttered dashboard mess
+- plain bootstrap-looking screens
+- generic low-effort components
+- giant empty whitespace with weak content structure
+
+Aim for:
+- premium software aesthetic
+- operator-friendly usability
+- modern SaaS confidence
+
+==================================================
+FEATURE AREAS TO POLISH DEEPLY
+==================================================
+
+Pay special design attention to these areas:
+1. Dashboard
+2. Quote builder
+3. Quote detail page
+4. Quote history/list views
+5. CRM/customers
+6. Instant Quote Page management
+7. Integrations / Jobber settings
+8. Subscription/account pages
+9. AI / automation feature pages
+10. Settings / company branding
+
+These should feel especially polished because they are core demo surfaces.
+
+==================================================
+MOBILE + WEB COEXISTENCE
+==================================================
+
+Do NOT break the iOS/mobile app.
+Do NOT remove mobile functionality.
+Do NOT regress current mobile flows.
+
+Keep mobile and web as one product with shared logic and shared backend/services.
+
+Refactor carefully so that:
+- business logic is shared
+- validation is shared
+- quote logic is shared
+- Jobber sync logic is shared
+- AI logic is shared
+- subscription checks are shared
+
+Only separate platform-specific presentation layers where appropriate.
+
+==================================================
+ARCHITECTURE REQUIREMENTS
+==================================================
+
+If the current structure is causing fragmented web implementation, fix it.
+
+Refactor toward:
+- shared core services
+- shared API/data layer
+- shared domain logic
+- shared state patterns if appropriate
+- clearly separated web presentation layer
+- reusable design system/components
+- scalable routing/layout structure for web
+
+Do not let the web app become a pile of disconnected screens.
+Make it a coherent product architecture.
+
+==================================================
+STRICT IMPLEMENTATION RULES
+==================================================
+
+- No placeholder pages unless explicitly marked temporary
+- No “good enough for now” basic UI
+- No skipping parity silently
+- No fragmented design language
+- No generic boilerplate dashboard look
+- No partial implementations presented as complete
+- No rebuilding the product into a disconnected clone
+
+If a feature already exists in mobile/app logic, bring it to web properly.
+If a feature needs redesign for web, redesign it properly.
+
+==================================================
+QUALITY BAR FOR WEB UI
+==================================================
+
+Before considering any screen complete, ensure:
+- it looks polished
+- it uses good spacing
+- it has strong hierarchy
+- actions are obvious
+- it feels desktop-native
+- it aligns with the rest of the app visually
+- it is worthy of being shown in a demo or on a website screenshot
+
+If a screen is technically functional but visually weak, keep improving it.
+
+==================================================
+RESPONSIVENESS
+==================================================
+
+The web app should be:
+- excellent on desktop
+- good on tablet
+- usable on mobile web
+
+But prioritize desktop experience first.
+Do not let desktop look like an oversized phone screen.
+
+==================================================
+OUTPUT / DELIVERABLES
+==================================================
+
+When finished, provide:
+
+1. FULL PARITY AUDIT
+A complete checklist of current product features and web parity status for each.
+
+2. UI / UX IMPROVEMENTS SUMMARY
+What was redesigned or upgraded visually.
+
+3. ARCHITECTURE SUMMARY
+What was reused, what was refactored, and how mobile + web now coexist.
+
+4. FILES / ROUTES / COMPONENTS
+What was created or updated.
+
+5. REMAINING GAPS
+Anything that still prevents true 100% parity.
+
+6. TESTING GUIDE
+Exactly how I can test the web app end-to-end.
+
+==================================================
+FINAL INSTRUCTION
+==================================================
+
+Treat this as a full web parity and premium UI stabilization pass for QuotePro.
+
+Do not continue incrementally with weak/basic screens.
+Do not stop after partial parity.
+Do not prioritize speed over quality.
+
+Start by auditing the current codebase thoroughly.
+Then implement the missing parity work.
+Then upgrade the web UI across the product so it looks and feels like a premium SaaS platform.
+
+QuotePro web should be something I can confidently demo, sell, and screenshot on my website.

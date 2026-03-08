@@ -13,6 +13,10 @@ import CustomerDetailPage from "./pages/CustomerDetailPage";
 import CustomerCreatePage from "./pages/CustomerCreatePage";
 import JobsPage from "./pages/JobsPage";
 import SettingsPage from "./pages/SettingsPage";
+import FollowUpsPage from "./pages/FollowUpsPage";
+import OpportunitiesPage from "./pages/OpportunitiesPage";
+import AIAssistantPage from "./pages/AIAssistantPage";
+import WalkthroughAIPage from "./pages/WalkthroughAIPage";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -59,6 +63,10 @@ export default function App() {
         <Route path="/customers/new" element={<CustomerCreatePage />} />
         <Route path="/customers/:id" element={<CustomerDetailPage />} />
         <Route path="/jobs" element={<JobsPage />} />
+        <Route path="/follow-ups" element={<FollowUpsPage />} />
+        <Route path="/opportunities" element={<OpportunitiesPage />} />
+        <Route path="/ai-assistant" element={<AIAssistantPage />} />
+        <Route path="/walkthrough-ai" element={<WalkthroughAIPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 

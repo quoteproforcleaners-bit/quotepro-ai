@@ -1,35 +1,58 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiPut, apiDelete } from "../lib/api";
+import { apiPut, apiDelete, apiPost } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
-import { ArrowLeft, Save, Trash2, Star, FileText } from "lucide-react";
+import {
+  Save,
+  Trash2,
+  Star,
+  FileText,
+  Briefcase,
+  Mail,
+  Phone,
+  MapPin,
+  Sparkles,
+  MessageSquare,
+  BanIcon,
+  Shield,
+} from "lucide-react";
 import { useState, useEffect } from "react";
-
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    draft: "bg-slate-100 text-slate-600",
-    sent: "bg-blue-50 text-blue-700",
-    accepted: "bg-green-50 text-green-700",
-    declined: "bg-red-50 text-red-700",
-  };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${styles[status] || styles.draft}`}>
-      {status.replace(/-/g, " ")}
-    </span>
-  );
-}
+import {
+  PageHeader,
+  Card,
+  CardHeader,
+  Badge,
+  Button,
+  Input,
+  ConfirmModal,
+  Spinner,
+  EmptyState,
+} from "../components/ui";
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   const { data: customer, isLoading } = useQuery<any>({
     queryKey: [`/api/customers/${id}`],
   });
   const { data: quotes = [] } = useQuery<any[]>({ queryKey: ["/api/quotes"] });
+  const { data: jobs = [] } = useQuery<any[]>({ queryKey: ["/api/jobs"] });
+  const { data: marketingPrefs } = useQuery<any>({
+    queryKey: [`/api/customers/${id}/marketing-prefs`],
+    enabled: !!customer,
+  });
 
   const [form, setForm] = useState({
-    firstName: "", lastName: "", email: "", phone: "", address: "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    address: "",
   });
 
   useEffect(() => {
@@ -49,6 +72,8 @@ export default function CustomerDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/customers/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
     },
   });
 
@@ -61,133 +86,186 @@ export default function CustomerDetailPage() {
   });
 
   const vipMutation = useMutation({
-    mutationFn: () => apiPut(`/api/customers/${id}`, { isVip: !customer?.isVip }),
+    mutationFn: () =>
+      apiPut(`/api/customers/${id}`, { isVip: !customer?.isVip }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/customers/${id}`] });
     },
   });
 
-  const customerQuotes = quotes.filter((q: any) => q.customerId === id);
+  const dncMutation = useMutation({
+    mutationFn: () =>
+      apiPut(`/api/customers/${id}/do-not-contact`, {
+        doNotContact: !customer?.doNotContact,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/customers/${id}`] });
+    },
+  });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const generateMessage = async () => {
+    setAiLoading(true);
+    try {
+      const res = await apiPost(`/api/ai/generate-message`, {
+        context: "customer",
+        customerName: `${customer.firstName} ${customer.lastName}`,
+        customerId: id,
+      });
+      setAiMessage((res as any).message || "");
+    } catch {
+      setAiMessage("Unable to generate message.");
+    }
+    setAiLoading(false);
+  };
+
+  const customerQuotes = quotes.filter((q: any) => q.customerId === id);
+  const customerJobs = jobs.filter((j: any) => j.customerId === id);
+
+  if (isLoading) return <Spinner />;
 
   if (!customer) {
     return (
-      <div className="text-center py-20">
-        <p className="text-slate-500">Customer not found</p>
-      </div>
+      <EmptyState
+        title="Customer not found"
+        description="This customer may have been deleted"
+        action={
+          <Button variant="secondary" onClick={() => navigate("/customers")}>
+            Back to customers
+          </Button>
+        }
+      />
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <button
-        onClick={() => navigate("/customers")}
-        className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to customers
-      </button>
+  const totalSpent = customerQuotes
+    .filter((q: any) => q.status === "accepted")
+    .reduce((sum: number, q: any) => sum + (Number(q.total) || 0), 0);
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-900">
-            {customer.firstName} {customer.lastName}
-          </h1>
-          {customer.isVip && (
-            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
-              <Star className="w-3 h-3 fill-amber-500" />
-              VIP
-            </span>
-          )}
-        </div>
-        <button
-          onClick={() => vipMutation.mutate()}
-          className={`flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-lg border transition-colors ${
-            customer.isVip
-              ? "border-amber-200 bg-amber-50 text-amber-700"
-              : "border-slate-200 text-slate-600 hover:bg-slate-50"
-          }`}
-        >
-          <Star className={`w-3.5 h-3.5 ${customer.isVip ? "fill-amber-500 text-amber-500" : ""}`} />
-          {customer.isVip ? "VIP" : "Set VIP"}
-        </button>
+  return (
+    <div>
+      <PageHeader
+        title={`${customer.firstName} ${customer.lastName}`}
+        backTo="/customers"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant={customer.isVip ? "secondary" : "ghost"}
+              icon={Star}
+              onClick={() => vipMutation.mutate()}
+              size="sm"
+              className={customer.isVip ? "border-amber-200 bg-amber-50 text-amber-700" : ""}
+            >
+              {customer.isVip ? "VIP" : "Set VIP"}
+            </Button>
+            <Button
+              icon={FileText}
+              onClick={() => navigate("/quotes/new")}
+              size="sm"
+            >
+              Create Quote
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="flex items-center gap-2 mb-6">
+        {customer.isVip ? <Badge status="warning" label="VIP Customer" dot /> : null}
+        {customer.doNotContact ? <Badge status="error" label="Do Not Contact" dot /> : null}
+        {customer.status ? <Badge status={customer.status} dot /> : null}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <h2 className="font-semibold text-slate-900 mb-4">Contact Info</h2>
+          <Card>
+            <CardHeader title="Contact Information" icon={Mail} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                { key: "firstName", label: "First name" },
-                { key: "lastName", label: "Last name" },
-                { key: "email", label: "Email", type: "email" },
-                { key: "phone", label: "Phone" },
-              ].map((f) => (
-                <div key={f.key}>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
-                  <input
-                    type={f.type || "text"}
-                    value={(form as any)[f.key]}
-                    onChange={(e) => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              ))}
+              <Input
+                label="First name"
+                value={form.firstName}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, firstName: e.target.value }))
+                }
+              />
+              <Input
+                label="Last name"
+                value={form.lastName}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, lastName: e.target.value }))
+                }
+              />
+              <Input
+                label="Email"
+                type="email"
+                value={form.email}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, email: e.target.value }))
+                }
+              />
+              <Input
+                label="Phone"
+                value={form.phone}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, phone: e.target.value }))
+                }
+              />
               <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Address</label>
-                <input
+                <Input
+                  label="Address"
                   value={form.address}
-                  onChange={(e) => setForm(p => ({ ...p, address: e.target.value }))}
-                  className="w-full h-11 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, address: e.target.value }))
+                  }
                 />
               </div>
             </div>
-            <div className="flex gap-2 mt-4">
-              <button
+            <div className="flex items-center gap-3 mt-5 pt-4 border-t border-slate-100">
+              <Button
+                icon={Save}
                 onClick={() => updateMutation.mutate(form)}
-                disabled={updateMutation.isPending}
-                className="flex items-center gap-1.5 h-9 px-4 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-60"
+                loading={updateMutation.isPending}
+                size="sm"
               >
-                <Save className="w-3.5 h-3.5" />
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
-              </button>
-              {updateMutation.isSuccess && (
-                <span className="flex items-center text-sm text-green-600">Saved</span>
-              )}
+                {saved ? "Saved!" : "Save Changes"}
+              </Button>
             </div>
-          </div>
+          </Card>
 
-          <div className="bg-white rounded-xl border border-slate-200">
-            <div className="px-5 py-4 border-b border-slate-100">
+          <Card padding={false}>
+            <div className="px-5 lg:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h2 className="font-semibold text-slate-900">Quotes</h2>
+              <span className="text-xs text-slate-400">
+                {customerQuotes.length} total
+              </span>
             </div>
             {customerQuotes.length === 0 ? (
-              <div className="px-5 py-8 text-center">
-                <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">No quotes for this customer</p>
-                <button
-                  onClick={() => navigate("/quotes/new")}
-                  className="mt-2 text-sm text-primary-600 font-medium"
-                >
-                  Create a quote
-                </button>
-              </div>
+              <EmptyState
+                icon={FileText}
+                title="No quotes yet"
+                description="Create a quote for this customer"
+                action={
+                  <Button
+                    icon={FileText}
+                    size="sm"
+                    onClick={() => navigate("/quotes/new")}
+                  >
+                    Create Quote
+                  </Button>
+                }
+              />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100">
-                      <th className="text-right px-5 py-3 text-xs font-medium text-slate-500 uppercase">Total</th>
-                      <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase">Status</th>
-                      <th className="text-right px-5 py-3 text-xs font-medium text-slate-500 uppercase">Date</th>
+                      <th className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase">
+                        Total
+                      </th>
+                      <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase">
+                        Status
+                      </th>
+                      <th className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase">
+                        Date
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -195,44 +273,171 @@ export default function CustomerDetailPage() {
                       <tr
                         key={q.id}
                         onClick={() => navigate(`/quotes/${q.id}`)}
-                        className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer"
+                        className="border-b border-slate-50 hover:bg-slate-50/80 cursor-pointer transition-colors"
                       >
-                        <td className="px-5 py-3 text-right font-medium">${Number(q.total || 0).toFixed(2)}</td>
-                        <td className="px-5 py-3"><StatusBadge status={q.status} /></td>
-                        <td className="px-5 py-3 text-right text-slate-500">{new Date(q.createdAt).toLocaleDateString()}</td>
+                        <td className="px-5 lg:px-6 py-3 text-right font-semibold text-slate-900">
+                          ${Number(q.total || 0).toLocaleString()}
+                        </td>
+                        <td className="px-5 py-3">
+                          <Badge status={q.status} dot />
+                        </td>
+                        <td className="px-5 lg:px-6 py-3 text-right text-slate-500">
+                          {new Date(q.createdAt).toLocaleDateString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-          </div>
+          </Card>
+
+          {customerJobs.length > 0 ? (
+            <Card padding={false}>
+              <div className="px-5 lg:px-6 py-4 border-b border-slate-100">
+                <h2 className="font-semibold text-slate-900">Jobs</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="text-left px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase">
+                        Title
+                      </th>
+                      <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase">
+                        Status
+                      </th>
+                      <th className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase">
+                        Date
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customerJobs.map((j: any) => (
+                      <tr
+                        key={j.id}
+                        onClick={() => navigate(`/jobs`)}
+                        className="border-b border-slate-50 hover:bg-slate-50/80 cursor-pointer transition-colors"
+                      >
+                        <td className="px-5 lg:px-6 py-3 font-medium text-slate-900">
+                          {j.title || "Cleaning Job"}
+                        </td>
+                        <td className="px-5 py-3">
+                          <Badge status={j.status} dot />
+                        </td>
+                        <td className="px-5 lg:px-6 py-3 text-right text-slate-500">
+                          {j.scheduledDate
+                            ? new Date(j.scheduledDate).toLocaleDateString()
+                            : "Not scheduled"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : null}
         </div>
 
-        <div>
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <h2 className="font-semibold text-slate-900 mb-3">Actions</h2>
-            <div className="space-y-2">
-              <button
-                onClick={() => navigate("/quotes/new")}
-                className="w-full flex items-center gap-2 h-9 px-3 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                Create Quote
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm("Delete this customer? This cannot be undone.")) deleteMutation.mutate();
-                }}
-                className="w-full flex items-center gap-2 h-9 px-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Customer
-              </button>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader title="Customer Summary" />
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Quotes</span>
+                <span className="font-medium text-slate-900">
+                  {customerQuotes.length}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Spent</span>
+                <span className="font-semibold text-emerald-600">
+                  ${totalSpent.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Jobs</span>
+                <span className="font-medium text-slate-900">
+                  {customerJobs.length}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Customer Since</span>
+                <span className="font-medium text-slate-900">
+                  {new Date(customer.createdAt).toLocaleDateString()}
+                </span>
+              </div>
             </div>
-          </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="AI Assistant" icon={Sparkles} />
+            <Button
+              variant="secondary"
+              icon={MessageSquare}
+              onClick={generateMessage}
+              loading={aiLoading}
+              size="sm"
+              className="w-full justify-start"
+            >
+              Draft Message
+            </Button>
+            {aiMessage ? (
+              <div className="mt-3 bg-violet-50 rounded-lg p-3">
+                <p className="text-sm text-violet-900 whitespace-pre-wrap">
+                  {aiMessage}
+                </p>
+                <button
+                  onClick={() => navigator.clipboard.writeText(aiMessage)}
+                  className="text-xs text-violet-600 font-medium mt-2"
+                >
+                  Copy
+                </button>
+              </div>
+            ) : null}
+          </Card>
+
+          <Card>
+            <CardHeader title="Controls" icon={Shield} />
+            <div className="space-y-2">
+              <Button
+                variant="ghost"
+                icon={BanIcon}
+                onClick={() => dncMutation.mutate()}
+                size="sm"
+                className={`w-full justify-start ${
+                  customer.doNotContact
+                    ? "text-red-600 bg-red-50"
+                    : ""
+                }`}
+              >
+                {customer.doNotContact
+                  ? "Remove Do Not Contact"
+                  : "Mark Do Not Contact"}
+              </Button>
+              <Button
+                variant="ghost"
+                icon={Trash2}
+                onClick={() => setDeleteOpen(true)}
+                size="sm"
+                className="w-full justify-start text-red-600 hover:bg-red-50"
+              >
+                Delete Customer
+              </Button>
+            </div>
+          </Card>
         </div>
       </div>
+
+      <ConfirmModal
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        title="Delete Customer"
+        description="Are you sure you want to delete this customer? All associated data will be lost."
+        confirmLabel="Delete"
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

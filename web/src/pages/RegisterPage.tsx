@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { Zap } from "lucide-react";
+import { Zap, ArrowRight } from "lucide-react";
+import { Alert, Button, Input } from "../components/ui";
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -17,8 +18,9 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  const set =
+    (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -54,114 +56,155 @@ export default function RegisterPage() {
     }
   };
 
-  const fields = [
-    { key: "firstName", label: "First name", type: "text", placeholder: "Jane" },
-    { key: "lastName", label: "Last name", type: "text", placeholder: "Smith" },
-    { key: "companyName", label: "Company name", type: "text", placeholder: "Sparkle Cleaners" },
-    { key: "email", label: "Email", type: "email", placeholder: "you@company.com" },
-    { key: "password", label: "Password", type: "password", placeholder: "Create a password" },
-  ];
-
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-primary-600 flex items-center justify-center mx-auto mb-4">
-            <Zap className="w-7 h-7 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex">
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary-600 to-primary-800 items-center justify-center p-12">
+        <div className="max-w-md text-white">
+          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center mb-8">
+            <Zap className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Create your account
+          <h1 className="text-3xl font-bold mb-4 leading-tight">
+            Start closing more quotes today.
           </h1>
-          <p className="text-slate-500 mt-1">
-            Get started with QuotePro
+          <p className="text-primary-100 text-lg leading-relaxed">
+            Join hundreds of cleaning business owners who use QuotePro to
+            create professional quotes and grow their revenue.
           </p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={googleLoading}
-            className="w-full h-11 flex items-center justify-center gap-3 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 transition-colors disabled:opacity-60"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-            </svg>
-            {googleLoading ? "Redirecting..." : "Continue with Google"}
-          </button>
-
-          <div className="relative my-5">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-3 text-slate-400 uppercase tracking-wide">or</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              {fields.slice(0, 2).map((f) => (
-                <div key={f.key}>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    {f.label}
-                  </label>
-                  <input
-                    type={f.type}
-                    value={(form as any)[f.key]}
-                    onChange={set(f.key)}
-                    required
-                    placeholder={f.placeholder}
-                    className="w-full h-11 px-3.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  />
+          <div className="mt-8 space-y-3">
+            {[
+              "Set up in under 5 minutes",
+              "Free to start, upgrade when you're ready",
+              "No credit card required",
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                  <ArrowRight className="w-3 h-3 text-white" />
                 </div>
-              ))}
-            </div>
-
-            {fields.slice(2).map((f) => (
-              <div key={f.key}>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  {f.label}
-                </label>
-                <input
-                  type={f.type}
-                  value={(form as any)[f.key]}
-                  onChange={set(f.key)}
-                  required
-                  placeholder={f.placeholder}
-                  className="w-full h-11 px-3.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+                <span className="text-primary-100">{item}</span>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-600/20 lg:hidden">
+              <Zap className="w-7 h-7 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Create your account
+            </h1>
+            <p className="text-slate-500 mt-1">Get started with QuotePro</p>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm shadow-slate-200/50 border border-slate-200/80 p-6">
+            {error ? (
+              <div className="mb-4">
+                <Alert variant="error" title={error} />
+              </div>
+            ) : null}
 
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-medium rounded-lg transition-colors text-sm"
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading}
+              className="w-full h-11 flex items-center justify-center gap-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 transition-all disabled:opacity-60 shadow-sm"
             >
-              {loading ? "Creating account..." : "Create account"}
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                  fill="#4285F4"
+                />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853"
+                />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  fill="#FBBC05"
+                />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  fill="#EA4335"
+                />
+              </svg>
+              {googleLoading ? "Redirecting..." : "Continue with Google"}
             </button>
-          </form>
-        </div>
 
-        <p className="text-center text-sm text-slate-500 mt-6">
-          Already have an account?{" "}
-          <Link
-            to="/login"
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
-            Sign in
-          </Link>
-        </p>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-white px-3 text-slate-400 uppercase tracking-wider">
+                  or
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="First name"
+                  value={form.firstName}
+                  onChange={set("firstName")}
+                  required
+                  placeholder="Jane"
+                />
+                <Input
+                  label="Last name"
+                  value={form.lastName}
+                  onChange={set("lastName")}
+                  required
+                  placeholder="Smith"
+                />
+              </div>
+              <Input
+                label="Company name"
+                value={form.companyName}
+                onChange={set("companyName")}
+                required
+                placeholder="Sparkle Cleaners"
+              />
+              <Input
+                label="Email"
+                type="email"
+                value={form.email}
+                onChange={set("email")}
+                required
+                placeholder="you@company.com"
+              />
+              <Input
+                label="Password"
+                type="password"
+                value={form.password}
+                onChange={set("password")}
+                required
+                placeholder="Create a password"
+              />
+              <Button
+                type="submit"
+                loading={loading}
+                className="w-full"
+                size="lg"
+              >
+                Create account
+              </Button>
+            </form>
+          </div>
+
+          <p className="text-center text-sm text-slate-500 mt-6">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-primary-600 hover:text-primary-700 font-medium"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
