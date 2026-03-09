@@ -275,6 +275,11 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
   };
 
   if (phase === "welcome") {
+    const samplePrices = [
+      { tier: "Good", label: "Maintenance Clean", price: 180 },
+      { tier: "Better", label: "Standard Clean", price: 240, popular: true },
+      { tier: "Best", label: "Deep Clean", price: 320 },
+    ];
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <ScrollView
@@ -296,17 +301,77 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
             </View>
 
             <ThemedText type="h1" style={styles.welcomeTitle}>
-              Create Your First Cleaning Quote in 30 Seconds
+              Close More Cleaning Jobs in 30 Seconds
             </ThemedText>
 
             <ThemedText type="body" style={[styles.welcomeSubtitle, { color: theme.textSecondary }]}>
-              See exactly how much to charge based on the property details. No guesswork.
+              Generate professional quote options your customers can approve fast.
             </ThemedText>
+
+            <View style={[styles.sampleSection, { borderColor: theme.border }]}>
+              <View style={styles.sampleLabelRow}>
+                <View style={[styles.sampleBadge, { backgroundColor: theme.primary + "15" }]}>
+                  <Feather name="eye" size={12} color={theme.primary} />
+                  <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700", fontSize: 11 }}>
+                    SAMPLE
+                  </ThemedText>
+                </View>
+              </View>
+              <ThemedText type="subtitle" style={{ fontWeight: "700", marginBottom: 2 }}>
+                Example Quote Your Customer Sees
+              </ThemedText>
+              <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
+                3 bed / 2 bath home
+              </ThemedText>
+
+              <View style={{ gap: Spacing.sm }}>
+                {samplePrices.map((s) => (
+                  <View
+                    key={s.tier}
+                    style={[
+                      styles.sampleCard,
+                      {
+                        backgroundColor: s.popular
+                          ? theme.primary + "08"
+                          : isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)",
+                        borderColor: s.popular ? theme.primary : theme.border,
+                        borderWidth: s.popular ? 2 : 1,
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                        <ThemedText type="caption" style={{ color: theme.textSecondary, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", fontSize: 10 }}>
+                          {s.tier}
+                        </ThemedText>
+                        {s.popular ? (
+                          <View style={[styles.miniPopularBadge, { backgroundColor: theme.primary }]}>
+                            <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 9 }}>
+                              Most Popular
+                            </ThemedText>
+                          </View>
+                        ) : null}
+                      </View>
+                      <ThemedText type="body" style={{ fontWeight: "600", marginTop: 2, color: s.popular ? theme.primary : theme.text }}>
+                        {s.label}
+                      </ThemedText>
+                    </View>
+                    <ThemedText type="h3" style={{ color: s.popular ? theme.primary : theme.text }}>
+                      ${s.price}
+                    </ThemedText>
+                  </View>
+                ))}
+              </View>
+
+              <ThemedText type="caption" style={{ color: theme.textSecondary + "90", textAlign: "center", marginTop: Spacing.md, lineHeight: 16 }}>
+                Your customers see polished quote options like this.
+              </ThemedText>
+            </View>
 
             <View style={styles.welcomeFeatures}>
               {[
                 { icon: "zap" as const, text: "Instant pricing based on your rates" },
-                { icon: "layers" as const, text: "Standard, Deep Clean, and Move-Out options" },
+                { icon: "layers" as const, text: "Good, Better, Best quote options" },
                 { icon: "send" as const, text: "Share with your customer instantly" },
               ].map((f) => (
                 <View key={f.text} style={styles.featureRow}>
@@ -331,10 +396,14 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
               >
                 <Feather name="zap" size={22} color="#FFFFFF" />
                 <ThemedText type="h3" style={{ color: "#FFFFFF", fontWeight: "700" }}>
-                  Generate My First Quote
+                  Create Your First Quote
                 </ThemedText>
               </LinearGradient>
             </Pressable>
+
+            <ThemedText type="caption" style={{ color: theme.textSecondary + "70", textAlign: "center", marginTop: Spacing.md, lineHeight: 16 }}>
+              Free to try. No complicated setup.
+            </ThemedText>
           </View>
         </ScrollView>
       </View>
@@ -603,6 +672,35 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: Spacing["2xl"],
     lineHeight: 22,
+  },
+  sampleSection: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    marginBottom: Spacing.xl,
+  },
+  sampleLabelRow: {
+    flexDirection: "row",
+    marginBottom: Spacing.sm,
+  },
+  sampleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+  },
+  sampleCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+  },
+  miniPopularBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
   },
   welcomeFeatures: { gap: Spacing.md, marginBottom: Spacing.lg },
   featureRow: { flexDirection: "row", alignItems: "center", gap: Spacing.md },
