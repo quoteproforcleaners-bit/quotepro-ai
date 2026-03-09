@@ -102,10 +102,24 @@ export default function LandingScreen() {
         </View>
 
         <View style={styles.previewCard}>
+          <View style={styles.sampleLabelRow}>
+            <View style={[styles.sampleBadge, { backgroundColor: theme.primary + "15" }]}>
+              <Feather name="eye" size={11} color={theme.primary} />
+              <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700", fontSize: 10 }}>
+                {landing.sampleBadge || "SAMPLE"}
+              </ThemedText>
+            </View>
+          </View>
+          <ThemedText type="small" style={{ fontWeight: "700", textAlign: "center", marginBottom: 2 }}>
+            {landing.sampleTitle || "Example Quote Your Customer Sees"}
+          </ThemedText>
+          <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginBottom: Spacing.sm, fontSize: 11 }}>
+            {landing.sampleProperty || "3 bed / 2 bath home"}
+          </ThemedText>
           <View style={styles.previewTiers}>
             {[
               { label: landing.previewGood || "Good", price: "$180" },
-              { label: landing.previewBetter || "Better", price: "$240" },
+              { label: landing.previewBetter || "Better", price: "$240", popular: true },
               { label: landing.previewBest || "Best", price: "$320" },
             ].map((tier, i) => (
               <View
@@ -113,20 +127,23 @@ export default function LandingScreen() {
                 style={[
                   styles.previewTier,
                   {
-                    backgroundColor: i === 1 ? theme.primary + "15" : isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.01)",
-                    borderColor: i === 1 ? theme.primary : theme.border,
+                    backgroundColor: tier.popular ? theme.primary + "15" : isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.01)",
+                    borderColor: tier.popular ? theme.primary : theme.border,
                   },
                 ]}
               >
-                <ThemedText type="caption" style={{ color: i === 1 ? theme.primary : theme.textSecondary, fontWeight: "600" }}>
+                <ThemedText type="caption" style={{ color: tier.popular ? theme.primary : theme.textSecondary, fontWeight: "600", fontSize: 10 }}>
                   {tier.label}
                 </ThemedText>
-                <ThemedText type="subtitle" style={{ color: i === 1 ? theme.primary : theme.text, fontWeight: "700" }}>
+                <ThemedText type="subtitle" style={{ color: tier.popular ? theme.primary : theme.text, fontWeight: "700" }}>
                   {tier.price}
                 </ThemedText>
               </View>
             ))}
           </View>
+          <ThemedText type="caption" style={{ color: theme.textSecondary + "90", textAlign: "center", marginTop: Spacing.sm, fontSize: 10, lineHeight: 14 }}>
+            {landing.sampleFootnote || "These are sample customer-facing quote options, not app pricing."}
+          </ThemedText>
         </View>
 
         <View style={styles.buttonsSection}>
@@ -137,7 +154,7 @@ export default function LandingScreen() {
           >
             <Feather name="file-text" size={18} color="#FFFFFF" />
             <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: Spacing.sm }}>
-              {landing.createFreeQuote}
+              {landing.createYourFirstQuote || "Create Your First Quote"}
             </ThemedText>
           </Pressable>
 
@@ -260,6 +277,18 @@ const styles = StyleSheet.create({
   previewCard: {
     width: "100%",
     marginBottom: Spacing.lg,
+  },
+  sampleLabelRow: {
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  sampleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: 20,
   },
   previewTiers: {
     flexDirection: "row",
