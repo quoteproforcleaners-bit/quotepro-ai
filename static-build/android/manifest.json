@@ -1,11 +1,11 @@
 {
-  "id": "2fb8662d-30be-42b8-8d91-c39d685bf02e",
-  "createdAt": "2026-03-08T16:05:52.555Z",
+  "id": "dcd3a74d-8e9b-4e46-b35f-6c96e2e4a168",
+  "createdAt": "2026-03-09T02:40:45.243Z",
   "runtimeVersion": "exposdk:54.0.0",
   "launchAsset": {
-    "key": "bundle-1772985952555-4097",
+    "key": "bundle-1773024045243-647",
     "contentType": "application/javascript",
-    "url": "https://0910c995-64df-4b46-9f4f-2cd72531c016-00-26ee99v9jw29r.picard.replit.dev/1772985952555-4097/_expo/static/js/android/bundle.js"
+    "url": "https://0910c995-64df-4b46-9f4f-2cd72531c016-00-26ee99v9jw29r.picard.replit.dev/1773024045243-647/_expo/static/js/android/bundle.js"
   },
   "assets": [],
   "metadata": {},
@@ -22,7 +22,7 @@
           "projectId": "1f443844-46bd-4e73-8e18-259c56ec1a81"
         }
       },
-      "version": "1.1.1",
+      "version": "1.1.2",
       "orientation": "portrait",
       "icon": "./assets/images/icon.png",
       "scheme": "quotepro",
@@ -111,6 +111,6 @@
       },
       "mainModuleName": "client/index"
     },
-    "scopeKey": "@anonymous/quotepro-22cb76a2-f791-4af5-93b8-1a823757f21b"
+    "scopeKey": "@anonymous/quotepro-c039bc65-81f2-44a9-9ed9-42bf5584c21b"
   }
 }

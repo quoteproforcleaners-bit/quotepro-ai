@@ -38,6 +38,21 @@ const CLEANING_TYPES = [
   { id: "move-in-out", label: "Move-Out Clean" },
 ];
 
+const TIER_META: Record<string, { tier: string; tagline: string }> = {
+  "regular": { tier: "Good", tagline: "Basic upkeep cleaning for maintained homes" },
+  "deep-clean": { tier: "Better", tagline: "Detailed recurring clean with extra attention" },
+  "move-in-out": { tier: "Best", tagline: "Top-to-bottom deep clean for move-in or move-out" },
+};
+
+const DEEPER_FEATURES = [
+  { icon: "edit-3" as const, text: "Add branded proposal styling" },
+  { icon: "plus-circle" as const, text: "Include add-ons and upsells" },
+  { icon: "cpu" as const, text: "Generate AI-powered follow-up messages" },
+  { icon: "users" as const, text: "Save customer details to CRM" },
+  { icon: "bar-chart-2" as const, text: "Track jobs and quoting activity" },
+  { icon: "sliders" as const, text: "Refine pricing and profit details" },
+];
+
 const EMPTY_ADDONS: AddOns = {
   insideFridge: false,
   insideOven: false,
@@ -348,8 +363,11 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
             <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>
               Property Details
             </ThemedText>
-            <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.xl }}>
+            <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.xs }}>
               Enter the basics to get an instant quote
+            </ThemedText>
+            <ThemedText type="caption" style={{ color: theme.textSecondary + "90", marginBottom: Spacing.xl }}>
+              Fast first draft. Full proposal in the next step.
             </ThemedText>
 
             <SqftStepper />
@@ -435,113 +453,128 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
             <Feather name="arrow-left" size={22} color={theme.text} />
           </Pressable>
 
-          <ThemedText type="h2" style={{ marginBottom: Spacing.xs }}>
-            Your Quote is Ready
-          </ThemedText>
-          <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
-            {parseInt(sqft).toLocaleString()} sq ft | {beds} bed | {baths} bath
-          </ThemedText>
+          <View style={styles.successHeader}>
+            <View style={[styles.successIcon, { backgroundColor: theme.success + "15" }]}>
+              <Feather name="check-circle" size={32} color={theme.success} />
+            </View>
+            <ThemedText type="h2" style={{ textAlign: "center" }}>
+              Quote Created
+            </ThemedText>
+            <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center", lineHeight: 22 }}>
+              Your quick quote is ready. Customize it further to create a polished client-ready proposal.
+            </ThemedText>
+            <View style={[styles.propertyPill, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }]}>
+              <Feather name="home" size={14} color={theme.textSecondary} />
+              <ThemedText type="caption" style={{ color: theme.textSecondary, fontWeight: "600" }}>
+                {parseInt(sqft).toLocaleString()} sq ft  |  {beds} bed  |  {baths} bath
+              </ThemedText>
+            </View>
+          </View>
 
           <View style={styles.resultsCards}>
             {results?.options.map((o) => {
-              const isRecommended = o.recommended;
+              const meta = TIER_META[o.id] || { tier: "Option", tagline: o.option.scope };
+              const isMostPopular = o.id === "deep-clean";
+              const isHighlighted = isMostPopular;
               return (
                 <View
                   key={o.id}
                   style={[
                     styles.resultCard,
                     {
-                      backgroundColor: isRecommended
-                        ? theme.primary + "10"
+                      backgroundColor: isHighlighted
+                        ? theme.primary + "08"
                         : isDark
                         ? "rgba(255,255,255,0.04)"
                         : "rgba(0,0,0,0.02)",
-                      borderColor: isRecommended ? theme.primary : theme.border,
-                      borderWidth: isRecommended ? 2 : 1,
+                      borderColor: isHighlighted ? theme.primary : theme.border,
+                      borderWidth: isHighlighted ? 2 : 1,
                     },
                   ]}
                 >
-                  {isRecommended ? (
-                    <View style={[styles.recommendedBadge, { backgroundColor: theme.primary }]}>
-                      <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 10 }}>
-                        Recommended
+                  {isMostPopular ? (
+                    <View style={[styles.mostPopularBadge, { backgroundColor: theme.primary }]}>
+                      <Feather name="star" size={10} color="#FFFFFF" />
+                      <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 11 }}>
+                        Most Popular
                       </ThemedText>
                     </View>
                   ) : null}
-                  <View style={styles.resultCardContent}>
-                    <View style={{ flex: 1 }}>
-                      <ThemedText type="subtitle" style={{ fontWeight: "700", color: isRecommended ? theme.primary : theme.text }}>
-                        {o.label}
-                      </ThemedText>
-                      <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
-                        {o.option.scope}
-                      </ThemedText>
-                    </View>
-                    <ThemedText type="h2" style={{ color: isRecommended ? theme.primary : theme.text }}>
-                      ${o.option.price}
-                    </ThemedText>
-                  </View>
+                  <ThemedText type="caption" style={{ color: theme.textSecondary, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", fontSize: 11 }}>
+                    {meta.tier}
+                  </ThemedText>
+                  <ThemedText type="subtitle" style={{ fontWeight: "700", color: isHighlighted ? theme.primary : theme.text, marginTop: 4 }}>
+                    {o.label}
+                  </ThemedText>
+                  <ThemedText type="h1" style={{ color: isHighlighted ? theme.primary : theme.text, marginTop: Spacing.sm }}>
+                    ${o.option.price}
+                  </ThemedText>
+                  <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.xs, lineHeight: 20 }}>
+                    {meta.tagline}
+                  </ThemedText>
                 </View>
               );
             })}
           </View>
 
-          <View style={[styles.sendCard, { backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)", borderColor: theme.border }]}>
-            <ThemedText type="subtitle" style={{ fontWeight: "600", marginBottom: Spacing.md, textAlign: "center" }}>
-              Send this as a professional quote to your customer.
-            </ThemedText>
-
-            <View style={styles.sendButtons}>
-              <Pressable
-                testID="button-send-text"
-                onPress={handleSendText}
-                style={[styles.sendBtn, { backgroundColor: theme.primary }]}
-              >
-                <Feather name="message-circle" size={18} color="#FFFFFF" />
-                <ThemedText type="subtitle" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-                  Send via Text
-                </ThemedText>
-              </Pressable>
-
-              <Pressable
-                testID="button-send-email"
-                onPress={handleSendEmail}
-                style={[styles.sendBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: theme.border }]}
-              >
-                <Feather name="mail" size={18} color={theme.text} />
-                <ThemedText type="subtitle" style={{ color: theme.text, fontWeight: "600" }}>
-                  Send via Email
-                </ThemedText>
-              </Pressable>
-
-              <Pressable
-                testID="button-copy-link"
-                onPress={handleCopyLink}
-                style={[styles.sendBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", borderWidth: 1, borderColor: theme.border }]}
-              >
-                <Feather name={copiedLink ? "check" : "copy"} size={18} color={copiedLink ? theme.success : theme.text} />
-                <ThemedText type="subtitle" style={{ color: copiedLink ? theme.success : theme.text, fontWeight: "600" }}>
-                  {copiedLink ? "Copied!" : "Copy Quote"}
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
+          <ThemedText type="caption" style={{ color: theme.textSecondary + "80", textAlign: "center", marginBottom: Spacing.xl, lineHeight: 18 }}>
+            Professional quote options can help increase average ticket value.
+          </ThemedText>
 
           <Pressable
-            testID="button-continue-dashboard"
+            testID="button-customize-quote"
             onPress={handleContinueToDashboard}
-            style={{ borderRadius: BorderRadius.md, overflow: "hidden", marginTop: Spacing.xl }}
+            style={{ borderRadius: BorderRadius.md, overflow: "hidden" }}
           >
             <LinearGradient
               colors={[theme.primary, "#1D4ED8"]}
               style={styles.ctaButton}
             >
+              <Feather name="edit-3" size={20} color="#FFFFFF" />
               <ThemedText type="h3" style={{ color: "#FFFFFF", fontWeight: "700" }}>
-                Go to Dashboard
+                Customize This Quote
               </ThemedText>
-              <Feather name="arrow-right" size={20} color="#FFFFFF" />
             </LinearGradient>
           </Pressable>
+
+          <View style={styles.secondaryActions}>
+            <Pressable
+              testID="button-send-text"
+              onPress={handleSendText}
+              style={[styles.secondaryBtn, { borderColor: theme.border }]}
+            >
+              <Feather name="message-circle" size={16} color={theme.text} />
+              <ThemedText type="subtitle" style={{ color: theme.text, fontWeight: "600" }}>
+                Send Quote
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              testID="button-copy-link"
+              onPress={handleCopyLink}
+              style={[styles.secondaryBtn, { borderColor: theme.border }]}
+            >
+              <Feather name={copiedLink ? "check" : "copy"} size={16} color={copiedLink ? theme.success : theme.text} />
+              <ThemedText type="subtitle" style={{ color: copiedLink ? theme.success : theme.text, fontWeight: "600" }}>
+                {copiedLink ? "Copied!" : "Copy Quote"}
+              </ThemedText>
+            </Pressable>
+          </View>
+
+          <View style={[styles.deeperSection, { backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", borderColor: theme.border }]}>
+            <ThemedText type="h4" style={{ marginBottom: Spacing.md }}>
+              Take this quote further
+            </ThemedText>
+            {DEEPER_FEATURES.map((f) => (
+              <View key={f.text} style={styles.deeperRow}>
+                <View style={[styles.deeperCheck, { backgroundColor: theme.primary + "12" }]}>
+                  <Feather name={f.icon} size={14} color={theme.primary} />
+                </View>
+                <ThemedText type="body" style={{ flex: 1, color: theme.textSecondary, lineHeight: 20 }}>
+                  {f.text}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -601,18 +634,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  compactStepperBtn: {
-    width: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   stepperValue: {
     flex: 1,
     minWidth: 36,
     alignItems: "center",
     justifyContent: "center",
   },
-  twoCol: { flexDirection: "row", gap: Spacing.md },
   typeGrid: { gap: Spacing.sm },
   typeChip: {
     flexDirection: "row",
@@ -621,38 +648,78 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: BorderRadius.md,
   },
-  resultsCards: { gap: Spacing.md, marginBottom: Spacing.xl },
+  successHeader: {
+    alignItems: "center",
+    marginBottom: Spacing.xl,
+    gap: Spacing.sm,
+  },
+  successIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.xs,
+  },
+  propertyPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    marginTop: Spacing.xs,
+  },
+  resultsCards: { gap: Spacing.md, marginBottom: Spacing.md },
   resultCard: {
     borderRadius: BorderRadius.md,
     padding: Spacing.lg,
     position: "relative",
     overflow: "hidden",
   },
-  resultCardContent: {
+  mostPopularBadge: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-  },
-  recommendedBadge: {
-    position: "absolute",
-    top: 0,
-    right: 0,
+    gap: 4,
+    alignSelf: "flex-start",
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
-    borderBottomLeftRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.full,
+    marginBottom: Spacing.sm,
   },
-  sendCard: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
+  secondaryActions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xl,
   },
-  sendButtons: { gap: Spacing.sm },
-  sendBtn: {
+  secondaryBtn: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.sm,
     height: 48,
     borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  deeperSection: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  deeperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  deeperCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
