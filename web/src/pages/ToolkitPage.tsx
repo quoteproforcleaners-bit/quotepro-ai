@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Calculator,
   FileText,
@@ -12,6 +12,7 @@ import {
   DollarSign,
   ClipboardList,
   BarChart3,
+  Unlock,
 } from "lucide-react";
 import { LeadCaptureModal } from "../components/LeadCaptureModal";
 
@@ -160,6 +161,21 @@ export default function ToolkitPage() {
       return false;
     }
   });
+  const [stickyVisible, setStickyVisible] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollEl = document.querySelector("main");
+      if (!scrollEl) return;
+      const scrollPct = scrollEl.scrollTop / (scrollEl.scrollHeight - scrollEl.clientHeight);
+      setStickyVisible(scrollPct >= 0.3);
+    };
+    const main = document.querySelector("main");
+    if (main) {
+      main.addEventListener("scroll", handleScroll, { passive: true });
+      return () => main.removeEventListener("scroll", handleScroll);
+    }
+  }, []);
 
   const filtered = activeCategory === "all"
     ? resources
@@ -279,6 +295,36 @@ export default function ToolkitPage() {
         onSuccess={handleLeadCaptured}
         resourceTitle={pendingResource?.title || ""}
       />
+
+      {stickyVisible && !sessionUnlocked ? (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[90] transition-all duration-300"
+          style={{
+            animation: "slideUp 0.35s ease-out",
+          }}
+        >
+          <div className="bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-[0_-4px_24px_rgba(0,0,0,0.06)]">
+            <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+              <p className="text-sm font-medium text-slate-700 hidden sm:block">
+                Get the Free Cleaning Business Toolkit
+              </p>
+              <p className="text-sm font-medium text-slate-700 sm:hidden">
+                Free Cleaning Toolkit
+              </p>
+              <button
+                onClick={() => {
+                  setPendingResource(null);
+                  setModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.97] transition-all duration-150 shadow-sm shadow-primary-600/20 shrink-0"
+              >
+                <Unlock className="w-4 h-4" />
+                Unlock Free Tools
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {toast ? (
         <div
