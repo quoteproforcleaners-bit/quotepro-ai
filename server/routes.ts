@@ -12,6 +12,7 @@ import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClie
 import { getUncachableGoogleCalendarClient, isGoogleCalendarConnected } from "./googleCalendarClient";
 import { QBOClient, encryptToken, decryptToken, logSync } from "./qbo-client";
 import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage, getMoveInOutCleaningCalculatorPage } from "./seo-pages";
+import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "./calculator-engine";
 import { JobberClient, buildJobberAuthUrl, exchangeJobberCode, logJobberSync, syncQuoteToJobber } from "./jobber-client";
 
 let stripe: Stripe | null = null;
@@ -5465,16 +5466,26 @@ Respond with JSON: {"reply": string}`
     res.send(getDeleteAccountHTML());
   });
 
+  app.get("/calculators", (_req: Request, res: Response) => {
+    res.send(renderCalculatorIndex());
+  });
+
+  app.get("/calculators/:slug", (req: Request, res: Response) => {
+    const def = getCalculatorBySlug(req.params.slug);
+    if (!def) return res.status(404).send("Calculator not found");
+    res.send(renderCalculatorPage(def));
+  });
+
   app.get("/house-cleaning-price-calculator", (_req: Request, res: Response) => {
-    res.send(getHouseCleaningPriceCalculatorPage());
+    res.redirect(301, "/calculators/house-cleaning-price-calculator");
   });
 
   app.get("/deep-cleaning-price-calculator", (_req: Request, res: Response) => {
-    res.send(getDeepCleaningPriceCalculatorPage());
+    res.redirect(301, "/calculators/deep-cleaning-price-calculator");
   });
 
   app.get("/move-in-out-cleaning-calculator", (_req: Request, res: Response) => {
-    res.send(getMoveInOutCleaningCalculatorPage());
+    res.redirect(301, "/calculators/move-in-out-cleaning-calculator");
   });
 
   // ─── Sticky Product: Follow-Up Queue ───

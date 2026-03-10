@@ -78,15 +78,16 @@ Job scheduling includes start/end clock functionality with duration tracking. Jo
 - **Calendar Integration**: Create calendar event stubs with ICS download and Google Calendar deep links.
 - **Webhooks & API Keys**: For Zapier/Make with HMAC-SHA256 signing and retry logic for events like `quote.created/sent/accepted/declined`.
 
-### SEO Calculator Landing Pages
-- **Template system**: `server/seo-pages.ts` — reusable `renderSEOPage(config)` template for creating SEO-optimized calculator pages.
-- **Pages**:
-  - `/house-cleaning-price-calculator` — standard cleaning price calculator with beds/baths/sqft/service type/frequency
-  - `/deep-cleaning-price-calculator` — deep clean calculator with home condition selector
-  - `/move-in-out-cleaning-calculator` — move clean calculator with extras (garage, carpet treatment)
-- **Features**: FAQ schema markup (JSON-LD), absolute canonical URLs, OG/Twitter meta tags, client-side calculator with Good/Better/Best tier pricing, mobile responsive layout, internal links to toolkit.
-- **Instant Quote Generator Funnel**: After calculator results, a professional quote preview card appears showing service details + estimated price. "Generate Professional Quote" opens a styled proposal overlay with service details, scope of work, and estimated investment. "Send This Quote to Your Customer" triggers a signup modal. On signup, `POST /api/public/calculator-signup` creates user + business + quote (server-side price recalculation, rate-limited, validated inputs) and redirects to `/app/quotes/:id`.
-- **Adding new pages**: Create a new function in `seo-pages.ts` following `CalculatorPageConfig` interface, register the route in `routes.ts`.
+### Scalable Calculator Engine
+- **Engine**: `server/calculator-engine.ts` — data-driven calculator engine. Define a `CalcDefinition` (slug, fields, formula, SEO content, FAQ) and the engine auto-generates the full calculator page with form, tier pricing, quote funnel, and SEO markup.
+- **Template**: `server/seo-pages.ts` — shared `renderSEOPage()` template with all CSS/HTML/JS for tier cards, quote preview, proposal overlay, signup modal.
+- **Index page**: `/calculators` — lists all calculators with card grid, count badge, and toolkit CTA.
+- **Dynamic route**: `/calculators/:slug` — looks up `CalcDefinition` from registry and renders the page.
+- **Current calculators (10)**: house-cleaning-price, deep-cleaning-price, move-in-out-cleaning, office-cleaning-bid, carpet-cleaning-price, window-cleaning-price, pressure-washing-price, airbnb-cleaning-price, post-construction-cleaning, janitorial-bidding.
+- **Legacy URLs**: `/house-cleaning-price-calculator`, `/deep-cleaning-price-calculator`, `/move-in-out-cleaning-calculator` redirect 301 to `/calculators/` prefix.
+- **Features**: FAQ schema markup (JSON-LD), canonical URLs, OG/Twitter meta, Good/Better/Best tier pricing, mobile responsive, breadcrumbs linking to `/calculators`.
+- **Instant Quote Generator Funnel**: After calculator results, a quote preview card appears. "Generate Professional Quote" opens proposal overlay. "Send This Quote" triggers signup modal. `POST /api/public/calculator-signup` creates user + business + quote (server-side price recalculation, rate-limited, validated inputs) and redirects to `/app/quotes/:id`.
+- **Adding new calculators**: Add a `CalcDefinition` object to the `calculators` array in `server/calculator-engine.ts`. No routing changes needed — the `/calculators/:slug` route handles it automatically.
 
 ### Cleaning Business Toolkit
 - **Web route**: `/app/toolkit` — resource page with 10 downloadable/viewable cleaning business resources (calculators, templates, scripts, AI prompts).

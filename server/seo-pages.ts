@@ -20,6 +20,8 @@ export interface CalculatorPageConfig {
   calculatorHTML: string;
   faq: FAQItem[];
   toolkitCTA?: string;
+  scopeItems?: string[];
+  serviceLabel?: string;
 }
 
 function faqSchema(faq: FAQItem[]): string {
@@ -233,7 +235,7 @@ a:hover{text-decoration:underline}
 <body>
 
 <header class="seo-header">
-  <nav class="breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/app/toolkit">Toolkit</a> &rsaquo; ${config.h1}</nav>
+  <nav class="breadcrumb"><a href="/">Home</a> &rsaquo; <a href="/calculators">Calculators</a> &rsaquo; ${config.h1}</nav>
   <h1>${config.h1}</h1>
   <p class="intro">${config.introParagraph}</p>
 </header>
@@ -368,17 +370,19 @@ document.querySelectorAll('.faq-item').forEach(function(item){
 var _quoteData = {};
 var _serviceLabels = {regular:'Regular Cleaning',deep_clean:'Deep Cleaning',move_in_out:'Move In / Move Out'};
 var _freqLabels = {'one-time':'One-Time',weekly:'Weekly',biweekly:'Bi-Weekly',monthly:'Monthly'};
-var _scopeItems = {
+var _defaultScopeItems = {
   regular: ['Dust all surfaces and furniture','Vacuum and mop all floors','Clean and sanitize bathrooms','Clean kitchen counters and appliances','Empty trash and replace liners','Wipe mirrors and glass surfaces'],
   deep_clean: ['All standard cleaning tasks','Inside oven, microwave, and refrigerator','Baseboard and wall spot cleaning','Interior window and track detailing','Behind and under furniture','Detailed grout and tile scrubbing','Light fixtures and ceiling fans','Cabinet fronts and door frames'],
   move_in_out: ['Complete deep cleaning of all rooms','Inside all cabinets, drawers, and closets','Inside all appliances','All light fixtures and switch plates','Window sills, tracks, and interior glass','Wall spot cleaning and baseboard detailing','Garage sweeping (if applicable)','Move-in/move-out ready guarantee']
 };
+var _customScopeItems = ${config.scopeItems ? JSON.stringify(config.scopeItems) : 'null'};
+var _customServiceLabel = ${config.serviceLabel ? JSON.stringify(config.serviceLabel) : 'null'};
 var _checkSvg = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>';
 
 function updateQuotePreview(data) {
   _quoteData = data;
   var st = data.service_type || 'regular';
-  document.getElementById('qpServiceType').textContent = _serviceLabels[st] || st;
+  document.getElementById('qpServiceType').textContent = _customServiceLabel || _serviceLabels[st] || st;
   document.getElementById('qpSqft').textContent = (data.square_footage || 0).toLocaleString() + ' sq ft';
   document.getElementById('qpBeds').textContent = data.bedrooms || 0;
   document.getElementById('qpBaths').textContent = data.bathrooms || 0;
@@ -390,7 +394,8 @@ function updateQuotePreview(data) {
 function showProposal() {
   var d = _quoteData;
   var st = d.service_type || 'regular';
-  document.getElementById('prServiceType').textContent = _serviceLabels[st] || st;
+  var serviceLabel = _customServiceLabel || _serviceLabels[st] || st;
+  document.getElementById('prServiceType').textContent = serviceLabel;
   document.getElementById('prFrequency').textContent = _freqLabels[d.frequency] || d.frequency || 'One-Time';
   document.getElementById('prBeds').textContent = d.bedrooms || 0;
   document.getElementById('prBaths').textContent = d.bathrooms || 0;
@@ -398,8 +403,7 @@ function showProposal() {
   document.getElementById('prDate').textContent = new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});
   document.getElementById('prPriceAmount').textContent = '$' + (d.estimated_price || 0);
 
-  var scopeKey = st;
-  var items = _scopeItems[scopeKey] || _scopeItems.regular;
+  var items = _customScopeItems || _defaultScopeItems[st] || _defaultScopeItems.regular;
   document.getElementById('prScopeList').innerHTML = items.map(function(t){return '<li>'+_checkSvg+' '+t+'</li>';}).join('');
 
   var addonsHtml = '';
