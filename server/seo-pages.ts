@@ -103,8 +103,13 @@ a:hover{text-decoration:underline}
 .content-section ul,.content-section ol{color:#475569;margin-bottom:1rem;padding-left:1.5rem;font-size:0.95rem}
 .content-section li{margin-bottom:0.4rem}
 
+.free-badge-row{display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.35rem}
+.free-badge{display:inline-flex;align-items:center;gap:0.35rem;padding:0.25rem 0.75rem;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;border-radius:20px;box-shadow:0 2px 8px rgba(5,150,105,0.25)}
+.free-badge svg{width:12px;height:12px}
+.free-subtext{text-align:center;font-size:0.82rem;color:#64748b;margin-bottom:1.25rem}
 .calc-wrapper{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:2rem;margin:2rem 0;box-shadow:0 4px 24px rgba(0,0,0,0.06)}
-.calc-wrapper h2{font-size:1.35rem;font-weight:700;color:#0f172a;margin-bottom:1.25rem;text-align:center}
+.calc-wrapper h2{font-size:1.35rem;font-weight:700;color:#0f172a;margin-bottom:0.35rem;text-align:center}
+.quote-upsell-text{text-align:center;font-size:0.88rem;color:#475569;font-weight:500;margin-bottom:0.75rem;margin-top:0.25rem}
 .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 .calc-field{display:flex;flex-direction:column;gap:0.35rem}
 .calc-field.full{grid-column:1/-1}
@@ -244,9 +249,14 @@ a:hover{text-decoration:underline}
   ${sectionsHTML}
 
   <div class="calc-wrapper" id="calculator">
+    <div class="free-badge-row">
+      <span class="free-badge"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg> Free Tool</span>
+    </div>
     ${config.calculatorHTML}
+    <p class="free-subtext">This calculator is completely free to use. No signup required.</p>
 
     <div class="quote-preview" id="quotePreview">
+      <p class="quote-upsell-text">Want to send this as a professional quote to your customer?</p>
       <div class="quote-card">
         <div class="quote-card-header">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>

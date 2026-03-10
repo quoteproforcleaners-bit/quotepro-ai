@@ -15,6 +15,9 @@ import {
   Unlock,
   Search,
   X,
+  Check,
+  ArrowRight,
+  Crown,
 } from "lucide-react";
 import { LeadCaptureModal } from "../components/LeadCaptureModal";
 import { trackEvent } from "../lib/analytics";
@@ -357,6 +360,66 @@ export default function ToolkitPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-10 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+            <div className="px-5 py-4 bg-gradient-to-r from-emerald-50 to-green-50 border-b border-emerald-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-emerald-900">Free Toolkit</h3>
+                  <p className="text-[11px] text-emerald-600 font-medium">Free resources, just enter your email</p>
+                </div>
+              </div>
+            </div>
+            <ul className="p-5 space-y-3">
+              {["Pricing calculators for every service", "Professional quote templates", "Sales & follow-up scripts", "AI prompts for your business", "Growth playbook & KPI tracker"].map((item) => (
+                <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                  <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="bg-white rounded-2xl border-2 border-primary-200 overflow-hidden shadow-sm shadow-primary-100/50">
+            <div className="px-5 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-primary-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-primary-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-primary-900">QuotePro</h3>
+                  <p className="text-[11px] text-primary-600 font-medium">The full platform for pros</p>
+                </div>
+              </div>
+            </div>
+            <ul className="p-5 space-y-3">
+              {["Send professional quotes to customers", "Auto-generate proposals & invoices", "Built-in CRM & lead management", "Automated follow-up sequences", "Revenue tracking & analytics"].map((item) => (
+                <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                  <Check className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="px-5 pb-5">
+              <button
+                onClick={() => {
+                  trackEvent("quotepro_trial_click", { page: "/toolkit", source: "comparison_section" });
+                  window.location.href = "/app/signup";
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.98] transition-all duration-150 shadow-sm shadow-primary-600/20"
+              >
+                Try QuotePro Free
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <LeadCaptureModal

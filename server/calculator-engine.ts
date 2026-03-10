@@ -696,6 +696,7 @@ export function renderCalculatorIndex(): string {
   const baseUrl = getBaseUrl();
   const calcCards = calculators.map(c => `
     <a href="/calculators/${c.slug}" class="calc-index-card">
+      <span class="card-free-badge">Free</span>
       <h3>${c.h1}</h3>
       <p>${c.metaDescription.substring(0, 120)}...</p>
       <span class="calc-index-link">Open Calculator &rarr;</span>
@@ -727,8 +728,9 @@ a{color:inherit;text-decoration:none}
 .idx-header .count{display:inline-block;background:rgba(255,255,255,0.15);padding:0.25rem 0.85rem;border-radius:20px;font-size:0.82rem;font-weight:600;margin-top:0.75rem}
 .idx-body{max-width:900px;margin:0 auto;padding:2rem 1.5rem 4rem}
 .idx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.25rem}
-.calc-index-card{display:block;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:1.5rem;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.calc-index-card{display:block;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:1.5rem;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.04);position:relative}
 .calc-index-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.08);border-color:#bfdbfe;text-decoration:none}
+.card-free-badge{display:inline-block;padding:0.15rem 0.55rem;background:#ecfdf5;color:#059669;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;border-radius:6px;border:1px solid #a7f3d0;margin-bottom:0.5rem}
 .calc-index-card h3{font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:0.5rem}
 .calc-index-card p{font-size:0.85rem;color:#64748b;margin-bottom:0.75rem;line-height:1.5}
 .calc-index-link{font-size:0.82rem;font-weight:600;color:#2563eb}
