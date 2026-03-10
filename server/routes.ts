@@ -11,7 +11,7 @@ import { google } from "googleapis";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableGoogleCalendarClient, isGoogleCalendarConnected } from "./googleCalendarClient";
 import { QBOClient, encryptToken, decryptToken, logSync } from "./qbo-client";
-import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage, getMoveInOutCleaningCalculatorPage } from "./seo-pages";
+import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage, getMoveInOutCleaningCalculatorPage, getCleaningQuoteGeneratorPage } from "./seo-pages";
 import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "./calculator-engine";
 import { JobberClient, buildJobberAuthUrl, exchangeJobberCode, logJobberSync, syncQuoteToJobber } from "./jobber-client";
 
@@ -4930,6 +4930,9 @@ Respond with JSON: {"reply": string}`
         if (quoteData.add_ons && typeof quoteData.add_ons === "object") {
           if (quoteData.add_ons.garage) { sanitizedAddOns.garage = true; total += 75; }
           if (quoteData.add_ons.carpets) { sanitizedAddOns.carpets = true; total += 100; }
+          if (quoteData.add_ons.oven) { sanitizedAddOns.oven = true; total += 45; }
+          if (quoteData.add_ons.fridge) { sanitizedAddOns.fridge = true; total += 40; }
+          if (quoteData.add_ons.windows) { sanitizedAddOns.windows = true; total += 60; }
         }
 
         const estimated = Math.round(total);
@@ -5486,6 +5489,10 @@ Respond with JSON: {"reply": string}`
 
   app.get("/move-in-out-cleaning-calculator", (_req: Request, res: Response) => {
     res.redirect(301, "/calculators/move-in-out-cleaning-calculator");
+  });
+
+  app.get("/cleaning-quote-generator", (_req: Request, res: Response) => {
+    res.send(getCleaningQuoteGeneratorPage());
   });
 
   // ─── Sticky Product: Follow-Up Queue ───

@@ -994,3 +994,525 @@ export function getMoveInOutCleaningCalculatorPage(): string {
     toolkitCTA: "Explore More Free Cleaning Business Tools",
   });
 }
+
+export function getCleaningQuoteGeneratorPage(): string {
+  const baseUrl = getBaseUrl();
+  const canonicalUrl = `${baseUrl}/cleaning-quote-generator`;
+  const faq: FAQItem[] = [
+    { question: "How much should I charge for a house cleaning?", answer: "House cleaning prices typically range from $120 to $350+ depending on the home size, condition, and service type. Standard cleaning for a 3-bedroom, 2-bathroom home averages $180 to $240. Deep cleaning costs 40-60% more. Use our free quote generator above to get an instant estimate." },
+    { question: "What should a professional cleaning quote include?", answer: "A professional cleaning quote should include the service type, property details (bedrooms, bathrooms, square footage), scope of work, any add-on services, pricing tiers, frequency discounts, and an expiration date. QuotePro generates all of this automatically." },
+    { question: "How do I send a cleaning estimate to a customer?", answer: "With QuotePro, generate your estimate using the calculator above, then click 'Send This Quote to Your Customer.' Create a free account and your quote is instantly saved. From your dashboard, you can email a professional PDF proposal directly to your customer." },
+    { question: "Should I offer Good/Better/Best pricing?", answer: "Yes. Tiered pricing (Good/Better/Best) is proven to increase average ticket size by 15-25%. Most customers choose the middle option. QuotePro automatically generates three pricing tiers for every quote." },
+    { question: "How do I price recurring cleaning services?", answer: "Recurring services are typically discounted: weekly (15-20% off), biweekly (10-15% off), monthly (5-10% off). The recurring discount is offset by guaranteed revenue and reduced customer acquisition costs." },
+    { question: "What add-ons increase my cleaning revenue?", answer: "The highest-value add-ons are inside oven cleaning ($35-50), inside refrigerator cleaning ($30-45), interior window cleaning ($40-75), carpet cleaning, and garage cleaning. Offering add-ons can increase your average ticket by 20-35%." },
+    { question: "Is this quote generator free?", answer: "Yes. The quote generator is completely free to use with no signup required. If you want to save and send professional proposals to customers, you can create a free QuotePro account." },
+  ];
+  const faqSchemaJSON = faqSchema(faq);
+  const faqHTML = faq.map(f => `<div class="faq-item"><h3 class="faq-q">${f.question}</h3><p class="faq-a">${f.answer}</p></div>`).join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Cleaning Quote Generator | Create Cleaning Estimates Online</title>
+<meta name="description" content="Generate professional cleaning quotes in seconds. Create residential or commercial cleaning estimates and send proposals to customers.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="${canonicalUrl}">
+<meta property="og:title" content="Cleaning Quote Generator | Create Cleaning Estimates Online">
+<meta property="og:description" content="Generate professional cleaning quotes in seconds. Create residential or commercial cleaning estimates and send proposals to customers.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="${canonicalUrl}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Cleaning Quote Generator | Create Cleaning Estimates Online">
+<meta name="twitter:description" content="Generate professional cleaning quotes in seconds. Create residential or commercial cleaning estimates and send proposals to customers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script type="application/ld+json">${faqSchemaJSON}</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;color:#0f172a;background:#f8fafc;-webkit-font-smoothing:antialiased;line-height:1.7}
+a{color:#2563eb;text-decoration:none}
+a:hover{text-decoration:underline}
+
+.hero{background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 40%,#3b82f6 100%);color:#fff;padding:4rem 1.5rem 3.5rem;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 50%,rgba(255,255,255,0.04) 0%,transparent 50%);pointer-events:none}
+.hero h1{font-size:2.5rem;font-weight:800;line-height:1.15;margin-bottom:0.75rem;letter-spacing:-0.03em;max-width:700px;margin-left:auto;margin-right:auto;position:relative}
+.hero .sub{max-width:540px;margin:0 auto 2rem;font-size:1.1rem;color:rgba(255,255,255,0.85);line-height:1.6;position:relative}
+.hero-btns{display:flex;align-items:center;justify-content:center;gap:0.75rem;flex-wrap:wrap;position:relative}
+.hero-btn-primary{display:inline-flex;align-items:center;gap:0.5rem;padding:0.85rem 2rem;background:#fff;color:#1e3a8a;font-size:1rem;font-weight:700;border:none;border-radius:12px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 14px rgba(0,0,0,0.15)}
+.hero-btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.2);text-decoration:none}
+.hero-btn-secondary{display:inline-flex;align-items:center;gap:0.5rem;padding:0.85rem 2rem;background:rgba(255,255,255,0.12);color:#fff;font-size:1rem;font-weight:600;border:1.5px solid rgba(255,255,255,0.3);border-radius:12px;cursor:pointer;transition:all 0.2s;backdrop-filter:blur(4px)}
+.hero-btn-secondary:hover{background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.5);text-decoration:none}
+.hero-trust{margin-top:2rem;display:flex;align-items:center;justify-content:center;gap:1.5rem;flex-wrap:wrap;position:relative}
+.hero-trust span{font-size:0.8rem;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:0.35rem}
+.hero-trust svg{width:14px;height:14px}
+
+.page-body{max-width:800px;margin:0 auto;padding:2.5rem 1.5rem 4rem}
+
+.free-badge-row{display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.5rem}
+.free-badge{display:inline-flex;align-items:center;gap:0.35rem;padding:0.25rem 0.75rem;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;border-radius:20px;box-shadow:0 2px 8px rgba(5,150,105,0.25)}
+.free-badge svg{width:12px;height:12px}
+.free-subtext{text-align:center;font-size:0.82rem;color:#64748b;margin-bottom:1.25rem}
+
+.gen-wrapper{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:2rem;margin-bottom:2.5rem;box-shadow:0 4px 24px rgba(0,0,0,0.06)}
+.gen-wrapper h2{font-size:1.35rem;font-weight:700;color:#0f172a;margin-bottom:0.35rem;text-align:center}
+
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.calc-field{display:flex;flex-direction:column;gap:0.35rem}
+.calc-field.full{grid-column:1/-1}
+.calc-field label{font-size:0.82rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.04em}
+.calc-field input,.calc-field select{padding:0.65rem 0.85rem;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;font-family:inherit;color:#0f172a;background:#f8fafc;transition:border-color 0.2s,box-shadow 0.2s}
+.calc-field input:focus,.calc-field select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.12)}
+
+.addons-section{margin-top:1.25rem;padding-top:1rem;border-top:1px solid #f1f5f9}
+.addons-title{font-size:0.82rem;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.75rem}
+.addons-grid{display:flex;flex-wrap:wrap;gap:0.5rem}
+.addon-chip{display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0.85rem;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;cursor:pointer;transition:all 0.2s;font-size:0.85rem;color:#475569;user-select:none}
+.addon-chip:hover{border-color:#93c5fd;background:#eff6ff}
+.addon-chip.active{background:#eff6ff;border-color:#3b82f6;color:#1e40af}
+.addon-chip input{display:none}
+.addon-check{width:16px;height:16px;border:1.5px solid #cbd5e1;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
+.addon-chip.active .addon-check{background:#2563eb;border-color:#2563eb}
+.addon-chip.active .addon-check svg{display:block}
+.addon-check svg{display:none;width:10px;height:10px;color:#fff}
+.addon-price{font-size:0.75rem;color:#94a3b8;font-weight:500}
+
+.calc-btn{display:block;width:100%;padding:0.85rem;margin-top:1.25rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-size:1rem;font-weight:700;border:none;border-radius:12px;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 4px 14px rgba(37,99,235,0.3)}
+.calc-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(37,99,235,0.35)}
+.calc-btn:active{transform:translateY(0)}
+
+.quote-result{display:none;margin-top:2rem;animation:fadeUp 0.5s ease-out}
+.proposal-card{background:#fff;border:2px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.08)}
+.proposal-header{background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:1.5rem;text-align:center;color:#fff}
+.proposal-header h3{font-size:1.2rem;font-weight:700;margin-bottom:0.15rem}
+.proposal-header span{font-size:0.8rem;color:rgba(255,255,255,0.7)}
+.proposal-body{padding:1.5rem}
+.proposal-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1.25rem}
+.proposal-item{background:#f8fafc;border-radius:10px;padding:0.75rem 1rem}
+.proposal-item-label{font-size:0.72rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.15rem}
+.proposal-item-value{font-size:0.95rem;color:#0f172a;font-weight:600}
+.scope-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#2563eb;margin-bottom:0.75rem}
+.scope-list{list-style:none;padding:0;margin-bottom:1.25rem}
+.scope-list li{display:flex;align-items:flex-start;gap:0.5rem;padding:0.4rem 0;font-size:0.88rem;color:#334155}
+.scope-list li svg{width:16px;height:16px;color:#059669;flex-shrink:0;margin-top:2px}
+.addons-summary{margin-bottom:1.25rem}
+.addon-line{display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.75rem;background:#fefce8;border-radius:8px;margin-bottom:0.35rem;font-size:0.85rem}
+.addon-line-name{color:#854d0e;font-weight:500}
+.addon-line-price{color:#a16207;font-weight:700}
+.price-box{background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #bfdbfe;border-radius:14px;padding:1.25rem;text-align:center;margin-bottom:1rem}
+.price-label{font-size:0.78rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.25rem}
+.price-amount{font-size:2.25rem;font-weight:800;color:#1e3a8a;letter-spacing:-0.02em}
+.price-note{font-size:0.75rem;color:#64748b;margin-top:0.25rem}
+
+.conversion-cta{text-align:center;padding:1.25rem 1.5rem;background:#f8fafc;border-top:1px solid #e2e8f0}
+.upsell-text{font-size:0.9rem;color:#475569;font-weight:500;margin-bottom:0.75rem}
+.send-btn{display:flex;align-items:center;justify-content:center;gap:0.5rem;width:100%;padding:0.9rem;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-size:1rem;font-weight:700;border:none;border-radius:12px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 14px rgba(5,150,105,0.3)}
+.send-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(5,150,105,0.35)}
+.send-btn svg{width:18px;height:18px}
+
+.signup-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;background:rgba(15,23,42,0.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1rem}
+.signup-modal{background:#fff;border-radius:20px;max-width:420px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,0.25);animation:fadeUp 0.35s ease-out;overflow:hidden;position:relative}
+.signup-modal-header{background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:2rem 2rem 1.5rem;text-align:center;color:#fff}
+.signup-modal-header h3{font-size:1.2rem;font-weight:700;margin-bottom:0.35rem}
+.signup-modal-header p{color:rgba(255,255,255,0.75);font-size:0.85rem}
+.signup-modal-body{padding:1.5rem 2rem 2rem}
+.signup-field{margin-bottom:1rem}
+.signup-field label{display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.35rem;text-transform:uppercase;letter-spacing:0.04em}
+.signup-field input{width:100%;padding:0.7rem 0.85rem;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;font-family:inherit;color:#0f172a;background:#f8fafc;transition:border-color 0.2s,box-shadow 0.2s}
+.signup-field input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.12)}
+.signup-submit{display:flex;align-items:center;justify-content:center;gap:0.5rem;width:100%;padding:0.85rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-size:1rem;font-weight:700;border:none;border-radius:12px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 14px rgba(37,99,235,0.3);margin-top:0.5rem}
+.signup-submit:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(37,99,235,0.35)}
+.signup-submit:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+.signup-error{background:#fef2f2;color:#dc2626;border-radius:8px;padding:0.65rem 0.85rem;font-size:0.82rem;font-weight:500;margin-bottom:1rem;display:none}
+.signup-close{position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.15);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;transition:background 0.2s}
+.signup-close:hover{background:rgba(255,255,255,0.25)}
+
+.benefits{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:2.5rem 2rem;margin-bottom:2.5rem;box-shadow:0 2px 12px rgba(0,0,0,0.04)}
+.benefits h2{font-size:1.4rem;font-weight:700;color:#0f172a;text-align:center;margin-bottom:0.35rem;letter-spacing:-0.01em}
+.benefits .benefits-sub{text-align:center;font-size:0.9rem;color:#64748b;margin-bottom:2rem;max-width:500px;margin-left:auto;margin-right:auto}
+.benefits-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.benefit-card{display:flex;gap:0.85rem;align-items:flex-start}
+.benefit-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.benefit-icon svg{width:20px;height:20px;color:#fff}
+.benefit-text h3{font-size:0.95rem;font-weight:700;color:#0f172a;margin-bottom:0.2rem}
+.benefit-text p{font-size:0.82rem;color:#64748b;line-height:1.5}
+
+.faq-section{margin-bottom:2.5rem}
+.faq-section h2{font-size:1.4rem;font-weight:700;color:#0f172a;margin-bottom:1.25rem}
+.faq-item{border-bottom:1px solid #e2e8f0;padding:1rem 0}
+.faq-item:last-child{border-bottom:none}
+.faq-q{font-size:1rem;font-weight:600;color:#1e293b;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:0.5rem}
+.faq-q::after{content:'+';font-size:1.25rem;color:#94a3b8;transition:transform 0.2s;flex-shrink:0}
+.faq-item.open .faq-q::after{transform:rotate(45deg)}
+.faq-a{color:#475569;font-size:0.92rem;line-height:1.7;max-height:0;overflow:hidden;transition:max-height 0.3s ease,padding 0.3s ease;padding-top:0}
+.faq-item.open .faq-a{max-height:500px;padding-top:0.75rem}
+
+.final-cta{background:linear-gradient(135deg,#1e293b,#334155);border-radius:16px;padding:2.5rem 2rem;text-align:center;color:#fff;margin-bottom:2.5rem}
+.final-cta h2{font-size:1.35rem;font-weight:700;margin-bottom:0.5rem}
+.final-cta p{color:rgba(255,255,255,0.75);font-size:0.95rem;margin-bottom:1.25rem;max-width:480px;margin-left:auto;margin-right:auto}
+.final-cta a{display:inline-block;padding:0.75rem 2rem;background:#fff;color:#1e293b;font-weight:700;border-radius:10px;font-size:0.95rem;box-shadow:0 2px 8px rgba(0,0,0,0.15);transition:transform 0.15s}
+.final-cta a:hover{transform:translateY(-1px);text-decoration:none}
+
+.seo-footer{background:#1e293b;color:rgba(255,255,255,0.6);text-align:center;padding:2rem 1.5rem;font-size:0.82rem}
+.seo-footer a{color:rgba(255,255,255,0.75)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:640px){
+  .hero{padding:3rem 1.25rem 2.5rem}
+  .hero h1{font-size:1.75rem}
+  .page-body{padding:1.5rem 1.25rem 3rem}
+  .calc-grid{grid-template-columns:1fr}
+  .proposal-grid{grid-template-columns:1fr}
+  .benefits-grid{grid-template-columns:1fr}
+  .benefits{padding:2rem 1.5rem}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Generate a Professional Cleaning Quote in 30 Seconds</h1>
+  <p class="sub">Create polished cleaning quotes for residential or commercial jobs. Free to use, no signup required.</p>
+  <div class="hero-btns">
+    <a href="#generator" class="hero-btn-primary" onclick="document.getElementById('generator').scrollIntoView({behavior:'smooth'});return false">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456Z" /></svg>
+      Generate Quote
+    </a>
+    <a href="#example" class="hero-btn-secondary" onclick="showExample();return false">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+      View Example
+    </a>
+  </div>
+  <div class="hero-trust">
+    <span><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg> Free to use</span>
+    <span><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg> No signup required</span>
+    <span><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg> Instant results</span>
+  </div>
+</header>
+
+<div class="page-body">
+  <div class="gen-wrapper" id="generator">
+    <div class="free-badge-row">
+      <span class="free-badge"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg> Free Tool</span>
+    </div>
+    <h2>Create Your Cleaning Quote</h2>
+    <p class="free-subtext">This tool is completely free. No signup required.</p>
+
+    <form id="quoteForm" onsubmit="return generateQuote(event)">
+      <div class="calc-grid">
+        <div class="calc-field">
+          <label for="serviceType">Service Type</label>
+          <select id="serviceType">
+            <option value="regular" selected>Regular Cleaning</option>
+            <option value="deep_clean">Deep Cleaning</option>
+            <option value="move_in_out">Move In / Move Out</option>
+          </select>
+        </div>
+        <div class="calc-field">
+          <label for="sqft">Square Footage</label>
+          <input type="number" id="sqft" value="1500" min="200" max="20000" step="100">
+        </div>
+        <div class="calc-field">
+          <label for="beds">Bedrooms</label>
+          <input type="number" id="beds" value="3" min="1" max="10">
+        </div>
+        <div class="calc-field">
+          <label for="baths">Bathrooms</label>
+          <input type="number" id="baths" value="2" min="1" max="10">
+        </div>
+      </div>
+
+      <div class="addons-section">
+        <div class="addons-title">Optional Add-ons</div>
+        <div class="addons-grid">
+          <label class="addon-chip" id="chip-oven" onclick="toggleAddon('oven')">
+            <input type="checkbox" id="addon-oven">
+            <span class="addon-check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg></span>
+            Inside Oven <span class="addon-price">+$45</span>
+          </label>
+          <label class="addon-chip" id="chip-fridge" onclick="toggleAddon('fridge')">
+            <input type="checkbox" id="addon-fridge">
+            <span class="addon-check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg></span>
+            Inside Fridge <span class="addon-price">+$40</span>
+          </label>
+          <label class="addon-chip" id="chip-windows" onclick="toggleAddon('windows')">
+            <input type="checkbox" id="addon-windows">
+            <span class="addon-check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg></span>
+            Interior Windows <span class="addon-price">+$60</span>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="calc-btn">Generate Quote</button>
+    </form>
+
+    <div class="quote-result" id="quoteResult">
+      <div class="proposal-card">
+        <div class="proposal-header">
+          <h3>Cleaning Service Proposal</h3>
+          <span id="proposalDate"></span>
+        </div>
+        <div class="proposal-body">
+          <div class="proposal-grid">
+            <div class="proposal-item"><div class="proposal-item-label">Service Type</div><div class="proposal-item-value" id="rServiceType">--</div></div>
+            <div class="proposal-item"><div class="proposal-item-label">Home Size</div><div class="proposal-item-value" id="rSqft">--</div></div>
+            <div class="proposal-item"><div class="proposal-item-label">Bedrooms</div><div class="proposal-item-value" id="rBeds">--</div></div>
+            <div class="proposal-item"><div class="proposal-item-label">Bathrooms</div><div class="proposal-item-value" id="rBaths">--</div></div>
+          </div>
+          <div class="scope-title">Scope of Work</div>
+          <ul class="scope-list" id="rScope"></ul>
+          <div class="addons-summary" id="rAddons"></div>
+          <div class="price-box">
+            <div class="price-label">Estimated Investment</div>
+            <div class="price-amount" id="rPrice">$0</div>
+            <div class="price-note">Based on Better tier pricing</div>
+          </div>
+        </div>
+        <div class="conversion-cta">
+          <p class="upsell-text">Want to send this as a professional quote to your customer?</p>
+          <button class="send-btn" onclick="showSignup()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>
+            Send This Quote to Your Customer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="benefits" id="benefits">
+    <h2>Why Cleaning Pros Use QuotePro</h2>
+    <p class="benefits-sub">Everything you need to quote faster, close more jobs, and grow your cleaning business.</p>
+    <div class="benefits-grid">
+      <div class="benefit-card">
+        <div class="benefit-icon" style="background:linear-gradient(135deg,#2563eb,#1d4ed8)">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+        </div>
+        <div class="benefit-text">
+          <h3>Create Quotes Faster</h3>
+          <p>Generate professional cleaning quotes in under 30 seconds. No spreadsheets, no guesswork.</p>
+        </div>
+      </div>
+      <div class="benefit-card">
+        <div class="benefit-icon" style="background:linear-gradient(135deg,#059669,#047857)">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+        </div>
+        <div class="benefit-text">
+          <h3>Send Professional Proposals</h3>
+          <p>Impress customers with polished, branded proposals that build trust and win more jobs.</p>
+        </div>
+      </div>
+      <div class="benefit-card">
+        <div class="benefit-icon" style="background:linear-gradient(135deg,#7c3aed,#6d28d9)">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+        </div>
+        <div class="benefit-text">
+          <h3>Manage Your Leads</h3>
+          <p>Track every lead, follow up automatically, and never lose a potential customer again.</p>
+        </div>
+      </div>
+      <div class="benefit-card">
+        <div class="benefit-icon" style="background:linear-gradient(135deg,#ea580c,#c2410c)">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" /></svg>
+        </div>
+        <div class="benefit-text">
+          <h3>Increase Close Rates</h3>
+          <p>Businesses using QuotePro close 35% more jobs with professional proposals and automated follow-ups.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="faq-section">
+    <h2>Frequently Asked Questions</h2>
+    ${faqHTML}
+  </div>
+
+  <div class="final-cta">
+    <h2>Ready to Send Professional Quotes?</h2>
+    <p>Join thousands of cleaning professionals who quote faster and close more jobs with QuotePro.</p>
+    <a href="#generator" onclick="document.getElementById('generator').scrollIntoView({behavior:'smooth'});return false">Generate Your First Quote</a>
+  </div>
+</div>
+
+<footer class="seo-footer">
+  <p>&copy; ${new Date().getFullYear()} QuotePro &middot; <a href="/privacy">Privacy</a> &middot; <a href="/terms">Terms</a></p>
+</footer>
+
+<div class="signup-overlay" id="signupOverlay">
+  <div class="signup-modal">
+    <button class="signup-close" onclick="hideSignup()">&times;</button>
+    <div class="signup-modal-header">
+      <h3>Save & Send Your Quote</h3>
+      <p>Create a free QuotePro account to send this proposal to your customer.</p>
+    </div>
+    <div class="signup-modal-body">
+      <div class="signup-error" id="signupError"></div>
+      <div class="signup-field">
+        <label for="signupEmail">Email Address</label>
+        <input type="email" id="signupEmail" placeholder="you@company.com" required>
+      </div>
+      <div class="signup-field">
+        <label for="signupPassword">Password</label>
+        <input type="password" id="signupPassword" placeholder="At least 6 characters" minlength="6" required>
+      </div>
+      <button class="signup-submit" id="signupBtn" onclick="submitSignup()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" /></svg>
+        Create Account & Send Quote
+      </button>
+    </div>
+    <div style="text-align:center;padding:0 2rem 1.5rem;font-size:0.78rem;color:#94a3b8">
+      Already have an account? Your quote will be added to your dashboard.
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.faq-item').forEach(function(item){
+  item.querySelector('.faq-q').addEventListener('click',function(){
+    item.classList.toggle('open');
+  });
+});
+
+var _quoteData = {};
+var _checkSvg = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>';
+var _serviceLabels = {regular:'Regular Cleaning',deep_clean:'Deep Cleaning',move_in_out:'Move In / Move Out'};
+var _scopeItems = {
+  regular: ['Dust all surfaces and furniture','Vacuum and mop all floors','Clean and sanitize bathrooms','Clean kitchen counters and appliances','Empty trash and replace liners','Wipe mirrors and glass surfaces'],
+  deep_clean: ['All standard cleaning tasks','Inside oven, microwave, and refrigerator','Baseboard and wall spot cleaning','Interior window and track detailing','Behind and under furniture','Detailed grout and tile scrubbing','Light fixtures and ceiling fans','Cabinet fronts and door frames'],
+  move_in_out: ['Complete deep cleaning of all rooms','Inside all cabinets, drawers, and closets','Inside all appliances','All light fixtures and switch plates','Window sills, tracks, and interior glass','Wall spot cleaning and baseboard detailing','Garage sweeping (if applicable)','Move-in/move-out ready guarantee']
+};
+var _addonLabels = {oven:'Inside Oven Cleaning',fridge:'Inside Fridge Cleaning',windows:'Interior Window Cleaning'};
+var _addonPrices = {oven:45,fridge:40,windows:60};
+
+function toggleAddon(name) {
+  var cb = document.getElementById('addon-'+name);
+  cb.checked = !cb.checked;
+  document.getElementById('chip-'+name).classList.toggle('active', cb.checked);
+}
+
+function generateQuote(e) {
+  e.preventDefault();
+  var st = document.getElementById('serviceType').value;
+  var sqft = parseInt(document.getElementById('sqft').value) || 1500;
+  var beds = parseInt(document.getElementById('beds').value) || 3;
+  var baths = parseInt(document.getElementById('baths').value) || 2;
+
+  var baseRate = 40;
+  var baseHours = sqft * 0.01 + beds * 0.25 + baths * 0.5;
+  var mult = 1;
+  if (st === 'deep_clean') mult = 1.5;
+  if (st === 'move_in_out') mult = 2;
+  var total = Math.max(baseRate * baseHours * mult, 100 * mult);
+
+  var addOns = {};
+  var addonsHtml = '';
+  ['oven','fridge','windows'].forEach(function(a){
+    if (document.getElementById('addon-'+a).checked) {
+      addOns[a] = true;
+      total += _addonPrices[a];
+      addonsHtml += '<div class="addon-line"><span class="addon-line-name">'+_addonLabels[a]+'</span><span class="addon-line-price">+$'+_addonPrices[a]+'</span></div>';
+    }
+  });
+
+  var estimated = Math.round(total);
+
+  document.getElementById('rServiceType').textContent = _serviceLabels[st] || st;
+  document.getElementById('rSqft').textContent = sqft.toLocaleString() + ' sq ft';
+  document.getElementById('rBeds').textContent = beds;
+  document.getElementById('rBaths').textContent = baths;
+  document.getElementById('proposalDate').textContent = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('rPrice').textContent = '$' + estimated;
+
+  var items = _scopeItems[st] || _scopeItems.regular;
+  document.getElementById('rScope').innerHTML = items.map(function(t){return '<li>'+_checkSvg+' '+t+'</li>';}).join('');
+  document.getElementById('rAddons').innerHTML = addonsHtml;
+
+  _quoteData = {service_type:st, square_footage:sqft, bedrooms:beds, bathrooms:baths, estimated_price:estimated, frequency:'one-time', add_ons:addOns};
+
+  var el = document.getElementById('quoteResult');
+  el.style.display = 'block';
+  el.style.animation = 'fadeUp 0.5s ease-out';
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  return false;
+}
+
+function showExample() {
+  document.getElementById('serviceType').value = 'deep_clean';
+  document.getElementById('sqft').value = '2200';
+  document.getElementById('beds').value = '4';
+  document.getElementById('baths').value = '3';
+  document.getElementById('addon-oven').checked = true;
+  document.getElementById('chip-oven').classList.add('active');
+  document.getElementById('addon-fridge').checked = true;
+  document.getElementById('chip-fridge').classList.add('active');
+  generateQuote({preventDefault:function(){}});
+}
+
+function showSignup() {
+  var ov = document.getElementById('signupOverlay');
+  ov.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function hideSignup() {
+  document.getElementById('signupOverlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+document.getElementById('signupOverlay').addEventListener('click', function(e){
+  if (e.target === this) hideSignup();
+});
+
+function submitSignup() {
+  var email = document.getElementById('signupEmail').value.trim();
+  var pw = document.getElementById('signupPassword').value;
+  var errEl = document.getElementById('signupError');
+  var btn = document.getElementById('signupBtn');
+
+  errEl.style.display = 'none';
+
+  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!pw || pw.length < 6) {
+    errEl.textContent = 'Password must be at least 6 characters.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating account...';
+
+  fetch('/api/public/calculator-signup', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({email:email, password:pw, quoteData:_quoteData})
+  })
+  .then(function(r){return r.json().then(function(d){return {ok:r.ok,data:d}})})
+  .then(function(res){
+    if (!res.ok) {
+      errEl.textContent = res.data.message || 'Something went wrong.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" /></svg> Create Account & Send Quote';
+      return;
+    }
+    window.location.href = res.data.redirectUrl || '/app/dashboard';
+  })
+  .catch(function(){
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" /></svg> Create Account & Send Quote';
+  });
+}
+<\/script>
+
+</body>
+</html>`;
+}
