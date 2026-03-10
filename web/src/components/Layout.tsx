@@ -20,6 +20,7 @@ import {
   Crown,
   Lock,
   ArrowUpRight,
+  Wrench,
 } from "lucide-react";
 
 const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant"];
@@ -52,6 +53,12 @@ const navSections = [
     items: [
       { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true },
       { to: "/walkthrough-ai", label: "Quote from Notes", icon: Wand2 },
+    ],
+  },
+  {
+    label: "Resources",
+    items: [
+      { to: "/toolkit", label: "Toolkit", icon: Wrench },
     ],
   },
 ];

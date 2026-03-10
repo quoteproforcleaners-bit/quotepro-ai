@@ -4814,6 +4814,29 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  app.post("/api/public/toolkit-lead", async (req: Request, res: Response) => {
+    try {
+      const { email, firstName, resource } = req.body;
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      const cleanEmail = email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        return res.status(400).json({ message: "Invalid email" });
+      }
+
+      await pool.query(
+        `INSERT INTO toolkit_leads (email, first_name, resource) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING`,
+        [cleanEmail, firstName || null, resource || null]
+      );
+
+      return res.json({ success: true });
+    } catch (error: any) {
+      console.error("Toolkit lead error:", error);
+      return res.status(500).json({ message: "Failed to save lead" });
+    }
+  });
+
   // ─── Background Cron (called periodically) ───
 
   app.post("/api/internal/cron", async (_req: Request, res: Response) => {
@@ -8383,6 +8406,24 @@ initOAuthStatesTable();
     `);
   } catch (e) {
     console.warn("Additional tables migration:", (e as Error).message);
+  }
+})();
+
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS toolkit_leads (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        email TEXT NOT NULL,
+        first_name TEXT,
+        resource TEXT,
+        source TEXT NOT NULL DEFAULT 'toolkit',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_toolkit_leads_email ON toolkit_leads (email)`);
+  } catch (e) {
+    console.warn("Toolkit leads migration:", (e as Error).message);
   }
 })();
 

@@ -22,6 +22,7 @@ import OpportunitiesPage from "./pages/OpportunitiesPage";
 import GrowthDashboardPage from "./pages/GrowthDashboardPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import WalkthroughAIPage from "./pages/WalkthroughAIPage";
+import ToolkitPage from "./pages/ToolkitPage";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -81,6 +82,7 @@ export default function App() {
           <Route path="/opportunities" element={<ProGate feature="Opportunities"><OpportunitiesPage /></ProGate>} />
           <Route path="/ai-assistant" element={<ProGate feature="AI Sales Assistant"><AIAssistantPage /></ProGate>} />
           <Route path="/walkthrough-ai" element={<WalkthroughAIPage />} />
+          <Route path="/toolkit" element={<ToolkitPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
 
