@@ -11,6 +11,7 @@ import { google } from "googleapis";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableGoogleCalendarClient, isGoogleCalendarConnected } from "./googleCalendarClient";
 import { QBOClient, encryptToken, decryptToken, logSync } from "./qbo-client";
+import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage, getMoveInOutCleaningCalculatorPage } from "./seo-pages";
 import { JobberClient, buildJobberAuthUrl, exchangeJobberCode, logJobberSync, syncQuoteToJobber } from "./jobber-client";
 
 let stripe: Stripe | null = null;
@@ -5325,6 +5326,18 @@ Respond with JSON: {"reply": string}`
 
   app.get("/delete-account", (_req: Request, res: Response) => {
     res.send(getDeleteAccountHTML());
+  });
+
+  app.get("/house-cleaning-price-calculator", (_req: Request, res: Response) => {
+    res.send(getHouseCleaningPriceCalculatorPage());
+  });
+
+  app.get("/deep-cleaning-price-calculator", (_req: Request, res: Response) => {
+    res.send(getDeepCleaningPriceCalculatorPage());
+  });
+
+  app.get("/move-in-out-cleaning-calculator", (_req: Request, res: Response) => {
+    res.send(getMoveInOutCleaningCalculatorPage());
   });
 
   // ─── Sticky Product: Follow-Up Queue ───

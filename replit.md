@@ -78,6 +78,15 @@ Job scheduling includes start/end clock functionality with duration tracking. Jo
 - **Calendar Integration**: Create calendar event stubs with ICS download and Google Calendar deep links.
 - **Webhooks & API Keys**: For Zapier/Make with HMAC-SHA256 signing and retry logic for events like `quote.created/sent/accepted/declined`.
 
+### SEO Calculator Landing Pages
+- **Template system**: `server/seo-pages.ts` — reusable `renderSEOPage(config)` template for creating SEO-optimized calculator pages.
+- **Pages**:
+  - `/house-cleaning-price-calculator` — standard cleaning price calculator with beds/baths/sqft/service type/frequency
+  - `/deep-cleaning-price-calculator` — deep clean calculator with home condition selector
+  - `/move-in-out-cleaning-calculator` — move clean calculator with extras (garage, carpet treatment)
+- **Features**: FAQ schema markup (JSON-LD), absolute canonical URLs, OG/Twitter meta tags, client-side calculator with Good/Better/Best tier pricing, mobile responsive layout, internal links to toolkit.
+- **Adding new pages**: Create a new function in `seo-pages.ts` following `CalculatorPageConfig` interface, register the route in `routes.ts`.
+
 ### Cleaning Business Toolkit
 - **Web route**: `/app/toolkit` — resource page with 10 downloadable/viewable cleaning business resources (calculators, templates, scripts, AI prompts).
 - **Lead capture modal**: Gated behind email capture modal. Email (required) + first name (optional). Session-unlocked via `sessionStorage`; per-resource unlock via `localStorage`.
