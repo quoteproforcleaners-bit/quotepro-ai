@@ -85,6 +85,7 @@ Job scheduling includes start/end clock functionality with duration tracking. Jo
   - `/deep-cleaning-price-calculator` — deep clean calculator with home condition selector
   - `/move-in-out-cleaning-calculator` — move clean calculator with extras (garage, carpet treatment)
 - **Features**: FAQ schema markup (JSON-LD), absolute canonical URLs, OG/Twitter meta tags, client-side calculator with Good/Better/Best tier pricing, mobile responsive layout, internal links to toolkit.
+- **Instant Quote Generator Funnel**: After calculator results, a professional quote preview card appears showing service details + estimated price. "Generate Professional Quote" opens a styled proposal overlay with service details, scope of work, and estimated investment. "Send This Quote to Your Customer" triggers a signup modal. On signup, `POST /api/public/calculator-signup` creates user + business + quote (server-side price recalculation, rate-limited, validated inputs) and redirects to `/app/quotes/:id`.
 - **Adding new pages**: Create a new function in `seo-pages.ts` following `CalculatorPageConfig` interface, register the route in `routes.ts`.
 
 ### Cleaning Business Toolkit

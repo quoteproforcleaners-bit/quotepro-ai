@@ -143,6 +143,73 @@ a:hover{text-decoration:underline}
 .seo-footer{background:#1e293b;color:rgba(255,255,255,0.6);text-align:center;padding:2rem 1.5rem;font-size:0.82rem}
 .seo-footer a{color:rgba(255,255,255,0.75)}
 
+.quote-preview{display:none;margin-top:2rem;animation:fadeUp 0.5s ease-out}
+.quote-card{background:#fff;border:2px solid #e2e8f0;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.08)}
+.quote-card-header{background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.75rem}
+.quote-card-header svg{width:24px;height:24px;color:#fff;flex-shrink:0}
+.quote-card-header h3{color:#fff;font-size:1.1rem;font-weight:700;margin:0}
+.quote-card-header span{color:rgba(255,255,255,0.7);font-size:0.8rem;font-weight:500}
+.quote-card-body{padding:1.5rem}
+.quote-row{display:flex;justify-content:space-between;align-items:center;padding:0.65rem 0;border-bottom:1px solid #f1f5f9}
+.quote-row:last-child{border-bottom:none}
+.quote-row-label{font-size:0.85rem;color:#64748b;font-weight:500}
+.quote-row-value{font-size:0.9rem;color:#0f172a;font-weight:600}
+.quote-row-value.price{font-size:1.15rem;color:#2563eb;font-weight:800}
+.quote-card-footer{padding:1.25rem 1.5rem;background:#f8fafc;border-top:1px solid #e2e8f0}
+.generate-quote-btn{display:flex;align-items:center;justify-content:center;gap:0.5rem;width:100%;padding:0.85rem;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-size:0.95rem;font-weight:700;border:none;border-radius:12px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 14px rgba(5,150,105,0.3)}
+.generate-quote-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(5,150,105,0.35)}
+.generate-quote-btn svg{width:18px;height:18px}
+
+.proposal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:1000;background:rgba(15,23,42,0.6);backdrop-filter:blur(4px);overflow-y:auto;padding:2rem 1rem}
+.proposal-container{max-width:680px;margin:0 auto;animation:fadeUp 0.4s ease-out}
+.proposal-close{display:flex;align-items:center;gap:0.5rem;color:rgba(255,255,255,0.8);font-size:0.85rem;font-weight:500;background:none;border:none;cursor:pointer;margin-bottom:1rem;padding:0.5rem 0}
+.proposal-close:hover{color:#fff}
+.proposal-doc{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.2)}
+.proposal-doc-header{background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 50%,#3b82f6 100%);padding:2.5rem 2rem;text-align:center;color:#fff}
+.proposal-doc-header h2{font-size:1.5rem;font-weight:800;margin-bottom:0.25rem;letter-spacing:-0.02em}
+.proposal-doc-header p{color:rgba(255,255,255,0.75);font-size:0.88rem;font-weight:400}
+.proposal-section{padding:1.5rem 2rem;border-bottom:1px solid #f1f5f9}
+.proposal-section:last-child{border-bottom:none}
+.proposal-section-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#2563eb;margin-bottom:1rem}
+.proposal-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem}
+.proposal-detail{background:#f8fafc;border-radius:10px;padding:0.85rem 1rem}
+.proposal-detail-label{font-size:0.72rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.2rem}
+.proposal-detail-value{font-size:0.95rem;color:#0f172a;font-weight:600}
+.scope-list{list-style:none;padding:0}
+.scope-list li{display:flex;align-items:flex-start;gap:0.6rem;padding:0.5rem 0;font-size:0.9rem;color:#334155}
+.scope-list li svg{width:18px;height:18px;color:#059669;flex-shrink:0;margin-top:1px}
+.proposal-price-box{background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #bfdbfe;border-radius:14px;padding:1.5rem;text-align:center}
+.proposal-price-label{font-size:0.78rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.35rem}
+.proposal-price-amount{font-size:2.5rem;font-weight:800;color:#1e3a8a;letter-spacing:-0.02em}
+.proposal-price-note{font-size:0.78rem;color:#64748b;margin-top:0.35rem}
+.proposal-addons{margin-top:1rem}
+.proposal-addon-item{display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0.85rem;background:#fefce8;border-radius:8px;margin-bottom:0.5rem;font-size:0.85rem}
+.proposal-addon-name{color:#854d0e;font-weight:500}
+.proposal-addon-price{color:#a16207;font-weight:700}
+.proposal-cta-section{padding:1.5rem 2rem 2rem;text-align:center}
+.send-quote-btn{display:flex;align-items:center;justify-content:center;gap:0.5rem;width:100%;padding:1rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-size:1.05rem;font-weight:700;border:none;border-radius:14px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 16px rgba(37,99,235,0.35)}
+.send-quote-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,99,235,0.4)}
+.send-quote-btn svg{width:20px;height:20px}
+.proposal-cta-note{font-size:0.78rem;color:#94a3b8;margin-top:0.75rem}
+
+.signup-modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;background:rgba(15,23,42,0.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:1rem}
+.signup-modal{background:#fff;border-radius:20px;max-width:420px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,0.25);animation:fadeUp 0.35s ease-out;overflow:hidden}
+.signup-modal-header{background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:2rem 2rem 1.5rem;text-align:center;color:#fff}
+.signup-modal-header h3{font-size:1.25rem;font-weight:700;margin-bottom:0.35rem}
+.signup-modal-header p{color:rgba(255,255,255,0.75);font-size:0.85rem}
+.signup-modal-body{padding:1.5rem 2rem 2rem}
+.signup-field{margin-bottom:1rem}
+.signup-field label{display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.35rem;text-transform:uppercase;letter-spacing:0.04em}
+.signup-field input{width:100%;padding:0.7rem 0.85rem;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;font-family:inherit;color:#0f172a;background:#f8fafc;transition:border-color 0.2s,box-shadow 0.2s}
+.signup-field input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.12)}
+.signup-submit{display:flex;align-items:center;justify-content:center;gap:0.5rem;width:100%;padding:0.85rem;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-size:1rem;font-weight:700;border:none;border-radius:12px;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 14px rgba(37,99,235,0.3);margin-top:0.5rem}
+.signup-submit:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(37,99,235,0.35)}
+.signup-submit:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+.signup-error{background:#fef2f2;color:#dc2626;border-radius:8px;padding:0.65rem 0.85rem;font-size:0.82rem;font-weight:500;margin-bottom:1rem;display:none}
+.signup-modal-footer{text-align:center;padding:0 2rem 1.5rem;font-size:0.78rem;color:#94a3b8}
+.signup-modal-close{position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.15);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;transition:background 0.2s}
+.signup-modal-close:hover{background:rgba(255,255,255,0.25)}
+
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 
 @media(max-width:640px){
@@ -153,6 +220,13 @@ a:hover{text-decoration:underline}
   .tier-cards{grid-template-columns:1fr}
   .tier-card{padding:1rem}
   .toolkit-cta{padding:2rem 1.5rem}
+  .proposal-detail-grid{grid-template-columns:1fr}
+  .proposal-doc-header{padding:2rem 1.5rem}
+  .proposal-section{padding:1.25rem 1.5rem}
+  .proposal-cta-section{padding:1.25rem 1.5rem 1.5rem}
+  .proposal-price-amount{font-size:2rem}
+  .signup-modal-header{padding:1.5rem 1.5rem 1.25rem}
+  .signup-modal-body{padding:1.25rem 1.5rem 1.5rem}
 }
 </style>
 </head>
@@ -169,6 +243,103 @@ a:hover{text-decoration:underline}
 
   <div class="calc-wrapper" id="calculator">
     ${config.calculatorHTML}
+
+    <div class="quote-preview" id="quotePreview">
+      <div class="quote-card">
+        <div class="quote-card-header">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+          <div>
+            <h3>Your Estimate Preview</h3>
+            <span>Based on your inputs</span>
+          </div>
+        </div>
+        <div class="quote-card-body">
+          <div class="quote-row"><span class="quote-row-label">Service Type</span><span class="quote-row-value" id="qpServiceType">--</span></div>
+          <div class="quote-row"><span class="quote-row-label">Home Size</span><span class="quote-row-value" id="qpSqft">--</span></div>
+          <div class="quote-row"><span class="quote-row-label">Bedrooms</span><span class="quote-row-value" id="qpBeds">--</span></div>
+          <div class="quote-row"><span class="quote-row-label">Bathrooms</span><span class="quote-row-value" id="qpBaths">--</span></div>
+          <div class="quote-row"><span class="quote-row-label">Estimated Price</span><span class="quote-row-value price" id="qpPrice">--</span></div>
+        </div>
+        <div class="quote-card-footer">
+          <button class="generate-quote-btn" onclick="showProposal()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456Z" /></svg>
+            Generate Professional Quote
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="proposal-overlay" id="proposalOverlay">
+    <div class="proposal-container">
+      <button class="proposal-close" onclick="hideProposal()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
+        Back to Calculator
+      </button>
+      <div class="proposal-doc">
+        <div class="proposal-doc-header">
+          <h2>Cleaning Service Proposal</h2>
+          <p>Professional Estimate</p>
+        </div>
+        <div class="proposal-section">
+          <div class="proposal-section-title">Service Details</div>
+          <div class="proposal-detail-grid">
+            <div class="proposal-detail"><div class="proposal-detail-label">Service</div><div class="proposal-detail-value" id="prServiceType">--</div></div>
+            <div class="proposal-detail"><div class="proposal-detail-label">Frequency</div><div class="proposal-detail-value" id="prFrequency">--</div></div>
+            <div class="proposal-detail"><div class="proposal-detail-label">Bedrooms</div><div class="proposal-detail-value" id="prBeds">--</div></div>
+            <div class="proposal-detail"><div class="proposal-detail-label">Bathrooms</div><div class="proposal-detail-value" id="prBaths">--</div></div>
+            <div class="proposal-detail"><div class="proposal-detail-label">Square Footage</div><div class="proposal-detail-value" id="prSqft">--</div></div>
+            <div class="proposal-detail"><div class="proposal-detail-label">Date</div><div class="proposal-detail-value" id="prDate">--</div></div>
+          </div>
+        </div>
+        <div class="proposal-section">
+          <div class="proposal-section-title">Scope of Work</div>
+          <ul class="scope-list" id="prScopeList"></ul>
+        </div>
+        <div class="proposal-section">
+          <div class="proposal-section-title">Estimated Investment</div>
+          <div class="proposal-price-box">
+            <div class="proposal-price-label">Recommended Price</div>
+            <div class="proposal-price-amount" id="prPriceAmount">$0</div>
+            <div class="proposal-price-note">Based on "Better" tier pricing</div>
+          </div>
+          <div class="proposal-addons" id="prAddons"></div>
+        </div>
+        <div class="proposal-cta-section">
+          <button class="send-quote-btn" onclick="handleSendQuote()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>
+            Send This Quote to Your Customer
+          </button>
+          <p class="proposal-cta-note">Create your free QuotePro account to send, track, and manage professional quotes</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="signup-modal-overlay" id="signupOverlay">
+    <div class="signup-modal" style="position:relative">
+      <button class="signup-modal-close" onclick="hideSignup()">&times;</button>
+      <div class="signup-modal-header">
+        <h3>Create Your Free Account</h3>
+        <p>Send this quote and manage all your estimates in one place</p>
+      </div>
+      <div class="signup-modal-body">
+        <div class="signup-error" id="signupError"></div>
+        <div class="signup-field">
+          <label for="signupEmail">Email</label>
+          <input type="email" id="signupEmail" placeholder="you@company.com">
+        </div>
+        <div class="signup-field">
+          <label for="signupPassword">Password</label>
+          <input type="password" id="signupPassword" placeholder="Create a password (min. 6 characters)">
+        </div>
+        <button class="signup-submit" id="signupSubmitBtn" onclick="submitSignup()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
+          Create Account &amp; Send Quote
+        </button>
+      </div>
+      <div class="signup-modal-footer">By signing up you agree to our Terms of Service</div>
+    </div>
   </div>
 
   <section class="faq-section" id="faq">
@@ -192,6 +363,109 @@ document.querySelectorAll('.faq-item').forEach(function(item){
   item.querySelector('.faq-q').addEventListener('click',function(){
     item.classList.toggle('open');
   });
+});
+
+var _quoteData = {};
+var _serviceLabels = {regular:'Regular Cleaning',deep_clean:'Deep Cleaning',move_in_out:'Move In / Move Out'};
+var _freqLabels = {'one-time':'One-Time',weekly:'Weekly',biweekly:'Bi-Weekly',monthly:'Monthly'};
+var _scopeItems = {
+  regular: ['Dust all surfaces and furniture','Vacuum and mop all floors','Clean and sanitize bathrooms','Clean kitchen counters and appliances','Empty trash and replace liners','Wipe mirrors and glass surfaces'],
+  deep_clean: ['All standard cleaning tasks','Inside oven, microwave, and refrigerator','Baseboard and wall spot cleaning','Interior window and track detailing','Behind and under furniture','Detailed grout and tile scrubbing','Light fixtures and ceiling fans','Cabinet fronts and door frames'],
+  move_in_out: ['Complete deep cleaning of all rooms','Inside all cabinets, drawers, and closets','Inside all appliances','All light fixtures and switch plates','Window sills, tracks, and interior glass','Wall spot cleaning and baseboard detailing','Garage sweeping (if applicable)','Move-in/move-out ready guarantee']
+};
+var _checkSvg = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>';
+
+function updateQuotePreview(data) {
+  _quoteData = data;
+  var st = data.service_type || 'regular';
+  document.getElementById('qpServiceType').textContent = _serviceLabels[st] || st;
+  document.getElementById('qpSqft').textContent = (data.square_footage || 0).toLocaleString() + ' sq ft';
+  document.getElementById('qpBeds').textContent = data.bedrooms || 0;
+  document.getElementById('qpBaths').textContent = data.bathrooms || 0;
+  document.getElementById('qpPrice').textContent = '$' + (data.estimated_price || 0);
+  document.getElementById('quotePreview').style.display = 'block';
+  document.getElementById('quotePreview').style.animation = 'fadeUp 0.5s ease-out';
+}
+
+function showProposal() {
+  var d = _quoteData;
+  var st = d.service_type || 'regular';
+  document.getElementById('prServiceType').textContent = _serviceLabels[st] || st;
+  document.getElementById('prFrequency').textContent = _freqLabels[d.frequency] || d.frequency || 'One-Time';
+  document.getElementById('prBeds').textContent = d.bedrooms || 0;
+  document.getElementById('prBaths').textContent = d.bathrooms || 0;
+  document.getElementById('prSqft').textContent = (d.square_footage || 0).toLocaleString() + ' sq ft';
+  document.getElementById('prDate').textContent = new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('prPriceAmount').textContent = '$' + (d.estimated_price || 0);
+
+  var scopeKey = st;
+  var items = _scopeItems[scopeKey] || _scopeItems.regular;
+  document.getElementById('prScopeList').innerHTML = items.map(function(t){return '<li>'+_checkSvg+' '+t+'</li>';}).join('');
+
+  var addonsHtml = '';
+  if (d.add_ons) {
+    var addons = d.add_ons;
+    if (addons.garage) addonsHtml += '<div class="proposal-addon-item"><span class="proposal-addon-name">Garage Cleaning</span><span class="proposal-addon-price">+$75</span></div>';
+    if (addons.carpets) addonsHtml += '<div class="proposal-addon-item"><span class="proposal-addon-name">Carpet Treatment</span><span class="proposal-addon-price">+$100</span></div>';
+  }
+  document.getElementById('prAddons').innerHTML = addonsHtml;
+
+  document.getElementById('proposalOverlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  window.scrollTo(0,0);
+}
+
+function hideProposal() {
+  document.getElementById('proposalOverlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function handleSendQuote() {
+  document.getElementById('signupOverlay').style.display = 'flex';
+}
+
+function hideSignup() {
+  document.getElementById('signupOverlay').style.display = 'none';
+  document.getElementById('signupError').style.display = 'none';
+}
+
+function submitSignup() {
+  var email = document.getElementById('signupEmail').value.trim();
+  var password = document.getElementById('signupPassword').value;
+  var errEl = document.getElementById('signupError');
+  var btn = document.getElementById('signupSubmitBtn');
+
+  if (!email || !password) { errEl.textContent = 'Please enter both email and password.'; errEl.style.display = 'block'; return; }
+  if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = 'block'; return; }
+
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.innerHTML = 'Creating account...';
+
+  fetch('/api/public/calculator-signup', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    credentials: 'include',
+    body: JSON.stringify({ email: email, password: password, quoteData: _quoteData })
+  })
+  .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,data:d}; }); })
+  .then(function(res){
+    if (!res.ok) { throw new Error(res.data.message || 'Signup failed'); }
+    window.location.href = res.data.redirectUrl || '/app/dashboard';
+  })
+  .catch(function(err){
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.innerHTML = 'Create Account & Send Quote';
+  });
+}
+
+document.getElementById('proposalOverlay').addEventListener('click', function(e){
+  if (e.target === this) hideProposal();
+});
+document.getElementById('signupOverlay').addEventListener('click', function(e){
+  if (e.target === this) hideSignup();
 });
 </script>
 </body>
@@ -349,6 +623,7 @@ export function getHouseCleaningPriceCalculatorPage(): string {
         document.getElementById('priceBest').innerHTML='$'+best;
         document.getElementById('calcResults').style.display='block';
         document.getElementById('calcResults').style.animation='fadeUp 0.4s ease-out';
+        updateQuotePreview({service_type:serviceType,square_footage:sqft,bedrooms:beds,bathrooms:baths,estimated_price:better,frequency:frequency,add_ons:{}});
         return false;
       }
       </script>
@@ -523,6 +798,7 @@ export function getDeepCleaningPriceCalculatorPage(): string {
         document.getElementById('priceBest').innerHTML='$'+best;
         document.getElementById('calcResults').style.display='block';
         document.getElementById('calcResults').style.animation='fadeUp 0.4s ease-out';
+        updateQuotePreview({service_type:'deep_clean',square_footage:sqft,bedrooms:beds,bathrooms:baths,estimated_price:better,frequency:'one-time',add_ons:{}});
         return false;
       }
       </script>
@@ -673,6 +949,8 @@ export function getMoveInOutCleaningCalculatorPage(): string {
         document.getElementById('priceBest').innerHTML='$'+best;
         document.getElementById('calcResults').style.display='block';
         document.getElementById('calcResults').style.animation='fadeUp 0.4s ease-out';
+        var addOns={};if(extras==='garage'){addOns.garage=true}if(extras==='carpets'){addOns.carpets=true}if(extras==='both'){addOns.garage=true;addOns.carpets=true}
+        updateQuotePreview({service_type:'move_in_out',square_footage:sqft,bedrooms:beds,bathrooms:baths,estimated_price:better,frequency:'one-time',add_ons:addOns});
         return false;
       }
       </script>

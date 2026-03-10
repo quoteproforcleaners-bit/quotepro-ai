@@ -4838,6 +4838,143 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  // ─── Calculator Signup + Quote Creation ───
+
+  const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>();
+
+  app.post("/api/public/calculator-signup", async (req: Request, res: Response) => {
+    try {
+      const { email, password, quoteData } = req.body;
+
+      if (!email || typeof email !== "string" || !password || typeof password !== "string") {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      const cleanEmail = email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        return res.status(400).json({ message: "Please enter a valid email address" });
+      }
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      const ip = req.ip || "unknown";
+      const rateKey = `${ip}:${cleanEmail}`;
+      const now = Date.now();
+      const attempt = _calcSignupAttempts.get(rateKey);
+      if (attempt && attempt.resetAt > now && attempt.count >= 5) {
+        return res.status(429).json({ message: "Too many attempts. Please try again in a few minutes." });
+      }
+      if (!attempt || attempt.resetAt <= now) {
+        _calcSignupAttempts.set(rateKey, { count: 1, resetAt: now + 5 * 60 * 1000 });
+      } else {
+        attempt.count++;
+      }
+
+      const existing = await getUserByEmail(cleanEmail);
+      let user;
+      let business;
+      let isNewUser = false;
+
+      if (existing) {
+        if (!existing.passwordHash) {
+          return res.status(400).json({ message: "This account uses social login. Please sign in with Google or Apple." });
+        }
+        const valid = await bcrypt.compare(password, existing.passwordHash);
+        if (!valid) {
+          return res.status(401).json({ message: "Invalid email or password" });
+        }
+        user = existing;
+        business = await getBusinessByOwner(user.id);
+        if (!business) {
+          business = await createBusiness(user.id);
+        }
+      } else {
+        const passwordHash = await bcrypt.hash(password, 12);
+        user = await createUser({
+          email: cleanEmail,
+          name: null,
+          passwordHash,
+          authProvider: "email",
+        });
+        business = await createBusiness(user.id);
+        isNewUser = true;
+      }
+
+      req.session.userId = user.id;
+
+      let quoteId = null;
+      if (quoteData && typeof quoteData === "object" && business) {
+        const validServiceTypes = ["regular", "deep_clean", "move_in_out"];
+        const validFrequencies = ["one-time", "weekly", "biweekly", "monthly"];
+
+        const serviceType = validServiceTypes.includes(quoteData.service_type) ? quoteData.service_type : "regular";
+        const frequency = validFrequencies.includes(quoteData.frequency) ? quoteData.frequency : "one-time";
+        const beds = Math.max(1, Math.min(10, parseInt(quoteData.bedrooms) || 3));
+        const baths = Math.max(1, Math.min(10, parseInt(quoteData.bathrooms) || 2));
+        const sqft = Math.max(200, Math.min(20000, parseInt(quoteData.square_footage) || 1500));
+
+        const baseRate = 40;
+        const baseHours = sqft * 0.01 + beds * 0.25 + baths * 0.5;
+        let mult = 1;
+        if (serviceType === "deep_clean") mult = 1.5;
+        if (serviceType === "move_in_out") mult = 2;
+        let freqDisc = 1;
+        if (frequency === "weekly") freqDisc = 0.8;
+        if (frequency === "biweekly") freqDisc = 0.85;
+        if (frequency === "monthly") freqDisc = 0.9;
+        let total = Math.max(baseRate * baseHours * mult, 100 * mult) * freqDisc;
+
+        const sanitizedAddOns: Record<string, boolean> = {};
+        if (quoteData.add_ons && typeof quoteData.add_ons === "object") {
+          if (quoteData.add_ons.garage) { sanitizedAddOns.garage = true; total += 75; }
+          if (quoteData.add_ons.carpets) { sanitizedAddOns.carpets = true; total += 100; }
+        }
+
+        const estimated = Math.round(total);
+        const good = Math.round(estimated * 0.8);
+        const best = Math.round(estimated * 1.3);
+
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 14);
+
+        const q = await createQuote({
+          businessId: business.id,
+          customerId: null,
+          propertyBeds: beds,
+          propertyBaths: baths,
+          propertySqft: sqft,
+          propertyDetails: { serviceType },
+          addOns: sanitizedAddOns,
+          frequencySelected: frequency,
+          selectedOption: "better",
+          recommendedOption: "better",
+          options: {
+            good: { price: good, label: "Good" },
+            better: { price: estimated, label: "Better" },
+            best: { price: best, label: "Best" },
+          },
+          subtotal: estimated,
+          tax: 0,
+          total: estimated,
+          status: "draft",
+          expiresAt,
+        });
+        quoteId = q.id;
+      }
+
+      return res.json({
+        success: true,
+        quoteId,
+        isNewUser,
+        redirectUrl: quoteId ? `/app/quotes/${quoteId}` : "/app/dashboard",
+      });
+    } catch (error: any) {
+      console.error("Calculator signup error:", error);
+      return res.status(500).json({ message: "Registration failed. Please try again." });
+    }
+  });
+
   // ─── Background Cron (called periodically) ───
 
   app.post("/api/internal/cron", async (_req: Request, res: Response) => {
