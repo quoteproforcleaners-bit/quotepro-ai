@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { LeadCaptureModal } from "../components/LeadCaptureModal";
+import { trackEvent } from "../lib/analytics";
 
 type Resource = {
   id: string;
@@ -180,6 +181,10 @@ export default function ToolkitPage() {
   const [stickyVisible, setStickyVisible] = useState(false);
 
   useEffect(() => {
+    trackEvent("toolkit_page_view", { page: "/toolkit", source: "web" });
+  }, []);
+
+  useEffect(() => {
     const handleScroll = () => {
       const scrollEl = document.querySelector("main");
       if (!scrollEl) return;
@@ -219,6 +224,14 @@ export default function ToolkitPage() {
   };
 
   const handleResourceClick = (resource: Resource) => {
+    const eventName = resource.category === "calculator" ? "calculator_click" : "template_download";
+    trackEvent(eventName, {
+      page: "/toolkit",
+      resource_name: resource.title,
+      resource_type: resource.category,
+      source: "web",
+    });
+
     if (sessionUnlocked || unlockedResources.has(resource.id)) {
       markUnlocked(resource.id);
       showToast(`"${resource.title}" is ready — check your email for the full resource.`);
@@ -229,6 +242,13 @@ export default function ToolkitPage() {
   };
 
   const handleLeadCaptured = () => {
+    trackEvent("toolkit_email_signup", {
+      page: "/toolkit",
+      resource_name: pendingResource?.title || "sticky_bar",
+      resource_type: pendingResource?.category || "general",
+      source: "web",
+    });
+
     setSessionUnlocked(true);
     try {
       sessionStorage.setItem("toolkit_session_unlocked", "true");
@@ -363,6 +383,7 @@ export default function ToolkitPage() {
               </p>
               <button
                 onClick={() => {
+                  trackEvent("quotepro_trial_click", { page: "/toolkit", source: "sticky_bar" });
                   setPendingResource(null);
                   setModalOpen(true);
                 }}
