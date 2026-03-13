@@ -70,6 +70,8 @@ import {
   getCommunicationsByBusiness,
   createCommunication,
   cancelPendingCommunicationsForQuote,
+  getScheduledFollowUpsForQuote,
+  getCommunicationById,
   getAutomationRules,
   upsertAutomationRules,
   getTasksByBusiness,
@@ -1205,17 +1207,19 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       });
 
       const rules = await getAutomationRules(business.id);
-      if (rules?.quoteFollowupsEnabled && rules.followupSchedule) {
-        const schedule = rules.followupSchedule as any[];
-        for (const step of schedule) {
-          const scheduledFor = new Date();
-          scheduledFor.setMinutes(scheduledFor.getMinutes() + step.delayMinutes);
+      const followupsEnabled = !rules || rules.quoteFollowupsEnabled !== false;
+      if (followupsEnabled) {
+        const existingScheduled = await getScheduledFollowUpsForQuote(quote.id);
+        if (existingScheduled.length === 0) {
+          const firstStep = (rules?.followupSchedule as any[])?.[0];
+          const delayMinutes = firstStep?.delayMinutes ?? 1440;
+          const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000);
+          const followupChannel = rules?.followupChannel || channel || "sms";
           await createCommunication({
             businessId: business.id,
             customerId: quote.customerId || undefined,
             quoteId: quote.id,
-            channel: rules.followupChannel || "sms",
-            templateKey: step.templateKey,
+            channel: followupChannel,
             content: "",
             status: "queued",
             scheduledFor,
@@ -3166,6 +3170,168 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       return res.json(c);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to create communication" });
+    }
+  });
+
+  // ─── Follow-Up Automation Helpers ───
+
+  async function generateFollowUpMessage(quote: any, customer: any, business: any, channel: string): Promise<string> {
+    const ageDays = Math.round(((Date.now() - (quote.sentAt?.getTime() || quote.createdAt.getTime())) / (1000 * 60 * 60 * 24)) * 10) / 10;
+    const msgType = channel === "email" ? "email" : "SMS";
+    const maxLen = channel === "email" ? 200 : 160;
+    const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5-nano",
+      messages: [
+        {
+          role: "system",
+          content: `Write a ${msgType} follow-up (under ${maxLen} chars for SMS) for "${business?.companyName || "our cleaning company"}". Quote is $${quote.total} sent ${ageDays} days ago. Quote link: ${quoteUrl}. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}". For email: start with "Subject: " then blank line then body. Do NOT put the raw URL in the email body; a button will be added automatically.`
+        },
+        {
+          role: "user",
+          content: `Write a friendly follow-up ${msgType} for ${customer?.firstName || "the customer"} asking if they had a chance to review their cleaning quote. Reply with ONLY the message text.`
+        },
+      ],
+      max_completion_tokens: channel === "email" ? 250 : 100,
+    });
+    return completion.choices[0]?.message?.content?.trim() || "";
+  }
+
+  async function sendFollowUpNow(commId: string, req: Request): Promise<{ success: boolean; message: string }> {
+    const comm = await getCommunicationById(commId);
+    if (!comm) return { success: false, message: "Follow-up not found" };
+
+    const quote = comm.quoteId ? await getQuoteById(comm.quoteId) : null;
+    if (!quote) return { success: false, message: "Quote not found" };
+    if (quote.status === "accepted") return { success: false, message: "Quote already accepted - no follow-up needed" };
+    if (quote.status === "expired") return { success: false, message: "Quote has expired" };
+
+    const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+    const business = await db_getBusinessById(quote.businessId);
+
+    let messageText = comm.content?.trim() || "";
+    if (!messageText) {
+      messageText = await generateFollowUpMessage(quote, customer, business, comm.channel);
+    }
+
+    const channel = comm.channel;
+
+    if (channel === "email") {
+      const sgApiKey = process.env.SENDGRID_API_KEY;
+      if (!sgApiKey) return { success: false, message: "Email service not configured" };
+      const toEmail = customer?.email;
+      if (!toEmail) return { success: false, message: "Customer email not found" };
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+      const replyTo = business?.email;
+      const fromName = business?.companyName || "QuotePro";
+      const quoteUrl = `${process.env.APP_URL || `https://${req.get("host")}`}/q/${quote.publicToken}`;
+      const primaryColor = (business as any)?.primaryColor || "#2563EB";
+      const quoteButtonHtml = `<div style="margin-top:24px;text-align:center;"><a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Accept Your Quote</a></div>`;
+      const subjectMatch = messageText.match(/^Subject:\s*(.+)/i);
+      const subject = subjectMatch ? subjectMatch[1].trim() : `Following up on your quote from ${fromName}`;
+      const body = subjectMatch ? messageText.replace(/^Subject:.*\n\n?/i, "").trim() : messageText;
+      const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${body.split('\n').map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join('')}${quoteButtonHtml}</td></tr><tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
+      const emailPayload: any = {
+        personalizations: [{ to: [{ email: toEmail }] }],
+        from: { email: fromEmail, name: fromName },
+        subject,
+        content: [{ type: "text/plain", value: body }, { type: "text/html", value: htmlBody }],
+      };
+      if (replyTo) emailPayload.reply_to = { email: replyTo, name: fromName };
+      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(emailPayload),
+      });
+      if (!sgRes.ok) {
+        const errText = await sgRes.text();
+        console.error("Follow-up email error:", sgRes.status, errText);
+        return { success: false, message: "Failed to send follow-up email" };
+      }
+    } else {
+      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+      const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+      if (!twilioSid || !twilioToken || !twilioFrom) return { success: false, message: "SMS service not configured" };
+      const toPhone = customer?.phone;
+      if (!toPhone) return { success: false, message: "Customer phone not found" };
+      const quoteUrl = `${process.env.APP_URL || `https://${req.get("host")}`}/q/${quote.publicToken}`;
+      const smsText = `${messageText}\n${quoteUrl}`;
+      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+      const twilioRes = await fetch(twilioUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({ From: twilioFrom, To: toPhone, Body: smsText }).toString(),
+      });
+      if (!twilioRes.ok) {
+        const errText = await twilioRes.text();
+        console.error("Follow-up SMS error:", twilioRes.status, errText);
+        return { success: false, message: "Failed to send follow-up SMS" };
+      }
+    }
+
+    await updateCommunication(commId, { status: "sent", sentAt: new Date(), content: messageText });
+    return { success: true, message: "Follow-up sent successfully" };
+  }
+
+  app.get("/api/quotes/:id/scheduled-followups", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const followUps = await getScheduledFollowUpsForQuote(req.params.id);
+      return res.json(followUps);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get scheduled follow-ups" });
+    }
+  });
+
+  app.post("/api/quotes/:id/followup-preview", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const quote = await getQuoteById(req.params.id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+      const business = await db_getBusinessById(quote.businessId);
+      const channel = req.body.channel || "sms";
+      const draft = await generateFollowUpMessage(quote, customer, business, channel);
+      return res.json({ draft });
+    } catch (error: any) {
+      console.error("Followup preview error:", error);
+      return res.status(500).json({ message: "Failed to generate preview" });
+    }
+  });
+
+  app.put("/api/communications/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { content, scheduledFor, channel } = req.body;
+      const updates: any = {};
+      if (content !== undefined) updates.content = content;
+      if (scheduledFor) updates.scheduledFor = new Date(scheduledFor);
+      if (channel) updates.channel = channel;
+      const comm = await updateCommunication(req.params.id, updates);
+      return res.json(comm);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update communication" });
+    }
+  });
+
+  app.delete("/api/communications/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await updateCommunication(req.params.id, { status: "canceled" });
+      return res.json({ message: "Follow-up canceled" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to cancel follow-up" });
+    }
+  });
+
+  app.post("/api/communications/:id/send-now", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await sendFollowUpNow(req.params.id, req);
+      if (!result.success) return res.status(400).json({ message: result.message });
+      return res.json({ success: true, message: result.message });
+    } catch (error: any) {
+      console.error("Send follow-up now error:", error);
+      return res.status(500).json({ message: "Failed to send follow-up" });
     }
   });
 
@@ -5133,7 +5299,8 @@ Respond with JSON: {"reply": string}`
     try {
       const expiredCount = await expireOldQuotes();
       if (expiredCount > 0) console.log(`Expired ${expiredCount} quotes`);
-      return res.json({ expired: expiredCount });
+      const { sent, canceled } = await processPendingFollowUps();
+      return res.json({ expired: expiredCount, followupsSent: sent, followupsCanceled: canceled });
     } catch (error: any) {
       console.error("Cron error:", error);
       return res.status(500).json({ message: "Cron failed" });
@@ -8393,11 +8560,101 @@ init();
 
   const httpServer = createServer(app);
 
+  async function processPendingFollowUps() {
+    const pending = await getPendingCommunications();
+    let sent = 0;
+    let canceled = 0;
+    for (const comm of pending) {
+      try {
+        if (!comm.quoteId) { await updateCommunication(comm.id, { status: "canceled" }); canceled++; continue; }
+        const quote = await getQuoteById(comm.quoteId);
+        if (!quote || quote.status === "accepted" || quote.status === "expired") {
+          await updateCommunication(comm.id, { status: "canceled" });
+          canceled++;
+          continue;
+        }
+        const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+        const business = await db_getBusinessById(quote.businessId);
+        let messageText = comm.content?.trim() || "";
+        if (!messageText) {
+          messageText = await generateFollowUpMessage(quote, customer, business, comm.channel);
+        }
+        if (comm.channel === "email") {
+          const sgApiKey = process.env.SENDGRID_API_KEY;
+          const toEmail = customer?.email;
+          if (!sgApiKey || !toEmail) {
+            await updateCommunication(comm.id, { status: "failed", errorMessage: !sgApiKey ? "No SendGrid key" : "No customer email" });
+            continue;
+          }
+          const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+          const fromName = business?.companyName || "QuotePro";
+          const replyTo = business?.email;
+          const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
+          const primaryColor = (business as any)?.primaryColor || "#2563EB";
+          const quoteButtonHtml = `<div style="margin-top:24px;text-align:center;"><a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Accept Your Quote</a></div>`;
+          const subjectMatch = messageText.match(/^Subject:\s*(.+)/i);
+          const subject = subjectMatch ? subjectMatch[1].trim() : `Following up on your quote from ${fromName}`;
+          const body = subjectMatch ? messageText.replace(/^Subject:.*\n\n?/i, "").trim() : messageText;
+          const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${body.split('\n').map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join('')}${quoteButtonHtml}</td></tr><tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
+          const emailPayload: any = {
+            personalizations: [{ to: [{ email: toEmail }] }],
+            from: { email: fromEmail, name: fromName },
+            subject,
+            content: [{ type: "text/plain", value: body }, { type: "text/html", value: htmlBody }],
+          };
+          if (replyTo) emailPayload.reply_to = { email: replyTo, name: fromName };
+          const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify(emailPayload),
+          });
+          if (!sgRes.ok) {
+            const errText = await sgRes.text();
+            await updateCommunication(comm.id, { status: "failed", errorMessage: errText.slice(0, 200) });
+            continue;
+          }
+        } else {
+          const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+          const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+          const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+          const toPhone = customer?.phone;
+          if (!twilioSid || !twilioToken || !twilioFrom || !toPhone) {
+            await updateCommunication(comm.id, { status: "failed", errorMessage: !toPhone ? "No customer phone" : "Twilio not configured" });
+            continue;
+          }
+          const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
+          const smsText = `${messageText}\n${quoteUrl}`;
+          const twilioRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+            method: "POST",
+            headers: {
+              "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({ From: twilioFrom, To: toPhone, Body: smsText }).toString(),
+          });
+          if (!twilioRes.ok) {
+            const errText = await twilioRes.text();
+            await updateCommunication(comm.id, { status: "failed", errorMessage: errText.slice(0, 200) });
+            continue;
+          }
+        }
+        await updateCommunication(comm.id, { status: "sent", sentAt: new Date(), content: messageText });
+        sent++;
+        console.log(`Auto follow-up sent: commId=${comm.id}, channel=${comm.channel}, quoteId=${comm.quoteId}`);
+      } catch (e) {
+        console.error(`Failed to process follow-up ${comm.id}:`, e);
+      }
+    }
+    return { sent, canceled };
+  }
+
   setInterval(async () => {
     try {
       await expireOldQuotes();
+      const { sent, canceled } = await processPendingFollowUps();
+      if (sent > 0 || canceled > 0) console.log(`Follow-ups processed: ${sent} sent, ${canceled} canceled`);
     } catch (e) {
-      console.error("Auto-expire error:", e);
+      console.error("Auto-expire/followup error:", e);
     }
   }, 60 * 60 * 1000);
 

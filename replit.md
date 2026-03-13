@@ -36,6 +36,16 @@ A public, customer-facing instant quote page at `/q/:token` offers an interactiv
 ### Job Management
 Job scheduling includes start/end clock functionality with duration tracking. Jobs have a detailed status flow (Scheduled → En Route → Service Started → In Progress → Final Touches → Completed) and a customer-facing live update page (`/job-updates/:token`) showing progress, checklist items, and photos.
 
+### AI Follow-Up Automation
+When a quote is sent, the system automatically schedules a follow-up message to be delivered 24 hours later (if not accepted). The follow-up is stored in the `communications` table with `status='queued'` and processed by a background cron (hourly). An AI message is generated on delivery using quote context (customer name, amount, business name, quote link). Users can:
+- Toggle automation on/off per business (`automation_rules.quote_followups_enabled`)
+- Change timing (12h/24h/48h via `automation_rules.followup_schedule`)
+- Edit/preview the AI-generated message before it sends
+- Send now or cancel any scheduled follow-up
+- Follow-ups auto-cancel when quote is accepted (`cancel_pending_communications_for_quote`)
+UI: "Follow-Up Automation" section in `QuoteDetailScreen.tsx` (mobile) and `QuoteDetailPage.tsx` (web), visible only for `sent` quotes.
+API routes: `GET /api/quotes/:id/scheduled-followups`, `POST /api/communications/:id/send-now`, `PUT /api/communications/:id`, `DELETE /api/communications/:id`, `POST /api/quotes/:id/followup-preview`.
+
 ## External Dependencies
 
 ### Core Framework

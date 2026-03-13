@@ -112,6 +112,11 @@ export default function QuoteDetailScreen() {
 
   const [qboCreating, setQboCreating] = useState(false);
   const [jobberSyncing, setJobberSyncing] = useState(false);
+  const [showFollowUpEdit, setShowFollowUpEdit] = useState(false);
+  const [followUpEditText, setFollowUpEditText] = useState("");
+  const [followUpEditLoading, setFollowUpEditLoading] = useState(false);
+  const [followUpSendingNow, setFollowUpSendingNow] = useState(false);
+  const [showTimingPicker, setShowTimingPicker] = useState(false);
 
   const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
@@ -127,6 +132,21 @@ export default function QuoteDetailScreen() {
 
   const { data: qboStatus } = useQuery<any>({
     queryKey: ['/api/integrations/qbo/status'],
+  });
+
+  const { data: automationRules, refetch: refetchAutomation } = useQuery<any>({
+    queryKey: ['/api/automations'],
+  });
+
+  const { data: scheduledFollowUps, refetch: refetchFollowUps } = useQuery<any[]>({
+    queryKey: ['/api/quotes', route.params.quoteId, 'scheduled-followups'],
+    queryFn: async () => {
+      const url = new URL(`/api/quotes/${route.params.quoteId}/scheduled-followups`, getApiUrl());
+      const res = await fetch(url.toString(), { credentials: 'include' });
+      return res.json();
+    },
+    enabled: !!quote && quote.status === 'sent',
+    refetchInterval: 30000,
   });
 
   const { data: qboInvoiceLink, refetch: refetchQboLink } = useQuery<any>({
@@ -1654,6 +1674,334 @@ export default function QuoteDetailScreen() {
               </ThemedText>
             )}
           </View>
+        ) : null}
+
+        {quote?.status === 'sent' ? (
+          <>
+            <SectionHeader title="Follow-Up Automation" />
+            <View style={{ backgroundColor: theme.backgroundSecondary, borderRadius: BorderRadius.lg, padding: Spacing.md, gap: Spacing.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, marginRight: Spacing.sm }}>
+                  <ThemedText type="body" style={{ fontWeight: '600' }}>Auto Follow-Up</ThemedText>
+                  <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                    Automatically send a reminder if quote is not accepted
+                  </ThemedText>
+                </View>
+                <Pressable
+                  testID="followup-toggle"
+                  onPress={async () => {
+                    const newVal = !(automationRules?.quoteFollowupsEnabled !== false);
+                    await apiRequest('PUT', '/api/automations', { quoteFollowupsEnabled: newVal });
+                    refetchAutomation();
+                    if (!newVal) {
+                      const fus = scheduledFollowUps || [];
+                      for (const fu of fus) {
+                        await apiRequest('DELETE', `/api/communications/${fu.id}`);
+                      }
+                      refetchFollowUps();
+                    }
+                  }}
+                  style={{
+                    width: 48,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: (automationRules?.quoteFollowupsEnabled !== false) ? theme.primary : theme.border,
+                    justifyContent: 'center',
+                    paddingHorizontal: 2,
+                  }}
+                >
+                  <View style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    backgroundColor: '#fff',
+                    alignSelf: (automationRules?.quoteFollowupsEnabled !== false) ? 'flex-end' : 'flex-start',
+                  }} />
+                </Pressable>
+              </View>
+
+              {(automationRules?.quoteFollowupsEnabled !== false) ? (
+                <>
+                  <View style={{ height: 1, backgroundColor: theme.border }} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                    <ThemedText type="small" style={{ color: theme.textSecondary }}>Timing</ThemedText>
+                    <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {[
+                        { label: '12h', minutes: 720 },
+                        { label: '24h', minutes: 1440 },
+                        { label: '48h', minutes: 2880 },
+                      ].map((opt) => {
+                        const currentDelay = (automationRules?.followupSchedule as any[])?.[0]?.delayMinutes ?? 1440;
+                        const isActive = currentDelay === opt.minutes;
+                        return (
+                          <Pressable
+                            key={opt.label}
+                            testID={`timing-${opt.label}`}
+                            onPress={async () => {
+                              await apiRequest('PUT', '/api/automations', {
+                                followupSchedule: [{ delayMinutes: opt.minutes, templateKey: `followup_${opt.label}` }],
+                              });
+                              refetchAutomation();
+                            }}
+                            style={{
+                              paddingHorizontal: 12,
+                              paddingVertical: 4,
+                              borderRadius: 20,
+                              backgroundColor: isActive ? theme.primary : theme.background,
+                              borderWidth: 1,
+                              borderColor: isActive ? theme.primary : theme.border,
+                            }}
+                          >
+                            <ThemedText type="caption" style={{ color: isActive ? '#fff' : theme.text, fontWeight: isActive ? '600' : '400' }}>
+                              {opt.label}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {scheduledFollowUps && scheduledFollowUps.length > 0 ? (
+                    <>
+                      <View style={{ height: 1, backgroundColor: theme.border }} />
+                      {scheduledFollowUps.map((fu: any) => {
+                        const fuDate = new Date(fu.scheduledFor);
+                        const now = Date.now();
+                        const diffMs = fuDate.getTime() - now;
+                        const diffHrs = diffMs / (1000 * 60 * 60);
+                        let timeLabel = '';
+                        if (diffHrs < 1) timeLabel = 'Less than an hour';
+                        else if (diffHrs < 24) timeLabel = `In ${Math.round(diffHrs)} hours`;
+                        else timeLabel = `${fuDate.toLocaleDateString()} at ${fuDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                        return (
+                          <View key={fu.id} style={{ gap: Spacing.xs }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+                              <Feather name="clock" size={14} color={theme.primary} />
+                              <ThemedText type="small" style={{ color: theme.primary, fontWeight: '600' }}>
+                                Scheduled: {timeLabel}
+                              </ThemedText>
+                              <View style={{ marginLeft: 'auto' as any }}>
+                                <ThemedText type="caption" style={{ color: theme.textSecondary, textTransform: 'capitalize' }}>
+                                  via {fu.channel}
+                                </ThemedText>
+                              </View>
+                            </View>
+                            {fu.content ? (
+                              <ThemedText type="caption" style={{ color: theme.textSecondary, fontStyle: 'italic' }} numberOfLines={2}>
+                                {fu.content}
+                              </ThemedText>
+                            ) : (
+                              <ThemedText type="caption" style={{ color: theme.textSecondary, fontStyle: 'italic' }}>
+                                AI will generate message at send time
+                              </ThemedText>
+                            )}
+                            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs }}>
+                              <Pressable
+                                testID="followup-send-now"
+                                disabled={followUpSendingNow}
+                                onPress={async () => {
+                                  setFollowUpSendingNow(true);
+                                  try {
+                                    const url = new URL(`/api/communications/${fu.id}/send-now`, getApiUrl());
+                                    const res = await fetch(url.toString(), { method: 'POST', credentials: 'include' });
+                                    const data = await res.json();
+                                    if (res.ok) {
+                                      Alert.alert('Sent', 'Follow-up sent successfully.');
+                                      refetchFollowUps();
+                                    } else {
+                                      Alert.alert('Error', data.message || 'Failed to send');
+                                    }
+                                  } catch {
+                                    Alert.alert('Error', 'Failed to send follow-up');
+                                  } finally {
+                                    setFollowUpSendingNow(false);
+                                  }
+                                }}
+                                style={{
+                                  flex: 1,
+                                  paddingVertical: Spacing.xs,
+                                  borderRadius: BorderRadius.md,
+                                  backgroundColor: theme.primary,
+                                  alignItems: 'center',
+                                  flexDirection: 'row',
+                                  justifyContent: 'center',
+                                  gap: 4,
+                                }}
+                              >
+                                {followUpSendingNow ? (
+                                  <ActivityIndicator size="small" color="#fff" />
+                                ) : (
+                                  <>
+                                    <Feather name="send" size={13} color="#fff" />
+                                    <ThemedText type="caption" style={{ color: '#fff', fontWeight: '600' }}>Send Now</ThemedText>
+                                  </>
+                                )}
+                              </Pressable>
+                              <Pressable
+                                testID="followup-edit"
+                                onPress={() => {
+                                  setFollowUpEditText(fu.content || '');
+                                  setShowFollowUpEdit(true);
+                                }}
+                                style={{
+                                  flex: 1,
+                                  paddingVertical: Spacing.xs,
+                                  borderRadius: BorderRadius.md,
+                                  backgroundColor: theme.backgroundSecondary,
+                                  alignItems: 'center',
+                                  flexDirection: 'row',
+                                  justifyContent: 'center',
+                                  gap: 4,
+                                  borderWidth: 1,
+                                  borderColor: theme.border,
+                                }}
+                              >
+                                <Feather name="edit-2" size={13} color={theme.text} />
+                                <ThemedText type="caption" style={{ fontWeight: '600' }}>Edit</ThemedText>
+                              </Pressable>
+                              <Pressable
+                                testID="followup-cancel"
+                                onPress={() => {
+                                  Alert.alert('Cancel Follow-Up', 'Are you sure you want to cancel this follow-up?', [
+                                    { text: 'No', style: 'cancel' },
+                                    {
+                                      text: 'Yes, Cancel',
+                                      style: 'destructive',
+                                      onPress: async () => {
+                                        const url = new URL(`/api/communications/${fu.id}`, getApiUrl());
+                                        await fetch(url.toString(), { method: 'DELETE', credentials: 'include' });
+                                        refetchFollowUps();
+                                      },
+                                    },
+                                  ]);
+                                }}
+                                style={{
+                                  paddingVertical: Spacing.xs,
+                                  paddingHorizontal: Spacing.sm,
+                                  borderRadius: BorderRadius.md,
+                                  backgroundColor: theme.backgroundSecondary,
+                                  alignItems: 'center',
+                                  borderWidth: 1,
+                                  borderColor: theme.border,
+                                }}
+                              >
+                                <Feather name="x" size={14} color={theme.error} />
+                              </Pressable>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <ThemedText type="caption" style={{ color: theme.textSecondary, fontStyle: 'italic' }}>
+                      No follow-up scheduled. Re-send the quote to schedule one.
+                    </ThemedText>
+                  )}
+                </>
+              ) : null}
+            </View>
+
+            <Modal visible={showFollowUpEdit} animationType="slide" transparent presentationStyle="overFullScreen">
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+                <View style={{ backgroundColor: theme.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: Spacing.lg, gap: Spacing.md }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <ThemedText type="body" style={{ fontWeight: '700', fontSize: 17 }}>Edit Follow-Up Message</ThemedText>
+                    <Pressable onPress={() => setShowFollowUpEdit(false)}>
+                      <Feather name="x" size={22} color={theme.text} />
+                    </Pressable>
+                  </View>
+                  <TextInput
+                    value={followUpEditText}
+                    onChangeText={setFollowUpEditText}
+                    multiline
+                    numberOfLines={6}
+                    placeholder="Leave empty for AI to generate at send time..."
+                    placeholderTextColor={theme.textSecondary}
+                    style={{
+                      backgroundColor: theme.backgroundSecondary,
+                      borderRadius: BorderRadius.md,
+                      padding: Spacing.md,
+                      color: theme.text,
+                      minHeight: 120,
+                      textAlignVertical: 'top',
+                      fontSize: 14,
+                    }}
+                    testID="followup-edit-input"
+                  />
+                  <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                    <Pressable
+                      onPress={async () => {
+                        if (!isPro) { navigation.navigate('Paywall'); return; }
+                        setFollowUpEditLoading(true);
+                        try {
+                          const fu = (scheduledFollowUps || [])[0];
+                          const url = new URL(`/api/quotes/${route.params.quoteId}/followup-preview`, getApiUrl());
+                          const res = await fetch(url.toString(), {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ channel: fu?.channel || 'sms' }),
+                          });
+                          const data = await res.json();
+                          if (data.draft) setFollowUpEditText(data.draft);
+                        } catch { }
+                        setFollowUpEditLoading(false);
+                      }}
+                      style={{
+                        flex: 1,
+                        paddingVertical: Spacing.sm,
+                        borderRadius: BorderRadius.md,
+                        backgroundColor: theme.backgroundSecondary,
+                        alignItems: 'center',
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        gap: 4,
+                        borderWidth: 1,
+                        borderColor: theme.border,
+                      }}
+                    >
+                      {followUpEditLoading ? (
+                        <ActivityIndicator size="small" color={theme.primary} />
+                      ) : (
+                        <>
+                          <Feather name="zap" size={14} color={theme.primary} />
+                          <ThemedText type="caption" style={{ color: theme.primary, fontWeight: '600' }}>
+                            {isPro ? 'AI Generate' : 'AI (Pro)'}
+                          </ThemedText>
+                        </>
+                      )}
+                    </Pressable>
+                    <Pressable
+                      testID="followup-save-msg"
+                      onPress={async () => {
+                        const fus = scheduledFollowUps || [];
+                        for (const fu of fus) {
+                          const url = new URL(`/api/communications/${fu.id}`, getApiUrl());
+                          await fetch(url.toString(), {
+                            method: 'PUT',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content: followUpEditText }),
+                          });
+                        }
+                        refetchFollowUps();
+                        setShowFollowUpEdit(false);
+                      }}
+                      style={{
+                        flex: 1,
+                        paddingVertical: Spacing.sm,
+                        borderRadius: BorderRadius.md,
+                        backgroundColor: theme.primary,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <ThemedText type="caption" style={{ color: '#fff', fontWeight: '600' }}>Save</ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          </>
         ) : null}
 
         <SectionHeader title="Quick Actions" />

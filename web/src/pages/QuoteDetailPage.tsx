@@ -71,6 +71,10 @@ export default function QuoteDetailPage() {
   const [expandedRec, setExpandedRec] = useState<number | null>(null);
   const [msgChannel, setMsgChannel] = useState<MessageChannel>("sms");
   const [msgPurpose, setMsgPurpose] = useState<MessagePurpose>("follow_up");
+  const [followUpEditOpen, setFollowUpEditOpen] = useState(false);
+  const [followUpEditText, setFollowUpEditText] = useState("");
+  const [followUpSendingNow, setFollowUpSendingNow] = useState(false);
+  const [followUpPreviewLoading, setFollowUpPreviewLoading] = useState(false);
 
   const { data: quote, isLoading } = useQuery<any>({
     queryKey: [`/api/quotes/${id}`],
@@ -88,6 +92,44 @@ export default function QuoteDetailPage() {
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/settings"],
+  });
+
+  const { data: automationRules, refetch: refetchAutomation } = useQuery<any>({
+    queryKey: ["/api/automations"],
+  });
+
+  const { data: scheduledFollowUps, refetch: refetchFollowUps } = useQuery<any[]>({
+    queryKey: [`/api/quotes/${id}/scheduled-followups`],
+    enabled: !!quote && quote.status === "sent",
+    refetchInterval: 30000,
+  });
+
+  const toggleFollowUpsMutation = useMutation({
+    mutationFn: (enabled: boolean) => apiPut("/api/automations", { quoteFollowupsEnabled: enabled }),
+    onSuccess: () => {
+      refetchAutomation();
+      if (!automationRules?.quoteFollowupsEnabled) {
+        refetchFollowUps();
+      }
+    },
+  });
+
+  const updateTimingMutation = useMutation({
+    mutationFn: (minutes: number) => apiPut("/api/automations", {
+      followupSchedule: [{ delayMinutes: minutes, templateKey: `followup_${minutes}m` }],
+    }),
+    onSuccess: () => refetchAutomation(),
+  });
+
+  const cancelFollowUpMutation = useMutation({
+    mutationFn: (commId: string) => apiDelete(`/api/communications/${commId}`),
+    onSuccess: () => refetchFollowUps(),
+  });
+
+  const updateFollowUpMutation = useMutation({
+    mutationFn: ({ commId, content }: { commId: string; content: string }) =>
+      apiPut(`/api/communications/${commId}`, { content }),
+    onSuccess: () => { refetchFollowUps(); setFollowUpEditOpen(false); },
   });
 
   const statusMutation = useMutation({
@@ -713,6 +755,160 @@ export default function QuoteDetailPage() {
               ) : null}
             </div>
           </Card>
+
+          {quote.status === "sent" ? (
+            <Card>
+              <CardHeader title="Follow-Up Automation" icon={Zap} />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">Auto Follow-Up</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Send a reminder if not accepted</p>
+                  </div>
+                  <Toggle
+                    checked={automationRules?.quoteFollowupsEnabled !== false}
+                    onChange={async (val) => {
+                      toggleFollowUpsMutation.mutate(val);
+                      if (!val) {
+                        for (const fu of scheduledFollowUps || []) {
+                          cancelFollowUpMutation.mutate(fu.id);
+                        }
+                      }
+                    }}
+                    label=""
+                  />
+                </div>
+
+                {automationRules?.quoteFollowupsEnabled !== false ? (
+                  <>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 mb-2">Timing</p>
+                      <div className="flex gap-2">
+                        {[{ label: "12h", minutes: 720 }, { label: "24h", minutes: 1440 }, { label: "48h", minutes: 2880 }].map((opt) => {
+                          const current = (automationRules?.followupSchedule as any[])?.[0]?.delayMinutes ?? 1440;
+                          const isActive = current === opt.minutes;
+                          return (
+                            <button
+                              key={opt.label}
+                              onClick={() => updateTimingMutation.mutate(opt.minutes)}
+                              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${isActive ? "bg-primary-600 text-white border-primary-600" : "bg-white text-slate-600 border-slate-200 hover:border-primary-300"}`}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {scheduledFollowUps && scheduledFollowUps.length > 0 ? (
+                      scheduledFollowUps.map((fu: any) => {
+                        const fuDate = new Date(fu.scheduledFor);
+                        const diffMs = fuDate.getTime() - Date.now();
+                        const diffHrs = diffMs / (1000 * 60 * 60);
+                        const timeLabel = diffHrs < 1 ? "Less than an hour" : diffHrs < 24 ? `In ${Math.round(diffHrs)} hours` : fuDate.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+                        return (
+                          <div key={fu.id} className="border border-primary-100 bg-primary-50/40 rounded-xl p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 text-primary-700">
+                                <Clock className="w-3.5 h-3.5" />
+                                <span className="text-xs font-semibold">{timeLabel}</span>
+                              </div>
+                              <span className="text-xs text-slate-400 capitalize">via {fu.channel}</span>
+                            </div>
+                            {fu.content ? (
+                              <p className="text-xs text-slate-600 italic line-clamp-2">{fu.content}</p>
+                            ) : (
+                              <p className="text-xs text-slate-400 italic">AI will generate message at send time</p>
+                            )}
+                            <div className="flex gap-2 pt-1">
+                              <Button
+                                size="xs"
+                                loading={followUpSendingNow}
+                                onClick={async () => {
+                                  setFollowUpSendingNow(true);
+                                  try {
+                                    const res = await apiPost(`/api/communications/${fu.id}/send-now`, {});
+                                    refetchFollowUps();
+                                  } catch (e: any) {
+                                    alert(e?.message || "Failed to send");
+                                  } finally {
+                                    setFollowUpSendingNow(false);
+                                  }
+                                }}
+                              >
+                                Send Now
+                              </Button>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                onClick={() => { setFollowUpEditText(fu.content || ""); setFollowUpEditOpen(true); }}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                onClick={() => cancelFollowUpMutation.mutate(fu.id)}
+                                loading={cancelFollowUpMutation.isPending}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No follow-up scheduled. Re-send the quote to schedule one.</p>
+                    )}
+                  </>
+                ) : null}
+
+                {followUpEditOpen ? (
+                  <div className="border border-slate-200 rounded-xl p-3 space-y-3 bg-slate-50">
+                    <p className="text-xs font-semibold text-slate-700">Edit Follow-Up Message</p>
+                    <textarea
+                      value={followUpEditText}
+                      onChange={(e) => setFollowUpEditText(e.target.value)}
+                      className="w-full text-sm border border-slate-200 rounded-lg p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/20 bg-white"
+                      rows={5}
+                      placeholder="Leave empty for AI to generate at send time..."
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        loading={followUpPreviewLoading}
+                        onClick={async () => {
+                          setFollowUpPreviewLoading(true);
+                          try {
+                            const fu = (scheduledFollowUps || [])[0];
+                            const data = await apiPost(`/api/quotes/${id}/followup-preview`, { channel: fu?.channel || "sms" }) as any;
+                            if (data?.draft) setFollowUpEditText(data.draft);
+                          } catch {}
+                          setFollowUpPreviewLoading(false);
+                        }}
+                      >
+                        AI Generate
+                      </Button>
+                      <Button
+                        size="xs"
+                        onClick={() => {
+                          const fu = (scheduledFollowUps || [])[0];
+                          if (fu) updateFollowUpMutation.mutate({ commId: fu.id, content: followUpEditText });
+                        }}
+                        loading={updateFollowUpMutation.isPending}
+                      >
+                        Save
+                      </Button>
+                      <Button size="xs" variant="ghost" onClick={() => setFollowUpEditOpen(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader

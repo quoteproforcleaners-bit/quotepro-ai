@@ -690,6 +690,8 @@ export async function updateCommunication(
     providerMessageId: string;
     sentAt: Date;
     errorMessage: string;
+    content: string;
+    scheduledFor: Date;
   }>
 ): Promise<Communication> {
   const [c] = await db
@@ -697,6 +699,27 @@ export async function updateCommunication(
     .set(data)
     .where(eq(communications.id, id))
     .returning();
+  return c;
+}
+
+export async function getScheduledFollowUpsForQuote(quoteId: string): Promise<Communication[]> {
+  return db
+    .select()
+    .from(communications)
+    .where(
+      and(
+        eq(communications.quoteId, quoteId),
+        eq(communications.status, "queued")
+      )
+    )
+    .orderBy(asc(communications.scheduledFor));
+}
+
+export async function getCommunicationById(id: string): Promise<Communication | undefined> {
+  const [c] = await db
+    .select()
+    .from(communications)
+    .where(eq(communications.id, id));
   return c;
 }
 
