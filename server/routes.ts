@@ -1671,6 +1671,36 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
+  // Manual-only statuses cleaner can tap. In Progress and Final Touches are auto-computed.
+  const MANUAL_CLEANER_STATUSES = ["scheduled", "en_route", "service_started", "completed"];
+
+  // Auto-progression timing (minutes after service_started_at)
+  function getAutoProgressTiming(jobType: string): { inProgressMinutes: number; finalTouchesMinutes: number } {
+    if (jobType === "deep_clean" || jobType === "move_in_out") {
+      return { inProgressMinutes: 45, finalTouchesMinutes: 90 };
+    }
+    return { inProgressMinutes: 30, finalTouchesMinutes: 60 };
+  }
+
+  // Compute the effective customer-facing status from timestamps
+  function computeAutoProgressStatus(
+    detailedStatus: string,
+    jobType: string,
+    serviceStartedAt: Date | null,
+    completedAt: Date | null
+  ): string {
+    if (detailedStatus === "completed" || completedAt) return "completed";
+    if (!serviceStartedAt || detailedStatus === "scheduled" || detailedStatus === "en_route") {
+      return detailedStatus;
+    }
+    const { inProgressMinutes, finalTouchesMinutes } = getAutoProgressTiming(jobType || "regular");
+    const elapsedMs = Date.now() - serviceStartedAt.getTime();
+    const elapsedMinutes = elapsedMs / 60000;
+    if (elapsedMinutes >= finalTouchesMinutes) return "final_touches";
+    if (elapsedMinutes >= inProgressMinutes) return "in_progress";
+    return "service_started";
+  }
+
   app.post("/api/jobs/:id/update-status", requireAuth, async (req: Request, res: Response) => {
     try {
       const { status, note } = req.body;
@@ -1687,15 +1717,18 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const coreStatus = status === "completed" ? "completed" : (status === "scheduled" ? "scheduled" : "in_progress");
       await pool.query(`UPDATE jobs SET status = $1 WHERE id = $2`, [coreStatus, req.params.id]);
 
-      if (status === "en_route" || status === "service_started") {
-        await pool.query(`UPDATE jobs SET started_at = COALESCE(started_at, NOW()) WHERE id = $1`, [req.params.id]);
+      if (status === "en_route") {
+        await pool.query(`UPDATE jobs SET started_at = COALESCE(started_at, NOW()), en_route_at = COALESCE(en_route_at, NOW()) WHERE id = $1`, [req.params.id]);
+      }
+      if (status === "service_started") {
+        await pool.query(`UPDATE jobs SET started_at = COALESCE(started_at, NOW()), service_started_at = COALESCE(service_started_at, NOW()) WHERE id = $1`, [req.params.id]);
       }
       if (status === "completed") {
         await pool.query(`UPDATE jobs SET completed_at = COALESCE(completed_at, NOW()) WHERE id = $1`, [req.params.id]);
       }
 
       await pool.query(
-        `INSERT INTO job_status_history (id, job_id, status, note, created_at) VALUES (gen_random_uuid(), $1, $2, $3, NOW())`,
+        `INSERT INTO job_status_history (id, job_id, status, note, created_at, auto_generated) VALUES (gen_random_uuid(), $1, $2, $3, NOW(), false)`,
         [req.params.id, status, note || ""]
       );
 
@@ -1845,9 +1878,61 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         [job.id]
       );
 
-      const effectiveDetailedStatus = (job.detailed_status && job.detailed_status !== "scheduled")
-        ? job.detailed_status
-        : (job.status === "in_progress" ? "in_progress" : (job.status === "completed" ? "completed" : job.detailed_status || job.status));
+      const serviceStartedAt = job.service_started_at ? new Date(job.service_started_at) : null;
+      const completedAt = job.completed_at ? new Date(job.completed_at) : null;
+
+      // Compute the auto-progressed customer-facing status
+      const computedStatus = computeAutoProgressStatus(
+        job.detailed_status || job.status || "scheduled",
+        job.job_type || "regular",
+        serviceStartedAt,
+        completedAt
+      );
+
+      // If computed status has auto-advanced beyond what's in the DB, write it back and add timeline entries
+      const STATUS_ORDER = ["scheduled", "en_route", "service_started", "in_progress", "final_touches", "completed"];
+      const dbStatusIdx = STATUS_ORDER.indexOf(job.detailed_status || "scheduled");
+      const computedStatusIdx = STATUS_ORDER.indexOf(computedStatus);
+
+      if (computedStatusIdx > dbStatusIdx && !completedAt) {
+        try {
+          // Write back computed status to DB
+          await pool.query(
+            `UPDATE jobs SET detailed_status = $1, updated_at = NOW() WHERE id = $2`,
+            [computedStatus, job.id]
+          );
+
+          // Insert auto-generated timeline entries for any skipped stages
+          for (let i = dbStatusIdx + 1; i <= computedStatusIdx; i++) {
+            const autoStatus = STATUS_ORDER[i];
+            // Only auto-insert in_progress and final_touches
+            if (autoStatus !== "in_progress" && autoStatus !== "final_touches") continue;
+            // Check if this entry already exists in timeline
+            const existing = timeline.rows.find((r: any) => r.status === autoStatus && r.auto_generated);
+            if (!existing) {
+              const { inProgressMinutes, finalTouchesMinutes } = getAutoProgressTiming(job.job_type || "regular");
+              const minutesOffset = autoStatus === "in_progress" ? inProgressMinutes : finalTouchesMinutes;
+              const autoTimestamp = new Date(serviceStartedAt!.getTime() + minutesOffset * 60000);
+              await pool.query(
+                `INSERT INTO job_status_history (id, job_id, status, note, created_at, auto_generated) VALUES (gen_random_uuid(), $1, $2, $3, $4, true)`,
+                [job.id, autoStatus, "", autoTimestamp]
+              );
+            }
+          }
+          // Re-fetch timeline with new entries
+          const updatedTimeline = await pool.query(
+            `SELECT * FROM job_status_history WHERE job_id = $1 ORDER BY created_at ASC`,
+            [job.id]
+          );
+          timeline.rows = updatedTimeline.rows;
+        } catch (autoErr: any) {
+          console.warn("Auto-progression write error:", autoErr.message);
+        }
+      }
+
+      const effectiveDetailedStatus = computedStatus;
+
+      const { inProgressMinutes: ipm, finalTouchesMinutes: ftm } = getAutoProgressTiming(job.job_type || "regular");
 
       return res.json({
         jobType: job.job_type,
@@ -1859,6 +1944,8 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         total: job.total,
         startedAt: job.started_at,
         completedAt: job.completed_at,
+        serviceStartedAt: job.service_started_at || null,
+        autoProgressTiming: { inProgressMinutes: ipm, finalTouchesMinutes: ftm },
         companyName: profile.company_name || "Cleaning Service",
         companyLogo: profile.logo_url || null,
         brandColor: profile.brand_color || "#2563EB",
@@ -2019,10 +2106,45 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' at ' + formatTime(dateStr);
     }
 
+    function formatMinutes(mins) {
+      if (mins >= 60) {
+        var h = Math.floor(mins / 60);
+        var m = mins % 60;
+        return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
+      }
+      return mins + ' min';
+    }
+
+    // Live smooth progress bar animation
+    function getLiveProgress(data) {
+      var status = data.detailedStatus || data.status || "scheduled";
+      if (status === "completed") return 100;
+      if (!data.serviceStartedAt) return getProgress(status);
+      var started = new Date(data.serviceStartedAt).getTime();
+      var now = Date.now();
+      var elapsedMs = now - started;
+      var timing = data.autoProgressTiming || { inProgressMinutes: 30, finalTouchesMinutes: 60 };
+      var ipMs = timing.inProgressMinutes * 60000;
+      var ftMs = timing.finalTouchesMinutes * 60000;
+      // Interpolate smoothly through the three active zones
+      if (elapsedMs < ipMs) {
+        // service_started → in_progress: 30% → 55%
+        return 30 + Math.min(25, (elapsedMs / ipMs) * 25);
+      } else if (elapsedMs < ftMs) {
+        // in_progress → final_touches: 55% → 80%
+        return 55 + Math.min(25, ((elapsedMs - ipMs) / (ftMs - ipMs)) * 25);
+      } else {
+        // final_touches → 80% and holding until cleaner taps Complete
+        return 80;
+      }
+    }
+
     function render(data) {
       const status = data.detailedStatus || data.status || "scheduled";
       const sc = STATUS_COLORS[status] || STATUS_COLORS.scheduled;
-      const progress = getProgress(status);
+      const rawProgress = getProgress(status);
+      const liveProgress = status !== "completed" && data.serviceStartedAt ? getLiveProgress(data) : rawProgress;
+      const progress = Math.round(liveProgress);
       const brandColor = data.brandColor || "#2563EB";
       const isComplete = status === "completed";
 
@@ -2065,6 +2187,31 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       }
       html += '</div>';
 
+      // Auto-update hint: show next expected stage when in progress
+      if (!isComplete && data.serviceStartedAt && (status === 'service_started' || status === 'in_progress' || status === 'final_touches')) {
+        var timing = data.autoProgressTiming || { inProgressMinutes: 30, finalTouchesMinutes: 60 };
+        var startedMs = new Date(data.serviceStartedAt).getTime();
+        var nowMs = Date.now();
+        var elapsedMin = (nowMs - startedMs) / 60000;
+        var nextStageLabel = null;
+        var minsUntilNext = null;
+        if (status === 'service_started' && elapsedMin < timing.inProgressMinutes) {
+          nextStageLabel = 'In Progress';
+          minsUntilNext = Math.ceil(timing.inProgressMinutes - elapsedMin);
+        } else if (status === 'in_progress' && elapsedMin < timing.finalTouchesMinutes) {
+          nextStageLabel = 'Final Touches';
+          minsUntilNext = Math.ceil(timing.finalTouchesMinutes - elapsedMin);
+        }
+        if (nextStageLabel && minsUntilNext !== null && minsUntilNext > 0) {
+          html += '<div class="card" style="background:#F0F9FF;border:1px solid #BAE6FD">';
+          html += '<div style="display:flex;align-items:center;gap:8px">';
+          html += '<div style="width:28px;height:28px;border-radius:8px;background:#0EA5E9;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px">&#128336;</div>';
+          html += '<div><div style="font-size:13px;font-weight:600;color:#0369A1">Auto-updating to ' + nextStageLabel + '</div>';
+          html += '<div style="font-size:12px;color:#0284C7">Expected in ~' + formatMinutes(minsUntilNext) + ' &middot; This page refreshes automatically</div></div>';
+          html += '</div></div>';
+        }
+      }
+
       // Timeline
       if (data.timeline && data.timeline.length > 0) {
         html += '<div class="card"><div class="card-title">Timeline</div>';
@@ -2073,7 +2220,8 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
           html += '<div class="timeline-item">';
           html += '<div class="timeline-dot" style="background:' + tsc.bg + '">' + (STATUS_ICONS[t.status] || "&#9679;") + '</div>';
           html += '<div class="timeline-content">';
-          html += '<div class="timeline-status">' + (STATUS_LABELS[t.status] || t.status) + '</div>';
+          var autoTag = t.auto_generated ? ' <span style="font-size:10px;color:#94A3B8;font-weight:400;margin-left:4px">auto</span>' : '';
+          html += '<div class="timeline-status">' + (STATUS_LABELS[t.status] || t.status) + autoTag + '</div>';
           html += '<div class="timeline-time">' + formatDateTime(t.created_at) + '</div>';
           if (t.note) html += '<div class="timeline-note">' + t.note + '</div>';
           html += '</div></div>';
@@ -8472,6 +8620,9 @@ initOAuthStatesTable();
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS update_token VARCHAR UNIQUE`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS detailed_status TEXT NOT NULL DEFAULT 'scheduled'`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS en_route_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS service_started_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE job_status_history ADD COLUMN IF NOT EXISTS auto_generated BOOLEAN NOT NULL DEFAULT false`);
     await pool.query(`ALTER TABLE job_checklist_items ADD COLUMN IF NOT EXISTS room_group TEXT NOT NULL DEFAULT 'General'`);
     await pool.query(`ALTER TABLE job_checklist_items ADD COLUMN IF NOT EXISTS customer_visible BOOLEAN NOT NULL DEFAULT true`);
     await pool.query(`ALTER TABLE job_photos ADD COLUMN IF NOT EXISTS customer_visible BOOLEAN NOT NULL DEFAULT true`);

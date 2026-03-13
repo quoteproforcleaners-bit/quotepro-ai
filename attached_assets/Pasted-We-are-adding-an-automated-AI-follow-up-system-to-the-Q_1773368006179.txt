@@ -1,0 +1,168 @@
+We are adding an automated AI follow-up system to the QuotePro quoting workflow.
+
+GOAL
+Increase quote acceptance rates by automatically sending intelligent follow-up messages if the quote has not been accepted.
+
+This feature should feel helpful and professional, not spammy.
+
+PRIMARY WORKFLOW
+
+When a quote is sent to a customer:
+
+1. The system automatically schedules a follow-up message to be sent 24 hours later.
+
+2. The follow-up should only send if:
+   - the quote has NOT been accepted
+   - the quote has NOT expired
+
+3. The message should be AI-generated using information from the quote.
+
+4. The app user should have the ability to:
+   - disable automatic follow-ups
+   - change the follow-up timing
+   - edit the generated message
+   - send the follow-up manually if desired.
+
+DEFAULT SETTINGS
+
+Default follow-up schedule:
+
+Follow-up #1
+24 hours after quote is sent.
+
+Optional Follow-up #2
+48 hours after quote is sent.
+
+Optional Follow-up #3
+72 hours after quote is sent OR near quote expiration.
+
+Only the first follow-up should be enabled by default.
+
+USER CONFIGURATION
+
+Inside the quote screen, add a new section called:
+
+"Follow-Up Automation"
+
+Allow the user to configure:
+
+- toggle: enable automated follow-ups
+- timing options:
+   - 12 hours
+   - 24 hours
+   - 48 hours
+   - custom time
+
+- edit follow-up message text
+
+Allow them to preview the AI-generated message.
+
+AI MESSAGE GENERATION
+
+Generate a personalized follow-up message using the quote data.
+
+Context provided to the AI:
+
+- customer first name
+- service type
+- home size or job description
+- package options
+- recommended package
+- business name
+- quote link
+
+The AI should produce a friendly, conversational message.
+
+Example tone:
+
+"Hi Sarah, just checking in to see if you had a chance to review the cleaning quote I sent yesterday. Let me know if you have any questions — I'm happy to help."
+
+The message should encourage the customer to review the quote and accept if ready.
+
+DELIVERY CHANNELS
+
+If the quote was sent via:
+
+Email → follow-up sent via email
+
+SMS → follow-up sent via SMS
+
+If both exist, allow the user to choose the preferred channel.
+
+IMPORTANT LOGIC
+
+Do NOT send follow-up if:
+- quote has been accepted
+- quote has expired
+- follow-ups are disabled
+- message was already sent manually
+
+Track:
+
+- quote_followup_scheduled
+- quote_followup_sent
+- quote_followup_opened (if possible)
+- quote_followup_clicked
+- quote_accepted_after_followup
+
+UI CHANGES
+
+Add follow-up automation controls in:
+
+Quote Builder screen
+Quote Details screen
+
+Show upcoming scheduled follow-ups.
+
+Example:
+
+Upcoming Follow-Up
+Tomorrow at 9:30 AM
+
+Allow the user to:
+- cancel
+- reschedule
+- send now
+
+QUOTE PAGE INTEGRATION
+
+Follow-up messages should include:
+
+- friendly reminder text
+- link back to the interactive quote page
+- business name
+
+Example message structure:
+
+Greeting
+
+Short reminder about quote
+
+Encouragement to review or accept
+
+Quote link
+
+Signature
+
+EDGE CASES
+
+If the customer accepts the quote before the follow-up is sent:
+cancel scheduled follow-up.
+
+If the quote expires before follow-up time:
+do not send the message.
+
+If the user manually sends a follow-up:
+cancel scheduled follow-up unless the user chooses to keep it.
+
+DELIVERABLES
+
+When complete provide:
+
+1. files modified
+2. database fields added
+3. scheduling system used
+4. where follow-ups are configured
+5. how AI generates the message
+6. how to test the system
+7. how follow-ups are cancelled when quote is accepted

@@ -126,6 +126,9 @@ const DETAILED_STATUS_ICONS: Record<string, string> = {
 
 const STATUS_FLOW = ["scheduled", "en_route", "service_started", "in_progress", "final_touches", "completed"];
 
+// Only these statuses require a manual cleaner tap — In Progress and Final Touches are auto-computed
+const MANUAL_STATUS_FLOW = ["en_route", "service_started", "completed"];
+
 function getStatusProgress(status: string): number {
   const map: Record<string, number> = { scheduled: 0, en_route: 15, service_started: 30, in_progress: 55, final_touches: 80, completed: 100 };
   return map[status] || 0;
@@ -365,7 +368,15 @@ export default function JobDetailScreen() {
     const label = DETAILED_STATUS_LABELS[status] || status;
     Alert.alert(`Update Status`, `Mark this job as "${label}"?`, [
       { text: "Cancel", style: "cancel" },
-      { text: "Confirm", onPress: () => updateStatusMutation.mutate({ status }) },
+      {
+        text: "Confirm",
+        onPress: () => {
+          updateStatusMutation.mutate({ status });
+          if (status === "en_route") trackEvent("en_route_clicked", { jobId });
+          else if (status === "service_started") trackEvent("service_started_clicked", { jobId });
+          else if (status === "completed") trackEvent("completed_clicked", { jobId });
+        },
+      },
     ]);
   };
 
@@ -521,7 +532,12 @@ export default function JobDetailScreen() {
   })();
 
   const currentStepIndex = STATUS_FLOW.indexOf(detailedStatus);
-  const nextStatuses = STATUS_FLOW.filter((_, i) => i > currentStepIndex && i <= currentStepIndex + 2);
+  // Only show the next MANUAL step — In Progress and Final Touches are auto-computed from time elapsed
+  const nextManualStatus = MANUAL_STATUS_FLOW.find((s) => {
+    const sIdx = STATUS_FLOW.indexOf(s);
+    return sIdx > currentStepIndex;
+  });
+  const nextStatuses = nextManualStatus ? [nextManualStatus] : [];
 
   const checklistGroups: Record<string, ChecklistItem[]> = {};
   checklist.forEach((item) => {
@@ -757,7 +773,7 @@ export default function JobDetailScreen() {
             <>
               {!isCompleted && !isCanceled ? (
                 <>
-                  <SectionHeader title="Quick Status Update" />
+                  <SectionHeader title="Update Status" />
                   <View style={styles.statusButtonGrid}>
                     {nextStatuses.map((s) => {
                       const sc = getStatusColor(s, theme);
@@ -790,6 +806,16 @@ export default function JobDetailScreen() {
                       </Pressable>
                     ) : null}
                   </View>
+                  {(detailedStatus === "service_started" || detailedStatus === "in_progress" || detailedStatus === "final_touches") ? (
+                    <Card style={[styles.infoCard, { backgroundColor: `${theme.primary}08`, borderColor: `${theme.primary}20`, borderWidth: 1, marginBottom: Spacing.sm }]}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                        <Feather name="clock" size={16} color={theme.primary} />
+                        <ThemedText type="small" style={{ color: theme.textSecondary, flex: 1 }}>
+                          {"In Progress and Final Touches update automatically based on time elapsed. Tap Completed when the job is done."}
+                        </ThemedText>
+                      </View>
+                    </Card>
+                  ) : null}
 
                   <View style={styles.statusFlowContainer}>
                     {STATUS_FLOW.map((s, i) => {

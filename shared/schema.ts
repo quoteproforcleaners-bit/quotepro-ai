@@ -215,6 +215,8 @@ export const jobs = pgTable("jobs", {
   total: real("total"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
+  enRouteAt: timestamp("en_route_at"),
+  serviceStartedAt: timestamp("service_started_at"),
   satisfactionRating: integer("satisfaction_rating"),
   ratingComment: text("rating_comment"),
   ratingToken: varchar("rating_token").default(sql`gen_random_uuid()`),

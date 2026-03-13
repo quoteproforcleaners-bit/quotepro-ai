@@ -56,6 +56,9 @@ const STATUS_FLOW = [
   { key: "completed", label: "Completed", icon: CheckCircle },
 ];
 
+// Auto-computed stages — not manually tappable
+const AUTO_STATUSES = new Set(["in_progress", "final_touches"]);
+
 function getStatusIndex(status: string): number {
   const idx = STATUS_FLOW.findIndex((s) => s.key === status);
   return idx >= 0 ? idx : 0;
@@ -200,7 +203,11 @@ export default function JobDetailPage() {
   const tabs = ["overview", "progress", "checklist", "photos"];
 
   const handleAdvanceStatus = () => {
-    const nextIdx = statusIdx + 1;
+    // Skip auto-computed stages and find the next manual one
+    let nextIdx = statusIdx + 1;
+    while (nextIdx < STATUS_FLOW.length && AUTO_STATUSES.has(STATUS_FLOW[nextIdx].key)) {
+      nextIdx++;
+    }
     if (nextIdx < STATUS_FLOW.length) {
       setSelectedStatus(STATUS_FLOW[nextIdx].key);
       setStatusModal(true);
@@ -631,20 +638,25 @@ function ProgressTab({
             const Icon = step.icon;
             const isActive = i <= statusIdx;
             const isCurrent = step.key === detailedStatus;
+            const isAutoStage = AUTO_STATUSES.has(step.key);
+            const isClickable = i > statusIdx && !isAutoStage;
             return (
               <div key={step.key} className="flex items-center">
                 <button
                   onClick={() => {
-                    if (i > statusIdx) onUpdateStatus(step.key);
+                    if (isClickable) onUpdateStatus(step.key);
                   }}
-                  disabled={i <= statusIdx}
+                  disabled={!isClickable}
+                  title={isAutoStage && !isActive ? "This stage updates automatically" : undefined}
                   className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-lg transition-all min-w-[80px] ${
                     isCurrent
                       ? "bg-primary-50 ring-2 ring-primary-200"
                       : isActive
                       ? "bg-emerald-50"
+                      : isAutoStage
+                      ? "bg-sky-50 cursor-not-allowed opacity-70"
                       : "bg-slate-50 hover:bg-slate-100 cursor-pointer"
-                  } ${i <= statusIdx ? "cursor-default" : ""}`}
+                  } ${!isClickable ? "cursor-default" : ""}`}
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -652,6 +664,8 @@ function ProgressTab({
                         ? "bg-primary-500 text-white"
                         : isActive
                         ? "bg-emerald-500 text-white"
+                        : isAutoStage
+                        ? "bg-sky-200 text-sky-500"
                         : "bg-slate-200 text-slate-400"
                     }`}
                   >
@@ -667,11 +681,16 @@ function ProgressTab({
                         ? "text-primary-700"
                         : isActive
                         ? "text-emerald-700"
+                        : isAutoStage
+                        ? "text-sky-500"
                         : "text-slate-400"
                     }`}
                   >
                     {step.label}
                   </span>
+                  {isAutoStage && !isActive ? (
+                    <span className="text-[9px] text-sky-400 font-medium">auto</span>
+                  ) : null}
                 </button>
                 {i < STATUS_FLOW.length - 1 ? (
                   <div
@@ -684,6 +703,9 @@ function ProgressTab({
             );
           })}
         </div>
+        <p className="text-xs text-slate-400 mt-2">
+          In Progress and Final Touches advance automatically based on elapsed time after Service Started.
+        </p>
       </div>
 
       <div>
