@@ -363,10 +363,10 @@ export default function MainTabNavigator() {
         name="GrowthTab"
         component={GrowthDashboardScreen}
         options={{
-          title: t.tabs.growth,
-          headerTitle: t.tabs.growth,
+          title: "Reports",
+          headerTitle: "Reports",
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="trending-up" color={color} size={size} focused={focused} badgeCount={pendingTaskCount} />
+            <TabIcon name="bar-chart-2" color={color} size={size} focused={focused} badgeCount={pendingTaskCount} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}

@@ -1,300 +1,450 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { View, StyleSheet, ScrollView, RefreshControl, Pressable, Platform, useWindowDimensions } from "react-native";
+import {
+  View, StyleSheet, ScrollView, RefreshControl, Pressable, Platform, useWindowDimensions,
+} from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
-import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius } from "@/constants/theme";
-import { useLanguage } from "@/context/LanguageContext";
+import { Spacing, BorderRadius, Elevation } from "@/constants/theme";
 import { ProGate } from "@/components/ProGate";
-import OnboardingBanner from "@/components/OnboardingBanner";
-import { useTutorial } from "@/context/TutorialContext";
-import { GROWTH_TOUR } from "@/lib/tourDefinitions";
 
-function useDesignTokens() {
-  const { theme, isDark } = useTheme();
-  return useMemo(() => ({
-    gradientTop: theme.bg0,
-    gradientBottom: theme.bg1,
-    surfacePrimary: theme.surface0,
-    surfaceSecondary: theme.surface1,
-    borderSecondary: theme.divider,
-    textPrimary: theme.text,
-    textSecondary: theme.textSecondary,
-    textMuted: theme.textMuted,
-    accent: theme.primary,
-    accentSoft: theme.primarySoft,
-    chipBg: isDark ? theme.divider : "rgba(0,0,0,0.03)",
-    chipBorder: theme.border,
-    shadow: isDark
-      ? { boxShadow: "0px 4px 12px rgba(0,0,0,0.25)" }
-      : { boxShadow: "0px 2px 8px rgba(0,0,0,0.06)" },
-  }), [theme, isDark]);
+type Nav = NativeStackNavigationProp<any>;
+
+function formatMoney(n: number) {
+  if (n >= 1000) return `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
+  return `$${Math.round(n).toLocaleString()}`;
 }
 
-const TASK_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
-  review_request: "star", upsell: "trending-up", rebook: "repeat",
-  reactivation: "user-plus", follow_up: "phone", default: "check-circle",
-};
-
-function getTimeAgo(dateStr: string, t: any): string {
-  const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
-  if (mins < 1) return t.growth.justNow;
-  if (mins < 60) return `${mins}${t.growth.minutesAgo}`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}${t.growth.hoursAgo}`;
-  return `${Math.floor(hrs / 24)}${t.growth.daysAgo}`;
+function timeAgo(dateStr: string) {
+  const s = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
 }
 
-function CircularProgress({ score, color, bgColor, label }: { score: number; color: string; bgColor: string; label: string }) {
-  const pct = Math.min(Math.max(score, 0), 100) / 100;
+interface ReportCardProps {
+  title: string;
+  value: string;
+  sub?: string;
+  icon: keyof typeof Feather.glyphMap;
+  iconColor: string;
+  trend?: { value: string; positive: boolean };
+  onPress?: () => void;
+  theme: any;
+}
+
+function ReportCard({ title, value, sub, icon, iconColor, trend, onPress, theme }: ReportCardProps) {
   return (
-    <View style={{ width: 120, height: 120, alignItems: "center", justifyContent: "center" }}>
-      <View style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 8, borderColor: bgColor, position: "absolute" }} />
-      <View style={{
-        width: 120, height: 120, borderRadius: 60, borderWidth: 8, position: "absolute",
-        transform: [{ rotate: "-90deg" }],
-        borderTopColor: pct >= 0.25 ? color : "transparent",
-        borderRightColor: pct >= 0.5 ? color : "transparent",
-        borderBottomColor: pct >= 0.75 ? color : "transparent",
-        borderLeftColor: pct >= 1 ? color : "transparent",
-      }} />
-      <ThemedText type="h1" style={{ fontWeight: "800" }}>{score}</ThemedText>
-      <ThemedText type="caption" style={{ color, fontWeight: "600", marginTop: -2 }}>{label}</ThemedText>
+    <Pressable
+      onPress={onPress}
+      style={[s.reportCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }, Elevation.e1]}
+    >
+      <View style={s.reportCardHeader}>
+        <View style={[s.reportCardIcon, { backgroundColor: iconColor + "14" }]}>
+          <Feather name={icon} size={14} color={iconColor} />
+        </View>
+        {trend ? (
+          <View style={[s.trendBadge, { backgroundColor: trend.positive ? "#16A34A14" : "#EF444414" }]}>
+            <Feather name={trend.positive ? "trending-up" : "trending-down"} size={10} color={trend.positive ? "#16A34A" : "#EF4444"} />
+            <ThemedText style={[s.trendText, { color: trend.positive ? "#16A34A" : "#EF4444" }]}>{trend.value}</ThemedText>
+          </View>
+        ) : null}
+      </View>
+      <ThemedText style={[s.reportCardValue, { color: theme.text }]}>{value}</ThemedText>
+      <ThemedText style={[s.reportCardTitle, { color: theme.textSecondary }]}>{title}</ThemedText>
+      {sub ? <ThemedText style={[s.reportCardSub, { color: theme.textMuted }]}>{sub}</ThemedText> : null}
+    </Pressable>
+  );
+}
+
+function SectionHeader({ title, action, onAction, theme }: {
+  title: string; action?: string; onAction?: () => void; theme: any;
+}) {
+  return (
+    <View style={s.sectionHeaderRow}>
+      <ThemedText style={[s.sectionTitle, { color: theme.text }]}>{title}</ThemedText>
+      {action ? (
+        <Pressable onPress={onAction}>
+          <ThemedText style={[s.sectionAction, { color: theme.primary }]}>{action}</ThemedText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
+function OpportunityChip({ icon, label, count, color, onPress, theme }: {
+  icon: keyof typeof Feather.glyphMap; label: string; count: number; color: string; onPress: () => void; theme: any;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[s.oppChip, { backgroundColor: theme.cardBackground, borderColor: theme.border }, Elevation.e1]}
+    >
+      <View style={[s.oppChipIcon, { backgroundColor: color + "14" }]}>
+        <Feather name={icon} size={15} color={color} />
+      </View>
+      <ThemedText style={[s.oppChipCount, { color: theme.text }]}>{count}</ThemedText>
+      <ThemedText style={[s.oppChipLabel, { color: theme.textSecondary }]}>{label}</ThemedText>
+    </Pressable>
+  );
+}
+
+function ActivityItem({ icon, iconColor, title, subtitle, time, theme }: {
+  icon: keyof typeof Feather.glyphMap; iconColor: string; title: string; subtitle?: string; time: string; theme: any;
+}) {
+  return (
+    <View style={[s.activityItem, { borderBottomColor: theme.border }]}>
+      <View style={[s.activityItemIcon, { backgroundColor: iconColor + "12" }]}>
+        <Feather name={icon} size={12} color={iconColor} />
+      </View>
+      <View style={s.activityItemText}>
+        <ThemedText style={[s.activityItemTitle, { color: theme.text }]} numberOfLines={1}>{title}</ThemedText>
+        {subtitle ? <ThemedText style={[s.activityItemSub, { color: theme.textSecondary }]} numberOfLines={1}>{subtitle}</ThemedText> : null}
+      </View>
+      <ThemedText style={[s.activityItemTime, { color: theme.textMuted }]}>{time}</ThemedText>
+    </View>
+  );
+}
+
+const TASK_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
+  review_request: "star",
+  upsell: "trending-up",
+  rebook: "repeat",
+  reactivation: "user-plus",
+  follow_up: "phone",
+  default: "check-circle",
+};
+
 export default function GrowthDashboardScreen() {
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
-  const navigation = useNavigation<NativeStackNavigationProp<any>>();
-  const { theme } = useTheme();
-  const dt = useDesignTokens();
-  const { t } = useLanguage();
-  const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
+  const navigation = useNavigation<Nav>();
+  const { theme, isDark } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const { width: screenWidth } = useWindowDimensions();
-  const useMaxWidth = screenWidth > 600;
+  const maxWidth = screenWidth > 600;
 
-  React.useEffect(() => {
-    if (!hasCompletedTour(GROWTH_TOUR.id) && !tourActive) {
-      const timer = setTimeout(() => startTour(GROWTH_TOUR), 800);
-      return () => clearTimeout(timer);
-    }
-  }, []);
+  const { data: stats, refetch: r1 } = useQuery<{
+    totalQuotes: number; sentQuotes: number; acceptedQuotes: number;
+    declinedQuotes: number; totalRevenue: number; avgQuoteValue: number; closeRate: number;
+  }>({ queryKey: ["/api/reports/stats"] });
 
-  const { data: growthTasks = [], refetch: r1 } = useQuery<any[]>({ queryKey: ["/api/growth-tasks"] });
   const { data: forecast, refetch: r2 } = useQuery<any>({ queryKey: ["/api/forecast"] });
+
   const { data: reviewRequests = [], refetch: r3 } = useQuery<any[]>({ queryKey: ["/api/review-requests"] });
   const { data: upsellOpps = [], refetch: r4 } = useQuery<any[]>({ queryKey: ["/api/upsell-opportunities"] });
   const { data: rebookCandidates = [], refetch: r5 } = useQuery<any[]>({ queryKey: ["/api/rebook-candidates"] });
   const { data: dormantOpps = [], refetch: r6 } = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"] });
+  const { data: growthTasks = [], refetch: r7 } = useQuery<any[]>({ queryKey: ["/api/growth-tasks"] });
+  const { data: followUpQueue = [], refetch: r8 } = useQuery<any[]>({ queryKey: ["/api/followup-queue"] });
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([r1(), r2(), r3(), r4(), r5(), r6()]);
+    await Promise.all([r1(), r2(), r3(), r4(), r5(), r6(), r7(), r8()]);
     setRefreshing(false);
-  }, [r1, r2, r3, r4, r5, r6]);
+  }, [r1, r2, r3, r4, r5, r6, r7, r8]);
 
-  const pending = useMemo(() => (growthTasks || []).filter((t: any) => t.status === "pending"), [growthTasks]);
-  const completed = useMemo(() => (growthTasks || []).filter((t: any) => t.status === "completed"), [growthTasks]);
-  const topTasks = pending.slice(0, 3);
+  const totalRevenue = stats?.totalRevenue || 0;
+  const sentQuotes = stats?.sentQuotes || 0;
+  const acceptedQuotes = stats?.acceptedQuotes || 0;
+  const closeRate = Math.round(stats?.closeRate || 0);
+  const avgValue = Math.round(stats?.avgQuoteValue || 0);
+  const openQuoteValue = forecast?.openQuoteValue || 0;
+  const forecastedRevenue = forecast?.forecastedRevenue || 0;
 
-  const recentActivity = useMemo(() =>
-    [...(growthTasks || [])]
+  const amountAtRisk = useMemo(() =>
+    followUpQueue.reduce((sum: number, q: any) => sum + (q.total || 0), 0),
+    [followUpQueue]
+  );
+
+  const recentActivity = useMemo(() => {
+    const tasks = [...(growthTasks || [])]
       .filter((t: any) => t.completedAt || t.createdAt)
       .sort((a: any, b: any) => new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime())
-      .slice(0, 5),
-  [growthTasks]);
+      .slice(0, 5);
+    return tasks;
+  }, [growthTasks]);
 
-  const growthScore = useMemo(() => {
-    const s1 = Math.min(pending.length * 5, 30);
-    const s2 = Math.min(completed.length * 3, 40);
-    const s3 = Math.min(Math.round((forecast?.closeRate || 0) * 30), 30);
-    return Math.min(s1 + s2 + s3, 100);
-  }, [pending, completed, forecast]);
+  const TASK_ICON_COLORS: Record<string, string> = {
+    review_request: "#F59E0B",
+    upsell: "#10B981",
+    rebook: "#3B82F6",
+    reactivation: "#EF4444",
+    follow_up: "#8B5CF6",
+    default: "#94A3B8",
+  };
 
-  const opportunities = [
-    { label: t.growth.reviews, count: reviewRequests.length, icon: "star" as const, color: theme.warning, nav: "ReviewsReferrals" },
-    { label: t.growth.upsells, count: upsellOpps.length, icon: "trending-up" as const, color: theme.success, nav: "UpsellOpportunities" },
-    { label: t.growth.rebook, count: rebookCandidates.length, icon: "repeat" as const, color: theme.primary, nav: "TasksQueue" },
-    { label: t.growth.reactivation, count: dormantOpps.length, icon: "user-plus" as const, color: theme.error, nav: "ReactivationCampaigns" },
-  ];
-
-  const quickActions = [
-    { label: t.growth.generateTasks, icon: "zap" as const, screen: "TasksQueue", color: "#F59E0B" },
-    { label: t.growth.sendCampaign, icon: "send" as const, screen: "ReactivationCampaigns", color: "#2F7BFF" },
-    { label: t.growth.viewAutomations, icon: "settings" as const, screen: "AutomationsHub", color: "#8B5CF6" },
-  ];
-
-  const cardStyle = (extra?: any) => [s.card, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderSecondary, ...(Platform.OS === "ios" ? dt.shadow : {}) }, extra];
+  function nav(screen: string, params?: any) {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.navigate(screen, params);
+  }
 
   return (
-    <ProGate featureName="Growth Dashboard">
-    <LinearGradient colors={[dt.gradientTop, dt.gradientBottom]} style={s.flex}>
-      <ScrollView
-        contentContainerStyle={[{ paddingHorizontal: Spacing.lg, gap: Spacing.lg, paddingTop: headerHeight + Spacing.xl, paddingBottom: tabBarHeight + Spacing.xl }, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : [])]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        showsVerticalScrollIndicator={false}
-      >
-        <OnboardingBanner />
-
-        <View style={{ flexDirection: "row", gap: Spacing.sm }}>
-          {quickActions.map((a) => (
-            <Pressable
-              key={a.label}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigation.navigate(a.screen); }}
-              style={({ pressed }) => [s.quickAction, { backgroundColor: pressed ? `${a.color}25` : `${a.color}12`, borderColor: `${a.color}30` }]}
-              testID={`quick-${a.label.toLowerCase().replace(/\s/g, "-")}`}
-            >
-              <View style={[s.quickActionIcon, { backgroundColor: `${a.color}20` }]}>
-                <Feather name={a.icon} size={18} color={a.color} />
-              </View>
-              <ThemedText type="caption" style={{ color: dt.textPrimary, fontWeight: "700", marginTop: Spacing.xs }} numberOfLines={1}>{a.label}</ThemedText>
-              {a.screen === "TasksQueue" && pending.length > 0 ? (
-                <View style={[s.redBadge, { borderColor: dt.gradientTop }]}>
-                  <ThemedText type="caption" style={s.redBadgeText}>
-                    {pending.length > 99 ? "99+" : String(pending.length)}
-                  </ThemedText>
-                </View>
-              ) : null}
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={cardStyle({ flexDirection: "row", gap: Spacing.xl })}>
-          <CircularProgress score={growthScore} color={dt.accent} bgColor={dt.accentSoft} label={t.growth.growthScore} />
-          <View style={{ flex: 1, gap: Spacing.sm }}>
-            {[
-              { icon: "check-circle" as const, color: theme.success, text: `${completed.length} ${t.growth.completed}` },
-              { icon: "clock" as const, color: theme.warning, text: `${pending.length} ${t.growth.pending}` },
-              { icon: "percent" as const, color: dt.accent, text: `${Math.round((forecast?.closeRate || 0) * 100)}% ${t.growth.closeRate}` },
-            ].map((r) => (
-              <View key={r.text} style={s.row}>
-                <Feather name={r.icon} size={14} color={r.color} />
-                <ThemedText type="small" style={{ marginLeft: 6 }}>{r.text}</ThemedText>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <Pressable onPress={() => navigation.navigate("TasksQueue")} style={cardStyle()} testID="todays-focus-card">
-          <View style={s.sectionHeader}>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="subtitle" style={{ fontWeight: "700" }}>{t.growth.todaysFocus}</ThemedText>
-              <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
-                {pending.length > 0 ? `${pending.length} ${pending.length === 1 ? t.growth.taskPending : t.growth.tasksPending}` : t.growth.noPendingTasks}
-              </ThemedText>
-            </View>
-            <View style={[s.viewAll, { backgroundColor: dt.accentSoft }]}>
-              <ThemedText type="caption" style={{ color: dt.accent, fontWeight: "600" }}>{t.growth.viewAll}</ThemedText>
-              <Feather name="chevron-right" size={14} color={dt.accent} />
+    <ProGate featureName="Reports">
+      <View style={[s.root, { backgroundColor: isDark ? "#000" : "#F6F8FB" }]}>
+        <ScrollView
+          contentContainerStyle={[
+            s.content,
+            { paddingTop: headerHeight + Spacing.md, paddingBottom: tabBarHeight + Spacing.xl },
+            maxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined,
+          ]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Quote Performance */}
+          <View style={s.section}>
+            <SectionHeader title="Quote Performance" theme={theme} />
+            <View style={s.grid2x2}>
+              <ReportCard
+                title="Quotes Sent"
+                value={String(sentQuotes)}
+                icon="send"
+                iconColor="#2563EB"
+                sub="all time"
+                theme={theme}
+              />
+              <ReportCard
+                title="Close Rate"
+                value={closeRate > 0 ? `${closeRate}%` : "—"}
+                icon="percent"
+                iconColor="#16A34A"
+                sub="accepted / sent"
+                theme={theme}
+              />
+              <ReportCard
+                title="Avg Quote Value"
+                value={avgValue > 0 ? formatMoney(avgValue) : "—"}
+                icon="dollar-sign"
+                iconColor="#8B5CF6"
+                sub="per quote"
+                theme={theme}
+              />
+              <ReportCard
+                title="Accepted"
+                value={String(acceptedQuotes)}
+                icon="check-circle"
+                iconColor="#16A34A"
+                sub="quotes won"
+                theme={theme}
+              />
             </View>
           </View>
-          {topTasks.length > 0 ? (
-            <View style={{ marginTop: Spacing.md }}>
-              {topTasks.map((task: any, i: number) => (
-                <View key={task.id || i} style={[s.taskRow, { borderTopColor: dt.borderSecondary }]}>
-                  <View style={[s.iconCircle, { backgroundColor: dt.accentSoft }]}>
-                    <Feather name={TASK_ICONS[task.taskType] || TASK_ICONS.default} size={14} color={dt.accent} />
+
+          {/* Revenue */}
+          <View style={s.section}>
+            <SectionHeader title="Revenue" theme={theme} />
+            <View style={s.grid2x2}>
+              <ReportCard
+                title="Total Revenue"
+                value={totalRevenue > 0 ? formatMoney(totalRevenue) : "—"}
+                icon="trending-up"
+                iconColor="#16A34A"
+                sub="all time"
+                theme={theme}
+              />
+              <ReportCard
+                title="Open Pipeline"
+                value={openQuoteValue > 0 ? formatMoney(openQuoteValue) : "—"}
+                icon="bar-chart-2"
+                iconColor="#2563EB"
+                sub="quotes pending"
+                theme={theme}
+              />
+              <ReportCard
+                title="Forecasted"
+                value={forecastedRevenue > 0 ? formatMoney(forecastedRevenue) : "—"}
+                icon="activity"
+                iconColor="#8B5CF6"
+                sub="estimated closings"
+                theme={theme}
+              />
+              <ReportCard
+                title="Revenue at Risk"
+                value={amountAtRisk > 0 ? formatMoney(amountAtRisk) : "$0"}
+                icon="alert-triangle"
+                iconColor={amountAtRisk > 0 ? "#D97706" : "#94A3B8"}
+                sub={`${followUpQueue.length} quotes`}
+                onPress={() => nav("FollowUpQueue")}
+                theme={theme}
+              />
+            </View>
+          </View>
+
+          {/* Growth Opportunities */}
+          <View style={s.section}>
+            <SectionHeader
+              title="Growth Opportunities"
+              action="View Tasks"
+              onAction={() => nav("TasksQueue")}
+              theme={theme}
+            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.sm, paddingBottom: 2 }}>
+              <OpportunityChip
+                icon="star" label="Reviews" count={reviewRequests.length}
+                color="#F59E0B" onPress={() => nav("ReviewsReferrals")} theme={theme}
+              />
+              <OpportunityChip
+                icon="trending-up" label="Upsells" count={upsellOpps.length}
+                color="#10B981" onPress={() => nav("UpsellOpportunities")} theme={theme}
+              />
+              <OpportunityChip
+                icon="repeat" label="Rebook" count={rebookCandidates.length}
+                color="#2563EB" onPress={() => nav("TasksQueue")} theme={theme}
+              />
+              <OpportunityChip
+                icon="user-plus" label="Reactivation" count={dormantOpps.length}
+                color="#EF4444" onPress={() => nav("ReactivationCampaigns")} theme={theme}
+              />
+              <OpportunityChip
+                icon="clock" label="Follow-ups" count={followUpQueue.length}
+                color="#D97706" onPress={() => nav("FollowUpQueue")} theme={theme}
+              />
+            </ScrollView>
+          </View>
+
+          {/* Quick Reports Links */}
+          <View style={s.section}>
+            <SectionHeader title="Explore" theme={theme} />
+            <View style={[s.exploreCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }, Elevation.e1]}>
+              {[
+                { label: "Follow-Up Queue", sub: `${followUpQueue.length} quotes waiting`, icon: "phone-missed" as const, color: "#D97706", screen: "FollowUpQueue" },
+                { label: "Automations", sub: "Manage AI sequences", icon: "cpu" as const, color: "#8B5CF6", screen: "AutomationsHub" },
+                { label: "Upsell Opportunities", sub: `${upsellOpps.length} clients to grow`, icon: "trending-up" as const, color: "#10B981", screen: "UpsellOpportunities" },
+                { label: "Reactivation", sub: `${dormantOpps.length} dormant clients`, icon: "user-plus" as const, color: "#EF4444", screen: "ReactivationCampaigns" },
+                { label: "Reviews & Referrals", sub: `${reviewRequests.length} pending`, icon: "star" as const, color: "#F59E0B", screen: "ReviewsReferrals" },
+              ].map((item, i, arr) => (
+                <Pressable
+                  key={item.label}
+                  onPress={() => nav(item.screen)}
+                  style={[s.exploreRow, { borderBottomWidth: i < arr.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: theme.border }]}
+                  testID={`explore-${item.label.toLowerCase().replace(/\s/g, "-")}`}
+                >
+                  <View style={[s.exploreIcon, { backgroundColor: item.color + "14" }]}>
+                    <Feather name={item.icon} size={14} color={item.color} />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText type="small" numberOfLines={1} style={{ fontWeight: "500" }}>{task.title || task.taskType || "Task"}</ThemedText>
-                    <ThemedText type="caption" style={{ color: dt.textSecondary }} numberOfLines={1}>{task.customerName || ""}</ThemedText>
+                  <View style={s.exploreText}>
+                    <ThemedText style={[s.exploreLabel, { color: theme.text }]}>{item.label}</ThemedText>
+                    <ThemedText style={[s.exploreSub, { color: theme.textSecondary }]}>{item.sub}</ThemedText>
                   </View>
-                </View>
+                  <Feather name="chevron-right" size={14} color={theme.textMuted} />
+                </Pressable>
               ))}
             </View>
-          ) : (
-            <View style={s.empty}>
-              <Feather name="check-circle" size={20} color={theme.success} />
-              <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>{t.growth.allCaughtUp}</ThemedText>
+          </View>
+
+          {/* Recent Activity */}
+          {recentActivity.length > 0 ? (
+            <View style={s.section}>
+              <SectionHeader title="Recent Activity" action="View All" onAction={() => nav("TasksQueue")} theme={theme} />
+              <View style={[s.activityCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }, Elevation.e1]}>
+                {recentActivity.map((item: any, i: number) => (
+                  <ActivityItem
+                    key={item.id || i}
+                    icon={TASK_ICONS[item.taskType] || TASK_ICONS.default}
+                    iconColor={TASK_ICON_COLORS[item.taskType] || TASK_ICON_COLORS.default}
+                    title={item.title || item.taskType || "Activity"}
+                    subtitle={item.customerName}
+                    time={timeAgo(item.completedAt || item.createdAt)}
+                    theme={theme}
+                  />
+                ))}
+              </View>
             </View>
-          )}
-        </Pressable>
-
-        <View style={cardStyle()}>
-          <ThemedText type="subtitle" style={{ fontWeight: "700", marginBottom: Spacing.md }}>{t.growth.pipelineSnapshot}</ThemedText>
-          <View style={s.grid}>
-            {[
-              { label: t.growth.openQuotes, value: `$${(forecast?.openQuoteValue || 0).toLocaleString()}` },
-              { label: t.growth.forecasted, value: `$${(forecast?.forecastedRevenue || 0).toLocaleString()}` },
-              { label: t.growth.closeRate, value: `${Math.round((forecast?.closeRate || 0) * 100)}%` },
-              { label: t.growth.confidence, value: forecast?.confidenceBand || "---" },
-            ].map((stat) => (
-              <View key={stat.label} style={[s.statCell, { backgroundColor: dt.surfaceSecondary }]}>
-                <ThemedText type="caption" style={{ color: dt.textSecondary }}>{stat.label}</ThemedText>
-                <ThemedText type="h3" style={{ marginTop: 4 }}>{stat.value}</ThemedText>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <ThemedText type="subtitle" style={{ fontWeight: "700", paddingTop: Spacing.xs }}>{t.growth.growthOpportunities}</ThemedText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.sm }}>
-          {opportunities.map((c) => (
-            <Pressable
-              key={c.label}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigation.navigate(c.nav); }}
-              style={[s.oppCard, { backgroundColor: dt.surfacePrimary, borderColor: dt.borderSecondary }]}
-              testID={`opportunity-${c.label.toLowerCase()}`}
-            >
-              <View style={[s.iconCircle, { backgroundColor: `${c.color}15` }]}>
-                <Feather name={c.icon} size={16} color={c.color} />
-              </View>
-              <ThemedText type="h3" style={{ marginTop: Spacing.sm }}>{c.count.toString()}</ThemedText>
-              <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>{c.label}</ThemedText>
-            </Pressable>
-          ))}
+          ) : null}
         </ScrollView>
-
-        {recentActivity.length > 0 ? (
-          <View style={cardStyle()}>
-            <ThemedText type="subtitle" style={{ fontWeight: "700", marginBottom: Spacing.md }}>{t.growth.recentActivity}</ThemedText>
-            {recentActivity.map((item: any, i: number) => (
-              <View key={item.id || i} style={[s.actRow, i > 0 ? { borderTopWidth: 1, borderTopColor: dt.borderSecondary } : {}]}>
-                <View style={[s.dot, { backgroundColor: dt.accent }]} />
-                <View style={{ flex: 1 }}>
-                  <ThemedText type="small" numberOfLines={1}>{item.title || item.taskType || "Activity"}</ThemedText>
-                  <ThemedText type="caption" style={{ color: dt.textSecondary }}>{item.customerName || ""}</ThemedText>
-                </View>
-                <ThemedText type="caption" style={{ color: dt.textMuted }}>{getTimeAgo(item.completedAt || item.createdAt, t)}</ThemedText>
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        
-      </ScrollView>
-    </LinearGradient>
+      </View>
     </ProGate>
   );
 }
 
 const s = StyleSheet.create({
-  flex: { flex: 1 },
-  card: { padding: Spacing.lg, borderRadius: BorderRadius["2xl"], borderWidth: 1 },
-  row: { flexDirection: "row", alignItems: "center" },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  viewAll: { flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.xs, gap: 2 },
-  taskRow: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.sm, borderTopWidth: 1, gap: Spacing.sm },
-  iconCircle: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  empty: { alignItems: "center", paddingVertical: Spacing.xl },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
-  statCell: { width: "48%", flexGrow: 1, padding: Spacing.md, borderRadius: BorderRadius.sm },
-  oppCard: { width: 110, padding: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1, alignItems: "center" },
-  actRow: { flexDirection: "row", alignItems: "center", paddingVertical: Spacing.sm, gap: Spacing.sm },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  quickAction: { flex: 1, alignItems: "center", paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm, borderRadius: BorderRadius.xl, borderWidth: 1.5, position: "relative" as const },
-  quickActionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  redBadge: { position: "absolute" as const, top: -6, right: -4, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#FF3B30", alignItems: "center" as const, justifyContent: "center" as const, paddingHorizontal: 5, borderWidth: 2 },
-  redBadgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800" as const, lineHeight: 13 },
+  root: { flex: 1 },
+  content: { paddingHorizontal: 0 },
+
+  section: { marginBottom: Spacing.lg, paddingHorizontal: Spacing.lg },
+  sectionHeaderRow: {
+    flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between", marginBottom: Spacing.sm,
+  },
+  sectionTitle: { fontSize: 13, fontWeight: "700", letterSpacing: 0.1 },
+  sectionAction: { fontSize: 13, fontWeight: "600" },
+
+  grid2x2: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
+  reportCard: {
+    width: "47.5%",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  reportCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: Spacing.sm },
+  reportCardIcon: {
+    width: 30, height: 30, borderRadius: BorderRadius.sm,
+    alignItems: "center", justifyContent: "center",
+  },
+  trendBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8,
+  },
+  trendText: { fontSize: 10, fontWeight: "700" },
+  reportCardValue: { fontSize: 22, fontWeight: "700" },
+  reportCardTitle: { fontSize: 12, marginTop: 2 },
+  reportCardSub: { fontSize: 11, marginTop: 1 },
+
+  oppChip: {
+    width: 108,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+  },
+  oppChipIcon: {
+    width: 36, height: 36, borderRadius: BorderRadius.md,
+    alignItems: "center", justifyContent: "center",
+    marginBottom: Spacing.xs,
+  },
+  oppChipCount: { fontSize: 20, fontWeight: "700" },
+  oppChipLabel: { fontSize: 11, marginTop: 2, textAlign: "center" },
+
+  exploreCard: {
+    borderRadius: BorderRadius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  exploreRow: {
+    flexDirection: "row", alignItems: "center",
+    gap: Spacing.sm, paddingVertical: 12, paddingHorizontal: Spacing.md,
+  },
+  exploreIcon: {
+    width: 32, height: 32, borderRadius: BorderRadius.sm,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  exploreText: { flex: 1, minWidth: 0 },
+  exploreLabel: { fontSize: 14, fontWeight: "500" },
+  exploreSub: { fontSize: 12, marginTop: 1 },
+
+  activityCard: {
+    borderRadius: BorderRadius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  activityItem: {
+    flexDirection: "row", alignItems: "center",
+    gap: Spacing.sm, paddingVertical: 11, paddingHorizontal: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  activityItemIcon: {
+    width: 26, height: 26, borderRadius: 13,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  activityItemText: { flex: 1, minWidth: 0 },
+  activityItemTitle: { fontSize: 13, fontWeight: "500" },
+  activityItemSub: { fontSize: 11, marginTop: 1 },
+  activityItemTime: { fontSize: 11, flexShrink: 0 },
 });
