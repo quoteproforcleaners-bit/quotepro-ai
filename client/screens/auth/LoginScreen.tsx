@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -40,6 +40,15 @@ export default function LoginScreen() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === "ios") {
+      AppleAuthentication.isAvailableAsync()
+        .then(setAppleAvailable)
+        .catch(() => setAppleAvailable(false));
+    }
+  }, []);
 
   const handleEmailAuth = async () => {
     if (!email.trim() || !password.trim()) {
@@ -211,7 +220,7 @@ export default function LoginScreen() {
           </View>
         ) : null}
 
-        {Platform.OS === "ios" ? (
+        {appleAvailable ? (
           <View style={[styles.appleButtonContainer, { borderColor: theme.border }]}>
             <AppleAuthentication.AppleAuthenticationButton
               buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
@@ -219,6 +228,7 @@ export default function LoginScreen() {
               cornerRadius={BorderRadius.lg - 1}
               style={styles.appleButton}
               onPress={handleAppleSignIn}
+              testID="button-apple-signin"
             />
           </View>
         ) : null}
