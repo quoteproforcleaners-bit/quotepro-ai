@@ -164,6 +164,13 @@ import {
   createWebhookDelivery,
   getWebhookDeliveriesByEventId,
   updateWebhookDelivery,
+  getStaleQuotesForNudge,
+  markQuoteNudgeSent,
+  markMilestoneCelebrated,
+  markWeeklyDigestSent,
+  getWeeklyQuoteStats,
+  getAllBusinessIds,
+  markReviewRequestSent,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -5899,6 +5906,38 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  // ─── Retention: Milestone Celebration ───
+
+  const MILESTONES = [1000, 5000, 10000, 25000, 50000, 100000];
+
+  app.get("/api/milestones/check", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const prefs = await getPreferencesByBusiness(business.id);
+      const stats = await getQuoteStats(business.id);
+      const totalRevenue = stats.totalRevenue;
+      const celebrated: number[] = Array.isArray(prefs?.celebratedMilestones) ? (prefs.celebratedMilestones as number[]) : [];
+      const nextMilestone = MILESTONES.find((m) => totalRevenue >= m && !celebrated.includes(m)) || null;
+      return res.json({ totalRevenue, nextMilestone, celebrated });
+    } catch (e: any) {
+      return res.status(500).json({ message: "Failed to check milestones" });
+    }
+  });
+
+  app.post("/api/milestones/celebrate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { milestone } = req.body;
+      if (!milestone || !MILESTONES.includes(Number(milestone))) return res.status(400).json({ message: "Invalid milestone" });
+      await markMilestoneCelebrated(business.id, Number(milestone));
+      return res.json({ ok: true });
+    } catch (e: any) {
+      return res.status(500).json({ message: "Failed to record milestone" });
+    }
+  });
+
   // ─── Sticky Product: Preferences ───
 
   app.get("/api/preferences", requireAuth, async (req: Request, res: Response) => {
@@ -9191,11 +9230,166 @@ Rules:
     return { sent, canceled };
   }
 
+  // ─── Background: Stale Quote Push Nudges ───
+  async function sendStaleQuoteNudges() {
+    try {
+      const staleQuotes = await getStaleQuotesForNudge(48);
+      if (!staleQuotes.length) return;
+      for (const q of staleQuotes) {
+        try {
+          const biz = await (async () => {
+            const r = await pool.query("SELECT owner_user_id, company_name FROM businesses WHERE id = $1", [q.businessId]);
+            return r.rows[0];
+          })();
+          if (!biz?.owner_user_id) continue;
+          const tokens = await getPushTokensByUser(biz.owner_user_id);
+          if (!tokens.length) continue;
+          const customerName = (q.propertyDetails as any)?.customerName || "a customer";
+          const pushMessages = tokens.map((t: any) => ({
+            to: t.token,
+            title: "Quote still pending",
+            body: `Your quote for ${customerName} ($${ (q.total || 0).toFixed(0)}) hasn't been viewed. A quick follow-up can double your close rate.`,
+            data: { screen: "QuoteDetail", quoteId: q.id },
+            sound: "default",
+          }));
+          const res = await fetch("https://exp.host/--/api/v2/push/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify(pushMessages.length === 1 ? pushMessages[0] : pushMessages),
+          });
+          if (res.ok) {
+            await markQuoteNudgeSent(q.id);
+            console.log(`[nudge] Sent push for quote ${q.id} to business ${q.businessId}`);
+          }
+        } catch (e) {
+          console.error(`[nudge] Error for quote ${q.id}:`, e);
+        }
+      }
+    } catch (e) {
+      console.error("[nudge] Failed to send stale quote nudges:", e);
+    }
+  }
+
+  // ─── Background: Weekly Digest Email ───
+  async function sendWeeklyDigestEmails() {
+    const now = new Date();
+    if (now.getDay() !== 1) return; // Only Mondays
+    const hour = now.getHours();
+    if (hour < 7 || hour > 9) return; // Only 7-9am
+
+    const sgApiKey = process.env.SENDGRID_API_KEY;
+    if (!sgApiKey) return;
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+
+    try {
+      const businessIds = await getAllBusinessIds();
+      for (const businessId of businessIds) {
+        try {
+          const prefs = await getPreferencesByBusiness(businessId);
+          if (!prefs?.weeklyRecapEnabled) continue;
+
+          const lastSent = prefs.lastWeeklyDigestAt ? new Date(prefs.lastWeeklyDigestAt) : null;
+          if (lastSent) {
+            const hoursSinceSent = (now.getTime() - lastSent.getTime()) / (60 * 60 * 1000);
+            if (hoursSinceSent < 144) continue; // Skip if sent within last 6 days
+          }
+
+          const bizRow = await pool.query(
+            "SELECT owner_user_id, company_name, email FROM businesses WHERE id = $1",
+            [businessId]
+          );
+          if (!bizRow.rows.length) continue;
+          const { owner_user_id, company_name, email: bizEmail } = bizRow.rows[0];
+
+          const user = await getUserById(owner_user_id);
+          const toEmail = user?.email || bizEmail;
+          if (!toEmail) continue;
+
+          const stats = await getWeeklyQuoteStats(businessId);
+          const totalStats = await getQuoteStats(businessId);
+
+          const pendingListHtml = stats.pendingQuotes.length
+            ? stats.pendingQuotes.map((q) =>
+                `<tr><td style="padding:6px 0;border-bottom:1px solid #f0f0f0;">${q.customerName}</td><td style="padding:6px 0;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600;">$${q.total.toFixed(2)}</td></tr>`
+              ).join("")
+            : `<tr><td colspan="2" style="padding:8px 0;color:#6b7280;">No pending quotes — great job!</td></tr>`;
+
+          const emailHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:20px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+  <div style="background:linear-gradient(135deg,#7C3AED,#4F46E5);padding:32px 28px;">
+    <p style="color:rgba(255,255,255,0.8);margin:0 0 4px;font-size:13px;">WEEKLY SNAPSHOT</p>
+    <h1 style="color:#fff;margin:0;font-size:26px;font-weight:700;">${company_name || "Your Business"}</h1>
+  </div>
+  <div style="padding:28px;">
+    <div style="display:flex;gap:12px;margin-bottom:24px;">
+      <div style="flex:1;background:#f5f3ff;border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:#7C3AED;">${stats.sentCount}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px;">Quotes Sent</div>
+      </div>
+      <div style="flex:1;background:#ecfdf5;border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:#059669;">${stats.acceptedCount}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px;">Won</div>
+      </div>
+      <div style="flex:1;background:#eff6ff;border-radius:12px;padding:16px;text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:#2563EB;">$${stats.revenueWon.toFixed(0)}</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px;">Revenue Won</div>
+      </div>
+    </div>
+    <div style="background:#fafafa;border-radius:12px;padding:16px;margin-bottom:20px;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">All-Time Revenue</p>
+      <p style="margin:0;font-size:24px;font-weight:700;color:#111;">$${totalStats.totalRevenue.toFixed(2)}</p>
+    </div>
+    ${stats.pendingQuotes.length > 0 ? `
+    <h3 style="font-size:14px;font-weight:600;color:#374151;margin:0 0 8px;">Quotes Awaiting Reply</h3>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:20px;">${pendingListHtml}</table>
+    <a href="${process.env.BASE_URL || 'https://quotepro.app'}" style="display:block;text-align:center;background:#7C3AED;color:#fff;padding:14px;border-radius:10px;font-weight:600;text-decoration:none;font-size:15px;">Follow Up Now</a>
+    ` : `<p style="text-align:center;color:#6b7280;font-size:14px;">No open quotes — ready to send some new ones?</p>`}
+  </div>
+  <div style="padding:16px 28px;border-top:1px solid #f0f0f0;text-align:center;">
+    <p style="margin:0;font-size:12px;color:#9ca3af;">QuotePro Weekly Digest &bull; <a href="${process.env.BASE_URL || ''}/settings" style="color:#7C3AED;">Manage notifications</a></p>
+  </div>
+</div>
+</body></html>`;
+
+          const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              personalizations: [{ to: [{ email: toEmail }] }],
+              from: { email: fromEmail, name: "QuotePro" },
+              subject: `Your week in review — ${stats.sentCount} quote${stats.sentCount !== 1 ? "s" : ""} sent, $${stats.revenueWon.toFixed(0)} won`,
+              content: [
+                { type: "text/plain", value: `${company_name} Weekly Snapshot\nQuotes Sent: ${stats.sentCount}\nWon: ${stats.acceptedCount}\nRevenue Won: $${stats.revenueWon.toFixed(2)}\nAll-Time Revenue: $${totalStats.totalRevenue.toFixed(2)}` },
+                { type: "text/html", value: emailHtml },
+              ],
+            }),
+          });
+
+          if (sgRes.ok) {
+            await markWeeklyDigestSent(businessId);
+            console.log(`[digest] Weekly digest sent to ${toEmail} for business ${businessId}`);
+          } else {
+            const err = await sgRes.text();
+            console.error(`[digest] SendGrid error for ${businessId}:`, err);
+          }
+        } catch (e) {
+          console.error(`[digest] Error for business ${businessId}:`, e);
+        }
+      }
+    } catch (e) {
+      console.error("[digest] Failed to send weekly digests:", e);
+    }
+  }
+
   setInterval(async () => {
     try {
       await expireOldQuotes();
       const { sent, canceled } = await processPendingFollowUps();
       if (sent > 0 || canceled > 0) console.log(`Follow-ups processed: ${sent} sent, ${canceled} canceled`);
+      await sendStaleQuoteNudges();
+      await sendWeeklyDigestEmails();
     } catch (e) {
       console.error("Auto-expire/followup error:", e);
     }

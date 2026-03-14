@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, gte, lte, ilike, or, sql, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, ilike, or, sql, isNotNull, isNull, lt } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -2229,4 +2229,88 @@ export async function getWebhookDeliveriesByEventId(eventId: string): Promise<We
 
 export async function updateWebhookDelivery(id: string, data: Partial<Pick<WebhookDelivery, "statusCode" | "responseBodyExcerpt" | "nextRetryAt" | "deliveredAt">>): Promise<void> {
   await db.update(webhookDeliveries).set(data).where(eq(webhookDeliveries.id, id));
+}
+
+// ─── Retention Features ───
+
+export async function getStaleQuotesForNudge(hoursOld: number = 48): Promise<any[]> {
+  const cutoff = new Date(Date.now() - hoursOld * 60 * 60 * 1000);
+  return db
+    .select({
+      id: quotes.id,
+      businessId: quotes.businessId,
+      customerId: quotes.customerId,
+      propertyDetails: quotes.propertyDetails,
+      total: quotes.total,
+      sentAt: quotes.sentAt,
+    })
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.status, "sent"),
+        lt(quotes.sentAt, cutoff),
+        isNull(quotes.nudgeSentAt)
+      )
+    );
+}
+
+export async function markQuoteNudgeSent(quoteId: string): Promise<void> {
+  await db.update(quotes).set({ nudgeSentAt: new Date() }).where(eq(quotes.id, quoteId));
+}
+
+export async function markReviewRequestSent(quoteId: string): Promise<void> {
+  await db.update(quotes).set({ reviewRequestSentAt: new Date() }).where(eq(quotes.id, quoteId));
+}
+
+export async function getAllBusinessIds(): Promise<string[]> {
+  const rows = await db.select({ id: businesses.id }).from(businesses);
+  return rows.map((r) => r.id);
+}
+
+export async function markMilestoneCelebrated(businessId: string, milestone: number): Promise<void> {
+  const prefs = await getPreferencesByBusiness(businessId);
+  const current: number[] = Array.isArray(prefs?.celebratedMilestones) ? (prefs.celebratedMilestones as number[]) : [];
+  if (current.includes(milestone)) return;
+  const updated = [...current, milestone];
+  await upsertPreferences(businessId, { celebratedMilestones: updated } as any);
+}
+
+export async function markWeeklyDigestSent(businessId: string): Promise<void> {
+  await db
+    .update(userPreferences)
+    .set({ lastWeeklyDigestAt: new Date() })
+    .where(eq(userPreferences.businessId, businessId));
+}
+
+export async function getWeeklyQuoteStats(businessId: string): Promise<{
+  sentCount: number;
+  acceptedCount: number;
+  revenueWon: number;
+  pendingQuotes: Array<{ id: string; customerName: string; total: number; sentAt: Date | null }>;
+}> {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const allQuotes = await db
+    .select()
+    .from(quotes)
+    .where(and(eq(quotes.businessId, businessId), gte(quotes.createdAt, since)));
+
+  const sentCount = allQuotes.filter((q) => ["sent", "accepted", "declined"].includes(q.status)).length;
+  const acceptedCount = allQuotes.filter((q) => q.status === "accepted").length;
+  const revenueWon = allQuotes.filter((q) => q.status === "accepted").reduce((s, q) => s + (Number(q.total) || 0), 0);
+
+  const pendingAll = await db
+    .select()
+    .from(quotes)
+    .where(and(eq(quotes.businessId, businessId), eq(quotes.status, "sent")))
+    .orderBy(asc(quotes.sentAt))
+    .limit(5);
+
+  const pendingQuotes = pendingAll.map((q) => ({
+    id: q.id,
+    customerName: (q.propertyDetails as any)?.customerName || "Customer",
+    total: Number(q.total) || 0,
+    sentAt: q.sentAt,
+  }));
+
+  return { sentCount, acceptedCount, revenueWon, pendingQuotes };
 }

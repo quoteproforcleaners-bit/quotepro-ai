@@ -142,6 +142,8 @@ export const quotes = pgTable("quotes", {
   acceptedSource: text("accepted_source"),
   acceptedNotes: text("accepted_notes"),
   acceptedPreferences: jsonb("accepted_preferences").default(sql`'{}'::jsonb`),
+  nudgeSentAt: timestamp("nudge_sent_at"),
+  reviewRequestSentAt: timestamp("review_request_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -523,6 +525,8 @@ export const userPreferences = pgTable("user_preferences", {
   maxFollowUpsPerDay: integer("max_follow_ups_per_day").notNull().default(1),
   weeklyGoal: text("weekly_goal"),
   weeklyGoalTarget: integer("weekly_goal_target"),
+  celebratedMilestones: jsonb("celebrated_milestones").notNull().default(sql`'[]'::jsonb`),
+  lastWeeklyDigestAt: timestamp("last_weekly_digest_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

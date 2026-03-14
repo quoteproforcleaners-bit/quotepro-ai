@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -27,6 +27,8 @@ import { trackEvent } from "@/lib/analytics";
 import { ensureInstallDate, incrementSessionCount } from "@/lib/growthLoop";
 import OnboardingBanner from "@/components/OnboardingBanner";
 import { useProGate } from "@/components/ProGate";
+import MilestoneCelebrationModal from "@/components/MilestoneCelebrationModal";
+import { apiRequest } from "@/lib/query-client";
 
 type Nav = NativeStackNavigationProp<any>;
 
@@ -117,6 +119,7 @@ export default function DashboardScreen() {
   const [setupSkipped, setSetupSkipped] = useState(false);
   const [setupCompleted, setSetupCompleted] = useState(false);
   const [setupLoaded, setSetupLoaded] = useState(false);
+  const [milestoneModal, setMilestoneModal] = useState<{ milestone: number; totalRevenue: number } | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -156,6 +159,31 @@ export default function DashboardScreen() {
     queryKey: ["/api/intake-requests/count"],
     staleTime: 60000,
   });
+
+  const { data: milestoneData } = useQuery<{
+    nextMilestone: number | null;
+    totalRevenue: number;
+    celebrated: number[];
+  }>({
+    queryKey: ["/api/milestones/check"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (!milestoneData) return;
+    const { nextMilestone, totalRevenue } = milestoneData;
+    if (!nextMilestone || milestoneModal) return;
+    setMilestoneModal({ milestone: nextMilestone, totalRevenue });
+  }, [milestoneData]);
+
+  const handleMilestoneDismiss = useCallback(async () => {
+    if (!milestoneModal) return;
+    setMilestoneModal(null);
+    try {
+      await apiRequest("POST", "/api/milestones/celebrate", { milestone: milestoneModal.milestone });
+    } catch {}
+  }, [milestoneModal]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -480,6 +508,13 @@ export default function DashboardScreen() {
           </View>
         )}
       </ScrollView>
+
+      <MilestoneCelebrationModal
+        visible={milestoneModal !== null}
+        milestone={milestoneModal?.milestone ?? 1000}
+        totalRevenue={milestoneModal?.totalRevenue ?? 0}
+        onDismiss={handleMilestoneDismiss}
+      />
     </View>
   );
 }
