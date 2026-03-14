@@ -8988,11 +8988,11 @@ Rules:
       for (const li of lineItems) {
         await createLineItem({
           quoteId: q.id,
-          description: li.description || "Cleaning Service",
+          name: li.description || li.name || "Cleaning Service",
           quantity: li.quantity || 1,
           unitPrice: li.unitPrice || li.subtotal || 0,
-          subtotal: li.subtotal || li.unitPrice || 0,
-          category: "service",
+          totalPrice: li.subtotal || li.unitPrice || 0,
+          type: "base",
         });
       }
 
