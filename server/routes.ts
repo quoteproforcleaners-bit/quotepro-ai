@@ -8558,6 +8558,199 @@ init();
     }
   });
 
+  // ============ SMART QUOTE INTAKE ============
+
+  // DB migration
+  (async () => {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS intake_requests (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          business_id VARCHAR NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+          customer_name TEXT NOT NULL DEFAULT '',
+          customer_email TEXT NOT NULL DEFAULT '',
+          customer_phone TEXT NOT NULL DEFAULT '',
+          raw_text TEXT,
+          extracted_fields JSONB NOT NULL DEFAULT '{}'::jsonb,
+          status TEXT NOT NULL DEFAULT 'pending',
+          converted_quote_id VARCHAR REFERENCES quotes(id),
+          source TEXT NOT NULL DEFAULT 'intake_form',
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+    } catch (e) {
+      console.error("intake_requests migration error:", e);
+    }
+  })();
+
+  // Public: get business profile for intake form header
+  app.get("/api/public/intake-business/:businessId", async (req: Request, res: Response) => {
+    try {
+      const biz = await db_getBusinessById(req.params.businessId);
+      if (!biz) return res.status(404).json({ message: "Business not found" });
+      res.json({
+        id: biz.id,
+        companyName: biz.companyName,
+        logoUri: biz.logoUri,
+        primaryColor: biz.primaryColor || "#2563EB",
+        phone: biz.phone,
+        email: biz.email,
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Public: AI-extract fields from free text
+  app.post("/api/public/intake/:businessId/extract", async (req: Request, res: Response) => {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ message: "text is required" });
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a cleaning quote intake assistant. Extract structured fields from a customer's description of their cleaning job. Return ONLY valid JSON with these fields (use null for unknown):
+{
+  "serviceType": "standard_cleaning" | "deep_clean" | "move_in_out" | "recurring" | "airbnb" | "post_construction" | null,
+  "beds": number | null,
+  "baths": number | null,
+  "sqft": number | null,
+  "frequency": "one-time" | "weekly" | "biweekly" | "monthly" | null,
+  "pets": boolean | null,
+  "petType": "none" | "cat" | "dog" | "multiple" | null,
+  "addOns": {
+    "insideFridge": boolean,
+    "insideOven": boolean,
+    "insideCabinets": boolean,
+    "interiorWindows": boolean,
+    "blindsDetail": boolean,
+    "baseboardsDetail": boolean,
+    "laundryFoldOnly": boolean,
+    "dishes": boolean,
+    "organizationTidy": boolean
+  },
+  "notes": string | null,
+  "confidence": "high" | "medium" | "low",
+  "missingFields": string[]
+}
+Do NOT invent prices. Only extract what is explicitly mentioned or strongly implied.`,
+          },
+          { role: "user", content: text },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+      });
+      const extracted = JSON.parse(completion.choices[0].message.content || "{}");
+      res.json({ extracted });
+    } catch (e: any) {
+      console.error("Intake extract error:", e);
+      res.status(500).json({ message: "Extraction failed" });
+    }
+  });
+
+  // Public: submit intake request (customer submits)
+  app.post("/api/public/intake/:businessId", async (req: Request, res: Response) => {
+    const { businessId } = req.params;
+    const { customerName, customerEmail, customerPhone, rawText, extractedFields, source } = req.body;
+    if (!customerName?.trim()) return res.status(400).json({ message: "Customer name is required" });
+    try {
+      const biz = await db_getBusinessById(businessId);
+      if (!biz) return res.status(404).json({ message: "Business not found" });
+      const result = await pool.query(
+        `INSERT INTO intake_requests (business_id, customer_name, customer_email, customer_phone, raw_text, extracted_fields, source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [
+          businessId,
+          (customerName || "").trim(),
+          (customerEmail || "").trim(),
+          (customerPhone || "").trim(),
+          rawText || null,
+          JSON.stringify(extractedFields || {}),
+          source || "intake_form",
+        ]
+      );
+      res.status(201).json({ id: result.rows[0].id, message: "Request submitted successfully" });
+    } catch (e: any) {
+      console.error("Intake submit error:", e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Protected: list intake requests for the current business
+  app.get("/api/intake-requests", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await storage.getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const result = await pool.query(
+        `SELECT * FROM intake_requests WHERE business_id=$1 AND status='pending' ORDER BY created_at DESC`,
+        [business.id]
+      );
+      res.json(result.rows.map((r: any) => ({
+        id: r.id,
+        customerName: r.customer_name,
+        customerEmail: r.customer_email,
+        customerPhone: r.customer_phone,
+        rawText: r.raw_text,
+        extractedFields: r.extracted_fields || {},
+        status: r.status,
+        source: r.source,
+        convertedQuoteId: r.converted_quote_id,
+        createdAt: r.created_at,
+      })));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Protected: dismiss (delete) an intake request
+  app.delete("/api/intake-requests/:id", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await storage.getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      await pool.query(
+        `UPDATE intake_requests SET status='dismissed', updated_at=NOW() WHERE id=$1 AND business_id=$2`,
+        [req.params.id, business.id]
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Protected: mark as converted and link to quote
+  app.post("/api/intake-requests/:id/convert", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await storage.getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { quoteId } = req.body;
+      await pool.query(
+        `UPDATE intake_requests SET status='converted', converted_quote_id=$1, updated_at=NOW() WHERE id=$2 AND business_id=$3`,
+        [quoteId || null, req.params.id, business.id]
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Protected: count pending intake requests (for badge)
+  app.get("/api/intake-requests/count", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await storage.getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const result = await pool.query(
+        `SELECT COUNT(*) as count FROM intake_requests WHERE business_id=$1 AND status='pending'`,
+        [business.id]
+      );
+      res.json({ count: parseInt(result.rows[0].count) });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   async function processPendingFollowUps() {

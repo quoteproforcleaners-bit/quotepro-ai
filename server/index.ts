@@ -235,7 +235,7 @@ function configureExpoAndLanding(app: express.Application) {
   if (fs.existsSync(webDistPath)) {
     app.use("/app", express.static(webDistPath));
     app.use((req: Request, res: Response, next: NextFunction) => {
-      if (req.path.startsWith("/app")) {
+      if (req.path.startsWith("/app") || req.path.startsWith("/intake/")) {
         const indexPath = path.join(webDistPath, "index.html");
         if (fs.existsSync(indexPath)) {
           return res.sendFile(indexPath);

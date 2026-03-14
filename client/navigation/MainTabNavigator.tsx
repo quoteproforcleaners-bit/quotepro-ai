@@ -170,24 +170,61 @@ function TabIcon({ name, color, size, focused, isHome, badgeCount }: {
 function QuotesHeaderRight() {
   const { theme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { data: intakeCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/intake-requests/count"],
+    staleTime: 60000,
+  });
+  const pendingCount = intakeCount?.count || 0;
   return (
-    <HeaderButton onPress={() => navigation.navigate("QuotePreferences")}>
-      <View style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        backgroundColor: `${theme.primary}15`,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: `${theme.primary}30`,
-      }}>
-        <Feather name="sliders" size={15} color={theme.primary} />
-        <Text style={{ fontSize: 13, color: theme.primary, fontWeight: "700" }}>Settings</Text>
-        <Feather name="chevron-right" size={14} color={theme.primary} />
-      </View>
-    </HeaderButton>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <HeaderButton onPress={() => navigation.navigate("IntakeQueue")}>
+        <View style={{ position: "relative" }}>
+          <View style={{
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            backgroundColor: `${theme.primary}15`,
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+            <Feather name="inbox" size={16} color={theme.primary} />
+          </View>
+          {pendingCount > 0 ? (
+            <View style={{
+              position: "absolute",
+              top: -3,
+              right: -3,
+              backgroundColor: "#EF4444",
+              borderRadius: 8,
+              minWidth: 16,
+              height: 16,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: 3,
+            }}>
+              <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>{pendingCount > 9 ? "9+" : pendingCount}</Text>
+            </View>
+          ) : null}
+        </View>
+      </HeaderButton>
+      <HeaderButton onPress={() => navigation.navigate("QuotePreferences")}>
+        <View style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          backgroundColor: `${theme.primary}15`,
+          paddingHorizontal: 12,
+          paddingVertical: 7,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: `${theme.primary}30`,
+        }}>
+          <Feather name="sliders" size={15} color={theme.primary} />
+          <Text style={{ fontSize: 13, color: theme.primary, fontWeight: "700" }}>Settings</Text>
+          <Feather name="chevron-right" size={14} color={theme.primary} />
+        </View>
+      </HeaderButton>
+    </View>
   );
 }
 

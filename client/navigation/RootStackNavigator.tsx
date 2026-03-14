@@ -31,6 +31,7 @@ import QBOLogsScreen from "@/screens/QBOLogsScreen";
 import JobberSettingsScreen from "@/screens/JobberSettingsScreen";
 import JobberLogsScreen from "@/screens/JobberLogsScreen";
 import JobberImportScreen from "@/screens/JobberImportScreen";
+import IntakeQueueScreen from "@/screens/IntakeQueueScreen";
 import WalkthroughAIScreen from "@/screens/WalkthroughAIScreen";
 import WalkthroughResultsScreen from "@/screens/WalkthroughResultsScreen";
 import WalkthroughEditScreen from "@/screens/WalkthroughEditScreen";
@@ -76,6 +77,7 @@ export type RootStackParamList = {
   JobberSettings: undefined;
   JobberLogs: undefined;
   JobberImport: undefined;
+  IntakeQueue: undefined;
   WalkthroughAI: undefined;
   WalkthroughResults: { extractedFields: any; assumptions: string[]; confidence: string; description: string };
   WalkthroughEdit: { extractedFields: any; assumptions: string[]; confidence: string; description: string };
@@ -358,6 +360,13 @@ export default function RootStackNavigator() {
             component={JobberImportScreen}
             options={{
               headerTitle: "Import Clients",
+            }}
+          />
+          <Stack.Screen
+            name="IntakeQueue"
+            component={IntakeQueueScreen}
+            options={{
+              headerTitle: "Quote Requests",
             }}
           />
           <Stack.Screen

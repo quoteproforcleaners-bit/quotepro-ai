@@ -215,6 +215,99 @@ export function calculateAllOptions(
   return { good, better, best };
 }
 
+export interface PriceBreakdownLine {
+  label: string;
+  detail: string;
+  value?: number;
+  type: "base" | "add" | "multiplier" | "discount" | "addon" | "floor" | "total";
+}
+
+export interface PriceBreakdown {
+  lines: PriceBreakdownLine[];
+  totalHours: number;
+  hourlyRate: number;
+  rawTotal: number;
+  finalPrice: number;
+}
+
+export function calculatePriceBreakdown(
+  homeDetails: HomeDetails,
+  addOns: AddOns,
+  frequency: ServiceFrequency,
+  serviceType: ServiceTypeConfig,
+  settings: PricingSettings
+): PriceBreakdown {
+  const sqftHours = getSqftBaseHours(homeDetails.sqft);
+  const bathHours = getBathroomHours(homeDetails.baths, homeDetails.halfBaths);
+  const bedHours = getBedroomHours(homeDetails.beds);
+  const petHours = getPetHours(homeDetails.petType, homeDetails.petShedding);
+  const conditionMult = getConditionMultiplier(homeDetails.conditionScore);
+  const peopleMult = getPeopleMultiplier(homeDetails.peopleCount);
+  const serviceMult = serviceType.multiplier;
+  const addOnHours = getAddOnHours(addOns);
+  const addOnPrice = getAddOnPrice(addOns, settings.addOnPrices);
+
+  const rawBaseHours = sqftHours + bathHours + bedHours + petHours;
+  const adjustedBaseHours = rawBaseHours * conditionMult * peopleMult;
+  const serviceHours = roundHours(adjustedBaseHours * serviceMult);
+  const totalHours = roundHours(serviceHours + addOnHours);
+
+  const basePrice = totalHours * settings.hourlyRate;
+  let price = basePrice + addOnPrice;
+  const rawTotal = price;
+  const hitMinimum = price < settings.minimumTicket;
+  if (hitMinimum) price = settings.minimumTicket;
+
+  const canDiscount = serviceType.id !== "move-in-out" && serviceType.id !== "post-construction";
+  const discountPct = canDiscount ? getFrequencyDiscount(frequency, settings.frequencyDiscounts) : 0;
+  if (discountPct > 0) price = price * (1 - discountPct);
+
+  price = roundToNearest(price, 5);
+
+  const lines: PriceBreakdownLine[] = [];
+
+  lines.push({ label: "Sq ft base", detail: `${homeDetails.sqft.toLocaleString()} sq ft`, value: sqftHours, type: "base" });
+  if (bathHours > 0) lines.push({ label: "Bathrooms", detail: `${homeDetails.baths} bath`, value: bathHours, type: "add" });
+  if (bedHours > 0) lines.push({ label: "Bedrooms", detail: `${homeDetails.beds} bed`, value: bedHours, type: "add" });
+  if (petHours > 0) lines.push({ label: "Pets", detail: homeDetails.petType, value: petHours, type: "add" });
+
+  if (conditionMult !== 1.0) {
+    const condPct = conditionMult > 1 ? `+${Math.round((conditionMult - 1) * 100)}%` : `-${Math.round((1 - conditionMult) * 100)}%`;
+    lines.push({ label: "Condition", detail: `Score ${homeDetails.conditionScore}/10 (${condPct})`, type: "multiplier" });
+  }
+  if (peopleMult > 1.0) {
+    lines.push({ label: "Occupants", detail: `${homeDetails.peopleCount} people (+${Math.round((peopleMult - 1) * 100)}%)`, type: "multiplier" });
+  }
+  if (serviceMult !== 1.0) {
+    lines.push({ label: serviceType.name, detail: `${serviceMult}x multiplier`, type: "multiplier" });
+  }
+
+  lines.push({ label: "Labor hours", detail: `${totalHours - addOnHours}h × $${settings.hourlyRate}/hr`, value: serviceHours * settings.hourlyRate, type: "base" });
+
+  if (addOnHours > 0 || addOnPrice > 0) {
+    lines.push({ label: "Add-ons", detail: `+${addOnHours}h / $${addOnPrice.toFixed(0)}`, value: addOnPrice, type: "addon" });
+  }
+
+  if (hitMinimum) {
+    lines.push({ label: "Minimum price applied", detail: `$${settings.minimumTicket}`, type: "floor" });
+  }
+
+  if (discountPct > 0) {
+    const saveAmt = hitMinimum ? settings.minimumTicket * discountPct : rawTotal * discountPct;
+    lines.push({ label: `${FREQ_LABEL[frequency] || frequency} discount`, detail: `-${Math.round(discountPct * 100)}%  (-$${saveAmt.toFixed(0)})`, type: "discount" });
+  }
+
+  lines.push({ label: "Total", detail: `$${price}`, value: price, type: "total" });
+
+  return { lines, totalHours, hourlyRate: settings.hourlyRate, rawTotal, finalPrice: price };
+}
+
+const FREQ_LABEL: Record<string, string> = {
+  weekly: "Weekly",
+  biweekly: "Bi-weekly",
+  monthly: "Monthly",
+};
+
 export function generateEmailDraft(
   customerName: string,
   businessName: string,

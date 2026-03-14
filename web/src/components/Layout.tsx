@@ -21,6 +21,7 @@ import {
   Lock,
   ArrowUpRight,
   Wrench,
+  Inbox,
 } from "lucide-react";
 
 const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant"];
@@ -53,6 +54,7 @@ const navSections = [
     items: [
       { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true },
       { to: "/walkthrough-ai", label: "Quote from Notes", icon: Wand2 },
+      { to: "/intake-requests", label: "Quote Requests", icon: Inbox },
     ],
   },
   {

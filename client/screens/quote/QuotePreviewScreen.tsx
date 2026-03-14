@@ -32,6 +32,8 @@ import {
 } from "@/types";
 import {
   calculateAllOptions,
+  calculatePriceBreakdown,
+  getServiceTypeById,
   generateEmailDraft,
   generateSmsDraft,
 } from "@/lib/quoteCalculator";
@@ -131,6 +133,7 @@ export default function QuotePreviewScreen({
   } | null>(null);
   const [aiPricingLoading, setAiPricingLoading] = useState(false);
   const [showAiPricing, setShowAiPricing] = useState(false);
+  const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
 
   const baseOptions = useMemo(() => {
     return calculateAllOptions(
@@ -160,6 +163,16 @@ export default function QuotePreviewScreen({
   }, [options, aiDescriptions]);
 
   const selectedOpt = useMemo(() => options[selectedOption], [options, selectedOption]);
+
+  const priceBreakdown = useMemo(() => {
+    const serviceTypeConfig = getServiceTypeById(pricingSettings, selectedOpt.serviceTypeId);
+    if (!serviceTypeConfig) return null;
+    try {
+      return calculatePriceBreakdown(homeDetails, addOns, frequency, serviceTypeConfig, pricingSettings);
+    } catch {
+      return null;
+    }
+  }, [homeDetails, addOns, frequency, pricingSettings, selectedOpt.serviceTypeId]);
 
   const emailDraft = useMemo(() => {
     const po = getPaymentOptions(businessProfile.paymentOptions);
@@ -813,6 +826,52 @@ export default function QuotePreviewScreen({
           ) : null
         ) : null}
 
+        {priceBreakdown ? (
+          <Pressable
+            onPress={() => setShowPriceBreakdown(v => !v)}
+            style={[styles.breakdownToggle, { borderColor: theme.border, backgroundColor: theme.cardBackground }]}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Feather name="layers" size={13} color={theme.primary} />
+              <ThemedText type="small" style={{ fontWeight: "600", color: theme.primary }}>How was this priced?</ThemedText>
+            </View>
+            <Feather name={showPriceBreakdown ? "chevron-up" : "chevron-down"} size={14} color={theme.textSecondary} />
+          </Pressable>
+        ) : null}
+
+        {showPriceBreakdown && priceBreakdown ? (
+          <View style={[styles.breakdownDetailCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+            <ThemedText type="caption" style={{ fontWeight: "700", opacity: 0.5, marginBottom: Spacing.sm, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              Price Breakdown — {selectedOpt.serviceTypeName}
+            </ThemedText>
+            {priceBreakdown.lines.filter(l => l.type !== "total").map((line, i) => (
+              <View key={i} style={[styles.bdLine, line.type === "discount" ? { backgroundColor: `${theme.success}08` } : line.type === "multiplier" ? { backgroundColor: `${theme.primary}06` } : {}]}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="small" style={{ fontWeight: "500" }}>{line.label}</ThemedText>
+                  <ThemedText type="caption" style={{ opacity: 0.55, marginTop: 1 }}>{line.detail}</ThemedText>
+                </View>
+                {line.type === "discount" ? (
+                  <ThemedText type="small" style={{ color: theme.success, fontWeight: "600" }}>{line.detail.match(/-\$[\d.]+/)?.[0] || ""}</ThemedText>
+                ) : line.type === "multiplier" ? (
+                  <View style={[styles.multiplierTag, { backgroundColor: `${theme.primary}15` }]}>
+                    <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>adj</ThemedText>
+                  </View>
+                ) : line.value !== undefined ? (
+                  <ThemedText type="small" style={{ opacity: 0.65 }}>{line.type === "base" || line.type === "add" ? `${line.value}h` : `$${line.value.toFixed(0)}`}</ThemedText>
+                ) : null}
+              </View>
+            ))}
+            <View style={[styles.bdDivider, { backgroundColor: theme.border }]} />
+            <View style={[styles.bdLine, { backgroundColor: `${theme.primary}08` }]}>
+              <ThemedText type="small" style={{ fontWeight: "700" }}>Final Price</ThemedText>
+              <ThemedText type="small" style={{ fontWeight: "700", color: theme.primary }}>${priceBreakdown.finalPrice}</ThemedText>
+            </View>
+            <ThemedText type="caption" style={{ opacity: 0.45, marginTop: Spacing.sm, textAlign: "center" }}>
+              Based on your configured hourly rate of ${priceBreakdown.hourlyRate}/hr
+            </ThemedText>
+          </View>
+        ) : null}
+
         <View style={[styles.breakdownCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
           <View style={styles.breakdownRow}>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>Subtotal</ThemedText>
@@ -1232,6 +1291,40 @@ const styles = StyleSheet.create({
   breakdownDivider: {
     height: 1,
     marginVertical: Spacing.sm,
+  },
+  breakdownToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.xs,
+  },
+  breakdownDetailCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+  },
+  bdLine: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    marginBottom: 2,
+  },
+  bdDivider: {
+    height: 1,
+    marginVertical: Spacing.xs,
+  },
+  multiplierTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   upgradeCard: {
     flexDirection: "row",

@@ -23,6 +23,8 @@ import GrowthDashboardPage from "./pages/GrowthDashboardPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import WalkthroughAIPage from "./pages/WalkthroughAIPage";
 import ToolkitPage from "./pages/ToolkitPage";
+import IntakePage from "./pages/IntakePage";
+import IntakeRequestsPage from "./pages/IntakeRequestsPage";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -83,8 +85,12 @@ export default function App() {
           <Route path="/ai-assistant" element={<ProGate feature="AI Sales Assistant"><AIAssistantPage /></ProGate>} />
           <Route path="/walkthrough-ai" element={<WalkthroughAIPage />} />
           <Route path="/toolkit" element={<ToolkitPage />} />
+          <Route path="/intake-requests" element={<IntakeRequestsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
+
+        {/* Public intake form — no auth required */}
+        <Route path="/intake/:businessId" element={<IntakePage />} />
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
