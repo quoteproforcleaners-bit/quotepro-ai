@@ -1,0 +1,136 @@
+You are working on my app’s quote request and quote delivery flow. Fix the following issues completely and safely without breaking existing functionality. After making changes, verify the full flow end-to-end.
+
+PROJECT GOALS
+1. The customer-facing quote must NEVER display $0.00 unless the actual quote total is truly zero.
+2. The “Send Intake Link” modal/sheet must be fully opaque, readable, and Apple-review safe.
+3. All AI-powered features must be gated behind the paywall so unpaid users cannot access them.
+
+ISSUE 1: CUSTOMER QUOTE SHOWS $0.00 INSTEAD OF THE REAL PRICE
+Current behavior:
+- App user/business owner receives a quote request.
+- Customer fills out the intake form and submits it.
+- The app auto-updates with the customer info.
+- The business owner can then click “Build Quote” or “Build Quote with AI.”
+- After the quote is sent, the customer receives it in their inbox.
+- On the customer-facing quote page, line items are shown, but the total and CTA button show $0.00.
+
+Required fix:
+- Ensure the customer-facing quote page displays the exact total that was built and sent by the business owner.
+- The total must be calculated from the actual quote data at send time and persisted correctly.
+- The “Total” field and the “Accept Quote — $X.XX” button must always reflect the same final quote amount.
+- If line items exist, the total should be the sum of all included line items unless an explicit stored final total overrides it by design.
+- Remove any fallback that defaults the displayed total to 0 when valid pricing data exists elsewhere in the quote object.
+- Make sure currency formatting is consistent everywhere.
+
+What I want you to check:
+- The quote creation logic
+- The AI quote generation logic
+- The manual quote builder logic
+- The payload being saved when the quote is sent
+- The database fields used for subtotal/total/final amount
+- The API response used by the customer-facing quote page
+- The rendering logic for “Total” and “Accept Quote” CTA
+- Any mismatch between frontend field names and backend/database field names
+- Any race condition where line items save but total does not
+- Any serialization/deserialization issue that turns undefined/null into 0
+
+Implementation requirements:
+- Use one canonical total field for sent quotes.
+- Persist the total at the moment the quote is finalized/sent.
+- On the customer quote page:
+  - Prefer the persisted final total
+  - If missing, derive it from line items
+  - Never silently show $0.00 if line items have value
+- Add defensive validation so a quote with positive-value line items cannot be sent with a zero total unless explicitly confirmed by the app user.
+- Add logging around quote send/persist/render so this can be debugged easily if it ever happens again.
+
+Acceptance criteria for issue 1:
+- A quote with line items totaling $250.00 displays:
+  - Total: $250.00
+  - Accept Quote — $250.00
+- Manual quotes and AI-generated quotes both behave correctly.
+- Refreshing the page or reopening the quote still shows the correct total.
+- Existing previously sent quotes should render correctly if enough stored data exists.
+
+ISSUE 2: “SEND INTAKE LINK” SCREEN IS TRANSPARENT / HARD TO READ
+Current behavior:
+- When the app user clicks “Send” in the quote request screen, the “Send Intake Link” modal/sheet appears transparent.
+- The background content shows through too strongly, making it hard to read.
+- This looks unfinished and is risky for Apple App Review.
+
+Required fix:
+- Make the “Send Intake Link” modal/sheet fully readable and visually solid.
+- Use a proper opaque or near-opaque modal background and a proper dimmed backdrop.
+- Eliminate unintended transparency on the modal container/content area.
+- Ensure text fields, buttons, and labels have strong contrast.
+- Ensure the modal presentation looks native and production-ready on iPhone.
+
+What I want adjusted:
+- Modal/sheet background
+- Overlay/backdrop opacity
+- z-index / stacking issues
+- blur/transparency settings
+- card/container background color
+- text contrast
+- any theme token causing alpha/translucency
+- safe-area spacing and visual polish
+
+Apple-review-safe requirements:
+- No see-through panel that makes text hard to read
+- Clear visual separation between foreground modal and background screen
+- Accessible contrast for text and controls
+- Stable presentation in light mode and dark mode if supported
+
+Acceptance criteria for issue 2:
+- The “Send Intake Link” screen is easy to read on iPhone.
+- Background content no longer visually interferes with the modal content.
+- The screen looks polished and compliant for App Store review.
+
+ISSUE 3: GATE ALL AI FEATURES BEHIND THE PAYWALL
+Required fix:
+- Ensure every AI-powered feature is inaccessible to users who are not on a paid plan with AI access.
+- This must be enforced both in the frontend and backend.
+- Do not rely only on hiding buttons in the UI.
+
+AI features to gate:
+- “Build Quote with AI”
+- Any AI-assisted quote generation
+- Any AI autofill, AI rewrite, AI recommendations, AI-generated pricing suggestions, or similar functionality anywhere in the app
+- Any hidden/internal AI endpoints or actions
+
+Implementation requirements:
+- Add server-side authorization checks for plan/entitlement before any AI action runs.
+- Add client-side gating so unpaid users see locked UI or upgrade messaging.
+- Return a proper error/upgrade response if an unpaid user attempts to hit an AI endpoint directly.
+- Audit the codebase for all AI entry points and gate every one of them consistently.
+- Centralize plan/feature entitlement checks if possible.
+
+Acceptance criteria for issue 3:
+- Unpaid users cannot trigger AI features from the UI.
+- Unpaid users cannot bypass the paywall by calling API routes directly.
+- Paid users with AI access can use the features normally.
+- The upgrade path/message is clear and consistent.
+
+DELIVERABLES
+After fixing, provide:
+1. A summary of root causes found
+2. The exact files changed
+3. What was changed in each file
+4. Any database/schema changes
+5. Any migrations required
+6. A short end-to-end test report covering:
+   - intake submitted
+   - app user builds quote
+   - quote sent
+   - customer opens quote
+   - correct total shown
+   - send intake modal is readable
+   - unpaid user blocked from AI
+   - paid user allowed to use AI
+
+IMPORTANT
+- Do not just patch the symptom. Find and fix the root cause.
+- Keep the UI polished and mobile-friendly.
+- Do not break the existing quote request flow.
+- If multiple quote amount fields exist, normalize them and remove ambiguity.
+- Make the fixes production-ready, not temporary.

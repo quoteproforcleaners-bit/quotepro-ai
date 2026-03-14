@@ -397,6 +397,7 @@ var selectedOption="{{preselectedOption}}";
 var optionData={{optionDataJson}};
 var addonData={{addonDataJson}};
 var token="{{publicToken}}";
+var storedTotal={{storedTotal}};
 var expiresAt={{expiresAtMs}};
 var depositRequired={{depositRequired}};
 var depositAmount={{depositAmountNum}};
@@ -439,7 +440,9 @@ function getSelectedAddons(){
 
 function updateTotals(){
   var opt=optionData.find(function(o){return o.key===selectedOption});
-  var basePrice=opt?opt.price:optionData.length===1?optionData[0].price:0;
+  var basePrice;
+  if(optionData.length===0){basePrice=storedTotal;}
+  else{basePrice=opt?opt.price:optionData.length===1?optionData[0].price:0;}
   var addonsTotal=getSelectedAddonsTotal();
   var total=basePrice+addonsTotal;
   var totalEl=document.getElementById("totalAmount");

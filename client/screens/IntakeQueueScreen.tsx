@@ -438,9 +438,10 @@ function SendLinkModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <Pressable style={styles.modalBackdrop} onPress={handleClose} />
-      <KeyboardAvoidingView behavior="padding" style={styles.modalKAV}>
-        <View style={[styles.modalSheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + Spacing.lg }]}>
+      <View style={styles.modalOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <KeyboardAvoidingView behavior="padding">
+        <View style={[styles.modalSheet, { backgroundColor: theme.cardBackground, paddingBottom: insets.bottom + Spacing.lg }]}>
           <View style={[styles.modalHandle, { backgroundColor: theme.border }]} />
 
           <View style={styles.modalHeader}>
@@ -522,7 +523,8 @@ function SendLinkModal({
             </View>
           )}
         </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -914,8 +916,11 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: "600", marginBottom: 6, textAlign: "center" },
   emptySub: { fontSize: 13, textAlign: "center", lineHeight: 19 },
 
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
-  modalKAV: { justifyContent: "flex-end" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+  },
   modalSheet: {
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingTop: Spacing.sm, paddingHorizontal: Spacing.lg,

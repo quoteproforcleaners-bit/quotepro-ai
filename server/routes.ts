@@ -2467,7 +2467,7 @@ ${growthSettings?.includeReviewOnPdf && growthSettings?.googleReviewLink?.trim()
     }
   });
 
-  app.post("/api/commercial/generate-scope", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/commercial/generate-scope", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const { walkthrough, tier } = req.body;
       if (!walkthrough) return res.status(400).json({ message: "walkthrough data is required" });
@@ -2519,7 +2519,7 @@ ${growthSettings?.includeReviewOnPdf && growthSettings?.googleReviewLink?.trim()
     }
   });
 
-  app.post("/api/commercial/risk-scan", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/commercial/risk-scan", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const { walkthrough, laborEstimate, pricing, tiers } = req.body;
       if (!walkthrough || !pricing) return res.status(400).json({ message: "walkthrough and pricing data are required" });
@@ -7124,7 +7124,9 @@ init();
 
       const depositRequired = q.depositRequired || false;
       const depositAmount = Number(q.depositAmount) || 0;
-      const totalNum = Number(q.total) || 0;
+      const lineItemsSum = lineItems.reduce((s: number, li: any) => s + (Number(li.totalPrice) || 0), 0);
+      const totalNum = Number(q.total) > 0 ? Number(q.total) : lineItemsSum > 0 ? lineItemsSum : 0;
+      console.log(`[quote render] token=${req.params.token} q.total=${q.total} lineItemsSum=${lineItemsSum} totalNum=${totalNum} lineItems=${lineItems.length}`);
       const depositFormatted = depositAmount.toFixed(2);
       const balanceFormatted = Math.max(0, totalNum - depositAmount).toFixed(2);
 
@@ -7208,6 +7210,7 @@ init();
         "{{businessPhone}}": escHtml(business?.phone || ""),
         "{{businessEmail}}": escHtml(business?.email || ""),
         "{{frequencyLabel}}": frequencyLabel,
+        "{{storedTotal}}": String(totalNum),
       };
 
       for (const [key, val] of Object.entries(replacements)) {
@@ -8631,13 +8634,14 @@ init();
 
   async function lookupIntakeBusiness(codeOrId: string) {
     const r = await pool.query(
-      `SELECT id, company_name, logo_uri, primary_color, phone, email, intake_code FROM businesses WHERE intake_code = $1 OR id = $1 LIMIT 1`,
+      `SELECT id, owner_user_id, company_name, logo_uri, primary_color, phone, email, intake_code FROM businesses WHERE intake_code = $1 OR id = $1 LIMIT 1`,
       [codeOrId]
     );
     if (!r.rows.length) return null;
     const row = r.rows[0];
     return {
       id: row.id,
+      ownerUserId: row.owner_user_id,
       companyName: row.company_name,
       logoUri: row.logo_uri,
       primaryColor: row.primary_color,
@@ -8665,11 +8669,17 @@ init();
     }
   });
 
-  // Public: AI-extract fields from free text
+  // Public: AI-extract fields from free text (Pro only - check business owner subscription)
   app.post("/api/public/intake/:businessId/extract", async (req: Request, res: Response) => {
     const { text } = req.body;
     if (!text?.trim()) return res.status(400).json({ message: "text is required" });
     try {
+      const biz = await lookupIntakeBusiness(req.params.businessId);
+      if (!biz) return res.status(404).json({ message: "Business not found" });
+      const owner = await getUserById(biz.ownerUserId!);
+      if (!owner || owner.subscriptionTier !== "pro") {
+        return res.status(403).json({ message: "This feature requires a Pro subscription", requiresUpgrade: true });
+      }
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
@@ -8951,39 +8961,42 @@ Rules:
       try { aiData = JSON.parse(completion.choices[0].message.content || "{}"); } catch {}
 
       const lineItems = Array.isArray(aiData.lineItems) ? aiData.lineItems : [];
-      const total = typeof aiData.total === "number" ? aiData.total : lineItems.reduce((s: number, li: any) => s + (li.subtotal || li.unitPrice || 0), 0);
+      const lineItemsTotal = lineItems.reduce((s: number, li: any) => s + (Number(li.subtotal) || Number(li.unitPrice) || 0), 0);
+      const total = typeof aiData.total === "number" && aiData.total > 0 ? aiData.total : lineItemsTotal;
+      console.log(`[ai-quote] aiData.total=${aiData.total} lineItemsTotal=${lineItemsTotal} final total=${total}`);
 
-      const quotePayload = {
-        businessId: business.id,
+      const propertyDetails = {
         customerName: intake.customer_name,
-        customerEmail: intake.customer_email || "",
-        customerPhone: intake.customer_phone || "",
-        customerAddress: intake.customer_address || f.address || "",
-        status: "draft",
-        total,
-        propertyDetails: {
-          customerName: intake.customer_name,
-          customerPhone: intake.customer_phone,
-          customerEmail: intake.customer_email,
-          customerAddress: intake.customer_address,
-          sqft: f.sqft || 0,
-          beds: f.beds || 0,
-          baths: f.baths || 0,
-          petType: f.pets ? (f.petType || "dog") : "none",
-          conditionScore: 7,
-          peopleCount: 2,
-          homeType: "house",
-          kitchensCount: 1,
-          halfBaths: 0,
-          petShedding: false,
-        },
-        serviceType: f.serviceType || "standard_cleaning",
-        frequencySelected: f.frequency || "one-time",
-        notes: aiData.summary || f.notes || "",
-        aiGenerated: true,
+        customerPhone: intake.customer_phone,
+        customerEmail: intake.customer_email,
+        customerAddress: intake.customer_address,
+        sqft: f.sqft || 0,
+        beds: f.beds || 0,
+        baths: f.baths || 0,
+        petType: f.pets ? (f.petType || "dog") : "none",
+        conditionScore: 7,
+        peopleCount: 2,
+        homeType: "house",
+        kitchensCount: 1,
+        halfBaths: 0,
+        petShedding: false,
       };
 
-      const q = await createQuote(quotePayload);
+      const q = await createQuote({
+        businessId: business.id,
+        propertyBeds: f.beds || 0,
+        propertyBaths: f.baths || 0,
+        propertySqft: f.sqft || 0,
+        propertyDetails,
+        addOns: f.addOns || {},
+        frequencySelected: f.frequency || "one-time",
+        selectedOption: "better",
+        options: {},
+        subtotal: total,
+        tax: 0,
+        total,
+        status: "draft",
+      });
 
       for (const li of lineItems) {
         await createLineItem({
