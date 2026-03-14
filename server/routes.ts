@@ -8726,7 +8726,7 @@ Return ONLY valid JSON:
   // Protected: list intake requests with filter support
   app.get("/api/intake-requests", requireAuth, async (req: any, res: Response) => {
     try {
-      const business = await storage.getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const filter = (req.query.filter as string) || "new";
       let whereStatus: string;
@@ -8764,7 +8764,7 @@ Return ONLY valid JSON:
   // Protected: dismiss (delete) an intake request
   app.delete("/api/intake-requests/:id", requireAuth, async (req: any, res: Response) => {
     try {
-      const business = await storage.getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       await pool.query(
         `UPDATE intake_requests SET status='dismissed', updated_at=NOW() WHERE id=$1 AND business_id=$2`,
@@ -8779,7 +8779,7 @@ Return ONLY valid JSON:
   // Protected: patch intake request (update status, notes, fields)
   app.patch("/api/intake-requests/:id", requireAuth, async (req: any, res: Response) => {
     try {
-      const business = await storage.getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const { status, reviewNotes, extractedFields, confidence, missingFieldFlags } = req.body;
 
@@ -8820,7 +8820,7 @@ Return ONLY valid JSON:
   // Protected: mark as converted and link to quote
   app.post("/api/intake-requests/:id/convert", requireAuth, async (req: any, res: Response) => {
     try {
-      const business = await storage.getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const { quoteId } = req.body;
       await pool.query(
@@ -8836,7 +8836,7 @@ Return ONLY valid JSON:
   // Protected: send intake link via email to a prospect
   app.post("/api/intake-requests/send-link", requireAuth, async (req: any, res: Response) => {
     try {
-      const business = await storage.getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const { toEmail, toName, customMessage } = req.body;
       if (!toEmail?.trim()) return res.status(400).json({ message: "Email is required" });
@@ -8873,7 +8873,7 @@ Return ONLY valid JSON:
   // Protected: count actionable intake requests (pending + needs_review)
   app.get("/api/intake-requests/count", requireAuth, async (req: any, res: Response) => {
     try {
-      const business = await storage.getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const result = await pool.query(
         `SELECT
