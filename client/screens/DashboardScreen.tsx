@@ -45,16 +45,7 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-const QUICK_ACTIONS = [
-  {
-    id: "new-quote",
-    label: "New Quote",
-    sub: "Build with AI",
-    icon: "zap" as const,
-    color: "#2563EB",
-    screen: "QuoteCalculator",
-    testID: "quick-action-new-quote",
-  },
+const SECONDARY_ACTIONS = [
   {
     id: "smart-intake",
     label: "Smart Intake",
@@ -86,86 +77,30 @@ const QUICK_ACTIONS = [
   },
 ];
 
-function QuickActionCard({
-  action,
-  intakeBadge,
-  onPress,
-}: {
-  action: (typeof QUICK_ACTIONS)[number];
-  intakeBadge?: number;
-  onPress: () => void;
-}) {
-  const { theme } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      testID={action.testID}
-      style={({ pressed }) => [
-        s.quickCard,
-        { backgroundColor: theme.cardBackground, borderColor: theme.border, opacity: pressed ? 0.88 : 1 },
-        Elevation.e1,
-      ]}
-    >
-      <View style={[s.quickIconWrap, { backgroundColor: action.color + "14" }]}>
-        <Feather name={action.icon} size={20} color={action.color} />
-        {intakeBadge != null && intakeBadge > 0 ? (
-          <View style={s.quickBadge}>
-            <ThemedText style={s.quickBadgeText}>{intakeBadge > 9 ? "9+" : intakeBadge}</ThemedText>
-          </View>
-        ) : null}
-      </View>
-      <ThemedText style={[s.quickLabel, { color: theme.text }]}>{action.label}</ThemedText>
-      <ThemedText style={[s.quickSub, { color: theme.textSecondary }]} numberOfLines={1}>{action.sub}</ThemedText>
-    </Pressable>
-  );
-}
-
-function PipelineStat({ label, value, icon, color, onPress, theme }: {
-  label: string;
-  value: string;
-  icon: keyof typeof Feather.glyphMap;
-  color: string;
-  onPress?: () => void;
-  theme: any;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[s.pipelineStat, { backgroundColor: theme.cardBackground, borderColor: theme.border }, Elevation.e1]}
-      testID={`pipeline-${label.toLowerCase().replace(/\s+/g, "-")}`}
-    >
-      <View style={[s.pipelineIconWrap, { backgroundColor: color + "12" }]}>
-        <Feather name={icon} size={13} color={color} />
-      </View>
-      <ThemedText style={[s.pipelineValue, { color: theme.text }]}>{value}</ThemedText>
-      <ThemedText style={[s.pipelineLabel, { color: theme.textSecondary }]}>{label}</ThemedText>
-    </Pressable>
-  );
-}
-
-function ActivityRow({ icon, iconColor, title, subtitle, time, theme }: {
-  icon: keyof typeof Feather.glyphMap;
-  iconColor: string;
+function SectionLabel({ title, action, onAction, theme, isDark }: {
   title: string;
-  subtitle?: string;
-  time: string;
+  action?: string;
+  onAction?: () => void;
   theme: any;
+  isDark?: boolean;
 }) {
   return (
-    <View style={[s.activityRow, { borderBottomColor: theme.border }]}>
-      <View style={[s.activityIconWrap, { backgroundColor: iconColor + "12" }]}>
-        <Feather name={icon} size={13} color={iconColor} />
-      </View>
-      <View style={s.activityText}>
-        <ThemedText style={[s.activityTitle, { color: theme.text }]} numberOfLines={1}>{title}</ThemedText>
-        {subtitle ? (
-          <ThemedText style={[s.activitySub, { color: theme.textSecondary }]} numberOfLines={1}>{subtitle}</ThemedText>
-        ) : null}
-      </View>
-      <ThemedText style={[s.activityTime, { color: theme.textMuted }]}>{time}</ThemedText>
+    <View style={sl.row}>
+      <ThemedText style={[sl.label, { color: theme.textMuted }]}>{title.toUpperCase()}</ThemedText>
+      {action ? (
+        <Pressable onPress={onAction} hitSlop={10}>
+          <ThemedText style={[sl.action, { color: theme.primary }]}>{action}</ThemedText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
+
+const sl = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  label: { fontSize: 11, fontWeight: "600", letterSpacing: 0.7 },
+  action: { fontSize: 12, fontWeight: "500" },
+});
 
 export default function DashboardScreen() {
   const headerHeight = useHeaderHeight();
@@ -210,27 +145,13 @@ export default function DashboardScreen() {
   const { data: followUpQueue = [], refetch: refetchFollowUp } = useQuery<any[]>({
     queryKey: ["/api/followup-queue"],
   });
-
   const { data: stats, refetch: refetchStats } = useQuery<{
-    totalQuotes: number;
-    sentQuotes: number;
-    acceptedQuotes: number;
-    totalRevenue: number;
-    closeRate: number;
+    totalQuotes: number; sentQuotes: number; acceptedQuotes: number;
+    totalRevenue: number; closeRate: number;
   }>({ queryKey: ["/api/reports/stats"] });
-
-  const { data: quotes = [], refetch: refetchQuotes } = useQuery<any[]>({
-    queryKey: ["/api/quotes"],
-  });
-
-  const { data: customers = [], refetch: refetchCustomers } = useQuery<any[]>({
-    queryKey: ["/api/customers"],
-  });
-
-  const { data: allJobs = [], refetch: refetchJobs } = useQuery<any[]>({
-    queryKey: ["/api/jobs"],
-  });
-
+  const { data: quotes = [], refetch: refetchQuotes } = useQuery<any[]>({ queryKey: ["/api/quotes"] });
+  const { data: customers = [], refetch: refetchCustomers } = useQuery<any[]>({ queryKey: ["/api/customers"] });
+  const { data: allJobs = [], refetch: refetchJobs } = useQuery<any[]>({ queryKey: ["/api/jobs"] });
   const { data: intakeCount } = useQuery<{ count: number; newCount: number; reviewCount: number }>({
     queryKey: ["/api/intake-requests/count"],
     staleTime: 60000,
@@ -242,13 +163,12 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [refetchFollowUp, refetchStats, refetchQuotes, refetchCustomers, refetchJobs]);
 
-  // Revenue Alert
   const amountAtRisk = useMemo(() =>
     followUpQueue.reduce((sum: number, q: any) => sum + (q.total || 0), 0),
     [followUpQueue]
   );
   const oldestDays = useMemo(() => {
-    if (followUpQueue.length === 0) return 0;
+    if (!followUpQueue.length) return 0;
     const now = Date.now();
     let oldest = 0;
     followUpQueue.forEach((q: any) => {
@@ -259,103 +179,96 @@ export default function DashboardScreen() {
     return oldest;
   }, [followUpQueue]);
 
-  // Pipeline stats
   const jobsThisWeek = useMemo(() => {
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     weekStart.setHours(0, 0, 0, 0);
-    return (allJobs || []).filter((j: any) => {
-      const d = new Date(j.scheduledDate || j.createdAt);
-      return d >= weekStart;
-    }).length;
+    return (allJobs || []).filter((j: any) => new Date(j.scheduledDate || j.createdAt) >= weekStart).length;
   }, [allJobs]);
 
   const sentThisWeek = useMemo(() => {
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - 7);
-    return (quotes || []).filter((q: any) => {
-      const d = new Date(q.sentAt || q.createdAt);
-      return d >= weekStart && (q.status === "sent" || q.sentAt);
-    }).length;
+    const cutoff = new Date(Date.now() - 7 * 86400000);
+    return (quotes || []).filter((q: any) =>
+      new Date(q.sentAt || q.createdAt) >= cutoff && (q.status === "sent" || q.sentAt)
+    ).length;
   }, [quotes]);
 
-  // Recent activity feed (quotes + jobs + customers, sorted by date)
   const recentActivity = useMemo(() => {
-    const events: { id: string; type: "quote" | "job" | "customer"; icon: keyof typeof Feather.glyphMap; iconColor: string; title: string; subtitle?: string; date: Date }[] = [];
+    const events: { id: string; icon: keyof typeof Feather.glyphMap; iconColor: string; title: string; subtitle?: string; date: Date }[] = [];
 
     (quotes || []).slice(0, 15).forEach((q: any) => {
       const date = new Date(q.sentAt || q.updatedAt || q.createdAt);
+      const name = q.customerName || q.customer?.name;
       if (q.status === "accepted") {
-        events.push({ id: `q-won-${q.id}`, type: "quote", icon: "check-circle", iconColor: "#16A34A", title: "Quote accepted", subtitle: q.customerName || q.customer?.name, date });
+        events.push({ id: `q-won-${q.id}`, icon: "check-circle", iconColor: "#16A34A", title: "Quote accepted", subtitle: name, date });
       } else if (q.status === "sent" || q.sentAt) {
-        events.push({ id: `q-sent-${q.id}`, type: "quote", icon: "send", iconColor: "#2563EB", title: "Quote sent", subtitle: q.customerName || q.customer?.name, date });
-      } else if (q.status === "draft") {
-        events.push({ id: `q-draft-${q.id}`, type: "quote", icon: "file-text", iconColor: "#94A3B8", title: "Quote created", subtitle: q.customerName || q.customer?.name, date });
+        events.push({ id: `q-sent-${q.id}`, icon: "send", iconColor: "#2563EB", title: "Quote sent", subtitle: name, date });
+      } else {
+        events.push({ id: `q-draft-${q.id}`, icon: "file-text", iconColor: "#94A3B8", title: "Quote created", subtitle: name, date });
       }
     });
-
     (allJobs || []).slice(0, 10).forEach((j: any) => {
-      events.push({ id: `j-${j.id}`, type: "job", icon: "calendar", iconColor: "#D97706", title: j.status === "completed" ? "Job completed" : "Job scheduled", subtitle: j.customerName || j.title, date: new Date(j.updatedAt || j.createdAt) });
+      events.push({ id: `j-${j.id}`, icon: "calendar", iconColor: "#D97706", title: j.status === "completed" ? "Job completed" : "Job scheduled", subtitle: j.customerName || j.title, date: new Date(j.updatedAt || j.createdAt) });
     });
-
     (customers || []).slice(0, 5).forEach((c: any) => {
-      events.push({ id: `c-${c.id}`, type: "customer", icon: "user-plus", iconColor: "#16A34A", title: "Customer added", subtitle: c.name, date: new Date(c.createdAt) });
+      events.push({ id: `c-${c.id}`, icon: "user-plus", iconColor: "#16A34A", title: "Customer added", subtitle: c.name, date: new Date(c.createdAt) });
     });
 
     return events
       .filter(e => !isNaN(e.date.getTime()))
       .sort((a, b) => b.date.getTime() - a.date.getTime())
-      .slice(0, 6);
+      .slice(0, 5);
   }, [quotes, allJobs, customers]);
 
   const maxWidth = screenWidth > 600;
+  const bg = isDark ? "#000" : "#F5F6F8";
+  const cardBg = isDark ? "#1C1C1E" : "#FFFFFF";
+  const divider = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
 
-  function navigate(screen: string, params?: any) {
+  function nav(screen: string, params?: any) {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     navigation.navigate(screen, params);
   }
 
-  const firstName = useMemo(() => {
-    const name = profile?.companyName || "";
-    return name.split(" ")[0] || "there";
-  }, [profile]);
-
   return (
-    <View style={[s.root, { backgroundColor: isDark ? "#000" : "#F6F8FB" }]}>
+    <View style={[s.root, { backgroundColor: bg }]}>
       <ScrollView
         contentContainerStyle={[
           s.content,
-          { paddingTop: headerHeight + Spacing.sm, paddingBottom: tabBarHeight + Spacing.xl },
-          maxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined,
+          { paddingTop: headerHeight + Spacing.lg, paddingBottom: tabBarHeight + Spacing["2xl"] },
+          maxWidth ? { maxWidth: 540, alignSelf: "center" as const, width: "100%" } : undefined,
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+
+        {/* ── Header ── */}
         <View style={s.header}>
           <View style={s.headerLeft}>
             <ProfileAvatar
               config={profile?.avatarConfig || null}
-              size={40}
+              size={38}
               fallbackInitials={profile?.companyName}
-              style={{ marginRight: Spacing.sm }}
+              style={{ marginRight: 11 }}
             />
-            <View>
-              <ThemedText style={[s.greetingText, { color: theme.textSecondary }]}>{greeting()}</ThemedText>
-              <ThemedText style={[s.businessName, { color: theme.text }]} numberOfLines={1}>{profile?.companyName || "Your Business"}</ThemedText>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <ThemedText style={[s.greetLabel, { color: theme.textMuted }]}>{greeting()}</ThemedText>
+              <ThemedText style={[s.greetName, { color: theme.text }]} numberOfLines={1}>
+                {profile?.companyName || "Your Business"}
+              </ThemedText>
             </View>
           </View>
           <Pressable
-            onPress={() => navigation.navigate("Main", { screen: "SettingsTab" })}
-            style={[s.headerIconBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)", borderColor: theme.border }]}
+            onPress={() => nav("Main", { screen: "SettingsTab" })}
+            style={[s.headerBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)" }]}
             testID="settings-btn"
           >
             <Feather name="settings" size={15} color={theme.textSecondary} />
           </Pressable>
         </View>
 
-        {/* Onboarding / trial banner */}
+        {/* Banners */}
         <View style={{ paddingHorizontal: Spacing.lg }}>
           <OnboardingBanner />
         </View>
@@ -363,149 +276,205 @@ export default function DashboardScreen() {
         {/* Setup card */}
         {showSetupCard ? (
           <Pressable
-            onPress={() => navigate("ProSetupChecklist")}
-            style={[s.setupCard, { backgroundColor: theme.primary + "10", borderColor: theme.primary + "30" }]}
+            onPress={() => nav("ProSetupChecklist")}
+            style={[s.setupCard, { backgroundColor: theme.primary + "0D", borderColor: theme.primary + "25" }]}
             testID="button-pro-setup"
           >
-            <View style={[s.setupIcon, { backgroundColor: theme.primary + "20" }]}>
-              <Feather name="clipboard" size={18} color={theme.primary} />
+            <View style={[s.setupIconWrap, { backgroundColor: theme.primary + "18" }]}>
+              <Feather name="clipboard" size={16} color={theme.primary} />
             </View>
-            <View style={s.setupText}>
+            <View style={s.setupTextWrap}>
               <ThemedText style={[s.setupTitle, { color: theme.text }]}>Complete Your Setup</ThemedText>
               <ThemedText style={[s.setupSub, { color: theme.textSecondary }]}>
                 {subscriptionStatus === "trial" && trialDaysLeft != null
-                  ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} left in trial — get started now`
-                  : "Finish setup to start quoting like a pro"}
+                  ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} left in trial`
+                  : "Finish setup to quote like a pro"}
               </ThemedText>
             </View>
-            <Feather name="chevron-right" size={18} color={theme.primary} />
+            <Feather name="chevron-right" size={16} color={theme.primary + "80"} />
           </Pressable>
         ) : null}
 
-        {/* Section: Quick Actions */}
+        {/* ── Revenue Alert ── */}
+        {followUpQueue.length > 0 ? (
+          <View style={s.section}>
+            <View style={[s.alertCard, {
+              backgroundColor: isDark ? "rgba(217,119,6,0.10)" : "rgba(217,119,6,0.06)",
+              borderColor: isDark ? "rgba(217,119,6,0.22)" : "rgba(217,119,6,0.18)",
+            }]}>
+              <View style={s.alertTop}>
+                <Feather name="alert-triangle" size={13} color="#D97706" />
+                <ThemedText style={[s.alertTitle, { color: isDark ? "#FBBF24" : "#B45309" }]}>Revenue at Risk</ThemedText>
+              </View>
+              <ThemedText style={[s.alertBody, { color: theme.textSecondary }]}>
+                {followUpQueue.length} {followUpQueue.length === 1 ? "quote" : "quotes"} without a reply
+                {oldestDays > 0 ? ` · oldest ${oldestDays}d ago` : ""}
+                {amountAtRisk > 0 ? ` · $${amountAtRisk.toLocaleString()} at risk` : ""}
+              </ThemedText>
+              <View style={s.alertActions}>
+                <Pressable
+                  onPress={() => nav("FollowUpQueue")}
+                  style={[s.alertPrimary, { backgroundColor: "#D97706" }]}
+                  testID="hero-follow-up-cta"
+                >
+                  <ThemedText style={s.alertPrimaryTxt}>Follow Up Now</ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => nav("Main", { screen: "QuotesTab" })}
+                  style={s.alertSecondary}
+                  testID="hero-view-quotes"
+                >
+                  <ThemedText style={[s.alertSecondaryTxt, { color: isDark ? "#FBBF24" : "#B45309" }]}>View All</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {/* ── Quick Actions ── */}
         <View style={s.section}>
-          <ThemedText style={[s.sectionTitle, { color: theme.text }]}>Quick Actions</ThemedText>
-          <View style={s.quickGrid}>
-            {QUICK_ACTIONS.map(action => (
-              <QuickActionCard
+          <SectionLabel title="Quick Actions" theme={theme} isDark={isDark} />
+
+          {/* Primary: New Quote */}
+          <Pressable
+            onPress={() => nav("QuoteCalculator")}
+            style={({ pressed }) => [
+              s.primaryAction,
+              { backgroundColor: isDark ? theme.primary + "20" : theme.primary + "0E", borderColor: theme.primary + "30", opacity: pressed ? 0.88 : 1 },
+            ]}
+            testID="quick-action-new-quote"
+          >
+            <View style={[s.primaryActionIcon, { backgroundColor: theme.primary }]}>
+              <Feather name="zap" size={18} color="#fff" />
+            </View>
+            <View style={s.primaryActionText}>
+              <ThemedText style={[s.primaryActionLabel, { color: theme.text }]}>New Quote</ThemedText>
+              <ThemedText style={[s.primaryActionSub, { color: theme.textSecondary }]}>Build and send a quote with AI</ThemedText>
+            </View>
+            <Feather name="arrow-right" size={16} color={theme.primary + "80"} />
+          </Pressable>
+
+          {/* Secondary: 3 in a row */}
+          <View style={s.secondaryRow}>
+            {SECONDARY_ACTIONS.map(action => (
+              <Pressable
                 key={action.id}
-                action={action}
-                intakeBadge={action.id === "smart-intake" ? intakeCount?.count : undefined}
-                onPress={() => navigate(action.screen, (action as any).screenParams)}
-              />
+                onPress={() => nav(action.screen, (action as any).screenParams)}
+                testID={action.testID}
+                style={({ pressed }) => [
+                  s.secondaryCard,
+                  { backgroundColor: cardBg, borderColor: divider, opacity: pressed ? 0.85 : 1 },
+                  Elevation.e1,
+                ]}
+              >
+                <View style={[s.secondaryIconWrap, { backgroundColor: action.color + "12" }]}>
+                  <Feather name={action.icon} size={16} color={action.color} />
+                  {action.id === "smart-intake" && intakeCount != null && intakeCount.count > 0 ? (
+                    <View style={s.badge}>
+                      <ThemedText style={s.badgeTxt}>{intakeCount.count > 9 ? "9+" : intakeCount.count}</ThemedText>
+                    </View>
+                  ) : null}
+                </View>
+                <ThemedText style={[s.secondaryLabel, { color: theme.text }]} numberOfLines={1}>{action.label}</ThemedText>
+                <ThemedText style={[s.secondarySub, { color: theme.textMuted }]} numberOfLines={1}>{action.sub}</ThemedText>
+              </Pressable>
             ))}
           </View>
         </View>
 
-        {/* Section: Revenue Alert */}
-        {followUpQueue.length > 0 ? (
-          <View style={s.section}>
-            <View style={[s.alertCard, { backgroundColor: theme.cardBackground, borderColor: "#D97706" + "40", borderLeftColor: "#D97706" }, Elevation.e1]}>
-              <View style={s.alertHeader}>
-                <View style={[s.alertIconWrap, { backgroundColor: "#D9770610" }]}>
-                  <Feather name="alert-triangle" size={14} color="#D97706" />
-                </View>
-                <View style={s.alertText}>
-                  <ThemedText style={[s.alertTitle, { color: theme.text }]}>Revenue at Risk</ThemedText>
-                  <ThemedText style={[s.alertSub, { color: theme.textSecondary }]}>
-                    {followUpQueue.length} {followUpQueue.length === 1 ? "quote" : "quotes"} waiting
-                    {oldestDays > 0 ? ` · oldest ${oldestDays}d ago` : ""}
-                    {amountAtRisk > 0 ? ` · $${amountAtRisk.toLocaleString()} at risk` : ""}
-                  </ThemedText>
-                </View>
-              </View>
-              <View style={s.alertActions}>
-                <Pressable
-                  onPress={() => navigate("FollowUpQueue")}
-                  style={[s.alertBtnPrimary, { backgroundColor: "#D97706" }]}
-                  testID="hero-follow-up-cta"
-                >
-                  <Feather name="zap" size={13} color="#fff" />
-                  <ThemedText style={s.alertBtnPrimaryText}>Follow Up Now</ThemedText>
-                </Pressable>
-                <Pressable
-                  onPress={() => navigate("Main", { screen: "QuotesTab" })}
-                  style={[s.alertBtnSecondary, { borderColor: "#D97706" + "40" }]}
-                  testID="hero-view-quotes"
-                >
-                  <ThemedText style={[s.alertBtnSecondaryText, { color: "#D97706" }]}>View All</ThemedText>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        ) : null}
-
-        {/* Section: Pipeline Snapshot */}
+        {/* ── Pipeline ── */}
         <View style={s.section}>
-          <View style={s.sectionHeaderRow}>
-            <ThemedText style={[s.sectionTitle, { color: theme.text }]}>Pipeline</ThemedText>
-            <Pressable onPress={() => navigate("Main", { screen: "GrowthTab" })} testID="pipeline-view-reports">
-              <ThemedText style={[s.sectionLink, { color: theme.primary }]}>Reports</ThemedText>
-            </Pressable>
-          </View>
-          <View style={s.pipelineGrid}>
-            <PipelineStat
-              label="Awaiting Reply"
-              value={String(followUpQueue.length)}
-              icon="clock"
-              color={followUpQueue.length > 0 ? "#D97706" : "#94A3B8"}
-              onPress={() => navigate("FollowUpQueue")}
-              theme={theme}
-            />
-            <PipelineStat
-              label="Sent This Week"
-              value={String(sentThisWeek)}
-              icon="send"
-              color="#2563EB"
-              onPress={() => navigate("Main", { screen: "QuotesTab" })}
-              theme={theme}
-            />
-            <PipelineStat
-              label="Jobs This Week"
-              value={String(jobsThisWeek)}
-              icon="calendar"
-              color="#D97706"
-              onPress={() => navigate("Main", { screen: "JobsTab" })}
-              theme={theme}
-            />
-            <PipelineStat
-              label="Close Rate"
-              value={stats?.closeRate != null ? `${Math.round(stats.closeRate)}%` : "—"}
-              icon="percent"
-              color="#16A34A"
-              onPress={() => navigate("Main", { screen: "GrowthTab" })}
-              theme={theme}
-            />
+          <SectionLabel
+            title="Pipeline"
+            action="Reports"
+            onAction={() => nav("Main", { screen: "GrowthTab" })}
+            theme={theme}
+            isDark={isDark}
+          />
+          <View style={s.statsRow}>
+            {[
+              {
+                value: String(followUpQueue.length),
+                label: "Awaiting Reply",
+                urgent: followUpQueue.length > 0,
+                onPress: () => nav("FollowUpQueue"),
+                testID: "pipeline-awaiting-reply",
+              },
+              {
+                value: String(sentThisWeek),
+                label: "Sent This Week",
+                urgent: false,
+                onPress: () => nav("Main", { screen: "QuotesTab" }),
+                testID: "pipeline-sent-this-week",
+              },
+              {
+                value: String(jobsThisWeek),
+                label: "Jobs This Week",
+                urgent: false,
+                onPress: () => nav("Main", { screen: "JobsTab" }),
+                testID: "pipeline-jobs-this-week",
+              },
+              {
+                value: stats?.closeRate != null ? `${Math.round(stats.closeRate)}%` : "—",
+                label: "Close Rate",
+                urgent: false,
+                onPress: () => nav("Main", { screen: "GrowthTab" }),
+                testID: "pipeline-close-rate",
+              },
+            ].map((stat, i) => (
+              <Pressable
+                key={i}
+                onPress={stat.onPress}
+                testID={stat.testID}
+                style={({ pressed }) => [
+                  s.statCard,
+                  { backgroundColor: cardBg, borderColor: divider, opacity: pressed ? 0.85 : 1 },
+                  Elevation.e1,
+                ]}
+              >
+                <ThemedText style={[s.statValue, { color: stat.urgent ? "#D97706" : theme.text }]}>
+                  {stat.value}
+                </ThemedText>
+                <ThemedText style={[s.statLabel, { color: theme.textMuted }]}>{stat.label}</ThemedText>
+              </Pressable>
+            ))}
           </View>
         </View>
 
-        {/* Section: Recent Activity */}
+        {/* ── Recent Activity ── */}
         {recentActivity.length > 0 ? (
           <View style={s.section}>
-            <ThemedText style={[s.sectionTitle, { color: theme.text }]}>Recent Activity</ThemedText>
-            <View style={[s.activityCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }, Elevation.e1]}>
+            <SectionLabel title="Recent Activity" theme={theme} isDark={isDark} />
+            <View style={[s.activityCard, { backgroundColor: cardBg, borderColor: divider }, Elevation.e1]}>
               {recentActivity.map((event, i) => (
-                <ActivityRow
+                <View
                   key={event.id}
-                  icon={event.icon}
-                  iconColor={event.iconColor}
-                  title={event.title}
-                  subtitle={event.subtitle}
-                  time={timeAgo(event.date.toISOString())}
-                  theme={theme}
-                />
+                  style={[
+                    s.activityRow,
+                    { borderBottomColor: divider, borderBottomWidth: i < recentActivity.length - 1 ? StyleSheet.hairlineWidth : 0 },
+                  ]}
+                >
+                  <View style={[s.activityDot, { backgroundColor: event.iconColor + "18" }]}>
+                    <Feather name={event.icon} size={11} color={event.iconColor} />
+                  </View>
+                  <View style={s.activityTextWrap}>
+                    <ThemedText style={[s.activityTitle, { color: theme.text }]} numberOfLines={1}>{event.title}</ThemedText>
+                    {event.subtitle ? (
+                      <ThemedText style={[s.activitySub, { color: theme.textMuted }]} numberOfLines={1}>{event.subtitle}</ThemedText>
+                    ) : null}
+                  </View>
+                  <ThemedText style={[s.activityTime, { color: theme.textMuted }]}>{timeAgo(event.date.toISOString())}</ThemedText>
+                </View>
               ))}
             </View>
           </View>
-        ) : recentActivity.length === 0 && (quotes.length > 0 || allJobs.length > 0) ? null : (
+        ) : (
           <View style={s.section}>
-            <View style={[s.emptyActivity, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-              <View style={[s.emptyActivityIcon, { backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }]}>
-                <Feather name="activity" size={22} color={theme.textMuted} />
-              </View>
-              <ThemedText style={[s.emptyActivityTitle, { color: theme.text }]}>No activity yet</ThemedText>
-              <ThemedText style={[s.emptyActivitySub, { color: theme.textSecondary }]}>
-                Create your first quote or add a customer to get started.
+            <View style={[s.emptyState, { backgroundColor: cardBg, borderColor: divider }]}>
+              <Feather name="activity" size={20} color={theme.textMuted} style={{ marginBottom: 10 }} />
+              <ThemedText style={[s.emptyTitle, { color: theme.text }]}>No activity yet</ThemedText>
+              <ThemedText style={[s.emptySub, { color: theme.textSecondary }]}>
+                Create a quote or add a customer to get started.
               </ThemedText>
             </View>
           </View>
@@ -519,121 +488,126 @@ const s = StyleSheet.create({
   root: { flex: 1 },
   content: { paddingHorizontal: 0 },
 
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.lg,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", flex: 1, minWidth: 0 },
-  greetingText: { fontSize: 12, fontWeight: "400" },
-  businessName: { fontSize: 17, fontWeight: "700", marginTop: 1 },
-  headerIconBtn: {
-    width: 36, height: 36, borderRadius: 18,
+  greetLabel: { fontSize: 11, fontWeight: "400", letterSpacing: 0.2 },
+  greetName: { fontSize: 18, fontWeight: "700", letterSpacing: -0.3 },
+  headerBtn: {
+    width: 34, height: 34, borderRadius: 17,
     alignItems: "center", justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
   },
 
+  // Setup card
   setupCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
     marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
     padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
   },
-  setupIcon: {
-    width: 36, height: 36, borderRadius: BorderRadius.md,
+  setupIconWrap: {
+    width: 34, height: 34, borderRadius: BorderRadius.sm,
     alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
-  setupText: { flex: 1, minWidth: 0 },
-  setupTitle: { fontSize: 14, fontWeight: "600" },
+  setupTextWrap: { flex: 1, minWidth: 0 },
+  setupTitle: { fontSize: 13, fontWeight: "600" },
   setupSub: { fontSize: 12, marginTop: 1 },
 
-  section: { marginBottom: Spacing.lg, paddingHorizontal: Spacing.lg },
-  sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: Spacing.sm },
-  sectionTitle: { fontSize: 13, fontWeight: "700", letterSpacing: 0.1, marginBottom: Spacing.sm },
-  sectionLink: { fontSize: 13, fontWeight: "600" },
+  // Section wrapper
+  section: { marginBottom: Spacing["2xl"], paddingHorizontal: Spacing.lg },
 
-  quickGrid: {
+  // Revenue alert
+  alertCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    padding: Spacing.lg,
+  },
+  alertTop: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 5 },
+  alertTitle: { fontSize: 13, fontWeight: "600" },
+  alertBody: { fontSize: 13, lineHeight: 19, marginBottom: Spacing.md },
+  alertActions: { flexDirection: "row", gap: Spacing.sm },
+  alertPrimary: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    paddingVertical: 10, borderRadius: BorderRadius.sm,
+  },
+  alertPrimaryTxt: { fontSize: 13, fontWeight: "600", color: "#fff" },
+  alertSecondary: {
+    paddingHorizontal: Spacing.md, paddingVertical: 10,
+    borderRadius: BorderRadius.sm,
+  },
+  alertSecondaryTxt: { fontSize: 13, fontWeight: "500" },
+
+  // Primary action (New Quote)
+  primaryAction: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.sm,
+    alignItems: "center",
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
   },
-  quickCard: {
-    width: "47.5%",
+  primaryActionIcon: {
+    width: 40, height: 40, borderRadius: BorderRadius.sm,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  primaryActionText: { flex: 1, minWidth: 0 },
+  primaryActionLabel: { fontSize: 15, fontWeight: "600", letterSpacing: -0.1 },
+  primaryActionSub: { fontSize: 12, marginTop: 2 },
+
+  // Secondary actions (3-up row)
+  secondaryRow: { flexDirection: "row", gap: Spacing.sm },
+  secondaryCard: {
+    flex: 1,
     padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
+    borderRadius: BorderRadius.lg,
     borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "flex-start",
   },
-  quickIconWrap: {
-    width: 40, height: 40, borderRadius: BorderRadius.lg,
+  secondaryIconWrap: {
+    width: 34, height: 34, borderRadius: BorderRadius.xs,
     alignItems: "center", justifyContent: "center",
     marginBottom: Spacing.sm,
     position: "relative",
   },
-  quickBadge: {
-    position: "absolute",
-    top: -5, right: -5,
-    minWidth: 16, height: 16, borderRadius: 8,
+  badge: {
+    position: "absolute", top: -5, right: -5,
+    minWidth: 15, height: 15, borderRadius: 8,
     backgroundColor: "#EF4444",
     alignItems: "center", justifyContent: "center",
     paddingHorizontal: 3,
   },
-  quickBadgeText: { fontSize: 9, color: "#fff", fontWeight: "800" },
-  quickLabel: { fontSize: 14, fontWeight: "700", marginBottom: 2 },
-  quickSub: { fontSize: 12 },
+  badgeTxt: { fontSize: 9, color: "#fff", fontWeight: "800" },
+  secondaryLabel: { fontSize: 12, fontWeight: "600", marginBottom: 1 },
+  secondarySub: { fontSize: 11 },
 
-  alertCard: {
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderLeftWidth: 3,
-    padding: Spacing.md,
-  },
-  alertHeader: { flexDirection: "row", alignItems: "flex-start", gap: Spacing.sm, marginBottom: Spacing.md },
-  alertIconWrap: {
-    width: 32, height: 32, borderRadius: BorderRadius.sm,
-    alignItems: "center", justifyContent: "center", flexShrink: 0,
-  },
-  alertText: { flex: 1 },
-  alertTitle: { fontSize: 14, fontWeight: "700" },
-  alertSub: { fontSize: 12, marginTop: 2, lineHeight: 17 },
-  alertActions: { flexDirection: "row", gap: Spacing.sm },
-  alertBtnPrimary: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 5, paddingVertical: 9, borderRadius: BorderRadius.lg,
-  },
-  alertBtnPrimaryText: { fontSize: 13, fontWeight: "700", color: "#fff" },
-  alertBtnSecondary: {
-    paddingVertical: 9, paddingHorizontal: 16, borderRadius: BorderRadius.lg, borderWidth: 1,
-  },
-  alertBtnSecondaryText: { fontSize: 13, fontWeight: "600" },
-
-  pipelineGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.sm,
-  },
-  pipelineStat: {
+  // Pipeline stats
+  statsRow: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
+  statCard: {
     width: "47.5%",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "flex-start",
   },
-  pipelineIconWrap: {
-    width: 26, height: 26, borderRadius: BorderRadius.sm,
-    alignItems: "center", justifyContent: "center",
-    marginBottom: Spacing.xs,
-  },
-  pipelineValue: { fontSize: 22, fontWeight: "700" },
-  pipelineLabel: { fontSize: 12, marginTop: 2 },
+  statValue: { fontSize: 26, fontWeight: "700", letterSpacing: -0.8 },
+  statLabel: { fontSize: 11, fontWeight: "500", marginTop: 4, letterSpacing: 0.1 },
 
+  // Activity
   activityCard: {
-    borderRadius: BorderRadius.xl,
+    borderRadius: BorderRadius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
@@ -641,30 +615,25 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    paddingVertical: 11,
+    paddingVertical: 12,
     paddingHorizontal: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  activityIconWrap: {
-    width: 28, height: 28, borderRadius: 14,
+  activityDot: {
+    width: 24, height: 24, borderRadius: 12,
     alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
-  activityText: { flex: 1, minWidth: 0 },
+  activityTextWrap: { flex: 1, minWidth: 0 },
   activityTitle: { fontSize: 13, fontWeight: "500" },
   activitySub: { fontSize: 11, marginTop: 1 },
   activityTime: { fontSize: 11, flexShrink: 0 },
 
-  emptyActivity: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.xl,
+  // Empty state
+  emptyState: {
+    padding: Spacing["3xl"],
+    borderRadius: BorderRadius.lg,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
   },
-  emptyActivityIcon: {
-    width: 52, height: 52, borderRadius: 26,
-    alignItems: "center", justifyContent: "center",
-    marginBottom: Spacing.md,
-  },
-  emptyActivityTitle: { fontSize: 15, fontWeight: "600", marginBottom: 6 },
-  emptyActivitySub: { fontSize: 13, textAlign: "center", lineHeight: 19 },
+  emptyTitle: { fontSize: 14, fontWeight: "600", marginBottom: 5 },
+  emptySub: { fontSize: 13, textAlign: "center", lineHeight: 19 },
 });
