@@ -8882,7 +8882,7 @@ Return ONLY valid JSON:
   });
 
   // Protected: AI-generate a complete quote from intake data
-  app.post("/api/intake-requests/:id/ai-quote", requireAuth, async (req: any, res: Response) => {
+  app.post("/api/intake-requests/:id/ai-quote", requireAuth, requirePro, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });

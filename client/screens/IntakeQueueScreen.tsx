@@ -24,6 +24,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -114,7 +115,9 @@ function IntakeCard({
   onDismiss,
   onMarkReview,
   onNotesSaved,
+  onUpgrade,
   tab,
+  isPro,
 }: {
   item: IntakeRequest;
   onConvert: () => void;
@@ -122,7 +125,9 @@ function IntakeCard({
   onDismiss: () => void;
   onMarkReview: () => void;
   onNotesSaved: (notes: string) => void;
+  onUpgrade: () => void;
   tab: TabKey;
+  isPro: boolean;
 }) {
   const { theme } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -148,6 +153,11 @@ function IntakeCard({
   }
 
   async function handleAiQuote() {
+    if (!isPro) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onUpgrade();
+      return;
+    }
     setAiLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
@@ -327,17 +337,25 @@ function IntakeCard({
             testID={`button-ai-quote-${item.id}`}
             onPress={handleAiQuote}
             disabled={aiLoading}
-            style={[styles.aiBtn, { opacity: aiLoading ? 0.8 : 1 }]}
+            style={[styles.aiBtn, !isPro ? styles.aiBtnLocked : undefined, { opacity: aiLoading ? 0.8 : 1 }]}
           >
             {aiLoading ? (
               <>
                 <ActivityIndicator size="small" color="#fff" />
                 <ThemedText style={styles.aiBtnText}>Generating quote...</ThemedText>
               </>
-            ) : (
+            ) : isPro ? (
               <>
                 <Feather name="zap" size={13} color="#fff" />
                 <ThemedText style={styles.aiBtnText}>Build Quote with AI</ThemedText>
+              </>
+            ) : (
+              <>
+                <Feather name="lock" size={13} color="#fff" />
+                <ThemedText style={styles.aiBtnText}>Build Quote with AI</ThemedText>
+                <View style={styles.proBadge}>
+                  <ThemedText style={styles.proBadgeText}>PRO</ThemedText>
+                </View>
               </>
             )}
           </Pressable>
@@ -514,6 +532,7 @@ export default function IntakeQueueScreen() {
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation<Nav>();
   const { theme } = useTheme();
+  const { isPro } = useSubscription();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("new");
   const [sendLinkVisible, setSendLinkVisible] = useState(false);
@@ -682,8 +701,10 @@ export default function IntakeQueueScreen() {
           <IntakeCard
             item={item}
             tab={activeTab}
+            isPro={isPro}
             onConvert={() => handleConvert(item)}
             onAiQuote={() => handleAiQuote(item)}
+            onUpgrade={() => navigation.navigate("Paywall")}
             onDismiss={() => handleDismiss(item.id)}
             onMarkReview={() => handleMarkReview(item.id)}
             onNotesSaved={(notes) => handleSaveNotes(item.id, notes)}
@@ -871,7 +892,13 @@ const styles = StyleSheet.create({
     paddingVertical: 11, borderRadius: BorderRadius.sm,
     backgroundColor: "#7C3AED",
   },
+  aiBtnLocked: { backgroundColor: "#6B7280" },
   aiBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  proBadge: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 2,
+  },
+  proBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800", lineHeight: 11, includeFontPadding: false } as any,
 
   doneTag: {
     flexDirection: "row", alignItems: "center", gap: 6,
