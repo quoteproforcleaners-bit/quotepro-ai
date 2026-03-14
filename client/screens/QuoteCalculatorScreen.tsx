@@ -60,10 +60,10 @@ export default function QuoteCalculatorScreen() {
     if (editQuoteData) {
       const pd = editQuoteData.propertyDetails || {};
       return {
-        name: pd.customerName || "",
-        phone: pd.customerPhone || "",
-        email: pd.customerEmail || "",
-        address: pd.customerAddress || "",
+        name: pd.customerName || prefill?.name || "",
+        phone: pd.customerPhone || prefill?.phone || "",
+        email: pd.customerEmail || prefill?.email || "",
+        address: pd.customerAddress || prefill?.address || "",
         datePreference: pd.datePreference || "",
       };
     }
@@ -80,13 +80,13 @@ export default function QuoteCalculatorScreen() {
     if (editQuoteData) {
       const pd = editQuoteData.propertyDetails || {};
       return {
-        sqft: editQuoteData.propertySqft || 0,
-        beds: editQuoteData.propertyBeds || 3,
-        baths: Math.floor(editQuoteData.propertyBaths || 2),
+        sqft: editQuoteData.propertySqft || pd.sqft || 0,
+        beds: editQuoteData.propertyBeds || pd.beds || 3,
+        baths: Math.floor(editQuoteData.propertyBaths || pd.baths || 2),
         halfBaths: pd.halfBaths || 0,
         conditionScore: pd.conditionScore || 7,
         peopleCount: pd.peopleCount || 2,
-        petType: pd.petType || "none",
+        petType: editQuoteData.petType || pd.petType || "none",
         petShedding: pd.petShedding || false,
         homeType: pd.homeType || "house",
         kitchensCount: pd.kitchensCount || 1,

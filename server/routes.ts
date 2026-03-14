@@ -8866,6 +8866,148 @@ Return ONLY valid JSON:
     }
   });
 
+  // Protected: get the business's intake link (generates short code if needed)
+  app.get("/api/intake-requests/my-link", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const code = await ensureIntakeCode(business.id);
+      const reqHost = req.headers.host || req.hostname;
+      const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+      const url = `${reqProto}://${reqHost}/intake/${code}`;
+      res.json({ url, code });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Protected: AI-generate a complete quote from intake data
+  app.post("/api/intake-requests/:id/ai-quote", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const intakeResult = await pool.query(
+        `SELECT * FROM intake_requests WHERE id = $1 AND business_id = $2`,
+        [req.params.id, business.id]
+      );
+      if (!intakeResult.rows.length) return res.status(404).json({ message: "Intake request not found" });
+      const intake = intakeResult.rows[0];
+      const f = intake.extracted_fields || {};
+
+      let pricingContext = "";
+      try {
+        const ps = await getPricingByBusiness(business.id);
+        if (ps) {
+          pricingContext = `Business pricing: base rates around $${ps.basePrice || 120} per visit. `;
+          if (ps.pricePerSqft) pricingContext += `$${ps.pricePerSqft} per sqft. `;
+          if (ps.bedBathMultiplier) pricingContext += `Bed/bath multiplier: ${ps.bedBathMultiplier}. `;
+        }
+      } catch (_e) {}
+
+      const serviceLabel: Record<string, string> = {
+        standard_cleaning: "Standard Cleaning",
+        deep_clean: "Deep Clean",
+        move_in_out: "Move-In/Move-Out Clean",
+        airbnb: "Airbnb Turnover Clean",
+        post_construction: "Post-Construction Clean",
+        recurring: "Recurring Cleaning",
+      };
+      const addOnsList = Object.entries(f.addOns || {}).filter(([, v]) => v).map(([k]) => k.replace(/([A-Z])/g, ' $1').toLowerCase()).join(', ');
+
+      const prompt = `You are an expert cleaning business pricing assistant. Generate a professional quote for the following job.
+
+Customer: ${intake.customer_name || "Unknown"}
+Address: ${intake.customer_address || f.address || "Not provided"}
+Property: ${f.beds ?? "?"}BR / ${f.baths ?? "?"}BA${f.sqft ? `, ${f.sqft} sqft` : ""}
+Service: ${serviceLabel[f.serviceType] || f.serviceType || "Standard Cleaning"}
+Frequency: ${f.frequency || "one-time"}
+Pets: ${f.pets ? `Yes (${f.petType || "unknown"})` : "No"}${addOnsList ? `\nAdd-ons: ${addOnsList}` : ""}${f.notes ? `\nCustomer notes: ${f.notes}` : ""}
+${pricingContext}
+
+Generate a realistic, professional cleaning quote. Return ONLY valid JSON:
+{
+  "total": <number>,
+  "lineItems": [
+    { "description": "<string>", "quantity": <number>, "unitPrice": <number>, "subtotal": <number> }
+  ],
+  "summary": "<one sentence describing the quote>"
+}
+
+Rules:
+- 2-5 line items (base service + relevant extras)
+- Total should be the sum of all subtotals
+- Prices should be realistic for a professional cleaning business (typically $80-$350)
+- Never output markdown, only pure JSON`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+      });
+
+      let aiData: any = {};
+      try { aiData = JSON.parse(completion.choices[0].message.content || "{}"); } catch {}
+
+      const lineItems = Array.isArray(aiData.lineItems) ? aiData.lineItems : [];
+      const total = typeof aiData.total === "number" ? aiData.total : lineItems.reduce((s: number, li: any) => s + (li.subtotal || li.unitPrice || 0), 0);
+
+      const quotePayload = {
+        businessId: business.id,
+        customerName: intake.customer_name,
+        customerEmail: intake.customer_email || "",
+        customerPhone: intake.customer_phone || "",
+        customerAddress: intake.customer_address || f.address || "",
+        status: "draft",
+        total,
+        propertyDetails: {
+          customerName: intake.customer_name,
+          customerPhone: intake.customer_phone,
+          customerEmail: intake.customer_email,
+          customerAddress: intake.customer_address,
+          sqft: f.sqft || 0,
+          beds: f.beds || 0,
+          baths: f.baths || 0,
+          petType: f.pets ? (f.petType || "dog") : "none",
+          conditionScore: 7,
+          peopleCount: 2,
+          homeType: "house",
+          kitchensCount: 1,
+          halfBaths: 0,
+          petShedding: false,
+        },
+        serviceType: f.serviceType || "standard_cleaning",
+        frequencySelected: f.frequency || "one-time",
+        notes: aiData.summary || f.notes || "",
+        aiGenerated: true,
+      };
+
+      const q = await createQuote(quotePayload);
+
+      for (const li of lineItems) {
+        await createLineItem({
+          quoteId: q.id,
+          description: li.description || "Cleaning Service",
+          quantity: li.quantity || 1,
+          unitPrice: li.unitPrice || li.subtotal || 0,
+          subtotal: li.subtotal || li.unitPrice || 0,
+          category: "service",
+        });
+      }
+
+      await pool.query(
+        `UPDATE intake_requests SET status = 'converted', converted_quote_id = $1 WHERE id = $2`,
+        [q.id, intake.id]
+      );
+
+      return res.json({ quoteId: q.id, total, lineItemCount: lineItems.length });
+    } catch (e: any) {
+      console.error("AI quote error:", e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // Protected: mark as converted and link to quote
   app.post("/api/intake-requests/:id/convert", requireAuth, async (req: any, res: Response) => {
     try {

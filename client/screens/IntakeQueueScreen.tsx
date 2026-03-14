@@ -9,8 +9,6 @@ import {
   TextInput,
   Modal,
   Platform,
-  ScrollView,
-  KeyboardAvoidingView,
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,13 +19,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { useApp } from "@/context/AppContext";
-import { apiRequest, getPublicBaseUrl } from "@/lib/query-client";
+import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -49,13 +47,24 @@ const FREQ_LABELS: Record<string, string> = {
   monthly: "Monthly",
 };
 
+const ADDON_LABELS: Record<string, string> = {
+  insideFridge: "Fridge",
+  insideOven: "Oven",
+  insideCabinets: "Cabinets",
+  interiorWindows: "Windows",
+  blindsDetail: "Blinds",
+  baseboardsDetail: "Baseboards",
+  laundryFoldOnly: "Laundry",
+  dishes: "Dishes",
+  organizationTidy: "Organization",
+};
+
 function timeAgo(dateStr: string) {
   const s = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  const d = Math.floor(s / 86400);
-  return `${d}d ago`;
+  return `${Math.floor(s / 86400)}d ago`;
 }
 
 interface IntakeRequest {
@@ -98,21 +107,10 @@ function ConfidenceBadge({ level }: { level: "high" | "medium" | "low" }) {
   );
 }
 
-function MissingFieldsBar({ fields }: { fields: string[] }) {
-  if (!fields || fields.length === 0) return null;
-  return (
-    <View style={styles.missingBar}>
-      <Feather name="alert-triangle" size={11} color="#F59E0B" />
-      <ThemedText style={styles.missingText} numberOfLines={1}>
-        Missing: {fields.slice(0, 3).join(" · ")}{fields.length > 3 ? ` +${fields.length - 3}` : ""}
-      </ThemedText>
-    </View>
-  );
-}
-
 function IntakeCard({
   item,
   onConvert,
+  onAiQuote,
   onDismiss,
   onMarkReview,
   onNotesSaved,
@@ -120,6 +118,7 @@ function IntakeCard({
 }: {
   item: IntakeRequest;
   onConvert: () => void;
+  onAiQuote: () => Promise<void>;
   onDismiss: () => void;
   onMarkReview: () => void;
   onNotesSaved: (notes: string) => void;
@@ -129,6 +128,7 @@ function IntakeCard({
   const [expanded, setExpanded] = useState(false);
   const [notesMode, setNotesMode] = useState(false);
   const [notes, setNotes] = useState(item.reviewNotes || "");
+  const [aiLoading, setAiLoading] = useState(false);
   const notesRef = useRef<TextInput>(null);
 
   const f = item.extractedFields || {};
@@ -138,12 +138,23 @@ function IntakeCard({
     f.sqft != null ? `${f.sqft.toLocaleString()} sqft` : null,
   ].filter(Boolean).join(" · ");
 
+  const addOnKeys = Object.entries(f.addOns || {}).filter(([, v]) => v).map(([k]) => ADDON_LABELS[k] || k);
   const isDone = tab === "done";
   const contactLine = item.customerPhone || item.customerEmail || "";
 
-  function handleNoteBlur() {
+  async function handleNoteBlur() {
     setNotesMode(false);
     if (notes !== item.reviewNotes) onNotesSaved(notes);
+  }
+
+  async function handleAiQuote() {
+    setAiLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await onAiQuote();
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   return (
@@ -169,9 +180,14 @@ function IntakeCard({
               {propertyLine}
             </ThemedText>
           ) : null}
+          {item.customerAddress ? (
+            <ThemedText style={[styles.propLine, { color: theme.textSecondary }]} numberOfLines={1}>
+              {item.customerAddress}
+            </ThemedText>
+          ) : null}
         </View>
         <View style={styles.cardRight}>
-          <ThemedText style={[styles.timeText, { color: theme.textSecondary }]}>{timeAgo(item.createdAt)}</ThemedText>
+          <ThemedText style={[styles.timeText, { color: theme.textMuted ?? theme.textSecondary }]}>{timeAgo(item.createdAt)}</ThemedText>
           {f.frequency && f.frequency !== "one-time" ? (
             <View style={[styles.freqBadge, { backgroundColor: "#10B98115" }]}>
               <Feather name="repeat" size={10} color="#10B981" />
@@ -181,15 +197,38 @@ function IntakeCard({
         </View>
       </View>
 
-      {f.serviceType ? (
-        <View style={[styles.serviceBadge, { backgroundColor: theme.primary + "12" }]}>
-          <ThemedText style={[styles.serviceText, { color: theme.primary }]}>
-            {SERVICE_LABELS[f.serviceType] || f.serviceType}
+      <View style={styles.tagsRow}>
+        {f.serviceType ? (
+          <View style={[styles.tag, { backgroundColor: theme.primary + "12" }]}>
+            <ThemedText style={[styles.tagText, { color: theme.primary }]}>
+              {SERVICE_LABELS[f.serviceType] || f.serviceType}
+            </ThemedText>
+          </View>
+        ) : null}
+        {f.pets ? (
+          <View style={[styles.tag, { backgroundColor: "#F59E0B12" }]}>
+            <ThemedText style={[styles.tagText, { color: "#D97706" }]}>
+              Pet{f.petType ? ` · ${f.petType}` : ""}
+            </ThemedText>
+          </View>
+        ) : null}
+        {addOnKeys.length > 0 ? (
+          <View style={[styles.tag, { backgroundColor: theme.border }]}>
+            <ThemedText style={[styles.tagText, { color: theme.textSecondary }]}>
+              +{addOnKeys.slice(0, 2).join(", ")}{addOnKeys.length > 2 ? ` +${addOnKeys.length - 2}` : ""}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+
+      {item.missingFieldFlags && item.missingFieldFlags.length > 0 && !isDone ? (
+        <View style={[styles.missingBar, { backgroundColor: "#F59E0B0A", borderColor: "#F59E0B20" }]}>
+          <Feather name="alert-triangle" size={11} color="#F59E0B" />
+          <ThemedText style={[styles.missingText, { color: "#D97706" }]} numberOfLines={1}>
+            Missing: {item.missingFieldFlags.slice(0, 3).join(" · ")}{item.missingFieldFlags.length > 3 ? ` +${item.missingFieldFlags.length - 3}` : ""}
           </ThemedText>
         </View>
       ) : null}
-
-      {!isDone ? <MissingFieldsBar fields={item.missingFieldFlags} /> : null}
 
       {f.notes ? (
         <View style={[styles.notesBox, { backgroundColor: theme.cardBackground }]}>
@@ -256,30 +295,51 @@ function IntakeCard({
       ) : null}
 
       {!isDone ? (
-        <View style={styles.actions}>
-          <Pressable
-            testID={`button-convert-${item.id}`}
-            onPress={onConvert}
-            style={[styles.convertBtn, { backgroundColor: theme.primary }]}
-          >
-            <Feather name="file-plus" size={13} color="#fff" />
-            <ThemedText style={styles.convertBtnText}>Build Quote</ThemedText>
-          </Pressable>
-          {tab === "new" ? (
+        <View style={styles.actionsCol}>
+          <View style={styles.actionsRow}>
             <Pressable
-              testID={`button-review-${item.id}`}
-              onPress={onMarkReview}
-              style={[styles.reviewBtn, { borderColor: "#F59E0B40", backgroundColor: "#F59E0B0F" }]}
+              testID={`button-convert-${item.id}`}
+              onPress={onConvert}
+              style={[styles.buildBtn, { backgroundColor: theme.primary }]}
             >
-              <Feather name="flag" size={13} color="#D97706" />
+              <Feather name="file-plus" size={13} color="#fff" />
+              <ThemedText style={styles.buildBtnText}>Build Quote</ThemedText>
             </Pressable>
-          ) : null}
+            {tab === "new" ? (
+              <Pressable
+                testID={`button-review-${item.id}`}
+                onPress={onMarkReview}
+                style={[styles.iconBtn, { borderColor: "#F59E0B40", backgroundColor: "#F59E0B0F" }]}
+              >
+                <Feather name="flag" size={13} color="#D97706" />
+              </Pressable>
+            ) : null}
+            <Pressable
+              testID={`button-dismiss-${item.id}`}
+              onPress={onDismiss}
+              style={[styles.iconBtn, { borderColor: theme.border }]}
+            >
+              <Feather name="x" size={15} color={theme.textSecondary} />
+            </Pressable>
+          </View>
+
           <Pressable
-            testID={`button-dismiss-${item.id}`}
-            onPress={onDismiss}
-            style={[styles.dismissBtn, { borderColor: theme.border }]}
+            testID={`button-ai-quote-${item.id}`}
+            onPress={handleAiQuote}
+            disabled={aiLoading}
+            style={[styles.aiBtn, { opacity: aiLoading ? 0.8 : 1 }]}
           >
-            <Feather name="x" size={15} color={theme.textSecondary} />
+            {aiLoading ? (
+              <>
+                <ActivityIndicator size="small" color="#fff" />
+                <ThemedText style={styles.aiBtnText}>Generating quote...</ThemedText>
+              </>
+            ) : (
+              <>
+                <Feather name="zap" size={13} color="#fff" />
+                <ThemedText style={styles.aiBtnText}>Build Quote with AI</ThemedText>
+              </>
+            )}
           </Pressable>
         </View>
       ) : (
@@ -317,7 +377,6 @@ function SendLinkModal({
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [sendError, setSendError] = useState("");
-  const qc = useQueryClient();
 
   async function handleCopy() {
     await Clipboard.setStringAsync(intakeUrl);
@@ -344,7 +403,7 @@ function SendLinkModal({
       setToEmail("");
       setToName("");
       setTimeout(() => { setSent(false); onClose(); }, 2000);
-    } catch (e: any) {
+    } catch {
       setSendError("Failed to send. Check your email settings.");
     } finally {
       setSending(false);
@@ -362,10 +421,7 @@ function SendLinkModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
       <Pressable style={styles.modalBackdrop} onPress={handleClose} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.modalKAV}
-      >
+      <KeyboardAvoidingView behavior="padding" style={styles.modalKAV}>
         <View style={[styles.modalSheet, { backgroundColor: theme.background, paddingBottom: insets.bottom + Spacing.lg }]}>
           <View style={[styles.modalHandle, { backgroundColor: theme.border }]} />
 
@@ -382,7 +438,7 @@ function SendLinkModal({
 
           <View style={[styles.linkRow, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
             <ThemedText style={[styles.linkText, { color: theme.textSecondary }]} numberOfLines={1}>
-              {intakeUrl}
+              {intakeUrl || "Loading..."}
             </ThemedText>
             <Pressable
               onPress={handleCopy}
@@ -458,12 +514,16 @@ export default function IntakeQueueScreen() {
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation<Nav>();
   const { theme } = useTheme();
-  const { businessProfile } = useApp();
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("new");
   const [sendLinkVisible, setSendLinkVisible] = useState(false);
 
-  const intakeUrl = businessProfile?.id ? `${getPublicBaseUrl()}/intake/${businessProfile.id}` : "";
+  const { data: linkData } = useQuery<{ url: string; code: string }>({
+    queryKey: ["/api/intake-requests/my-link"],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const intakeUrl = linkData?.url || "";
 
   const { data: requests = [], isLoading, refetch } = useQuery<IntakeRequest[]>({
     queryKey: ["/api/intake-requests", activeTab],
@@ -509,17 +569,32 @@ export default function IntakeQueueScreen() {
       editQuoteData: {
         fromIntake: true,
         intakeId: item.id,
-        propertyBeds: f.beds || 2,
-        propertyBaths: f.baths || 1,
-        propertySqft: f.sqft || 0,
-        serviceTypeId: f.serviceType || undefined,
-        frequency: f.frequency || "one-time",
-        petType: f.petType || "none",
-        addOns: f.addOns || {},
-        notes: f.notes || item.reviewNotes || "",
+        propertyBeds: f.beds ?? 2,
+        propertyBaths: f.baths ?? 1,
+        propertySqft: f.sqft ?? 0,
+        serviceTypeId: f.serviceType ?? undefined,
+        frequencySelected: f.frequency ?? "one-time",
+        petType: f.petType ?? "none",
+        hasPets: f.pets ?? false,
+        addOns: f.addOns ?? {},
+        notes: f.notes ?? item.reviewNotes ?? "",
       },
     });
   }, [navigation]);
+
+  const handleAiQuote = useCallback(async (item: IntakeRequest) => {
+    try {
+      const res = await apiRequest("POST", `/api/intake-requests/${item.id}/ai-quote`, {});
+      const data = await res.json();
+      if (!data.quoteId) throw new Error("No quote ID returned");
+      qc.invalidateQueries({ queryKey: ["/api/intake-requests"] });
+      qc.invalidateQueries({ queryKey: ["/api/intake-requests/count"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.navigate("QuoteDetail", { quoteId: data.quoteId });
+    } catch (e: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  }, [navigation, qc]);
 
   const handleDismiss = useCallback((id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -593,76 +668,47 @@ export default function IntakeQueueScreen() {
         </ThemedText>
       ) : null}
     </View>
-  ), [theme, intakeUrl, requests.length, activeTab, TabBar]);
-
-  const ListEmpty = useCallback(() => {
-    const msgs: Record<TabKey, { icon: string; title: string; sub: string }> = {
-      new: {
-        icon: "inbox",
-        title: "No new requests",
-        sub: "Share your intake link with leads. New requests appear here as they come in.",
-      },
-      review: {
-        icon: "flag",
-        title: "No flagged requests",
-        sub: "When AI is unsure about a request, or you flag one manually, it appears here for review.",
-      },
-      done: {
-        icon: "check-circle",
-        title: "Nothing here yet",
-        sub: "Converted and dismissed requests will appear here.",
-      },
-    };
-    const msg = msgs[activeTab];
-    return (
-      <View style={styles.empty}>
-        <View style={[styles.emptyIcon, { backgroundColor: theme.cardBackground }]}>
-          <Feather name={msg.icon as any} size={26} color={theme.textSecondary} />
-        </View>
-        <ThemedText style={styles.emptyTitle}>{msg.title}</ThemedText>
-        <ThemedText style={[styles.emptySub, { color: theme.textSecondary }]}>{msg.sub}</ThemedText>
-        {activeTab === "new" ? (
-          <Pressable
-            onPress={() => setSendLinkVisible(true)}
-            style={[styles.emptyAction, { backgroundColor: theme.primary }]}
-          >
-            <Feather name="send" size={14} color="#fff" />
-            <ThemedText style={styles.emptyActionText}>Send Intake Link</ThemedText>
-          </Pressable>
-        ) : null}
-      </View>
-    );
-  }, [theme, activeTab]);
+  ), [theme, intakeUrl, activeTab, requests.length, countData]);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <FlatList
         data={requests}
-        keyExtractor={item => item.id}
+        keyExtractor={i => i.id}
+        contentContainerStyle={{ paddingTop: headerHeight + Spacing.md, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg }}
+        ListHeaderComponent={ListHeader}
+        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={theme.primary} />}
         renderItem={({ item }) => (
           <IntakeCard
             item={item}
             tab={activeTab}
             onConvert={() => handleConvert(item)}
+            onAiQuote={() => handleAiQuote(item)}
             onDismiss={() => handleDismiss(item.id)}
             onMarkReview={() => handleMarkReview(item.id)}
-            onNotesSaved={notes => handleSaveNotes(item.id, notes)}
+            onNotesSaved={(notes) => handleSaveNotes(item.id, notes)}
           />
         )}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={isLoading ? null : ListEmpty}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={theme.primary} />}
-        contentContainerStyle={[
-          styles.list,
-          { paddingTop: headerHeight + Spacing.md, paddingBottom: insets.bottom + Spacing.xl },
-        ]}
-        scrollIndicatorInsets={{ bottom: insets.bottom }}
+        ListEmptyComponent={
+          !isLoading ? (
+            <View style={styles.empty}>
+              <View style={[styles.emptyIcon, { backgroundColor: theme.cardBackground }]}>
+                <Feather name={activeTab === "done" ? "check-circle" : "inbox"} size={28} color={theme.textSecondary} />
+              </View>
+              <ThemedText style={[styles.emptyTitle, { color: theme.text }]}>
+                {activeTab === "new" ? "No new requests" : activeTab === "review" ? "Nothing to review" : "No completed requests"}
+              </ThemedText>
+              <ThemedText style={[styles.emptySub, { color: theme.textSecondary }]}>
+                {activeTab === "new" ? "Send your intake link to start getting quote requests." : activeTab === "review" ? "Flag requests from the New tab to review them here." : "Converted and dismissed requests appear here."}
+              </ThemedText>
+            </View>
+          ) : null
+        }
       />
-
       <SendLinkModal
         visible={sendLinkVisible}
         intakeUrl={intakeUrl}
-        businessName={businessProfile?.companyName || "Us"}
+        businessName=""
         onClose={() => setSendLinkVisible(false)}
       />
     </View>
@@ -671,44 +717,34 @@ export default function IntakeQueueScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  list: { paddingHorizontal: Spacing.lg },
-  listHeader: { marginBottom: Spacing.sm },
 
+  listHeader: { gap: Spacing.md, marginBottom: Spacing.md },
   linkCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
-    borderWidth: 1,
-    borderRadius: BorderRadius.xl,
     padding: Spacing.md,
-    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
   },
   linkIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: BorderRadius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
   linkInfo: { flex: 1, minWidth: 0 },
-  linkTitle: { fontSize: 13, fontWeight: "600" },
-  linkSub: { fontSize: 11, marginTop: 1 },
+  linkTitle: { fontSize: 13, fontWeight: "600", marginBottom: 1 },
+  linkSub: { fontSize: 11 },
   sendLinkBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: BorderRadius.lg,
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: BorderRadius.sm,
   },
-  sendLinkBtnText: { fontSize: 12, fontWeight: "700", color: "#fff" },
+  sendLinkBtnText: { fontSize: 12, color: "#fff", fontWeight: "600" },
 
   tabBar: {
     flexDirection: "row",
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
     overflow: "hidden",
   },
   tabItem: {
@@ -717,7 +753,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 5,
-    paddingVertical: 9,
+    paddingVertical: 10,
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },
@@ -731,21 +767,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 4,
   },
-  tabCountText: { fontSize: 10, color: "#fff", fontWeight: "700" },
-  countLabel: { fontSize: 12, marginBottom: Spacing.xs, marginTop: 2 },
+  tabCountText: {
+    fontSize: 10,
+    color: "#fff",
+    fontWeight: "700",
+    lineHeight: 12,
+    includeFontPadding: false,
+  } as any,
+  countLabel: { fontSize: 12, marginTop: 2 },
 
   card: { marginBottom: Spacing.md, padding: Spacing.md },
-  cardHeader: { flexDirection: "row", alignItems: "flex-start", gap: Spacing.sm, marginBottom: Spacing.xs },
+  cardHeader: { flexDirection: "row", alignItems: "flex-start", gap: Spacing.sm, marginBottom: Spacing.sm },
   avatar: {
     width: 38, height: 38, borderRadius: 19,
     alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
   avatarText: { fontSize: 15, fontWeight: "700" },
   cardMeta: { flex: 1, minWidth: 0 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 7, flexWrap: "wrap" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 7, flexWrap: "wrap", marginBottom: 2 },
   customerName: { fontSize: 14, fontWeight: "600" },
-  contactLine: { fontSize: 11, marginTop: 2 },
-  propLine: { fontSize: 11, marginTop: 2 },
+  contactLine: { fontSize: 11, marginBottom: 1 },
+  propLine: { fontSize: 11, marginBottom: 1 },
   cardRight: { alignItems: "flex-end", gap: 4, flexShrink: 0 },
   timeText: { fontSize: 11 },
 
@@ -760,202 +802,139 @@ const styles = StyleSheet.create({
   confDot: { width: 5, height: 5, borderRadius: 3 },
   confText: { fontSize: 10, fontWeight: "600" },
 
-  freqBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  freqText: { fontSize: 10, fontWeight: "600", color: "#10B981" },
-
-  serviceBadge: {
-    alignSelf: "flex-start",
+  tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: Spacing.xs },
+  tag: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
-    marginBottom: Spacing.xs,
   },
-  serviceText: { fontSize: 11, fontWeight: "600" },
+  tagText: { fontSize: 11, fontWeight: "600" },
+
+  freqBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8,
+  },
+  freqText: { fontSize: 10, fontWeight: "600", color: "#10B981" },
 
   missingBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    backgroundColor: "#FEF3C708",
-    marginBottom: Spacing.xs,
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: 8, borderWidth: 1, marginBottom: Spacing.xs,
   },
-  missingText: { fontSize: 11, color: "#D97706", flex: 1 },
+  missingText: { fontSize: 10, fontWeight: "500", flex: 1 },
 
   notesBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    marginBottom: Spacing.xs,
+    flexDirection: "row", gap: 6, padding: 8,
+    borderRadius: 8, marginBottom: Spacing.xs,
   },
-  notesText: { fontSize: 12, flex: 1, lineHeight: 17 },
+  notesText: { fontSize: 11, flex: 1, lineHeight: 15 },
 
   clarifyBox: {
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    marginBottom: Spacing.xs,
+    padding: 10, borderRadius: 8, borderWidth: 1, marginBottom: Spacing.xs,
   },
-  clarifyLabel: { fontSize: 11, fontWeight: "700", marginBottom: 3 },
-  clarifyQ: { fontSize: 11, lineHeight: 16, marginTop: 1 },
+  clarifyLabel: { fontSize: 10, fontWeight: "700", marginBottom: 4 },
+  clarifyQ: { fontSize: 11, lineHeight: 15 },
 
-  expandRow: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 3, marginBottom: Spacing.xs },
-  expandText: { fontSize: 11 },
-  rawBox: {
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    marginBottom: Spacing.xs,
+  expandRow: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingVertical: 5, marginBottom: 2,
   },
-  rawText: { fontSize: 12, lineHeight: 17, fontStyle: "italic" },
+  expandText: { fontSize: 11 },
+
+  rawBox: {
+    padding: 10, borderRadius: 8, borderWidth: 1, marginBottom: Spacing.xs,
+  },
+  rawText: { fontSize: 11, lineHeight: 16, fontStyle: "italic" },
 
   notesInput: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.sm,
-    marginTop: Spacing.xs,
-    minHeight: 38,
+    flexDirection: "row", alignItems: "center", gap: 8,
+    borderWidth: 1, borderRadius: 10, padding: 10,
+    minHeight: 38, marginBottom: Spacing.sm,
   },
-  notesInputText: { fontSize: 12, flex: 1, lineHeight: 17 },
+  notesInputText: { fontSize: 12, flex: 1 },
 
-  actions: { flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.sm },
-  convertBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center",
-    justifyContent: "center", gap: 6,
-    paddingVertical: 9, borderRadius: BorderRadius.lg,
+  actionsCol: { gap: Spacing.sm },
+  actionsRow: { flexDirection: "row", alignItems: "center", gap: Spacing.xs },
+  buildBtn: {
+    flex: 1,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    paddingVertical: 11, borderRadius: BorderRadius.sm,
   },
-  convertBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
-  reviewBtn: {
-    width: 38, height: 38, borderRadius: BorderRadius.lg,
-    borderWidth: 1, alignItems: "center", justifyContent: "center",
-  },
-  dismissBtn: {
-    width: 38, height: 38, borderRadius: BorderRadius.lg,
-    borderWidth: 1, alignItems: "center", justifyContent: "center",
-  },
-  doneTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingTop: Spacing.sm,
-    marginTop: Spacing.sm,
-    borderTopWidth: 1,
-  },
-  doneText: { fontSize: 12, fontWeight: "500" },
-
-  empty: { alignItems: "center", paddingVertical: 52, paddingHorizontal: 28 },
-  emptyIcon: {
-    width: 60, height: 60, borderRadius: 30,
+  buildBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  iconBtn: {
+    width: 38, height: 38, borderRadius: 10,
     alignItems: "center", justifyContent: "center",
-    marginBottom: Spacing.md,
+    borderWidth: 1,
   },
-  emptyTitle: { fontSize: 16, fontWeight: "600", marginBottom: 8, textAlign: "center" },
-  emptySub: { fontSize: 13, lineHeight: 19, textAlign: "center", marginBottom: 20 },
-  emptyAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.lg,
+  aiBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
+    paddingVertical: 11, borderRadius: BorderRadius.sm,
+    backgroundColor: "#7C3AED",
   },
-  emptyActionText: { fontSize: 13, fontWeight: "700", color: "#fff" },
+  aiBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+
+  doneTag: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingTop: Spacing.sm, borderTopWidth: 1, marginTop: 2,
+  },
+  doneText: { fontSize: 11, fontWeight: "500" },
+
+  empty: { alignItems: "center", paddingTop: 48, paddingHorizontal: Spacing.xl },
+  emptyIcon: {
+    width: 60, height: 60, borderRadius: 18,
+    alignItems: "center", justifyContent: "center", marginBottom: 14,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: "600", marginBottom: 6, textAlign: "center" },
+  emptySub: { fontSize: 13, textAlign: "center", lineHeight: 19 },
 
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
   modalKAV: { justifyContent: "flex-end" },
   modalSheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: Spacing.lg,
-    paddingTop: Spacing.md,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingTop: Spacing.sm, paddingHorizontal: Spacing.lg,
   },
-  modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: Spacing.md },
-  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: Spacing.lg },
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
   modalTitle: { fontSize: 18, fontWeight: "700" },
   modalClose: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
   modalSubtitle: { fontSize: 13, marginBottom: Spacing.md },
 
   linkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.sm,
-    gap: Spacing.sm,
+    flexDirection: "row", alignItems: "center",
+    borderRadius: 12, borderWidth: 1, overflow: "hidden",
     marginBottom: Spacing.sm,
   },
-  linkText: { flex: 1, fontSize: 12, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+  linkText: { flex: 1, fontSize: 12, paddingHorizontal: Spacing.md },
   copyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: BorderRadius.md,
-    flexShrink: 0,
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 14, paddingVertical: 12,
   },
-  copyBtnText: { fontSize: 12, fontWeight: "700", color: "#fff" },
+  copyBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
   shareRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 11,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    marginBottom: Spacing.lg,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    padding: 13, borderRadius: 12, borderWidth: 1, marginBottom: Spacing.md,
   },
   shareText: { fontSize: 14, fontWeight: "600" },
 
-  dividerRow: {
-    borderTopWidth: 1,
-    paddingTop: Spacing.md,
-    marginBottom: Spacing.md,
-    alignItems: "center",
-  },
+  dividerRow: { borderTopWidth: 1, paddingTop: Spacing.md, marginBottom: Spacing.md, alignItems: "center" },
   dividerText: { fontSize: 12 },
 
   sentBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
+    flexDirection: "row", alignItems: "center", gap: 10,
+    padding: 16, borderRadius: 12,
   },
   sentText: { fontSize: 14, fontWeight: "600" },
 
   emailSection: {},
   emailInput: {
-    borderWidth: 1,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 11,
+    borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11,
     fontSize: 14,
   },
   sendError: { fontSize: 12, marginTop: 6 },
   sendBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingVertical: 13,
-    borderRadius: BorderRadius.lg,
-    marginTop: Spacing.md,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    padding: 14, borderRadius: 12, marginTop: Spacing.sm,
   },
-  sendBtnText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  sendBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
 });
