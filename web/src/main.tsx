@@ -7,9 +7,14 @@ import { queryClient } from "./lib/queryClient";
 import App from "./App";
 import "./index.css";
 
+// Intake links live at /intake/:id (outside the /app prefix).
+// Use basename "/" for those paths so React Router can match them.
+const isIntakePath = window.location.pathname.startsWith("/intake/");
+const basename = isIntakePath ? "/" : "/app";
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter basename="/app">
+    <BrowserRouter basename={basename}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <App />

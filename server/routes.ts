@@ -8598,10 +8598,59 @@ init();
     }
   })();
 
+  // DB migration v3: short intake_code on businesses for clean URLs
+  (async () => {
+    try {
+      await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS intake_code VARCHAR(12) UNIQUE`);
+    } catch (e) {
+      console.error("businesses intake_code migration error:", e);
+    }
+  })();
+
+  function generateIntakeCode(len = 8): string {
+    const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+    let code = "";
+    for (let i = 0; i < len; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  }
+
+  async function ensureIntakeCode(businessId: string): Promise<string> {
+    const existing = await pool.query(`SELECT intake_code FROM businesses WHERE id = $1`, [businessId]);
+    if (existing.rows[0]?.intake_code) return existing.rows[0].intake_code;
+    let code = generateIntakeCode();
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        await pool.query(`UPDATE businesses SET intake_code = $1 WHERE id = $2`, [code, businessId]);
+        return code;
+      } catch {
+        code = generateIntakeCode();
+      }
+    }
+    return code;
+  }
+
+  async function lookupIntakeBusiness(codeOrId: string) {
+    const r = await pool.query(
+      `SELECT id, company_name, logo_uri, primary_color, phone, email, intake_code FROM businesses WHERE intake_code = $1 OR id = $1 LIMIT 1`,
+      [codeOrId]
+    );
+    if (!r.rows.length) return null;
+    const row = r.rows[0];
+    return {
+      id: row.id,
+      companyName: row.company_name,
+      logoUri: row.logo_uri,
+      primaryColor: row.primary_color,
+      phone: row.phone,
+      email: row.email,
+      intakeCode: row.intake_code,
+    };
+  }
+
   // Public: get business profile for intake form header
   app.get("/api/public/intake-business/:businessId", async (req: Request, res: Response) => {
     try {
-      const biz = await db_getBusinessById(req.params.businessId);
+      const biz = await lookupIntakeBusiness(req.params.businessId);
       if (!biz) return res.status(404).json({ message: "Business not found" });
       res.json({
         id: biz.id,
@@ -8689,7 +8738,7 @@ Return ONLY valid JSON:
     if (!customerName?.trim()) return res.status(400).json({ message: "Customer name is required" });
     if (!customerEmail?.trim() && !customerPhone?.trim()) return res.status(400).json({ message: "At least one contact method is required" });
     try {
-      const biz = await db_getBusinessById(businessId);
+      const biz = await lookupIntakeBusiness(businessId);
       if (!biz) return res.status(404).json({ message: "Business not found" });
 
       const ef = extractedFields || {};
@@ -8703,7 +8752,7 @@ Return ONLY valid JSON:
         `INSERT INTO intake_requests (business_id, customer_name, customer_email, customer_phone, customer_address, raw_text, extracted_fields, source, status, confidence, missing_field_flags)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
         [
-          businessId,
+          biz.id,
           (customerName || "").trim(),
           (customerEmail || "").trim(),
           (customerPhone || "").trim(),
@@ -8841,7 +8890,10 @@ Return ONLY valid JSON:
       const { toEmail, toName, customMessage } = req.body;
       if (!toEmail?.trim()) return res.status(400).json({ message: "Email is required" });
 
-      const intakeUrl = `${process.env.APP_BASE_URL || "https://quotepro.app"}/intake/${business.id}`;
+      const intakeCode = await ensureIntakeCode(business.id);
+      const reqHost = req.headers.host || req.hostname;
+      const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+      const intakeUrl = `${reqProto}://${reqHost}/intake/${intakeCode}`;
       const recipientName = (toName || "there").trim();
       const defaultMessage = `Hi ${recipientName},\n\n${business.companyName} would like to give you a personalized cleaning quote. Please fill out this quick form so we can prepare an accurate estimate:\n\n${intakeUrl}\n\nIt only takes about 2 minutes.\n\nThanks,\n${business.companyName}`;
       const bodyText = customMessage?.trim() || defaultMessage;
