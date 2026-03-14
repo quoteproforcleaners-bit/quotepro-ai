@@ -8560,7 +8560,7 @@ init();
 
   // ============ SMART QUOTE INTAKE ============
 
-  // DB migration
+  // DB migration v1
   (async () => {
     try {
       await pool.query(`
@@ -8581,6 +8581,20 @@ init();
       `);
     } catch (e) {
       console.error("intake_requests migration error:", e);
+    }
+  })();
+
+  // DB migration v2: confidence, review fields, address
+  (async () => {
+    try {
+      await pool.query(`ALTER TABLE intake_requests ADD COLUMN IF NOT EXISTS confidence TEXT DEFAULT 'low'`);
+      await pool.query(`ALTER TABLE intake_requests ADD COLUMN IF NOT EXISTS review_notes TEXT`);
+      await pool.query(`ALTER TABLE intake_requests ADD COLUMN IF NOT EXISTS missing_field_flags JSONB DEFAULT '[]'::jsonb`);
+      await pool.query(`ALTER TABLE intake_requests ADD COLUMN IF NOT EXISTS follow_up_sent BOOLEAN NOT NULL DEFAULT FALSE`);
+      await pool.query(`ALTER TABLE intake_requests ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP`);
+      await pool.query(`ALTER TABLE intake_requests ADD COLUMN IF NOT EXISTS customer_address TEXT NOT NULL DEFAULT ''`);
+    } catch (e) {
+      console.error("intake_requests migration v2 error:", e);
     }
   })();
 
@@ -8612,7 +8626,23 @@ init();
         messages: [
           {
             role: "system",
-            content: `You are a cleaning quote intake assistant. Extract structured fields from a customer's description of their cleaning job. Return ONLY valid JSON with these fields (use null for unknown):
+            content: `You are a cleaning quote intake assistant. Extract structured fields from a customer's description of their cleaning job.
+
+EXTRACTION RULES:
+- Only extract what is explicitly mentioned or strongly implied. Never invent data.
+- If the customer mentions "cleaning" or "clean my house" without specifying type → serviceType="standard_cleaning"
+- If they mention "deep clean", "thorough", "first time", "catching up" → "deep_clean"
+- If they mention "move" or "moving" → "move_in_out"
+- If they mention "construction", "remodel", "build" → "post_construction"
+- If they mention "airbnb", "rental", "guests", "turnover" → "airbnb"
+- If they say "every week" or "weekly" → frequency="weekly"; "every 2 weeks", "biweekly", "twice a month" → "biweekly"; "monthly" → "monthly"
+- For pets: "dog", "puppy", "pup" → petType="dog"; "cat", "kitten" → "cat"; multiple animals → "multiple"
+- For sqft: if not mentioned, try to infer from beds/baths using typical averages, but set confidence to "medium" or "low" if inferred
+- missingFields: list human-readable names of critical missing fields (e.g. "number of bedrooms", "square footage", "service type")
+- confidence: "high" if beds, baths, serviceType, and frequency are all known; "medium" if 2-3 are known; "low" if fewer than 2 are known
+- clarificationQuestions: up to 2 specific questions to ask the customer to fill in critical gaps
+
+Return ONLY valid JSON:
 {
   "serviceType": "standard_cleaning" | "deep_clean" | "move_in_out" | "recurring" | "airbnb" | "post_construction" | null,
   "beds": number | null,
@@ -8621,6 +8651,7 @@ init();
   "frequency": "one-time" | "weekly" | "biweekly" | "monthly" | null,
   "pets": boolean | null,
   "petType": "none" | "cat" | "dog" | "multiple" | null,
+  "address": string | null,
   "addOns": {
     "insideFridge": boolean,
     "insideOven": boolean,
@@ -8634,9 +8665,9 @@ init();
   },
   "notes": string | null,
   "confidence": "high" | "medium" | "low",
-  "missingFields": string[]
-}
-Do NOT invent prices. Only extract what is explicitly mentioned or strongly implied.`,
+  "missingFields": string[],
+  "clarificationQuestions": string[]
+}`,
           },
           { role: "user", content: text },
         ],
@@ -8654,38 +8685,57 @@ Do NOT invent prices. Only extract what is explicitly mentioned or strongly impl
   // Public: submit intake request (customer submits)
   app.post("/api/public/intake/:businessId", async (req: Request, res: Response) => {
     const { businessId } = req.params;
-    const { customerName, customerEmail, customerPhone, rawText, extractedFields, source } = req.body;
+    const { customerName, customerEmail, customerPhone, customerAddress, rawText, extractedFields, source } = req.body;
     if (!customerName?.trim()) return res.status(400).json({ message: "Customer name is required" });
+    if (!customerEmail?.trim() && !customerPhone?.trim()) return res.status(400).json({ message: "At least one contact method is required" });
     try {
       const biz = await db_getBusinessById(businessId);
       if (!biz) return res.status(404).json({ message: "Business not found" });
+
+      const ef = extractedFields || {};
+      const confidence = ef.confidence || "low";
+      const missingFieldFlags = ef.missingFields || ef.missingFieldFlags || [];
+      // Auto-flag for review if confidence is low or many fields are missing
+      const needsReview = confidence === "low" || missingFieldFlags.length >= 3;
+      const status = needsReview ? "needs_review" : "pending";
+
       const result = await pool.query(
-        `INSERT INTO intake_requests (business_id, customer_name, customer_email, customer_phone, raw_text, extracted_fields, source)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        `INSERT INTO intake_requests (business_id, customer_name, customer_email, customer_phone, customer_address, raw_text, extracted_fields, source, status, confidence, missing_field_flags)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
         [
           businessId,
           (customerName || "").trim(),
           (customerEmail || "").trim(),
           (customerPhone || "").trim(),
+          (customerAddress || "").trim(),
           rawText || null,
-          JSON.stringify(extractedFields || {}),
+          JSON.stringify(ef),
           source || "intake_form",
+          status,
+          confidence,
+          JSON.stringify(missingFieldFlags),
         ]
       );
-      res.status(201).json({ id: result.rows[0].id, message: "Request submitted successfully" });
+      res.status(201).json({ id: result.rows[0].id, message: "Request submitted successfully", status });
     } catch (e: any) {
       console.error("Intake submit error:", e);
       res.status(500).json({ message: e.message });
     }
   });
 
-  // Protected: list intake requests for the current business
+  // Protected: list intake requests with filter support
   app.get("/api/intake-requests", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await storage.getBusinessByUserId(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
+      const filter = (req.query.filter as string) || "new";
+      let whereStatus: string;
+      if (filter === "review") whereStatus = `status='needs_review'`;
+      else if (filter === "done") whereStatus = `status IN ('converted','dismissed')`;
+      else if (filter === "all") whereStatus = `status NOT IN ('dismissed')`;
+      else whereStatus = `status='pending'`; // default 'new'
       const result = await pool.query(
-        `SELECT * FROM intake_requests WHERE business_id=$1 AND status='pending' ORDER BY created_at DESC`,
+        `SELECT * FROM intake_requests WHERE business_id=$1 AND ${whereStatus} ORDER BY created_at DESC`,
         [business.id]
       );
       res.json(result.rows.map((r: any) => ({
@@ -8693,12 +8743,18 @@ Do NOT invent prices. Only extract what is explicitly mentioned or strongly impl
         customerName: r.customer_name,
         customerEmail: r.customer_email,
         customerPhone: r.customer_phone,
+        customerAddress: r.customer_address || "",
         rawText: r.raw_text,
         extractedFields: r.extracted_fields || {},
         status: r.status,
+        confidence: r.confidence || "low",
+        reviewNotes: r.review_notes || "",
+        missingFieldFlags: r.missing_field_flags || [],
+        followUpSent: r.follow_up_sent || false,
         source: r.source,
         convertedQuoteId: r.converted_quote_id,
         createdAt: r.created_at,
+        reviewedAt: r.reviewed_at,
       })));
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -8720,6 +8776,47 @@ Do NOT invent prices. Only extract what is explicitly mentioned or strongly impl
     }
   });
 
+  // Protected: patch intake request (update status, notes, fields)
+  app.patch("/api/intake-requests/:id", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await storage.getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { status, reviewNotes, extractedFields, confidence, missingFieldFlags } = req.body;
+
+      const setClauses: string[] = ["updated_at=NOW()"];
+      const values: any[] = [];
+      let idx = 1;
+
+      if (status !== undefined) {
+        setClauses.push(`status=$${idx++}`);
+        values.push(status);
+        if (status === "pending") {
+          setClauses.push(`reviewed_at=$${idx++}`);
+          values.push(new Date());
+        }
+      }
+      if (reviewNotes !== undefined) { setClauses.push(`review_notes=$${idx++}`); values.push(reviewNotes); }
+      if (extractedFields !== undefined) { setClauses.push(`extracted_fields=$${idx++}`); values.push(JSON.stringify(extractedFields)); }
+      if (confidence !== undefined) { setClauses.push(`confidence=$${idx++}`); values.push(confidence); }
+      if (missingFieldFlags !== undefined) { setClauses.push(`missing_field_flags=$${idx++}`); values.push(JSON.stringify(missingFieldFlags)); }
+
+      values.push(req.params.id, business.id);
+      const result = await pool.query(
+        `UPDATE intake_requests SET ${setClauses.join(", ")} WHERE id=$${idx++} AND business_id=$${idx++} RETURNING *`,
+        values
+      );
+      if (result.rows.length === 0) return res.status(404).json({ message: "Not found" });
+      const r = result.rows[0];
+      res.json({
+        id: r.id, status: r.status, confidence: r.confidence,
+        reviewNotes: r.review_notes, extractedFields: r.extracted_fields,
+        missingFieldFlags: r.missing_field_flags,
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // Protected: mark as converted and link to quote
   app.post("/api/intake-requests/:id/convert", requireAuth, async (req: any, res: Response) => {
     try {
@@ -8736,16 +8833,62 @@ Do NOT invent prices. Only extract what is explicitly mentioned or strongly impl
     }
   });
 
-  // Protected: count pending intake requests (for badge)
+  // Protected: send intake link via email to a prospect
+  app.post("/api/intake-requests/send-link", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await storage.getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { toEmail, toName, customMessage } = req.body;
+      if (!toEmail?.trim()) return res.status(400).json({ message: "Email is required" });
+
+      const intakeUrl = `${process.env.APP_BASE_URL || "https://quotepro.app"}/intake/${business.id}`;
+      const recipientName = (toName || "there").trim();
+      const defaultMessage = `Hi ${recipientName},\n\n${business.companyName} would like to give you a personalized cleaning quote. Please fill out this quick form so we can prepare an accurate estimate:\n\n${intakeUrl}\n\nIt only takes about 2 minutes.\n\nThanks,\n${business.companyName}`;
+      const bodyText = customMessage?.trim() || defaultMessage;
+
+      const sgApiKey = process.env.SENDGRID_API_KEY;
+      if (!sgApiKey) return res.status(500).json({ message: "Email not configured" });
+
+      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: toEmail.trim(), name: toName || "" }] }],
+          from: { email: business.email || "noreply@quotepro.app", name: business.companyName },
+          subject: `${business.companyName} — Your personalized quote`,
+          content: [{ type: "text/plain", value: bodyText }],
+        }),
+      });
+      if (!sgRes.ok) {
+        const err = await sgRes.text();
+        console.error("Send intake link email error:", err);
+        return res.status(500).json({ message: "Failed to send email" });
+      }
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Protected: count actionable intake requests (pending + needs_review)
   app.get("/api/intake-requests/count", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await storage.getBusinessByUserId(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const result = await pool.query(
-        `SELECT COUNT(*) as count FROM intake_requests WHERE business_id=$1 AND status='pending'`,
+        `SELECT
+          COUNT(*) FILTER (WHERE status='pending') as new_count,
+          COUNT(*) FILTER (WHERE status='needs_review') as review_count,
+          COUNT(*) FILTER (WHERE status IN ('pending','needs_review')) as total
+         FROM intake_requests WHERE business_id=$1`,
         [business.id]
       );
-      res.json({ count: parseInt(result.rows[0].count) });
+      const row = result.rows[0];
+      res.json({
+        count: parseInt(row.total),
+        newCount: parseInt(row.new_count),
+        reviewCount: parseInt(row.review_count),
+      });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

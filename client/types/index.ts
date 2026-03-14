@@ -150,7 +150,8 @@ export interface Quote {
   };
   selectedOption: "good" | "better" | "best";
   createdAt: string;
-  status: "draft" | "sent" | "accepted" | "expired";
+  status: "draft" | "review_needed" | "ready_to_send" | "sent" | "accepted" | "expired";
+  workflowStatus?: "review_needed" | "ready_to_send" | null;
   emailDraft?: string;
   smsDraft?: string;
 }
