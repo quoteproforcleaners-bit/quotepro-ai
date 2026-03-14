@@ -588,7 +588,7 @@ const s = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     paddingHorizontal: 3,
   },
-  badgeTxt: { fontSize: 9, color: "#fff", fontWeight: "800" },
+  badgeTxt: { fontSize: 9, color: "#fff", fontWeight: "800", lineHeight: 11, includeFontPadding: false } as any,
   secondaryLabel: { fontSize: 12, fontWeight: "600", marginBottom: 1 },
   secondarySub: { fontSize: 11 },
 
