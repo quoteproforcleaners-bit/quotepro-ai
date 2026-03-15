@@ -1233,6 +1233,30 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Pressable
+        onPress={() => navigation.navigate("AIQuoteAssistantInbox" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-ai-quote-assistant"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: "#7C3AED15" }]}>
+            <Feather name="cpu" size={20} color="#7C3AED" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>AI Quote Assistant</ThemedText>
+              <View style={{ backgroundColor: "#7C3AED", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                <ThemedText style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>BETA</ThemedText>
+              </View>
+            </View>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Answer leads faster with AI-powered SMS conversations
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
         onPress={() => navigation.navigate("AutomationsHub" as any)}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-automations-hub"

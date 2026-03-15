@@ -105,3 +105,21 @@ API routes: `GET /api/quotes/:id/scheduled-followups`, `POST /api/communications
 - **Backend endpoint**: `POST /api/public/toolkit-lead` (public, no auth) — stores leads in `toolkit_leads` table with `ON CONFLICT DO NOTHING` for idempotent duplicate handling.
 - **DB table**: `toolkit_leads` (id, email UNIQUE, first_name, resource, source, created_at).
 - **Components**: `web/src/pages/ToolkitPage.tsx`, `web/src/components/LeadCaptureModal.tsx`.
+### AI Quote Assistant (Beta) — Linq-Powered SMS Automation
+- **Purpose**: AI-powered SMS inbox for cleaning businesses. Qualifies leads, runs structured intake, answers FAQs, and hands off to the owner when needed.
+- **Messaging transport**: Linq (configurable via `LINQ_API_TOKEN`, `LINQ_BASE_URL`, `LINQ_WEBHOOK_SECRET`, `LINQ_ENVIRONMENT=sandbox`)
+- **AI**: OpenAI gpt-4o-mini for intent classification, FAQ matching, and suggested replies
+- **DB Tables** (7 new): `linq_accounts`, `linq_phone_numbers`, `conversation_threads`, `conversation_messages`, `conversation_automations`, `ai_quote_assistant_settings`, `ai_quote_intake_sessions`
+- **Service files**: `server/services/linq/` — `types.ts`, `client.ts`, `webhooks.ts`, `assistant-orchestrator.ts`, `faq.ts`, `intake.ts`, `handoff.ts`
+- **Webhook**: `POST /api/integrations/linq/webhook` (no auth, validates HMAC signature if `LINQ_WEBHOOK_SECRET` set)
+- **Authenticated routes**: `GET|POST /api/ai-assistant/settings`, `GET /api/ai-assistant/threads`, `GET /api/ai-assistant/threads/:id`, `POST /api/ai-assistant/threads/:id/pause|resume|take-over|release-to-ai|reply|generate-suggested-reply`
+- **Test route**: `POST /api/ai-assistant/test/send` — simulates inbound webhook for sandbox testing
+- **Mobile screens**: `AIQuoteAssistantInboxScreen`, `AIQuoteAssistantThreadScreen`, `AIQuoteAssistantSettingsScreen`
+- **Web pages**: `/ai-quote-assistant`, `/ai-quote-assistant/:id`, `/ai-quote-assistant/settings`
+- **Settings entry**: In the mobile Settings screen under "Growth & Automations" section, labeled "AI Quote Assistant" with BETA badge
+- **Web nav**: Under "AI Tools" section in the web sidebar
+- **Pro-gated**: All routes and screens require `requirePro` middleware
+- **Sandbox mode**: When `LINQ_ENVIRONMENT=sandbox`, outbound messages are logged only (not sent). Inbound webhook simulated via test route.
+- **Handoff escalation rules**: Configurable — discount requests, angry customers, commercial jobs, low AI confidence all trigger human handoff
+- **Intake collection**: 9-step structured intake (ZIP, service type, bedrooms, bathrooms, sq ft, pets, frequency, last cleaned, preferred date). Progress tracked as completion score 0-100%.
+- **FAQ automation**: Built-in defaults for 9 common cleaning questions + per-business overrides stored as JSONB

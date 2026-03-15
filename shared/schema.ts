@@ -1024,3 +1024,131 @@ export type LeadFinderSettings = typeof leadFinderSettings.$inferSelect;
 export type LeadFinderLead = typeof leadFinderLeads.$inferSelect;
 export type LeadFinderReply = typeof leadFinderReplies.$inferSelect;
 export type LeadFinderEvent = typeof leadFinderEvents.$inferSelect;
+
+// ===== AI Quote Assistant =====
+
+export const linqAccounts = pgTable("linq_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  provider: text("provider").notNull().default("linq"),
+  environment: text("environment").notNull().default("sandbox"),
+  linqWorkspaceId: text("linq_workspace_id"),
+  webhookSecret: text("webhook_secret"),
+  isConnected: boolean("is_connected").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const linqPhoneNumbers = pgTable("linq_phone_numbers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  linqAccountId: varchar("linq_account_id").references(() => linqAccounts.id),
+  externalPhoneId: text("external_phone_id"),
+  phoneNumber: text("phone_number").notNull(),
+  displayName: text("display_name"),
+  isPrimary: boolean("is_primary").notNull().default(true),
+  status: text("status").notNull().default("active"),
+  capabilities: jsonb("capabilities"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const conversationThreads = pgTable("conversation_threads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  customerId: varchar("customer_id").references(() => customers.id),
+  channel: text("channel").notNull().default("sms"),
+  externalThreadId: text("external_thread_id"),
+  phoneNumber: text("phone_number").notNull(),
+  customerName: text("customer_name"),
+  aiStatus: text("ai_status").notNull().default("active"),
+  handoffStatus: text("handoff_status").notNull().default("ai"),
+  currentState: text("current_state").notNull().default("idle"),
+  lastMessageAt: timestamp("last_message_at"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const conversationMessages = pgTable("conversation_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id").notNull().references(() => conversationThreads.id),
+  direction: text("direction").notNull(),
+  provider: text("provider").notNull().default("linq"),
+  externalMessageId: text("external_message_id"),
+  sender: text("sender"),
+  recipient: text("recipient"),
+  body: text("body").notNull(),
+  messageType: text("message_type").notNull().default("text"),
+  status: text("status"),
+  rawPayload: jsonb("raw_payload"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const conversationAutomations = pgTable("conversation_automations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id").notNull().references(() => conversationThreads.id),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  automationType: text("automation_type").notNull(),
+  state: jsonb("state"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastAiConfidence: integer("last_ai_confidence"),
+  lastIntent: text("last_intent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const aiQuoteAssistantSettings = pgTable("ai_quote_assistant_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  enabled: boolean("enabled").notNull().default(false),
+  autoReplyEnabled: boolean("auto_reply_enabled").notNull().default(true),
+  businessTone: text("business_tone").notNull().default("professional"),
+  responseHoursOnly: boolean("response_hours_only").notNull().default(false),
+  startHour: integer("start_hour"),
+  endHour: integer("end_hour"),
+  timezone: text("timezone"),
+  requireHandoffOnDiscount: boolean("require_handoff_on_discount").notNull().default(true),
+  requireHandoffOnAngry: boolean("require_handoff_on_angry").notNull().default(true),
+  requireHandoffOnCommercial: boolean("require_handoff_on_commercial").notNull().default(true),
+  requireHandoffOnLowConfidence: boolean("require_handoff_on_low_confidence").notNull().default(true),
+  lowConfidenceThreshold: integer("low_confidence_threshold").notNull().default(70),
+  allowFaqAutoAnswers: boolean("allow_faq_auto_answers").notNull().default(true),
+  allowIntakeAutomation: boolean("allow_intake_automation").notNull().default(true),
+  autoCreateQuoteDraft: boolean("auto_create_quote_draft").notNull().default(true),
+  autoSendQuote: boolean("auto_send_quote").notNull().default(false),
+  faqOverrides: jsonb("faq_overrides"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const aiQuoteIntakeSessions = pgTable("ai_quote_intake_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id").notNull().references(() => conversationThreads.id),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  status: text("status").notNull().default("active"),
+  serviceType: text("service_type"),
+  zipCode: text("zip_code"),
+  city: text("city"),
+  squareFootage: text("square_footage"),
+  bedrooms: text("bedrooms"),
+  bathrooms: text("bathrooms"),
+  pets: text("pets"),
+  lastCleaned: text("last_cleaned"),
+  frequency: text("frequency"),
+  preferredDate: text("preferred_date"),
+  notes: text("notes"),
+  extractedStructuredData: jsonb("extracted_structured_data"),
+  quoteDraftId: varchar("quote_draft_id"),
+  completionScore: integer("completion_score").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type LinqAccount = typeof linqAccounts.$inferSelect;
+export type LinqPhoneNumber = typeof linqPhoneNumbers.$inferSelect;
+export type ConversationThread = typeof conversationThreads.$inferSelect;
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
+export type ConversationAutomation = typeof conversationAutomations.$inferSelect;
+export type AiQuoteAssistantSettings = typeof aiQuoteAssistantSettings.$inferSelect;
+export type AiQuoteIntakeSession = typeof aiQuoteIntakeSessions.$inferSelect;

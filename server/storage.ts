@@ -1,5 +1,5 @@
 import { eq, and, desc, asc, gte, lte, ilike, or, sql, isNotNull, isNull, lt } from "drizzle-orm";
-import { db } from "./db";
+import { db, pool } from "./db";
 import {
   users,
   businesses,
@@ -75,6 +75,19 @@ import {
   type LeadFinderSettings,
   type LeadFinderLead,
   type LeadFinderReply,
+  linqAccounts,
+  linqPhoneNumbers,
+  conversationThreads,
+  conversationMessages,
+  conversationAutomations,
+  aiQuoteAssistantSettings,
+  aiQuoteIntakeSessions,
+  type LinqAccount,
+  type LinqPhoneNumber,
+  type ConversationThread,
+  type ConversationMessage,
+  type AiQuoteAssistantSettings,
+  type AiQuoteIntakeSession,
 } from "@shared/schema";
 
 export async function getUserById(id: string): Promise<User | undefined> {
@@ -2555,4 +2568,249 @@ export async function logLeadFinderEvent(
     eventType,
     metadata,
   });
+}
+
+// ===== AI Quote Assistant Storage =====
+
+export async function getBusinessById(id: string): Promise<Business | undefined> {
+  const [b] = await db.select().from(businesses).where(eq(businesses.id, id));
+  return b;
+}
+
+export async function getLinqAccountByBusinessId(businessId: string): Promise<LinqAccount | undefined> {
+  const [row] = await db.select().from(linqAccounts).where(eq(linqAccounts.businessId, businessId));
+  return row;
+}
+
+export async function upsertLinqAccount(businessId: string, data: Partial<LinqAccount>): Promise<LinqAccount> {
+  const existing = await getLinqAccountByBusinessId(businessId);
+  if (existing) {
+    const [updated] = await db
+      .update(linqAccounts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(linqAccounts.businessId, businessId))
+      .returning();
+    return updated;
+  }
+  const [created] = await db
+    .insert(linqAccounts)
+    .values({ businessId, ...data } as any)
+    .returning();
+  return created;
+}
+
+export async function getLinqPrimaryNumber(businessId: string): Promise<LinqPhoneNumber | undefined> {
+  const [row] = await db
+    .select()
+    .from(linqPhoneNumbers)
+    .where(and(eq(linqPhoneNumbers.businessId, businessId), eq(linqPhoneNumbers.isPrimary, true)))
+    .limit(1);
+  return row;
+}
+
+export async function upsertLinqPhoneNumber(businessId: string, data: Partial<LinqPhoneNumber>): Promise<LinqPhoneNumber> {
+  const existing = await getLinqPrimaryNumber(businessId);
+  if (existing) {
+    const [updated] = await db
+      .update(linqPhoneNumbers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(linqPhoneNumbers.id, existing.id))
+      .returning();
+    return updated;
+  }
+  const [created] = await db
+    .insert(linqPhoneNumbers)
+    .values({ businessId, isPrimary: true, ...data } as any)
+    .returning();
+  return created;
+}
+
+export async function getOrCreateConversationThread(
+  businessId: string,
+  phoneNumber: string,
+  channel: string,
+  initialData?: { externalThreadId?: string; customerName?: string }
+): Promise<ConversationThread> {
+  const [existing] = await db
+    .select()
+    .from(conversationThreads)
+    .where(and(eq(conversationThreads.businessId, businessId), eq(conversationThreads.phoneNumber, phoneNumber)))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(conversationThreads)
+      .set({ lastMessageAt: new Date(), updatedAt: new Date() })
+      .where(eq(conversationThreads.id, existing.id));
+    return existing;
+  }
+
+  const [created] = await db
+    .insert(conversationThreads)
+    .values({
+      businessId,
+      phoneNumber,
+      channel,
+      externalThreadId: initialData?.externalThreadId,
+      customerName: initialData?.customerName,
+      lastMessageAt: new Date(),
+    })
+    .returning();
+  return created;
+}
+
+export async function getConversationThreadById(id: string, businessId: string): Promise<ConversationThread | undefined> {
+  const [row] = await db
+    .select()
+    .from(conversationThreads)
+    .where(and(eq(conversationThreads.id, id), eq(conversationThreads.businessId, businessId)));
+  return row;
+}
+
+export async function listConversationThreads(
+  businessId: string,
+  filters?: { aiStatus?: string; handoffStatus?: string; search?: string }
+): Promise<ConversationThread[]> {
+  let query = db
+    .select()
+    .from(conversationThreads)
+    .where(eq(conversationThreads.businessId, businessId))
+    .orderBy(desc(conversationThreads.lastMessageAt)) as any;
+  return query;
+}
+
+export async function addConversationMessage(data: {
+  threadId: string;
+  direction: string;
+  provider?: string;
+  externalMessageId?: string;
+  sender?: string;
+  recipient?: string;
+  body: string;
+  messageType?: string;
+  status?: string;
+  rawPayload?: any;
+}) {
+  const [row] = await db
+    .insert(conversationMessages)
+    .values({
+      threadId: data.threadId,
+      direction: data.direction,
+      provider: data.provider || "linq",
+      externalMessageId: data.externalMessageId,
+      sender: data.sender,
+      recipient: data.recipient,
+      body: data.body,
+      messageType: data.messageType || "text",
+      status: data.status,
+      rawPayload: data.rawPayload,
+    })
+    .returning();
+  return row;
+}
+
+export async function listConversationMessages(
+  threadId: string,
+  businessId: string,
+  limit = 50
+): Promise<ConversationMessage[]> {
+  return db
+    .select()
+    .from(conversationMessages)
+    .where(eq(conversationMessages.threadId, threadId))
+    .orderBy(desc(conversationMessages.createdAt))
+    .limit(limit);
+}
+
+export async function updateThreadAiStatus(threadId: string, businessId: string, aiStatus: string) {
+  await db
+    .update(conversationThreads)
+    .set({ aiStatus, updatedAt: new Date() })
+    .where(and(eq(conversationThreads.id, threadId), eq(conversationThreads.businessId, businessId)));
+}
+
+export async function updateThreadHandoffStatus(threadId: string, businessId: string, handoffStatus: string) {
+  await db
+    .update(conversationThreads)
+    .set({ handoffStatus, updatedAt: new Date() })
+    .where(and(eq(conversationThreads.id, threadId), eq(conversationThreads.businessId, businessId)));
+}
+
+export async function updateThreadState(threadId: string, businessId: string, currentState: string) {
+  await db
+    .update(conversationThreads)
+    .set({ currentState, updatedAt: new Date() })
+    .where(and(eq(conversationThreads.id, threadId), eq(conversationThreads.businessId, businessId)));
+}
+
+export async function getAiQuoteAssistantSettings(businessId: string): Promise<AiQuoteAssistantSettings | undefined> {
+  const [row] = await db
+    .select()
+    .from(aiQuoteAssistantSettings)
+    .where(eq(aiQuoteAssistantSettings.businessId, businessId));
+  return row;
+}
+
+export async function upsertAiQuoteAssistantSettings(
+  businessId: string,
+  payload: Partial<AiQuoteAssistantSettings>
+): Promise<AiQuoteAssistantSettings> {
+  const existing = await getAiQuoteAssistantSettings(businessId);
+  if (existing) {
+    const [updated] = await db
+      .update(aiQuoteAssistantSettings)
+      .set({ ...payload, updatedAt: new Date() })
+      .where(eq(aiQuoteAssistantSettings.businessId, businessId))
+      .returning();
+    return updated;
+  }
+  const [created] = await db
+    .insert(aiQuoteAssistantSettings)
+    .values({ businessId, ...payload } as any)
+    .returning();
+  return created;
+}
+
+export async function getActiveIntakeSession(threadId: string): Promise<AiQuoteIntakeSession | undefined> {
+  const [row] = await db
+    .select()
+    .from(aiQuoteIntakeSessions)
+    .where(and(eq(aiQuoteIntakeSessions.threadId, threadId), eq(aiQuoteIntakeSessions.status, "active")))
+    .limit(1);
+  return row;
+}
+
+export async function createOrUpdateIntakeSession(
+  threadId: string,
+  businessId: string,
+  data: Partial<AiQuoteIntakeSession>
+): Promise<AiQuoteIntakeSession> {
+  const existing = await getActiveIntakeSession(threadId);
+  if (existing) {
+    const [updated] = await db
+      .update(aiQuoteIntakeSessions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(aiQuoteIntakeSessions.id, existing.id))
+      .returning();
+    return updated;
+  }
+  const [created] = await db
+    .insert(aiQuoteIntakeSessions)
+    .values({ threadId, businessId, status: "active", ...data } as any)
+    .returning();
+  return created;
+}
+
+export async function completeIntakeSession(threadId: string) {
+  await db
+    .update(aiQuoteIntakeSessions)
+    .set({ status: "completed", updatedAt: new Date() })
+    .where(and(eq(aiQuoteIntakeSessions.threadId, threadId), eq(aiQuoteIntakeSessions.status, "active")));
+}
+
+export async function abandonIntakeSession(threadId: string) {
+  await db
+    .update(aiQuoteIntakeSessions)
+    .set({ status: "abandoned", updatedAt: new Date() })
+    .where(and(eq(aiQuoteIntakeSessions.threadId, threadId), eq(aiQuoteIntakeSessions.status, "active")));
 }

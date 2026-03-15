@@ -23,9 +23,10 @@ import {
   Wrench,
   Inbox,
   Radio,
+  Cpu,
 } from "lucide-react";
 
-const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant", "/lead-finder"];
+const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant", "/lead-finder", "/ai-quote-assistant"];
 
 const navSections = [
   {
@@ -54,6 +55,7 @@ const navSections = [
   {
     label: "AI Tools",
     items: [
+      { to: "/ai-quote-assistant", label: "AI Quote Assistant", icon: Cpu, pro: true },
       { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true },
       { to: "/walkthrough-ai", label: "Quote from Notes", icon: Wand2 },
       { to: "/intake-requests", label: "Quote Requests", icon: Inbox },

@@ -28,6 +28,9 @@ import IntakeRequestsPage from "./pages/IntakeRequestsPage";
 import LeadFinderPage from "./pages/LeadFinderPage";
 import LeadFinderDetailPage from "./pages/LeadFinderDetailPage";
 import LeadFinderSettingsPage from "./pages/LeadFinderSettingsPage";
+import AIQuoteAssistantPage from "./pages/AIQuoteAssistantPage";
+import AIQuoteAssistantThreadPage from "./pages/AIQuoteAssistantThreadPage";
+import AIQuoteAssistantSettingsPage from "./pages/AIQuoteAssistantSettingsPage";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -92,6 +95,9 @@ export default function App() {
           <Route path="/lead-finder" element={<ProGate feature="Local Lead Finder"><LeadFinderPage /></ProGate>} />
           <Route path="/lead-finder/settings" element={<ProGate feature="Local Lead Finder"><LeadFinderSettingsPage /></ProGate>} />
           <Route path="/lead-finder/:id" element={<ProGate feature="Local Lead Finder"><LeadFinderDetailPage /></ProGate>} />
+          <Route path="/ai-quote-assistant" element={<ProGate feature="AI Quote Assistant"><AIQuoteAssistantPage /></ProGate>} />
+          <Route path="/ai-quote-assistant/settings" element={<ProGate feature="AI Quote Assistant"><AIQuoteAssistantSettingsPage /></ProGate>} />
+          <Route path="/ai-quote-assistant/:id" element={<ProGate feature="AI Quote Assistant"><AIQuoteAssistantThreadPage /></ProGate>} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
 
