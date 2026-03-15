@@ -68,6 +68,13 @@ import {
   type WebhookEndpoint,
   type WebhookEvent,
   type WebhookDelivery,
+  leadFinderSettings,
+  leadFinderLeads,
+  leadFinderReplies,
+  leadFinderEvents,
+  type LeadFinderSettings,
+  type LeadFinderLead,
+  type LeadFinderReply,
 } from "@shared/schema";
 
 export async function getUserById(id: string): Promise<User | undefined> {
@@ -2313,4 +2320,239 @@ export async function getWeeklyQuoteStats(businessId: string): Promise<{
   }));
 
   return { sentCount, acceptedCount, revenueWon, pendingQuotes };
+}
+
+// ─── Local Lead Finder Storage ───────────────────────────────────────────────
+
+export async function getLeadFinderSettings(
+  userId: string,
+  businessId: string
+): Promise<LeadFinderSettings | undefined> {
+  const [row] = await db
+    .select()
+    .from(leadFinderSettings)
+    .where(and(eq(leadFinderSettings.userId, userId), eq(leadFinderSettings.businessId, businessId)));
+  return row;
+}
+
+export async function upsertLeadFinderSettings(
+  userId: string,
+  businessId: string,
+  payload: Partial<typeof leadFinderSettings.$inferInsert>
+): Promise<LeadFinderSettings> {
+  const existing = await getLeadFinderSettings(userId, businessId);
+  if (existing) {
+    const [updated] = await db
+      .update(leadFinderSettings)
+      .set({ ...payload, updatedAt: new Date() })
+      .where(eq(leadFinderSettings.id, existing.id))
+      .returning();
+    return updated;
+  }
+  const [created] = await db
+    .insert(leadFinderSettings)
+    .values({ userId, businessId, ...payload })
+    .returning();
+  return created;
+}
+
+export async function createLeadIfNotExists(data: {
+  userId: string;
+  businessId: string;
+  source: string;
+  externalId: string;
+  subreddit?: string;
+  title?: string;
+  body?: string;
+  author?: string;
+  postUrl?: string;
+  permalink?: string;
+  matchedKeyword?: string;
+  detectedLocation?: string;
+  intent?: string;
+  aiClassification?: string;
+  aiConfidence?: number;
+  aiReason?: string;
+  leadScore?: number;
+  postedAt?: Date;
+  metadata?: any;
+}): Promise<{ lead: LeadFinderLead; created: boolean }> {
+  const [existing] = await db
+    .select()
+    .from(leadFinderLeads)
+    .where(
+      and(
+        eq(leadFinderLeads.businessId, data.businessId),
+        eq(leadFinderLeads.source, data.source),
+        eq(leadFinderLeads.externalId, data.externalId)
+      )
+    );
+  if (existing) return { lead: existing, created: false };
+
+  const [lead] = await db
+    .insert(leadFinderLeads)
+    .values({
+      userId: data.userId,
+      businessId: data.businessId,
+      source: data.source,
+      externalId: data.externalId,
+      subreddit: data.subreddit,
+      title: data.title,
+      body: data.body,
+      author: data.author,
+      postUrl: data.postUrl,
+      permalink: data.permalink,
+      matchedKeyword: data.matchedKeyword,
+      detectedLocation: data.detectedLocation,
+      intent: data.intent,
+      aiClassification: data.aiClassification,
+      aiConfidence: data.aiConfidence,
+      aiReason: data.aiReason,
+      leadScore: data.leadScore ?? 0,
+      postedAt: data.postedAt,
+      metadata: data.metadata,
+    })
+    .returning();
+  return { lead, created: true };
+}
+
+export async function getLeadFinderLeads(
+  userId: string,
+  businessId: string,
+  filters: {
+    status?: string;
+    keyword?: string;
+    minScore?: number;
+    limit?: number;
+    page?: number;
+  } = {}
+): Promise<{ leads: LeadFinderLead[]; total: number }> {
+  const limit = Math.min(filters.limit ?? 20, 50);
+  const offset = ((filters.page ?? 1) - 1) * limit;
+
+  const conditions = [
+    eq(leadFinderLeads.userId, userId),
+    eq(leadFinderLeads.businessId, businessId),
+  ];
+
+  if (filters.status && filters.status !== "all") {
+    conditions.push(eq(leadFinderLeads.status, filters.status));
+  }
+  if (filters.keyword) {
+    conditions.push(eq(leadFinderLeads.matchedKeyword, filters.keyword));
+  }
+
+  const leads = await db
+    .select()
+    .from(leadFinderLeads)
+    .where(and(...conditions))
+    .orderBy(desc(leadFinderLeads.leadScore), desc(leadFinderLeads.postedAt))
+    .limit(limit)
+    .offset(offset);
+
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(leadFinderLeads)
+    .where(and(...conditions));
+
+  return { leads, total: Number(count) };
+}
+
+export async function getLeadFinderLeadById(
+  id: string,
+  userId: string,
+  businessId: string
+): Promise<LeadFinderLead | undefined> {
+  const [lead] = await db
+    .select()
+    .from(leadFinderLeads)
+    .where(
+      and(
+        eq(leadFinderLeads.id, id),
+        eq(leadFinderLeads.userId, userId),
+        eq(leadFinderLeads.businessId, businessId)
+      )
+    );
+  return lead;
+}
+
+export async function updateLeadStatus(
+  id: string,
+  userId: string,
+  businessId: string,
+  status: string
+): Promise<LeadFinderLead | undefined> {
+  const [updated] = await db
+    .update(leadFinderLeads)
+    .set({ status, updatedAt: new Date() })
+    .where(
+      and(
+        eq(leadFinderLeads.id, id),
+        eq(leadFinderLeads.userId, userId),
+        eq(leadFinderLeads.businessId, businessId)
+      )
+    )
+    .returning();
+  return updated;
+}
+
+export async function countNewLeadFinderLeads(
+  userId: string,
+  businessId: string
+): Promise<number> {
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(leadFinderLeads)
+    .where(
+      and(
+        eq(leadFinderLeads.userId, userId),
+        eq(leadFinderLeads.businessId, businessId),
+        eq(leadFinderLeads.status, "new")
+      )
+    );
+  return Number(count);
+}
+
+export async function saveGeneratedReplies(
+  leadId: string,
+  replies: Array<{ tone: string; replyText: string }>
+): Promise<LeadFinderReply[]> {
+  await db.delete(leadFinderReplies).where(eq(leadFinderReplies.leadId, leadId));
+  const inserted = await db
+    .insert(leadFinderReplies)
+    .values(replies.map((r) => ({ leadId, tone: r.tone, replyText: r.replyText })))
+    .returning();
+  return inserted;
+}
+
+export async function getGeneratedReplies(leadId: string): Promise<LeadFinderReply[]> {
+  return db
+    .select()
+    .from(leadFinderReplies)
+    .where(eq(leadFinderReplies.leadId, leadId))
+    .orderBy(asc(leadFinderReplies.createdAt));
+}
+
+export async function findBusinessesWithLeadFinderEnabled(): Promise<
+  Array<{ userId: string; businessId: string; settings: LeadFinderSettings }>
+> {
+  const rows = await db
+    .select()
+    .from(leadFinderSettings)
+    .where(eq(leadFinderSettings.enabled, true));
+  return rows.map((s) => ({ userId: s.userId, businessId: s.businessId, settings: s }));
+}
+
+export async function logLeadFinderEvent(
+  leadId: string | null,
+  userId: string,
+  eventType: string,
+  metadata?: any
+): Promise<void> {
+  await db.insert(leadFinderEvents).values({
+    leadId: leadId ?? undefined,
+    userId,
+    eventType,
+    metadata,
+  });
 }

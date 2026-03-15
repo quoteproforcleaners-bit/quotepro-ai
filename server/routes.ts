@@ -9230,6 +9230,294 @@ Rules:
     return { sent, canceled };
   }
 
+  // ─── Local Lead Finder Routes ────────────────────────────────────────────────
+  {
+    const {
+      getLeadFinderSettings,
+      upsertLeadFinderSettings,
+      createLeadIfNotExists,
+      getLeadFinderLeads,
+      getLeadFinderLeadById,
+      updateLeadStatus,
+      countNewLeadFinderLeads,
+      saveGeneratedReplies,
+      getGeneratedReplies,
+      findBusinessesWithLeadFinderEnabled,
+      logLeadFinderEvent,
+    } = await import("./storage");
+    const { fetchRedditLeads, getMockLeads } = await import("./services/lead-finder/reddit");
+    const { classifyLead, shouldStoreLead } = await import("./services/lead-finder/classifier");
+    const { scoreLead } = await import("./services/lead-finder/scoring");
+    const { generateReplies } = await import("./services/lead-finder/reply-generator");
+
+    app.get("/api/lead-finder/settings", requireAuth, async (req: Request, res: Response) => {
+      try {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (!business) return res.status(404).json({ message: "Business not found" });
+        const settings = await getLeadFinderSettings(req.session.userId!, business.id);
+        return res.json(settings ?? {
+          enabled: false,
+          targetCities: [],
+          targetZips: [],
+          radiusMiles: 25,
+          keywords: [],
+          subreddits: [],
+          notifyNewLeads: true,
+        });
+      } catch (e: any) {
+        return res.status(500).json({ message: "Failed to fetch settings" });
+      }
+    });
+
+    app.post("/api/lead-finder/settings", requireAuth, async (req: Request, res: Response) => {
+      try {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (!business) return res.status(404).json({ message: "Business not found" });
+        const {
+          enabled, targetCities, targetZips, radiusMiles,
+          keywords, subreddits, notifyNewLeads,
+        } = req.body;
+        const settings = await upsertLeadFinderSettings(req.session.userId!, business.id, {
+          enabled: enabled ?? true,
+          targetCities: targetCities ?? [],
+          targetZips: targetZips ?? [],
+          radiusMiles: radiusMiles ?? 25,
+          keywords: keywords ?? [],
+          subreddits: subreddits ?? [],
+          notifyNewLeads: notifyNewLeads ?? true,
+        });
+        return res.json(settings);
+      } catch (e: any) {
+        return res.status(500).json({ message: "Failed to save settings" });
+      }
+    });
+
+    app.get("/api/lead-finder/leads", requireAuth, async (req: Request, res: Response) => {
+      try {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (!business) return res.status(404).json({ message: "Business not found" });
+        const {
+          status, keyword, minScore, limit = "20", page = "1",
+        } = req.query as Record<string, string>;
+        const { leads, total } = await getLeadFinderLeads(
+          req.session.userId!,
+          business.id,
+          {
+            status,
+            keyword,
+            minScore: minScore ? Number(minScore) : undefined,
+            limit: Number(limit),
+            page: Number(page),
+          }
+        );
+        return res.json({ leads, total, page: Number(page), limit: Number(limit) });
+      } catch (e: any) {
+        return res.status(500).json({ message: "Failed to fetch leads" });
+      }
+    });
+
+    app.get("/api/lead-finder/count", requireAuth, async (req: Request, res: Response) => {
+      try {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (!business) return res.json({ count: 0 });
+        const count = await countNewLeadFinderLeads(req.session.userId!, business.id);
+        return res.json({ count });
+      } catch {
+        return res.json({ count: 0 });
+      }
+    });
+
+    app.get("/api/lead-finder/leads/:id", requireAuth, async (req: Request, res: Response) => {
+      try {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (!business) return res.status(404).json({ message: "Business not found" });
+        const lead = await getLeadFinderLeadById(req.params.id, req.session.userId!, business.id);
+        if (!lead) return res.status(404).json({ message: "Lead not found" });
+        const replies = await getGeneratedReplies(lead.id);
+        return res.json({ ...lead, replies });
+      } catch (e: any) {
+        return res.status(500).json({ message: "Failed to fetch lead" });
+      }
+    });
+
+    app.post("/api/lead-finder/leads/:id/status", requireAuth, async (req: Request, res: Response) => {
+      try {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (!business) return res.status(404).json({ message: "Business not found" });
+        const VALID = ["new", "saved", "dismissed", "contacted"];
+        const { status } = req.body;
+        if (!VALID.includes(status)) return res.status(400).json({ message: "Invalid status" });
+        const updated = await updateLeadStatus(req.params.id, req.session.userId!, business.id, status);
+        if (!updated) return res.status(404).json({ message: "Lead not found" });
+        await logLeadFinderEvent(req.params.id, req.session.userId!, `status_${status}`);
+        return res.json(updated);
+      } catch (e: any) {
+        return res.status(500).json({ message: "Failed to update status" });
+      }
+    });
+
+    app.post("/api/lead-finder/leads/:id/generate-replies", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+      try {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (!business) return res.status(404).json({ message: "Business not found" });
+        const lead = await getLeadFinderLeadById(req.params.id, req.session.userId!, business.id);
+        if (!lead) return res.status(404).json({ message: "Lead not found" });
+        const replies = await generateReplies({
+          postTitle: lead.title ?? "",
+          postBody: lead.body ?? "",
+          subreddit: lead.subreddit ?? "",
+          businessName: business.companyName || "My Cleaning Business",
+          detectedLocation: lead.detectedLocation ?? undefined,
+          intent: lead.intent ?? undefined,
+        });
+        const saved = await saveGeneratedReplies(lead.id, replies);
+        await logLeadFinderEvent(lead.id, req.session.userId!, "generate_replies");
+        return res.json({ replies: saved });
+      } catch (e: any) {
+        return res.status(500).json({ message: "Failed to generate replies" });
+      }
+    });
+
+    app.post("/api/lead-finder/poll", requireAuth, async (req: Request, res: Response) => {
+      try {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (!business) return res.status(404).json({ message: "Business not found" });
+        const settings = await getLeadFinderSettings(req.session.userId!, business.id);
+
+        const targetCities = (settings?.targetCities as string[]) ?? [];
+        const keywords = (settings?.keywords as string[]) ?? [];
+        const subreddits = (settings?.subreddits as string[]) ?? [];
+
+        let posts = await fetchRedditLeads({ keywords, subreddits, targetCities });
+        if (!posts.length) posts = getMockLeads();
+
+        let stored = 0;
+        let skipped = 0;
+        let rejected = 0;
+
+        for (const post of posts) {
+          const classification = await classifyLead(post.title, post.body, post.subreddit);
+          if (!classification || !shouldStoreLead(classification)) {
+            rejected++;
+            continue;
+          }
+          const { score } = scoreLead(classification, post.postedAt);
+          const { created } = await createLeadIfNotExists({
+            userId: req.session.userId!,
+            businessId: business.id,
+            source: "reddit",
+            externalId: post.externalId,
+            subreddit: post.subreddit,
+            title: post.title,
+            body: post.body,
+            author: post.author,
+            postUrl: post.postUrl,
+            permalink: post.permalink,
+            matchedKeyword: post.matchedKeyword,
+            detectedLocation: classification.detectedLocation,
+            intent: classification.intent,
+            aiClassification: classification.classification,
+            aiConfidence: classification.confidence,
+            aiReason: classification.reason,
+            leadScore: score,
+            postedAt: post.postedAt,
+            metadata: post.metadata,
+          });
+          if (created) stored++;
+          else skipped++;
+        }
+
+        return res.json({
+          ok: true,
+          processed: posts.length,
+          stored,
+          skipped,
+          rejected,
+          usedMock: !posts.length,
+        });
+      } catch (e: any) {
+        console.error("[lead-finder poll]", e);
+        return res.status(500).json({ message: "Poll failed", error: e.message });
+      }
+    });
+
+    // Background poll task (called from worker)
+    async function runLeadFinderWorker() {
+      try {
+        const businesses = await findBusinessesWithLeadFinderEnabled();
+        let totalStored = 0;
+
+        for (const { userId, businessId, settings } of businesses) {
+          try {
+            const targetCities = (settings.targetCities as string[]) ?? [];
+            const keywords = (settings.keywords as string[]) ?? [];
+            const subreddits = (settings.subreddits as string[]) ?? [];
+
+            const posts = await fetchRedditLeads({ keywords, subreddits, targetCities });
+
+            let stored = 0;
+            for (const post of posts) {
+              const classification = await classifyLead(post.title, post.body, post.subreddit);
+              if (!classification || !shouldStoreLead(classification)) continue;
+              const { score } = scoreLead(classification, post.postedAt);
+              const { created } = await createLeadIfNotExists({
+                userId, businessId,
+                source: "reddit",
+                externalId: post.externalId,
+                subreddit: post.subreddit,
+                title: post.title,
+                body: post.body,
+                author: post.author,
+                postUrl: post.postUrl,
+                permalink: post.permalink,
+                matchedKeyword: post.matchedKeyword,
+                detectedLocation: classification.detectedLocation,
+                intent: classification.intent,
+                aiClassification: classification.classification,
+                aiConfidence: classification.confidence,
+                aiReason: classification.reason,
+                leadScore: score,
+                postedAt: post.postedAt,
+                metadata: post.metadata,
+              });
+              if (created) stored++;
+            }
+
+            if (stored > 0) {
+              totalStored += stored;
+              if (settings.notifyNewLeads) {
+                const tokens = await getPushTokensByUser(userId);
+                if (tokens.length) {
+                  await fetch("https://exp.host/--/api/v2/push/send", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      to: tokens.map((t: any) => t.token),
+                      title: "New cleaning lead found",
+                      body: `Someone nearby is asking for cleaning help. Respond while it's fresh.`,
+                      data: { screen: "LeadFinder" },
+                      sound: "default",
+                    }),
+                  });
+                }
+              }
+              console.log(`[lead-finder] ${stored} new leads for business ${businessId}`);
+            }
+          } catch (e) {
+            console.error(`[lead-finder] Error for business ${businessId}:`, e);
+          }
+        }
+        if (totalStored > 0) console.log(`[lead-finder] Worker stored ${totalStored} total new leads`);
+      } catch (e) {
+        console.error("[lead-finder] Worker error:", e);
+      }
+    }
+
+    // Hook into existing worker
+    const _originalWorker = runLeadFinderWorker;
+    (app as any).__leadFinderWorker = _originalWorker;
+  }
+
   // ─── Background: Stale Quote Push Nudges ───
   async function sendStaleQuoteNudges() {
     try {
@@ -9390,6 +9678,7 @@ Rules:
       if (sent > 0 || canceled > 0) console.log(`Follow-ups processed: ${sent} sent, ${canceled} canceled`);
       await sendStaleQuoteNudges();
       await sendWeeklyDigestEmails();
+      if ((app as any).__leadFinderWorker) await (app as any).__leadFinderWorker();
     } catch (e) {
       console.error("Auto-expire/followup error:", e);
     }

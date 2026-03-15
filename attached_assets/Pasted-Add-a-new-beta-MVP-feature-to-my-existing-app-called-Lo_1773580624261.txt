@@ -1,0 +1,540 @@
+Add a new beta MVP feature to my existing app called "Local Lead Finder."
+
+IMPORTANT:
+This is an existing production app. Do NOT rebuild the app structure.
+Follow the existing architecture, routing, auth, design system, theme, database patterns, and naming conventions already in the codebase.
+
+My stack:
+- Mobile frontend: React Native with Expo SDK 54, iOS-first
+- Navigation: React Navigation (native stack + bottom tabs)
+- Animations: React Native Reanimated + Gesture Handler
+- Web frontend: React 19 + Vite + Tailwind CSS in /web/src
+- Backend: Express.js + TypeScript on Node.js
+- API prefix: /api
+- Auth: session-based auth using express-session + connect-pg-simple
+- Database: PostgreSQL (Neon) via Drizzle ORM
+- Existing backend files: server/routes.ts, server/storage.ts
+- Existing mobile UI primitives: ThemedText, ThemedView, Card
+- Theme source: constants/theme.ts
+- Design style: iOS 26 Liquid Glass aesthetic
+- Icons: Feather
+- Existing services: OpenAI (gpt-4o-mini), Twilio, SendGrid, Expo Push, Stripe, Google Calendar, QuickBooks, Jobber
+- Existing worker runs every 60 minutes
+
+Goal:
+Build a beta feature that helps cleaning companies discover public Reddit posts from people actively looking for house cleaners in their local area.
+
+This feature should feel native to the existing app and should work in both:
+1. the React Native mobile app
+2. the companion web app
+
+======================================
+FEATURE OVERVIEW
+======================================
+
+Feature name:
+Local Lead Finder
+
+User value:
+Find people in a user’s target service area who are publicly asking for cleaning help online, classify the best opportunities, and help the user respond quickly.
+
+Beta source:
+Reddit only
+
+Beta scope:
+- user enters service areas and keywords
+- background worker pulls relevant Reddit posts
+- AI classifies if a post is a likely residential cleaning lead
+- AI scores and labels the lead
+- app shows a lead inbox
+- user can save, dismiss, mark contacted
+- app can generate 3 suggested replies
+
+Do not over-engineer.
+Prioritize a clean MVP that fits the current app architecture.
+
+======================================
+DATABASE / DRIZZLE
+======================================
+
+Create any needed Drizzle schema and migration files for this feature.
+
+Add tables for:
+
+1. lead_finder_settings
+Columns:
+- id
+- user_id
+- business_id
+- enabled boolean default true
+- target_cities jsonb
+- target_zips jsonb
+- radius_miles integer default 25
+- keywords jsonb
+- subreddits jsonb
+- notify_new_leads boolean default true
+- created_at
+- updated_at
+
+2. lead_finder_leads
+Columns:
+- id
+- user_id
+- business_id
+- source text default 'reddit'
+- external_id text
+- subreddit text
+- title text
+- body text
+- author text
+- post_url text
+- permalink text
+- matched_keyword text
+- detected_location text
+- intent text
+- ai_classification text
+- ai_confidence integer
+- ai_reason text
+- lead_score integer
+- status text default 'new'
+- posted_at timestamp
+- ingested_at timestamp
+- metadata jsonb
+- created_at
+- updated_at
+
+3. lead_finder_replies
+Columns:
+- id
+- lead_id
+- tone text
+- reply_text text
+- created_at
+
+4. Optional audit table if helpful:
+lead_finder_events
+Columns:
+- id
+- lead_id
+- user_id
+- event_type
+- metadata jsonb
+- created_at
+
+Requirements:
+- add unique constraint to prevent duplicate Reddit leads per business/user based on source + external_id
+- use existing timestamp conventions in the app
+- follow existing Drizzle style and patterns in the codebase
+
+======================================
+STORAGE LAYER
+======================================
+
+In server/storage.ts, add methods for:
+
+Settings:
+- getLeadFinderSettings(userId, businessId)
+- upsertLeadFinderSettings(userId, businessId, payload)
+
+Leads:
+- createLeadIfNotExists(...)
+- getLeadFinderLeads(userId, businessId, filters)
+- getLeadFinderLeadById(id, userId, businessId)
+- updateLeadStatus(id, userId, businessId, status)
+- countNewLeadFinderLeads(userId, businessId)
+- saveGeneratedReplies(leadId, replies)
+- getGeneratedReplies(leadId)
+
+Worker helpers:
+- findBusinessesWithLeadFinderEnabled()
+- getLeadFinderPollingInputsForBusiness(...)
+- storeLeadFinderIngestionResult(...)
+
+Keep query logic centralized in storage.ts rather than embedding DB logic in routes.
+
+======================================
+API ROUTES
+======================================
+
+In server/routes.ts, add new authenticated session-based API routes under /api/lead-finder
+
+Routes to add:
+
+GET /api/lead-finder/settings
+- return current settings for authenticated user/business
+
+POST /api/lead-finder/settings
+- create/update settings
+- validate payload
+
+GET /api/lead-finder/leads
+Query params:
+- status
+- city
+- keyword
+- minScore
+- source
+- limit
+- cursor or page
+- sort (default highest score + newest)
+Return paginated results
+
+GET /api/lead-finder/leads/:id
+- return single lead detail + any saved generated replies
+
+POST /api/lead-finder/leads/:id/status
+Body:
+- status: new | saved | dismissed | contacted
+Update status
+
+POST /api/lead-finder/leads/:id/generate-replies
+- call OpenAI
+- generate 3 variants:
+  1. professional
+  2. warm
+  3. concise
+- save replies to DB
+- return them
+
+POST /api/lead-finder/poll
+- authenticated manual trigger for testing
+- only for logged-in user
+- fetch Reddit posts using that user’s current settings
+- classify and store results
+- return summary counts
+This is useful for beta testing and admin debugging
+
+Use the same auth/session middleware patterns already used in the app.
+
+======================================
+REDDIT INGESTION SERVICE
+======================================
+
+Create a modular service for Reddit ingestion, for example:
+- server/services/lead-finder/reddit.ts
+- server/services/lead-finder/classifier.ts
+- server/services/lead-finder/scoring.ts
+- server/services/lead-finder/reply-generator.ts
+
+Implement a simple Reddit ingestion flow.
+
+Beta data acquisition strategy:
+- Use Reddit public JSON endpoints if feasible for beta, or a lightweight Reddit API approach
+- Add environment variable placeholders for any credentials if needed
+- If live Reddit access is unavailable, include a mock fallback so the feature can still be tested end-to-end
+
+For beta, support matching posts from configured subreddits and keyword search.
+
+Default subreddit suggestions:
+- local city subreddits from settings if obvious
+- plus optional defaults such as:
+  - cleaningtips
+  - moving
+  - homeowners
+But prioritize city/local subreddits entered by the user
+
+Default tracked keywords:
+- house cleaner
+- cleaning service
+- maid service
+- deep cleaning
+- move out cleaning
+- move-in cleaning
+- recurring cleaning
+- biweekly cleaning
+- recommend a cleaner
+- need a cleaner
+
+Each ingested candidate should include:
+- title
+- body/selftext
+- subreddit
+- author
+- URL/permalink
+- created timestamp
+- matched keyword
+- raw metadata
+
+======================================
+AI CLASSIFICATION
+======================================
+
+Use the existing OpenAI integration with gpt-4o-mini.
+
+Create a lead classification service that determines whether a Reddit post is likely a real residential cleaning lead.
+
+Return structured JSON with:
+- classification: yes | maybe | no
+- confidence: 0-100
+- intent:
+  - recommendation_request
+  - quote_request
+  - recurring_cleaning
+  - deep_clean
+  - move_out
+  - move_in
+  - one_time_clean
+  - other
+- detected_location
+- reason
+
+Important:
+Ignore and reject posts such as:
+- jokes
+- memes
+- someone casually talking about cleaning their own home
+- job seekers offering cleaning services
+- B2B janitorial job posts
+- commercial cleaning hiring
+- irrelevant uses of the word cleaning
+
+Only store leads where classification is yes or strong maybe above a reasonable threshold.
+
+Make the prompt conservative and practical for this vertical.
+
+======================================
+LEAD SCORING
+======================================
+
+Add a lead scoring utility.
+
+Scoring rules:
+- Explicitly asking for a cleaner or recommendation: +50
+- Includes city/location: +20
+- Mentions recurring cleaning: +15
+- Mentions move-out or deep clean: +10
+- Posted in last 24 hours: +10
+- Clear request/recommendation intent: +10
+
+Cap score at 100.
+Return score plus score explanation metadata if useful.
+
+Sort default lead inbox by:
+1. highest score
+2. newest posted_at
+
+======================================
+BACKGROUND WORKER
+======================================
+
+Integrate this into the existing background worker that runs every 60 minutes.
+
+Add a new worker task:
+- find businesses/users with Local Lead Finder enabled
+- poll Reddit for matching posts
+- classify new candidates
+- score them
+- store only unique valid leads
+
+Requirements:
+- prevent duplicates
+- log summary counts
+- fail gracefully
+- do not break the rest of the worker pipeline
+- if notify_new_leads is enabled, send a push notification when new leads are found
+
+Push notification copy example:
+Title: New cleaning lead found
+Body: Someone nearby is asking for cleaning help. Respond while it’s fresh.
+
+If push pattern already exists elsewhere in the app, reuse it.
+
+======================================
+MOBILE APP (EXPO)
+======================================
+
+Add a new screen in client/screens called something like:
+LeadFinderScreen.tsx
+
+Also add a settings/detail screen if helpful:
+- LeadFinderSettingsScreen.tsx
+- LeadFinderDetailScreen.tsx
+
+Place feature access in a logical existing area of the app.
+Use current navigation patterns.
+Do not break current navigation architecture.
+
+Mobile UI should use:
+- ThemedView
+- ThemedText
+- Card
+- theme values from constants/theme.ts
+- Feather icons
+- existing loading/empty/error patterns
+- existing paywall/subscription gating patterns if applicable
+
+Main screen requirements:
+- Title: Local Lead Finder
+- Subtitle: Find people in your area already asking for cleaning help online.
+- summary chips:
+  - New
+  - Saved
+  - Contacted
+- lead cards list
+- filters:
+  - status
+  - keyword
+  - score
+- pull to refresh
+- button to manually poll for testing in beta
+
+Each lead card should show:
+- subreddit
+- title
+- excerpt
+- matched keyword
+- lead score
+- time since posted
+- detected location if present
+- status badge
+
+Actions:
+- Save Lead
+- Dismiss
+- Mark Contacted
+- View Original Post
+- Generate Reply
+
+Detail screen:
+- full title/body
+- original post link
+- AI reason
+- intent label
+- score
+- reply generator section
+
+Generated replies:
+- show 3 cards
+- professional
+- warm
+- concise
+- copy button
+- optionally share sheet integration on mobile
+
+Settings screen:
+- toggle enabled
+- cities / ZIPs input
+- radius input
+- keyword editor
+- subreddit editor
+- toggle push notifications
+- save button
+
+Use the app’s existing iOS-first aesthetic.
+Make the cards feel premium and aligned with current quote/CRM UI.
+
+======================================
+WEB APP
+======================================
+
+Add matching web UI under web/src.
+
+Suggested routes:
+- /app/lead-finder
+- /app/lead-finder/settings
+- /app/lead-finder/:id
+
+Use existing web patterns and Tailwind styling.
+Do not invent a totally different design language.
+
+Web inbox requirements:
+- table or cards
+- filters on top
+- score badges
+- status actions
+- generate replies
+- original Reddit link
+- settings page
+
+Make sure web and mobile both use the same backend APIs.
+
+======================================
+COPY / UX
+======================================
+
+Use this product copy:
+
+Page title:
+Local Lead Finder
+
+Subtitle:
+Find people in your area already asking for cleaning help online.
+
+Statuses:
+- New
+- Saved
+- Dismissed
+- Contacted
+
+Buttons:
+- Save Lead
+- Dismiss
+- Mark Contacted
+- Generate Reply
+- View Original Post
+- Run Scan Now
+- Save Settings
+
+Empty state:
+No leads yet.
+Try adjusting your cities, ZIP codes, subreddits, or keywords, then run a scan.
+
+Reply generation helper text:
+Suggested replies are designed to sound helpful and human, not spammy.
+
+======================================
+PLAN LIMITS / GATING
+======================================
+
+Implement this as beta-safe.
+
+Option A:
+Gate the feature to Pro users only, reusing existing ProGate/subscription logic.
+
+Option B:
+Allow all users to try up to 10 leads in beta, then gate further use.
+
+Choose the option that best matches the current subscription architecture with minimal code complexity.
+Prefer reusing the existing Pro/paywall patterns.
+
+======================================
+TESTING / SEEDING
+======================================
+
+Add a seeded mock dataset or fallback fixture for lead finder so the UI can be tested without live Reddit data.
+
+Also add:
+- a manual test route or script if helpful
+- clear env var placeholders for Reddit/OpenAI configuration
+- README notes for:
+  - feature overview
+  - schema additions
+  - new API routes
+  - worker integration
+  - local testing steps
+  - env vars needed
+  - what is mocked vs production-ready
+
+======================================
+IMPLEMENTATION NOTES
+======================================
+
+Important constraints:
+- Keep backend code modular even though routes.ts is large
+- If needed, extract helper functions/modules rather than bloating route handlers
+- Follow existing patterns for API responses and error handling
+- Use TypeScript types throughout
+- Respect session auth and business scoping
+- Do not create a separate auth model
+- Do not create a new backend framework
+- Do not change the existing quote, CRM, toolkit, or revenue flows
+- Do not change app-wide theme primitives
+- Do not add heavy infrastructure beyond what is needed for MVP
+
+At the end, provide:
+1. all files created or modified
+2. all new DB tables and fields
+3. all new routes
+4. all required env vars
+5. exact local testing steps
+6. any assumptions or mock behaviors used

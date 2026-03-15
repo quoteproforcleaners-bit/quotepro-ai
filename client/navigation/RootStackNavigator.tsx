@@ -36,6 +36,9 @@ import WalkthroughAIScreen from "@/screens/WalkthroughAIScreen";
 import WalkthroughResultsScreen from "@/screens/WalkthroughResultsScreen";
 import WalkthroughEditScreen from "@/screens/WalkthroughEditScreen";
 import ClosingAssistantScreen from "@/screens/ClosingAssistantScreen";
+import LeadFinderScreen from "@/screens/LeadFinderScreen";
+import LeadFinderDetailScreen from "@/screens/LeadFinderDetailScreen";
+import LeadFinderSettingsScreen from "@/screens/LeadFinderSettingsScreen";
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -82,6 +85,9 @@ export type RootStackParamList = {
   WalkthroughResults: { extractedFields: any; assumptions: string[]; confidence: string; description: string };
   WalkthroughEdit: { extractedFields: any; assumptions: string[]; confidence: string; description: string };
   ClosingAssistant: { quoteAmount?: number; serviceType?: string; frequency?: string; addOns?: string[]; customerName?: string; notes?: string; pricingSummary?: string } | undefined;
+  LeadFinder: undefined;
+  LeadFinderDetail: { leadId: string };
+  LeadFinderSettings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -395,6 +401,27 @@ export default function RootStackNavigator() {
             component={ClosingAssistantScreen}
             options={{
               headerTitle: "Closing Assistant",
+            }}
+          />
+          <Stack.Screen
+            name="LeadFinder"
+            component={LeadFinderScreen}
+            options={{
+              headerTitle: "Local Lead Finder",
+            }}
+          />
+          <Stack.Screen
+            name="LeadFinderDetail"
+            component={LeadFinderDetailScreen}
+            options={{
+              headerTitle: "Lead Detail",
+            }}
+          />
+          <Stack.Screen
+            name="LeadFinderSettings"
+            component={LeadFinderSettingsScreen}
+            options={{
+              headerTitle: "Lead Finder Settings",
             }}
           />
         </>

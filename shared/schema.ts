@@ -940,3 +940,87 @@ export type JobberConnection = typeof jobberConnections.$inferSelect;
 export type JobberClientMapping = typeof jobberClientMappings.$inferSelect;
 export type JobberJobLink = typeof jobberJobLinks.$inferSelect;
 export type JobberSyncLogEntry = typeof jobberSyncLog.$inferSelect;
+
+// ─── Local Lead Finder ───────────────────────────────────────────────────────
+
+export const leadFinderSettings = pgTable("lead_finder_settings", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  enabled: boolean("enabled").notNull().default(true),
+  targetCities: jsonb("target_cities").default([]),
+  targetZips: jsonb("target_zips").default([]),
+  radiusMiles: integer("radius_miles").notNull().default(25),
+  keywords: jsonb("keywords").default([]),
+  subreddits: jsonb("subreddits").default([]),
+  notifyNewLeads: boolean("notify_new_leads").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const leadFinderLeads = pgTable("lead_finder_leads", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  source: text("source").notNull().default("reddit"),
+  externalId: text("external_id").notNull(),
+  subreddit: text("subreddit"),
+  title: text("title"),
+  body: text("body"),
+  author: text("author"),
+  postUrl: text("post_url"),
+  permalink: text("permalink"),
+  matchedKeyword: text("matched_keyword"),
+  detectedLocation: text("detected_location"),
+  intent: text("intent"),
+  aiClassification: text("ai_classification"),
+  aiConfidence: integer("ai_confidence"),
+  aiReason: text("ai_reason"),
+  leadScore: integer("lead_score").default(0),
+  status: text("status").notNull().default("new"),
+  postedAt: timestamp("posted_at"),
+  ingestedAt: timestamp("ingested_at").defaultNow(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const leadFinderReplies = pgTable("lead_finder_replies", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id")
+    .notNull()
+    .references(() => leadFinderLeads.id),
+  tone: text("tone").notNull(),
+  replyText: text("reply_text").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const leadFinderEvents = pgTable("lead_finder_events", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").references(() => leadFinderLeads.id),
+  userId: varchar("user_id").references(() => users.id),
+  eventType: text("event_type").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type LeadFinderSettings = typeof leadFinderSettings.$inferSelect;
+export type LeadFinderLead = typeof leadFinderLeads.$inferSelect;
+export type LeadFinderReply = typeof leadFinderReplies.$inferSelect;
+export type LeadFinderEvent = typeof leadFinderEvents.$inferSelect;

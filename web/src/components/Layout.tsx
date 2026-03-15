@@ -22,9 +22,10 @@ import {
   ArrowUpRight,
   Wrench,
   Inbox,
+  Radio,
 } from "lucide-react";
 
-const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant"];
+const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant", "/lead-finder"];
 
 const navSections = [
   {
@@ -46,6 +47,7 @@ const navSections = [
     items: [
       { to: "/growth", label: "Growth Hub", icon: TrendingUp, pro: true },
       { to: "/follow-ups", label: "Follow-ups", icon: Bell },
+      { to: "/lead-finder", label: "Lead Finder", icon: Radio, pro: true },
       { to: "/opportunities", label: "Opportunities", icon: Target, pro: true },
     ],
   },

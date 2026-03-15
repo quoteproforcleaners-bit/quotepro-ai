@@ -25,6 +25,9 @@ import WalkthroughAIPage from "./pages/WalkthroughAIPage";
 import ToolkitPage from "./pages/ToolkitPage";
 import IntakePage from "./pages/IntakePage";
 import IntakeRequestsPage from "./pages/IntakeRequestsPage";
+import LeadFinderPage from "./pages/LeadFinderPage";
+import LeadFinderDetailPage from "./pages/LeadFinderDetailPage";
+import LeadFinderSettingsPage from "./pages/LeadFinderSettingsPage";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -86,6 +89,9 @@ export default function App() {
           <Route path="/walkthrough-ai" element={<WalkthroughAIPage />} />
           <Route path="/toolkit" element={<ToolkitPage />} />
           <Route path="/intake-requests" element={<IntakeRequestsPage />} />
+          <Route path="/lead-finder" element={<LeadFinderPage />} />
+          <Route path="/lead-finder/settings" element={<LeadFinderSettingsPage />} />
+          <Route path="/lead-finder/:id" element={<LeadFinderDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
 

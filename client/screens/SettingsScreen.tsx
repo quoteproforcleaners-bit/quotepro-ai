@@ -1209,6 +1209,30 @@ export default function SettingsScreen() {
       <SectionHeader title={t.settings.growthAndAutomations} subtitle={t.settings.growthAndAutomationsSubtitle} />
 
       <Pressable
+        onPress={() => navigation.navigate("LeadFinder" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-lead-finder"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: "#7C3AED15" }]}>
+            <Feather name="radio" size={20} color="#7C3AED" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>Local Lead Finder</ThemedText>
+              <View style={{ backgroundColor: "#7C3AED", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                <ThemedText style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>BETA</ThemedText>
+              </View>
+            </View>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Find people nearby asking for cleaning help
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
         onPress={() => navigation.navigate("AutomationsHub" as any)}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-automations-hub"
