@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -85,8 +84,8 @@ export default function LeadFinderScreen() {
   const { isPro } = useSubscription();
   const navigation = useNavigation<Nav>();
   const headerHeight = useHeaderHeight();
-  const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
+
   const qc = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<TabKey>("new");
@@ -271,8 +270,8 @@ export default function LeadFinderScreen() {
         contentContainerStyle={[
           styles.listContent,
           {
-            paddingTop: Spacing.md,
-            paddingBottom: tabBarHeight + Spacing["2xl"],
+            paddingTop: headerHeight + Spacing.md,
+            paddingBottom: insets.bottom + Spacing["2xl"],
           },
         ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}

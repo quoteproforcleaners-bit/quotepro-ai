@@ -10,7 +10,6 @@ import {
   Platform,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -98,7 +97,6 @@ export default function LeadFinderDetailScreen() {
   const { leadId } = route.params;
   const theme = useTheme();
   const headerHeight = useHeaderHeight();
-  const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
 
@@ -159,7 +157,7 @@ export default function LeadFinderDetailScreen() {
       style={[styles.root, { backgroundColor: theme.background }]}
       contentContainerStyle={{
         paddingTop: headerHeight + Spacing.md,
-        paddingBottom: tabBarHeight + Spacing["3xl"],
+        paddingBottom: insets.bottom + Spacing["3xl"],
         paddingHorizontal: Spacing.md,
       }}
       scrollIndicatorInsets={{ bottom: insets.bottom }}

@@ -184,9 +184,21 @@ export default function MilestoneCelebrationModal({ visible, milestone, totalRev
         <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} />
 
         {showContent ? (
-          <Animated.View style={[styles.card, { backgroundColor: theme.cardBackground, paddingBottom: insets.bottom + 24 }]}>
+          <Animated.View style={[
+            styles.card,
+            {
+              backgroundColor: theme.cardBackground,
+              paddingBottom: insets.bottom + 24,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 16,
+              elevation: 24,
+            },
+          ]}>
+            <View style={styles.dragHandle} />
             <View style={styles.emojiRow}>
-              <View style={[styles.trophyBadge, { backgroundColor: "#7C3AED15" }]}>
+              <View style={[styles.trophyBadge, { backgroundColor: "#7C3AED20" }]}>
                 <Feather name="award" size={40} color="#7C3AED" />
               </View>
             </View>
@@ -249,8 +261,16 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: Spacing.xl,
-    paddingTop: 28,
+    paddingTop: 12,
     alignItems: "center",
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(0,0,0,0.15)",
+    marginBottom: 20,
+    alignSelf: "center",
   },
   emojiRow: {
     marginBottom: 16,
