@@ -94,7 +94,7 @@ export function parseLinqWebhookEvent(rawBody: any): LinqInboundEvent | null {
     const payload = typeof rawBody === "string" ? JSON.parse(rawBody) : rawBody;
     const type = payload?.type || payload?.event_type || "unknown";
 
-    if (!["message.inbound", "inbound_message", "message_received"].includes(type)) {
+    if (!["message.received", "message.inbound", "inbound_message", "message_received"].includes(type)) {
       return null;
     }
 
