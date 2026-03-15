@@ -15,6 +15,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { ProGate } from "@/components/ProGate";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { apiRequest } from "@/lib/query-client";
 import { Spacing, BorderRadius } from "@/constants/theme";
 
@@ -57,12 +59,8 @@ export default function AIQuoteAssistantSettingsScreen() {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { isPro } = useSubscription();
   const [saving, setSaving] = useState(false);
-
-  const { data: serverSettings, isLoading } = useQuery<any>({
-    queryKey: ["/api/ai-assistant/settings"],
-  });
-
   const [settings, setSettings] = useState<any>({
     enabled: false,
     autoReplyEnabled: true,
@@ -79,9 +77,18 @@ export default function AIQuoteAssistantSettingsScreen() {
     autoSendQuote: false,
   });
 
+  const { data: serverSettings, isLoading } = useQuery<any>({
+    queryKey: ["/api/ai-assistant/settings"],
+    enabled: isPro,
+  });
+
   useEffect(() => {
     if (serverSettings) setSettings((prev: any) => ({ ...prev, ...serverSettings }));
   }, [serverSettings]);
+
+  if (!isPro) {
+    return <ProGate featureName="AI Quote Assistant"><View /></ProGate>;
+  }
 
   const toggle = (key: string) => setSettings((prev: any) => ({ ...prev, [key]: !prev[key] }));
 

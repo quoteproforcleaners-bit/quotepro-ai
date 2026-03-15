@@ -17,6 +17,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { ProGate } from "@/components/ProGate";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { apiRequest } from "@/lib/query-client";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -100,7 +102,9 @@ export default function AIQuoteAssistantThreadScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
+  const { isPro } = useSubscription();
   const { threadId } = route.params;
+
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [suggestedReply, setSuggestedReply] = useState("");
@@ -108,6 +112,7 @@ export default function AIQuoteAssistantThreadScreen() {
 
   const { data, isLoading, refetch } = useQuery<any>({
     queryKey: ["/api/ai-assistant/threads", threadId],
+    enabled: isPro,
     queryFn: async () => {
       const { getApiUrl } = await import("@/lib/query-client");
       const url = new URL(`/api/ai-assistant/threads/${threadId}`, getApiUrl());
@@ -116,6 +121,10 @@ export default function AIQuoteAssistantThreadScreen() {
       return res.json();
     },
   });
+
+  if (!isPro) {
+    return <ProGate featureName="AI Quote Assistant"><View /></ProGate>;
+  }
 
   const thread = data?.thread;
   const messages: any[] = data?.messages || [];

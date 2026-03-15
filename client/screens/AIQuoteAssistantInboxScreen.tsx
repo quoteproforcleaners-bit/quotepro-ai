@@ -17,6 +17,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/hooks/useTheme";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
+import { ProGate } from "@/components/ProGate";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -76,12 +78,23 @@ export default function AIQuoteAssistantInboxScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
+  const { isPro } = useSubscription();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
 
+  const { data: settings } = useQuery<any>({
+    queryKey: ["/api/ai-assistant/settings"],
+    enabled: isPro,
+  });
+
   const { data: threads = [], isLoading, refetch, isRefetching } = useQuery<any[]>({
     queryKey: ["/api/ai-assistant/threads"],
+    enabled: isPro && settings?.enabled,
   });
+
+  if (!isPro) {
+    return <ProGate featureName="AI Quote Assistant"><View /></ProGate>;
+  }
 
   const filtered = (threads as any[]).filter((t) => {
     const matchFilter =
@@ -96,6 +109,29 @@ export default function AIQuoteAssistantInboxScreen() {
       t.customerName?.toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
   });
+
+  if (settings && !settings.enabled) {
+    return (
+      <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
+        <View style={styles.center}>
+          <View style={[styles.disabledIcon, { backgroundColor: PURPLE + "15" }]}>
+            <Feather name="cpu" size={36} color={PURPLE} />
+          </View>
+          <ThemedText style={[styles.emptyTitle, { color: theme.text }]}>AI Quote Assistant is Off</ThemedText>
+          <ThemedText style={[styles.emptySubtitle, { color: theme.textMuted }]}>
+            Turn it on in settings to start automatically answering leads, collecting quote details, and handling FAQs via SMS.
+          </ThemedText>
+          <Pressable
+            style={[styles.enableBtn, { backgroundColor: PURPLE }]}
+            onPress={() => navigation.navigate("AIQuoteAssistantSettings")}
+          >
+            <Feather name="toggle-right" size={18} color="#fff" style={{ marginRight: 8 }} />
+            <ThemedText style={styles.enableBtnText}>Go to Settings to Enable</ThemedText>
+          </Pressable>
+        </View>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={[styles.container, { paddingTop: headerHeight }]}>
@@ -203,5 +239,8 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: "700" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: Spacing.xl },
   emptyTitle: { fontSize: 17, fontWeight: "700", textAlign: "center", marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 20, marginBottom: 24 },
+  disabledIcon: { width: 72, height: 72, borderRadius: 36, justifyContent: "center", alignItems: "center", marginBottom: 16 },
+  enableBtn: { flexDirection: "row", alignItems: "center", borderRadius: 14, paddingHorizontal: 20, paddingVertical: 14, marginTop: 4 },
+  enableBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });
