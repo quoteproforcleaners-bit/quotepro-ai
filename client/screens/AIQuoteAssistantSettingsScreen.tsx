@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -75,6 +76,7 @@ export default function AIQuoteAssistantSettingsScreen() {
     allowIntakeAutomation: true,
     autoCreateQuoteDraft: true,
     autoSendQuote: false,
+    linqPhoneNumber: "",
   });
 
   const { data: serverSettings, isLoading } = useQuery<any>({
@@ -138,6 +140,19 @@ export default function AIQuoteAssistantSettingsScreen() {
         <View style={[styles.section, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <SettingRow label="Enable AI Quote Assistant" description="Turn on AI-powered automatic replies" value={settings.enabled} onToggle={() => toggle("enabled")} theme={theme} />
           <SettingRow label="Auto Reply" description="AI will automatically respond to inbound messages" value={settings.autoReplyEnabled} onToggle={() => toggle("autoReplyEnabled")} theme={theme} />
+          <View style={[styles.phoneRow, { borderTopColor: theme.border }]}>
+            <ThemedText style={styles.phoneLabel}>Linq Phone Number</ThemedText>
+            <ThemedText style={[styles.phoneDesc, { color: theme.textMuted }]}>The phone number AI will answer (e.g. +12052435879)</ThemedText>
+            <TextInput
+              style={[styles.phoneInput, { backgroundColor: theme.backgroundRoot, borderColor: theme.border, color: theme.text }]}
+              value={settings.linqPhoneNumber || ""}
+              onChangeText={(v) => setSettings((p: any) => ({ ...p, linqPhoneNumber: v }))}
+              placeholder="+12052435879"
+              placeholderTextColor={theme.textMuted}
+              keyboardType="phone-pad"
+              autoCorrect={false}
+            />
+          </View>
         </View>
 
         {/* Tone */}
@@ -204,4 +219,8 @@ const styles = StyleSheet.create({
   toneLabel: { fontSize: 15 },
   saveBtn: { borderRadius: BorderRadius.lg, paddingVertical: 16, alignItems: "center", marginTop: Spacing.lg },
   saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  phoneRow: { paddingHorizontal: Spacing.md, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  phoneLabel: { fontSize: 15, fontWeight: "600", marginBottom: 2 },
+  phoneDesc: { fontSize: 12, lineHeight: 16, marginBottom: 8 },
+  phoneInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 },
 });

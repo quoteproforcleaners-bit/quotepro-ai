@@ -2755,18 +2755,19 @@ export async function upsertAiQuoteAssistantSettings(
   businessId: string,
   payload: Partial<AiQuoteAssistantSettings>
 ): Promise<AiQuoteAssistantSettings> {
+  const { id, businessId: _bid, createdAt, updatedAt, ...safe } = payload as any;
   const existing = await getAiQuoteAssistantSettings(businessId);
   if (existing) {
     const [updated] = await db
       .update(aiQuoteAssistantSettings)
-      .set({ ...payload, updatedAt: new Date() })
+      .set({ ...safe, updatedAt: new Date() })
       .where(eq(aiQuoteAssistantSettings.businessId, businessId))
       .returning();
     return updated;
   }
   const [created] = await db
     .insert(aiQuoteAssistantSettings)
-    .values({ businessId, ...payload } as any)
+    .values({ businessId, ...safe } as any)
     .returning();
   return created;
 }

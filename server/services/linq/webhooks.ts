@@ -161,6 +161,18 @@ async function findBusinessByPhoneNumber(phone: string): Promise<{ businessId: s
       [phone]
     );
     if (r.rows.length > 0) return { businessId: r.rows[0].business_id };
+
+    // Fallback: if LINQ_PHONE_NUMBER env var matches, use the first business with AI settings
+    const envPhone = process.env.LINQ_PHONE_NUMBER;
+    if (envPhone && (phone === envPhone || phone.replace(/\D/g, "") === envPhone.replace(/\D/g, ""))) {
+      const fallback = await pool.query(
+        `SELECT business_id FROM ai_quote_assistant_settings WHERE enabled = true LIMIT 1`
+      );
+      if (fallback.rows.length > 0) return { businessId: fallback.rows[0].business_id };
+      // If no AI settings yet, just grab the first business
+      const anyBiz = await pool.query(`SELECT id FROM businesses LIMIT 1`);
+      if (anyBiz.rows.length > 0) return { businessId: anyBiz.rows[0].id };
+    }
     return null;
   } catch {
     return null;

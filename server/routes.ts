@@ -9724,7 +9724,11 @@ Rules:
         const business = await getBusinessByOwner(req.session.userId!);
         if (!business) return res.status(404).json({ message: "Business not found" });
         const settings = await getAiQuoteAssistantSettings(business.id);
-        res.json(settings ?? { businessId: business.id, enabled: false, autoReplyEnabled: true, businessTone: "professional", allowFaqAutoAnswers: true, allowIntakeAutomation: true, autoCreateQuoteDraft: true, autoSendQuote: false, requireHandoffOnDiscount: true, requireHandoffOnAngry: true, requireHandoffOnCommercial: true, requireHandoffOnLowConfidence: true, lowConfidenceThreshold: 70, responseHoursOnly: false });
+        const { getLinqPrimaryNumber } = await import("./storage");
+        const linqPhone = await getLinqPrimaryNumber(business.id);
+        const linqPhoneNumber = linqPhone?.phoneNumber || process.env.LINQ_PHONE_NUMBER || null;
+        const base = settings ?? { businessId: business.id, enabled: false, autoReplyEnabled: true, businessTone: "professional", allowFaqAutoAnswers: true, allowIntakeAutomation: true, autoCreateQuoteDraft: true, autoSendQuote: false, requireHandoffOnDiscount: true, requireHandoffOnAngry: true, requireHandoffOnCommercial: true, requireHandoffOnLowConfidence: true, lowConfidenceThreshold: 70, responseHoursOnly: false };
+        res.json({ ...base, linqPhoneNumber });
       } catch (e: any) { res.status(500).json({ message: e.message }); }
     });
 
@@ -9732,8 +9736,17 @@ Rules:
       try {
         const business = await getBusinessByOwner(req.session.userId!);
         if (!business) return res.status(404).json({ message: "Business not found" });
-        const updated = await upsertAiQuoteAssistantSettings(business.id, req.body);
-        res.json(updated);
+        const { linqPhoneNumber, ...settingsPayload } = req.body;
+        const updated = await upsertAiQuoteAssistantSettings(business.id, settingsPayload);
+        if (linqPhoneNumber?.trim()) {
+          const { upsertLinqPhoneNumber } = await import("./storage");
+          await upsertLinqPhoneNumber(business.id, {
+            phoneNumber: linqPhoneNumber.trim(),
+            status: "active",
+            isPrimary: true,
+          } as any);
+        }
+        res.json({ ...updated, linqPhoneNumber: linqPhoneNumber?.trim() || null });
       } catch (e: any) { res.status(500).json({ message: e.message }); }
     });
 
@@ -9843,7 +9856,7 @@ Rules:
         const { from = "+15550001111", body = "Hi, I need a cleaning quote for my 3-bedroom house." } = req.body;
         const primaryNum = await getLinqPrimaryNumber(business.id);
         const to = primaryNum?.phoneNumber || "+15550000000";
-        const fakeWebhookPayload = { type: "message.inbound", message: { id: `test_${Date.now()}`, from, to, body, timestamp: new Date().toISOString() } };
+        const fakeWebhookPayload = { type: "message.received", message: { id: `test_${Date.now()}`, from, to, body, timestamp: new Date().toISOString() } };
         const { handleLinqWebhook: handleHook } = await import("./services/linq/webhooks");
         const fakeReq = { body: fakeWebhookPayload, headers: {} } as any;
         const fakeRes = { status: (c: number) => ({ json: (d: any) => d }), json: (d: any) => d } as any;
