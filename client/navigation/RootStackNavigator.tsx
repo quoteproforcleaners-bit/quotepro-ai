@@ -39,9 +39,7 @@ import ClosingAssistantScreen from "@/screens/ClosingAssistantScreen";
 import LeadFinderScreen from "@/screens/LeadFinderScreen";
 import LeadFinderDetailScreen from "@/screens/LeadFinderDetailScreen";
 import LeadFinderSettingsScreen from "@/screens/LeadFinderSettingsScreen";
-import AIQuoteAssistantInboxScreen from "@/screens/AIQuoteAssistantInboxScreen";
-import AIQuoteAssistantThreadScreen from "@/screens/AIQuoteAssistantThreadScreen";
-import AIQuoteAssistantSettingsScreen from "@/screens/AIQuoteAssistantSettingsScreen";
+
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -91,9 +89,7 @@ export type RootStackParamList = {
   LeadFinder: undefined;
   LeadFinderDetail: { leadId: string };
   LeadFinderSettings: undefined;
-  AIQuoteAssistantInbox: undefined;
-  AIQuoteAssistantThread: { threadId: string };
-  AIQuoteAssistantSettings: undefined;
+
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -428,27 +424,6 @@ export default function RootStackNavigator() {
             component={LeadFinderSettingsScreen}
             options={{
               headerTitle: "Lead Finder Settings",
-            }}
-          />
-          <Stack.Screen
-            name="AIQuoteAssistantInbox"
-            component={AIQuoteAssistantInboxScreen}
-            options={{
-              headerTitle: "AI Quote Assistant",
-            }}
-          />
-          <Stack.Screen
-            name="AIQuoteAssistantThread"
-            component={AIQuoteAssistantThreadScreen}
-            options={{
-              headerTitle: "Conversation",
-            }}
-          />
-          <Stack.Screen
-            name="AIQuoteAssistantSettings"
-            component={AIQuoteAssistantSettingsScreen}
-            options={{
-              headerTitle: "AI Assistant Settings",
             }}
           />
         </>
