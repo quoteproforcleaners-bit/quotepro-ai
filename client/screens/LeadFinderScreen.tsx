@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -6,8 +6,8 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
-  Linking,
   Text,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -26,15 +26,16 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
+const PURPLE = "#7C3AED";
+
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+type FilterKey = "all" | "new" | "saved" | "contacted";
 
-type TabKey = "new" | "saved" | "contacted" | "all";
-
-const TABS: { key: TabKey; label: string }[] = [
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: "all", label: "All" },
   { key: "new", label: "New" },
   { key: "saved", label: "Saved" },
   { key: "contacted", label: "Contacted" },
-  { key: "all", label: "All" },
 ];
 
 const INTENT_LABELS: Record<string, string> = {
@@ -56,26 +57,11 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-function ScoreBadge({ score, theme }: { score: number; theme: any }) {
+function ScoreBadge({ score }: { score: number }) {
   const color = score >= 70 ? "#059669" : score >= 40 ? "#D97706" : "#6b7280";
   return (
     <View style={[styles.scoreBadge, { backgroundColor: color + "20", borderColor: color + "40" }]}>
-      <ThemedText style={[styles.scoreText, { color }]}>{score}</ThemedText>
-    </View>
-  );
-}
-
-function StatusBadge({ status, theme }: { status: string; theme: any }) {
-  const map: Record<string, { label: string; color: string }> = {
-    new: { label: "New", color: "#7C3AED" },
-    saved: { label: "Saved", color: "#2563EB" },
-    contacted: { label: "Contacted", color: "#059669" },
-    dismissed: { label: "Dismissed", color: "#6b7280" },
-  };
-  const item = map[status] ?? { label: status, color: "#6b7280" };
-  return (
-    <View style={[styles.statusBadge, { backgroundColor: item.color + "18" }]}>
-      <ThemedText style={[styles.statusText, { color: item.color }]}>{item.label}</ThemedText>
+      <Text style={[styles.scoreText, { color }]}>{score}</Text>
     </View>
   );
 }
@@ -86,43 +72,45 @@ export default function LeadFinderScreen() {
   const navigation = useNavigation<Nav>();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
-
   const qc = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<TabKey>("new");
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [polling, setPolling] = useState(false);
-
-  const queryKey = ["/api/lead-finder/leads", activeTab];
+  const [scanning, setScanning] = useState(false);
+  const autoScanned = useRef(false);
 
   const { data, isLoading } = useQuery<{ leads: any[]; total: number }>({
-    queryKey,
+    queryKey: ["/api/lead-finder/leads", "all"],
     queryFn: async () => {
-      const params = new URLSearchParams({ status: activeTab === "all" ? "" : activeTab, limit: "30" });
+      const params = new URLSearchParams({ status: "", limit: "100" });
       const res = await fetch(`/api/lead-finder/leads?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
   });
 
-  const leads = data?.leads ?? [];
+  const allLeads = data?.leads ?? [];
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await qc.invalidateQueries({ queryKey: ["/api/lead-finder/leads"] });
-    setRefreshing(false);
-  }, [qc]);
-
-  const handlePoll = useCallback(async () => {
-    setPolling(true);
+  const triggerScan = useCallback(async (silent = false) => {
+    if (!silent) setScanning(true);
     try {
       await apiRequest("POST", "/api/lead-finder/poll", {});
       await qc.invalidateQueries({ queryKey: ["/api/lead-finder/leads"] });
       await qc.invalidateQueries({ queryKey: ["/api/lead-finder/count"] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (!silent) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
-    setPolling(false);
+    if (!silent) setScanning(false);
   }, [qc]);
+
+  useEffect(() => {
+    if (!isLoading && !autoScanned.current) {
+      autoScanned.current = true;
+      if (allLeads.length === 0) {
+        triggerScan(true);
+      }
+    }
+  }, [isLoading, allLeads.length]);
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -133,30 +121,55 @@ export default function LeadFinderScreen() {
     },
   });
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await triggerScan(true);
+    setRefreshing(false);
+  }, [triggerScan]);
+
+  const filteredLeads = allLeads.filter((lead) => {
+    if (filter !== "all" && lead.status !== filter) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (
+        (lead.title ?? "").toLowerCase().includes(q) ||
+        (lead.body ?? "").toLowerCase().includes(q) ||
+        (lead.subreddit ?? "").toLowerCase().includes(q) ||
+        (lead.detectedLocation ?? "").toLowerCase().includes(q) ||
+        (lead.matchedKeyword ?? "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
   const renderLead = useCallback(({ item }: { item: any }) => {
-    const postedDate = item.postedAt ? timeAgo(item.postedAt) : "unknown";
+    const postedDate = item.postedAt ? timeAgo(item.postedAt) : "";
     const excerpt = (item.body ?? "").slice(0, 120).trim();
+    const statusColor: Record<string, string> = {
+      new: PURPLE,
+      saved: "#2563EB",
+      contacted: "#059669",
+      dismissed: "#9CA3AF",
+    };
+    const sc = statusColor[item.status] ?? "#9CA3AF";
 
     return (
       <Pressable
         onPress={() => navigation.navigate("LeadFinderDetail", { leadId: item.id })}
         style={({ pressed }) => [styles.cardWrap, { opacity: pressed ? 0.85 : 1 }]}
+        testID={`card-lead-${item.id}`}
       >
         <Card style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLeft}>
-              <View style={[styles.subredditPill, { backgroundColor: theme.primary + "15" }]}>
-                <ThemedText style={[styles.subredditText, { color: theme.primary }]}>
-                  r/{item.subreddit ?? "reddit"}
-                </ThemedText>
+              <View style={[styles.subredditPill, { backgroundColor: PURPLE + "15" }]}>
+                <Text style={[styles.subredditText, { color: PURPLE }]}>r/{item.subreddit ?? "reddit"}</Text>
               </View>
-              <ThemedText style={[styles.timeAgo, { color: theme.textSecondary }]}>
-                {postedDate}
-              </ThemedText>
+              <ThemedText style={[styles.timeAgo, { color: theme.textSecondary }]}>{postedDate}</ThemedText>
             </View>
             <View style={styles.cardHeaderRight}>
-              <ScoreBadge score={item.leadScore ?? 0} theme={theme} />
-              {item.status !== "new" ? <StatusBadge status={item.status} theme={theme} /> : null}
+              <ScoreBadge score={item.leadScore ?? 0} />
+              <View style={[styles.statusDot, { backgroundColor: sc }]} />
             </View>
           </View>
 
@@ -168,41 +181,23 @@ export default function LeadFinderScreen() {
             </ThemedText>
           ) : null}
 
-          <View style={styles.cardMeta}>
-            {item.detectedLocation ? (
-              <View style={styles.metaChip}>
-                <Feather name="map-pin" size={11} color={theme.textSecondary} />
-                <ThemedText style={[styles.metaText, { color: theme.textSecondary }]}>
-                  {item.detectedLocation}
-                </ThemedText>
-              </View>
-            ) : null}
-            {item.intent ? (
-              <View style={styles.metaChip}>
-                <Feather name="tag" size={11} color={theme.textSecondary} />
-                <ThemedText style={[styles.metaText, { color: theme.textSecondary }]}>
-                  {INTENT_LABELS[item.intent] ?? item.intent}
-                </ThemedText>
-              </View>
-            ) : null}
-            {item.matchedKeyword ? (
-              <View style={styles.metaChip}>
-                <Feather name="search" size={11} color={theme.textSecondary} />
-                <ThemedText style={[styles.metaText, { color: theme.textSecondary }]} numberOfLines={1}>
-                  {item.matchedKeyword}
-                </ThemedText>
-              </View>
-            ) : null}
-          </View>
+          {item.detectedLocation ? (
+            <View style={styles.locationRow}>
+              <Feather name="map-pin" size={11} color={theme.textSecondary} />
+              <ThemedText style={[styles.locationText, { color: theme.textSecondary }]}>
+                {item.detectedLocation}
+              </ThemedText>
+            </View>
+          ) : null}
 
           <View style={[styles.cardActions, { borderTopColor: theme.border }]}>
-            {item.status === "new" ? (
+            {item.status !== "saved" ? (
               <Pressable
                 style={[styles.actionBtn, { backgroundColor: "#2563EB15" }]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); statusMutation.mutate({ id: item.id, status: "saved" }); }}
               >
                 <Feather name="bookmark" size={13} color="#2563EB" />
-                <ThemedText style={[styles.actionText, { color: "#2563EB" }]}>Save</ThemedText>
+                <Text style={[styles.actionText, { color: "#2563EB" }]}>Save</Text>
               </Pressable>
             ) : null}
             {item.status !== "contacted" ? (
@@ -211,24 +206,15 @@ export default function LeadFinderScreen() {
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); statusMutation.mutate({ id: item.id, status: "contacted" }); }}
               >
                 <Feather name="check" size={13} color="#059669" />
-                <ThemedText style={[styles.actionText, { color: "#059669" }]}>Contacted</ThemedText>
-              </Pressable>
-            ) : null}
-            {item.status !== "dismissed" ? (
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: theme.border }]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); statusMutation.mutate({ id: item.id, status: "dismissed" }); }}
-              >
-                <Feather name="x" size={13} color={theme.textSecondary} />
-                <ThemedText style={[styles.actionText, { color: theme.textSecondary }]}>Dismiss</ThemedText>
+                <Text style={[styles.actionText, { color: "#059669" }]}>Contacted</Text>
               </Pressable>
             ) : null}
             <Pressable
-              style={[styles.actionBtn, { backgroundColor: "#7C3AED15" }]}
+              style={[styles.actionBtn, { backgroundColor: PURPLE + "15", marginLeft: "auto" }]}
               onPress={() => navigation.navigate("LeadFinderDetail", { leadId: item.id })}
             >
-              <Feather name="message-square" size={13} color="#7C3AED" />
-              <ThemedText style={[styles.actionText, { color: "#7C3AED" }]}>Reply</ThemedText>
+              <Feather name="message-square" size={13} color={PURPLE} />
+              <Text style={[styles.actionText, { color: PURPLE }]}>Reply</Text>
             </Pressable>
           </View>
         </Card>
@@ -242,95 +228,93 @@ export default function LeadFinderScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <View style={[styles.tabBar, { borderBottomColor: theme.border, paddingTop: headerHeight }]}>
-        {TABS.map((t) => (
-          <Pressable
-            key={t.key}
-            onPress={() => setActiveTab(t.key)}
-            style={[
-              styles.tab,
-              activeTab === t.key && { borderBottomColor: theme.primary, borderBottomWidth: 2 },
-            ]}
-          >
-            <ThemedText
+      <View style={[styles.topBar, { paddingTop: headerHeight, backgroundColor: theme.background, borderBottomColor: theme.border }]}>
+        <View style={[styles.searchRow, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <Feather name="search" size={15} color={theme.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search leads, subreddits, locations..."
+            placeholderTextColor={theme.textSecondary}
+            returnKeyType="search"
+            autoCorrect={false}
+            testID="input-lead-search"
+          />
+          {search.length > 0 ? (
+            <Pressable onPress={() => setSearch("")}>
+              <Feather name="x" size={15} color={theme.textSecondary} />
+            </Pressable>
+          ) : null}
+        </View>
+        <View style={styles.filterRow}>
+          {FILTERS.map((f) => (
+            <Pressable
+              key={f.key}
+              onPress={() => setFilter(f.key)}
               style={[
-                styles.tabLabel,
-                { color: activeTab === t.key ? theme.primary : theme.textSecondary },
+                styles.filterChip,
+                filter === f.key
+                  ? { backgroundColor: PURPLE, borderColor: PURPLE }
+                  : { backgroundColor: "transparent", borderColor: theme.border },
               ]}
             >
-              {t.label}
-            </ThemedText>
+              <Text style={[styles.filterChipText, { color: filter === f.key ? "#fff" : theme.textSecondary }]}>
+                {f.label}
+              </Text>
+            </Pressable>
+          ))}
+          <Pressable
+            style={[styles.refreshBtn, { borderColor: theme.border }]}
+            onPress={() => triggerScan(false)}
+            disabled={scanning}
+            testID="button-run-scan"
+          >
+            {scanning
+              ? <ActivityIndicator size="small" color={PURPLE} />
+              : <Feather name="refresh-cw" size={15} color={PURPLE} />}
           </Pressable>
-        ))}
+          <Pressable
+            style={[styles.settingsBtn, { borderColor: theme.border }]}
+            onPress={() => navigation.navigate("LeadFinderSettings")}
+          >
+            <Feather name="settings" size={15} color={theme.textSecondary} />
+          </Pressable>
+        </View>
       </View>
 
       <FlatList
-        data={leads}
+        data={filteredLeads}
         keyExtractor={(item) => item.id}
         renderItem={renderLead}
         contentContainerStyle={[
           styles.listContent,
-          {
-            paddingTop: Spacing.md,
-            paddingBottom: insets.bottom + Spacing["2xl"],
-          },
+          { paddingBottom: insets.bottom + Spacing["2xl"] },
         ]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE} />}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         ListEmptyComponent={
-          isLoading ? (
+          isLoading || scanning ? (
             <View style={styles.emptyState}>
-              <ActivityIndicator color={theme.primary} />
+              <ActivityIndicator color={PURPLE} size="large" />
+              <ThemedText style={[styles.emptyTitle, { color: theme.text, marginTop: 12 }]}>
+                Scanning Reddit for leads...
+              </ThemedText>
+              <ThemedText style={[styles.emptySub, { color: theme.textSecondary }]}>
+                This takes about 10-15 seconds on first run.
+              </ThemedText>
             </View>
           ) : (
             <View style={[styles.emptyState, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
               <Feather name="search" size={32} color={theme.textSecondary} style={{ marginBottom: 12 }} />
-              <ThemedText style={[styles.emptyTitle, { color: theme.text }]}>No leads yet</ThemedText>
+              <ThemedText style={[styles.emptyTitle, { color: theme.text }]}>No leads found</ThemedText>
               <ThemedText style={[styles.emptySub, { color: theme.textSecondary }]}>
-                Try adjusting your cities, ZIP codes, subreddits, or keywords, then run a scan.
+                {search.trim()
+                  ? "Try a different search term or clear the filter."
+                  : "Add your target cities in Settings to find local leads, then tap the refresh icon to scan."}
               </ThemedText>
-              <Pressable
-                style={[styles.scanBtn, { backgroundColor: theme.primary }]}
-                onPress={handlePoll}
-                disabled={polling}
-              >
-                {polling ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.scanBtnText}>Run Scan Now</Text>
-                )}
-              </Pressable>
             </View>
           )
-        }
-        ListHeaderComponent={
-          <View style={styles.listHeader}>
-            <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
-              Find people in your area already asking for cleaning help online.
-            </ThemedText>
-            <View style={styles.headerActions}>
-              <Pressable
-                style={[styles.scanBtn, { backgroundColor: theme.primary }]}
-                onPress={handlePoll}
-                disabled={polling}
-              >
-                {polling ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Feather name="refresh-cw" size={14} color="#fff" />
-                    <Text style={styles.scanBtnText}>Run Scan Now</Text>
-                  </>
-                )}
-              </Pressable>
-              <Pressable
-                style={[styles.settingsBtn, { borderColor: theme.border }]}
-                onPress={() => navigation.navigate("LeadFinderSettings")}
-              >
-                <Feather name="settings" size={16} color={theme.textSecondary} />
-              </Pressable>
-            </View>
-          </View>
         }
       />
     </View>
@@ -339,72 +323,73 @@ export default function LeadFinderScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  tabBar: {
-    flexDirection: "row",
+  topBar: {
     borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
+  searchRow: {
+    flexDirection: "row",
     alignItems: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 10,
   },
-  tabLabel: { fontSize: 13, fontWeight: "600" },
-  listContent: { paddingHorizontal: Spacing.md },
-  listHeader: { marginBottom: Spacing.md },
-  subtitle: { fontSize: 13, lineHeight: 18, marginBottom: 12 },
-  headerActions: { flexDirection: "row", gap: 8, alignItems: "center" },
-  scanBtn: {
+  searchInput: { flex: 1, fontSize: 14 },
+  filterRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: BorderRadius.md,
-    flex: 1,
-    justifyContent: "center",
   },
-  scanBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterChipText: { fontSize: 12, fontWeight: "600" },
+  refreshBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: "auto",
+  },
   settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.md,
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.sm,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
+  listContent: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
   cardWrap: { marginBottom: Spacing.sm },
   card: { padding: Spacing.md },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   cardHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
   cardHeaderRight: { flexDirection: "row", alignItems: "center", gap: 6 },
-  subredditPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
+  subredditPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   subredditText: { fontSize: 11, fontWeight: "700" },
   timeAgo: { fontSize: 11 },
-  scoreBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
+  scoreBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, borderWidth: 1 },
   scoreText: { fontSize: 11, fontWeight: "700" },
-  statusBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20 },
-  statusText: { fontSize: 10, fontWeight: "700" },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
   leadTitle: { fontSize: 14, fontWeight: "600", lineHeight: 20, marginBottom: 4 },
-  leadExcerpt: { fontSize: 12, lineHeight: 17, marginBottom: 8 },
-  cardMeta: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 },
-  metaChip: { flexDirection: "row", alignItems: "center", gap: 4 },
-  metaText: { fontSize: 11 },
+  leadExcerpt: { fontSize: 12, lineHeight: 17, marginBottom: 6 },
+  locationRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 8 },
+  locationText: { fontSize: 11 },
   cardActions: {
     flexDirection: "row",
     gap: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 10,
+    alignItems: "center",
   },
   actionBtn: {
     flexDirection: "row",
@@ -423,5 +408,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptyTitle: { fontSize: 15, fontWeight: "700", marginBottom: 6 },
-  emptySub: { fontSize: 13, textAlign: "center", lineHeight: 19, marginBottom: 16 },
+  emptySub: { fontSize: 13, textAlign: "center", lineHeight: 19 },
 });
