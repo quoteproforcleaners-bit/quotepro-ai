@@ -19,6 +19,7 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
+import { ProGate } from "@/components/ProGate";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
@@ -234,6 +235,7 @@ export default function LeadFinderScreen() {
   }, [navigation, theme, statusMutation]);
 
   return (
+    <ProGate featureName="Local Lead Finder">
     <View style={[styles.root, { backgroundColor: theme.background }]}>
       <View style={[styles.tabBar, { borderBottomColor: theme.border }]}>
         {TABS.map((t) => (
@@ -327,6 +329,7 @@ export default function LeadFinderScreen() {
         }
       />
     </View>
+    </ProGate>
   );
 }
 

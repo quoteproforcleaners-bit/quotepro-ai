@@ -9250,7 +9250,7 @@ Rules:
     const { scoreLead } = await import("./services/lead-finder/scoring");
     const { generateReplies } = await import("./services/lead-finder/reply-generator");
 
-    app.get("/api/lead-finder/settings", requireAuth, async (req: Request, res: Response) => {
+    app.get("/api/lead-finder/settings", requireAuth, requirePro as any, async (req: Request, res: Response) => {
       try {
         const business = await getBusinessByOwner(req.session.userId!);
         if (!business) return res.status(404).json({ message: "Business not found" });
@@ -9269,7 +9269,7 @@ Rules:
       }
     });
 
-    app.post("/api/lead-finder/settings", requireAuth, async (req: Request, res: Response) => {
+    app.post("/api/lead-finder/settings", requireAuth, requirePro as any, async (req: Request, res: Response) => {
       try {
         const business = await getBusinessByOwner(req.session.userId!);
         if (!business) return res.status(404).json({ message: "Business not found" });
@@ -9292,7 +9292,7 @@ Rules:
       }
     });
 
-    app.get("/api/lead-finder/leads", requireAuth, async (req: Request, res: Response) => {
+    app.get("/api/lead-finder/leads", requireAuth, requirePro as any, async (req: Request, res: Response) => {
       try {
         const business = await getBusinessByOwner(req.session.userId!);
         if (!business) return res.status(404).json({ message: "Business not found" });
@@ -9316,7 +9316,7 @@ Rules:
       }
     });
 
-    app.get("/api/lead-finder/count", requireAuth, async (req: Request, res: Response) => {
+    app.get("/api/lead-finder/count", requireAuth, requirePro as any, async (req: Request, res: Response) => {
       try {
         const business = await getBusinessByOwner(req.session.userId!);
         if (!business) return res.json({ count: 0 });
@@ -9327,7 +9327,7 @@ Rules:
       }
     });
 
-    app.get("/api/lead-finder/leads/:id", requireAuth, async (req: Request, res: Response) => {
+    app.get("/api/lead-finder/leads/:id", requireAuth, requirePro as any, async (req: Request, res: Response) => {
       try {
         const business = await getBusinessByOwner(req.session.userId!);
         if (!business) return res.status(404).json({ message: "Business not found" });
@@ -9340,7 +9340,7 @@ Rules:
       }
     });
 
-    app.post("/api/lead-finder/leads/:id/status", requireAuth, async (req: Request, res: Response) => {
+    app.post("/api/lead-finder/leads/:id/status", requireAuth, requirePro as any, async (req: Request, res: Response) => {
       try {
         const business = await getBusinessByOwner(req.session.userId!);
         if (!business) return res.status(404).json({ message: "Business not found" });
@@ -9378,7 +9378,7 @@ Rules:
       }
     });
 
-    app.post("/api/lead-finder/poll", requireAuth, async (req: Request, res: Response) => {
+    app.post("/api/lead-finder/poll", requireAuth, requirePro as any, async (req: Request, res: Response) => {
       try {
         const business = await getBusinessByOwner(req.session.userId!);
         if (!business) return res.status(404).json({ message: "Business not found" });
