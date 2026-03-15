@@ -8260,6 +8260,12 @@ init();
 
   app.post("/api/integrations/jobber/disconnect", requireAuth, requirePro as any, async (req: any, res) => {
     try {
+      const jobberClient = new JobberClient(req.session.userId);
+      const conn = await jobberClient.loadConnection();
+      if (conn) {
+        await jobberClient.ensureValidToken().catch(() => {});
+        await jobberClient.disconnectApp();
+      }
       await pool.query(
         `UPDATE jobber_connections SET status = 'disconnected', disconnected_at = NOW(),
                 access_token_encrypted = NULL, refresh_token_encrypted = NULL

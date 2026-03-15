@@ -327,6 +327,21 @@ export class JobberClient {
 
     return result.job;
   }
+
+  async disconnectApp(): Promise<void> {
+    const mutation = `
+      mutation AppDisconnect {
+        appDisconnect {
+          success
+        }
+      }
+    `;
+    try {
+      await this.graphql(mutation);
+    } catch (e: any) {
+      console.warn("appDisconnect mutation failed (token may already be invalid):", e.message);
+    }
+  }
 }
 
 export async function syncQuoteToJobber(
