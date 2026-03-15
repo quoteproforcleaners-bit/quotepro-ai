@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Linking,
+  Text,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -241,7 +242,7 @@ export default function LeadFinderScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <View style={[styles.tabBar, { borderBottomColor: theme.border }]}>
+      <View style={[styles.tabBar, { borderBottomColor: theme.border, paddingTop: headerHeight }]}>
         {TABS.map((t) => (
           <Pressable
             key={t.key}
@@ -270,7 +271,7 @@ export default function LeadFinderScreen() {
         contentContainerStyle={[
           styles.listContent,
           {
-            paddingTop: headerHeight + Spacing.md,
+            paddingTop: Spacing.md,
             paddingBottom: insets.bottom + Spacing["2xl"],
           },
         ]}
@@ -296,7 +297,7 @@ export default function LeadFinderScreen() {
                 {polling ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <ThemedText style={styles.scanBtnText}>Run Scan Now</ThemedText>
+                  <Text style={styles.scanBtnText}>Run Scan Now</Text>
                 )}
               </Pressable>
             </View>
@@ -318,7 +319,7 @@ export default function LeadFinderScreen() {
                 ) : (
                   <>
                     <Feather name="refresh-cw" size={14} color="#fff" />
-                    <ThemedText style={styles.scanBtnText}>Run Scan Now</ThemedText>
+                    <Text style={styles.scanBtnText}>Run Scan Now</Text>
                   </>
                 )}
               </Pressable>

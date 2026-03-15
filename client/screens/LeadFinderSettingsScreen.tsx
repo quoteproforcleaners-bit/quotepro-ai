@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   TextInput,
   Switch,
   ActivityIndicator,
+  FlatList,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,7 +27,123 @@ const DEFAULT_KEYWORDS = [
   "deep cleaning", "move out cleaning", "recurring cleaning",
 ];
 
-const DEFAULT_SUBREDDITS = ["cleaningtips", "moving", "homeowners"];
+const DEFAULT_SUBREDDITS = [
+  "cleaningtips", "moving", "homeowners", "firsttimehomebuyer",
+  "landlord", "airbnb", "PropertyManagement", "Tenant",
+];
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
+function CityTagEditor({
+  values,
+  onChange,
+  theme,
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  theme: any;
+}) {
+  const [input, setInput] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const debouncedInput = useDebounce(input, 350);
+
+  useEffect(() => {
+    if (debouncedInput.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    setLoadingSuggestions(true);
+    fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(debouncedInput)}&format=json&limit=6&featuretype=city&addressdetails=1`,
+      { headers: { "Accept-Language": "en" } }
+    )
+      .then((r) => r.json())
+      .then((data: any[]) => {
+        const cities = data
+          .filter((d) => d.address)
+          .map((d) => {
+            const city = d.address.city || d.address.town || d.address.village || d.name;
+            const state = d.address.state_code || d.address.state || "";
+            return city && state ? `${city}, ${state}` : city || d.display_name.split(",")[0];
+          })
+          .filter(Boolean)
+          .filter((c: string) => !values.includes(c));
+        const unique = [...new Set(cities)] as string[];
+        setSuggestions(unique.slice(0, 5));
+      })
+      .catch(() => setSuggestions([]))
+      .finally(() => setLoadingSuggestions(false));
+  }, [debouncedInput]);
+
+  const add = useCallback((city?: string) => {
+    const val = (city ?? input).trim();
+    if (!val || values.includes(val)) { setInput(""); setSuggestions([]); return; }
+    onChange([...values, val]);
+    setInput("");
+    setSuggestions([]);
+  }, [input, values, onChange]);
+
+  const remove = useCallback((v: string) => {
+    onChange(values.filter((x) => x !== v));
+  }, [values, onChange]);
+
+  return (
+    <View style={styles.tagEditorWrap}>
+      <ThemedText style={[styles.fieldLabel, { color: theme.textSecondary }]}>TARGET CITIES</ThemedText>
+      <View style={styles.tagInputRow}>
+        <TextInput
+          style={[styles.tagInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
+          value={input}
+          onChangeText={setInput}
+          placeholder="e.g. Austin"
+          placeholderTextColor={theme.textSecondary}
+          onSubmitEditing={() => add()}
+          returnKeyType="done"
+          autoCorrect={false}
+        />
+        <Pressable style={[styles.addTagBtn, { backgroundColor: theme.primary }]} onPress={() => add()}>
+          {loadingSuggestions
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Feather name="plus" size={16} color="#fff" />}
+        </Pressable>
+      </View>
+      {suggestions.length > 0 ? (
+        <View style={[styles.suggestionBox, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          {suggestions.map((s) => (
+            <Pressable
+              key={s}
+              style={[styles.suggestionItem, { borderBottomColor: theme.border }]}
+              onPress={() => add(s)}
+            >
+              <Feather name="map-pin" size={12} color={theme.textSecondary} style={{ marginRight: 6 }} />
+              <ThemedText style={[styles.suggestionText, { color: theme.text }]}>{s}</ThemedText>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      <View style={styles.tagList}>
+        {values.map((v) => (
+          <Pressable
+            key={v}
+            style={[styles.tag, { backgroundColor: theme.primary + "15", borderColor: theme.primary + "30" }]}
+            onPress={() => remove(v)}
+          >
+            <ThemedText style={[styles.tagText, { color: theme.primary }]}>{v}</ThemedText>
+            <Feather name="x" size={12} color={theme.primary} />
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 function TagEditor({
   label,
@@ -34,21 +151,23 @@ function TagEditor({
   onChange,
   placeholder,
   theme,
+  normalize = (s: string) => s.trim(),
 }: {
   label: string;
   values: string[];
   onChange: (v: string[]) => void;
   placeholder: string;
   theme: any;
+  normalize?: (s: string) => string;
 }) {
   const [input, setInput] = useState("");
 
   const add = useCallback(() => {
-    const trimmed = input.trim().toLowerCase();
-    if (!trimmed || values.includes(trimmed)) { setInput(""); return; }
-    onChange([...values, trimmed]);
+    const val = normalize(input);
+    if (!val || values.includes(val)) { setInput(""); return; }
+    onChange([...values, val]);
     setInput("");
-  }, [input, values, onChange]);
+  }, [input, values, onChange, normalize]);
 
   const remove = useCallback((v: string) => {
     onChange(values.filter((x) => x !== v));
@@ -66,13 +185,15 @@ function TagEditor({
           placeholderTextColor={theme.textSecondary}
           onSubmitEditing={add}
           returnKeyType="done"
+          autoCorrect={false}
+          autoCapitalize="none"
         />
         <Pressable style={[styles.addTagBtn, { backgroundColor: theme.primary }]} onPress={add}>
           <Feather name="plus" size={16} color="#fff" />
         </Pressable>
       </View>
       <View style={styles.tagList}>
-        {values.map((v) => (
+        {values.length > 0 ? values.map((v) => (
           <Pressable
             key={v}
             style={[styles.tag, { backgroundColor: theme.primary + "15", borderColor: theme.primary + "30" }]}
@@ -81,7 +202,11 @@ function TagEditor({
             <ThemedText style={[styles.tagText, { color: theme.primary }]}>{v}</ThemedText>
             <Feather name="x" size={12} color={theme.primary} />
           </Pressable>
-        ))}
+        )) : (
+          <ThemedText style={[styles.emptyTags, { color: theme.textSecondary }]}>
+            None added — tap + to add
+          </ThemedText>
+        )}
       </View>
     </View>
   );
@@ -93,6 +218,7 @@ export default function LeadFinderSettingsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const qc = useQueryClient();
+  const initialized = useRef(false);
 
   const { data: settings, isLoading } = useQuery<any>({
     queryKey: ["/api/lead-finder/settings"],
@@ -112,7 +238,8 @@ export default function LeadFinderSettingsScreen() {
   const [subreddits, setSubreddits] = useState<string[]>(DEFAULT_SUBREDDITS);
 
   useEffect(() => {
-    if (!settings) return;
+    if (!settings || initialized.current) return;
+    initialized.current = true;
     setEnabled(settings.enabled ?? true);
     setNotifyNewLeads(settings.notifyNewLeads ?? true);
     setRadiusMiles(String(settings.radiusMiles ?? 25));
@@ -195,22 +322,17 @@ export default function LeadFinderSettingsScreen() {
 
       <Card style={styles.section}>
         <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>Service Area</ThemedText>
+        <CityTagEditor values={targetCities} onChange={setTargetCities} theme={theme} />
         <TagEditor
-          label="Target Cities"
-          values={targetCities}
-          onChange={setTargetCities}
-          placeholder="e.g. Austin, Dallas"
-          theme={theme}
-        />
-        <TagEditor
-          label="ZIP Codes"
+          label="ZIP CODES"
           values={targetZips}
           onChange={setTargetZips}
           placeholder="e.g. 78701"
           theme={theme}
+          normalize={(s) => s.trim()}
         />
         <View style={styles.fieldGroup}>
-          <ThemedText style={[styles.fieldLabel, { color: theme.textSecondary }]}>Radius (miles)</ThemedText>
+          <ThemedText style={[styles.fieldLabel, { color: theme.textSecondary }]}>RADIUS (MILES)</ThemedText>
           <TextInput
             style={[styles.textInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
             value={radiusMiles}
@@ -225,19 +347,28 @@ export default function LeadFinderSettingsScreen() {
       <Card style={styles.section}>
         <ThemedText style={[styles.sectionTitle, { color: theme.text }]}>Search Settings</ThemedText>
         <TagEditor
-          label="Keywords to Track"
+          label="KEYWORDS TO TRACK"
           values={keywords}
           onChange={setKeywords}
           placeholder="e.g. house cleaner"
           theme={theme}
+          normalize={(s) => s.trim().toLowerCase()}
         />
         <TagEditor
-          label="Subreddits"
+          label="SUBREDDITS"
           values={subreddits}
           onChange={setSubreddits}
           placeholder="e.g. chicago (no r/)"
           theme={theme}
+          normalize={(s) => s.trim().replace(/^r\//i, "")}
         />
+        <View style={[styles.subredditTip, { backgroundColor: theme.primary + "0D", borderColor: theme.primary + "25" }]}>
+          <Feather name="info" size={13} color={theme.primary} style={{ marginTop: 1 }} />
+          <ThemedText style={[styles.subredditTipText, { color: theme.textSecondary }]}>
+            <ThemedText style={{ color: theme.primary, fontWeight: "700" }}>How it works: </ThemedText>
+            QuotePro scans Reddit for posts matching your keywords inside these subreddits. Local city subreddits (e.g. "chicago", "Austin") are great sources. Airbnb hosts, landlords, and homeowners frequently post cleaning requests.
+          </ThemedText>
+        </View>
       </Card>
 
       <Pressable
@@ -266,43 +397,68 @@ const styles = StyleSheet.create({
   switchSub: { fontSize: 12, lineHeight: 17 },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 14 },
   tagEditorWrap: { marginBottom: 16 },
-  fieldLabel: { fontSize: 12, fontWeight: "600", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
+  fieldLabel: { fontSize: 12, fontWeight: "700", marginBottom: 6, letterSpacing: 0.5 },
   tagInputRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
   tagInput: {
     flex: 1,
     borderWidth: 1,
     borderRadius: BorderRadius.sm,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
+    paddingVertical: 10,
+    fontSize: 15,
   },
   addTagBtn: {
-    width: 38,
-    height: 38,
+    width: 42,
+    height: 42,
     borderRadius: BorderRadius.sm,
     alignItems: "center",
     justifyContent: "center",
   },
+  suggestionBox: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    marginTop: -4,
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+  suggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  suggestionText: { fontSize: 14 },
   tagList: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   tag: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
   },
-  tagText: { fontSize: 12, fontWeight: "600" },
+  tagText: { fontSize: 13, fontWeight: "600" },
+  emptyTags: { fontSize: 12, fontStyle: "italic" },
   fieldGroup: { marginBottom: 4 },
   textInput: {
     borderWidth: 1,
     borderRadius: BorderRadius.sm,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
+    paddingVertical: 10,
+    fontSize: 15,
     width: 100,
   },
+  subredditTip: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 6,
+    padding: 10,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  subredditTipText: { flex: 1, fontSize: 12, lineHeight: 17 },
   saveBtn: {
     padding: 16,
     borderRadius: BorderRadius.md,

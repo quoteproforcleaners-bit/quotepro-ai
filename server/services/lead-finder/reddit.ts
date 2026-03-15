@@ -24,7 +24,10 @@ const DEFAULT_KEYWORDS = [
   "need a cleaner",
 ];
 
-const DEFAULT_SUBREDDITS = ["cleaningtips", "moving", "homeowners"];
+const DEFAULT_SUBREDDITS = [
+  "cleaningtips", "moving", "homeowners", "firsttimehomebuyer",
+  "landlord", "airbnb", "PropertyManagement", "Tenant",
+];
 
 function buildSearchUrl(query: string, subreddit?: string): string {
   const encoded = encodeURIComponent(query);
