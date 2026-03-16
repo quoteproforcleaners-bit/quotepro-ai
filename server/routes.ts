@@ -8955,9 +8955,8 @@ Return ONLY valid JSON:
       const code = await ensureIntakeCode(business.id);
       const reqHost = req.headers.host || req.hostname;
       const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-      const longUrl = `${reqProto}://${reqHost}/intake/${code}`;
-      const shortUrl = await getOrCreateShortUrl(business.id, longUrl);
-      res.json({ url: shortUrl, longUrl, code, businessName: business.companyName });
+      const url = `${reqProto}://${reqHost}/intake/${code}`;
+      res.json({ url, code, businessName: business.companyName });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -9120,8 +9119,7 @@ Rules:
       const intakeCode = await ensureIntakeCode(business.id);
       const reqHost = req.headers.host || req.hostname;
       const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-      const longIntakeUrl = `${reqProto}://${reqHost}/intake/${intakeCode}`;
-      const intakeUrl = await getOrCreateShortUrl(business.id, longIntakeUrl);
+      const intakeUrl = `${reqProto}://${reqHost}/intake/${intakeCode}`;
       const recipientName = (toName || "there").trim();
       const defaultMessage = `Hi ${recipientName},\n\n${business.companyName} would like to give you a personalized cleaning quote. Please fill out this quick form so we can prepare an accurate estimate:\n\n${intakeUrl}\n\nIt only takes about 2 minutes.\n\nThanks,\n${business.companyName}`;
       const bodyText = customMessage?.trim() || defaultMessage;
