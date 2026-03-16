@@ -539,12 +539,13 @@ export default function IntakeQueueScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>("new");
   const [sendLinkVisible, setSendLinkVisible] = useState(false);
 
-  const { data: linkData } = useQuery<{ url: string; code: string }>({
+  const { data: linkData } = useQuery<{ url: string; code: string; businessName: string }>({
     queryKey: ["/api/intake-requests/my-link"],
     staleTime: 5 * 60 * 1000,
   });
 
   const intakeUrl = linkData?.url || "";
+  const intakeBusinessName = linkData?.businessName || "";
 
   const { data: requests = [], isLoading, refetch } = useQuery<IntakeRequest[]>({
     queryKey: ["/api/intake-requests", activeTab],
@@ -731,7 +732,7 @@ export default function IntakeQueueScreen() {
       <SendLinkModal
         visible={sendLinkVisible}
         intakeUrl={intakeUrl}
-        businessName=""
+        businessName={intakeBusinessName}
         onClose={() => setSendLinkVisible(false)}
       />
     </View>

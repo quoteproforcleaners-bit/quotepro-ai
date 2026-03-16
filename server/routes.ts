@@ -8957,7 +8957,7 @@ Return ONLY valid JSON:
       const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
       const longUrl = `${reqProto}://${reqHost}/intake/${code}`;
       const shortUrl = await getOrCreateShortUrl(business.id, longUrl);
-      res.json({ url: shortUrl, longUrl, code });
+      res.json({ url: shortUrl, longUrl, code, businessName: business.companyName });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

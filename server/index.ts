@@ -234,10 +234,31 @@ function configureExpoAndLanding(app: express.Application) {
   const webDistPath = path.resolve(process.cwd(), "web", "dist");
   if (fs.existsSync(webDistPath)) {
     app.use("/app", express.static(webDistPath));
-    app.use((req: Request, res: Response, next: NextFunction) => {
+    app.use(async (req: Request, res: Response, next: NextFunction) => {
       if (req.path.startsWith("/app") || req.path.startsWith("/intake/")) {
         const indexPath = path.join(webDistPath, "index.html");
         if (fs.existsSync(indexPath)) {
+          if (req.path.startsWith("/intake/")) {
+            try {
+              const code = req.path.split("/intake/")[1]?.split("/")[0];
+              let title = "Quick Quote Form";
+              if (code) {
+                const { pool } = await import("./db");
+                const r = await pool.query(
+                  `SELECT company_name FROM businesses WHERE intake_code = $1 OR id = $1 LIMIT 1`,
+                  [code]
+                );
+                if (r.rows[0]?.company_name) {
+                  title = `${r.rows[0].company_name} — Quick Quote Form`;
+                }
+              }
+              let html = fs.readFileSync(indexPath, "utf8");
+              html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
+              return res.type("html").send(html);
+            } catch {
+              return res.sendFile(indexPath);
+            }
+          }
           return res.sendFile(indexPath);
         }
       }
