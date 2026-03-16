@@ -8655,6 +8655,15 @@ init();
     }
   })();
 
+  // DB migration v4: cached short URL for intake link
+  (async () => {
+    try {
+      await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS intake_short_url TEXT`);
+    } catch (e) {
+      console.error("businesses intake_short_url migration error:", e);
+    }
+  })();
+
   function generateIntakeCode(len = 8): string {
     const chars = "abcdefghjkmnpqrstuvwxyz23456789";
     let code = "";
@@ -8675,6 +8684,23 @@ init();
       }
     }
     return code;
+  }
+
+  async function getOrCreateShortUrl(businessId: string, longUrl: string): Promise<string> {
+    try {
+      const cached = await pool.query(`SELECT intake_short_url FROM businesses WHERE id = $1`, [businessId]);
+      if (cached.rows[0]?.intake_short_url) return cached.rows[0].intake_short_url;
+      const resp = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+      if (!resp.ok) return longUrl;
+      const shortUrl = (await resp.text()).trim();
+      if (shortUrl.startsWith("http")) {
+        await pool.query(`UPDATE businesses SET intake_short_url = $1 WHERE id = $2`, [shortUrl, businessId]);
+        return shortUrl;
+      }
+    } catch {
+      // fall through to long URL on any error
+    }
+    return longUrl;
   }
 
   async function lookupIntakeBusiness(codeOrId: string) {
@@ -8929,8 +8955,9 @@ Return ONLY valid JSON:
       const code = await ensureIntakeCode(business.id);
       const reqHost = req.headers.host || req.hostname;
       const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-      const url = `${reqProto}://${reqHost}/intake/${code}`;
-      res.json({ url, code });
+      const longUrl = `${reqProto}://${reqHost}/intake/${code}`;
+      const shortUrl = await getOrCreateShortUrl(business.id, longUrl);
+      res.json({ url: shortUrl, longUrl, code });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -9093,7 +9120,8 @@ Rules:
       const intakeCode = await ensureIntakeCode(business.id);
       const reqHost = req.headers.host || req.hostname;
       const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-      const intakeUrl = `${reqProto}://${reqHost}/intake/${intakeCode}`;
+      const longIntakeUrl = `${reqProto}://${reqHost}/intake/${intakeCode}`;
+      const intakeUrl = await getOrCreateShortUrl(business.id, longIntakeUrl);
       const recipientName = (toName || "there").trim();
       const defaultMessage = `Hi ${recipientName},\n\n${business.companyName} would like to give you a personalized cleaning quote. Please fill out this quick form so we can prepare an accurate estimate:\n\n${intakeUrl}\n\nIt only takes about 2 minutes.\n\nThanks,\n${business.companyName}`;
       const bodyText = customMessage?.trim() || defaultMessage;
