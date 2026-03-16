@@ -353,6 +353,11 @@ async function generateRevenuePlaybook(quote: any, business: any, customer: any)
 export async function registerRoutes(app: Express): Promise<Server> {
   setupSession(app);
 
+  app.get("/download/session-transcript", (_req: Request, res: Response) => {
+    const filePath = require("path").resolve(process.cwd(), "session-transcript.md");
+    res.download(filePath, "quotepro-agent-session-transcript.md");
+  });
+
   app.post("/api/crash-report", async (req: Request, res: Response) => {
     try {
       const { error, stack, componentStack, source } = req.body;
