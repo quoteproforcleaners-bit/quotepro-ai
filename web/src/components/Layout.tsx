@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
+import { useTheme } from "../lib/theme";
 import {
   LayoutDashboard,
   FileText,
@@ -36,6 +37,8 @@ import {
   Sliders,
   Clipboard,
   PlugZap,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 const PRO_ROUTES = [
@@ -109,6 +112,7 @@ const navSections = [
 export function Layout() {
   const { user, business, logout } = useAuth();
   const { isPro } = useSubscription();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -122,7 +126,7 @@ export function Layout() {
     (user?.firstName?.[0] || "") + (user?.lastName?.[0] || "") || "U";
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex">
       {sidebarOpen ? (
         <div
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
@@ -132,17 +136,17 @@ export function Layout() {
 
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 w-[260px] bg-white border-r border-slate-200/80 flex flex-col
+          fixed inset-y-0 left-0 z-50 w-[260px] bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 flex flex-col
           transform transition-transform duration-200 ease-in-out
           lg:translate-x-0 lg:static lg:z-auto
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-slate-100 shrink-0">
+        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm shadow-primary-600/20">
             <Zap className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-lg text-slate-900 tracking-tight">QuotePro</span>
+          <span className="font-bold text-lg text-slate-900 dark:text-white tracking-tight">QuotePro</span>
           {isPro ? (
             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white uppercase tracking-wider">Pro</span>
           ) : null}
@@ -171,8 +175,8 @@ export function Layout() {
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 group ${
                         isActive
-                          ? "bg-primary-50 text-primary-700 shadow-sm shadow-primary-600/5"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                          ? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 shadow-sm shadow-primary-600/5"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                       }`
                     }
                   >
@@ -214,23 +218,30 @@ export function Layout() {
           </div>
         ) : null}
 
-        <div className="p-3 border-t border-slate-100 shrink-0">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors cursor-default">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-white flex items-center justify-center text-xs font-semibold shadow-sm">
+        <div className="p-3 border-t border-slate-100 dark:border-slate-800 shrink-0">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-default">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-white flex items-center justify-center text-xs font-semibold shadow-sm shrink-0">
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 truncate leading-tight">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate leading-tight">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-[11px] text-slate-500 truncate leading-tight">
+              <p className="text-[11px] text-slate-500 dark:text-slate-500 truncate leading-tight">
                 {business?.companyName || ""}
               </p>
             </div>
+            <button
+              onClick={toggleTheme}
+              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shrink-0"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-[13px] text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-[13px] text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors"
           >
             <LogOut className="w-4 h-4" />
             Sign out
@@ -239,7 +250,7 @@ export function Layout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-white/80 backdrop-blur-md border-b border-slate-200/60 flex items-center px-4 lg:px-6 shrink-0 sticky top-0 z-30">
+        <header className="h-14 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60 flex items-center px-4 lg:px-6 shrink-0 sticky top-0 z-30">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
