@@ -1209,6 +1209,25 @@ export default function SettingsScreen() {
       <SectionHeader title={t.settings.growthAndAutomations} subtitle={t.settings.growthAndAutomationsSubtitle} />
 
       <Pressable
+        onPress={() => navigation.navigate("LeadCaptureSettings" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-lead-capture-settings"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="link" size={20} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Lead Capture Link</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Your instant quote request link for website & social
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
         onPress={() => navigation.navigate("LeadFinder" as any)}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-lead-finder"

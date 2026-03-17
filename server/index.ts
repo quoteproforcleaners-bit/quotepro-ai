@@ -234,6 +234,29 @@ function configureExpoAndLanding(app: express.Application) {
   const webDistPath = path.resolve(process.cwd(), "web", "dist");
   if (fs.existsSync(webDistPath)) {
     app.use("/app", express.static(webDistPath));
+    // /request/:slug — branded public lead capture redirect
+    app.get("/request/:slug", async (req: Request, res: Response) => {
+      const slug = req.params.slug?.toLowerCase().trim();
+      if (!slug) return res.redirect("/");
+      try {
+        const { pool } = await import("./db");
+        const r = await pool.query(
+          `SELECT intake_code, public_quote_enabled, company_name FROM businesses WHERE public_quote_slug = $1 LIMIT 1`,
+          [slug]
+        );
+        if (!r.rows.length) {
+          return res.status(404).type("html").send(`<!DOCTYPE html><html><head><title>Not Found</title></head><body style="font-family:sans-serif;text-align:center;padding:80px 20px"><h2>Quote Request Page Not Found</h2><p>This link may have changed or been removed.</p></body></html>`);
+        }
+        const { intake_code, public_quote_enabled, company_name } = r.rows[0];
+        if (!public_quote_enabled) {
+          return res.status(410).type("html").send(`<!DOCTYPE html><html><head><title>Not Available</title></head><body style="font-family:sans-serif;text-align:center;padding:80px 20px"><h2>${company_name}</h2><p>Online quote requests are currently turned off.</p></body></html>`);
+        }
+        return res.redirect(302, `/intake/${intake_code}`);
+      } catch (e) {
+        return res.redirect(`/intake/${slug}`);
+      }
+    });
+
     app.use(async (req: Request, res: Response, next: NextFunction) => {
       if (req.path.startsWith("/app") || req.path.startsWith("/intake/")) {
         const indexPath = path.join(webDistPath, "index.html");

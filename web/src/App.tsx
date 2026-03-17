@@ -25,6 +25,7 @@ import WalkthroughAIPage from "./pages/WalkthroughAIPage";
 import ToolkitPage from "./pages/ToolkitPage";
 import IntakePage from "./pages/IntakePage";
 import IntakeRequestsPage from "./pages/IntakeRequestsPage";
+import LeadCapturePage from "./pages/LeadCapturePage";
 import LeadFinderPage from "./pages/LeadFinderPage";
 import LeadFinderDetailPage from "./pages/LeadFinderDetailPage";
 import LeadFinderSettingsPage from "./pages/LeadFinderSettingsPage";
@@ -90,6 +91,7 @@ export default function App() {
           <Route path="/walkthrough-ai" element={<WalkthroughAIPage />} />
           <Route path="/toolkit" element={<ToolkitPage />} />
           <Route path="/intake-requests" element={<IntakeRequestsPage />} />
+          <Route path="/lead-capture" element={<LeadCapturePage />} />
           <Route path="/lead-finder" element={<ProGate feature="Local Lead Finder"><LeadFinderPage /></ProGate>} />
           <Route path="/lead-finder/settings" element={<ProGate feature="Local Lead Finder"><LeadFinderSettingsPage /></ProGate>} />
           <Route path="/lead-finder/:id" element={<ProGate feature="Local Lead Finder"><LeadFinderDetailPage /></ProGate>} />

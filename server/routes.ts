@@ -8669,6 +8669,22 @@ init();
     }
   })();
 
+  // DB migration v5: public quote request slug for branded lead capture links
+  (async () => {
+    try {
+      await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS public_quote_slug VARCHAR(80) UNIQUE`);
+      await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS public_quote_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+      await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS public_quote_button_text TEXT NOT NULL DEFAULT 'Get a Free Quote'`);
+      // Auto-populate slugs from company name for existing businesses that don't have one
+      const bizRows = await pool.query(`SELECT id, company_name FROM businesses WHERE public_quote_slug IS NULL AND company_name != '' AND company_name IS NOT NULL`);
+      for (const b of bizRows.rows) {
+        await ensurePublicSlug(b.id, b.company_name);
+      }
+    } catch (e) {
+      console.error("businesses public_quote migration error:", e);
+    }
+  })();
+
   function generateIntakeCode(len = 8): string {
     const chars = "abcdefghjkmnpqrstuvwxyz23456789";
     let code = "";
@@ -8708,9 +8724,35 @@ init();
     return longUrl;
   }
 
+  function slugify(text: string): string {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .substring(0, 60);
+  }
+
+  async function ensurePublicSlug(businessId: string, companyName: string): Promise<string> {
+    const existing = await pool.query(`SELECT public_quote_slug FROM businesses WHERE id = $1`, [businessId]);
+    if (existing.rows[0]?.public_quote_slug) return existing.rows[0].public_quote_slug;
+    let base = slugify(companyName) || "my-cleaning-co";
+    let slug = base;
+    for (let i = 2; i <= 20; i++) {
+      try {
+        await pool.query(`UPDATE businesses SET public_quote_slug = $1 WHERE id = $2`, [slug, businessId]);
+        return slug;
+      } catch {
+        slug = `${base}-${i}`;
+      }
+    }
+    return slug;
+  }
+
   async function lookupIntakeBusiness(codeOrId: string) {
     const r = await pool.query(
-      `SELECT id, owner_user_id, company_name, logo_uri, primary_color, phone, email, intake_code FROM businesses WHERE intake_code = $1 OR id = $1 LIMIT 1`,
+      `SELECT id, owner_user_id, company_name, logo_uri, primary_color, phone, email, intake_code FROM businesses WHERE intake_code = $1 OR id = $1 OR public_quote_slug = $1 LIMIT 1`,
       [codeOrId]
     );
     if (!r.rows.length) return null;
@@ -8965,6 +9007,79 @@ Return ONLY valid JSON:
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
+  });
+
+  // Public: check if a slug is available
+  app.get("/api/public/slug-available/:slug", async (req: Request, res: Response) => {
+    try {
+      const raw = req.params.slug.toLowerCase().trim();
+      const slug = slugify(raw);
+      if (!slug || slug.length < 3) return res.json({ available: false, reason: "too_short" });
+      const r = await pool.query(`SELECT id FROM businesses WHERE public_quote_slug = $1`, [slug]);
+      res.json({ available: r.rows.length === 0, slug });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // Protected: get lead capture settings
+  app.get("/api/business/lead-capture-settings", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const r = await pool.query(
+        `SELECT public_quote_slug, public_quote_enabled, public_quote_button_text FROM businesses WHERE id = $1`,
+        [business.id]
+      );
+      const row = r.rows[0] || {};
+      // Auto-generate slug if not yet set
+      let slug = row.public_quote_slug;
+      if (!slug) slug = await ensurePublicSlug(business.id, business.companyName);
+      const reqHost = req.headers.host || req.hostname;
+      const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+      const publicUrl = `${reqProto}://${reqHost}/request/${slug}`;
+      res.json({
+        slug,
+        enabled: row.public_quote_enabled ?? true,
+        buttonText: row.public_quote_button_text || "Get a Free Quote",
+        publicUrl,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // Protected: update lead capture settings
+  app.put("/api/business/lead-capture-settings", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { slug: rawSlug, enabled, buttonText } = req.body;
+      const sets: string[] = ["updated_at=NOW()"];
+      const vals: any[] = [];
+      let idx = 1;
+      if (enabled !== undefined) { sets.push(`public_quote_enabled=$${idx++}`); vals.push(Boolean(enabled)); }
+      if (buttonText !== undefined) { sets.push(`public_quote_button_text=$${idx++}`); vals.push(String(buttonText).substring(0, 80)); }
+      if (rawSlug !== undefined) {
+        const slug = slugify(String(rawSlug));
+        if (!slug || slug.length < 3) return res.status(400).json({ message: "Slug must be at least 3 characters" });
+        const conflict = await pool.query(`SELECT id FROM businesses WHERE public_quote_slug = $1 AND id != $2`, [slug, business.id]);
+        if (conflict.rows.length > 0) return res.status(409).json({ message: "That URL is already taken" });
+        sets.push(`public_quote_slug=$${idx++}`); vals.push(slug);
+      }
+      vals.push(business.id);
+      await pool.query(`UPDATE businesses SET ${sets.join(",")} WHERE id=$${idx}`, vals);
+      const updated = await pool.query(
+        `SELECT public_quote_slug, public_quote_enabled, public_quote_button_text FROM businesses WHERE id = $1`,
+        [business.id]
+      );
+      const row = updated.rows[0];
+      const reqHost = req.headers.host || req.hostname;
+      const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+      const publicUrl = `${reqProto}://${reqHost}/request/${row.public_quote_slug}`;
+      res.json({
+        slug: row.public_quote_slug,
+        enabled: row.public_quote_enabled,
+        buttonText: row.public_quote_button_text,
+        publicUrl,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
   // Protected: AI-generate a complete quote from intake data

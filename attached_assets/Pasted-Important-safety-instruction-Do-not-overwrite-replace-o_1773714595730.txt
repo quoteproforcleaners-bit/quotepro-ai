@@ -1,0 +1,233 @@
+Important safety instruction:
+Do not overwrite, replace, or break any of my existing app functionality.
+This feature must integrate into what I have already built.
+Preserve my current auth, database structure, quote flow, AI quote builder, CRM, and customer acceptance flow.
+If there is any conflict, extend the existing app with new files/components/routes only, and modify existing files carefully.
+Before coding, first inspect the current project structure and identify the best integration points.
+
+Build and integrate a new feature into my existing app called:
+
+“Automatic Lead Capture”
+
+Goal:
+Allow each QuotePro user to have a unique public quote request URL they can share on their website, Google Business Profile, Instagram bio, email signature, or in text messages.
+This page should act as a branded lead capture and intake form for that specific cleaning business.
+When a customer fills it out, the lead should automatically be saved into the correct user’s account and flow into the existing quote-building workflow.
+
+Core product context:
+My app already has:
+- user accounts
+- customer intake form logic
+- quote builder
+- AI quote generation
+- ability to send quotes
+- customer acceptance flow
+- CRM / customer management
+
+This new feature should reuse as much of the existing intake and quote infrastructure as possible.
+
+Build these features:
+
+1. Unique Public Quote Request URL Per User
+Each logged-in app user should get a unique public URL like:
+- /request/{slug}
+
+Examples:
+- /request/sparkle-cleaning
+- /request/mikes-maids
+
+Requirements:
+- add a field on each user/business record for a unique public slug
+- generate a slug automatically from business name if one does not exist
+- sanitize slug: lowercase, hyphens, no special characters
+- if slug is taken, append a short unique suffix
+- allow the user to edit their slug from settings
+- validate uniqueness before saving
+- allow the user to enable or disable their public request page
+
+Suggested database fields:
+- public_quote_slug
+- public_quote_enabled
+- public_quote_button_text (optional)
+- public_brand_color (optional, only if easy)
+
+2. Public Quote Request Page
+Create a public-facing page route:
+- GET /request/:slug
+- POST /request/:slug
+
+This page should:
+- look polished, mobile friendly, and branded for that business
+- show business name and logo if available
+- say something like “Request Your Cleaning Quote”
+- collect the lead and intake details needed for quoting
+
+Re-use my existing intake form structure and fields wherever possible.
+
+Fields should include:
+- full name
+- phone
+- email
+- service address
+- square footage
+- number of bedrooms
+- number of bathrooms
+- clean type (standard / deep clean / move in-out / commercial if applicable)
+- cleaning frequency
+- pets
+- notes
+- optional photo upload if this already exists in my project or is easy to reuse
+
+After submission:
+- save the lead to the correct QuotePro user account
+- store the source as “public_quote_link”
+- create the lead/customer record using my existing CRM structure if possible
+- attach the intake details to the record
+- trigger any existing internal workflow that makes sense
+- if my current system supports it, prepare the lead for quote generation
+- show a clean success screen confirming the request was received
+
+Do not automatically send a quote unless that already exists and can be reused safely.
+For now the most important thing is automatic lead capture into the existing account.
+
+3. Dashboard Settings Page for the Feature
+Add a settings section inside the existing app, ideally in something like:
+- Settings > Lead Capture
+or
+- Settings > Quote Request Link
+
+This page should include:
+- toggle to enable/disable public quote page
+- editable slug input
+- preview of the public URL
+- “Copy Link” button
+- button text setting (for website button generator)
+- optional short helper text showing where to use the link:
+  - website
+  - Google Business Profile
+  - Instagram bio
+  - email signature
+  - text messages
+
+Example UI:
+- Your Instant Quote Request Link
+- https://getquotepro.ai/request/sparkle-cleaning
+- [Copy Link]
+
+4. Website Button Generator
+Add a simple “Website Button Generator” to the same settings page.
+
+The user should be able to:
+- choose button text
+- optionally choose button color and border radius if easy
+- preview button
+- copy a ready-to-paste HTML snippet
+
+The snippet should link to that user’s public request page.
+
+Example output:
+<a href="https://getquotepro.ai/request/sparkle-cleaning" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Get a Quote</a>
+
+Requirements:
+- include a “Copy Code” button
+- include a “Copy Link” button
+- keep this simple and reliable
+- do not build a complex widget or iframe system yet
+- this should be an MVP button generator only
+
+5. Lead Source Tracking
+Track where leads come from.
+
+When a lead is created from this public page, store:
+- source = public_quote_link
+
+If possible, also create support for:
+- source = website_button
+- source = manual_entry
+
+Only add these if they fit naturally into the existing data model.
+Do not overcomplicate.
+
+This is important because later I want reporting like:
+- leads generated from public quote link
+- quote requests this month
+
+6. Integration Requirements
+This must integrate into my current app, not act like a disconnected prototype.
+
+Use my existing:
+- authentication
+- user/business model
+- CRM/customer records if available
+- intake form logic if available
+- quote preparation flow if available
+- UI design system if available
+
+Before building:
+- inspect my existing project structure
+- identify current models/components/routes related to users, leads, customers, quotes, intake forms, and settings
+- reuse existing types, utilities, styling, components, and APIs wherever possible
+- avoid duplicate logic
+- do not create a second parallel intake/CRM system unless absolutely necessary
+
+7. Technical Requirements
+- follow the existing codebase patterns
+- use the existing stack already in the project
+- build production-ready code
+- mobile responsive
+- clean validation and error handling
+- secure public submission endpoint
+- prevent disabled slugs from serving forms
+- handle slug not found gracefully
+- rate-limit or basic spam-protect public submissions if there is already an existing pattern for this
+- do not expose private user data publicly
+
+8. UI/UX Requirements
+This should feel like a real QuotePro feature, not a bolted-on tool.
+
+The public request page should:
+- feel simple and trustworthy
+- be easy for homeowners or businesses to complete on mobile
+- clearly belong to the cleaning company
+- have a polished success state
+
+The settings page should:
+- be simple enough for non-technical cleaning business owners
+- make it obvious what to do
+- use plain-English language like:
+  - Instant Quote Request Link
+  - Website Quote Button
+  - Copy Link
+  - Copy Code
+
+9. Recommended Build Sequence
+Please implement in this order:
+Phase 1:
+- inspect current codebase and integration points
+- add database/model support for slug and enabled status
+- add public /request/:slug route
+- connect public submissions into existing CRM/lead flow
+
+Phase 2:
+- add settings page UI
+- add copy link
+- add slug editing and validation
+
+Phase 3:
+- add simple website button generator with preview and copy code
+
+10. Deliverables
+When done, provide:
+- the integrated feature in code
+- any database/schema changes needed
+- a short summary of what was added
+- a list of files created/modified
+- any migration/setup steps needed
+- brief notes on where this feature lives in the app
+
+Final instruction:
+The most important thing is to turn QuotePro into an easier lead-capture engine without breaking what I already built.
+Keep the implementation practical, elegant, and tightly integrated with the existing product.
+Do not redesign the app.
+Do not replace my current quote flow.
+Extend it carefully.

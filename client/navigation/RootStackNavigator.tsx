@@ -39,6 +39,7 @@ import ClosingAssistantScreen from "@/screens/ClosingAssistantScreen";
 import LeadFinderScreen from "@/screens/LeadFinderScreen";
 import LeadFinderDetailScreen from "@/screens/LeadFinderDetailScreen";
 import LeadFinderSettingsScreen from "@/screens/LeadFinderSettingsScreen";
+import LeadCaptureSettingsScreen from "@/screens/LeadCaptureSettingsScreen";
 
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
@@ -89,6 +90,7 @@ export type RootStackParamList = {
   LeadFinder: undefined;
   LeadFinderDetail: { leadId: string };
   LeadFinderSettings: undefined;
+  LeadCaptureSettings: undefined;
 
 };
 
@@ -424,6 +426,13 @@ export default function RootStackNavigator() {
             component={LeadFinderSettingsScreen}
             options={{
               headerTitle: "Lead Finder Settings",
+            }}
+          />
+          <Stack.Screen
+            name="LeadCaptureSettings"
+            component={LeadCaptureSettingsScreen}
+            options={{
+              headerTitle: "Lead Capture Link",
             }}
           />
         </>
