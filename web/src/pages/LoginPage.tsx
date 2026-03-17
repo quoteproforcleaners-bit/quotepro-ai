@@ -1,7 +1,7 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { Zap, AlertCircle, CheckCircle, Eye, TrendingUp, Clock, ChevronUp, ChevronDown } from "lucide-react";
+import { Zap, AlertCircle, CheckCircle, Eye, TrendingUp, Clock, Search, Sparkles } from "lucide-react";
 
 const GOOGLE_SVG = (
   <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24">
@@ -51,68 +51,81 @@ const ACTIVITY = [
   },
 ];
 
-const FREQ_OPTS = [
-  { value: "onetime",  label: "One-time", discount: 0 },
-  { value: "monthly",  label: "Monthly",  discount: 0.05 },
-  { value: "biweekly", label: "Biweekly", discount: 0.10 },
-  { value: "weekly",   label: "Weekly",   discount: 0.15 },
-] as const;
-type PanelFreq = typeof FREQ_OPTS[number]["value"];
+/* ── Scenarios the AI cycles through ── */
+const SCENARIOS = [
+  { prompt: "3 bed, 2 bath house — biweekly clean",   client: "Johnson Residence", beds: 3, baths: 2, sqft: 1850, disc: 0.10, recurring: true,  discLabel: "10% discount" },
+  { prompt: "Move-out clean, 4 bed home",              client: "Anderson Home",    beds: 4, baths: 2, sqft: 2400, disc: 0,    recurring: false, discLabel: "" },
+  { prompt: "Weekly service, 2 bed apartment",         client: "Martinez Apt",    beds: 2, baths: 1, sqft: 1100, disc: 0.15, recurring: true,  discLabel: "15% discount" },
+  { prompt: "Large estate, 5 beds — monthly",          client: "Wilson Estate",   beds: 5, baths: 3, sqft: 3200, disc: 0.05, recurring: true,  discLabel: "5% discount" },
+  { prompt: "Studio apartment, one-time deep clean",   client: "Park Studio",     beds: 1, baths: 1, sqft: 750,  disc: 0,    recurring: false, discLabel: "" },
+];
 
-function calcPanelQuote(beds: number, baths: number, sqft: number, freq: PanelFreq) {
-  const base = 48 + beds * 18 + baths * 13 + sqft * 0.02;
-  const disc = FREQ_OPTS.find((f) => f.value === freq)!.discount;
+function calcScenario(s: typeof SCENARIOS[0]) {
+  const base = 48 + s.beds * 18 + s.baths * 13 + s.sqft * 0.02;
   const r5 = (n: number) => Math.round(n / 5) * 5;
-  return { good: r5(base * (1 - disc)), better: r5(base * 1.27 * (1 - disc)), best: r5(base * 1.68 * (1 - disc)) };
+  return {
+    good:   r5(base * (1 - s.disc)),
+    better: r5(base * 1.27 * (1 - s.disc)),
+    best:   r5(base * 1.68 * (1 - s.disc)),
+  };
 }
 
-const CLIENT_NAMES: Record<number, string> = {
-  1: "Park Studio", 2: "Miller Apt", 3: "Johnson Residence",
-  4: "Anderson Home", 5: "Wilson Estate", 6: "Windsor Manor",
-};
-
-function MiniStepper({ label, value, min, max, onChange }: {
-  label: string; value: number; min: number; max: number; onChange: (v: number) => void;
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-slate-500 text-[10px]">{label}</span>
-      <button
-        onClick={() => onChange(Math.max(min, value - 1))}
-        disabled={value <= min}
-        className="w-4 h-4 rounded bg-white/8 border border-white/10 flex items-center justify-center text-slate-400 hover:bg-white/15 disabled:opacity-30 transition-colors"
-      >
-        <ChevronDown className="w-2.5 h-2.5" />
-      </button>
-      <span className="text-white text-[11px] font-semibold w-3 text-center">{value >= max ? `${max}+` : value}</span>
-      <button
-        onClick={() => onChange(Math.min(max, value + 1))}
-        disabled={value >= max}
-        className="w-4 h-4 rounded bg-white/8 border border-white/10 flex items-center justify-center text-slate-400 hover:bg-white/15 disabled:opacity-30 transition-colors"
-      >
-        <ChevronUp className="w-2.5 h-2.5" />
-      </button>
-    </div>
-  );
-}
+/* ── Chip suggestion groups ── */
+const CHIP_GROUPS = [[0, 1, 2], [2, 3, 4], [1, 3, 0]];
 
 function LivePanel() {
-  const [beds,  setBeds]  = useState(3);
-  const [baths, setBaths] = useState(2);
-  const [sqft,  setSqft]  = useState(1850);
-  const [freq,  setFreq]  = useState<PanelFreq>("biweekly");
-  const [selTier, setSelTier] = useState(1);
+  const [scenarioIdx, setScenarioIdx] = useState(0);
+  const [promptVisible, setPromptVisible] = useState(true);
+  const [cardVisible,   setCardVisible]   = useState(true);
+  const [chipGroupIdx,  setChipGroupIdx]  = useState(0);
+  const [chipsVisible,  setChipsVisible]  = useState(true);
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const scenarioTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chipTimer     = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { good, better, best } = calcPanelQuote(beds, baths, sqft, freq);
-  const prices = [good, better, best];
-  const disc = FREQ_OPTS.find((f) => f.value === freq)!.discount;
-  const isRecurring = freq !== "onetime";
+  const scenario = SCENARIOS[scenarioIdx];
+  const { good, better, best } = calcScenario(scenario);
 
-  const features = [
-    { label: "All rooms + hallways",           on: true },
-    { label: "Kitchen & bathroom deep clean",  on: selTier >= 1 },
-    { label: "Inside oven & fridge available", on: selTier >= 2 },
-  ];
+  /* Auto-cycle scenarios every 4 s */
+  useEffect(() => {
+    scenarioTimer.current = setInterval(() => {
+      setPromptVisible(false);
+      setCardVisible(false);
+      setTimeout(() => {
+        setScenarioIdx((i) => (i + 1) % SCENARIOS.length);
+        setPromptVisible(true);
+        setCardVisible(true);
+      }, 350);
+    }, 4000);
+    return () => { if (scenarioTimer.current) clearInterval(scenarioTimer.current); };
+  }, []);
+
+  /* Auto-cycle chips every 5 s */
+  useEffect(() => {
+    chipTimer.current = setInterval(() => {
+      setChipsVisible(false);
+      setTimeout(() => {
+        setChipGroupIdx((i) => (i + 1) % CHIP_GROUPS.length);
+        setChipsVisible(true);
+      }, 350);
+    }, 5000);
+    return () => { if (chipTimer.current) clearInterval(chipTimer.current); };
+  }, []);
+
+  const handleChipClick = (idx: number) => {
+    setPromptVisible(false);
+    setCardVisible(false);
+    setTimeout(() => {
+      setScenarioIdx(idx);
+      setQuery(SCENARIOS[idx].prompt);
+      setPromptVisible(true);
+      setCardVisible(true);
+    }, 200);
+  };
+
+  const currentChips = CHIP_GROUPS[chipGroupIdx];
 
   return (
     <div className="flex flex-col h-full px-8 py-8">
@@ -124,7 +137,7 @@ function LivePanel() {
         <span className="text-white font-bold text-sm tracking-tight">QuotePro</span>
       </div>
 
-      <div className="flex-1 flex flex-col justify-center min-h-0 py-6 gap-5">
+      <div className="flex-1 flex flex-col justify-center min-h-0 py-5 gap-4">
         {/* Headline */}
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 mb-4">
@@ -158,13 +171,82 @@ function LivePanel() {
           })}
         </div>
 
-        {/* ── Live Quote Calculator Card ── */}
-        <div className="relative">
+        {/* ── AI Pricing Search ── */}
+        <div className={`rounded-2xl border transition-all duration-300 ${focused ? "border-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.15)] bg-[#0f1929]" : "border-blue-500/40 shadow-[0_0_14px_rgba(59,130,246,0.20)] bg-[#0d1520]"}`}>
+          <div className="px-3 pt-2.5 pb-1 flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+                <Sparkles className="w-3 h-3 text-white" />
+              </div>
+              <span className="text-[10px] font-bold text-blue-400 tracking-wide uppercase">Pricing AI</span>
+            </div>
+            <div className="ml-auto flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] text-slate-500 font-medium">Ready</span>
+            </div>
+          </div>
+
+          <div className="px-3 pb-2.5">
+            {/* Animated prompt input */}
+            <div className="relative mb-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                className="w-full bg-transparent text-sm text-white font-medium outline-none placeholder-transparent py-0.5"
+                placeholder=" "
+              />
+              {!query && (
+                <span
+                  className="absolute top-0 left-0 py-0.5 text-sm text-slate-500 font-medium pointer-events-none transition-opacity duration-300 whitespace-nowrap overflow-hidden max-w-full"
+                  style={{ opacity: promptVisible ? 1 : 0 }}
+                >
+                  {scenario.prompt}
+                </span>
+              )}
+            </div>
+
+            {/* Chips + Calculate button */}
+            <div className="flex items-center justify-between pt-2 border-t border-white/8">
+              <div
+                className="flex gap-1 flex-wrap transition-opacity duration-300"
+                style={{ opacity: chipsVisible ? 1 : 0 }}
+              >
+                {currentChips.map((idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleChipClick(idx)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/5 hover:bg-blue-500/15 border border-white/10 hover:border-blue-500/30 text-[10px] font-medium text-slate-400 hover:text-blue-300 rounded-full transition-all"
+                  >
+                    {SCENARIOS[idx].prompt.length > 22 ? SCENARIOS[idx].prompt.slice(0, 22) + "…" : SCENARIOS[idx].prompt}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="shrink-0 ml-2 inline-flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold rounded-full transition-colors"
+              >
+                <Search className="w-2.5 h-2.5" />
+                Calculate
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Quote Result Card (auto-updates with scenario) ── */}
+        <div
+          className="relative transition-opacity duration-300"
+          style={{ opacity: cardVisible ? 1 : 0 }}
+        >
           <div className="absolute inset-0 translate-y-2 translate-x-1 rounded-2xl bg-blue-600/10 blur-sm" />
           <div className="absolute inset-0 translate-y-1 rounded-2xl bg-black/30" />
           <div className="relative rounded-2xl overflow-hidden border border-white/12 shadow-2xl shadow-black/50">
 
-            {/* Browser chrome bar */}
+            {/* Browser bar */}
             <div className="bg-slate-800 px-3 py-2 flex items-center gap-2 border-b border-white/8">
               <div className="flex gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
@@ -177,92 +259,66 @@ function LivePanel() {
             </div>
 
             <div className="bg-[#0d1117] p-4 space-y-3">
-              {/* Header row — client name + recurring badge */}
+              {/* Client header */}
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-white text-sm font-semibold">{CLIENT_NAMES[Math.min(beds, 6)]}</div>
-                  {/* Inline steppers for beds/baths + sqft display */}
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <MiniStepper label="bed" value={beds}  min={1} max={6} onChange={setBeds}  />
-                    <MiniStepper label="bath" value={baths} min={1} max={5} onChange={setBaths} />
-                    <span className="text-slate-500 text-[10px]">{sqft.toLocaleString()} sqft</span>
+                  <div className="text-white text-sm font-semibold">{scenario.client}</div>
+                  <div className="text-slate-400 text-xs mt-0.5">
+                    {scenario.beds} bed · {scenario.baths} bath · {scenario.sqft.toLocaleString()} sqft
                   </div>
                 </div>
-                {isRecurring ? (
+                {scenario.recurring ? (
                   <div className="flex flex-col items-end gap-0.5 shrink-0">
                     <span className="px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-[9px] font-semibold uppercase tracking-wide border border-blue-500/20">
                       Recurring
                     </span>
-                    <span className="text-slate-500 text-[9px]">{disc * 100}% discount</span>
+                    <span className="text-slate-500 text-[9px]">{scenario.discLabel}</span>
                   </div>
                 ) : null}
               </div>
 
-              {/* Sqft slider */}
-              <div>
-                <input
-                  type="range" min={600} max={4000} step={50} value={sqft}
-                  onChange={(e) => setSqft(Number(e.target.value))}
-                  className="w-full h-1 appearance-none rounded-full cursor-pointer accent-blue-500"
-                  style={{ background: `linear-gradient(to right, #3b82f6 ${((sqft - 600) / 3400) * 100}%, #334155 ${((sqft - 600) / 3400) * 100}%)` }}
-                />
-                <div className="flex justify-between text-[9px] text-slate-600 mt-0.5">
-                  <span>600</span><span>sqft</span><span>4,000</span>
-                </div>
-              </div>
-
-              {/* Frequency pills */}
-              <div className="flex gap-1">
-                {FREQ_OPTS.map((f) => (
-                  <button
-                    key={f.value}
-                    onClick={() => setFreq(f.value)}
-                    className={`flex-1 py-1 rounded-lg text-[9px] font-semibold transition-all border ${
-                      freq === f.value
-                        ? "bg-blue-600 border-blue-500 text-white"
-                        : "bg-white/5 border-white/8 text-slate-500 hover:bg-white/10"
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tier cards — clickable, prices update live */}
-              <div className="grid grid-cols-3 gap-1.5">
-                {(["GOOD", "BETTER", "BEST"] as const).map((label, i) => (
-                  <button
-                    key={label}
-                    onClick={() => setSelTier(i)}
-                    className={`rounded-xl p-2 text-center border relative transition-all ${
-                      selTier === i
+              {/* Tier cards — Popular badge sits INSIDE the card (no overflow clipping issue) */}
+              <div className="grid grid-cols-3 gap-1.5 pt-3">
+                {[
+                  { label: "GOOD",   price: good,   sub: "Standard",   pop: false },
+                  { label: "BETTER", price: better, sub: "Deep clean",  pop: true  },
+                  { label: "BEST",   price: best,   sub: "+ Add-ons",   pop: false },
+                ].map((t) => (
+                  <div
+                    key={t.label}
+                    className={`rounded-xl p-2.5 text-center border relative ${
+                      t.pop
                         ? "bg-blue-500/20 border-blue-400/40 shadow-lg shadow-blue-500/10"
-                        : "bg-white/4 border-white/8 hover:bg-white/8"
+                        : "bg-white/4 border-white/8"
                     }`}
                   >
-                    {i === 1 && (
-                      <div className="absolute -top-2 left-1/2 -translate-x-1/2">
-                        <span className="px-1.5 py-0.5 bg-blue-500 rounded text-[8px] text-white font-bold whitespace-nowrap">
+                    {t.pop && (
+                      <div className="absolute -top-3 left-0 right-0 flex justify-center">
+                        <span className="px-1.5 py-0.5 bg-blue-500 rounded text-[8px] text-white font-bold whitespace-nowrap leading-none">
                           Popular
                         </span>
                       </div>
                     )}
-                    <div className={`text-[9px] font-semibold uppercase tracking-wide mb-0.5 ${selTier === i ? "text-blue-300" : "text-slate-500"}`}>
-                      {label}
+                    <div className={`text-[9px] font-semibold uppercase tracking-wide mb-1 ${t.pop ? "text-blue-300" : "text-slate-500"}`}>
+                      {t.label}
                     </div>
-                    <div className={`text-base font-bold leading-none tabular-nums ${selTier === i ? "text-white" : "text-slate-300"}`}>
-                      ${prices[i]}
+                    <div className={`text-base font-bold tabular-nums leading-none ${t.pop ? "text-white" : "text-slate-300"}`}>
+                      ${t.price}
                     </div>
-                    <div className={`text-[9px] mt-0.5 ${selTier === i ? "text-blue-300/70" : "text-slate-600"}`}>
-                      {["Standard", "Deep clean", "+ Add-ons"][i]}
+                    <div className={`text-[9px] mt-1 ${t.pop ? "text-blue-300/70" : "text-slate-600"}`}>
+                      {t.sub}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
 
               {/* Features */}
               <div className="space-y-1.5">
-                {features.map((line) => (
+                {[
+                  { label: "All rooms + hallways",           on: true },
+                  { label: "Kitchen & bathroom deep clean",  on: true },
+                  { label: "Inside oven & fridge available", on: false },
+                ].map((line) => (
                   <div key={line.label} className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full shrink-0 ${line.on ? "bg-emerald-400" : "bg-slate-600"}`} />
                     <span className={`text-[11px] ${line.on ? "text-slate-300" : "text-slate-600"}`}>{line.label}</span>
@@ -270,7 +326,7 @@ function LivePanel() {
                 ))}
               </div>
 
-              {/* Action bar */}
+              {/* Action buttons */}
               <div className="flex gap-2 pt-0.5">
                 <div className="flex-1 h-7 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-600/30">
                   <span className="text-white text-[11px] font-semibold">Send Quote</span>
@@ -287,9 +343,9 @@ function LivePanel() {
       {/* Bottom stats */}
       <div className="shrink-0 flex items-center gap-5 pt-4 border-t border-white/8">
         {[
-          { value: "60 sec", label: "avg. quote time" },
-          { value: `+$${prices[selTier] * 3}`, label: "revenue today" },
-          { value: "3 jobs", label: "closed this week" },
+          { value: "60 sec",  label: "avg. quote time" },
+          { value: `+$${better * 3}`, label: "revenue today" },
+          { value: "3 jobs",  label: "closed this week" },
         ].map((s) => (
           <div key={s.label}>
             <div className="text-white font-bold text-sm">{s.value}</div>
