@@ -74,10 +74,10 @@ export default function PaywallPage() {
   }
 
   const headline = source === "quote_limit"
-    ? "You've used all 3 free quotes"
+    ? "You've used your free quotes — ready to grow?"
     : source === "feature_gate"
-    ? "This feature requires Pro"
-    : "Unlock your full potential";
+    ? "This feature is included in Pro"
+    : "Close more jobs. Recover lost revenue. Grow.";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-primary-50/30 to-violet-50/30">
@@ -92,7 +92,7 @@ export default function PaywallPage() {
             {headline}
           </h1>
           <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-            Join hundreds of cleaning professionals who close more deals, recover lost revenue, and grow their business with AI.
+            Professional quotes, AI follow-ups, and revenue intelligence — everything your cleaning business needs to stop leaving money on the table.
           </p>
         </div>
 

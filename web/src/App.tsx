@@ -4,6 +4,7 @@ import { SubscriptionProvider } from "./lib/subscription";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProGate } from "./components/ProGate";
 import { Layout } from "./components/Layout";
+import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import PaywallPage from "./pages/PaywallPage";
@@ -57,6 +58,13 @@ export default function App() {
   return (
     <SubscriptionProvider>
       <Routes>
+        {/* Public marketing funnel — unauthenticated visitors land here */}
+        <Route
+          path="/"
+          element={
+            isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />
+          }
+        />
         <Route
           path="/login"
           element={
@@ -126,7 +134,7 @@ export default function App() {
         {/* Public intake form — no auth required */}
         <Route path="/intake/:businessId" element={<IntakePage />} />
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>
     </SubscriptionProvider>
   );
