@@ -282,44 +282,45 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex flex-col bg-white min-w-0">
-        <div className="flex items-center justify-between px-8 py-5 lg:px-10 border-b border-slate-100">
-          <div className="flex items-center gap-2 lg:hidden">
+      <div className="flex-1 flex flex-col bg-slate-50 min-w-0">
+        {/* Minimal header — mobile logo only, no acquisition links */}
+        <div className="flex items-center px-8 py-5 lg:hidden">
+          <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
               <Zap className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="text-slate-900 font-bold text-sm tracking-tight">QuotePro</span>
           </div>
-          <div className="hidden lg:block" />
-          <p className="text-sm text-slate-500">
-            New to QuotePro?{" "}
-            <Link to="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
-              Start free
-            </Link>
-          </p>
         </div>
 
-        <div className="flex-1 flex items-center justify-center px-8 lg:px-12 py-10">
-          <div className="w-full max-w-[340px]">
-            <div className="mb-6">
-              <h1 className="text-[22px] font-bold text-slate-900 tracking-tight leading-snug">
-                Sign in to continue<br />closing jobs
+        <div className="flex-1 flex items-center justify-center px-6 lg:px-12 py-10">
+          {/* Contained card */}
+          <div className="w-full max-w-[440px] bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-200/70 px-8 py-9">
+
+            {/* Header hierarchy */}
+            <div className="mb-7">
+              <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-2">
+                Welcome back
+              </p>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight leading-snug">
+                Close more jobs in minutes
               </h1>
-              <p className="text-slate-500 text-sm mt-1.5">Your pipeline is waiting.</p>
+              <p className="text-slate-500 text-sm mt-1.5">Sign in to continue</p>
             </div>
 
             {error ? (
-              <div className="mb-4 flex items-start gap-2.5 p-3 rounded-xl bg-red-50 border border-red-200">
+              <div className="mb-5 flex items-start gap-2.5 p-3 rounded-xl bg-red-50 border border-red-200">
                 <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                 <p className="text-red-700 text-sm leading-snug">{error}</p>
               </div>
             ) : null}
 
+            {/* Google — full width, matches input width */}
             <button
               type="button"
               onClick={handleGoogleSignIn}
               disabled={googleLoading}
-              className="w-full h-[42px] flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 transition-colors disabled:opacity-60 shadow-sm"
+              className="w-full h-[44px] flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 transition-colors disabled:opacity-60 shadow-sm"
             >
               {GOOGLE_SVG}
               {googleLoading ? "Redirecting..." : "Continue with Google"}
@@ -334,51 +335,62 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="you@company.com"
-                  autoComplete="email"
-                  className="w-full h-[42px] px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  className="w-full h-[42px] px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all"
-                />
+            {/* Tightly grouped form */}
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-2.5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="you@company.com"
+                    autoComplete="email"
+                    className="w-full h-[42px] px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    placeholder="Enter your password"
+                    autoComplete="current-password"
+                    className="w-full h-[42px] px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all"
+                  />
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-[42px] flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-md shadow-blue-600/25"
+                className="mt-4 w-full h-[48px] flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-md shadow-blue-600/30"
               >
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 ) : (
-                  "Sign in"
+                  "Continue closing jobs"
                 )}
               </button>
             </form>
 
-            <p className="text-xs text-slate-400 text-center mt-6">
-              By signing in you agree to our{" "}
-              <span className="underline cursor-pointer hover:text-slate-600">Terms</span>{" "}
-              and{" "}
-              <span className="underline cursor-pointer hover:text-slate-600">Privacy Policy</span>.
+            {/* Micro trust line */}
+            <p className="text-center text-[11px] text-slate-400 mt-3 tracking-wide">
+              Secure login&nbsp;&nbsp;•&nbsp;&nbsp;Used by cleaning businesses
             </p>
+
+            {/* Account link — moved out of header, kept subtle */}
+            <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+              <p className="text-sm text-slate-500">
+                Don't have an account?{" "}
+                <Link to="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
+                  Start free
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
       </div>
