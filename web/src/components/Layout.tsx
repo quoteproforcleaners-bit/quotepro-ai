@@ -61,6 +61,7 @@ const navSections = [
       { to: "/customers", label: "Customers", icon: Users, pro: true },
       { to: "/jobs", label: "Jobs", icon: Briefcase, pro: true },
       { to: "/quote-preferences", label: "Quote Preferences", icon: Sliders },
+      { to: "/settings", label: "Price Settings", icon: Settings },
     ],
   },
   {
@@ -214,21 +215,6 @@ export function Layout() {
         ) : null}
 
         <div className="p-3 border-t border-slate-100 shrink-0">
-          <NavLink
-            to="/settings"
-            onClick={() => setSidebarOpen(false)}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 mb-1 ${
-                isActive
-                  ? "bg-primary-50 text-primary-700"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`
-            }
-          >
-            <Settings className="w-[18px] h-[18px] shrink-0" />
-            Settings
-          </NavLink>
-
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors cursor-default">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-white flex items-center justify-center text-xs font-semibold shadow-sm">
               {initials}
