@@ -28,12 +28,17 @@ import {
   DollarSign,
   Building2,
   RefreshCw,
+  CheckSquare,
+  BarChart2,
+  Star,
+  Layers,
 } from "lucide-react";
 
 const PRO_ROUTES = [
   "/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant",
   "/lead-finder", "/lead-capture", "/revenue", "/closing-assistant",
-  "/commercial-quote", "/reactivation",
+  "/commercial-quote", "/reactivation", "/automations", "/sales-strategy",
+  "/weekly-recap", "/tasks-queue", "/reviews-referrals",
 ];
 
 const navSections = [
@@ -57,8 +62,11 @@ const navSections = [
     items: [
       { to: "/revenue", label: "Revenue", icon: DollarSign, pro: true },
       { to: "/growth", label: "Growth Hub", icon: TrendingUp, pro: true },
+      { to: "/weekly-recap", label: "Weekly Recap", icon: BarChart2, pro: true },
+      { to: "/tasks-queue", label: "Tasks Queue", icon: CheckSquare, pro: true },
       { to: "/follow-ups", label: "Follow-ups", icon: Bell },
       { to: "/reactivation", label: "Reactivation", icon: RefreshCw, pro: true },
+      { to: "/reviews-referrals", label: "Reviews & Referrals", icon: Star, pro: true },
       { to: "/lead-finder", label: "Lead Finder", icon: Radio, pro: true },
       { to: "/opportunities", label: "Opportunities", icon: Target, pro: true },
     ],
@@ -67,6 +75,8 @@ const navSections = [
     label: "AI Tools",
     items: [
       { to: "/closing-assistant", label: "Closing Assistant", icon: Zap, pro: true },
+      { to: "/sales-strategy", label: "Sales Strategy", icon: Layers, pro: true },
+      { to: "/automations", label: "Automations Hub", icon: Cpu, pro: true },
       { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true },
       { to: "/walkthrough-ai", label: "Quote from Notes", icon: Wand2 },
       { to: "/intake-requests", label: "Quote Requests", icon: Inbox },

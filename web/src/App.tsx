@@ -33,6 +33,11 @@ import RevenuePage from "./pages/RevenuePage";
 import ClosingAssistantPage from "./pages/ClosingAssistantPage";
 import CommercialQuotePage from "./pages/CommercialQuotePage";
 import ReactivationPage from "./pages/ReactivationPage";
+import AutomationsHubPage from "./pages/AutomationsHubPage";
+import SalesStrategyPage from "./pages/SalesStrategyPage";
+import WeeklyRecapPage from "./pages/WeeklyRecapPage";
+import TasksQueuePage from "./pages/TasksQueuePage";
+import ReviewsReferralsPage from "./pages/ReviewsReferralsPage";
 
 
 export default function App() {
@@ -103,6 +108,11 @@ export default function App() {
           <Route path="/closing-assistant" element={<ProGate feature="Closing Assistant"><ClosingAssistantPage /></ProGate>} />
           <Route path="/commercial-quote" element={<ProGate feature="Commercial Quoting"><CommercialQuotePage /></ProGate>} />
           <Route path="/reactivation" element={<ProGate feature="Reactivation Campaigns"><ReactivationPage /></ProGate>} />
+          <Route path="/automations" element={<ProGate feature="Automations"><AutomationsHubPage /></ProGate>} />
+          <Route path="/sales-strategy" element={<ProGate feature="Sales Strategy"><SalesStrategyPage /></ProGate>} />
+          <Route path="/weekly-recap" element={<ProGate feature="Weekly Recap"><WeeklyRecapPage /></ProGate>} />
+          <Route path="/tasks-queue" element={<ProGate feature="Growth Tasks"><TasksQueuePage /></ProGate>} />
+          <Route path="/reviews-referrals" element={<ProGate feature="Reviews &amp; Referrals"><ReviewsReferralsPage /></ProGate>} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
 
