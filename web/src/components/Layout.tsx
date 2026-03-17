@@ -32,6 +32,10 @@ import {
   BarChart2,
   Star,
   Layers,
+  BookOpen,
+  Sliders,
+  Clipboard,
+  PlugZap,
 } from "lucide-react";
 
 const PRO_ROUTES = [
@@ -39,6 +43,7 @@ const PRO_ROUTES = [
   "/lead-finder", "/lead-capture", "/revenue", "/closing-assistant",
   "/commercial-quote", "/reactivation", "/automations", "/sales-strategy",
   "/weekly-recap", "/tasks-queue", "/reviews-referrals",
+  "/qbo-settings", "/jobber",
 ];
 
 const navSections = [
@@ -55,6 +60,7 @@ const navSections = [
       { to: "/commercial-quote", label: "Commercial Quote", icon: Building2, pro: true },
       { to: "/customers", label: "Customers", icon: Users, pro: true },
       { to: "/jobs", label: "Jobs", icon: Briefcase, pro: true },
+      { to: "/quote-preferences", label: "Quote Preferences", icon: Sliders },
     ],
   },
   {
@@ -84,9 +90,17 @@ const navSections = [
     ],
   },
   {
+    label: "Integrations",
+    items: [
+      { to: "/qbo-settings", label: "QuickBooks Online", icon: BookOpen, pro: true },
+      { to: "/jobber", label: "Jobber", icon: PlugZap, pro: true },
+    ],
+  },
+  {
     label: "Resources",
     items: [
       { to: "/toolkit", label: "Toolkit", icon: Wrench },
+      { to: "/pro-setup", label: "Setup Checklist", icon: Clipboard },
     ],
   },
 ];
