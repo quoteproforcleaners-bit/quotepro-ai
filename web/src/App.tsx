@@ -8,6 +8,7 @@ import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import PaywallPage from "./pages/PaywallPage";
+import PricingPage from "./pages/PricingPage";
 import DashboardPage from "./pages/DashboardPage";
 import QuotesListPage from "./pages/QuotesListPage";
 import QuoteDetailPage from "./pages/QuoteDetailPage";
@@ -81,9 +82,8 @@ export default function App() {
             )
           }
         />
-        <Route path="/upgrade" element={
-          isAuthenticated ? <PaywallPage /> : <Navigate to="/login" replace />
-        } />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/upgrade" element={<Navigate to="/pricing" replace />} />
         <Route path="/subscription/success" element={
           isAuthenticated ? <PaywallPage /> : <Navigate to="/login" replace />
         } />

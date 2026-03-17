@@ -2,13 +2,30 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import { useAuth } from "./auth";
 import { apiPost } from "./api";
 
+export type PlanTier = "free" | "starter" | "growth" | "pro";
+export type BillingInterval = "monthly" | "annual";
+
+export const PLAN_LIMITS: Record<PlanTier, { quotesPerMonth: number; label: string }> = {
+  free: { quotesPerMonth: 3, label: "Free" },
+  starter: { quotesPerMonth: 20, label: "Starter" },
+  growth: { quotesPerMonth: Infinity, label: "Growth" },
+  pro: { quotesPerMonth: Infinity, label: "Pro" },
+};
+
 interface SubscriptionContextType {
+  tier: PlanTier;
   isPro: boolean;
-  tier: string;
+  isGrowth: boolean;
+  isStarter: boolean;
+  isFree: boolean;
+  hasUnlimitedQuotes: boolean;
+  hasAI: boolean;
+  hasPremium: boolean;
+  quotesPerMonth: number;
   showPaywall: () => void;
   hidePaywall: () => void;
   paywallVisible: boolean;
-  startCheckout: () => Promise<void>;
+  startCheckout: (plan?: PlanTier, interval?: BillingInterval) => Promise<void>;
   openPortal: () => Promise<void>;
   checkoutLoading: boolean;
 }
@@ -20,16 +37,24 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  const tier = (user as any)?.subscriptionTier || "free";
+  const tier = ((user as any)?.subscriptionTier || "free") as PlanTier;
+
   const isPro = tier === "pro";
+  const isGrowth = tier === "growth" || tier === "pro";
+  const isStarter = tier === "starter";
+  const isFree = tier === "free";
+  const hasUnlimitedQuotes = isGrowth;
+  const hasAI = isGrowth;
+  const hasPremium = isPro;
+  const quotesPerMonth = PLAN_LIMITS[tier]?.quotesPerMonth ?? 3;
 
   const showPaywall = useCallback(() => setPaywallVisible(true), []);
   const hidePaywall = useCallback(() => setPaywallVisible(false), []);
 
-  const startCheckout = useCallback(async () => {
+  const startCheckout = useCallback(async (plan: PlanTier = "growth", interval: BillingInterval = "monthly") => {
     setCheckoutLoading(true);
     try {
-      const data: any = await apiPost("/api/subscription/create-checkout");
+      const data: any = await apiPost("/api/subscription/create-checkout", { plan, interval });
       if (data.alreadyPro) {
         window.location.reload();
         return;
@@ -57,7 +82,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   return (
     <SubscriptionContext.Provider
-      value={{ isPro, tier, showPaywall, hidePaywall, paywallVisible, startCheckout, openPortal, checkoutLoading }}
+      value={{
+        tier, isPro, isGrowth, isStarter, isFree,
+        hasUnlimitedQuotes, hasAI, hasPremium, quotesPerMonth,
+        showPaywall, hidePaywall, paywallVisible,
+        startCheckout, openPortal, checkoutLoading,
+      }}
     >
       {children}
     </SubscriptionContext.Provider>

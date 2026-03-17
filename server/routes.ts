@@ -258,12 +258,18 @@ function requireAuth(req: Request, res: Response, next: Function) {
   next();
 }
 
+function isGrowthOrAbove(tier: string | null | undefined) {
+  return tier === "growth" || tier === "pro";
+}
+function isStarterOrAbove(tier: string | null | undefined) {
+  return tier === "starter" || tier === "growth" || tier === "pro";
+}
 async function requirePro(req: Request, res: Response, next: Function) {
   try {
     const user = await getUserById(req.session.userId!);
-    if (!user || user.subscriptionTier !== "pro") {
+    if (!user || !isGrowthOrAbove(user.subscriptionTier)) {
       return res.status(403).json({ 
-        message: "This feature requires a Pro subscription",
+        message: "This feature requires a Growth or Pro subscription",
         requiresUpgrade: true,
       });
     }
@@ -1086,8 +1092,11 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       if (!business) return res.status(404).json({ message: "Business not found" });
       const allQuotes = await getQuotesByBusiness(business.id);
       const user = await getUserById(req.session.userId!);
-      const isPro = user?.subscriptionTier === "pro";
-      return res.json({ count: allQuotes.length, limit: 3, isPro });
+      const tier = user?.subscriptionTier || "free";
+      const isPaid = isGrowthOrAbove(tier);
+      const isStarter = tier === "starter";
+      const limit = isStarter ? 20 : (isPaid ? Infinity : 3);
+      return res.json({ count: allQuotes.length, limit: limit === Infinity ? null : limit, isPro: isPaid });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get quote count" });
     }
@@ -1099,11 +1108,14 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       if (!business) return res.status(404).json({ message: "Business not found" });
 
       const user = await getUserById(req.session.userId!);
-      if (user && user.subscriptionTier !== "pro") {
+      if (user && !isGrowthOrAbove(user.subscriptionTier)) {
         const existingQuotes = await getQuotesByBusiness(business.id);
-        if (existingQuotes.length >= 3) {
+        const quoteCap = user.subscriptionTier === "starter" ? 20 : 3;
+        if (existingQuotes.length >= quoteCap) {
           return res.status(403).json({
-            message: "You've used 3 of 3 free quotes. Upgrade to Pro for unlimited quotes.",
+            message: user.subscriptionTier === "starter"
+              ? `You've reached your ${quoteCap} quote monthly limit. Upgrade to Growth for unlimited quotes.`
+              : `You've used ${quoteCap} of ${quoteCap} free quotes. Upgrade to Growth for unlimited quotes.`,
             quoteLimitReached: true,
           });
         }
@@ -3620,7 +3632,44 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
       const user = await getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ message: "Not found" });
-      if (user.subscriptionTier === "pro") return res.json({ alreadyPro: true });
+
+      const plan: string = req.body.plan || "growth";
+      const interval: string = req.body.interval || "monthly";
+
+      // Already on requested plan or higher
+      const tierRank: Record<string, number> = { free: 0, starter: 1, growth: 2, pro: 3 };
+      const currentRank = tierRank[user.subscriptionTier] ?? 0;
+      const requestedRank = tierRank[plan] ?? 2;
+      if (currentRank >= requestedRank) return res.json({ alreadyPro: true });
+
+      const PLAN_CONFIG: Record<string, { name: string; desc: string; monthlyAmount: number; annualAmount: number; trialDays: number }> = {
+        starter: {
+          name: "QuotePro Starter",
+          desc: "20 quotes/month, Good/Better/Best quoting, CRM basics, branded intake forms",
+          monthlyAmount: 1900,
+          annualAmount: 1900 * 12,
+          trialDays: 0,
+        },
+        growth: {
+          name: "QuotePro Growth",
+          desc: "Unlimited quotes, AI tools, smart upsells, follow-up automations, full CRM, revenue dashboard",
+          monthlyAmount: 4900,
+          annualAmount: 49000,
+          trialDays: 7,
+        },
+        pro: {
+          name: "QuotePro Pro",
+          desc: "Everything in Growth plus advanced automation, reporting, priority support, and premium capabilities",
+          monthlyAmount: 9900,
+          annualAmount: 99000,
+          trialDays: 7,
+        },
+      };
+
+      const config = PLAN_CONFIG[plan] ?? PLAN_CONFIG.growth;
+      const isAnnual = interval === "annual";
+      const unitAmount = isAnnual ? config.annualAmount : config.monthlyAmount;
+      const recurringInterval = isAnnual ? "year" : "month";
 
       let stripeCustomerId = (user as any).stripeCustomerId;
       if (!stripeCustomerId) {
@@ -3634,32 +3683,32 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
 
       const host = req.get("host")!;
       const protocol = host.includes("localhost") ? "http" : "https";
-      const session = await stripe.checkout.sessions.create({
+
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
         customer: stripeCustomerId,
         mode: "subscription",
         line_items: [
           {
             price_data: {
               currency: "usd",
-              product_data: {
-                name: "QuotePro AI Pro",
-                description: "Unlimited quotes, CRM, AI tools, growth dashboard, and all Pro features",
-              },
-              recurring: { interval: "month" },
-              unit_amount: 1999,
+              product_data: { name: config.name, description: config.desc },
+              recurring: { interval: recurringInterval },
+              unit_amount: unitAmount,
             },
             quantity: 1,
           },
         ],
         success_url: `${protocol}://${host}/app/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${protocol}://${host}/app/settings`,
+        cancel_url: `${protocol}://${host}/app/pricing`,
         subscription_data: {
-          metadata: { userId: String(user.id) },
-          trial_period_days: 7,
+          metadata: { userId: String(user.id), plan, interval },
+          ...(config.trialDays > 0 ? { trial_period_days: config.trialDays } : {}),
         },
+        metadata: { plan, interval },
         allow_promotion_codes: true,
-      });
+      };
 
+      const session = await stripe.checkout.sessions.create(sessionParams);
       return res.json({ url: session.url });
     } catch (error: any) {
       console.error("Subscription checkout error:", error?.message || error);
@@ -3687,11 +3736,14 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       }
 
       if (session.payment_status === "paid" || session.status === "complete") {
+        const planFromMeta = (session.metadata as any)?.plan || "growth";
+        const intervalFromMeta = (session.metadata as any)?.interval || "monthly";
         await updateUser(req.session.userId!, {
-          subscriptionTier: "pro",
+          subscriptionTier: planFromMeta,
+          subscriptionInterval: intervalFromMeta,
           subscriptionExpiresAt: null,
-        });
-        return res.json({ success: true, tier: "pro" });
+        } as any);
+        return res.json({ success: true, tier: planFromMeta });
       }
       return res.json({ success: false, status: session.status });
     } catch (error: any) {
@@ -3723,8 +3775,10 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
           const session = event.data.object;
           const userId = session.subscription_data?.metadata?.userId || session.metadata?.userId;
           if (userId && session.mode === "subscription") {
-            await updateUser(userId, { subscriptionTier: "pro", subscriptionExpiresAt: null });
-            console.log(`Subscription activated for user ${userId}`);
+            const planMeta = session.subscription_data?.metadata?.plan || session.metadata?.plan || "growth";
+            const intervalMeta = session.subscription_data?.metadata?.interval || session.metadata?.interval || "monthly";
+            await updateUser(userId, { subscriptionTier: planMeta, subscriptionInterval: intervalMeta, subscriptionExpiresAt: null } as any);
+            console.log(`Subscription activated for user ${userId} on plan ${planMeta}`);
           }
           break;
         }
@@ -3734,11 +3788,12 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
           const userId = subscription.metadata?.userId;
           if (userId) {
             const isActive = subscription.status === "active" || subscription.status === "trialing";
+            const planFromMeta = subscription.metadata?.plan || "growth";
             await updateUser(userId, {
-              subscriptionTier: isActive ? "pro" : "free",
+              subscriptionTier: isActive ? planFromMeta : "free",
               subscriptionExpiresAt: isActive ? null : new Date(),
             });
-            console.log(`Subscription ${isActive ? "active" : "cancelled"} for user ${userId}`);
+            console.log(`Subscription ${isActive ? "active (" + planFromMeta + ")" : "cancelled"} for user ${userId}`);
           }
           break;
         }
@@ -8796,8 +8851,8 @@ init();
       const biz = await lookupIntakeBusiness(req.params.businessId);
       if (!biz) return res.status(404).json({ message: "Business not found" });
       const owner = await getUserById(biz.ownerUserId!);
-      if (!owner || owner.subscriptionTier !== "pro") {
-        return res.status(403).json({ message: "This feature requires a Pro subscription", requiresUpgrade: true });
+      if (!owner || !isGrowthOrAbove(owner.subscriptionTier)) {
+        return res.status(403).json({ message: "This feature requires a Growth or Pro subscription", requiresUpgrade: true });
       }
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
