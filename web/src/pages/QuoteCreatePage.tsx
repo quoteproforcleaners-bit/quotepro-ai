@@ -211,29 +211,54 @@ function calculateQuote(
         tierAddOnPrice += (addOnPrices as any)[opt.key] || 0;
       }
     }
-    const totalHours = roundHours(baseHours * st.multiplier + tierAddOnHours);
-    let price = totalHours * hourlyRate + tierAddOnPrice;
-    price = Math.max(price, minimumTicket);
+
     const canDiscount =
       st.id !== "move-in-out" && st.id !== "post-construction";
-    if (canDiscount && frequency !== "one-time") {
-      price = price * (1 - getFreqDiscount(frequency));
-    }
-    price = roundToNearest5(price);
+    const disc = canDiscount ? getFreqDiscount(frequency) : 0;
+    const isOneTime = frequency === "one-time";
+
+    // Service hours (no add-ons) — used for recurring price base
+    const serviceHours = roundHours(baseHours * st.multiplier);
+    // Total hours including add-ons — used for first-clean price
+    const totalHoursWithAddOns = roundHours(
+      baseHours * st.multiplier + tierAddOnHours
+    );
+
+    // First clean: add-ons included, no frequency discount
+    let firstCleanPrice = totalHoursWithAddOns * hourlyRate + tierAddOnPrice;
+    firstCleanPrice = Math.max(firstCleanPrice, minimumTicket);
+    firstCleanPrice = roundToNearest5(firstCleanPrice);
+
+    // Recurring: base service only, frequency discount applied
+    let recurringPrice = serviceHours * hourlyRate;
+    recurringPrice = Math.max(recurringPrice, minimumTicket);
+    if (disc > 0) recurringPrice = recurringPrice * (1 - disc);
+    recurringPrice = roundToNearest5(recurringPrice);
+
+    // Main price: for one-time quotes show full price; for recurring show recurring rate
+    const price = isOneTime ? firstCleanPrice : recurringPrice;
+
     return {
       price,
+      firstCleanPrice: isOneTime ? null : firstCleanPrice,
       name: st.name,
       scope: st.scope,
       serviceTypeId: st.id,
-      totalHours,
+      totalHours: isOneTime ? totalHoursWithAddOns : serviceHours,
     };
   };
 
+  // Good: no add-ons (base service only)
   const good = calcTier(goodTypeId, false);
-  const better = calcTier(betterTypeId, false);
+  // Better: user-selected add-ons included (fixed: was incorrectly false)
+  const better = calcTier(betterTypeId, true);
+  // Best: deep-clean default add-ons — oven, cabinets, windows, baseboards, blinds (no fridge)
   const best = calcTier(bestTypeId, false, {
-    insideFridge: true,
     insideOven: true,
+    insideCabinets: true,
+    interiorWindows: true,
+    baseboardsDetail: true,
+    blindsDetail: true,
   });
 
   return {
@@ -401,16 +426,19 @@ export default function QuoteCreatePage() {
       options: {
         good: {
           price: quote.good.price,
+          firstCleanPrice: quote.good.firstCleanPrice ?? undefined,
           name: `Good - ${quote.good.name}`,
           scope: quote.good.scope,
         },
         better: {
           price: quote.better.price,
+          firstCleanPrice: quote.better.firstCleanPrice ?? undefined,
           name: `Better - ${quote.better.name}`,
           scope: quote.better.scope,
         },
         best: {
           price: quote.best.price,
+          firstCleanPrice: quote.best.firstCleanPrice ?? undefined,
           name: `Best - ${quote.best.name}`,
           scope: quote.best.scope,
         },
@@ -971,7 +999,17 @@ export default function QuoteCreatePage() {
                       <p className="text-xs text-slate-500">{data.name}</p>
                       <p className="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
                         ${data.price.toFixed(0)}
+                        {data.firstCleanPrice ? (
+                          <span className="text-xs font-normal text-slate-400 ml-1">
+                            /visit
+                          </span>
+                        ) : null}
                       </p>
+                      {data.firstCleanPrice ? (
+                        <p className="text-xs text-amber-600 font-medium mt-0.5">
+                          First visit: ${data.firstCleanPrice.toFixed(0)}
+                        </p>
+                      ) : null}
                       <p className="text-xs text-slate-400 mt-1 line-clamp-2">
                         {data.scope}
                       </p>
@@ -1065,15 +1103,30 @@ export default function QuoteCreatePage() {
                   </>
                 ) : null}
               </div>
-              <div className="border-t border-slate-200 mt-4 pt-4 flex justify-between items-center">
-                <span className="font-semibold text-slate-900">
-                  {selectedOption.charAt(0).toUpperCase() +
-                    selectedOption.slice(1)}{" "}
-                  - {quote[selectedOption].name}
-                </span>
-                <span className="text-2xl font-bold text-primary-600 tracking-tight">
-                  ${quote[selectedOption].price.toFixed(0)}
-                </span>
+              <div className="border-t border-slate-200 mt-4 pt-4">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-slate-900">
+                    {selectedOption.charAt(0).toUpperCase() +
+                      selectedOption.slice(1)}{" "}
+                    - {quote[selectedOption].name}
+                  </span>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-primary-600 tracking-tight">
+                      ${quote[selectedOption].price.toFixed(0)}
+                      {quote[selectedOption].firstCleanPrice ? (
+                        <span className="text-sm font-normal text-slate-400 ml-1">
+                          /visit
+                        </span>
+                      ) : null}
+                    </div>
+                    {quote[selectedOption].firstCleanPrice ? (
+                      <div className="text-xs text-amber-600 font-medium mt-0.5">
+                        First visit: $
+                        {quote[selectedOption].firstCleanPrice.toFixed(0)}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -1,0 +1,248 @@
+This is a HIGH-PRIORITY pricing audit and correction sprint for QuotePro.
+
+The quoting tool’s pricing logic appears incorrect and may not match the logic in the mobile iOS app.
+This is a trust-critical issue.
+If quotes are wrong, users will lose confidence in the product.
+
+Do NOT treat this as a surface-level bug fix.
+I need a complete pricing logic audit across the web quoting tool and any shared pricing engine used by the app.
+
+Important:
+Do not overwrite or break unrelated functionality.
+Do not redesign the UI unless needed to expose corrected pricing behavior.
+Preserve existing auth, CRM, quote flows, and customer records.
+Before coding, first inspect the current architecture and identify:
+- where pricing logic lives
+- whether pricing logic is duplicated across web and iOS
+- whether pricing logic is shared in a common service / utility / API
+- where add-ons are applied
+- where deep clean logic is applied
+- where recurring / maintenance pricing is applied
+- where user pricing settings are stored and read from
+- whether AI quote generation can bypass pricing rules
+- where quote tiers (Good / Better / Best) are generated
+- whether there are fallback defaults that override user settings
+
+Then implement carefully.
+
+==================================================
+GOAL
+==================================================
+
+The goal is to make the pricing engine:
+- accurate
+- deterministic
+- aligned with the user’s configured price settings
+- consistent between web and mobile logic
+- safe against underpricing
+- correct for add-ons, deep cleans, and first-clean-only behavior
+
+The pricing engine must follow the business rules exactly.
+
+==================================================
+KNOWN ISSUES TO FIX
+==================================================
+
+1. ADD-ONS ARE NOT CHANGING THE PRICE
+Right now, when an add-on is selected, the quote price does not seem to change.
+This must be fixed.
+
+2. ADD-ONS SHOULD ONLY APPLY TO THE FIRST CLEAN
+When add-ons are included, they should only affect the first clean price.
+They should NOT continue being baked into recurring maintenance pricing unless explicitly intended by the business rules.
+
+3. DEEP CLEAN SHOULD INCLUDE DEFAULT ADD-ONS
+If the quote is a deep clean, it should include all add-ons by default EXCEPT inside fridge.
+
+Important exception:
+- inside fridge should NOT be automatically included in deep clean
+- inside fridge should be reserved for move-in / move-out logic
+
+4. WEB LOGIC MAY NOT MATCH IOS LOGIC
+Audit and compare logic paths so the web quoting behavior matches the intended product pricing behavior.
+If there is duplicated or diverging logic, identify it and either unify it or clearly align it.
+
+5. USER PRICE SETTINGS MAY NOT BE RESPECTED
+The pricing engine must follow the user’s price settings in the app.
+It currently seems “very off,” which suggests settings may be ignored, partially applied, or overridden.
+
+==================================================
+PRICING RULES TO ENFORCE
+==================================================
+
+Please enforce these rules explicitly:
+
+A. USER SETTINGS ARE SOURCE OF TRUTH
+The user’s configured price settings must be the primary source of truth.
+Do not silently override them with hardcoded defaults unless there is absolutely no data and a safe fallback is required.
+
+B. ADD-ONS MUST CHANGE PRICE
+Any selected add-on must visibly and actually increase the quote price according to the configured add-on pricing.
+
+C. ADD-ONS ARE FIRST-CLEAN ONLY
+Add-ons should only be included in the first clean total.
+They should not be automatically rolled into future recurring pricing unless the product explicitly supports that and the user intended it.
+
+D. DEEP CLEAN DEFAULTS
+If cleaning type is deep clean:
+- all standard deep-clean-related add-ons should be included by default
+- EXCEPT inside fridge
+- inside fridge should not be defaulted into deep clean pricing
+
+E. MOVE-IN / MOVE-OUT LOGIC
+Inside fridge should be reserved for move-in / move-out behavior, not automatically included in deep cleans.
+
+F. RECURRING VS FIRST CLEAN
+The engine must clearly distinguish:
+- first clean / initial clean price
+- recurring maintenance price
+
+Add-ons and one-time extras should affect the first clean appropriately and not distort maintenance pricing.
+
+==================================================
+AUDIT REQUIREMENTS
+==================================================
+
+Perform a complete audit of the pricing system.
+
+Audit all of the following:
+- quote builder pricing logic
+- AI quote generation logic
+- add-on calculation logic
+- deep clean logic
+- move-in / move-out logic
+- recurring pricing logic
+- quote tier generation logic
+- first clean vs recurring clean distinction
+- user settings retrieval and application
+- fallback pricing logic
+- any mobile/web divergence
+- any API calls that calculate or transform prices
+- any sanitizers / normalizers that reset values
+- any rounding or clamping logic that could hide pricing changes
+
+Determine:
+- where the pricing mismatch is happening
+- whether add-ons are being dropped in the final calculation
+- whether user settings are not being loaded or mapped correctly
+- whether the final displayed quote differs from the computed quote
+- whether the AI quote builder is using a different pricing path than the manual quote builder
+
+==================================================
+IMPLEMENTATION REQUIREMENTS
+==================================================
+
+1. CENTRALIZE OR ALIGN PRICING LOGIC
+If pricing logic is duplicated across files or platforms, reduce divergence.
+If there is already a shared pricing service/util, use that as the canonical source.
+If logic is not centralized, refactor carefully toward a single authoritative pricing path where practical.
+
+2. ENSURE USER SETTINGS ARE APPLIED
+Audit the mapping between user-configured pricing settings and actual quote calculations.
+Verify every relevant field:
+- base rates
+- square footage adjustments
+- clean type adjustments
+- add-on prices
+- deep clean pricing behavior
+- recurring discounts or modifiers
+- quote tier multipliers / package logic
+- any property-based adjustments
+
+3. FIX ADD-ON CALCULATIONS
+Make sure each add-on:
+- changes the first clean total correctly
+- is visible in quote totals / line items if the UI supports that
+- is not silently ignored
+
+4. IMPLEMENT DEEP CLEAN DEFAULT BEHAVIOR
+When cleaning type = deep clean:
+- automatically include all relevant deep-clean-related add-ons by default
+- exclude inside fridge from this default set
+- allow override if user removes or adds manually, if the UX supports that
+
+5. RESPECT MOVE-IN / MOVE-OUT EXCEPTION
+Inside fridge should be associated with move-in / move-out logic, not auto-added to deep clean.
+
+6. CLEAR FIRST-CLEAN VS RECURRING PRICING
+Ensure the system computes:
+- first clean price
+- recurring price
+cleanly and separately
+
+If the existing data model supports it, preserve both values.
+Do not let one-time extras pollute maintenance pricing.
+
+==================================================
+SAFETY GUARDRAILS
+==================================================
+
+Add pricing guardrails to reduce bad outputs.
+
+Examples:
+- if add-ons are selected but total does not change, fail validation or log an error
+- if user settings are missing, log clearly and use safe fallback behavior
+- if deep clean total is unexpectedly below standard clean or below configured minimums, flag it
+- if quote totals look obviously invalid, prevent silent bad output
+
+Add debug logging or comments where useful so future pricing issues are traceable.
+
+==================================================
+TESTING / VALIDATION
+==================================================
+
+After implementing, validate at minimum these scenarios:
+
+1. STANDARD CLEAN WITH NO ADD-ONS
+- confirm base price follows user settings
+
+2. STANDARD CLEAN WITH ADD-ONS
+- confirm total increases correctly
+- confirm increase is only on first clean if applicable
+
+3. DEEP CLEAN
+- confirm all appropriate default add-ons are included
+- confirm inside fridge is NOT included by default
+- confirm price reflects those default additions
+
+4. MOVE-IN / MOVE-OUT
+- confirm inside fridge behavior follows intended logic
+
+5. RECURRING QUOTE
+- confirm maintenance pricing does not include one-time add-ons incorrectly
+- confirm first-clean pricing and recurring pricing are clearly separated if both exist
+
+6. USER SETTINGS OVERRIDE TEST
+- change user-configured prices and verify quote output changes accordingly
+
+7. AI QUOTE GENERATION
+- verify AI-generated quote uses the same pricing rules as manual quote generation
+- verify AI path cannot ignore add-ons or user settings
+
+8. GOOD / BETTER / BEST
+- verify tier generation still works after pricing corrections
+- verify tiers reflect actual pricing logic and selected conditions
+
+If the project supports tests, add them.
+If not, at least add strong validation logic and document the scenarios checked.
+
+==================================================
+OUTPUT
+==================================================
+
+When done, provide:
+- a summary of what was wrong
+- whether pricing logic was duplicated or inconsistent across web / iOS paths
+- what files were modified
+- what files were created
+- what pricing rules were corrected
+- how add-on logic now works
+- how deep clean logic now works
+- how first-clean vs recurring pricing now works
+- any assumptions made
+- any remaining risks or recommended next steps
+
+Final instruction:
+Treat this as a trust and revenue emergency.
+The pricing engine must be accurate, consistent, and aligned with the user’s configured settings.
+Before coding, first inspect the codebase and summarize exactly how the current pricing logic works, where it diverges, and what you plan to fix.

@@ -201,14 +201,20 @@ export function calculateAllOptions(
   const betterType = getServiceTypeById(settings, settings.betterOptionId) || settings.serviceTypes[1];
   const bestType = getServiceTypeById(settings, settings.bestOptionId) || settings.serviceTypes[2];
 
+  // Good: no add-ons (base service only)
   const good = calculateQuoteOption(homeDetails, emptyAddOns, frequency, goodType, settings, "Good");
 
-  const better = calculateQuoteOption(homeDetails, emptyAddOns, frequency, betterType, settings, "Better");
+  // Better: user-selected add-ons included (fixed: was incorrectly using emptyAddOns)
+  const better = calculateQuoteOption(homeDetails, addOns, frequency, betterType, settings, "Better");
 
+  // Best: deep-clean default add-ons — oven, cabinets, windows, baseboards, blinds (no fridge)
   const bestAddOns: AddOns = {
     ...emptyAddOns,
-    insideFridge: true,
     insideOven: true,
+    insideCabinets: true,
+    interiorWindows: true,
+    baseboardsDetail: true,
+    blindsDetail: true,
   };
   const best = calculateQuoteOption(homeDetails, bestAddOns, frequency, bestType, settings, "Best");
 
