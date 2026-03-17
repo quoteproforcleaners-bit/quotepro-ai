@@ -29,6 +29,10 @@ import LeadCapturePage from "./pages/LeadCapturePage";
 import LeadFinderPage from "./pages/LeadFinderPage";
 import LeadFinderDetailPage from "./pages/LeadFinderDetailPage";
 import LeadFinderSettingsPage from "./pages/LeadFinderSettingsPage";
+import RevenuePage from "./pages/RevenuePage";
+import ClosingAssistantPage from "./pages/ClosingAssistantPage";
+import CommercialQuotePage from "./pages/CommercialQuotePage";
+import ReactivationPage from "./pages/ReactivationPage";
 
 
 export default function App() {
@@ -95,6 +99,10 @@ export default function App() {
           <Route path="/lead-finder" element={<ProGate feature="Local Lead Finder"><LeadFinderPage /></ProGate>} />
           <Route path="/lead-finder/settings" element={<ProGate feature="Local Lead Finder"><LeadFinderSettingsPage /></ProGate>} />
           <Route path="/lead-finder/:id" element={<ProGate feature="Local Lead Finder"><LeadFinderDetailPage /></ProGate>} />
+          <Route path="/revenue" element={<ProGate feature="Revenue Intelligence"><RevenuePage /></ProGate>} />
+          <Route path="/closing-assistant" element={<ProGate feature="Closing Assistant"><ClosingAssistantPage /></ProGate>} />
+          <Route path="/commercial-quote" element={<ProGate feature="Commercial Quoting"><CommercialQuotePage /></ProGate>} />
+          <Route path="/reactivation" element={<ProGate feature="Reactivation Campaigns"><ReactivationPage /></ProGate>} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
 

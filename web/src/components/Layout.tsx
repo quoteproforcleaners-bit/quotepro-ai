@@ -25,9 +25,16 @@ import {
   Radio,
   Cpu,
   Link2,
+  DollarSign,
+  Building2,
+  RefreshCw,
 } from "lucide-react";
 
-const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant", "/lead-finder", "/lead-capture"];
+const PRO_ROUTES = [
+  "/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant",
+  "/lead-finder", "/lead-capture", "/revenue", "/closing-assistant",
+  "/commercial-quote", "/reactivation",
+];
 
 const navSections = [
   {
@@ -40,6 +47,7 @@ const navSections = [
     label: "Manage",
     items: [
       { to: "/quotes", label: "Quotes", icon: FileText },
+      { to: "/commercial-quote", label: "Commercial Quote", icon: Building2, pro: true },
       { to: "/customers", label: "Customers", icon: Users, pro: true },
       { to: "/jobs", label: "Jobs", icon: Briefcase, pro: true },
     ],
@@ -47,8 +55,10 @@ const navSections = [
   {
     label: "Grow",
     items: [
+      { to: "/revenue", label: "Revenue", icon: DollarSign, pro: true },
       { to: "/growth", label: "Growth Hub", icon: TrendingUp, pro: true },
       { to: "/follow-ups", label: "Follow-ups", icon: Bell },
+      { to: "/reactivation", label: "Reactivation", icon: RefreshCw, pro: true },
       { to: "/lead-finder", label: "Lead Finder", icon: Radio, pro: true },
       { to: "/opportunities", label: "Opportunities", icon: Target, pro: true },
     ],
@@ -56,6 +66,7 @@ const navSections = [
   {
     label: "AI Tools",
     items: [
+      { to: "/closing-assistant", label: "Closing Assistant", icon: Zap, pro: true },
       { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true },
       { to: "/walkthrough-ai", label: "Quote from Notes", icon: Wand2 },
       { to: "/intake-requests", label: "Quote Requests", icon: Inbox },
