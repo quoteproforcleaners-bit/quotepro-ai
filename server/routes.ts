@@ -9020,8 +9020,8 @@ Return ONLY valid JSON:
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  // Protected: get lead capture settings
-  app.get("/api/business/lead-capture-settings", requireAuth, async (req: any, res: Response) => {
+  // Protected: get lead capture settings (Pro only)
+  app.get("/api/business/lead-capture-settings", requireAuth, requirePro as any, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -9045,8 +9045,8 @@ Return ONLY valid JSON:
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  // Protected: update lead capture settings
-  app.put("/api/business/lead-capture-settings", requireAuth, async (req: any, res: Response) => {
+  // Protected: update lead capture settings (Pro only)
+  app.put("/api/business/lead-capture-settings", requireAuth, requirePro as any, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });

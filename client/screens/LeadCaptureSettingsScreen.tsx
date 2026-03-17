@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
+import { ProGate } from "@/components/ProGate";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
@@ -140,6 +141,7 @@ export default function LeadCaptureSettingsScreen() {
   }
 
   return (
+    <ProGate featureName="Lead Capture Link">
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.background }}
       contentContainerStyle={{
@@ -285,6 +287,7 @@ export default function LeadCaptureSettingsScreen() {
         </Pressable>
       </Card>
     </ScrollView>
+    </ProGate>
   );
 }
 

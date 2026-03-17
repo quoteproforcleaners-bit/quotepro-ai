@@ -27,7 +27,7 @@ import {
   Link2,
 } from "lucide-react";
 
-const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant", "/lead-finder"];
+const PRO_ROUTES = ["/customers", "/jobs", "/growth", "/opportunities", "/ai-assistant", "/lead-finder", "/lead-capture"];
 
 const navSections = [
   {
@@ -59,7 +59,7 @@ const navSections = [
       { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true },
       { to: "/walkthrough-ai", label: "Quote from Notes", icon: Wand2 },
       { to: "/intake-requests", label: "Quote Requests", icon: Inbox },
-      { to: "/lead-capture", label: "Lead Capture Link", icon: Link2 },
+      { to: "/lead-capture", label: "Lead Capture Link", icon: Link2, pro: true },
     ],
   },
   {

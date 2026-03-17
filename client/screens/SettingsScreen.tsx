@@ -1218,7 +1218,14 @@ export default function SettingsScreen() {
             <Feather name="link" size={20} color={theme.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>Lead Capture Link</ThemedText>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>Lead Capture Link</ThemedText>
+              {!isPro ? (
+                <View style={{ backgroundColor: theme.primary, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                  <ThemedText style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>PRO</ThemedText>
+                </View>
+              ) : null}
+            </View>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
               Your instant quote request link for website & social
             </ThemedText>
