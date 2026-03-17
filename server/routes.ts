@@ -4600,6 +4600,7 @@ Rules:
       }
 
       const purposeDescriptions: Record<string, string> = {
+        send_quote: "sending a new quote to the customer for the first time - be enthusiastic, highlight the value and services included, mention the quote is ready for them to review, and encourage them to accept. If a quote link is available, invite them to click it to view and accept",
         initial_quote: "sending an initial quote - be enthusiastic and highlight value",
         follow_up: "a gentle follow-up on a previously sent quote - be polite and not pushy",
         thank_you: "thanking the customer for their business - be grateful and warm",

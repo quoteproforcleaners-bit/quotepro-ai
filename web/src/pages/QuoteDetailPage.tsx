@@ -52,7 +52,7 @@ import {
   ProgressBar,
 } from "../components/ui";
 
-type MessagePurpose = "follow_up" | "thank_you" | "reminder" | "upsell" | "review_request" | "payment_failed";
+type MessagePurpose = "send_quote" | "follow_up" | "thank_you" | "reminder" | "upsell" | "review_request" | "payment_failed";
 type MessageChannel = "email" | "sms";
 
 export default function QuoteDetailPage() {
@@ -394,6 +394,7 @@ export default function QuoteDetailPage() {
   ];
 
   const messagePurposes: Array<{ value: MessagePurpose; label: string; icon: typeof Send }> = [
+    { value: "send_quote", label: "Send Quote", icon: Send },
     { value: "follow_up", label: "Follow Up", icon: MessageSquare },
     { value: "thank_you", label: "Thank You", icon: Star },
     { value: "reminder", label: "Reminder", icon: Clock },
