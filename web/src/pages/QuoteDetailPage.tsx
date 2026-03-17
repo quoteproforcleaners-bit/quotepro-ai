@@ -456,11 +456,6 @@ export default function QuoteDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader title="Activity Timeline" icon={Clock} />
-            <Timeline items={timelineItems} />
-          </Card>
-
           {propertyRows.length > 0 ? (
             <Card>
               <CardHeader title="Property Details" icon={Home} />
@@ -734,6 +729,11 @@ export default function QuoteDetailPage() {
                 </div>
               ) : null}
             </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Activity Timeline" icon={Clock} />
+            <Timeline items={timelineItems} />
           </Card>
         </div>
 
