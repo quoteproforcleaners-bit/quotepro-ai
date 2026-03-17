@@ -299,6 +299,9 @@ export default function QuoteCreatePage() {
   const [selectedOption, setSelectedOption] = useState<
     "good" | "better" | "best"
   >("better");
+  const [recommendedOption, setRecommendedOption] = useState<
+    "good" | "better" | "best"
+  >("better");
   const [customerForm, setCustomerForm] = useState({
     firstName: "",
     lastName: "",
@@ -393,7 +396,7 @@ export default function QuoteCreatePage() {
       status: "draft",
       total: selected.price,
       frequencySelected: services.frequency,
-      recommendedOption: "better",
+      recommendedOption,
       selectedOption,
       options: {
         good: {
@@ -944,39 +947,54 @@ export default function QuoteCreatePage() {
               {(["good", "better", "best"] as const).map((tier) => {
                 const data = quote[tier];
                 const isSelected = selectedOption === tier;
+                const isRecommended = recommendedOption === tier;
                 return (
-                  <button
-                    key={tier}
-                    onClick={() => setSelectedOption(tier)}
-                    className={`text-left rounded-xl border-2 p-5 transition-all ${
-                      isSelected
-                        ? "border-primary-500 bg-primary-50/50 shadow-sm shadow-primary-600/5"
-                        : "border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-slate-900 capitalize">
-                        {tier}
-                      </h3>
-                      {tier === "better" ? (
-                        <span className="text-[10px] font-semibold uppercase bg-primary-600 text-white px-2 py-0.5 rounded-full">
-                          Recommended
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-slate-500">{data.name}</p>
-                    <p className="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
-                      ${data.price.toFixed(0)}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                      {data.scope}
-                    </p>
-                    {isSelected ? (
-                      <div className="mt-3 flex items-center gap-1 text-primary-600 text-xs font-medium">
-                        <Check className="w-3.5 h-3.5" /> Selected
+                  <div key={tier} className="relative">
+                    <button
+                      onClick={() => setSelectedOption(tier)}
+                      className={`w-full text-left rounded-xl border-2 p-5 transition-all ${
+                        isSelected
+                          ? "border-primary-500 bg-primary-50/50 shadow-sm shadow-primary-600/5"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-slate-900 capitalize">
+                          {tier}
+                        </h3>
+                        {isRecommended ? (
+                          <span className="text-[10px] font-semibold uppercase bg-primary-600 text-white px-2 py-0.5 rounded-full">
+                            Recommended
+                          </span>
+                        ) : null}
                       </div>
-                    ) : null}
-                  </button>
+                      <p className="text-xs text-slate-500">{data.name}</p>
+                      <p className="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
+                        ${data.price.toFixed(0)}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                        {data.scope}
+                      </p>
+                      {isSelected ? (
+                        <div className="mt-3 flex items-center gap-1 text-primary-600 text-xs font-medium">
+                          <Check className="w-3.5 h-3.5" /> Selected
+                        </div>
+                      ) : null}
+                    </button>
+                    {!isRecommended ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRecommendedOption(tier);
+                        }}
+                        className="mt-1.5 w-full text-center text-[11px] text-slate-400 hover:text-primary-600 transition-colors py-1 rounded-lg hover:bg-primary-50"
+                      >
+                        Set as Recommended
+                      </button>
+                    ) : (
+                      <div className="mt-1.5 h-7" />
+                    )}
+                  </div>
                 );
               })}
             </div>
