@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { Zap, AlertCircle, CheckCircle, Eye, TrendingUp, Clock, Search, Sparkles } from "lucide-react";
+import { Zap, AlertCircle } from "lucide-react";
 
 const GOOGLE_SVG = (
   <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24">
@@ -12,346 +12,215 @@ const GOOGLE_SVG = (
   </svg>
 );
 
-const ACTIVITY = [
-  {
-    icon: CheckCircle,
-    color: "text-emerald-400",
-    bg: "bg-emerald-500/10 border-emerald-500/20",
-    label: "Quote accepted",
-    sub: "Johnson Residence · $189",
-    time: "2 min ago",
-    highlight: true,
-  },
-  {
-    icon: Eye,
-    color: "text-blue-400",
-    bg: "bg-blue-500/10 border-blue-500/20",
-    label: "Customer viewed quote",
-    sub: "Martinez Residence · $224",
-    time: "11 min ago",
-    highlight: false,
-  },
-  {
-    icon: TrendingUp,
-    color: "text-violet-400",
-    bg: "bg-violet-500/10 border-violet-500/20",
-    label: "Upsell added · +$55",
-    sub: "Deep clean + oven detail",
-    time: "34 min ago",
-    highlight: false,
-  },
-  {
-    icon: Clock,
-    color: "text-slate-400",
-    bg: "bg-white/5 border-white/10",
-    label: "Quote sent in 58 sec",
-    sub: "Thompson Residence",
-    time: "1 hr ago",
-    highlight: false,
-  },
+const BED_BASE: Record<string, number> = {
+  "1": 75, "2": 95, "3": 120, "4": 150, "5": 185, "6+": 220,
+};
+const BATH_EXTRA: Record<string, number> = {
+  "1": 0, "2": 20, "3": 40, "4": 60, "5+": 80,
+};
+const SQFT_EXTRA: Record<string, number> = {
+  "Under 1,000": 0, "1,000 – 1,500": 15, "1,500 – 2,000": 25,
+  "2,000 – 2,500": 40, "2,500 – 3,000": 55, "3,000+": 75,
+};
+const CLEAN_MULT: Record<string, number> = {
+  "Standard Clean": 1, "Deep Clean": 1.35, "Move-Out Clean": 1.6,
+};
+const FREQ_DISC: Record<string, number> = {
+  "One Time": 0, "Monthly": 0.05, "Biweekly": 0.10, "Weekly": 0.15,
+};
+const COND_EXTRA: Record<string, number> = {
+  "Good Condition": 0, "Average": 20, "Needs Work": 40,
+};
+const PETS_EXTRA: Record<string, number> = {
+  "No Pets": 0, "1–2 Pets": 15, "3+ Pets": 30,
+};
+const OCC_EXTRA: Record<string, number> = {
+  "1–2 People": 0, "3–4 People": 10, "5+ People": 20,
+};
+const ADDONS = [
+  { label: "+$25 Inside Fridge", price: 25 },
+  { label: "+$30 Inside Oven",   price: 30 },
+  { label: "+$45 Interior Windows", price: 45 },
+  { label: "+$30 Laundry Fold",  price: 30 },
+  { label: "+$35 Garage Sweep",  price: 35 },
+  { label: "+$25 Patio / Balcony", price: 25 },
+  { label: "+$40 Cabinet Interiors", price: 40 },
 ];
 
-/* ── Scenarios the AI cycles through ── */
-const SCENARIOS = [
-  { prompt: "3 bed, 2 bath house — biweekly clean",   client: "Johnson Residence", beds: 3, baths: 2, sqft: 1850, disc: 0.10, recurring: true,  discLabel: "10% discount" },
-  { prompt: "Move-out clean, 4 bed home",              client: "Anderson Home",    beds: 4, baths: 2, sqft: 2400, disc: 0,    recurring: false, discLabel: "" },
-  { prompt: "Weekly service, 2 bed apartment",         client: "Martinez Apt",    beds: 2, baths: 1, sqft: 1100, disc: 0.15, recurring: true,  discLabel: "15% discount" },
-  { prompt: "Large estate, 5 beds — monthly",          client: "Wilson Estate",   beds: 5, baths: 3, sqft: 3200, disc: 0.05, recurring: true,  discLabel: "5% discount" },
-  { prompt: "Studio apartment, one-time deep clean",   client: "Park Studio",     beds: 1, baths: 1, sqft: 750,  disc: 0,    recurring: false, discLabel: "" },
-];
-
-function calcScenario(s: typeof SCENARIOS[0]) {
-  const base = 48 + s.beds * 18 + s.baths * 13 + s.sqft * 0.02;
-  const r5 = (n: number) => Math.round(n / 5) * 5;
-  return {
-    good:   r5(base * (1 - s.disc)),
-    better: r5(base * 1.27 * (1 - s.disc)),
-    best:   r5(base * 1.68 * (1 - s.disc)),
-  };
+function calcQuote(
+  beds: string, baths: string, sqft: string,
+  cleanType: string, freq: string, cond: string,
+  pets: string, occ: string, addons: Set<string>,
+) {
+  const base = (BED_BASE[beds] ?? 95) + (BATH_EXTRA[baths] ?? 0) + (SQFT_EXTRA[sqft] ?? 0);
+  const typed = base * (CLEAN_MULT[cleanType] ?? 1) * (1 - (FREQ_DISC[freq] ?? 0));
+  const extras = (COND_EXTRA[cond] ?? 0) + (PETS_EXTRA[pets] ?? 0) + (OCC_EXTRA[occ] ?? 0);
+  const addonTotal = [...addons].reduce((s, k) => s + (ADDONS.find((a) => a.label === k)?.price ?? 0), 0);
+  return Math.round(typed + extras + addonTotal);
 }
 
-/* ── Chip suggestion groups ── */
-const CHIP_GROUPS = [[0, 1, 2], [2, 3, 4], [1, 3, 0]];
+function SField({ label, value, options, onChange }: {
+  label: string; value: string; options: string[]; onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">{label}</div>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full appearance-none bg-white/6 border border-white/12 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-medium pr-6 outline-none focus:border-blue-500/60 transition-colors cursor-pointer"
+        >
+          {options.map((o) => <option key={o} value={o} className="bg-slate-900">{o}</option>)}
+        </select>
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+          <svg className="w-2.5 h-2.5 text-slate-500" fill="none" viewBox="0 0 10 6">
+            <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PillGroup({ label, options, value, onChange }: {
+  label: string; options: string[]; value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{label}</div>
+      <div className="flex gap-1.5 flex-wrap">
+        {options.map((o) => (
+          <button
+            key={o}
+            type="button"
+            onClick={() => onChange(o)}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+              value === o
+                ? "bg-blue-600 border-blue-500 text-white shadow-sm shadow-blue-600/30"
+                : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+            }`}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function LivePanel() {
-  const [scenarioIdx, setScenarioIdx] = useState(0);
-  const [promptVisible, setPromptVisible] = useState(true);
-  const [cardVisible,   setCardVisible]   = useState(true);
-  const [chipGroupIdx,  setChipGroupIdx]  = useState(0);
-  const [chipsVisible,  setChipsVisible]  = useState(true);
-  const [query, setQuery] = useState("");
-  const [focused, setFocused] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const scenarioTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const chipTimer     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [beds,      setBeds]      = useState("2");
+  const [baths,     setBaths]     = useState("1");
+  const [sqft,      setSqft]      = useState("1,000 – 1,500");
+  const [cleanType, setCleanType] = useState("Standard Clean");
+  const [freq,      setFreq]      = useState("One Time");
+  const [cond,      setCond]      = useState("Good Condition");
+  const [pets,      setPets]      = useState("No Pets");
+  const [occ,       setOcc]       = useState("1–2 People");
+  const [addons,    setAddons]    = useState<Set<string>>(new Set());
 
-  const scenario = SCENARIOS[scenarioIdx];
-  const { good, better, best } = calcScenario(scenario);
+  const toggleAddon = (label: string) =>
+    setAddons((prev) => { const n = new Set(prev); n.has(label) ? n.delete(label) : n.add(label); return n; });
 
-  /* Auto-cycle scenarios every 4 s */
-  useEffect(() => {
-    scenarioTimer.current = setInterval(() => {
-      setPromptVisible(false);
-      setCardVisible(false);
-      setTimeout(() => {
-        setScenarioIdx((i) => (i + 1) % SCENARIOS.length);
-        setPromptVisible(true);
-        setCardVisible(true);
-      }, 350);
-    }, 4000);
-    return () => { if (scenarioTimer.current) clearInterval(scenarioTimer.current); };
-  }, []);
-
-  /* Auto-cycle chips every 5 s */
-  useEffect(() => {
-    chipTimer.current = setInterval(() => {
-      setChipsVisible(false);
-      setTimeout(() => {
-        setChipGroupIdx((i) => (i + 1) % CHIP_GROUPS.length);
-        setChipsVisible(true);
-      }, 350);
-    }, 5000);
-    return () => { if (chipTimer.current) clearInterval(chipTimer.current); };
-  }, []);
-
-  const handleChipClick = (idx: number) => {
-    setPromptVisible(false);
-    setCardVisible(false);
-    setTimeout(() => {
-      setScenarioIdx(idx);
-      setQuery(SCENARIOS[idx].prompt);
-      setPromptVisible(true);
-      setCardVisible(true);
-    }, 200);
-  };
-
-  const currentChips = CHIP_GROUPS[chipGroupIdx];
+  const recommended = calcQuote(beds, baths, sqft, cleanType, freq, cond, pets, occ, addons);
+  const marketLow   = Math.round(recommended * 0.87);
+  const marketHigh  = Math.round(recommended * 1.10);
 
   return (
-    <div className="flex flex-col h-full px-8 py-8">
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 shrink-0">
+    <div className="flex flex-col h-full">
+      {/* Logo bar */}
+      <div className="shrink-0 flex items-center gap-2.5 px-8 pt-8 pb-5">
         <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/40">
           <Zap className="w-4 h-4 text-white" />
         </div>
         <span className="text-white font-bold text-sm tracking-tight">QuotePro</span>
       </div>
 
-      <div className="flex-1 flex flex-col justify-center min-h-0 py-5 gap-4">
-        {/* Headline */}
+      {/* Scrollable calculator body */}
+      <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
+        {/* Header */}
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 mb-4">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-emerald-400 text-xs font-semibold tracking-wide">Live — revenue activity</span>
-          </div>
-          <h2 className="text-white text-[22px] font-bold leading-tight mb-2">
-            Close more cleaning jobs<br />— faster.
-          </h2>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            Quote in 60 seconds. Follow up automatically. Track every dollar.
-          </p>
+          <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Free Calculator</div>
+          <div className="text-white text-lg font-bold leading-snug">Residential Price Calculator</div>
+          <div className="text-slate-400 text-xs mt-1">Customize every detail — see your real quote instantly.</div>
         </div>
 
-        {/* Live activity feed */}
-        <div className="space-y-2">
-          {ACTIVITY.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div key={item.label} className={`flex items-center gap-3 p-3 rounded-xl border ${item.bg}`}>
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${item.highlight ? "bg-emerald-500/20" : "bg-white/5"}`}>
-                  <Icon className={`w-3.5 h-3.5 ${item.color}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className={`text-xs font-semibold leading-none mb-0.5 ${item.highlight ? "text-white" : "text-slate-300"}`}>{item.label}</div>
-                  <div className="text-slate-500 text-[11px] truncate">{item.sub}</div>
-                </div>
-                <div className="text-[10px] text-slate-600 shrink-0">{item.time}</div>
+        {/* Live price badge */}
+        <div className="flex items-center gap-3 py-2 border-b border-white/8">
+          {[
+            { n: "1", label: "Configure", active: true },
+            { n: "2", label: "Analysis",  active: false },
+            { n: "3", label: "Quote",     active: false },
+          ].map((s) => (
+            <div key={s.n} className="flex items-center gap-1.5">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border ${s.active ? "bg-blue-600 border-blue-500 text-white" : "bg-transparent border-white/20 text-slate-500"}`}>
+                {s.n}
               </div>
-            );
-          })}
+              <span className={`text-[10px] font-semibold ${s.active ? "text-blue-300" : "text-slate-600"}`}>{s.label}</span>
+              {s.n !== "3" && <span className="text-slate-700 text-[10px]">—</span>}
+            </div>
+          ))}
+          <div className="ml-auto text-right">
+            <div className="text-[9px] text-slate-500 uppercase tracking-wide">Quote</div>
+            <div className="text-emerald-400 font-bold text-base tabular-nums">${recommended}</div>
+          </div>
         </div>
 
-        {/* ── AI Pricing Search ── */}
-        <div className={`rounded-2xl border transition-all duration-300 ${focused ? "border-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.15)] bg-[#0f1929]" : "border-blue-500/40 shadow-[0_0_14px_rgba(59,130,246,0.20)] bg-[#0d1520]"}`}>
-          <div className="px-3 pt-2.5 pb-1 flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-                <Sparkles className="w-3 h-3 text-white" />
-              </div>
-              <span className="text-[10px] font-bold text-blue-400 tracking-wide uppercase">Pricing AI</span>
-            </div>
-            <div className="ml-auto flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] text-slate-500 font-medium">Ready</span>
-            </div>
-          </div>
+        {/* Dropdowns grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <SField label="Bedrooms"      value={beds}      options={Object.keys(BED_BASE)}   onChange={setBeds} />
+          <SField label="Bathrooms"     value={baths}     options={Object.keys(BATH_EXTRA)} onChange={setBaths} />
+          <SField label="Square Footage" value={sqft}     options={Object.keys(SQFT_EXTRA)} onChange={setSqft} />
+          <SField label="Cleaning Type" value={cleanType} options={Object.keys(CLEAN_MULT)} onChange={setCleanType} />
+          <SField label="Frequency"     value={freq}      options={Object.keys(FREQ_DISC)}  onChange={setFreq} />
+          <SField label="Condition"     value={cond}      options={Object.keys(COND_EXTRA)} onChange={setCond} />
+        </div>
 
-          <div className="px-3 pb-2.5">
-            {/* Animated prompt input */}
-            <div className="relative mb-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                className="w-full bg-transparent text-sm text-white font-medium outline-none placeholder-transparent py-0.5"
-                placeholder=" "
-              />
-              {!query && (
-                <span
-                  className="absolute top-0 left-0 py-0.5 text-sm text-slate-500 font-medium pointer-events-none transition-opacity duration-300 whitespace-nowrap overflow-hidden max-w-full"
-                  style={{ opacity: promptVisible ? 1 : 0 }}
-                >
-                  {scenario.prompt}
-                </span>
-              )}
-            </div>
+        {/* Pill groups */}
+        <PillGroup label="Pets in Home" options={["No Pets", "1–2 Pets", "3+ Pets"]} value={pets} onChange={setPets} />
+        <PillGroup label="Occupants"    options={["1–2 People", "3–4 People", "5+ People"]} value={occ} onChange={setOcc} />
 
-            {/* Chips + Calculate button */}
-            <div className="flex items-center justify-between pt-2 border-t border-white/8">
-              <div
-                className="flex gap-1 flex-wrap transition-opacity duration-300"
-                style={{ opacity: chipsVisible ? 1 : 0 }}
-              >
-                {currentChips.map((idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleChipClick(idx)}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/5 hover:bg-blue-500/15 border border-white/10 hover:border-blue-500/30 text-[10px] font-medium text-slate-400 hover:text-blue-300 rounded-full transition-all"
-                  >
-                    {SCENARIOS[idx].prompt.length > 22 ? SCENARIOS[idx].prompt.slice(0, 22) + "…" : SCENARIOS[idx].prompt}
-                  </button>
-                ))}
-              </div>
+        {/* Add-ons */}
+        <div>
+          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Add-On Services</div>
+          <div className="flex flex-wrap gap-1.5">
+            {ADDONS.map((a) => (
               <button
+                key={a.label}
                 type="button"
-                className="shrink-0 ml-2 inline-flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold rounded-full transition-colors"
+                onClick={() => toggleAddon(a.label)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${
+                  addons.has(a.label)
+                    ? "bg-blue-600/20 border-blue-500/50 text-blue-300"
+                    : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                }`}
               >
-                <Search className="w-2.5 h-2.5" />
-                Calculate
+                {a.label}
               </button>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* ── Quote Result Card (auto-updates with scenario) ── */}
-        <div
-          className="relative transition-opacity duration-300"
-          style={{ opacity: cardVisible ? 1 : 0 }}
-        >
-          <div className="absolute inset-0 translate-y-2 translate-x-1 rounded-2xl bg-blue-600/10 blur-sm" />
-          <div className="absolute inset-0 translate-y-1 rounded-2xl bg-black/30" />
-          <div className="relative rounded-2xl overflow-hidden border border-white/12 shadow-2xl shadow-black/50">
-
-            {/* Browser bar */}
-            <div className="bg-slate-800 px-3 py-2 flex items-center gap-2 border-b border-white/8">
-              <div className="flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-              </div>
-              <div className="flex-1 mx-2 bg-slate-700/70 rounded px-2 py-0.5">
-                <span className="text-slate-400 text-[9px] font-mono">app.quotepro.io/quotes/new</span>
-              </div>
+        {/* Recommended Quote result */}
+        <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/8 p-4">
+          <div className="flex items-start justify-between mb-2">
+            <div>
+              <div className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Recommended Quote</div>
+              <div className="text-white text-3xl font-bold tabular-nums leading-none">${recommended}</div>
+              <div className="text-slate-400 text-[11px] mt-1">Customers typically accept quotes within this range.</div>
             </div>
-
-            <div className="bg-[#0d1117] p-4 space-y-3">
-              {/* Client header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-white text-sm font-semibold">{scenario.client}</div>
-                  <div className="text-slate-400 text-xs mt-0.5">
-                    {scenario.beds} bed · {scenario.baths} bath · {scenario.sqft.toLocaleString()} sqft
-                  </div>
-                </div>
-                {scenario.recurring ? (
-                  <div className="flex flex-col items-end gap-0.5 shrink-0">
-                    <span className="px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-[9px] font-semibold uppercase tracking-wide border border-blue-500/20">
-                      Recurring
-                    </span>
-                    <span className="text-slate-500 text-[9px]">{scenario.discLabel}</span>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Tier cards — Popular badge sits INSIDE the card (no overflow clipping issue) */}
-              <div className="grid grid-cols-3 gap-1.5 pt-3">
-                {[
-                  { label: "GOOD",   price: good,   sub: "Standard",   pop: false },
-                  { label: "BETTER", price: better, sub: "Deep clean",  pop: true  },
-                  { label: "BEST",   price: best,   sub: "+ Add-ons",   pop: false },
-                ].map((t) => (
-                  <div
-                    key={t.label}
-                    className={`rounded-xl p-2.5 text-center border relative ${
-                      t.pop
-                        ? "bg-blue-500/20 border-blue-400/40 shadow-lg shadow-blue-500/10"
-                        : "bg-white/4 border-white/8"
-                    }`}
-                  >
-                    {t.pop && (
-                      <div className="absolute -top-3 left-0 right-0 flex justify-center">
-                        <span className="px-1.5 py-0.5 bg-blue-500 rounded text-[8px] text-white font-bold whitespace-nowrap leading-none">
-                          Popular
-                        </span>
-                      </div>
-                    )}
-                    <div className={`text-[9px] font-semibold uppercase tracking-wide mb-1 ${t.pop ? "text-blue-300" : "text-slate-500"}`}>
-                      {t.label}
-                    </div>
-                    <div className={`text-base font-bold tabular-nums leading-none ${t.pop ? "text-white" : "text-slate-300"}`}>
-                      ${t.price}
-                    </div>
-                    <div className={`text-[9px] mt-1 ${t.pop ? "text-blue-300/70" : "text-slate-600"}`}>
-                      {t.sub}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Features */}
-              <div className="space-y-1.5">
-                {[
-                  { label: "All rooms + hallways",           on: true },
-                  { label: "Kitchen & bathroom deep clean",  on: true },
-                  { label: "Inside oven & fridge available", on: false },
-                ].map((line) => (
-                  <div key={line.label} className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${line.on ? "bg-emerald-400" : "bg-slate-600"}`} />
-                    <span className={`text-[11px] ${line.on ? "text-slate-300" : "text-slate-600"}`}>{line.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-2 pt-0.5">
-                <div className="flex-1 h-7 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-600/30">
-                  <span className="text-white text-[11px] font-semibold">Send Quote</span>
-                </div>
-                <div className="h-7 px-3 bg-white/8 rounded-lg flex items-center justify-center border border-white/8">
-                  <span className="text-slate-400 text-[11px]">Preview</span>
-                </div>
-              </div>
+            <div className="w-7 h-7 rounded-full border-2 border-emerald-500/50 flex items-center justify-center">
+              <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 14 14">
+                <path d="M2 7l3.5 3.5L12 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
+          </div>
+          <div className="flex items-center gap-2 pt-2 border-t border-emerald-500/15">
+            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Market Range</span>
+            <span className="text-emerald-400 text-[11px] font-bold tabular-nums">${marketLow} – ${marketHigh}</span>
           </div>
         </div>
-      </div>
-
-      {/* Bottom stats */}
-      <div className="shrink-0 flex items-center gap-5 pt-4 border-t border-white/8">
-        {[
-          { value: "60 sec",  label: "avg. quote time" },
-          { value: `+$${better * 3}`, label: "revenue today" },
-          { value: "3 jobs",  label: "closed this week" },
-        ].map((s) => (
-          <div key={s.label}>
-            <div className="text-white font-bold text-sm">{s.value}</div>
-            <div className="text-slate-600 text-[11px] mt-0.5">{s.label}</div>
-          </div>
-        ))}
       </div>
     </div>
   );
