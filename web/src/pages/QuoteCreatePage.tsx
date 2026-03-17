@@ -50,6 +50,18 @@ const addOnOptions = [
   { key: "organizationTidy", label: "Organization & Tidy", hours: 1.0 },
 ];
 
+const DEFAULT_ADD_ON_PRICES: Record<string, number> = {
+  insideFridge: 25,
+  insideOven: 25,
+  insideCabinets: 40,
+  interiorWindows: 40,
+  blindsDetail: 35,
+  baseboardsDetail: 35,
+  laundryFoldOnly: 20,
+  dishes: 15,
+  organizationTidy: 45,
+};
+
 function getSqftBaseHours(sqft: number): number {
   if (sqft <= 1000) return 1.5;
   if (sqft <= 1500) return 2.5;
@@ -156,17 +168,7 @@ function calculateQuote(
     biweekly: 15,
     monthly: 10,
   };
-  const addOnPrices = pricing?.addOnPrices || {
-    insideFridge: 25,
-    insideOven: 25,
-    insideCabinets: 40,
-    interiorWindows: 40,
-    blindsDetail: 35,
-    baseboardsDetail: 35,
-    laundryFoldOnly: 20,
-    dishes: 15,
-    organizationTidy: 45,
-  };
+  const addOnPrices = { ...DEFAULT_ADD_ON_PRICES, ...(pricing?.addOnPrices || {}) };
 
   const sqftHours = getSqftBaseHours(property.sqft);
   const bathHours =
@@ -877,8 +879,8 @@ export default function QuoteCreatePage() {
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {addOnOptions.map((o) => {
-                  const price =
-                    (pricing?.addOnPrices as any)?.[o.key] || 0;
+                  const effectiveAddOnPrices = { ...DEFAULT_ADD_ON_PRICES, ...(pricing?.addOnPrices || {}) };
+                  const price = effectiveAddOnPrices[o.key] || 0;
                   return (
                     <label
                       key={o.key}
