@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
-import { apiPut, apiPost, apiGet, apiDelete } from "../lib/api";
+import { apiPut, apiPost, apiGet, apiDelete, apiPatch } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import {
   Building2,
@@ -367,6 +367,8 @@ export default function SettingsPage() {
         methods[m.key] = opts[m.key]?.enabled || false;
       }
       setPaymentMethods(methods);
+      setAppLanguage((business as any).appLanguage || "en");
+      setCommLanguage((business as any).commLanguage || "en");
     }
   }, [business]);
 
@@ -414,6 +416,15 @@ export default function SettingsPage() {
     onSuccess: () => {
       refresh();
       showSaved("business");
+    },
+  });
+
+  const patchLanguage = useMutation({
+    mutationFn: (data: { appLanguage?: string; commLanguage?: string }) =>
+      apiPatch("/api/business", data),
+    onSuccess: () => {
+      refresh();
+      showSaved("features");
     },
   });
 
@@ -1075,17 +1086,23 @@ export default function SettingsPage() {
           <Card>
             <CardHeader title="Language" icon={Globe} />
             <p className="text-sm text-slate-500 mb-4">
-              Choose your app language and the language used for customer communications.
+              Choose the language used for AI-generated quotes, emails, and customer communications.
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">App Language</label>
-                <p className="text-xs text-slate-500 mb-2">Controls the language of the app interface</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">App Language</label>
+                <p className="text-xs text-slate-500 mb-2">
+                  Sets your preferred language. The app interface is currently English only — full translation coming soon.
+                </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {LANGUAGE_OPTIONS.map((lang) => (
                     <button
                       key={lang.value}
-                      onClick={() => setAppLanguage(lang.value)}
+                      disabled={patchLanguage.isPending}
+                      onClick={() => {
+                        setAppLanguage(lang.value);
+                        patchLanguage.mutate({ appLanguage: lang.value });
+                      }}
                       className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all border ${
                         appLanguage === lang.value
                           ? "bg-primary-50 text-primary-700 border-primary-200"
@@ -1102,13 +1119,17 @@ export default function SettingsPage() {
               </div>
               <Divider />
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Communication Language</label>
-                <p className="text-xs text-slate-500 mb-2">Language used for AI-generated emails, SMS, and quotes</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Communication Language</label>
+                <p className="text-xs text-slate-500 mb-2">Language used for AI-generated quotes, emails, and SMS messages sent to customers</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {LANGUAGE_OPTIONS.map((lang) => (
                     <button
                       key={`comm-${lang.value}`}
-                      onClick={() => setCommLanguage(lang.value)}
+                      disabled={patchLanguage.isPending}
+                      onClick={() => {
+                        setCommLanguage(lang.value);
+                        patchLanguage.mutate({ commLanguage: lang.value });
+                      }}
                       className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all border ${
                         commLanguage === lang.value
                           ? "bg-primary-50 text-primary-700 border-primary-200"

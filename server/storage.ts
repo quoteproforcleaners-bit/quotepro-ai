@@ -164,6 +164,8 @@ export async function updateBusiness(
     senderTitle: string;
     bookingLink: string;
     timezone: string;
+    appLanguage: string;
+    commLanguage: string;
     onboardingComplete: boolean;
     stripeAccountId: string | null;
     stripeOnboardingComplete: boolean;

@@ -53,6 +53,11 @@ export async function apiPut<T = unknown>(url: string, body?: unknown): Promise<
   return res.json();
 }
 
+export async function apiPatch<T = unknown>(url: string, body?: unknown): Promise<T> {
+  const res = await apiRequest("PATCH", url, body);
+  return res.json();
+}
+
 export async function apiDelete(url: string): Promise<void> {
   await apiRequest("DELETE", url);
 }

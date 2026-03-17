@@ -50,6 +50,8 @@ export const businesses = pgTable("businesses", {
   emailSignature: text("email_signature").notNull().default(""),
   smsSignature: text("sms_signature").notNull().default(""),
   timezone: text("timezone").notNull().default("America/New_York"),
+  appLanguage: varchar("app_language", { length: 10 }).default("en"),
+  commLanguage: varchar("comm_language", { length: 10 }).default("en"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   stripeAccountId: text("stripe_account_id"),
   stripeOnboardingComplete: boolean("stripe_onboarding_complete").notNull().default(false),
