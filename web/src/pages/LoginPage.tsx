@@ -1,7 +1,7 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { Zap, AlertCircle } from "lucide-react";
+import { Zap, AlertCircle, CheckCircle, Eye, TrendingUp, Clock } from "lucide-react";
 
 const GOOGLE_SVG = (
   <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24">
@@ -12,95 +12,210 @@ const GOOGLE_SVG = (
   </svg>
 );
 
-function QuoteMockup() {
+const ACTIVITY = [
+  {
+    icon: CheckCircle,
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10 border-emerald-500/20",
+    label: "Quote accepted",
+    sub: "Johnson Residence · $189",
+    time: "2 min ago",
+    highlight: true,
+  },
+  {
+    icon: Eye,
+    color: "text-blue-400",
+    bg: "bg-blue-500/10 border-blue-500/20",
+    label: "Customer viewed quote",
+    sub: "Martinez Residence · $224",
+    time: "11 min ago",
+    highlight: false,
+  },
+  {
+    icon: TrendingUp,
+    color: "text-violet-400",
+    bg: "bg-violet-500/10 border-violet-500/20",
+    label: "Upsell added · +$55",
+    sub: "Deep clean + oven detail",
+    time: "34 min ago",
+    highlight: false,
+  },
+  {
+    icon: Clock,
+    color: "text-slate-400",
+    bg: "bg-white/5 border-white/10",
+    label: "Quote sent in 58 sec",
+    sub: "Thompson Residence",
+    time: "1 hr ago",
+    highlight: false,
+  },
+];
+
+function LivePanel() {
   return (
-    <div className="w-full max-w-sm mx-auto">
-      <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/40 border border-white/10">
-        <div className="bg-slate-800/90 px-4 py-3 flex items-center gap-2 border-b border-white/10">
-          <div className="flex gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-red-500/70" />
-            <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
-            <div className="w-3 h-3 rounded-full bg-green-500/70" />
-          </div>
-          <div className="flex-1 mx-3">
-            <div className="h-5 bg-slate-700/80 rounded-md flex items-center px-3">
-              <span className="text-slate-400 text-[10px] font-mono">quotepro.app/quotes/new</span>
-            </div>
-          </div>
+    <div className="flex flex-col h-full px-10 py-9">
+      {/* Logo */}
+      <div className="flex items-center gap-2.5 shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/40">
+          <Zap className="w-4 h-4 text-white" />
         </div>
-        <div className="bg-slate-800/60 backdrop-blur-sm p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-white/90 text-sm font-semibold">Johnson Residence</div>
-              <div className="text-slate-400 text-xs mt-0.5">3 bed · 2 bath · 1,850 sqft</div>
-            </div>
-            <div className="px-2 py-1 bg-emerald-500/20 rounded-lg border border-emerald-500/30">
-              <span className="text-emerald-400 text-[10px] font-semibold uppercase tracking-wide">Draft</span>
-            </div>
+        <span className="text-white font-bold text-sm tracking-tight">QuotePro</span>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col justify-center min-h-0 py-8">
+        {/* Revenue signal — bold & front-and-center */}
+        <div className="mb-7">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 mb-5">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-emerald-400 text-xs font-semibold tracking-wide">Live — revenue activity</span>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { tier: "Good", price: "$148", popular: false },
-              { tier: "Better", price: "$189", popular: true },
-              { tier: "Best", price: "$249", popular: false },
-            ].map((t) => (
+
+          <h2 className="text-white text-[22px] font-bold leading-tight mb-2">
+            Close more cleaning jobs<br />— faster.
+          </h2>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            Quote in 60 seconds. Follow up automatically. Track every dollar.
+          </p>
+        </div>
+
+        {/* Live activity feed */}
+        <div className="space-y-2 mb-7">
+          {ACTIVITY.map((item) => {
+            const Icon = item.icon;
+            return (
               <div
-                key={t.tier}
-                className={`rounded-xl p-3 text-center border ${
-                  t.popular
-                    ? "bg-blue-500/20 border-blue-400/40"
-                    : "bg-white/5 border-white/10"
-                }`}
+                key={item.label}
+                className={`flex items-center gap-3 p-3 rounded-xl border ${item.bg} transition-all`}
               >
-                <div className={`text-[10px] font-semibold uppercase tracking-wide mb-1 ${t.popular ? "text-blue-300" : "text-slate-400"}`}>
-                  {t.tier}
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${item.highlight ? "bg-emerald-500/20" : "bg-white/5"}`}>
+                  <Icon className={`w-3.5 h-3.5 ${item.color}`} />
                 </div>
-                <div className={`text-lg font-bold leading-none ${t.popular ? "text-white" : "text-slate-300"}`}>
-                  {t.price}
+                <div className="flex-1 min-w-0">
+                  <div className={`text-xs font-semibold leading-none mb-0.5 ${item.highlight ? "text-white" : "text-slate-300"}`}>
+                    {item.label}
+                  </div>
+                  <div className="text-slate-500 text-[11px] truncate">{item.sub}</div>
                 </div>
-                {t.popular && (
-                  <div className="mt-1.5 text-[9px] text-blue-300 font-medium">Recommended</div>
-                )}
+                <div className="text-[10px] text-slate-600 shrink-0">{item.time}</div>
               </div>
-            ))}
-          </div>
-          <div className="space-y-2">
-            {["Standard clean of all rooms", "Kitchen & bathroom detail", "Add-ons available"].map((line) => (
-              <div key={line} className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 rounded-full bg-emerald-500/30 flex items-center justify-center shrink-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                </div>
-                <span className="text-slate-300 text-xs">{line}</span>
+            );
+          })}
+        </div>
+
+        {/* Quote preview card — elevated, product screenshot feel */}
+        <div className="relative">
+          {/* Shadow layer behind for depth */}
+          <div className="absolute inset-0 translate-y-2 translate-x-1 rounded-2xl bg-blue-600/10 blur-sm" />
+          <div className="absolute inset-0 translate-y-1 rounded-2xl bg-black/30" />
+
+          {/* Main card */}
+          <div className="relative rounded-2xl overflow-hidden border border-white/12 shadow-2xl shadow-black/50">
+            {/* Browser bar */}
+            <div className="bg-slate-800 px-4 py-2.5 flex items-center gap-2.5 border-b border-white/8">
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
               </div>
-            ))}
-          </div>
-          <div className="pt-1 flex items-center gap-2">
-            <div className="flex-1 h-8 bg-blue-600/80 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs font-semibold">Send Quote</span>
+              <div className="flex-1 mx-2 h-4.5 bg-slate-700/70 rounded flex items-center px-2.5">
+                <span className="text-slate-400 text-[9px] font-mono">app.quotepro.io/quotes/new</span>
+              </div>
             </div>
-            <div className="h-8 px-3 bg-white/10 rounded-lg flex items-center justify-center">
-              <span className="text-slate-300 text-xs">Save</span>
+
+            {/* Quote content */}
+            <div className="bg-[#0d1117] p-4 space-y-3.5">
+              {/* Customer header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-white text-sm font-semibold">Johnson Residence</div>
+                  <div className="text-slate-400 text-xs mt-0.5">3 bed · 2 bath · 1,850 sqft · deep clean</div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-[9px] font-semibold uppercase tracking-wide border border-blue-500/20">
+                    Recurring
+                  </span>
+                  <span className="text-slate-500 text-[9px]">10% discount</span>
+                </div>
+              </div>
+
+              {/* Tier cards */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { tier: "Good", price: "$148", detail: "Standard" },
+                  { tier: "Better", price: "$189", detail: "Deep clean", popular: true },
+                  { tier: "Best", price: "$249", detail: "+ Add-ons" },
+                ].map((t) => (
+                  <div
+                    key={t.tier}
+                    className={`rounded-xl p-2.5 text-center border relative ${
+                      t.popular
+                        ? "bg-blue-500/20 border-blue-400/40 shadow-lg shadow-blue-500/10"
+                        : "bg-white/4 border-white/8"
+                    }`}
+                  >
+                    {t.popular && (
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2">
+                        <span className="px-1.5 py-0.5 bg-blue-500 rounded text-[8px] text-white font-bold whitespace-nowrap">
+                          Popular
+                        </span>
+                      </div>
+                    )}
+                    <div className={`text-[9px] font-semibold uppercase tracking-wide mb-1 ${t.popular ? "text-blue-300" : "text-slate-500"}`}>
+                      {t.tier}
+                    </div>
+                    <div className={`text-base font-bold leading-none ${t.popular ? "text-white" : "text-slate-300"}`}>
+                      {t.price}
+                    </div>
+                    <div className={`text-[9px] mt-1 ${t.popular ? "text-blue-300/70" : "text-slate-600"}`}>
+                      {t.detail}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Line items */}
+              <div className="space-y-1.5">
+                {[
+                  { label: "All rooms + hallways", check: true },
+                  { label: "Kitchen & bathroom deep clean", check: true },
+                  { label: "Inside oven & fridge available", check: false },
+                ].map((line) => (
+                  <div key={line.label} className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full flex items-center justify-center shrink-0 ${line.check ? "bg-emerald-500/25" : "bg-white/5"}`}>
+                      <div className={`w-1.5 h-1.5 rounded-full ${line.check ? "bg-emerald-400" : "bg-slate-600"}`} />
+                    </div>
+                    <span className={`text-[11px] ${line.check ? "text-slate-300" : "text-slate-600"}`}>{line.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action bar */}
+              <div className="flex items-center gap-2 pt-0.5">
+                <div className="flex-1 h-7 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-600/30">
+                  <span className="text-white text-[11px] font-semibold">Send Quote</span>
+                </div>
+                <div className="h-7 px-3 bg-white/8 rounded-lg flex items-center justify-center border border-white/8">
+                  <span className="text-slate-400 text-[11px]">Preview</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <div className="flex-1 bg-white/5 rounded-xl p-3 border border-white/10">
-          <div className="text-slate-400 text-[10px] uppercase tracking-wide mb-1">Quote sent</div>
-          <div className="text-white text-sm font-semibold">$189</div>
-          <div className="text-slate-400 text-[10px] mt-0.5">2 min ago</div>
-        </div>
-        <div className="flex-1 bg-white/5 rounded-xl p-3 border border-white/10">
-          <div className="text-slate-400 text-[10px] uppercase tracking-wide mb-1">Follow-up</div>
-          <div className="text-emerald-400 text-sm font-semibold">Sent auto</div>
-          <div className="text-slate-400 text-[10px] mt-0.5">AI drafted</div>
-        </div>
-        <div className="flex-1 bg-white/5 rounded-xl p-3 border border-white/10">
-          <div className="text-slate-400 text-[10px] uppercase tracking-wide mb-1">Revenue</div>
-          <div className="text-white text-sm font-semibold">+$41</div>
-          <div className="text-slate-400 text-[10px] mt-0.5">Upsell added</div>
-        </div>
+      {/* Bottom stats */}
+      <div className="shrink-0 flex items-center gap-5 pt-4 border-t border-white/8">
+        {[
+          { value: "60 sec", label: "avg. quote time" },
+          { value: "+$412", label: "revenue today" },
+          { value: "3 jobs", label: "closed this week" },
+        ].map((s) => (
+          <div key={s.label}>
+            <div className="text-white font-bold text-sm">{s.value}</div>
+            <div className="text-slate-600 text-[11px] mt-0.5">{s.label}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -157,47 +272,18 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel — dark product preview */}
-      <div className="hidden lg:flex flex-1 bg-slate-900 flex-col relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(37,99,235,0.18),transparent)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_80%_at_80%_80%,rgba(37,99,235,0.08),transparent)]" />
-
-        <div className="relative flex flex-col h-full px-12 py-10">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/30">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-white font-bold text-base tracking-tight">QuotePro</span>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center justify-center py-12">
-            <div className="mb-8 text-center">
-              <h2 className="text-white text-xl font-semibold mb-2 leading-snug">
-                Your quotes are running.<br />Your pipeline is warm.
-              </h2>
-              <p className="text-slate-400 text-sm">Sign back in and pick up where you left off.</p>
-            </div>
-            <QuoteMockup />
-          </div>
-
-          <div className="flex items-center gap-6 pt-4 border-t border-white/10">
-            {[
-              { value: "60 sec", label: "avg. quote time" },
-              { value: "3×", label: "more jobs closed" },
-              { value: "$0", label: "to get started" },
-            ].map((s) => (
-              <div key={s.label}>
-                <div className="text-white font-bold text-base">{s.value}</div>
-                <div className="text-slate-500 text-xs mt-0.5">{s.label}</div>
-              </div>
-            ))}
-          </div>
+      {/* Left panel */}
+      <div className="hidden lg:flex flex-1 bg-[#0a0f1a] flex-col relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_40%_-5%,rgba(37,99,235,0.16),transparent)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_60%_at_90%_100%,rgba(37,99,235,0.07),transparent)]" />
+        <div className="relative h-full overflow-y-auto">
+          <LivePanel />
         </div>
       </div>
 
-      {/* Right panel — clean form */}
-      <div className="flex-1 flex flex-col bg-white">
-        <div className="flex items-center justify-between px-8 py-6 lg:px-12">
+      {/* Right panel */}
+      <div className="flex-1 flex flex-col bg-white min-w-0">
+        <div className="flex items-center justify-between px-8 py-5 lg:px-10 border-b border-slate-100">
           <div className="flex items-center gap-2 lg:hidden">
             <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
               <Zap className="w-3.5 h-3.5 text-white" />
@@ -213,15 +299,17 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="flex-1 flex items-center justify-center px-8 lg:px-16 pb-12">
-          <div className="w-full max-w-sm">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Sign in</h1>
-              <p className="text-slate-500 text-sm mt-1.5">Welcome back to QuotePro</p>
+        <div className="flex-1 flex items-center justify-center px-8 lg:px-12 py-10">
+          <div className="w-full max-w-[340px]">
+            <div className="mb-6">
+              <h1 className="text-[22px] font-bold text-slate-900 tracking-tight leading-snug">
+                Sign in to continue<br />closing jobs
+              </h1>
+              <p className="text-slate-500 text-sm mt-1.5">Your pipeline is waiting.</p>
             </div>
 
             {error ? (
-              <div className="mb-5 flex items-start gap-3 p-3.5 rounded-xl bg-red-50 border border-red-200">
+              <div className="mb-4 flex items-start gap-2.5 p-3 rounded-xl bg-red-50 border border-red-200">
                 <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                 <p className="text-red-700 text-sm leading-snug">{error}</p>
               </div>
@@ -231,13 +319,13 @@ export default function LoginPage() {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={googleLoading}
-              className="w-full h-11 flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 transition-colors disabled:opacity-60 shadow-sm"
+              className="w-full h-[42px] flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 transition-colors disabled:opacity-60 shadow-sm"
             >
               {GOOGLE_SVG}
               {googleLoading ? "Redirecting..." : "Continue with Google"}
             </button>
 
-            <div className="relative my-5">
+            <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200" />
               </div>
@@ -246,7 +334,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
                 <input
@@ -256,13 +344,11 @@ export default function LoginPage() {
                   required
                   placeholder="you@company.com"
                   autoComplete="email"
-                  className="w-full h-11 px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                  className="w-full h-[42px] px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all"
                 />
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-sm font-medium text-slate-700">Password</label>
-                </div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
                 <input
                   type="password"
                   value={password}
@@ -270,14 +356,14 @@ export default function LoginPage() {
                   required
                   placeholder="Enter your password"
                   autoComplete="current-password"
-                  className="w-full h-11 px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                  className="w-full h-[42px] px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 transition-all"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-11 flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-md shadow-blue-600/20 mt-1"
+                className="w-full h-[42px] flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-md shadow-blue-600/25"
               >
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -287,10 +373,11 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="text-xs text-slate-400 text-center mt-8">
+            <p className="text-xs text-slate-400 text-center mt-6">
               By signing in you agree to our{" "}
-              <span className="underline cursor-pointer">Terms</span> and{" "}
-              <span className="underline cursor-pointer">Privacy Policy</span>.
+              <span className="underline cursor-pointer hover:text-slate-600">Terms</span>{" "}
+              and{" "}
+              <span className="underline cursor-pointer hover:text-slate-600">Privacy Policy</span>.
             </p>
           </div>
         </div>
