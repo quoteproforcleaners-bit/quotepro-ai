@@ -70,13 +70,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openPortal = useCallback(async () => {
-    try {
-      const data: any = await apiPost("/api/subscription/create-portal");
-      if (data.url) {
-        window.open(data.url, "_blank");
-      }
-    } catch (err) {
-      console.error("Portal error:", err);
+    const data: any = await apiPost("/api/subscription/create-portal");
+    if (data.url) {
+      window.open(data.url, "_blank");
     }
   }, []);
 

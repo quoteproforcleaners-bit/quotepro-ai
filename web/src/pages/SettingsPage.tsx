@@ -238,7 +238,26 @@ const LANGUAGE_OPTIONS = [
 
 export default function SettingsPage() {
   const { user, business, logout, refresh } = useAuth();
-  const { isPro, startCheckout, openPortal, checkoutLoading } = useSubscription();
+  const { isPro, isGrowth, isStarter, tier, startCheckout, openPortal, checkoutLoading } = useSubscription();
+  const [portalError, setPortalError] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const handleManageSubscription = async () => {
+    setPortalError(null);
+    setPortalLoading(true);
+    try {
+      await openPortal();
+    } catch (err: any) {
+      const msg: string = err?.message || "";
+      if (msg.includes("No billing account")) {
+        setPortalError("Your subscription is managed through the App Store. On your iPhone, go to Settings → your name → Subscriptions to make changes.");
+      } else {
+        setPortalError("Could not open the billing portal. Please try again or contact support.");
+      }
+    } finally {
+      setPortalLoading(false);
+    }
+  };
   const navigate = useNavigate();
   const [tab, setTab] = useState("business");
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -1189,25 +1208,72 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader title="Subscription" icon={Zap} />
-            {isPro ? (
+            {isGrowth ? (
               <div className="p-4 bg-gradient-to-br from-primary-50 to-violet-50 rounded-xl border border-primary-100">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center shadow-sm">
                     <Zap className="w-4 h-4 text-white" />
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">QuotePro AI Pro</span>
+                  <span className="text-sm font-semibold text-slate-900 capitalize">
+                    QuotePro {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                  </span>
                   <Badge status="accepted" label="Active" dot size="sm" />
                 </div>
                 <p className="text-xs text-slate-500 mb-3">
-                  Full access to AI messaging, CRM, growth dashboard, and all Pro features.
+                  {isPro
+                    ? "Full access to all Pro features including revenue intelligence, lead finder, and advanced automations."
+                    : "Unlimited quotes, AI tools, automated follow-ups, and full CRM access."}
                 </p>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={openPortal}
+                  onClick={handleManageSubscription}
+                  loading={portalLoading}
                 >
                   Manage Subscription
                 </Button>
+                {portalError ? (
+                  <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+                    {portalError}
+                  </p>
+                ) : null}
+              </div>
+            ) : isStarter ? (
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-sm font-semibold text-slate-900">Starter Plan</span>
+                  <Badge status="accepted" label="Active" dot size="sm" />
+                </div>
+                <p className="text-xs text-slate-500 mb-3">
+                  20 quotes/month. Upgrade to Growth for unlimited quotes and AI tools.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={Zap}
+                    onClick={() => navigate("/pricing")}
+                    className="bg-gradient-to-r from-primary-600 to-primary-700"
+                  >
+                    Upgrade to Growth
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleManageSubscription}
+                    loading={portalLoading}
+                  >
+                    Manage
+                  </Button>
+                </div>
+                {portalError ? (
+                  <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+                    {portalError}
+                  </p>
+                ) : null}
               </div>
             ) : (
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -1219,17 +1285,16 @@ export default function SettingsPage() {
                   <Badge status="draft" label="Limited" dot size="sm" />
                 </div>
                 <p className="text-xs text-slate-500 mb-3">
-                  3 quotes included. Upgrade for unlimited quotes, CRM, AI tools, and more.
+                  3 quotes included. Upgrade for unlimited quotes, AI tools, and CRM.
                 </p>
                 <Button
                   variant="primary"
                   size="sm"
                   icon={Zap}
-                  onClick={startCheckout}
-                  loading={checkoutLoading}
+                  onClick={() => navigate("/pricing")}
                   className="bg-gradient-to-r from-primary-600 to-primary-700"
                 >
-                  Upgrade to Pro - $19.99/mo
+                  View plans
                 </Button>
               </div>
             )}
