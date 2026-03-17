@@ -8996,6 +8996,8 @@ Return ONLY valid JSON:
   });
 
   // Protected: get the business's intake link (generates short code if needed)
+  // Prefers the human-readable public_quote_slug when set; falls back to the
+  // auto-generated 12-char intake_code. Both resolve to the same intake form.
   app.get("/api/intake-requests/my-link", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
@@ -9003,8 +9005,18 @@ Return ONLY valid JSON:
       const code = await ensureIntakeCode(business.id);
       const reqHost = req.headers.host || req.hostname;
       const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-      const url = `${reqProto}://${reqHost}/intake/${code}`;
-      res.json({ url, code, businessName: business.companyName });
+      const baseUrl = `${reqProto}://${reqHost}`;
+
+      // Prefer clean slug URL when the business has set a custom slug
+      const slugRow = await pool.query(
+        `SELECT public_quote_slug FROM businesses WHERE id = $1 LIMIT 1`,
+        [business.id]
+      );
+      const slug = slugRow.rows[0]?.public_quote_slug;
+      const shortIdentifier = slug || code;
+      const url = `${baseUrl}/intake/${shortIdentifier}`;
+
+      res.json({ url, code, slug: slug || null, shortIdentifier, businessName: business.companyName });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -9097,15 +9109,82 @@ Return ONLY valid JSON:
       const intake = intakeResult.rows[0];
       const f = intake.extracted_fields || {};
 
-      let pricingContext = "";
+      // ── Proper server-side pricing calculation ─────────────────────────────
+      // IMPORTANT: We calculate the expected price ourselves using configured
+      // pricing rules. This prevents AI from generating absurdly low prices
+      // (like $120 for a deep clean) due to incorrect context.
+      function calcSqftBaseHours(sqft: number): number {
+        if (sqft <= 1000) return 1.5;
+        if (sqft <= 1500) return 2.5;
+        if (sqft <= 2000) return 3.0;
+        if (sqft <= 2500) return 3.5;
+        if (sqft <= 3000) return 4.0;
+        if (sqft <= 3500) return 4.5;
+        if (sqft <= 4000) return 5.0;
+        return 5.0 + Math.ceil((sqft - 4000) / 750);
+      }
+      function roundHalfUp(h: number) { return Math.round(h * 2) / 2; }
+      function roundNearest5(n: number) { return Math.round(n / 5) * 5; }
+
+      let computedMin = 120; // absolute fallback
+      let computedMax = 350;
+      let hourlyRate = 50;
+      let minimumTicket = 100;
+
       try {
         const ps = await getPricingByBusiness(business.id);
-        if (ps) {
-          pricingContext = `Business pricing: base rates around $${ps.basePrice || 120} per visit. `;
-          if (ps.pricePerSqft) pricingContext += `$${ps.pricePerSqft} per sqft. `;
-          if (ps.bedBathMultiplier) pricingContext += `Bed/bath multiplier: ${ps.bedBathMultiplier}. `;
+        const pss = (ps?.settings as any) || {};
+        hourlyRate = pss.hourlyRate || 50;
+        minimumTicket = pss.minimumTicket || 100;
+
+        const sqft = f.sqft || 1500;
+        const beds = f.beds || 3;
+        const baths = f.baths || 2;
+
+        const sqftHours = calcSqftBaseHours(sqft);
+        const bathHours = Math.max(0, baths - 1) * 0.5;
+        const bedHours  = Math.max(0, beds - 2) * 0.25;
+        const petHours  = f.pets ? 0.5 : 0;
+        const baseHours = sqftHours + bathHours + bedHours + petHours;
+
+        // Service type multipliers — keep same as mobile client
+        const serviceTypeMultipliers: Record<string, number> = {
+          standard_cleaning: 1.0,
+          deep_clean: 1.5,
+          move_in_out: 2.0,
+          post_construction: 2.0,
+          airbnb: 1.2,
+          recurring: 1.0,
+        };
+        const mult = serviceTypeMultipliers[f.serviceType || "standard_cleaning"] || 1.0;
+
+        const totalHours = roundHalfUp(baseHours * mult);
+        let basePrice = totalHours * hourlyRate;
+        basePrice = Math.max(basePrice, minimumTicket);
+
+        // Add-on price estimates
+        const addOnPrices: Record<string, number> = pss.addOnPrices || {};
+        let addOnTotal = 0;
+        for (const [key, val] of Object.entries(f.addOns || {})) {
+          if (val && addOnPrices[key]) addOnTotal += Number(addOnPrices[key]);
         }
-      } catch (_e) {}
+
+        // Frequency discount
+        const freqDiscounts = pss.frequencyDiscounts || { weekly: 25, biweekly: 15, monthly: 10 };
+        let freqDiscount = 0;
+        if (f.frequency === "weekly") freqDiscount = freqDiscounts.weekly / 100;
+        else if (f.frequency === "biweekly") freqDiscount = freqDiscounts.biweekly / 100;
+        else if (f.frequency === "monthly") freqDiscount = freqDiscounts.monthly / 100;
+
+        const computedPrice = roundNearest5((basePrice + addOnTotal) * (1 - freqDiscount));
+        // Provide a ±15% range so AI can write line items naturally, but stays anchored
+        computedMin = Math.round(computedPrice * 0.92 / 5) * 5;
+        computedMax = Math.round(computedPrice * 1.08 / 5) * 5;
+        console.log(`[ai-quote] computed price: $${computedPrice} (range $${computedMin}-$${computedMax}), hourlyRate=${hourlyRate}, mult=${mult}, hours=${totalHours}`);
+      } catch (pricingErr) {
+        console.error("[ai-quote] pricing calc error:", pricingErr);
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       const serviceLabel: Record<string, string> = {
         standard_cleaning: "Standard Cleaning",
@@ -9125,11 +9204,12 @@ Property: ${f.beds ?? "?"}BR / ${f.baths ?? "?"}BA${f.sqft ? `, ${f.sqft} sqft` 
 Service: ${serviceLabel[f.serviceType] || f.serviceType || "Standard Cleaning"}
 Frequency: ${f.frequency || "one-time"}
 Pets: ${f.pets ? `Yes (${f.petType || "unknown"})` : "No"}${addOnsList ? `\nAdd-ons: ${addOnsList}` : ""}${f.notes ? `\nCustomer notes: ${f.notes}` : ""}
-${pricingContext}
+Calculated price range: $${computedMin}–$${computedMax} (based on configured hourly rate of $${hourlyRate}/hr)
 
-Generate a realistic, professional cleaning quote. Return ONLY valid JSON:
+Generate a professional quote. The total MUST be between $${computedMin} and $${computedMax}.
+Return ONLY valid JSON:
 {
-  "total": <number>,
+  "total": <number between ${computedMin} and ${computedMax}>,
   "lineItems": [
     { "description": "<string>", "quantity": <number>, "unitPrice": <number>, "subtotal": <number> }
   ],
@@ -9138,15 +9218,15 @@ Generate a realistic, professional cleaning quote. Return ONLY valid JSON:
 
 Rules:
 - 2-5 line items (base service + relevant extras)
-- Total should be the sum of all subtotals
-- Prices should be realistic for a professional cleaning business (typically $80-$350)
+- Total MUST equal the sum of all subtotals
+- Total MUST be between $${computedMin} and $${computedMax} — do NOT go outside this range
 - Never output markdown, only pure JSON`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
-        temperature: 0.3,
+        temperature: 0.2,
       });
 
       let aiData: any = {};
@@ -9154,7 +9234,17 @@ Rules:
 
       const lineItems = Array.isArray(aiData.lineItems) ? aiData.lineItems : [];
       const lineItemsTotal = lineItems.reduce((s: number, li: any) => s + (Number(li.subtotal) || Number(li.unitPrice) || 0), 0);
-      const total = typeof aiData.total === "number" && aiData.total > 0 ? aiData.total : lineItemsTotal;
+      let total = typeof aiData.total === "number" && aiData.total > 0 ? aiData.total : lineItemsTotal;
+
+      // ── Sanity guardrail: never let AI under-price below configured minimum ──
+      if (total < minimumTicket) {
+        console.warn(`[ai-quote] AI returned total $${total} below minimum $${minimumTicket} — clamping`);
+        total = minimumTicket;
+      }
+      if (total < computedMin) {
+        console.warn(`[ai-quote] AI returned total $${total} below computed min $${computedMin} — clamping`);
+        total = computedMin;
+      }
       console.log(`[ai-quote] aiData.total=${aiData.total} lineItemsTotal=${lineItemsTotal} final total=${total}`);
 
       const propertyDetails = {

@@ -264,19 +264,52 @@ function calculateResidentialRecommendations(
     biannualDeepClean: false,
   };
 
+  // Resolve base types from user's configured Good/Better/Best option IDs
   const goodType = getServiceTypeById(settings, settings.goodOptionId) || settings.serviceTypes[0];
   const betterType = getServiceTypeById(settings, settings.betterOptionId) || settings.serviceTypes[1];
   const bestType = getServiceTypeById(settings, settings.bestOptionId) || settings.serviceTypes[2];
 
-  const good = calculateQuoteOption(homeDetails, emptyAddOns, frequency, goodType, settings, "Good");
-  const better = calculateQuoteOption(homeDetails, emptyAddOns, frequency, betterType, settings, "Better");
+  // If the customer requested a specific service type, anchor the tiers around it
+  // so every quote always presents exactly Good / Better / Best — never a 4th option.
+  const detectedType = getServiceTypeById(settings, detectedServiceId);
+
+  // Determine which tier to anchor the detected service to.
+  // Premium services (deep-clean, move-in-out, post-construction) → anchor to Better.
+  // The detected type replaces the configured type for that tier so the customer's
+  // request is respected while still showing all three revenue-generating options.
+  const premiumServiceIds = new Set(["deep-clean", "move-in-out", "post-construction"]);
+  let effectiveBetterType = betterType;
+  let detectedAnchor: "good" | "better" | "best" | null = null;
+
+  if (detectedType && detectedServiceId !== settings.goodOptionId &&
+      detectedServiceId !== settings.betterOptionId &&
+      detectedServiceId !== settings.bestOptionId) {
+    if (premiumServiceIds.has(detectedServiceId)) {
+      // Customer wants a premium service — anchor it at Better, keep Best with best tier + add-ons
+      effectiveBetterType = detectedType;
+      detectedAnchor = "better";
+    } else {
+      // Standard or basic detected service — anchor to Good
+      detectedAnchor = "good";
+    }
+  }
+
+  const effectiveGoodType = (detectedAnchor === "good" && detectedType) ? detectedType : goodType;
+
+  const good   = calculateQuoteOption(homeDetails, emptyAddOns, frequency, effectiveGoodType, settings, "Good");
+  const better = calculateQuoteOption(homeDetails, addOns, frequency, effectiveBetterType, settings, "Better");
 
   const bestAddOns: AddOns = {
     ...emptyAddOns,
     insideFridge: true,
     insideOven: true,
+    baseboardsDetail: true,
   };
   const best = calculateQuoteOption(homeDetails, bestAddOns, frequency, bestType, settings, "Best");
+
+  // Always show exactly 3 options: Good / Better / Best.
+  // Mark the detected anchor as recommended; default to Better when no detection.
+  const recommendedTier: "good" | "better" | "best" = detectedAnchor || "better";
 
   const options: RecommendedOption[] = [
     {
@@ -285,6 +318,7 @@ function calculateResidentialRecommendations(
       scope: good.scope,
       price: good.price,
       addOnsIncluded: good.addOnsIncluded,
+      isRecommended: recommendedTier === "good",
     },
     {
       name: better.name,
@@ -292,7 +326,7 @@ function calculateResidentialRecommendations(
       scope: better.scope,
       price: better.price,
       addOnsIncluded: better.addOnsIncluded,
-      isRecommended: true,
+      isRecommended: recommendedTier === "better",
     },
     {
       name: best.name,
@@ -300,26 +334,9 @@ function calculateResidentialRecommendations(
       scope: best.scope,
       price: best.price,
       addOnsIncluded: best.addOnsIncluded,
+      isRecommended: recommendedTier === "best",
     },
   ];
-
-  if (detectedServiceId !== settings.goodOptionId &&
-      detectedServiceId !== settings.betterOptionId &&
-      detectedServiceId !== settings.bestOptionId) {
-    const detectedType = getServiceTypeById(settings, detectedServiceId);
-    if (detectedType) {
-      const detected = calculateQuoteOption(homeDetails, addOns, frequency, detectedType, settings, "Detected");
-      options.push({
-        name: `${detectedType.name} (Detected)`,
-        serviceTypeName: detectedType.name,
-        scope: detectedType.scope,
-        price: detected.price,
-        addOnsIncluded: detected.addOnsIncluded,
-        isRecommended: true,
-      });
-      options[1].isRecommended = false;
-    }
-  }
 
   const baseHours = calculateBaseHours(homeDetails);
   const estimatedLaborHours = Math.round(baseHours * 2) / 2;

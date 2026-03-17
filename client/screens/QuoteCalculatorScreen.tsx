@@ -526,6 +526,7 @@ export default function QuoteCalculatorScreen() {
             onSetRecommended={setRecommendedOption}
             onSave={handleSave}
             onSaveForSend={performSaveForSend}
+            onAddOnsChange={setAddOns}
             isGuestMode={isGuestMode}
             isEditMode={isEditMode}
           />

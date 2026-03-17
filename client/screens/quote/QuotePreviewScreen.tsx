@@ -78,6 +78,7 @@ interface Props {
   onSetRecommended: (option: "good" | "better" | "best") => void;
   onSave: () => void;
   onSaveForSend?: (priceOverrides?: { good?: number; better?: number; best?: number }) => Promise<string | null>;
+  onAddOnsChange?: (addOns: AddOns) => void;
   isGuestMode?: boolean;
   isEditMode?: boolean;
 }
@@ -95,6 +96,7 @@ export default function QuotePreviewScreen({
   onSetRecommended,
   onSave,
   onSaveForSend,
+  onAddOnsChange,
   isGuestMode = false,
   isEditMode = false,
 }: Props) {
@@ -134,6 +136,47 @@ export default function QuotePreviewScreen({
   const [aiPricingLoading, setAiPricingLoading] = useState(false);
   const [showAiPricing, setShowAiPricing] = useState(false);
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
+  const [upsellDismissed, setUpsellDismissed] = useState(false);
+
+  // Smart upsell recommendations — revenue-focused suggestions based on job context
+  const smartUpsells = useMemo(() => {
+    type UpsellItem = { key: keyof AddOns; label: string; reason: string; price: number };
+    const suggestions: UpsellItem[] = [];
+
+    const ap = pricingSettings.addOnPrices;
+    // Use the configured Good option's service type to detect premium service context
+    const selectedSvcId = pricingSettings.goodOptionId || "";
+    const isDeepService = ["deep-clean", "move-in-out", "post-construction"].includes(selectedSvcId);
+    const isOneTime = frequency === "one-time";
+
+    if (!addOns.insideFridge && !isDeepService) {
+      suggestions.push({ key: "insideFridge", label: "Inside Fridge", reason: "Quick add-on that clients love — boosts ticket by $" + ap.insideFridge, price: ap.insideFridge });
+    }
+    if (!addOns.insideOven) {
+      suggestions.push({ key: "insideOven", label: "Inside Oven", reason: "High-margin add-on rarely declined — adds $" + ap.insideOven, price: ap.insideOven });
+    }
+    if (!addOns.baseboardsDetail && (homeDetails.petType !== "none" || homeDetails.conditionScore < 6)) {
+      suggestions.push({ key: "baseboardsDetail", label: "Baseboards Detail", reason: homeDetails.petType !== "none" ? "Pet hair accumulates on baseboards — great upsell for pet homes" : "Condition of home suggests this add-on", price: ap.baseboardsDetail });
+    }
+    if (!addOns.interiorWindows && homeDetails.sqft >= 2000) {
+      suggestions.push({ key: "interiorWindows", label: "Interior Windows", reason: "Larger home — interior windows add visible value at $" + ap.interiorWindows, price: ap.interiorWindows });
+    }
+    if (!addOns.blindsDetail && homeDetails.conditionScore < 6) {
+      suggestions.push({ key: "blindsDetail", label: "Blinds Detail", reason: "Poor condition home — blinds detail increases perceived thoroughness", price: ap.blindsDetail });
+    }
+    if (!addOns.dishes && isOneTime) {
+      suggestions.push({ key: "dishes", label: "Dishes", reason: "Easy add-on for one-time cleans — clients appreciate the convenience", price: ap.dishes });
+    }
+    if (!addOns.organizationTidy && homeDetails.peopleCount >= 3) {
+      suggestions.push({ key: "organizationTidy", label: "Organization / Tidy", reason: "Larger household — tidying adds real value and increases ticket", price: ap.organizationTidy });
+    }
+    if (!addOns.biannualDeepClean && !isDeepService && frequency !== "one-time") {
+      suggestions.push({ key: "biannualDeepClean", label: "Biannual Deep Clean", reason: "Auto-schedule a deep clean every 6 months — recurring revenue you set once", price: ap.biannualDeepClean });
+    }
+
+    // Return up to 3 highest-value upsells
+    return suggestions.sort((a, b) => b.price - a.price).slice(0, 3);
+  }, [addOns, homeDetails, frequency, pricingSettings]);
 
   const baseOptions = useMemo(() => {
     return calculateAllOptions(
@@ -694,6 +737,48 @@ export default function QuotePreviewScreen({
           onSetRecommended={() => onSetRecommended("best")}
           onPriceChange={(p) => setPriceOverrides((prev) => ({ ...prev, best: p }))}
         />
+
+        {/* ── Smart Upsell Recommendations ── */}
+        {!upsellDismissed && onAddOnsChange && smartUpsells.length > 0 ? (
+          <View style={[styles.upsellCard, { backgroundColor: `${"#16A34A"}08`, borderColor: `${"#16A34A"}20` }]}>
+            <View style={styles.upsellHeader}>
+              <Feather name="trending-up" size={14} color="#16A34A" />
+              <ThemedText type="small" style={{ color: "#16A34A", fontWeight: "700", marginLeft: 6, flex: 1 }}>
+                Upsell Opportunities
+              </ThemedText>
+              <Pressable onPress={() => setUpsellDismissed(true)} hitSlop={12}>
+                <Feather name="x" size={14} color={theme.textMuted} />
+              </Pressable>
+            </View>
+            <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+              Fastest ways to increase this quote value based on this job
+            </ThemedText>
+            {smartUpsells.map((u) => (
+              <Pressable
+                key={u.key}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onAddOnsChange({ ...addOns, [u.key]: true });
+                }}
+                style={[styles.upsellItem, { borderColor: `${"#16A34A"}25`, backgroundColor: theme.backgroundRoot }]}
+                testID={`upsell-add-${u.key}`}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <ThemedText type="small" style={{ color: theme.text, fontWeight: "600" }}>{u.label}</ThemedText>
+                    <View style={[styles.upsellBadge, { backgroundColor: `${"#16A34A"}15` }]}>
+                      <ThemedText type="caption" style={{ color: "#16A34A", fontWeight: "700" }}>+${u.price}</ThemedText>
+                    </View>
+                  </View>
+                  <ThemedText type="caption" style={{ color: theme.textMuted, marginTop: 2 }} numberOfLines={1}>{u.reason}</ThemedText>
+                </View>
+                <View style={[styles.upsellAddBtn, { backgroundColor: "#16A34A" }]}>
+                  <Feather name="plus" size={12} color="#fff" />
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
 
         <Pressable
           onPress={() => {
@@ -1518,5 +1603,38 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.xs,
     marginTop: Spacing.md,
+  },
+  upsellCard: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  upsellHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  upsellItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  upsellBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  upsellAddBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
 });

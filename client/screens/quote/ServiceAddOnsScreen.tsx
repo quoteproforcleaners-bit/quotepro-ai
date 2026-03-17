@@ -87,10 +87,10 @@ export default function ServiceAddOnsScreen({
         >
           <ThemedText type="small" style={{ color: theme.success }}>
             {frequency === "weekly"
-              ? "15%"
+              ? `${pricingSettings.frequencyDiscounts.weekly}%`
               : frequency === "biweekly"
-                ? "10%"
-                : "5%"}{" "}
+                ? `${pricingSettings.frequencyDiscounts.biweekly}%`
+                : `${pricingSettings.frequencyDiscounts.monthly}%`}{" "}
             recurring discount applied
           </ThemedText>
         </View>
