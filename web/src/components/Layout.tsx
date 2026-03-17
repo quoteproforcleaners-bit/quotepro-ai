@@ -198,13 +198,13 @@ export function Layout() {
               <div className="relative">
                 <div className="flex items-center gap-2 mb-1">
                   <Crown className="w-4 h-4 text-amber-300" />
-                  <span className="text-sm font-bold">Upgrade to Pro</span>
+                  <span className="text-sm font-bold">Upgrade to Growth</span>
                 </div>
                 <p className="text-[11px] text-primary-200 leading-tight">
                   Unlimited quotes, AI tools, CRM, and more
                 </p>
                 <div className="flex items-center gap-1 mt-2 text-xs text-primary-200 font-medium">
-                  <span>$19.99/mo</span>
+                  <span>From $19/mo</span>
                   <span className="text-primary-300">&middot;</span>
                   <span>7-day free trial</span>
                   <ArrowUpRight className="w-3 h-3 ml-auto" />
