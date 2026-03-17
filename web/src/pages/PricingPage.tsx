@@ -134,7 +134,7 @@ const COMPARISON = [
 ];
 
 export default function PricingPage() {
-  const [interval, setInterval] = useState<BillingInterval>("annual");
+  const [interval, setInterval] = useState<BillingInterval>("annual"); // default: annual
   const { startCheckout, checkoutLoading, tier } = useSubscription();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
