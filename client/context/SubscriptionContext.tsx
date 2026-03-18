@@ -8,6 +8,8 @@ import { trackEvent } from "@/lib/analytics";
 
 export type PlanTier = "free" | "starter" | "growth" | "pro";
 
+const RC_IOS_PUBLIC_KEY = "appl_knabujvvumnLXQVLBCGIcyDScWl";
+
 let PurchasesModule: typeof import("react-native-purchases").default | null = null;
 
 function getPurchases() {
@@ -270,9 +272,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
+      const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || RC_IOS_PUBLIC_KEY;
       if (!apiKey) {
-        console.warn("[RC] EXPO_PUBLIC_REVENUECAT_API_KEY not set");
+        console.warn("[RC] No RevenueCat API key available");
         setTier(dbTier);
         setIsLoading(false);
         return;
@@ -340,7 +342,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       if (!RC) throw new Error("Subscription service not available on this device.");
 
       if (!configuredRef.current) {
-        const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
+        const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || RC_IOS_PUBLIC_KEY;
         if (apiKey && user?.id) {
           RC.configure({ apiKey, appUserID: String(user.id) });
           configuredRef.current = true;
