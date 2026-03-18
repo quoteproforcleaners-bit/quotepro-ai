@@ -30,6 +30,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { ProGate } from "@/components/ProGate";
 import { apiRequest } from "@/lib/query-client";
 import { trackEvent } from "@/lib/analytics";
+import { useAIConsent } from "@/context/AIConsentContext";
 
 type VoiceState = "idle" | "requesting" | "recording" | "processing";
 
@@ -39,6 +40,7 @@ const PLACEHOLDER_TEXT =
 function WalkthroughAIContent() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme, isDark } = useTheme();
+  const { requestConsent } = useAIConsent();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { width: screenWidth } = useWindowDimensions();
@@ -183,6 +185,9 @@ function WalkthroughAIContent() {
       setError("Please describe the job before analyzing.");
       return;
     }
+
+    const consented = await requestConsent();
+    if (!consented) return;
 
     setError(null);
     setIsAnalyzing(true);

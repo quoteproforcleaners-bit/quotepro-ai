@@ -23,6 +23,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import { trackEvent } from "@/lib/analytics";
+import { useAIConsent } from "@/context/AIConsentContext";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ClosingAssistant">;
@@ -72,6 +73,7 @@ interface GeneratedResult {
 
 export default function ClosingAssistantScreen({ route }: Props) {
   const { theme, isDark } = useTheme();
+  const { requestConsent } = useAIConsent();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
 
@@ -112,6 +114,8 @@ export default function ClosingAssistantScreen({ route }: Props) {
         setError("Could not read image. Please try again.");
         return;
       }
+      const consented = await requestConsent();
+      if (!consented) return;
       setIsExtracting(true);
       setError("");
       const mimeType = asset.mimeType || "image/jpeg";
@@ -138,6 +142,8 @@ export default function ClosingAssistantScreen({ route }: Props) {
       setError("Please paste the customer's message or add some context first.");
       return;
     }
+    const consented = await requestConsent();
+    if (!consented) return;
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
     setError("");

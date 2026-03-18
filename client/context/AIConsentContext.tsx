@@ -38,10 +38,20 @@ export function AIConsentProvider({ children }: { children: ReactNode }) {
   const consent = t.aiConsent;
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
     AsyncStorage.getItem(AI_CONSENT_KEY).then((val) => {
-      setHasConsented(val === "true");
+      const consented = val === "true";
+      setHasConsented(consented);
       setIsLoading(false);
+      if (!consented) {
+        timer = setTimeout(() => {
+          setShowModal(true);
+        }, 1200);
+      }
     });
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+    };
   }, []);
 
   const requestConsent = useCallback(async (): Promise<boolean> => {
