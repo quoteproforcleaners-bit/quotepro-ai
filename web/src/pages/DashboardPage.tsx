@@ -109,19 +109,19 @@ function DynamicHero(p: HeroProps) {
             QuotePro turns your cleaning rates into professional quotes in under 2 minutes. Create your first one and start building a real pipeline.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button
-              icon={Plus}
+            <button
               onClick={() => navigate("/quotes/new")}
-              className="bg-white text-primary-700 hover:bg-primary-50 border-0 font-bold shadow-lg"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-primary-700 font-bold text-sm shadow-lg hover:bg-primary-50 transition-colors"
             >
+              <Plus className="w-4 h-4" />
               Create First Quote
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={() => navigate("/settings?tab=pricing")}
-              className="bg-primary-700/60 text-white hover:bg-primary-700 border border-primary-500 font-semibold"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-700/60 text-white font-semibold text-sm border border-primary-500 hover:bg-primary-700 transition-colors"
             >
               Configure Pricing
-            </Button>
+            </button>
           </div>
         </div>
       </div>
