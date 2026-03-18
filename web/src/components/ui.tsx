@@ -352,35 +352,39 @@ export function Tabs({
   onChange,
   counts,
 }: {
-  tabs: string[];
+  tabs: (string | { id: string; label: string })[];
   active: string;
   onChange: (tab: string) => void;
   counts?: Record<string, number>;
 }) {
   return (
     <div className="flex items-center gap-1 overflow-x-auto pb-px">
-      {tabs.map((t) => (
-        <button
-          key={t}
-          onClick={() => onChange(t)}
-          className={`px-3.5 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition-all duration-150 ${
-            active === t
-              ? "bg-primary-50 text-primary-700 shadow-sm"
-              : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-          }`}
-        >
-          {t.replace(/[-_]/g, " ")}
-          {counts && counts[t] !== undefined ? (
-            <span
-              className={`ml-1.5 text-xs ${
-                active === t ? "text-primary-500" : "text-slate-400"
-              }`}
-            >
-              {counts[t]}
-            </span>
-          ) : null}
-        </button>
-      ))}
+      {tabs.map((t) => {
+        const id = typeof t === "string" ? t : t.id;
+        const label = typeof t === "string" ? t.replace(/[-_]/g, " ") : t.label;
+        return (
+          <button
+            key={id}
+            onClick={() => onChange(id)}
+            className={`px-3.5 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition-all duration-150 ${
+              active === id
+                ? "bg-primary-50 text-primary-700 shadow-sm"
+                : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+            }`}
+          >
+            {label}
+            {counts && counts[id] !== undefined ? (
+              <span
+                className={`ml-1.5 text-xs ${
+                  active === id ? "text-primary-500" : "text-slate-400"
+                }`}
+              >
+                {counts[id]}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }

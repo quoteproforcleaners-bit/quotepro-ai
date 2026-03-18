@@ -519,7 +519,7 @@ export default function JobberPage() {
         title="Jobber"
         subtitle="Sync quotes and import clients from Jobber"
       />
-      <Tabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+      <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
       <div>
         {activeTab === "connection" && <ConnectionTab />}
         {activeTab === "import" && <ImportTab />}
