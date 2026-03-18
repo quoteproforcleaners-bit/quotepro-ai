@@ -29,7 +29,7 @@ The core logic calculates base hours based on square footage and applies multipl
 A public, customer-facing instant quote page at `/q/:token` offers an interactive experience for viewing and accepting quotes, including good/better/best tier selection, add-on toggling, expiration timers, deposit payments via Stripe Checkout, and testimonials.
 
 ### AI Features
-- **Walkthrough AI Quoting**: Allows generating quotes by extracting structured fields from natural language descriptions using `gpt-5-nano`, followed by pricing recommendations and quote creation.
+- **Walkthrough AI Quoting ("Quote from Notes")**: Paste raw walkthrough notes, customer texts, or property descriptions. AI (gpt-4o-mini) extracts structured quote details — property type, beds/baths/sqft, service type, frequency, condition, pets, add-ons, missing fields, and recommendations. Output is rendered in structured cards. "Create Quote Draft" prefills the quote builder with extracted data. Gated at Growth tier. Route: `POST /api/ai/walkthrough-extract` (accepts `description` or `notes` field).
 - **AI Closing Assistant**: Generates customer-facing messages for various purposes in multiple tones and languages.
 - **AI Dynamic Pricing Suggestions**: Analyzes property details, add-ons, frequency, and history to suggest optimal Good/Better/Best tier pricing.
 
@@ -70,7 +70,7 @@ API routes: `GET /api/quotes/:id/scheduled-followups`, `POST /api/communications
 - pg
 
 ### AI Integration
-- OpenAI via Replit AI Integrations (gpt-5-nano)
+- OpenAI via Replit AI Integrations (gpt-4o-mini for all AI routes)
 
 ### Third-Party Services
 - **Twilio**: SMS integration.

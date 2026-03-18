@@ -2518,7 +2518,7 @@ ${growthSettings?.includeReviewOnPdf && growthSettings?.googleReviewLink?.trim()
       const tierExcluded = tier?.excludedBullets?.join(", ") || "";
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -2571,7 +2571,7 @@ ${growthSettings?.includeReviewOnPdf && growthSettings?.googleReviewLink?.trim()
       const highestTierPrice = tiers?.length > 0 ? Math.max(...tiers.map((t: any) => t.pricePerVisit || 0)) : 0;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -3212,7 +3212,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
     const maxLen = channel === "email" ? 200 : 160;
     const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
     const completion = await openai.chat.completions.create({
-      model: "gpt-5-nano",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
@@ -3850,7 +3850,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       const lastComm = comms.length > 0 ? comms[0] : null;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -3903,7 +3903,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       const langInstruction = commLang === "es" ? " Write the message entirely in Spanish." : " Write the message entirely in English.";
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -4295,7 +4295,7 @@ Best tier: ${serviceTypes.best || "Deep Clean"}
 ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` : ""}`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -4369,7 +4369,7 @@ Current prices:
 ${historyContext}`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -4400,8 +4400,9 @@ ${historyContext}`;
 
   app.post("/api/ai/walkthrough-extract", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
-      const { description } = req.body;
-      if (!description || typeof description !== "string" || description.trim().length === 0) {
+      const raw = req.body.description || req.body.notes || "";
+      const description = typeof raw === "string" ? raw.trim() : "";
+      if (!description) {
         return res.status(400).json({ message: "A job description is required" });
       }
 
@@ -4416,65 +4417,83 @@ ${historyContext}`;
         } catch (_e) {}
       }
 
-      const systemPrompt = `You are a cleaning job detail extractor. Given a natural language description of a cleaning job, extract structured fields. You must NEVER return any prices, costs, rates, or dollar amounts — only physical property attributes and job characteristics.
+      const systemPrompt = `You are an expert quoting assistant for residential and commercial cleaning businesses. A cleaning company owner will paste rough notes, walkthrough text, a customer message, or a property description. Your job is to extract all useful quoting details and return a structured JSON response.
 
-Return a JSON object with these fields:
+You understand cleaning-industry terminology:
+- "first-time clean" or "initial clean" → isFirstTimeClean: true, often implies deep clean
+- "maintenance clean" or "recurring" → standard recurring service
+- "deep clean" → isDeepClean: true, serviceCategory: "deep"
+- "move-in" / "move-out" / "vacant" → isMoveInOut: true, serviceCategory: "move-in-out"
+- "biweekly" / "every two weeks" → frequency: "bi-weekly"
+- "very dirty" / "hasn't been cleaned in months" / "heavy buildup" → conditionLevel: "heavy" or "extreme"
+- "light" / "pretty clean" / "just needs a touch-up" → conditionLevel: "light"
+- "inside fridge" / "inside oven" → add to addOns
+- "Airbnb" / "turnover clean" / "short-term rental" → note in serviceNotes, may be recurring one-time
+- "salon" / "office" / "boutique" / "medical" / "restaurant" → isCommercial: true, set propertyType
+
+Return ONLY a valid JSON object with this exact structure:
 {
   "extractedFields": {
-    "propertyType": "house" | "apartment" | "condo" | "townhouse" | "office" | "retail" | "warehouse" | "medical" | "restaurant" | "gym" | "school" | "church" | "other" | null,
+    "propertyType": "house" | "apartment" | "condo" | "townhouse" | "office" | "retail" | "medical" | "restaurant" | "gym" | "airbnb" | "other" | null,
     "serviceCategory": "standard" | "deep" | "move-in-out" | "post-construction" | "recurring" | "one-time" | null,
     "isCommercial": boolean,
     "bedrooms": number | null,
     "bathrooms": number | null,
+    "halfBaths": number | null,
     "sqft": number | null,
+    "occupants": number | null,
     "frequency": "one-time" | "weekly" | "bi-weekly" | "monthly" | null,
-    "isFirstTimeClean": boolean | null,
-    "isDeepClean": boolean | null,
-    "isMoveInOut": boolean | null,
+    "isFirstTimeClean": boolean,
+    "isDeepClean": boolean,
+    "isMoveInOut": boolean,
     "petCount": number | null,
     "petType": "dog" | "cat" | "both" | "other" | "none" | null,
+    "petShedding": boolean | null,
     "addOns": string[],
     "conditionLevel": "light" | "moderate" | "heavy" | "extreme" | null,
-    "kitchenCondition": "light" | "moderate" | "heavy" | null,
-    "floors": number | null,
-    "stairs": number | null,
-    "officeCount": number | null,
-    "officeBathrooms": number | null,
-    "breakrooms": number | null,
-    "heavySoil": boolean | null,
+    "conditionReasoning": string | null,
     "urgency": "normal" | "rush" | "flexible" | null,
-    "notes": string | null
+    "customerName": string | null,
+    "address": string | null,
+    "serviceNotes": string | null
   },
+  "missingFields": string[],
+  "recommendations": string[],
+  "serviceReasoning": string,
   "assumptions": string[],
   "confidence": "high" | "medium" | "low"
 }
 
-Rules:
-- Only extract information explicitly stated or strongly implied in the description.
-- For any field not mentioned or inferable, use null.
-- List assumptions you made (e.g., "Assumed standard residential since no commercial indicators mentioned").
-- Set confidence based on how much detail was provided: high = most fields filled, medium = some gaps, low = very sparse description.
-- addOns should be an array of strings like ["oven cleaning", "inside fridge", "window cleaning", "laundry", "organizing", "garage", "baseboards", "blinds", "carpet cleaning", "wall washing"].
-- NEVER include any pricing, cost estimates, hourly rates, or dollar amounts in your response.`;
+Field rules:
+- Use null for any field not mentioned or inferable. Never guess without strong signal.
+- isFirstTimeClean / isDeepClean / isMoveInOut default to false if not mentioned.
+- isCommercial defaults to false.
+- addOns: use plain English strings like "inside oven", "inside fridge", "window cleaning", "laundry", "organizing", "baseboards", "blinds", "carpet cleaning", "wall washing", "garage", "pet hair treatment".
+- missingFields: list what a cleaner would need to finalize a quote but couldn't determine, e.g. ["square footage", "service frequency", "cleaning type"].
+- recommendations: 1-3 short, practical suggestions for the cleaner, e.g. "First-time deep clean recommended given language about dirtiness", "Ask about preferred recurring schedule after initial clean".
+- serviceReasoning: one sentence explaining why you chose the serviceCategory you did.
+- assumptions: list any inferences you made that aren't explicitly stated.
+- confidence: high = most key fields filled, medium = some gaps, low = very sparse.
+- NEVER include prices, costs, rates, or dollar amounts.`;
 
       let completion;
       try {
         completion = await openai.chat.completions.create({
-          model: "gpt-5-nano",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: systemPrompt },
-            { role: "user", content: description.trim() },
+            { role: "user", content: description },
           ],
           response_format: { type: "json_object" },
         });
       } catch (aiError: any) {
         console.error("Walkthrough AI call failed:", aiError?.message || aiError);
-        return res.status(500).json({ message: "AI service temporarily unavailable. Please try again." });
+        return res.status(500).json({ message: "AI service is temporarily unavailable. Please try again in a moment." });
       }
 
       const content = completion.choices[0]?.message?.content;
       if (!content) {
-        console.error("Walkthrough AI empty response:", JSON.stringify(completion.choices[0]));
+        console.error("Walkthrough AI empty response");
         return res.status(500).json({ message: "AI returned an empty response. Please try again." });
       }
 
@@ -4482,10 +4501,14 @@ Rules:
       try {
         parsed = JSON.parse(content);
       } catch {
-        return res.status(500).json({ message: "Invalid AI response format" });
+        console.error("Walkthrough AI JSON parse failed:", content?.slice(0, 200));
+        return res.status(500).json({ message: "AI response could not be parsed. Please try again." });
       }
 
       const extractedFields = parsed.extractedFields || {};
+      const missingFields = Array.isArray(parsed.missingFields) ? parsed.missingFields : [];
+      const recommendations = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
+      const serviceReasoning = typeof parsed.serviceReasoning === "string" ? parsed.serviceReasoning : "";
       const assumptions = Array.isArray(parsed.assumptions) ? parsed.assumptions : [];
       const confidence = ["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low";
 
@@ -4506,12 +4529,15 @@ Rules:
 
       return res.json({
         extractedFields,
+        missingFields,
+        recommendations,
+        serviceReasoning,
         assumptions,
         confidence,
       });
     } catch (error: any) {
       console.error("AI walkthrough extract error:", error);
-      return res.status(500).json({ message: "Failed to analyze job description" });
+      return res.status(500).json({ message: "Failed to analyze the job description. Please try again." });
     }
   });
 
@@ -4943,7 +4969,7 @@ Return exactly this JSON structure:
       let intentResult = { intent: false, confidence: 0, category: "general_question" };
       try {
         const intentCompletion = await openai.chat.completions.create({
-          model: "gpt-5-nano",
+          model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
@@ -4976,7 +5002,7 @@ Return exactly this JSON structure:
 
         try {
           const replyCompletion = await openai.chat.completions.create({
-            model: "gpt-5-nano",
+            model: "gpt-4o-mini",
             messages: [
               {
                 role: "system",
@@ -5066,7 +5092,7 @@ Respond with JSON: {"reply": string}`
       let extractedFields: any = {};
       try {
         const completion = await openai.chat.completions.create({
-          model: "gpt-5-nano",
+          model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
@@ -6731,7 +6757,7 @@ Respond with JSON: {"reply": string}`
       const systemPrompt = `Write a short marketing email for "${businessName}" (${ownerName}) to ${targetDesc}. Theme: "${campaignName}".${customInstruction} Rules: first line "Subject: ..." then blank line then body under 60 words in 3 short paragraphs. Use [Customer] as name. Sign off as ${signOff}. No links, no emojis. End with "Reply to book".`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: "Write the email." },
@@ -6778,7 +6804,7 @@ Respond with JSON: {"reply": string}`
       const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. ${linkInstruction} No emojis. Keep it personal and genuine.`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: "Generate a review request email." },
@@ -6850,7 +6876,7 @@ Respond with JSON: {"reply": string}`
       const userPrompt = `Customer first name: ${customerContext?.firstName || "there"}. ${customerContext?.quoteTotal ? `Quote total: $${customerContext.quoteTotal}.` : ""} ${customerContext?.serviceType ? `Service type: ${customerContext.serviceType}.` : ""} ${customerContext?.lastServiceDate ? `Last service date: ${customerContext.lastServiceDate}.` : ""} ${customerContext?.homeSize ? `Home size: ${customerContext.homeSize}.` : ""}`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
