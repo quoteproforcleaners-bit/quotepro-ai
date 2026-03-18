@@ -47,6 +47,7 @@ import QBOSettingsPage from "./pages/QBOSettingsPage";
 import JobberPage from "./pages/JobberPage";
 import QuotePreferencesPage from "./pages/QuotePreferencesPage";
 import ProSetupChecklistPage from "./pages/ProSetupChecklistPage";
+import AccountSettingsPage from "./pages/AccountSettingsPage";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -135,6 +136,7 @@ export default function App() {
           <Route path="/quote-preferences" element={<QuotePreferencesPage />} />
           <Route path="/pro-setup" element={<ProSetupChecklistPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/account-settings" element={<AccountSettingsPage />} />
         </Route>
 
         {/* Public intake form — no auth required */}

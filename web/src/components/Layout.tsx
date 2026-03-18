@@ -11,7 +11,6 @@ import {
   Users,
   Briefcase,
   Settings,
-  LogOut,
   Menu,
   X,
   Zap,
@@ -112,7 +111,7 @@ const navSections = [
 ];
 
 export function Layout() {
-  const { user, business, logout } = useAuth();
+  const { user, business } = useAuth();
   const { isPro } = useSubscription();
   const { theme, toggleTheme } = useTheme();
   const { isCompleted, isDismissed, startTour, resetTour } = useWalkthrough();
@@ -127,11 +126,6 @@ export function Layout() {
     }
   }, []);
 
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
 
   const initials =
     (user?.firstName?.[0] || "") + (user?.lastName?.[0] || "") || "U";
@@ -240,7 +234,10 @@ export function Layout() {
         ) : null}
 
         <div className="p-3 border-t border-slate-100 dark:border-slate-800 shrink-0">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-default">
+          <button
+            onClick={() => { navigate("/account-settings"); setSidebarOpen(false); }}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group text-left"
+          >
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-white flex items-center justify-center text-xs font-semibold shadow-sm shrink-0">
               {initials}
             </div>
@@ -252,20 +249,16 @@ export function Layout() {
                 {business?.companyName || ""}
               </p>
             </div>
-            <button
-              onClick={toggleTheme}
-              className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shrink-0"
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-[13px] text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Sign out
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleTheme(); }}
+                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+              <Settings className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-colors" />
+            </div>
           </button>
         </div>
       </aside>
