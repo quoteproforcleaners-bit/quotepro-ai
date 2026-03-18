@@ -1110,11 +1110,18 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const user = await getUserById(req.session.userId!);
       if (user && !isGrowthOrAbove(user.subscriptionTier)) {
         const existingQuotes = await getQuotesByBusiness(business.id);
-        const quoteCap = user.subscriptionTier === "starter" ? 20 : 3;
+        const FREE_TRIAL_DAYS = 14;
+        const userAgeDays = user.createdAt
+          ? Math.floor((Date.now() - new Date(user.createdAt).getTime()) / 86_400_000)
+          : 999;
+        const isInFreeTrial = user.subscriptionTier === "free" && userAgeDays < FREE_TRIAL_DAYS;
+        const quoteCap = user.subscriptionTier === "starter" ? 20 : (isInFreeTrial ? 20 : 3);
         if (existingQuotes.length >= quoteCap) {
           return res.status(403).json({
             message: user.subscriptionTier === "starter"
               ? `You've reached your ${quoteCap} quote monthly limit. Upgrade to Growth for unlimited quotes.`
+              : isInFreeTrial
+              ? `You've used all ${quoteCap} trial quotes. Upgrade to continue quoting.`
               : `You've used ${quoteCap} of ${quoteCap} free quotes. Upgrade to Growth for unlimited quotes.`,
             quoteLimitReached: true,
           });
@@ -10533,6 +10540,7 @@ function formatUser(u: any) {
     email: u.email,
     name: u.name,
     subscriptionTier: u.subscriptionTier || "free",
+    createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
   };
 }
 

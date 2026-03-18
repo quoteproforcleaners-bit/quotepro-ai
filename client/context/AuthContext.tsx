@@ -24,6 +24,7 @@ interface AuthUser {
   email: string;
   name: string | null;
   subscriptionTier: string;
+  createdAt: string | null;
 }
 
 interface AuthContextType {

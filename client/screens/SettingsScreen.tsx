@@ -44,7 +44,7 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
-  const { isPro, subscriptionStatus, trialDaysLeft, restore, tier } = useSubscription();
+  const { isPro, subscriptionStatus, trialDaysLeft, restore, tier, isInFreeTrial, freeTrialDaysLeft } = useSubscription();
   const TIER_DISPLAY: Record<string, string> = { starter: "Starter", growth: "Growth", pro: "Pro" };
   const tierDisplayName = TIER_DISPLAY[tier] || "Pro";
   const [restoring, setRestoring] = useState(false);
@@ -455,7 +455,9 @@ export default function SettingsScreen() {
           <View style={[styles.freePlanInfo, { backgroundColor: `${theme.warning}10`, borderColor: `${theme.warning}25` }]}>
             <Feather name="info" size={16} color={theme.warning} />
             <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm, color: theme.textSecondary }}>
-              Free Plan: 3 quotes included. No AI messaging, follow-up queue, or PDF export.
+              {isInFreeTrial
+                ? `Free Trial: ${freeTrialDaysLeft} day${freeTrialDaysLeft !== 1 ? "s" : ""} left. Up to 20 quotes.`
+                : "Free Plan: 3 quotes included. No AI messaging, follow-up queue, or PDF export."}
             </ThemedText>
           </View>
         </View>
@@ -511,6 +513,29 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
+      {Platform.OS === "ios" ? (
+        <Pressable
+          onPress={() => Linking.openURL("https://apps.apple.com/account/subscriptions")}
+          style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.sm }]}
+          testID="button-manage-subscription"
+        >
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="credit-card" size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                Manage Subscription
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                View or cancel in the App Store
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+          </View>
+        </Pressable>
+      ) : null}
+
       {!isPro ? (
         <View
           style={[
@@ -522,14 +547,14 @@ export default function SettingsScreen() {
           <View style={styles.freeLimitsHeader}>
             <Feather name="info" size={16} color={theme.textSecondary} />
             <ThemedText type="subtitle" style={{ marginLeft: Spacing.sm, fontWeight: "600" }}>
-              Free Plan Limits
+              {isInFreeTrial ? `Free Trial — ${freeTrialDaysLeft} day${freeTrialDaysLeft !== 1 ? "s" : ""} left` : "Free Plan Limits"}
             </ThemedText>
           </View>
           <View style={styles.freeLimitsList}>
             <View style={styles.freeLimitRow}>
               <Feather name="file-text" size={14} color={theme.textSecondary} />
               <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
-                3 residential quotes total
+                {isInFreeTrial ? "Up to 20 quotes during your trial" : "3 residential quotes total"}
               </ThemedText>
             </View>
             <View style={styles.freeLimitRow}>

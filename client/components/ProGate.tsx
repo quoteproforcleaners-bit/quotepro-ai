@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Platform, useWindowDimensions, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -10,7 +10,6 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useSubscription, usePlanGate, type PlanTier } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 
 interface ProGateProps {
@@ -35,6 +34,22 @@ const TIER_LABEL: Record<PlanTier, string> = {
   starter: "Starter",
   growth: "Growth",
   pro: "Pro",
+};
+
+// Feature-specific value taglines — shown as the subtitle on the gate overlay
+const FEATURE_TAGLINES: Record<string, string> = {
+  "AI Quote Builder": "Generate accurate, professional quotes in seconds — not minutes.",
+  "Follow-Up Queue": "Never let a hot lead go cold. Automated nudges that win jobs.",
+  "Walkthrough AI": "Let AI price rooms from a photo walkthrough — close on the spot.",
+  "Upsell Opportunities": "Add-ons and upsells that grow your average ticket automatically.",
+  "Revenue Dashboard": "See exactly what's earning and where your next dollar is coming from.",
+  "Customer Management": "Full CRM to track leads, history, and lifetime value.",
+  "Commercial Quote Builder": "Win bigger commercial contracts with professional proposals.",
+  "Lead Finder": "Find homeowners actively looking for cleaning services near you.",
+  "Automations Hub": "Set triggers and rules that run your business while you're on jobs.",
+  "Advanced Integrations": "Connect to Zapier, Make, and webhooks to automate anything.",
+  "Jobber Integration": "Sync clients and jobs directly with your Jobber account.",
+  "Social Leads": "Turn social media comments into booked appointments.",
 };
 
 const TIER_FEATURES: Record<PlanTier, { icon: string; label: string }[]> = {
@@ -67,9 +82,11 @@ export function ProGateOverlay({ featureName, minTier = "growth", isLoading = fa
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
-  const { t } = useLanguage();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
+  const { restore } = useSubscription();
+  const [restoring, setRestoring] = useState(false);
+  const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
 
   React.useEffect(() => {
     trackEvent("premium_feature_blocked", { feature: featureName || "unknown", required_tier: minTier });
@@ -89,8 +106,23 @@ export function ProGateOverlay({ featureName, minTier = "growth", isLoading = fa
     navigation.navigate("Paywall", { trigger_source: "feature_gate", required_tier: minTier });
   };
 
+  const handleRestore = async () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+    setRestoring(true);
+    setRestoreMsg(null);
+    try {
+      const ok = await restore();
+      setRestoreMsg(ok ? "Subscription restored!" : "No active subscription found.");
+    } catch {
+      setRestoreMsg("Restore failed. Try again.");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const tierLabel = TIER_LABEL[minTier] || "Pro";
   const features = TIER_FEATURES[minTier] || TIER_FEATURES.growth;
+  const tagline = featureName ? (FEATURE_TAGLINES[featureName] || `Upgrade to ${tierLabel} to unlock this and more.`) : `Upgrade to ${tierLabel} to unlock this feature and more.`;
 
   if (isLoading) {
     return (
@@ -115,11 +147,11 @@ export function ProGateOverlay({ featureName, minTier = "growth", isLoading = fa
         </View>
 
         <ThemedText type="h3" style={styles.title}>
-          {featureName ? featureName : `${tierLabel} Feature`}
+          {featureName ?? `${tierLabel} Feature`}
         </ThemedText>
 
         <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {`Upgrade to ${tierLabel} to unlock this feature and more.`}
+          {tagline}
         </ThemedText>
 
         <View style={styles.featureList}>
@@ -160,6 +192,27 @@ export function ProGateOverlay({ featureName, minTier = "growth", isLoading = fa
         <ThemedText type="caption" style={[styles.priceNote, { color: theme.textSecondary }]}>
           {minTier === "starter" ? "From $19/month" : minTier === "growth" ? "From $49/month" : "From $99/month"}
         </ThemedText>
+
+        {restoreMsg ? (
+          <ThemedText type="caption" style={[styles.restoreMsg, { color: restoreMsg.startsWith("Subscription restored") ? theme.success : theme.textSecondary }]}>
+            {restoreMsg}
+          </ThemedText>
+        ) : null}
+
+        <Pressable
+          onPress={handleRestore}
+          disabled={restoring}
+          style={styles.restoreBtn}
+          testID="button-progate-restore"
+        >
+          {restoring ? (
+            <ActivityIndicator size="small" color={theme.textSecondary} />
+          ) : (
+            <ThemedText type="caption" style={[styles.restoreText, { color: theme.textSecondary }]}>
+              Already subscribed? Restore purchases
+            </ThemedText>
+          )}
+        </Pressable>
       </View>
     </View>
   );
@@ -235,4 +288,7 @@ const styles = StyleSheet.create({
   },
   upgradeBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 17 },
   priceNote: { marginTop: Spacing.sm, textAlign: "center" },
+  restoreBtn: { marginTop: Spacing.md, paddingVertical: Spacing.xs },
+  restoreText: { textDecorationLine: "underline" },
+  restoreMsg: { marginTop: Spacing.sm, textAlign: "center" },
 });

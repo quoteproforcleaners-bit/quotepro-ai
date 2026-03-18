@@ -102,7 +102,7 @@ export default function DashboardScreen() {
   const { theme, isDark } = useTheme();
   const { businessProfile: profile } = useApp();
   const { hasAccess: isPro } = useProGate();
-  const { subscriptionStatus, trialDaysLeft } = useSubscription();
+  const { subscriptionStatus, trialDaysLeft, isInFreeTrial, freeTrialDaysLeft } = useSubscription();
 
   const [refreshing, setRefreshing] = useState(false);
   const [setupSkipped, setSetupSkipped] = useState(false);
@@ -306,6 +306,28 @@ export default function DashboardScreen() {
                 {subscriptionStatus === "trial" && trialDaysLeft != null
                   ? `${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} left in trial`
                   : "Finish setup to quote like a pro"}
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={16} color={theme.primary + "80"} />
+          </Pressable>
+        ) : null}
+
+        {/* ── Free Trial Banner ── */}
+        {isInFreeTrial ? (
+          <Pressable
+            onPress={() => navigation.navigate("Paywall", { trigger_source: "free_trial_banner" })}
+            style={[s.trialBanner, { backgroundColor: theme.primary + "12", borderColor: theme.primary + "30" }]}
+            testID="button-free-trial-banner"
+          >
+            <View style={[s.setupIconWrap, { backgroundColor: theme.primary + "18" }]}>
+              <Feather name="gift" size={16} color={theme.primary} />
+            </View>
+            <View style={s.setupTextWrap}>
+              <ThemedText style={[s.setupTitle, { color: theme.text }]}>
+                Free Trial — {freeTrialDaysLeft} day{freeTrialDaysLeft !== 1 ? "s" : ""} remaining
+              </ThemedText>
+              <ThemedText style={[s.setupSub, { color: theme.textSecondary }]}>
+                Tap to upgrade and keep your momentum going
               </ThemedText>
             </View>
             <Feather name="chevron-right" size={16} color={theme.primary + "80"} />
@@ -531,6 +553,16 @@ const s = StyleSheet.create({
 
   // Setup card
   setupCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+  },
+  trialBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,

@@ -76,6 +76,8 @@ interface SubscriptionContextType {
   subscriptionStatus: SubscriptionStatus;
   trialDaysLeft: number | null;
   trialInfo: TrialInfo;
+  isInFreeTrial: boolean;       // true if account < 14 days old and on free tier
+  freeTrialDaysLeft: number;    // days remaining in the product-level free trial
   purchase: (pkg?: PurchasesPackage) => Promise<boolean>;
   restore: () => Promise<boolean>;
   retryLoadOfferings: () => Promise<void>;
@@ -158,6 +160,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const isGrowth = tier === "growth" || tier === "pro";    // Same as isPro, explicit alias
   const isStarter = tier === "starter" || tier === "growth" || tier === "pro";
   const isProOnly = tier === "pro";                        // Strictly Pro-tier-only features
+
+  // Product-level free trial: 14 days from account creation, no payment required
+  const FREE_TRIAL_DAYS = 14;
+  const userAgeMs = user?.createdAt ? Date.now() - new Date(user.createdAt).getTime() : Infinity;
+  const isInFreeTrial = tier === "free" && userAgeMs < FREE_TRIAL_DAYS * 86_400_000;
+  const freeTrialDaysLeft = isInFreeTrial
+    ? Math.max(0, FREE_TRIAL_DAYS - Math.floor(userAgeMs / 86_400_000))
+    : 0;
 
   const deriveSubscriptionStatus = useCallback((customerInfo: CustomerInfo) => {
     const activeTier = getActiveTier(customerInfo);
@@ -427,6 +437,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         subscriptionStatus,
         trialDaysLeft,
         trialInfo,
+        isInFreeTrial,
+        freeTrialDaysLeft,
         purchase,
         restore,
         retryLoadOfferings: loadOfferings,
