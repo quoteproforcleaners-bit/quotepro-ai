@@ -60,7 +60,7 @@ export type RootStackParamList = {
   CustomerDetail: { customerId: string };
   JobDetail: { jobId: string };
   PricingSettings: undefined;
-  Paywall: { trigger_source?: string } | undefined;
+  Paywall: { trigger_source?: string; required_tier?: string } | undefined;
   AIAssistant: undefined;
   FollowUpQueue: undefined;
   WeeklyRecap: undefined;

@@ -101,7 +101,7 @@ export default function DashboardScreen() {
   const navigation = useNavigation<Nav>();
   const { theme, isDark } = useTheme();
   const { businessProfile: profile } = useApp();
-  const { isPro } = useProGate();
+  const { hasAccess: isPro } = useProGate();
   const { subscriptionStatus, trialDaysLeft } = useSubscription();
 
   const [refreshing, setRefreshing] = useState(false);

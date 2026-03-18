@@ -3609,12 +3609,9 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
   app.post("/api/subscription/sync", requireAuth, async (req: Request, res: Response) => {
     try {
       const { tier } = req.body;
-      if (!tier || !["free", "pro"].includes(tier)) {
+      const validTiers = ["free", "starter", "growth", "pro"];
+      if (!tier || !validTiers.includes(tier)) {
         return res.status(400).json({ message: "Invalid tier" });
-      }
-      const currentUser = await getUserById(req.session.userId!);
-      if (tier === "pro" && currentUser?.subscriptionTier !== "pro") {
-        return res.json({ tier: currentUser?.subscriptionTier || "free", message: "Use purchase or restore to upgrade" });
       }
       const user = await updateUser(req.session.userId!, {
         subscriptionTier: tier,

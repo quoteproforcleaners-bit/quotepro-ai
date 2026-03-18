@@ -1,35 +1,113 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable, ActivityIndicator, Platform, Modal, ScrollView, Linking, useWindowDimensions } from "react-native";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ActivityIndicator,
+  Platform,
+  Modal,
+  ScrollView,
+  Linking,
+  useWindowDimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { useSubscription } from "@/context/SubscriptionContext";
+import { useSubscription, type PlanTier } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
+import type { PurchasesPackage } from "react-native-purchases";
 
 type PaywallParams = {
-  Paywall: { trigger_source?: string } | undefined;
+  Paywall: { trigger_source?: string; required_tier?: PlanTier } | undefined;
 };
 
 const PRIVACY_POLICY_URL = "https://www.freeprivacypolicy.com/live/9ac71f0a-aa27-477d-98b2-5f8c103f766a";
 const TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 
-type ModalState = {
-  visible: boolean;
-  type: "success" | "error" | "info";
-  title: string;
-  message: string;
-};
+type ModalState = { visible: boolean; type: "success" | "error" | "info"; title: string; message: string };
+type BillingInterval = "monthly" | "annual";
+type SelectedPlan = "starter" | "growth" | "pro";
+
+interface PlanDefinition {
+  id: SelectedPlan;
+  label: string;
+  monthlyPrice: string;
+  annualPrice?: string;
+  annualPerMonth?: string;
+  savings?: string;
+  subtitle: string;
+  features: { icon: string; label: string }[];
+  highlight?: boolean;
+  supportsAnnual: boolean;
+}
+
+const PLAN_FEATURES: PlanDefinition[] = [
+  {
+    id: "starter",
+    label: "Starter",
+    monthlyPrice: "$19",
+    subtitle: "20 quotes / month",
+    supportsAnnual: false,
+    features: [
+      { icon: "home", label: "Good / Better / Best quoting" },
+      { icon: "edit-3", label: "Up to 20 quotes per month" },
+      { icon: "link", label: "Branded client intake form" },
+      { icon: "users", label: "Basic CRM & lead capture" },
+      { icon: "file-text", label: "Quote PDF export" },
+    ],
+  },
+  {
+    id: "growth",
+    label: "Growth",
+    monthlyPrice: "$49",
+    annualPrice: "$470",
+    annualPerMonth: "$39",
+    savings: "Save $118/yr",
+    subtitle: "Unlimited quotes",
+    supportsAnnual: true,
+    highlight: true,
+    features: [
+      { icon: "zap", label: "Everything in Starter" },
+      { icon: "cpu", label: "AI quote builder" },
+      { icon: "trending-up", label: "Smart upsell recommendations" },
+      { icon: "send", label: "Automated follow-up sequences" },
+      { icon: "users", label: "Full CRM & customer management" },
+      { icon: "bar-chart-2", label: "Revenue & close-rate dashboard" },
+      { icon: "star", label: "Review request automation" },
+    ],
+  },
+  {
+    id: "pro",
+    label: "Pro",
+    monthlyPrice: "$99",
+    annualPrice: "$950",
+    annualPerMonth: "$79",
+    savings: "Save $238/yr",
+    subtitle: "Everything in Growth",
+    supportsAnnual: true,
+    features: [
+      { icon: "zap", label: "Everything in Growth" },
+      { icon: "link", label: "Jobber & QuickBooks integrations" },
+      { icon: "briefcase", label: "Commercial quote builder" },
+      { icon: "search", label: "Lead finder & outreach tools" },
+      { icon: "activity", label: "Revenue intelligence analytics" },
+      { icon: "settings", label: "Advanced automation rules" },
+      { icon: "phone", label: "Priority support" },
+    ],
+  },
+];
 
 export default function PaywallScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute<RouteProp<PaywallParams, "Paywall">>();
   const triggerSource = route.params?.trigger_source || "settings";
+  const requiredTier = route.params?.required_tier;
   const { theme } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const {
@@ -42,52 +120,76 @@ export default function PaywallScreen() {
     isConfigured,
     retryLoadOfferings,
     trialInfo,
+    tier: currentTier,
   } = useSubscription();
   const { t } = useLanguage();
 
-  useEffect(() => {
-    trackEvent("paywall_viewed", { trigger_source: triggerSource });
-  }, [triggerSource]);
-
-  const BENEFITS = [
-    { icon: "clock" as const, label: "Quote in 10 seconds" },
-    { icon: "shield" as const, label: "Protect your margin on every job" },
-    { icon: "repeat" as const, label: "Auto-generate follow-ups that close" },
-  ];
-
-  const contextualHeader = triggerSource === "quote_limit"
-    ? "You've hit your free limit"
-    : triggerSource === "after_demo"
-    ? "Unlock unlimited quotes + AI follow-ups"
-    : triggerSource === "feature_gate"
-    ? "This feature requires Pro"
-    : "Upgrade to QuotePro Pro";
+  const defaultPlan: SelectedPlan = requiredTier === "starter" ? "starter" : requiredTier === "pro" ? "pro" : "growth";
+  const [selectedPlan, setSelectedPlan] = useState<SelectedPlan>(defaultPlan);
+  const [billing, setBilling] = useState<BillingInterval>("monthly");
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [modal, setModal] = useState<ModalState>({ visible: false, type: "info", title: "", message: "" });
 
-  const monthlyPrice = currentOffering?.monthly?.product?.priceString || "$19.99";
   const useMaxWidth = screenWidth > 600;
   const canPurchase = offeringsStatus === "ready" || Platform.OS === "web";
+  const planDef = PLAN_FEATURES.find(p => p.id === selectedPlan) || PLAN_FEATURES[1];
 
-  const ctaText = (() => {
-    if (offeringsStatus === "loading" && Platform.OS !== "web") return "Loading...";
-    if (trialInfo.hasFreeTrial && trialInfo.trialDurationText) {
-      return `Try free for ${trialInfo.trialDurationText}`;
+  useEffect(() => {
+    trackEvent("paywall_viewed", { trigger_source: triggerSource, selected_plan: selectedPlan });
+  }, [triggerSource]);
+
+  const selectedPackage: PurchasesPackage | null = useMemo(() => {
+    if (!currentOffering) return null;
+    const pkgs = currentOffering.availablePackages;
+
+    const findPkg = (identifier: string) => pkgs.find(p => p.identifier === identifier) ?? null;
+
+    if (selectedPlan === "starter") {
+      return findPkg("starter_monthly") || findPkg("STARTER_MONTHLY") || null;
     }
-    return `Subscribe for ${monthlyPrice}/mo`;
-  })();
-
-  const subtitleText = (() => {
-    if (triggerSource === "quote_limit") {
-      if (trialInfo.hasFreeTrial && trialInfo.trialDurationText) {
-        return `You've used 3 of 3 free quotes. Try Pro free for ${trialInfo.trialDurationText} to keep quoting.`;
+    if (selectedPlan === "growth") {
+      if (billing === "annual") {
+        return findPkg("$rc_annual") || findPkg("growth_annual") || findPkg("GROWTH_ANNUAL") || null;
       }
-      return "You've used 3 of 3 free quotes. Upgrade to Pro for unlimited quotes.";
+      return findPkg("$rc_monthly") || findPkg("growth_monthly") || findPkg("GROWTH_MONTHLY") || null;
     }
-    return "Everything you need to quote faster, earn more, and close jobs.";
-  })();
+    if (selectedPlan === "pro") {
+      if (billing === "annual") {
+        return findPkg("pro_annual") || findPkg("PRO_ANNUAL") || null;
+      }
+      return findPkg("pro_monthly") || findPkg("PRO_MONTHLY") || null;
+    }
+    return null;
+  }, [currentOffering, selectedPlan, billing]);
+
+  const displayPrice = useMemo(() => {
+    if (selectedPackage?.product?.priceString) return selectedPackage.product.priceString;
+    if (billing === "annual" && planDef.supportsAnnual) {
+      return planDef.annualPerMonth ? `${planDef.annualPerMonth}/mo` : `${planDef.monthlyPrice}/mo`;
+    }
+    return `${planDef.monthlyPrice}/mo`;
+  }, [selectedPackage, billing, planDef]);
+
+  const displayBilledNote = useMemo(() => {
+    if (billing === "annual" && planDef.supportsAnnual && planDef.savings) {
+      const annualTotal = selectedPackage?.product?.priceString
+        ? `billed ${selectedPackage.product.priceString}/year`
+        : `billed ${planDef.annualPrice}/year`;
+      return `${annualTotal} · ${planDef.savings}`;
+    }
+    if (trialInfo.hasFreeTrial && trialInfo.trialDurationText && selectedPlan !== "starter") {
+      return `per month after ${trialInfo.trialDurationText} free trial`;
+    }
+    return "per month";
+  }, [billing, planDef, trialInfo, selectedPackage, selectedPlan]);
+
+  const contextualHeader = triggerSource === "quote_limit"
+    ? "You've hit your quote limit"
+    : triggerSource === "feature_gate"
+    ? "Unlock this feature"
+    : "Choose your plan";
 
   const showModal = (type: ModalState["type"], title: string, message: string) => {
     setModal({ visible: true, type, title, message });
@@ -95,59 +197,43 @@ export default function PaywallScreen() {
 
   const dismissModal = () => {
     const wasSuccess = modal.type === "success";
-    setModal((m) => ({ ...m, visible: false }));
+    setModal(m => ({ ...m, visible: false }));
     if (wasSuccess) {
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      }
-      setTimeout(() => {
-        navigation.navigate("ProSetupChecklist" as any);
-      }, 400);
+      if (navigation.canGoBack()) navigation.goBack();
+      setTimeout(() => { navigation.navigate("ProSetupChecklist" as any); }, 400);
     }
   };
 
   const handleRetryOfferings = async () => {
     setRetrying(true);
-    try {
-      await retryLoadOfferings();
-    } finally {
-      setRetrying(false);
-    }
+    try { await retryLoadOfferings(); } finally { setRetrying(false); }
   };
 
   const handlePurchase = async () => {
     if (subscriptionLoading || purchasing) return;
-
     setPurchasing(true);
-    trackEvent("subscription_purchase_attempted", { trigger_source: triggerSource });
+    trackEvent("subscription_purchase_attempted", { trigger_source: triggerSource, plan: selectedPlan, billing });
+
     try {
-      if (Platform.OS !== "web") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       if (!canPurchase) {
         await retryLoadOfferings();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(r => setTimeout(r, 500));
       }
 
-      const success = await purchase();
+      const success = await purchase(selectedPackage ?? undefined);
       if (success) {
-        trackEvent("subscription_purchase_success", { trigger_source: triggerSource });
-        if (trialInfo.hasFreeTrial) {
-          trackEvent("trial_started", { trigger_source: triggerSource, trial_duration: trialInfo.trialDurationText });
-        }
-        if (Platform.OS !== "web") {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
+        trackEvent("subscription_purchase_success", { plan: selectedPlan, billing });
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         showModal("success", t.paywall.welcomeTitle, t.paywall.welcomeMessage);
       }
     } catch (error: any) {
       if (!error?.userCancelled && !error?.message?.includes("userCancelled")) {
-        trackEvent("subscription_purchase_failed", { trigger_source: triggerSource, error: error?.message });
-        const message = error?.message || t.paywall.purchaseFailedMessage;
-        showModal("error", t.paywall.purchaseFailed, message);
+        trackEvent("subscription_purchase_failed", { plan: selectedPlan, error: error?.message });
+        showModal("error", t.paywall.purchaseFailed, error?.message || t.paywall.purchaseFailedMessage);
       } else {
-        trackEvent("cancel_paywall", { trigger_source: triggerSource });
+        trackEvent("cancel_paywall", { plan: selectedPlan });
       }
     } finally {
       setPurchasing(false);
@@ -156,20 +242,17 @@ export default function PaywallScreen() {
 
   const handleRestore = async () => {
     setRestoring(true);
-    trackEvent("restore_purchases_tapped", { trigger_source: triggerSource });
+    trackEvent("restore_purchases_tapped");
     try {
       const success = await restore();
       if (success) {
         trackEvent("restore_purchases_success");
-        if (Platform.OS !== "web") {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         showModal("success", t.paywall.restoreSuccess, t.paywall.restoreSuccessMessage);
       } else {
         showModal("info", t.paywall.noSubscription, t.paywall.noSubscriptionMessage);
       }
     } catch {
-      trackEvent("restore_purchases_failed");
       showModal("error", t.paywall.restoreFailed, t.paywall.restoreFailedMessage);
     } finally {
       setRestoring(false);
@@ -177,24 +260,28 @@ export default function PaywallScreen() {
   };
 
   const handleDismiss = () => {
-    trackEvent("cancel_paywall", { trigger_source: triggerSource });
+    trackEvent("cancel_paywall", { plan: selectedPlan });
     navigation.goBack();
   };
 
+  const ctaText = (() => {
+    if (offeringsStatus === "loading" && Platform.OS !== "web") return "Loading...";
+    if (trialInfo.hasFreeTrial && trialInfo.trialDurationText && selectedPlan !== "starter") {
+      return `Try ${planDef.label} free for ${trialInfo.trialDurationText}`;
+    }
+    return `Subscribe to ${planDef.label}`;
+  })();
+
   const modalIcon = modal.type === "success" ? "check-circle" : modal.type === "error" ? "alert-circle" : "info";
   const modalColor = modal.type === "success" ? theme.success : modal.type === "error" ? theme.error : theme.primary;
-
-  const pricingSubtext = trialInfo.hasFreeTrial && trialInfo.trialDurationText
-    ? `per month after ${trialInfo.trialDurationText} free trial`
-    : "per month";
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl + 40 },
-          useMaxWidth ? { maxWidth: 560, alignSelf: "center", width: "100%" } : undefined,
+          { paddingTop: insets.top + Spacing.lg, paddingBottom: insets.bottom + Spacing.xl + 40 },
+          useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" as const } : undefined,
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -206,48 +293,111 @@ export default function PaywallScreen() {
           <Feather name="x" size={22} color={theme.text} />
         </Pressable>
 
-        <View style={[styles.iconContainer, { backgroundColor: `${theme.accent}15` }]}>
-          <Feather name="zap" size={36} color={theme.accent} />
-        </View>
-
         <ThemedText type="h2" style={styles.title}>
           {contextualHeader}
         </ThemedText>
 
-        <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {subtitleText}
-        </ThemedText>
+        {triggerSource === "quote_limit" ? (
+          <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Upgrade to keep creating quotes and grow your cleaning business.
+          </ThemedText>
+        ) : (
+          <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Built by a cleaning franchise owner for residential cleaning companies.
+          </ThemedText>
+        )}
 
-        <View style={styles.benefitsList}>
-          {BENEFITS.map((benefit, i) => (
-            <View key={i} style={styles.benefitRow} testID={`benefit-row-${i}`}>
-              <View style={[styles.benefitCheck, { backgroundColor: `${theme.success}15` }]}>
-                <Feather name="check" size={16} color={theme.success} />
+        <View style={[styles.planTabs, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+          {PLAN_FEATURES.map(plan => (
+            <Pressable
+              key={plan.id}
+              onPress={() => {
+                setSelectedPlan(plan.id);
+                if (!plan.supportsAnnual) setBilling("monthly");
+                if (Platform.OS !== "web") Haptics.selectionAsync();
+              }}
+              style={[
+                styles.planTab,
+                selectedPlan === plan.id && { backgroundColor: theme.primary },
+              ]}
+              testID={`tab-plan-${plan.id}`}
+            >
+              <ThemedText
+                type="small"
+                style={[
+                  styles.planTabText,
+                  { color: selectedPlan === plan.id ? "#FFFFFF" : theme.textSecondary },
+                ]}
+              >
+                {plan.label}
+              </ThemedText>
+              {plan.highlight && selectedPlan !== plan.id ? (
+                <View style={[styles.popularBadge, { backgroundColor: `${theme.accent}20` }]}>
+                  <ThemedText style={{ fontSize: 9, color: theme.accent, fontWeight: "700" }}>
+                    POPULAR
+                  </ThemedText>
+                </View>
+              ) : null}
+            </Pressable>
+          ))}
+        </View>
+
+        {planDef.supportsAnnual ? (
+          <View style={[styles.billingToggle, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+            <Pressable
+              onPress={() => setBilling("monthly")}
+              style={[styles.billingBtn, billing === "monthly" && { backgroundColor: theme.background }]}
+              testID="toggle-billing-monthly"
+            >
+              <ThemedText type="small" style={{ color: billing === "monthly" ? theme.text : theme.textSecondary, fontWeight: billing === "monthly" ? "600" : "400" }}>
+                Monthly
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setBilling("annual")}
+              style={[styles.billingBtn, billing === "annual" && { backgroundColor: theme.background }]}
+              testID="toggle-billing-annual"
+            >
+              <ThemedText type="small" style={{ color: billing === "annual" ? theme.text : theme.textSecondary, fontWeight: billing === "annual" ? "600" : "400" }}>
+                Annual
+              </ThemedText>
+              {planDef.savings ? (
+                <View style={[styles.savingsBadge, { backgroundColor: `${theme.success}20` }]}>
+                  <ThemedText style={{ fontSize: 9, color: theme.success, fontWeight: "700" }}>
+                    SAVE
+                  </ThemedText>
+                </View>
+              ) : null}
+            </Pressable>
+          </View>
+        ) : null}
+
+        <View style={styles.pricingRow}>
+          <ThemedText type="h2" style={styles.priceAmount}>
+            {displayPrice}
+          </ThemedText>
+          <ThemedText type="small" style={[styles.billedNote, { color: theme.textSecondary }]}>
+            {displayBilledNote}
+          </ThemedText>
+        </View>
+
+        <View style={[styles.featureCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+          <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm, fontWeight: "600" }}>
+            {planDef.label} includes:
+          </ThemedText>
+          {planDef.features.map((f, i) => (
+            <View key={i} style={styles.featureRow}>
+              <View style={[styles.featureCheck, { backgroundColor: `${theme.success}15` }]}>
+                <Feather name="check" size={14} color={theme.success} />
               </View>
-              <ThemedText type="body" style={{ flex: 1, fontWeight: "500" }}>
-                {benefit.label}
+              <ThemedText type="body" style={{ flex: 1, fontSize: 14 }}>
+                {f.label}
               </ThemedText>
             </View>
           ))}
         </View>
 
-        <View style={[styles.socialProofCard, { backgroundColor: theme.backgroundSecondary }]}>
-          <Feather name="star" size={14} color={theme.accent} />
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 6, fontStyle: "italic" }}>
-            Built by a cleaning franchise owner
-          </ThemedText>
-        </View>
-
-        <View style={styles.pricingContainer}>
-          <ThemedText type="h3" style={styles.price}>
-            {monthlyPrice}
-          </ThemedText>
-          <ThemedText type="small" style={{ color: theme.textSecondary }}>
-            {pricingSubtext}
-          </ThemedText>
-        </View>
-
-        {offeringsStatus === "loading" ? (
+        {offeringsStatus === "loading" && Platform.OS !== "web" ? (
           <View style={[styles.statusCard, { backgroundColor: theme.backgroundSecondary }]}>
             <ActivityIndicator size="small" color={theme.primary} />
             <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm }}>
@@ -290,7 +440,7 @@ export default function PaywallScreen() {
         ) : null}
 
         <ThemedText type="caption" style={[styles.disclosureText, { color: theme.textSecondary }]}>
-          Payment will be charged to your Apple ID at confirmation of purchase. Subscription automatically renews unless canceled at least 24 hours before the end of the billing period. You can manage or cancel your subscription in your Apple Account Settings.
+          Payment charged to your Apple ID at purchase confirmation. Subscription auto-renews unless canceled at least 24 hours before the billing period ends. Manage in Apple Account Settings.
         </ThemedText>
 
         <Pressable
@@ -335,11 +485,7 @@ export default function PaywallScreen() {
 
           <ThemedText type="small" style={{ color: theme.textSecondary }}> | </ThemedText>
 
-          <Pressable
-            onPress={handleDismiss}
-            style={styles.restoreBtn}
-            testID="button-not-now"
-          >
+          <Pressable onPress={handleDismiss} style={styles.restoreBtn} testID="button-not-now">
             <ThemedText type="small" style={{ color: theme.textSecondary, fontWeight: "600" }}>
               Not now
             </ThemedText>
@@ -355,7 +501,7 @@ export default function PaywallScreen() {
           <ThemedText type="caption" style={{ color: theme.textSecondary }}>  |  </ThemedText>
           <Pressable onPress={() => Linking.openURL(TERMS_URL)} testID="link-terms">
             <ThemedText type="caption" style={[styles.legalLink, { color: theme.primary }]}>
-              Terms of Use (EULA)
+              Terms of Use
             </ThemedText>
           </Pressable>
         </View>
@@ -363,38 +509,26 @@ export default function PaywallScreen() {
         {__DEV__ ? (
           <View style={[styles.debugCard, { backgroundColor: theme.backgroundSecondary }]}>
             <ThemedText type="caption" style={{ color: theme.textSecondary, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}>
-              {`RC: ${isConfigured ? "configured" : "not configured"}\nOfferings: ${offeringsStatus}\nPackages: ${currentOffering?.availablePackages?.length || 0}\nTrial: ${trialInfo.hasFreeTrial ? trialInfo.trialDurationText : "none"}`}
+              {`RC: ${isConfigured ? "configured" : "not configured"}\nOfferings: ${offeringsStatus}\nPackages: ${currentOffering?.availablePackages?.length || 0}\nSelected pkg: ${selectedPackage?.identifier || "none"}\nTier: ${currentTier}`}
             </ThemedText>
           </View>
         ) : null}
       </ScrollView>
 
-      <Modal
-        visible={modal.visible}
-        transparent
-        animationType="fade"
-        onRequestClose={dismissModal}
-      >
+      <Modal visible={modal.visible} transparent animationType="fade" onRequestClose={dismissModal}>
         <Pressable style={styles.modalOverlay} onPress={dismissModal}>
           <View style={[styles.modalContent, { backgroundColor: theme.backgroundRoot }]}>
             <View style={[styles.modalIconContainer, { backgroundColor: `${modalColor}15` }]}>
               <Feather name={modalIcon} size={28} color={modalColor} />
             </View>
-            <ThemedText type="h3" style={styles.modalTitle}>
-              {modal.title}
-            </ThemedText>
-            <ThemedText type="body" style={[styles.modalMessage, { color: theme.textSecondary }]}>
-              {modal.message}
-            </ThemedText>
+            <ThemedText type="h3" style={styles.modalTitle}>{modal.title}</ThemedText>
+            <ThemedText type="body" style={[styles.modalMessage, { color: theme.textSecondary }]}>{modal.message}</ThemedText>
             <Pressable
               onPress={dismissModal}
               style={[styles.modalDismissBtn, { backgroundColor: modal.type === "success" ? theme.accent : theme.backgroundSecondary }]}
               testID="button-dismiss-modal"
             >
-              <ThemedText
-                type="body"
-                style={{ fontWeight: "600", color: modal.type === "success" ? "#FFFFFF" : theme.text }}
-              >
+              <ThemedText type="body" style={{ fontWeight: "600", color: modal.type === "success" ? "#FFFFFF" : theme.text }}>
                 {modal.type === "success" ? t.paywall.letsGo : t.common.ok}
               </ThemedText>
             </Pressable>
@@ -406,9 +540,7 @@ export default function PaywallScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   scrollContent: {
     paddingHorizontal: Spacing.xl,
     alignItems: "center",
@@ -420,62 +552,82 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: Spacing.lg,
-  },
-  iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: Spacing.sm,
-  },
-  title: {
-    textAlign: "center",
-    marginBottom: 2,
-  },
-  subtitle: {
-    textAlign: "center",
     marginBottom: Spacing.md,
   },
-  benefitsList: {
+  title: { textAlign: "center", marginBottom: Spacing.xs },
+  subtitle: { textAlign: "center", marginBottom: Spacing.lg, paddingHorizontal: Spacing.md },
+  planTabs: {
+    flexDirection: "row",
     width: "100%",
-    marginBottom: Spacing.lg,
-    gap: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    padding: 4,
+    marginBottom: Spacing.md,
+    gap: 4,
   },
-  benefitRow: {
+  planTab: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    flexDirection: "row",
+    gap: 4,
+  },
+  planTabText: { fontWeight: "600", fontSize: 13 },
+  popularBadge: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  billingToggle: {
+    flexDirection: "row",
+    width: "100%",
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: Spacing.md,
+    gap: 3,
+  },
+  billingBtn: {
+    flex: 1,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: BorderRadius.xs - 2,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: Spacing.xs,
+  },
+  savingsBadge: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  pricingRow: { alignItems: "center", marginBottom: Spacing.md },
+  priceAmount: { fontSize: 36, fontWeight: "800", lineHeight: 44 },
+  billedNote: { textAlign: "center", marginTop: 2 },
+  featureCard: {
+    width: "100%",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  featureRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
+    paddingVertical: 3,
   },
-  benefitCheck: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  featureCheck: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
-  },
-  socialProofCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.xs,
-    marginBottom: Spacing.lg,
-  },
-  secondaryActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: Spacing.md,
-  },
-  pricingContainer: {
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  price: {
-    fontSize: 28,
-    fontWeight: "800",
+    flexShrink: 0,
   },
   statusCard: {
     flexDirection: "row",
@@ -499,10 +651,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.xs,
   },
-  errorActions: {
-    flexDirection: "row",
-    gap: Spacing.sm,
-  },
+  errorActions: { flexDirection: "row", gap: Spacing.sm },
   retryBtn: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
@@ -516,6 +665,12 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs,
     borderWidth: 1,
   },
+  disclosureText: {
+    textAlign: "center",
+    marginBottom: Spacing.md,
+    lineHeight: 16,
+    paddingHorizontal: Spacing.sm,
+  },
   purchaseBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -525,25 +680,14 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.sm,
     gap: Spacing.sm,
   },
-  purchaseBtnText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 17,
-  },
-  freeNote: {
-    textAlign: "center",
+  purchaseBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 17 },
+  secondaryActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: Spacing.md,
   },
-  restoreBtn: {
-    marginTop: Spacing.md,
-    paddingVertical: Spacing.sm,
-  },
-  disclosureText: {
-    textAlign: "center",
-    marginBottom: Spacing.lg,
-    lineHeight: 16,
-    paddingHorizontal: Spacing.sm,
-  },
+  restoreBtn: { paddingVertical: Spacing.sm },
   legalFooter: {
     flexDirection: "row",
     alignItems: "center",
@@ -551,10 +695,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xl,
     paddingTop: Spacing.md,
   },
-  legalLink: {
-    fontWeight: "500",
-    textDecorationLine: "underline",
-  },
+  legalLink: { fontWeight: "500", textDecorationLine: "underline" },
   debugCard: {
     width: "100%",
     padding: Spacing.sm,
@@ -584,15 +725,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: Spacing.md,
   },
-  modalTitle: {
-    textAlign: "center",
-    marginBottom: Spacing.sm,
-  },
-  modalMessage: {
-    textAlign: "center",
-    marginBottom: Spacing.xl,
-    lineHeight: 20,
-  },
+  modalTitle: { textAlign: "center", marginBottom: Spacing.sm },
+  modalMessage: { textAlign: "center", marginBottom: Spacing.xl, lineHeight: 20 },
   modalDismissBtn: {
     width: "100%",
     alignItems: "center",

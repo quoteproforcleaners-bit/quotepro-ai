@@ -1,6 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { Platform } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+
+function rcLogIn(userId: string) {
+  if (Platform.OS === "web") return;
+  try {
+    const RC = require("react-native-purchases").default;
+    RC.logIn(String(userId)).catch(() => {});
+  } catch {}
+}
+
+function rcLogOut() {
+  if (Platform.OS === "web") return;
+  try {
+    const RC = require("react-native-purchases").default;
+    RC.logOut().catch(() => {});
+  } catch {}
+}
 
 interface AuthUser {
   id: string;
@@ -66,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
     setNeedsOnboarding(data.needsOnboarding);
     setIsGuest(false);
+    if (data.user?.id) rcLogIn(data.user.id);
   };
 
   const register = async (email: string, password: string, name?: string) => {
@@ -74,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
     setNeedsOnboarding(data.needsOnboarding);
     setIsGuest(false);
+    if (data.user?.id) rcLogIn(data.user.id);
   };
 
   const loginWithApple = async (data: {
@@ -87,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(result.user);
     setNeedsOnboarding(result.needsOnboarding);
     setIsGuest(false);
+    if (result.user?.id) rcLogIn(result.user.id);
   };
 
   const loginWithGoogle = async (idToken: string) => {
@@ -95,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(result.user);
     setNeedsOnboarding(result.needsOnboarding);
     setIsGuest(false);
+    if (result.user?.id) rcLogIn(result.user.id);
   };
 
   const setAuthData = (authUser: AuthUser, onboarding: boolean) => {
@@ -121,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch {}
+    rcLogOut();
     queryClient.clear();
     setUser(null);
     setNeedsOnboarding(false);

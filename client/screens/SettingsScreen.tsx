@@ -44,7 +44,9 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
-  const { isPro, subscriptionStatus, trialDaysLeft, restore } = useSubscription();
+  const { isPro, subscriptionStatus, trialDaysLeft, restore, tier } = useSubscription();
+  const TIER_DISPLAY: Record<string, string> = { starter: "Starter", growth: "Growth", pro: "Pro" };
+  const tierDisplayName = TIER_DISPLAY[tier] || "Pro";
   const [restoring, setRestoring] = useState(false);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
@@ -337,7 +339,7 @@ export default function SettingsScreen() {
             </ThemedText>
           </View>
           <ThemedText type="body" style={{ fontWeight: "600", marginTop: Spacing.sm }}>
-            QuotePro AI
+            QuotePro {tierDisplayName}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4 }}>
             {t.settings.aiActiveDesc}
@@ -362,7 +364,7 @@ export default function SettingsScreen() {
             </ThemedText>
           </View>
           <ThemedText type="body" style={{ fontWeight: "600", marginTop: Spacing.sm }}>
-            QuotePro AI Trial
+            QuotePro {tierDisplayName} Trial
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 4 }}>
             {t.settings.aiActiveDesc}
