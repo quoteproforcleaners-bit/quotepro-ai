@@ -5,13 +5,15 @@
   "build": {
     "production": {
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "asset-manager-1-mquealy01.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "asset-manager-1-mquealy01.replit.app",
+        "EXPO_PUBLIC_REVENUECAT_API_KEY": "appl_knabujvvumnLXQVLBCGIcyDScWl"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "asset-manager-1-mquealy01.replit.app"
+        "EXPO_PUBLIC_DOMAIN": "asset-manager-1-mquealy01.replit.app",
+        "EXPO_PUBLIC_REVENUECAT_API_KEY": "appl_knabujvvumnLXQVLBCGIcyDScWl"
       }
     }
   },
