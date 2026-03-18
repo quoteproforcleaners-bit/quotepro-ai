@@ -1,0 +1,389 @@
+This is a HIGH-PRIORITY product, architecture, and UX overhaul for the QuotePro Lead Finder.
+
+Right now the feature is not good enough and feels broken/useless.
+
+Problems observed:
+- even when a large city is selected, no leads appear
+- adding tags/keywords/subreddits feels buggy and unreliable
+- selected tags disappear instead of clearly populating the tracked inputs
+- the current architecture depends too much on the user configuring the perfect setup before seeing any value
+- if the user sees no data, the feature feels dead and worthless
+
+This feature must be redesigned so the user sees useful lead opportunities quickly and can then filter/refine from there.
+
+Do NOT treat this as a small bug fix.
+This needs:
+1. root-cause debugging
+2. better lead ingestion architecture
+3. much better settings UX
+4. a fallback strategy so users still see useful data
+5. a more premium, trustworthy workflow
+
+Do not break subscriptions, CRM, navigation, or other growth features.
+Before coding, first inspect the current implementation and identify:
+- where the Lead Finder screen/component lives
+- where the settings screen/component lives
+- what backend/job/cron/API powers lead scanning
+- whether it only searches Reddit or multiple sources
+- how city / ZIP / radius / keyword / subreddit filters are actually used
+- why no results appear even with large-city settings
+- why tags disappear on add
+- whether the settings UI is writing to state incorrectly
+- whether saved settings are not being persisted or not being read by the scan job
+- whether scan results are being filtered too aggressively
+- whether location matching is too strict
+- whether the current architecture requires over-configuration before showing any value
+Then implement carefully.
+
+==================================================
+CORE PRODUCT DIRECTION
+==================================================
+
+The Lead Finder should help cleaning business owners discover people already asking for cleaning help online.
+
+But the current product is backwards:
+it makes the user configure everything first, and then often shows nothing.
+
+We need to redesign it around this principle:
+
+SHOW VALUE FIRST.
+FILTER SECOND.
+
+New direction:
+- the app should be able to fetch a broad stream of relevant cleaning-related lead opportunities
+- then let the user filter by location / intent / keyword / source / status
+- users should not have to guess the exact magic combination of settings to get any results
+
+If the user sees no data, the feature fails.
+
+==================================================
+PRIMARY GOALS
+==================================================
+
+1. Fix why no leads are appearing
+2. Fix the broken settings/tag behavior
+3. Redesign ingestion so there is always a broader pool of leads available
+4. Make filtering/refinement easier and more intuitive
+5. Make the feature feel actually useful and premium
+
+==================================================
+PART 1 — ROOT-CAUSE DEBUGGING
+==================================================
+
+Audit why the feature returns no results.
+
+Possible causes to inspect:
+- scan job not running
+- source API failing
+- Reddit fetch failing
+- settings not persisted
+- location filter too strict
+- city parsing too strict
+- keyword matching too strict
+- subreddit filter too strict
+- only scanning a tiny set of posts
+- scan results discarded if not perfectly matched
+- UI not reading results correctly
+- results stored but not rendered
+- new/saved/contacted tabs filtering everything out
+- stale cache / no refresh
+- lead normalization bug
+- status defaults excluding all items
+
+Determine exactly why large-city scans still return nothing.
+
+Do not just add fake placeholder data.
+Fix the real data pipeline.
+
+==================================================
+PART 2 — FIX SETTINGS UX BUGS
+==================================================
+
+The settings experience is currently buggy and confusing.
+
+Observed issue:
+- when user selects/adds a tag, it disappears and does not clearly populate the keywords or subreddit fields
+
+Fix all tag / chip / add interactions so they are reliable.
+
+Requirements:
+- adding a target city should visibly create a persistent chip
+- adding a ZIP should visibly create a persistent chip
+- adding a keyword should visibly create a persistent chip
+- adding a subreddit should visibly create a persistent chip
+- no disappearing items
+- user can remove chips cleanly
+- settings save correctly
+- settings reload correctly on refresh/reopen
+- what is being tracked is always obvious
+
+Do not let there be ambiguity about what is saved.
+
+==================================================
+PART 3 — RE-ARCHITECT THE DATA FLOW
+==================================================
+
+This is the key product change.
+
+Current model seems to be:
+- user configures narrow settings first
+- scan tries to find exact matches
+- returns nothing
+
+We need a better model:
+
+NEW RECOMMENDED ARCHITECTURE:
+1. Ingest a broader set of cleaning-related leads/opportunities first
+2. Normalize them into a common lead format
+3. Then apply user-facing filters on top
+
+Examples of broad sources:
+- Reddit posts/comments related to house cleaning, move-out cleaning, deep cleaning, maid service, recurring cleaning, cleaning recommendations, etc.
+- optionally local community-style requests or public posts if those sources already exist in the architecture
+
+The important part:
+The user should be able to see a broad stream of relevant potential leads even before filters are perfect.
+
+Then let them filter:
+- by city
+- by state
+- by ZIP proximity
+- by keyword
+- by source
+- by intent level
+- by status (new, saved, contacted)
+
+==================================================
+PART 4 — DEFAULT TO BROADER CLEANING-INTENT FEED
+==================================================
+
+Add a broad default feed for “people looking for cleaning help.”
+
+Examples of tracked intent:
+- house cleaner
+- cleaning service
+- maid service
+- deep clean
+- move out clean
+- recurring cleaning
+- biweekly cleaning
+- apartment cleaning
+- home cleaning recommendation
+- cleaner needed
+- cleaning quote
+- move-in clean
+- office cleaning
+- Airbnb turnover cleaning
+
+The point is:
+the feature should show relevant opportunities by default, not depend entirely on user custom keyword setup.
+
+User settings should refine and personalize the results, not determine whether the feature works at all.
+
+==================================================
+PART 5 — LOCATION FILTERING SHOULD BE SMARTER
+==================================================
+
+Current city/ZIP filtering is likely too brittle.
+
+Make location filtering more forgiving and more useful.
+
+Examples:
+- if a lead mentions “Brooklyn” and user set “New York,” it should still be relevant
+- if a lead has nearby ZIP or nearby city, it should still show
+- if no exact location match, still surface relevant general cleaning-intent leads with a weaker match label
+
+Implement location relevance tiers if useful:
+- strong local match
+- nearby match
+- general cleaning lead
+
+Do not hide everything just because it is not a perfect text match.
+
+Recommended:
+- broader feed first
+- then location relevance scoring
+- then user filters
+
+==================================================
+PART 6 — IMPROVE THE LEAD LIST EXPERIENCE
+==================================================
+
+The “No leads yet” empty state is too fragile.
+
+The lead list should feel useful even when exact local matches are sparse.
+
+Suggested lead list structure:
+- lead title / short summary
+- source
+- detected location
+- intent type
+- match score or local relevance
+- keyword tags
+- timestamp
+- status (new, saved, contacted)
+
+User actions:
+- Save
+- Mark Contacted
+- Dismiss / Hide
+- maybe Copy lead text / Open source if supported
+
+Tabs:
+- New
+- Saved
+- Contacted
+- All
+
+These should work reliably and not accidentally hide everything.
+
+==================================================
+PART 7 — FILTERS SHOULD LIVE ON TOP OF DATA, NOT BLOCK DATA
+==================================================
+
+Instead of using settings as hard requirements before results appear, use them as ranking/filtering signals.
+
+Suggested filtering/sorting options:
+- Location relevance
+- Newest
+- Highest intent
+- Residential vs commercial
+- Deep clean / move-out / recurring / standard
+- Source
+- Keyword match
+
+This way, even if there are no perfect local matches, the user still sees something useful.
+
+==================================================
+PART 8 — IMPROVE SETTINGS ARCHITECTURE
+==================================================
+
+Current settings should probably be split into:
+
+1. Service Area Preferences
+- cities
+- ZIPs
+- radius
+
+2. Search Preferences
+- tracked keywords
+- tracked subreddits
+- lead types
+
+3. Feed Behavior
+- broad feed on/off
+- strict local filter on/off
+- notification preferences
+- source preferences
+
+Recommended change:
+Add a setting like:
+- “Show broader cleaning leads if exact local matches are limited”
+
+Better yet:
+make this default behavior.
+
+==================================================
+PART 9 — BETTER EMPTY STATE / FALLBACKS
+==================================================
+
+If there are truly no strong local matches, do not just show an empty useless state.
+
+Instead show:
+- nearby matches
+- broader cleaning-intent opportunities
+- suggested keyword improvements
+- suggested location expansions
+- maybe “broaden your area” CTA
+
+The empty state should feel like:
+“Here’s what we found, and how to get more”
+not
+“There is nothing here.”
+
+==================================================
+PART 10 — PREMIUM PRODUCT FEEL
+==================================================
+
+This feature should feel like a serious local opportunity discovery tool.
+
+Improve:
+- visual hierarchy
+- filters
+- feed usefulness
+- trust
+- clarity
+- settings persistence
+- match explanations
+
+The user should understand WHY a lead is shown:
+- matches keyword “deep clean”
+- mentions New York
+- within radius
+- move-out cleaning intent
+- likely residential lead
+
+That transparency makes the feature feel real.
+
+==================================================
+PART 11 — GATING / MONETIZATION
+==================================================
+
+Audit whether Lead Finder is Growth or Pro.
+
+My recommendation:
+- broad lead feed could be Growth
+- advanced filtering / outreach / automation could be Pro
+OR
+- whole feature could be Pro if aligned with product strategy
+
+But if gated:
+- do not make it appear broken
+- show clear locked state / teaser
+- explain value and what unlocks it
+
+==================================================
+PART 12 — TEST CASES
+==================================================
+
+After implementation, test these:
+
+1. User adds a large city (e.g. New York) and sees relevant results
+2. User adds keywords and they persist visibly as chips
+3. User adds subreddits and they persist visibly as chips
+4. Refreshing the page does not lose settings
+5. Saving settings actually affects the ranking/filtering
+6. Broad default feed shows relevant cleaning leads even before perfect filters
+7. Location matching is not so strict that everything disappears
+8. Tabs New / Saved / Contacted / All work correctly
+9. Run Scan Now actually updates the feed
+10. Empty state only appears when truly nothing relevant exists, and even then offers useful fallback guidance
+
+Also test cases like:
+- city only
+- ZIP only
+- radius only
+- no custom keywords
+- keyword-heavy setup
+- no subreddit setup
+- strict local vs broader feed behavior
+
+==================================================
+PART 13 — OUTPUT
+==================================================
+
+When done, provide:
+- summary of what was broken
+- root cause of “no leads” behavior
+- root cause of disappearing tags/settings issues
+- files changed
+- files created
+- how the new ingestion/filtering architecture works
+- how settings are persisted
+- how location relevance is scored
+- how fallback/broader cleaning feed works
+- any assumptions / TODOs
+
+Final instruction:
+Turn Lead Finder from a dead, over-configured feature into a useful lead-discovery feed for cleaning businesses.
+Before coding, first inspect the current implementation and summarize exactly why users are seeing no value, why settings feel broken, and how you will redesign both the backend lead-fetching logic and the frontend experience so users see useful data fast.

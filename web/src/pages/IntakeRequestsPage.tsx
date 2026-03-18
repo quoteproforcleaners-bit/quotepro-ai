@@ -438,7 +438,7 @@ export default function IntakeRequestsPage() {
       <PageHeader
         title="Quote Requests"
         subtitle="Manage leads who submitted requests through your intake form"
-        action={
+        actions={
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSendLinkOpen(o => !o)}
@@ -546,7 +546,7 @@ export default function IntakeRequestsPage() {
         </div>
       ) : requests.length === 0 ? (
         <EmptyState
-          icon={<Inbox className="w-8 h-8 text-slate-400" />}
+          icon={Inbox}
           title={activeTab === "new" ? "No new requests" : activeTab === "review" ? "No requests flagged for review" : "No completed requests"}
           description={
             activeTab === "new"
