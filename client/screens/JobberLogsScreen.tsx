@@ -4,6 +4,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import { usePlanGate } from "@/context/SubscriptionContext";
+import { ProGateOverlay } from "@/components/ProGate";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
@@ -39,10 +41,15 @@ export default function JobberLogsScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const { hasAccess, isLoading: subLoading } = usePlanGate("pro");
 
   const { data: logs, isLoading } = useQuery<SyncLogEntry[]>({
     queryKey: ["/api/integrations/jobber/logs"],
   });
+
+  if (subLoading || !hasAccess) {
+    return <ProGateOverlay featureName="Jobber Integration" minTier="pro" isLoading={subLoading} />;
+  }
 
   if (isLoading) {
     return (

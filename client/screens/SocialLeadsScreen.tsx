@@ -78,7 +78,7 @@ export default function SocialLeadsScreen() {
   );
 
   return (
-    <ProGate featureName="Social Leads">
+    <ProGate featureName="Social Leads" minTier="pro">
       <View style={{ flex: 1 }}>
         <View style={{ paddingTop: headerHeight + Spacing.md, paddingHorizontal: Spacing.lg, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}>
           <SegmentedControl

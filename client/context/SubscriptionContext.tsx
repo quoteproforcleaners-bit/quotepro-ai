@@ -42,6 +42,17 @@ export function hasAccessToTier(currentTier: PlanTier, requiredTier: PlanTier): 
   return TIER_RANK[currentTier] >= TIER_RANK[requiredTier];
 }
 
+// Derive best-guess tier from RC package identifier when entitlements are ambiguous.
+// Used as a fallback after purchase when getActiveTier returns "free" unexpectedly.
+function tierFromPackageIdentifier(identifier: string): PlanTier {
+  const id = identifier.toLowerCase();
+  if (id.includes("pro")) return "pro";
+  // $rc_monthly and $rc_annual are the Growth packages
+  if (id.includes("growth") || id === "$rc_monthly" || id === "$rc_annual") return "growth";
+  if (id.includes("starter")) return "starter";
+  return "starter"; // Conservative fallback: at least grant Starter if we bought something
+}
+
 type OfferingsStatus = "idle" | "loading" | "ready" | "error";
 type SubscriptionStatus = "free" | "trial" | "active" | "expired";
 
@@ -53,9 +64,10 @@ export interface TrialInfo {
 
 interface SubscriptionContextType {
   tier: PlanTier;
-  isPro: boolean;
-  isGrowth: boolean;
-  isStarter: boolean;
+  isPro: boolean;      // true for Growth OR Pro (Growth+ features)
+  isGrowth: boolean;   // true for Growth OR Pro (alias of isPro, kept for clarity)
+  isStarter: boolean;  // true for Starter, Growth, or Pro
+  isProOnly: boolean;  // true ONLY for Pro tier (Pro-exclusive features)
   isLoading: boolean;
   currentOffering: PurchasesOffering | null;
   offeringsStatus: OfferingsStatus;
@@ -142,9 +154,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [trialInfo, setTrialInfo] = useState<TrialInfo>({ hasFreeTrial: false, trialDurationDays: null, trialDurationText: null });
   const configuredRef = useRef(false);
 
-  const isPro = tier === "growth" || tier === "pro";
-  const isGrowth = tier === "growth" || tier === "pro";
+  const isPro = tier === "growth" || tier === "pro";       // Growth+ access (Growth-gated features)
+  const isGrowth = tier === "growth" || tier === "pro";    // Same as isPro, explicit alias
   const isStarter = tier === "starter" || tier === "growth" || tier === "pro";
+  const isProOnly = tier === "pro";                        // Strictly Pro-tier-only features
 
   const deriveSubscriptionStatus = useCallback((customerInfo: CustomerInfo) => {
     const activeTier = getActiveTier(customerInfo);
@@ -352,10 +365,17 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       console.log("[RC] Purchasing:", targetPkg.identifier);
       const { customerInfo } = await RC.purchasePackage(targetPkg);
 
-      const newTier = getActiveTier(customerInfo);
+      const rcTier = getActiveTier(customerInfo);
+      // If RC entitlements are clear, use them. Otherwise derive tier from the
+      // package identifier. This handles Expo Go Preview Mode and transient
+      // entitlement propagation delays.
+      const resolvedTier = rcTier !== "free"
+        ? rcTier
+        : tierFromPackageIdentifier(targetPkg.identifier);
       deriveSubscriptionStatus(customerInfo);
-      setTier(newTier !== "free" ? newTier : "growth");
-      await syncToServer(newTier !== "free" ? newTier : "growth");
+      setTier(resolvedTier);
+      await syncToServer(resolvedTier);
+      console.log("[RC] Purchase resolved tier:", resolvedTier, "(rc:", rcTier, "pkg:", targetPkg.identifier, ")");
       return true;
     } catch (error: any) {
       if (
@@ -398,6 +418,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         isPro,
         isGrowth,
         isStarter,
+        isProOnly,
         isLoading,
         currentOffering,
         offeringsStatus,

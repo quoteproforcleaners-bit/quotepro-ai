@@ -68,7 +68,7 @@ function ScoreBadge({ score }: { score: number }) {
 
 export default function LeadFinderScreen() {
   const theme = useTheme();
-  const { isPro } = useSubscription();
+  const { isProOnly } = useSubscription();
   const navigation = useNavigation<Nav>();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
@@ -222,8 +222,8 @@ export default function LeadFinderScreen() {
     );
   }, [navigation, theme, statusMutation]);
 
-  if (!isPro) {
-    return <ProGate featureName="Local Lead Finder"><View /></ProGate>;
+  if (!isProOnly) {
+    return <ProGate featureName="Local Lead Finder" minTier="pro"><View /></ProGate>;
   }
 
   return (

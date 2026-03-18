@@ -347,7 +347,7 @@ export default function SocialScreen() {
 
   if (!automation?.socialOnboardingComplete) {
     return (
-      <ProGate featureName="Social AI Assistant">
+      <ProGate featureName="Social AI Assistant" minTier="pro">
         <ScrollView
           style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
           contentContainerStyle={{ paddingTop: headerHeight + Spacing.lg, paddingBottom: tabBarHeight + Spacing.xl, paddingHorizontal: Spacing.lg, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}
@@ -363,7 +363,7 @@ export default function SocialScreen() {
   const recentConversations = conversations.slice(0, 5);
 
   return (
-    <ProGate featureName="Social AI Assistant">
+    <ProGate featureName="Social AI Assistant" minTier="pro">
       <ScrollView
         style={{ flex: 1, backgroundColor: theme.backgroundRoot }}
         contentContainerStyle={{

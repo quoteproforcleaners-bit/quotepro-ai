@@ -44,7 +44,7 @@ export default function TikTokLeadCreateScreen() {
   });
 
   return (
-    <ProGate featureName="Social Leads">
+    <ProGate featureName="Social Leads" minTier="pro">
       <ScrollView
         contentContainerStyle={{
           paddingTop: headerHeight + Spacing.lg,

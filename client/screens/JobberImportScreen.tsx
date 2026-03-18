@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { usePlanGate } from "@/context/SubscriptionContext";
+import { ProGateOverlay } from "@/components/ProGate";
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
@@ -48,6 +50,7 @@ export default function JobberImportScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+  const { hasAccess, isLoading: subLoading } = usePlanGate("pro");
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [allClients, setAllClients] = useState<JobberClient[]>([]);
@@ -161,6 +164,10 @@ export default function JobberImportScreen() {
       setImporting(false);
     }
   };
+
+  if (subLoading || !hasAccess) {
+    return <ProGateOverlay featureName="Jobber Integration" minTier="pro" isLoading={subLoading} />;
+  }
 
   const allSelected = selectableClients.length > 0 && selectedIds.size === selectableClients.length;
 

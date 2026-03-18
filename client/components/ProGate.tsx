@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, ScrollView, Pressable, Platform, useWindowDimensions } from "react-native";
+import { View, StyleSheet, ScrollView, Pressable, Platform, useWindowDimensions, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useNavigation } from "@react-navigation/native";
@@ -22,7 +22,9 @@ interface ProGateProps {
 export function ProGate({ children, featureName, minTier = "growth" }: ProGateProps) {
   const { hasAccess, isLoading } = usePlanGate(minTier);
 
-  if (isLoading) return <>{children}</>;
+  // While subscription state loads, show the locked overlay (not the premium content).
+  // Never expose premium content before entitlement is confirmed.
+  if (isLoading) return <ProGateOverlay featureName={featureName} minTier={minTier} isLoading />;
   if (hasAccess) return <>{children}</>;
 
   return <ProGateOverlay featureName={featureName} minTier={minTier} />;
@@ -61,7 +63,7 @@ const TIER_FEATURES: Record<PlanTier, { icon: string; label: string }[]> = {
   free: [],
 };
 
-function ProGateOverlay({ featureName, minTier = "growth" }: { featureName?: string; minTier?: PlanTier }) {
+export function ProGateOverlay({ featureName, minTier = "growth", isLoading = false }: { featureName?: string; minTier?: PlanTier; isLoading?: boolean }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -89,6 +91,14 @@ function ProGateOverlay({ featureName, minTier = "growth" }: { featureName?: str
 
   const tierLabel = TIER_LABEL[minTier] || "Pro";
   const features = TIER_FEATURES[minTier] || TIER_FEATURES.growth;
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingCenter, { backgroundColor: theme.backgroundRoot }]}>
+        <ActivityIndicator size="large" color={theme.accent} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -176,6 +186,7 @@ export function useProGate(minTier: PlanTier = "growth") {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  loadingCenter: { alignItems: "center", justifyContent: "center" },
   scrollContent: {
     alignItems: "center",
     paddingHorizontal: Spacing.xl,

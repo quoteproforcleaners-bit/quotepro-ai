@@ -2,6 +2,8 @@ import React, { useState, useCallback } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator, Switch } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { usePlanGate } from "@/context/SubscriptionContext";
+import { ProGateOverlay } from "@/components/ProGate";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
@@ -62,6 +64,7 @@ export default function JobberSettingsScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const queryClient = useQueryClient();
+  const { hasAccess, isLoading: subLoading } = usePlanGate("pro");
 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -172,6 +175,10 @@ export default function JobberSettingsScreen() {
       setSettingsSaving(false);
     }
   }, [queryClient]);
+
+  if (subLoading || !hasAccess) {
+    return <ProGateOverlay featureName="Jobber Integration" minTier="pro" isLoading={subLoading} />;
+  }
 
   if (isLoading) {
     return (

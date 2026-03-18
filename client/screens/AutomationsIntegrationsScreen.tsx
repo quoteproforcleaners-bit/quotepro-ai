@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { ProGateOverlay, usePlanGate } from "@/components/ProGate";
 import {
   View,
   StyleSheet,
@@ -108,6 +109,7 @@ export default function AutomationsIntegrationsScreen() {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const { hasAccess, isLoading: subLoading } = usePlanGate("pro");
 
   const [showNewKeyModal, setShowNewKeyModal] = useState(false);
   const [newKeyRaw, setNewKeyRaw] = useState<string | null>(null);
@@ -315,6 +317,10 @@ export default function AutomationsIntegrationsScreen() {
   };
 
   const activeConnections = endpoints.filter((ep) => ep.isActive).length;
+
+  if (subLoading || !hasAccess) {
+    return <ProGateOverlay featureName="Advanced Integrations" minTier="pro" isLoading={subLoading} />;
+  }
 
   return (
     <ScrollView
