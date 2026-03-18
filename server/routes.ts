@@ -3932,187 +3932,142 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
 
       const business = await getBusinessByOwner(req.session.userId!);
 
-      let contextStr = "No business data available yet.";
+      let contextStr = "No business data yet — give general cleaning sales coaching.";
       const now = new Date();
 
       if (business) {
-        const stats = await getQuoteStats(business.id);
-        const allQuotes = await getQuotesByBusiness(business.id);
-        const customers = await getCustomersByBusiness(business.id);
-        const jobs = await getJobsByBusiness(business.id);
-        const comms = await getCommunicationsByBusiness(business.id);
+        // Run all DB queries in parallel for speed
+        const [stats, allQuotes, customers, jobs, comms] = await Promise.all([
+          getQuoteStats(business.id),
+          getQuotesByBusiness(business.id),
+          getCustomersByBusiness(business.id),
+          getJobsByBusiness(business.id),
+          getCommunicationsByBusiness(business.id),
+        ]);
 
         const sentQuotes = allQuotes.filter(q => q.status === "sent");
         const acceptedQuotes = allQuotes.filter(q => q.status === "accepted");
         const declinedQuotes = allQuotes.filter(q => q.status === "declined");
         const completedJobs = jobs.filter(j => j.status === "completed");
         const scheduledJobs = jobs.filter(j => j.status === "scheduled");
-
-        const quotesThisMonth = allQuotes.filter(q => {
-          const d = new Date(q.createdAt);
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        });
-        const quotesLastMonth = allQuotes.filter(q => {
-          const d = new Date(q.createdAt);
-          const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-          return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
-        });
-        const jobsThisMonth = completedJobs.filter(j => {
-          const d = j.endDatetime ? new Date(j.endDatetime) : new Date(j.updatedAt);
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        });
-
         const customerMap = new Map(customers.map(c => [c.id, c]));
+        const pipelineValue = sentQuotes.reduce((s, q) => s + q.total, 0);
+        const avgAcceptedTotal = acceptedQuotes.length > 0
+          ? acceptedQuotes.reduce((s, q) => s + q.total, 0) / acceptedQuotes.length : 0;
+        const recurringCount = acceptedQuotes.filter(q => q.frequencySelected !== "one-time").length;
 
         const openQuoteDetails = sentQuotes
           .sort((a, b) => (a.sentAt?.getTime() || a.createdAt.getTime()) - (b.sentAt?.getTime() || b.createdAt.getTime()))
-          .slice(0, 10)
+          .slice(0, 8)
           .map(q => {
             const cust = q.customerId ? customerMap.get(q.customerId) : null;
             const name = cust ? `${cust.firstName} ${cust.lastName}`.trim() : "Unknown";
             const sentDate = q.sentAt || q.createdAt;
             const ageDays = Math.round((now.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
             const quoteComms = comms.filter(c => c.quoteId === q.id);
-            const lastFollowUp = quoteComms.length > 0 ? quoteComms[0] : null;
-            const followUpAge = lastFollowUp ? Math.round((now.getTime() - new Date(lastFollowUp.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : null;
-            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected} (${q.selectedOption} tier), ${ageDays}d old${q.propertySqft ? `, ${q.propertySqft}sqft` : ""}${followUpAge !== null ? `, last follow-up ${followUpAge}d ago` : ", no follow-up sent"}`;
+            const followUpAge = quoteComms.length > 0
+              ? Math.round((now.getTime() - new Date(quoteComms[0].createdAt).getTime()) / (1000 * 60 * 60 * 24))
+              : null;
+            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected} (${q.selectedOption}), ${ageDays}d old${followUpAge !== null ? `, last follow-up ${followUpAge}d ago` : ", no follow-up sent"}`;
           });
 
-        const recentWins = acceptedQuotes
-          .sort((a, b) => (b.acceptedAt?.getTime() || 0) - (a.acceptedAt?.getTime() || 0))
-          .slice(0, 5)
-          .map(q => {
-            const cust = q.customerId ? customerMap.get(q.customerId) : null;
-            const name = cust ? `${cust.firstName} ${cust.lastName}`.trim() : "Unknown";
-            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected} (${q.selectedOption} tier)`;
-          });
-
-        const recentLosses = declinedQuotes
-          .sort((a, b) => (b.declinedAt?.getTime() || 0) - (a.declinedAt?.getTime() || 0))
-          .slice(0, 5)
-          .map(q => {
-            const cust = q.customerId ? customerMap.get(q.customerId) : null;
-            const name = cust ? `${cust.firstName} ${cust.lastName}`.trim() : "Unknown";
-            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected} (${q.selectedOption} tier)`;
-          });
-
-        const topCustomers = customers
-          .map(c => {
-            const custQuotes = allQuotes.filter(q => q.customerId === c.id && q.status === "accepted");
-            const totalSpent = custQuotes.reduce((s, q) => s + q.total, 0);
-            const custJobs = jobs.filter(j => j.customerId === c.id && j.status === "completed");
-            return { name: `${c.firstName} ${c.lastName}`.trim(), totalSpent, jobCount: custJobs.length, isVip: c.isVip };
-          })
-          .filter(c => c.totalSpent > 0)
-          .sort((a, b) => b.totalSpent - a.totalSpent)
-          .slice(0, 5)
-          .map(c => `  - ${c.name}: $${c.totalSpent.toFixed(0)} revenue, ${c.jobCount} jobs${c.isVip ? " (VIP)" : ""}`);
-
-        const dormantCustomers = customers.filter(c => {
+        const dormantCount = customers.filter(c => {
           const lastJob = jobs.filter(j => j.customerId === c.id && j.status === "completed")
             .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
           if (!lastJob) return false;
-          const daysSince = (now.getTime() - new Date(lastJob.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
-          return daysSince > 45;
-        });
+          return (now.getTime() - new Date(lastJob.updatedAt).getTime()) / (1000 * 60 * 60 * 24) > 45;
+        }).length;
 
-        const avgAcceptedTotal = acceptedQuotes.length > 0
-          ? acceptedQuotes.reduce((s, q) => s + q.total, 0) / acceptedQuotes.length
-          : 0;
-        const recurringCount = acceptedQuotes.filter(q => q.frequencySelected !== "one-time").length;
-        const oneTimeCount = acceptedQuotes.filter(q => q.frequencySelected === "one-time").length;
+        const recentWins = acceptedQuotes
+          .sort((a, b) => (b.acceptedAt?.getTime() || 0) - (a.acceptedAt?.getTime() || 0))
+          .slice(0, 4)
+          .map(q => {
+            const name = q.customerId ? (() => { const c = customerMap.get(q.customerId!); return c ? `${c.firstName} ${c.lastName}`.trim() : "Unknown"; })() : "Unknown";
+            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected}`;
+          });
 
-        const freqBreakdown = sentQuotes.reduce((acc, q) => {
-          acc[q.frequencySelected] = (acc[q.frequencySelected] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        const tierBreakdown = sentQuotes.reduce((acc, q) => {
-          acc[q.selectedOption] = (acc[q.selectedOption] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-
-        const pipelineValue = sentQuotes.reduce((s, q) => s + q.total, 0);
-
-        contextStr = [
-          `=== BUSINESS SNAPSHOT (${now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}) ===`,
-          `Business: ${business.companyName}`,
-          ``,
-          `--- PIPELINE ---`,
-          `Close rate: ${stats.closeRate}% (${stats.acceptedQuotes} accepted of ${stats.totalQuotes} total)`,
-          `Pipeline: ${sentQuotes.length} open quotes worth $${pipelineValue.toFixed(0)}`,
-          `Avg accepted quote: $${avgAcceptedTotal.toFixed(0)}`,
-          `Recurring vs one-time wins: ${recurringCount} recurring, ${oneTimeCount} one-time`,
-          `Open quote tiers: ${Object.entries(tierBreakdown).map(([k, v]) => `${k}=${v}`).join(", ") || "none"}`,
-          `Open quote frequencies: ${Object.entries(freqBreakdown).map(([k, v]) => `${k}=${v}`).join(", ") || "none"}`,
-          ``,
-          `--- REVENUE ---`,
-          `Total revenue: $${stats.totalRevenue}`,
-          `Quotes this month: ${quotesThisMonth.length} (last month: ${quotesLastMonth.length})`,
-          `Cleans this month: ${jobsThisMonth.length}`,
-          `Scheduled jobs: ${scheduledJobs.length}`,
-          ``,
-          openQuoteDetails.length > 0 ? `--- OPEN QUOTES (oldest first, need attention) ---\n${openQuoteDetails.join("\n")}` : "",
-          ``,
-          recentWins.length > 0 ? `--- RECENT WINS ---\n${recentWins.join("\n")}` : "",
-          recentLosses.length > 0 ? `--- RECENT LOSSES ---\n${recentLosses.join("\n")}` : "",
-          ``,
-          topCustomers.length > 0 ? `--- TOP CUSTOMERS ---\n${topCustomers.join("\n")}` : "",
-          ``,
-          `--- HEALTH ---`,
-          `${customers.length} total customers, ${dormantCustomers.length} dormant (45+ days since last job)`,
-          `${customers.filter(c => c.isVip).length} VIP customers`,
-        ].filter(s => s !== undefined).join("\n");
+        const contextParts = [
+          `Business: ${business.companyName} | Date: ${now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
+          `Close rate: ${stats.closeRate}% | Pipeline: ${sentQuotes.length} quotes worth $${pipelineValue.toFixed(0)} | Avg quote: $${avgAcceptedTotal.toFixed(0)}`,
+          `Won: ${stats.acceptedQuotes} quotes (${recurringCount} recurring) | Lost: ${declinedQuotes.length} | Scheduled jobs: ${scheduledJobs.length}`,
+          `Customers: ${customers.length} total, ${dormantCount} dormant (45d+), ${customers.filter(c => c.isVip).length} VIP`,
+        ];
+        if (openQuoteDetails.length > 0) contextParts.push(`Open quotes needing follow-up:\n${openQuoteDetails.join("\n")}`);
+        if (recentWins.length > 0) contextParts.push(`Recent wins:\n${recentWins.join("\n")}`);
+        contextStr = contextParts.join("\n");
       }
 
       const businessName = business?.companyName || "your cleaning business";
 
-      const systemPrompt = `You are a senior sales coach and business advisor for "${businessName}", a residential cleaning company. You have deep expertise in the cleaning industry, pricing strategy, customer retention, and sales psychology.
+      const systemPrompt = `You are an elite AI sales coach for "${businessName}", a residential cleaning company. Your job is to help the owner close more jobs, handle objections, and grow recurring revenue.
 
-YOUR ROLE: Give specific, data-driven advice using the real business data below. Never be generic. Always reference actual customer names, dollar amounts, and timelines from the data.
+RESPONSE FORMAT — return ONLY valid JSON, no other text:
+{
+  "mode": "follow-up" | "objection" | "script" | "strategy" | "coaching",
+  "quickTakeaway": "1-2 sentences. The single most important thing to do right now.",
+  "approach": "2-4 sentences. The reasoning, framing, and recommended tactic.",
+  "scripts": [
+    { "label": "Text message", "content": "Ready-to-send script — direct and conversational" },
+    { "label": "Email", "content": "Ready-to-send email with subject line on first line" }
+  ],
+  "alternateVersions": [
+    { "label": "More direct", "content": "..." }
+  ],
+  "nextStep": "1-2 sentences. What to do if no response after 48 hours."
+}
 
-RESPONSE RULES:
-- Be direct and actionable. Lead with the most important insight.
-- Use specific numbers, customer names, and dollar amounts from the data.
-- Keep responses to 3-5 sentences. No fluff, no filler.
-- When suggesting follow-ups, give the exact message approach (not just "follow up").
-- When analyzing pipeline, identify the biggest risk and opportunity.
-
-SALES EXPERTISE TO APPLY:
-- Follow-up timing: Quotes over 3 days old without follow-up are at high risk. 48hrs is the sweet spot.
-- Upselling: If a customer chose "good" tier, suggest how to pitch "better" by framing the value gap. One-time customers are upsell targets for recurring plans.
-- Pricing: If close rate is below 40%, prices may be too high or follow-up is weak. Above 70% may mean underpricing. Sweet spot is 45-65%.
-- Retention: Customers who haven't booked in 45+ days need a re-engagement offer (e.g., 10% off next clean).
-- Recurring revenue: Recurring cleans are 3-5x more valuable than one-time. Always highlight opportunities to convert one-time to recurring.
-- Objection handling: Price objection = reframe value per hour saved. "Too busy" = offer flexible scheduling. "Thinking about it" = create urgency with limited availability.
+RULES:
+- scripts: include 1-3 that are relevant. Omit irrelevant types. Always include a text message if a script is needed.
+- alternateVersions: include 1-2 when useful (softer, more direct, more premium, recurring-focused, phone). Omit if not helpful.
+- All scripts must sound human, not robotic. No placeholders like [Name]. Use real names from data if available.
+- Stay focused on cleaning service sales: one-time, recurring, deep clean, weekly/biweekly/monthly, move-in/out, add-ons.
+- When business data is available, reference real names, dollar amounts, and timelines. Never be generic.
+- Key sales principles: 48hr follow-up sweet spot; recurring = 3-5x value of one-time; price objection = reframe value saved per hour; "thinking about it" = create gentle urgency; deep clean first = sets the standard for recurring.
+- Do NOT write essay-length answers. Be direct, decisive, tactical.
 
 BUSINESS DATA:
 ${contextStr}`;
 
-      const chatMessages: any[] = [
-        { role: "system", content: systemPrompt },
-      ];
+      const chatMessages: any[] = [{ role: "system", content: systemPrompt }];
 
       if (conversationHistory && Array.isArray(conversationHistory)) {
-        for (const msg of conversationHistory.slice(-6)) {
+        for (const msg of conversationHistory.slice(-4)) {
           chatMessages.push({ role: msg.role, content: msg.content });
         }
       }
       chatMessages.push({ role: "user", content: message });
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: chatMessages,
+        max_completion_tokens: 800,
+        response_format: { type: "json_object" },
       });
 
-      const reply = completion.choices[0]?.message?.content?.trim() || "";
-      if (!reply) {
-        console.error("AI sales chat: empty response from model", JSON.stringify(completion.choices[0]));
-        return res.json({ reply: "I'm having trouble generating a response right now. Please try again in a moment." });
+      const rawContent = completion.choices[0]?.message?.content?.trim() || "";
+      if (!rawContent) {
+        return res.json({ reply: "I'm having trouble generating a response right now. Please try again.", mode: "coaching", quickTakeaway: "", approach: "", scripts: [], alternateVersions: [], nextStep: "" });
       }
-      return res.json({ reply });
+
+      let structured: any = {};
+      try {
+        structured = JSON.parse(rawContent);
+      } catch {
+        structured = { mode: "coaching", quickTakeaway: rawContent, approach: "", scripts: [], alternateVersions: [], nextStep: "" };
+      }
+
+      return res.json({
+        reply: rawContent,
+        mode: structured.mode || "coaching",
+        quickTakeaway: structured.quickTakeaway || "",
+        approach: structured.approach || "",
+        scripts: Array.isArray(structured.scripts) ? structured.scripts : [],
+        alternateVersions: Array.isArray(structured.alternateVersions) ? structured.alternateVersions : [],
+        nextStep: structured.nextStep || "",
+      });
     } catch (error: any) {
-      console.error("AI sales chat error:", error?.message || error, error?.stack);
-      return res.status(500).json({ message: "Failed to process chat" });
+      console.error("AI sales chat error:", error?.message || error);
+      return res.status(500).json({ message: "Failed to process your question. Please try again." });
     }
   });
 
