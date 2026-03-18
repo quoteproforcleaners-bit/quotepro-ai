@@ -394,7 +394,11 @@ export default function IntakeRequestsPage() {
     queryKey: ["/api/intake-requests/count"],
   });
 
-  const intakeUrl = business ? `${window.location.origin}/intake/${business.id}` : "";
+  const { data: linkData } = useQuery<{ url: string; code: string; businessName: string }>({
+    queryKey: ["/api/intake-requests/my-link"],
+  });
+
+  const intakeUrl = linkData?.url || "";
 
   function copyLink() {
     navigator.clipboard.writeText(intakeUrl).then(() => {
