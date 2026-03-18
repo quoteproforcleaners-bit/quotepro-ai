@@ -358,7 +358,7 @@ export default function CustomersScreen() {
     );
 
   return (
-    <ProGate featureName="Customer Management">
+    <ProGate featureName="Customer Management" minTier="starter">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <FlatList
         testID="customers-list"

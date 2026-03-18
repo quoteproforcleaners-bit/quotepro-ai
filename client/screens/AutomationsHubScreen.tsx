@@ -118,7 +118,7 @@ export default function AutomationsHubScreen() {
   }
 
   return (
-    <ProGate featureName="Automations">
+    <ProGate featureName="Growth Automation">
     <KeyboardAwareScrollViewCompat
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + Spacing.xl, paddingHorizontal: Spacing.lg, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}

@@ -1,0 +1,425 @@
+This is a HIGH-PRIORITY monetization sprint for the iOS version of QuotePro.
+
+The goal is not just to “add subscriptions.”
+The goal is to build a real monetization system that increases revenue, pushes users toward the right plan, and prevents giving away too much value for free.
+
+Do NOT work on web billing in this pass.
+Focus on iOS app monetization only.
+
+Important:
+Do not break existing auth, quote generation, CRM, onboarding, navigation, or dashboard functionality.
+Before coding, first inspect the current app architecture and identify:
+- where the app initializes
+- where login/signup happens
+- where onboarding happens
+- where paywall/subscription code already exists
+- where feature flags / entitlement checks should live
+- where quote counts are stored
+- where AI quote builder is called
+- where follow-ups / automation / upsells are triggered
+- where to place upgrade prompts
+- where to store subscription tier in app state
+
+Then implement carefully.
+
+==================================================
+BUSINESS GOAL
+==================================================
+
+QuotePro should make more money by doing these things well:
+
+1. Limit free / low-tier access
+2. Push most serious users into Growth
+3. Make Pro attractive for power users
+4. Trigger upgrades at moments of real intent
+5. Make the paywall and plan structure feel clear, premium, and worth it
+
+This is based on subscription app best practices:
+- hard gating beats over-generous freemium
+- paywall placement matters
+- pricing / packaging matters
+- upgrade prompts must happen at high-intent moments
+- Growth should be the default money-maker
+
+==================================================
+CURRENT PLAN STRUCTURE
+==================================================
+
+RevenueCat is already set up with:
+
+Products:
+- quotepro_ai_monthly
+- com.quotepro.growth.monthly
+- com.quotepro.growth.annual
+- com.quotepro.pro.monthly
+- com.quotepro.pro.annual
+
+Entitlements:
+- starter
+- growth
+- pro
+
+Offering:
+- default
+
+Packages:
+- starter_monthly
+- $rc_monthly = Growth Monthly
+- $rc_annual = Growth Annual
+- pro_monthly
+- pro_annual
+
+You must use this structure exactly.
+
+==================================================
+PART 1 — REVENUECAT WIRING
+==================================================
+
+Implement RevenueCat fully in the iOS app.
+
+Requirements:
+1. Initialize RevenueCat on iOS only
+2. Use EXPO_PUBLIC_REVENUECAT_API_KEY
+3. After user login/signup, call Purchases.logIn(user.id as string)
+4. On logout, call Purchases.logOut()
+5. Fetch current offering and packages
+6. Map active entitlements to app tier:
+   - starter
+   - growth
+   - pro
+   - free (if no entitlement)
+7. Add restore purchases flow
+8. Refresh entitlement state:
+   - on app launch
+   - after login
+   - after purchase
+   - after restore
+
+Use a clean shared subscription context / provider if appropriate.
+
+==================================================
+PART 2 — HARD FEATURE GATING (CRITICAL)
+==================================================
+
+This is the most important part.
+
+We must stop giving away the full product on the $19 plan.
+
+Implement strict access rules.
+
+----------------------------------------
+FREE
+----------------------------------------
+If the app still allows free users, keep them extremely limited.
+They should not be able to use the real product deeply.
+
+Suggested:
+- maybe 1 sample quote or read-only / partial experience
+- no AI
+- no automation
+- no recurring operational value
+
+If current architecture does not support a free tier cleanly, use Starter as the lowest meaningful access tier.
+
+----------------------------------------
+STARTER
+----------------------------------------
+Starter must feel useful but clearly limited.
+
+Starter rules:
+- max 20 quotes per month
+- Good / Better / Best quote generation allowed
+- basic intake form
+- basic CRM / lead capture
+- no AI quote builder
+- no smart upsell recommendations
+- no automated follow-ups
+- no advanced automation
+- no advanced revenue intelligence
+- no Pro-only tools
+
+If a Starter user hits 20 quotes, hard stop them and trigger upgrade.
+
+----------------------------------------
+GROWTH
+----------------------------------------
+Growth is the main plan and the one we want most users to choose.
+
+Growth rules:
+- unlimited quotes
+- AI quote builder
+- smart upsell recommendations
+- follow-up tools
+- quote requests / public lead capture
+- CRM / customer management
+- revenue dashboard / weekly recap if already built
+- core automation features
+- anything that represents the real core value of QuotePro
+
+----------------------------------------
+PRO
+----------------------------------------
+Pro should unlock everything in Growth plus premium / power-user features.
+
+Pro rules:
+- everything in Growth
+- advanced automation rules
+- advanced reporting / revenue intelligence
+- commercial quoting tools if already built
+- integrations if already built
+- premium / future-facing tools
+- anything that should be reserved for serious operators
+
+If some Pro features are not fully built yet, create clean Pro placeholders / gates instead of fake access.
+
+==================================================
+PART 3 — QUOTE LIMIT ENFORCEMENT
+==================================================
+
+Implement monthly quote usage tracking for Starter.
+
+Requirements:
+- Starter users can create/send a maximum of 20 quotes per month
+- quote count resets monthly
+- count should be reliable and tied to the user account
+- the app should clearly display how many quotes remain
+- once limit is reached:
+  - block further quote creation or sending
+  - show upgrade prompt to Growth
+
+Do not fake this in the UI only.
+This must be real logic.
+
+If quote count tracking already exists somewhere, reuse it.
+If not, build a clean extensible solution.
+
+==================================================
+PART 4 — UPGRADE TRIGGERS (HIGH-INTENT MOMENTS)
+==================================================
+
+Add upgrade prompts in the moments most likely to convert.
+
+Do NOT rely only on one generic paywall screen.
+
+Add upgrade triggers at these moments:
+
+1. Quote limit reached
+Message:
+“You’ve reached your 20 quote limit for this month.”
+CTA:
+“Upgrade to Growth for unlimited quotes”
+
+2. User taps AI quote builder on Starter
+Message:
+“AI quote builder is included with Growth”
+CTA:
+“Unlock AI quoting”
+
+3. User tries smart upsell recommendations on Starter
+Message:
+“Smart upsells are available on Growth”
+CTA:
+“Upgrade to increase quote value”
+
+4. User tries follow-up automation on Starter
+Message:
+“Automated follow-ups are a Growth feature”
+CTA:
+“Upgrade to automate more sales”
+
+5. User tries advanced automation / analytics / premium tools
+Message:
+“This is a Pro feature”
+CTA:
+“Upgrade to Pro”
+
+Requirements:
+- prompts should feel clean, premium, and contextual
+- not spammy
+- Growth should be the primary suggested upgrade in most cases
+- Pro prompts should only show when someone hits clearly advanced functionality
+
+==================================================
+PART 5 — PAYWALL / PLAN SELECTION EXPERIENCE
+==================================================
+
+Build or improve the iOS paywall so it follows this strategy:
+
+1. Growth is the default recommendation
+2. Annual should be emphasized
+3. Starter should be visible but clearly limited
+4. Pro should anchor value
+
+Required paywall structure:
+- 3 tiers:
+  - Starter
+  - Growth
+  - Pro
+- Monthly / annual options where applicable
+- Growth marked as:
+  - Most Popular
+  - Best Value
+  - Recommended
+- Growth annual visually emphasized
+- Show “2 months free” for annual plans if pricing math supports it
+- Clear feature differences
+- Restore Purchases button
+- Terms / Privacy links if needed
+
+Messaging direction:
+Avoid generic SaaS copy.
+Use outcome-driven copy like:
+- Quote faster. Close more jobs.
+- Unlock AI quoting and upsells.
+- Stop losing revenue to slow follow-up.
+- Upgrade to unlimited quotes.
+
+Important:
+The paywall should feel like a serious business tool, not a casual consumer app.
+
+==================================================
+PART 6 — PAYWALL COPY / PLAN POSITIONING
+==================================================
+
+Use this positioning:
+
+----------------------------------------
+STARTER
+----------------------------------------
+For solo operators just getting started
+
+- 20 quotes / month
+- Good / Better / Best quoting
+- Branded intake form
+- Basic CRM & lead capture
+- Email support
+
+----------------------------------------
+GROWTH
+----------------------------------------
+Best for most cleaning businesses
+
+- Unlimited quotes
+- AI quote builder
+- Smart upsell recommendations
+- Automated follow-ups
+- Full CRM & customer management
+- Revenue dashboard
+- Public quote request page
+- Weekly performance recap
+- Priority email support
+
+Growth should be the plan most users pick.
+
+----------------------------------------
+PRO
+----------------------------------------
+For serious operators building a real business
+
+- Everything in Growth
+- Advanced automation rules
+- Revenue intelligence & analytics
+- Commercial quote builder
+- Integrations (if built)
+- Priority support
+- Early access / premium features
+
+==================================================
+PART 7 — ONBOARDING / DAY 0 CONVERSION
+==================================================
+
+The first session matters.
+The app should not delay monetization too long, but it also should not show a paywall before value is clear.
+
+Please audit the current onboarding flow and improve paywall placement.
+
+Ideal flow:
+1. user understands product value quickly
+2. user sees what QuotePro does
+3. user reaches a meaningful action or intent moment
+4. paywall appears with context
+
+Do not drop users into a random paywall with no setup or context.
+Do not wait too long either.
+
+Find the best moment for monetization in the current flow.
+
+==================================================
+PART 8 — STATE / ARCHITECTURE
+==================================================
+
+Create a clean subscription access model in app state.
+
+Need:
+- current tier
+- active entitlement
+- available packages
+- quote usage count / limit
+- upgrade eligibility logic
+- restore purchase state
+- loading / error handling
+
+Make this easy to extend later.
+
+==================================================
+PART 9 — VALIDATION / TESTING
+==================================================
+
+After implementation, validate all of the following:
+
+RevenueCat / billing:
+- RevenueCat initializes correctly on iOS
+- offerings load correctly
+- all 5 packages are visible to the app
+- purchases succeed
+- entitlements map correctly
+- restore purchases works
+- logout/login does not break subscription state
+
+Starter gating:
+- Starter can create quotes, but only up to 20/month
+- Starter cannot use AI quote builder
+- Starter cannot use smart upsells
+- Starter cannot use automation features
+- Starter sees correct upgrade prompts
+
+Growth:
+- Growth unlocks unlimited quotes
+- Growth unlocks AI quote builder
+- Growth unlocks upsells and follow-ups
+- Growth is treated as the main product
+
+Pro:
+- Pro unlocks premium functionality
+- Pro prompts only show for advanced features
+
+Paywall:
+- Growth is default / recommended
+- annual is emphasized
+- paywall feels premium and clear
+- restore button exists
+- terms/privacy support exists if needed
+
+==================================================
+PART 10 — OUTPUT
+==================================================
+
+When done, provide:
+- summary of monetization system implemented
+- files changed
+- files created
+- where RevenueCat is initialized
+- where tier is stored
+- how quote limits are enforced
+- where upgrade prompts are shown
+- what Growth vs Pro unlocks
+- any assumptions / TODOs
+- any known risks
+
+Final instruction:
+Treat this like the monetization foundation for a real SaaS business.
+The app should no longer casually give away premium value.
+Starter should create friction.
+Growth should be the money-maker.
+Pro should capture serious operators.
+Before coding, first inspect the existing architecture and summarize exactly how you plan to implement this.

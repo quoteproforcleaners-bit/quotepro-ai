@@ -436,7 +436,7 @@ function WalkthroughAIContent() {
 
 export default function WalkthroughAIScreen() {
   return (
-    <ProGate featureName="Walkthrough AI">
+    <ProGate featureName="AI Quote Builder">
       <WalkthroughAIContent />
     </ProGate>
   );

@@ -1,0 +1,414 @@
+This is a HIGH-PRIORITY iOS subscription access-control audit for QuotePro.
+
+There is a serious monetization bug:
+No matter which tier I choose in the iOS app, I appear to have access to everything.
+
+This must be fixed immediately.
+
+The goal is to audit the entire entitlement / feature-gating system and make sure users only get access to features that belong to their subscription tier.
+
+Do NOT treat this as a cosmetic UI fix.
+This is a real access-control and monetization enforcement issue.
+
+Important:
+Do not break auth, quoting, CRM, onboarding, or purchase flows.
+Before coding, first inspect the current iOS app architecture and identify:
+- where RevenueCat is initialized
+- where purchases are completed
+- where entitlements are read
+- where plan tier is stored in app state
+- where feature access is currently checked (if anywhere)
+- where quote builder, AI quoting, CRM, follow-ups, upsells, dashboards, automations, integrations, and commercial quoting features are triggered
+- whether there is any fallback logic that incorrectly defaults users to full access
+- whether tier state is cached incorrectly
+- whether paywall selection UI is disconnected from actual entitlement enforcement
+
+Then implement carefully.
+
+==================================================
+PRIMARY GOAL
+==================================================
+
+Create a real, centralized feature-gating system for iOS so that:
+
+- Starter users only get Starter features
+- Growth users only get Growth + Starter features
+- Pro users get everything
+- Free users, if applicable, get only free access
+
+Users should be able to SEE higher-tier features in many places, but if they are not entitled:
+- they should not be able to use them
+- they should be blocked cleanly
+- they should get a contextual upgrade prompt
+
+In many cases, greying out locked features is preferred so users understand what exists and what they unlock by upgrading.
+
+==================================================
+KNOWN BUG
+==================================================
+
+Currently, users can access everything regardless of selected/purchased tier.
+
+Possible causes to audit:
+- all tiers mapped to same access state
+- RevenueCat entitlement not being read correctly
+- fallback state defaulting to highest access
+- UI tier selection being mistaken for actual entitlement
+- no real access checks in feature entry points
+- components rendering as unlocked by default
+- missing centralized access-control system
+- purchase success path not refreshing entitlement state
+- old legacy “pro access” logic still hanging around
+
+You must fully audit and fix this.
+
+==================================================
+CURRENT PLAN STRUCTURE
+==================================================
+
+RevenueCat is set up with:
+
+Entitlements:
+- starter
+- growth
+- pro
+
+Packages:
+- starter_monthly
+- $rc_monthly = Growth Monthly
+- $rc_annual = Growth Annual
+- pro_monthly
+- pro_annual
+
+Expected access model:
+
+----------------------------------------
+STARTER
+----------------------------------------
+- Good / Better / Best quoting
+- up to 20 quotes per month
+- branded client intake form
+- basic CRM & lead capture
+- quote PDF export
+
+NOT allowed:
+- AI quote builder
+- smart upsell recommendations
+- automated follow-up sequences
+- full CRM / advanced customer management
+- revenue dashboard / close-rate dashboard
+- review request automation
+- commercial quote builder
+- Jobber / QuickBooks integrations
+- lead finder & outreach tools
+- revenue intelligence analytics
+- advanced automation rules
+- priority / premium features
+
+----------------------------------------
+GROWTH
+----------------------------------------
+Includes Starter plus:
+- unlimited quotes
+- AI quote builder
+- smart upsell recommendations
+- automated follow-up sequences
+- full CRM & customer management
+- revenue & close-rate dashboard
+- review request automation
+- core business workflow features
+
+NOT allowed:
+- Jobber / QuickBooks integrations
+- commercial quote builder
+- lead finder & outreach tools
+- revenue intelligence analytics
+- advanced automation rules
+- other Pro-only features
+
+----------------------------------------
+PRO
+----------------------------------------
+Includes everything in Growth plus:
+- Jobber & QuickBooks integrations
+- commercial quote builder
+- lead finder & outreach tools
+- revenue intelligence analytics
+- advanced automation rules
+- premium support / premium tools
+- future high-end features
+
+==================================================
+PART 1 — FULL ACCESS-CONTROL AUDIT
+==================================================
+
+Perform a complete audit of how access is currently decided.
+
+Inspect:
+- RevenueCat customerInfo / entitlements.active mapping
+- app subscription context / provider
+- purchase success flow
+- restore purchases flow
+- app launch entitlement refresh
+- login / logout behavior
+- local tier caching
+- navigation guards
+- screen-level rendering logic
+- button disabled states
+- API calls / actions that should be protected
+- backend writes if any sensitive features should be server-side protected
+- any old “pro” flags, trial flags, or boolean shortcuts
+
+Determine:
+- why all users currently get everything
+- where access is leaking
+- whether this is UI-only or true logic-level leakage
+- whether features are unguarded at entry points
+- whether multiple contradictory entitlement sources exist
+
+==================================================
+PART 2 — CENTRALIZED GATING SYSTEM
+==================================================
+
+Implement a single centralized feature-access system.
+
+Create a clean source of truth, something like:
+- canAccessFeature(featureKey, tier)
+or
+- entitlement/plan capability map
+
+This system should control all premium features consistently.
+
+Example feature keys:
+- basic_quotes
+- quote_limit_20
+- ai_quote_builder
+- smart_upsells
+- automated_followups
+- full_crm
+- revenue_dashboard
+- review_automation
+- integrations
+- commercial_quotes
+- outreach_tools
+- revenue_intelligence
+- advanced_automation
+
+The access system should be:
+- easy to read
+- easy to extend
+- impossible to accidentally bypass
+- used across screens, buttons, actions, and workflows
+
+==================================================
+PART 3 — REAL FEATURE ENFORCEMENT
+==================================================
+
+Do NOT only hide UI.
+Actually block access.
+
+For every premium feature:
+- block the action if the user is not entitled
+- prevent navigation if needed
+- prevent API-triggering actions if needed
+- show upgrade modal / upgrade prompt
+
+Examples:
+- Starter taps AI quote builder → blocked + Growth upsell
+- Starter taps smart upsells → blocked + Growth upsell
+- Starter taps follow-up automation → blocked + Growth upsell
+- Growth taps commercial quoting → blocked + Pro upsell
+- Growth taps integrations → blocked + Pro upsell
+
+Do not let users trigger premium actions just because a button is visible.
+
+==================================================
+PART 4 — GREY OUT / LOCKED FEATURE UX
+==================================================
+
+In many places, I want users to SEE what exists, but understand it is locked.
+
+Please implement a polished locked-state UX where appropriate:
+- greyed out buttons/cards/modules
+- lock icon or subtle “Upgrade” chip
+- reduced opacity
+- non-clickable or intercept click/tap with upgrade modal
+- concise explanation of which plan unlocks it
+
+This should be done in a way that:
+- teases value
+- encourages upgrades
+- does not confuse users
+- does not feel broken
+
+Examples:
+- AI Quote Builder card visible but greyed out for Starter
+- Revenue Dashboard visible but locked on Starter
+- Integrations visible but locked on Growth
+- Commercial Quote Builder visible but locked on Growth
+- Advanced automation visible but locked on non-Pro
+
+==================================================
+PART 5 — TIER-SPECIFIC UPGRADE PROMPTS
+==================================================
+
+Upgrade prompts must be contextual.
+
+If Starter hits a Growth feature:
+- say it’s included in Growth
+- explain the value briefly
+- CTA: Upgrade to Growth
+
+If Starter hits quote limit:
+- say they reached 20 quotes this month
+- CTA: Upgrade to Growth for unlimited quotes
+
+If Growth hits Pro feature:
+- say it’s included in Pro
+- explain the advanced value
+- CTA: Upgrade to Pro
+
+Prompts should feel:
+- clean
+- premium
+- business-oriented
+- not spammy
+
+==================================================
+PART 6 — QUOTE LIMIT ENFORCEMENT
+==================================================
+
+Audit and enforce Starter’s 20 quote/month limit.
+
+Requirements:
+- Starter truly limited to 20 quotes/month
+- count tied to actual user account
+- resets monthly
+- user can see remaining usage
+- once limit reached:
+  - block quote creation or sending
+  - show upgrade prompt to Growth
+
+If limit logic already exists, verify it cannot be bypassed.
+If it does not exist cleanly, implement it properly.
+
+==================================================
+PART 7 — UI TIER SELECTION VS ACTUAL ACCESS
+==================================================
+
+Audit whether the paywall tab selection is being mistaken for actual entitlement.
+
+Possible bug:
+- user taps different plan tabs on paywall
+- UI changes
+- app mistakenly assumes tier changed
+- actual purchased entitlement never enforced
+
+Make sure:
+- plan browsing on the paywall does NOT grant access
+- only active RevenueCat entitlement determines access
+- selected plan in UI is purely for purchase selection, not access control
+
+==================================================
+PART 8 — APP STATE / REFRESH LOGIC
+==================================================
+
+Make sure subscription state refreshes correctly:
+- on app launch
+- after login
+- after purchase
+- after restore purchases
+- after logout/login swap
+- after returning to foreground if needed
+
+Prevent stale state where a prior Pro user or test account leaves full access behind.
+
+Audit:
+- local storage / async storage
+- cached entitlement state
+- memoization bugs
+- default tier bugs
+- race conditions between auth and RevenueCat
+
+==================================================
+PART 9 — SCREEN-BY-SCREEN AUDIT
+==================================================
+
+Audit every major screen / entry point where monetization matters.
+
+At minimum inspect and gate:
+- quote builder
+- AI quote builder
+- smart upsell recommendations
+- automated follow-up sequences
+- CRM/customer management
+- revenue / close-rate dashboard
+- review request automation
+- Jobber / QuickBooks integrations
+- commercial quote builder
+- lead finder & outreach tools
+- revenue intelligence analytics
+- advanced automation rules
+- any future premium modules already in navigation
+
+Do not assume a single global gate is enough.
+Check actual user journeys.
+
+==================================================
+PART 10 — VALIDATION / TESTING
+==================================================
+
+After implementation, validate these cases explicitly:
+
+1. Starter user
+- can access Starter features
+- cannot access Growth features
+- cannot access Pro features
+- quote limit works
+- locked UI states appear correctly
+- upgrade prompts appear correctly
+
+2. Growth user
+- can access Growth + Starter features
+- cannot access Pro features
+- Pro-locked modules appear correctly
+- Pro upgrade prompts appear correctly
+
+3. Pro user
+- can access everything intended
+- no false locks
+
+4. Free / no entitlement user if applicable
+- only free access available
+- cannot bypass into paid features
+
+5. Purchase / restore flow
+- buying Starter does not unlock Growth/Pro
+- buying Growth does not unlock Pro
+- buying Pro unlocks Pro
+- restore correctly re-applies access
+- logout/login does not leak prior access
+
+If the project has tests, add tests for capability mapping and gating behavior.
+If not, at least add robust validation and document the tested scenarios.
+
+==================================================
+PART 11 — OUTPUT
+==================================================
+
+When done, provide:
+- summary of what caused the gating bug
+- how access is now enforced
+- where the centralized feature map lives
+- what files were changed
+- what files were created
+- which screens/features were gated
+- how quote limits are enforced
+- how locked feature UI is shown
+- any assumptions made
+- any follow-up recommendations
+
+Final instruction:
+Treat this as a monetization and access-control emergency.
+No user should get features they are not entitled to.
+Before coding, first inspect the codebase and summarize exactly how access is currently leaking, what the plan tiers currently unlock in practice, and what you will fix.

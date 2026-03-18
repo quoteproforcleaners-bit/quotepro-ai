@@ -18,9 +18,9 @@ import { useTheme } from "@/hooks/useTheme";
 import { ThemedText } from "@/components/ThemedText";
 import { apiRequest } from "@/lib/query-client";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { useSubscription } from "@/context/SubscriptionContext";
 import { useAIConsent } from "@/context/AIConsentContext";
 import { AIConsentGate } from "@/components/AIConsentGate";
+import { ProGate } from "@/components/ProGate";
 
 interface Message {
   id: string;
@@ -90,7 +90,6 @@ export default function AIAssistantScreen() {
   const { theme } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
-  const { isPro } = useSubscription();
   const { requestConsent } = useAIConsent();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -98,12 +97,6 @@ export default function AIAssistantScreen() {
   const [typingId, setTypingId] = useState<string | null>(null);
   const [typingFullText, setTypingFullText] = useState("");
   const flatListRef = useRef<FlatList>(null);
-
-  useEffect(() => {
-    if (!isPro) {
-      navigation.navigate("Paywall");
-    }
-  }, [isPro]);
 
   const handleTypewriterUpdate = useCallback((id: string, text: string, done: boolean) => {
     setMessages((prev) =>
@@ -273,6 +266,7 @@ export default function AIAssistantScreen() {
   );
 
   return (
+    <ProGate featureName="AI Business Advisor">
     <AIConsentGate>
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
@@ -373,6 +367,7 @@ export default function AIAssistantScreen() {
       </View>
     </KeyboardAvoidingView>
     </AIConsentGate>
+    </ProGate>
   );
 }
 

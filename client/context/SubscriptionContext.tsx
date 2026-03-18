@@ -1,21 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
 import { Platform } from "react-native";
 import type { PurchasesOffering, PurchasesPackage, CustomerInfo } from "react-native-purchases";
-import Constants from "expo-constants";
 import { useAuth } from "@/context/AuthContext";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest } from "@/lib/query-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { trackEvent } from "@/lib/analytics";
 
 export type PlanTier = "free" | "starter" | "growth" | "pro";
-
-function isExpoGo(): boolean {
-  try {
-    return Constants.appOwnership === "expo";
-  } catch {
-    return false;
-  }
-}
 
 let PurchasesModule: typeof import("react-native-purchases").default | null = null;
 
@@ -25,12 +16,11 @@ function getPurchases() {
     PurchasesModule = require("react-native-purchases").default;
     return PurchasesModule;
   } catch (e) {
-    console.warn("RevenueCat native module not available:", e);
     return null;
   }
 }
 
-const TIER_RANK: Record<PlanTier, number> = { free: 0, starter: 1, growth: 2, pro: 3 };
+export const TIER_RANK: Record<PlanTier, number> = { free: 0, starter: 1, growth: 2, pro: 3 };
 
 const ENTITLEMENT_TO_TIER: Record<string, PlanTier> = {
   pro: "pro",
@@ -55,7 +45,7 @@ export function hasAccessToTier(currentTier: PlanTier, requiredTier: PlanTier): 
 type OfferingsStatus = "idle" | "loading" | "ready" | "error";
 type SubscriptionStatus = "free" | "trial" | "active" | "expired";
 
-interface TrialInfo {
+export interface TrialInfo {
   hasFreeTrial: boolean;
   trialDurationDays: number | null;
   trialDurationText: string | null;
@@ -91,7 +81,6 @@ function extractTrialInfo(offering: PurchasesOffering | null): TrialInfo {
   if (!pkg?.product) return noTrial;
 
   const product = pkg.product as any;
-
   let priceAmount: number | null = null;
   let unit: string | number | null = null;
   let count: number = 1;
@@ -109,7 +98,7 @@ function extractTrialInfo(offering: PurchasesOffering | null): TrialInfo {
   if (priceAmount === null && product.introPriceAmountMicros !== undefined) {
     const micros = Number(product.introPriceAmountMicros);
     priceAmount = isNaN(micros) ? null : micros;
-    if (typeof product.introPricePeriod === "string" && product.introPricePeriod.length > 0) {
+    if (typeof product.introPricePeriod === "string") {
       const iso = product.introPricePeriod;
       if (iso.includes("D")) { const m = iso.match(/(\d+)D/); unit = "DAY"; count = m ? parseInt(m[1], 10) : 1; }
       else if (iso.includes("W")) { const m = iso.match(/(\d+)W/); unit = "WEEK"; count = m ? parseInt(m[1], 10) : 1; }
@@ -119,26 +108,14 @@ function extractTrialInfo(offering: PurchasesOffering | null): TrialInfo {
     if (product.introPriceCycles) count = Number(product.introPriceCycles) || count;
   }
 
-  const introductory = product.introductoryPrice;
-  if (priceAmount === null && introductory && typeof introductory === "object") {
-    const rawPrice = introductory.price ?? introductory.priceAmountMicros;
-    if (rawPrice !== undefined && rawPrice !== null) {
-      priceAmount = typeof rawPrice === "string" ? parseFloat(rawPrice) : Number(rawPrice);
-    }
-    unit = unit ?? introductory.periodUnit ?? introductory.subscriptionPeriod ?? null;
-    count = introductory.periodNumberOfUnits || introductory.cycles || count;
-  }
-
   if (priceAmount === null || isNaN(priceAmount) || priceAmount > 0) return noTrial;
 
   let days: number | null = null;
   let text: string | null = null;
-
   if (unit === "DAY" || unit === "day" || unit === 0) { days = count; text = count === 1 ? "1 day" : `${count} days`; }
   else if (unit === "WEEK" || unit === "week" || unit === 1) { days = count * 7; text = count === 1 ? "1 week" : `${count} weeks`; }
   else if (unit === "MONTH" || unit === "month" || unit === 2) { days = count * 30; text = count === 1 ? "1 month" : `${count} months`; }
   else if (unit === "YEAR" || unit === "year" || unit === 3) { days = count * 365; text = count === 1 ? "1 year" : `${count} years`; }
-  else if (typeof unit === "string" && unit.length > 0) { days = count; text = `${count} ${unit.toLowerCase()}`; }
 
   if (days !== null) return { hasFreeTrial: true, trialDurationDays: days, trialDurationText: text };
   return noTrial;
@@ -172,10 +149,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const deriveSubscriptionStatus = useCallback((customerInfo: CustomerInfo) => {
     const activeTier = getActiveTier(customerInfo);
     if (activeTier !== "free") {
-      const entitlementIds = Object.keys(customerInfo.entitlements.active);
-      const activeEnt = entitlementIds.length > 0
-        ? customerInfo.entitlements.active[entitlementIds[0]]
-        : null;
+      const entIds = Object.keys(customerInfo.entitlements.active);
+      const activeEnt = entIds.length > 0 ? customerInfo.entitlements.active[entIds[0]] : null;
       const periodType = activeEnt ? (activeEnt as any).periodType : null;
       if (periodType === "trial" || periodType === "TRIAL") {
         setSubscriptionStatus("trial");
@@ -191,18 +166,17 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         setTrialDaysLeft(null);
       }
     } else {
-      const hadAny = Object.keys(customerInfo.entitlements.all).some(id => ENTITLEMENT_TO_TIER[id]);
-      setSubscriptionStatus(hadAny ? "expired" : "free");
+      setSubscriptionStatus("free");
       setTrialDaysLeft(null);
     }
   }, []);
 
-  const syncSubscriptionToServer = useCallback(async (newTier: PlanTier) => {
+  const syncToServer = useCallback(async (newTier: PlanTier) => {
     try {
       await apiRequest("POST", "/api/subscription/sync", { tier: newTier });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     } catch (error) {
-      console.error("Failed to sync subscription:", error);
+      console.warn("[RC] Sync to server failed:", error);
     }
   }, [queryClient]);
 
@@ -211,10 +185,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     deriveSubscriptionStatus(customerInfo);
     setTier(rcTier);
     if (rcTier !== dbTier) {
-      syncSubscriptionToServer(rcTier);
+      syncToServer(rcTier);
     }
     return rcTier;
-  }, [deriveSubscriptionStatus, syncSubscriptionToServer]);
+  }, [deriveSubscriptionStatus, syncToServer]);
 
   const loadOfferings = useCallback(async (): Promise<void> => {
     const RC = getPurchases();
@@ -225,23 +199,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
     for (let attempt = 0; attempt <= 2; attempt++) {
       try {
-        if (attempt > 0) await delay([500, 1200][attempt - 1]);
+        if (attempt > 0) await delay([500, 1500][attempt - 1]);
         const offerings = await RC.getOfferings();
-        console.log("RevenueCat offerings loaded, packages:", offerings.current?.availablePackages?.length || 0);
+        console.log("[RC] Offerings loaded, packages:", offerings.current?.availablePackages?.length || 0);
         if (offerings.current && offerings.current.availablePackages.length > 0) {
           setCurrentOffering(offerings.current);
           setTrialInfo(extractTrialInfo(offerings.current));
           setOfferingsStatus("ready");
           setOfferingsError(null);
-          trackEvent("offerings_load_success", {
-            offeringId: offerings.current.identifier,
-            packageCount: offerings.current.availablePackages.length,
-          });
+          trackEvent("offerings_load_success", { packageCount: offerings.current.availablePackages.length });
           return;
-        }
-        if (attempt === 2) {
-          setOfferingsStatus("error");
-          setOfferingsError("No subscription packages found. Please try again.");
         }
       } catch (err: any) {
         if (attempt === 2) {
@@ -251,10 +218,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         }
       }
     }
+    if (offeringsStatus !== "ready") {
+      setOfferingsStatus("error");
+      setOfferingsError("No subscription packages found.");
+    }
   }, []);
 
   useEffect(() => {
-    const initRevenueCat = async () => {
+    const init = async () => {
       if (!user) {
         setIsLoading(false);
         setTier("free");
@@ -263,89 +234,75 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
       const dbTier = tierFromDbString(user.subscriptionTier);
 
-      try {
-        if (Platform.OS === "web" || isExpoGo()) {
-          console.log(isExpoGo() ? "Expo Go — RevenueCat Preview Mode" : "Web — using DB tier");
-          setTier(dbTier);
-          setSubscriptionStatus(dbTier !== "free" ? "active" : "free");
-          setIsLoading(false);
-          return;
-        }
-
-        const baseUrl = getApiUrl();
-        const configRes = await fetch(new URL("/api/subscription/config", baseUrl), {
-          credentials: "include",
-        });
-
-        if (!configRes.ok) {
-          setTier(dbTier);
-          setIsLoading(false);
-          return;
-        }
-
-        const config = await configRes.json();
-        const apiKey = Platform.OS === "android"
-          ? (config.googleApiKey || config.apiKey)
-          : config.apiKey;
-
-        if (!apiKey) {
-          setTier(dbTier);
-          setIsLoading(false);
-          return;
-        }
-
-        const RC = getPurchases();
-        if (!RC) {
-          setTier(dbTier);
-          setIsLoading(false);
-          return;
-        }
-
-        if (!configuredRef.current) {
-          try {
-            RC.configure({ apiKey, appUserID: user.id });
-            configuredRef.current = true;
-            setRevenueCatReady(true);
-            console.log("RevenueCat configured, user:", user.id);
-          } catch (configError: any) {
-            console.warn("RevenueCat configure error:", configError);
-            setTier(dbTier);
-            setIsLoading(false);
-            return;
-          }
-        }
-
-        try {
-          const customerInfo = await RC.getCustomerInfo();
-          applyCustomerInfo(customerInfo, dbTier);
-        } catch (infoError: any) {
-          console.warn("RevenueCat getCustomerInfo error:", infoError);
-          setTier(dbTier);
-          setSubscriptionStatus(dbTier !== "free" ? "active" : "free");
-        }
-
-        await loadOfferings();
-
-        try {
-          RC.addCustomerInfoUpdateListener((info) => {
-            const updatedTier = getActiveTier(info);
-            deriveSubscriptionStatus(info);
-            setTier(updatedTier);
-            syncSubscriptionToServer(updatedTier);
-          });
-        } catch (listenerError: any) {
-          console.warn("RevenueCat listener error:", listenerError);
-        }
-      } catch (error) {
-        console.warn("Subscription init error:", error);
+      if (Platform.OS === "web") {
         setTier(dbTier);
-      } finally {
+        setSubscriptionStatus(dbTier !== "free" ? "active" : "free");
         setIsLoading(false);
+        return;
       }
+
+      if (Platform.OS !== "ios") {
+        setTier(dbTier);
+        setIsLoading(false);
+        return;
+      }
+
+      const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
+      if (!apiKey) {
+        console.warn("[RC] EXPO_PUBLIC_REVENUECAT_API_KEY not set");
+        setTier(dbTier);
+        setIsLoading(false);
+        return;
+      }
+
+      const RC = getPurchases();
+      if (!RC) {
+        setTier(dbTier);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!configuredRef.current) {
+        try {
+          RC.configure({ apiKey, appUserID: String(user.id) });
+          configuredRef.current = true;
+          setRevenueCatReady(true);
+          console.log("[RC] Configured for user:", user.id);
+        } catch (configError: any) {
+          console.warn("[RC] Configure error:", configError);
+          setTier(dbTier);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      try {
+        const customerInfo = await RC.getCustomerInfo();
+        applyCustomerInfo(customerInfo, dbTier);
+      } catch (infoError: any) {
+        console.warn("[RC] getCustomerInfo error:", infoError);
+        setTier(dbTier);
+        setSubscriptionStatus(dbTier !== "free" ? "active" : "free");
+      }
+
+      await loadOfferings();
+
+      try {
+        RC.addCustomerInfoUpdateListener((info) => {
+          const updatedTier = getActiveTier(info);
+          deriveSubscriptionStatus(info);
+          setTier(updatedTier);
+          syncToServer(updatedTier);
+        });
+      } catch (listenerError: any) {
+        console.warn("[RC] Listener error:", listenerError);
+      }
+
+      setIsLoading(false);
     };
 
-    initRevenueCat();
-  }, [user, applyCustomerInfo, syncSubscriptionToServer, loadOfferings, deriveSubscriptionStatus]);
+    init();
+  }, [user, applyCustomerInfo, syncToServer, loadOfferings, deriveSubscriptionStatus]);
 
   const purchase = useCallback(async (pkg?: PurchasesPackage): Promise<boolean> => {
     try {
@@ -357,19 +314,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       }
 
       const RC = getPurchases();
-      if (!RC) throw new Error("Subscription service is not available on this device.");
+      if (!RC) throw new Error("Subscription service not available on this device.");
 
       if (!configuredRef.current) {
-        const baseUrl = getApiUrl();
-        const configRes = await fetch(new URL("/api/subscription/config", baseUrl), { credentials: "include" });
-        if (configRes.ok) {
-          const config = await configRes.json();
-          const apiKey = Platform.OS === "android" ? (config.googleApiKey || config.apiKey) : config.apiKey;
-          if (apiKey) {
-            RC.configure({ apiKey, appUserID: user?.id });
-            configuredRef.current = true;
-            setRevenueCatReady(true);
-          }
+        const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || "";
+        if (apiKey && user?.id) {
+          RC.configure({ apiKey, appUserID: String(user.id) });
+          configuredRef.current = true;
+          setRevenueCatReady(true);
         }
       }
 
@@ -397,13 +349,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         throw new Error("No subscription package available. Please check your connection and try again.");
       }
 
-      console.log("Purchasing package:", targetPkg.identifier, targetPkg.product?.identifier);
+      console.log("[RC] Purchasing:", targetPkg.identifier);
       const { customerInfo } = await RC.purchasePackage(targetPkg);
 
       const newTier = getActiveTier(customerInfo);
       deriveSubscriptionStatus(customerInfo);
-      setTier(newTier !== "free" ? newTier : "pro");
-      await syncSubscriptionToServer(newTier !== "free" ? newTier : "pro");
+      setTier(newTier !== "free" ? newTier : "growth");
+      await syncToServer(newTier !== "free" ? newTier : "growth");
       return true;
     } catch (error: any) {
       if (
@@ -415,10 +367,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       ) {
         return false;
       }
-      console.error("Purchase error:", error?.message, error?.code);
+      console.error("[RC] Purchase error:", error?.message, error?.code);
       throw error;
     }
-  }, [currentOffering, revenueCatReady, deriveSubscriptionStatus, syncSubscriptionToServer, queryClient, user]);
+  }, [currentOffering, revenueCatReady, deriveSubscriptionStatus, syncToServer, queryClient, user]);
 
   const restore = useCallback(async (): Promise<boolean> => {
     try {
@@ -431,13 +383,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       const restoredTier = getActiveTier(customerInfo);
       deriveSubscriptionStatus(customerInfo);
       setTier(restoredTier);
-      await syncSubscriptionToServer(restoredTier);
+      await syncToServer(restoredTier);
       return restoredTier !== "free";
     } catch (error) {
-      console.error("Restore error:", error);
+      console.error("[RC] Restore error:", error);
       throw error;
     }
-  }, [revenueCatReady, deriveSubscriptionStatus, syncSubscriptionToServer]);
+  }, [revenueCatReady, deriveSubscriptionStatus, syncToServer]);
 
   return (
     <SubscriptionContext.Provider
@@ -466,9 +418,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
 export function useSubscription() {
   const context = useContext(SubscriptionContext);
-  if (!context) {
-    throw new Error("useSubscription must be used within a SubscriptionProvider");
-  }
+  if (!context) throw new Error("useSubscription must be used within a SubscriptionProvider");
   return context;
 }
 

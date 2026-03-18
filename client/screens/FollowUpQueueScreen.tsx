@@ -417,7 +417,7 @@ export default function FollowUpQueueScreen() {
   }, [theme, borderColor, handleText, handleEmail, handleCall, handleMarkContacted, handleViewQuote, navigation]);
 
   return (
-    <ProGate featureName="Follow-Up Queue">
+    <ProGate featureName="Automated Follow-Ups">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <View style={[styles.header, { paddingTop: headerHeight + Spacing.md }, useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined]}>
         <View style={[styles.atRiskCard, { backgroundColor: surfaceBg }]}>

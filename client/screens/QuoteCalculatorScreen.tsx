@@ -5,7 +5,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
@@ -42,8 +42,14 @@ export default function QuoteCalculatorScreen() {
   const useMaxWidth = screenWidth > 600;
   const { pricingSettings, businessProfile } = useApp();
   const { user, isGuest } = useAuth();
-  const { isPro } = useSubscription();
+  const { isPro, isGrowth, isStarter } = useSubscription();
   const queryClient = useQueryClient();
+
+  const { data: quoteCountData } = useQuery<{ count: number; limit: number | null }>({
+    queryKey: ["/api/quotes/count"],
+    enabled: !!user && isStarter && !isGrowth,
+    staleTime: 30000,
+  });
   const routeParams = (route.params as any) || {};
   const prefill = routeParams.prefillCustomer;
   const editQuoteId = routeParams.editQuoteId as string | undefined;
@@ -429,6 +435,48 @@ export default function QuoteCalculatorScreen() {
           What are you quoting?
         </ThemedText>
 
+        {isStarter && !isGrowth && quoteCountData ? (
+          <Pressable
+            onPress={() => navigation.navigate("Paywall", { required_tier: "growth", trigger_source: "quote_limit" } as any)}
+            style={[
+              styles.quoteCounter,
+              {
+                backgroundColor: (quoteCountData.limit !== null && quoteCountData.count >= (quoteCountData.limit - 3))
+                  ? `${theme.warning}22`
+                  : `${theme.primary}11`,
+                borderColor: (quoteCountData.limit !== null && quoteCountData.count >= (quoteCountData.limit - 3))
+                  ? `${theme.warning}55`
+                  : `${theme.primary}22`,
+              },
+            ]}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Feather
+                name="file-text"
+                size={13}
+                color={(quoteCountData.limit !== null && quoteCountData.count >= (quoteCountData.limit - 3)) ? theme.warning : theme.primary}
+              />
+              <ThemedText
+                type="caption"
+                style={{
+                  color: (quoteCountData.limit !== null && quoteCountData.count >= (quoteCountData.limit - 3)) ? theme.warning : theme.primary,
+                  fontWeight: "600",
+                }}
+              >
+                {quoteCountData.limit !== null
+                  ? `${quoteCountData.count} of ${quoteCountData.limit} quotes used this month`
+                  : `${quoteCountData.count} quotes created this month`}
+              </ThemedText>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
+                Go unlimited
+              </ThemedText>
+              <Feather name="chevron-right" size={12} color={theme.primary} />
+            </View>
+          </Pressable>
+        ) : null}
+
         <View style={styles.typeCardsContainer}>
           {typeCards.map((card) => {
             const isSelected = quoteType === card.key;
@@ -436,6 +484,10 @@ export default function QuoteCalculatorScreen() {
               <Pressable
                 key={card.key}
                 onPress={() => {
+                  if (card.key === "walkthrough" && !isGrowth && !isGuestMode) {
+                    navigation.navigate("Paywall", { required_tier: "growth", trigger_source: "ai_builder_gate" } as any);
+                    return;
+                  }
                   if (card.enabled) {
                     setQuoteType(card.key);
                     if (Platform.OS !== "web") Haptics.selectionAsync();
@@ -645,8 +697,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   typeSelectorTitle: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     textAlign: "center",
+  },
+  quoteCounter: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
   },
   typeCardsContainer: {
     width: "100%",

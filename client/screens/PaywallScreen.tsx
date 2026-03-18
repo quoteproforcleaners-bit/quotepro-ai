@@ -51,14 +51,14 @@ const PLAN_FEATURES: PlanDefinition[] = [
     id: "starter",
     label: "Starter",
     monthlyPrice: "$19",
-    subtitle: "20 quotes / month",
+    subtitle: "Start winning more jobs",
     supportsAnnual: false,
     features: [
-      { icon: "home", label: "Good / Better / Best quoting" },
-      { icon: "edit-3", label: "Up to 20 quotes per month" },
-      { icon: "link", label: "Branded client intake form" },
-      { icon: "users", label: "Basic CRM & lead capture" },
-      { icon: "file-text", label: "Quote PDF export" },
+      { icon: "home", label: "Professional Good / Better / Best quoting" },
+      { icon: "file-text", label: "Up to 20 quotes per month" },
+      { icon: "link", label: "Branded client intake link" },
+      { icon: "users", label: "Basic CRM & lead tracking" },
+      { icon: "download", label: "PDF quote export" },
     ],
   },
   {
@@ -68,15 +68,15 @@ const PLAN_FEATURES: PlanDefinition[] = [
     annualPrice: "$470",
     annualPerMonth: "$39",
     savings: "Save $118/yr",
-    subtitle: "Unlimited quotes",
+    subtitle: "Best for most cleaning businesses",
     supportsAnnual: true,
     highlight: true,
     features: [
-      { icon: "zap", label: "Everything in Starter" },
-      { icon: "cpu", label: "AI quote builder" },
-      { icon: "trending-up", label: "Smart upsell recommendations" },
-      { icon: "send", label: "Automated follow-up sequences" },
-      { icon: "users", label: "Full CRM & customer management" },
+      { icon: "check-circle", label: "Everything in Starter, unlimited quotes" },
+      { icon: "cpu", label: "AI quote builder — quote any job by voice" },
+      { icon: "trending-up", label: "Smart upsells — add $40-80 per job on average" },
+      { icon: "send", label: "Automated follow-ups that close more leads" },
+      { icon: "users", label: "Full CRM — notes, history & job tracking" },
       { icon: "bar-chart-2", label: "Revenue & close-rate dashboard" },
       { icon: "star", label: "Review request automation" },
     ],
@@ -88,15 +88,15 @@ const PLAN_FEATURES: PlanDefinition[] = [
     annualPrice: "$950",
     annualPerMonth: "$79",
     savings: "Save $238/yr",
-    subtitle: "Everything in Growth",
+    subtitle: "For high-volume operations",
     supportsAnnual: true,
     features: [
-      { icon: "zap", label: "Everything in Growth" },
-      { icon: "link", label: "Jobber & QuickBooks integrations" },
+      { icon: "check-circle", label: "Everything in Growth" },
+      { icon: "link", label: "Jobber & QuickBooks sync" },
       { icon: "briefcase", label: "Commercial quote builder" },
       { icon: "search", label: "Lead finder & outreach tools" },
       { icon: "activity", label: "Revenue intelligence analytics" },
-      { icon: "settings", label: "Advanced automation rules" },
+      { icon: "settings", label: "Custom automation rules" },
       { icon: "phone", label: "Priority support" },
     ],
   },
@@ -126,7 +126,7 @@ export default function PaywallScreen() {
 
   const defaultPlan: SelectedPlan = requiredTier === "starter" ? "starter" : requiredTier === "pro" ? "pro" : "growth";
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan>(defaultPlan);
-  const [billing, setBilling] = useState<BillingInterval>("monthly");
+  const [billing, setBilling] = useState<BillingInterval>(defaultPlan !== "starter" ? "annual" : "monthly");
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -187,6 +187,8 @@ export default function PaywallScreen() {
 
   const contextualHeader = triggerSource === "quote_limit"
     ? "You've hit your quote limit"
+    : triggerSource === "ai_builder_gate"
+    ? "Quote faster with AI"
     : triggerSource === "feature_gate"
     ? "Unlock this feature"
     : "Choose your plan";
@@ -269,7 +271,14 @@ export default function PaywallScreen() {
     if (trialInfo.hasFreeTrial && trialInfo.trialDurationText && selectedPlan !== "starter") {
       return `Try ${planDef.label} free for ${trialInfo.trialDurationText}`;
     }
-    return `Subscribe to ${planDef.label}`;
+    if (selectedPlan === "starter") return "Start with Starter — $19/mo";
+    if (selectedPlan === "growth") {
+      return billing === "annual" ? "Get Growth — 2 Months Free" : "Start Growth Plan — $49/mo";
+    }
+    if (selectedPlan === "pro") {
+      return billing === "annual" ? "Get Pro — 2 Months Free" : "Go Pro — $99/mo";
+    }
+    return `Get ${planDef.label}`;
   })();
 
   const modalIcon = modal.type === "success" ? "check-circle" : modal.type === "error" ? "alert-circle" : "info";
@@ -299,11 +308,15 @@ export default function PaywallScreen() {
 
         {triggerSource === "quote_limit" ? (
           <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Upgrade to keep creating quotes and grow your cleaning business.
+            Move to Growth for unlimited quotes and the tools to close more jobs.
+          </ThemedText>
+        ) : triggerSource === "ai_builder_gate" ? (
+          <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Describe the job by voice and get a professional quote in seconds.
           </ThemedText>
         ) : (
           <ThemedText type="body" style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Built by a cleaning franchise owner for residential cleaning companies.
+            Built for cleaning businesses ready to quote faster and win more jobs.
           </ThemedText>
         )}
 
@@ -364,7 +377,7 @@ export default function PaywallScreen() {
               {planDef.savings ? (
                 <View style={[styles.savingsBadge, { backgroundColor: `${theme.success}20` }]}>
                   <ThemedText style={{ fontSize: 9, color: theme.success, fontWeight: "700" }}>
-                    SAVE
+                    2 MONTHS FREE
                   </ThemedText>
                 </View>
               ) : null}
@@ -382,8 +395,11 @@ export default function PaywallScreen() {
         </View>
 
         <View style={[styles.featureCard, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-          <ThemedText type="subtitle" style={{ marginBottom: Spacing.sm, fontWeight: "600" }}>
-            {planDef.label} includes:
+          <ThemedText type="subtitle" style={{ fontWeight: "700" }}>
+            {planDef.label}
+          </ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
+            {planDef.subtitle}
           </ThemedText>
           {planDef.features.map((f, i) => (
             <View key={i} style={styles.featureRow}>

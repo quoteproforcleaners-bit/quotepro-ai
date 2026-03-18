@@ -185,7 +185,7 @@ export default function UpsellOpportunitiesScreen() {
   ), [dt]);
 
   return (
-    <ProGate featureName="Upsell Opportunities">
+    <ProGate featureName="Smart Upsell Recommendations">
     <View style={s.flex}>
       <FlatList
         data={opportunities}
