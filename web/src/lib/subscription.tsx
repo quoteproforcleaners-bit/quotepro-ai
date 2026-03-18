@@ -12,12 +12,16 @@ export const PLAN_LIMITS: Record<PlanTier, { quotesPerMonth: number; label: stri
   pro: { quotesPerMonth: Infinity, label: "Pro" },
 };
 
+const FREE_TRIAL_DAYS = 14;
+
 interface SubscriptionContextType {
   tier: PlanTier;
   isPro: boolean;
   isGrowth: boolean;
   isStarter: boolean;
   isFree: boolean;
+  isInFreeTrial: boolean;
+  freeTrialDaysLeft: number;
   hasUnlimitedQuotes: boolean;
   hasAI: boolean;
   hasPremium: boolean;
@@ -47,6 +51,15 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const hasAI = isGrowth;
   const hasPremium = isPro;
   const quotesPerMonth = PLAN_LIMITS[tier]?.quotesPerMonth ?? 3;
+
+  // 14-day product-level free trial computed from account creation date
+  const userAgeMs = (user as any)?.createdAt
+    ? Date.now() - new Date((user as any).createdAt).getTime()
+    : Infinity;
+  const isInFreeTrial = isFree && userAgeMs < FREE_TRIAL_DAYS * 86_400_000;
+  const freeTrialDaysLeft = isInFreeTrial
+    ? Math.max(0, FREE_TRIAL_DAYS - Math.floor(userAgeMs / 86_400_000))
+    : 0;
 
   const showPaywall = useCallback(() => setPaywallVisible(true), []);
   const hidePaywall = useCallback(() => setPaywallVisible(false), []);
@@ -80,6 +93,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     <SubscriptionContext.Provider
       value={{
         tier, isPro, isGrowth, isStarter, isFree,
+        isInFreeTrial, freeTrialDaysLeft,
         hasUnlimitedQuotes, hasAI, hasPremium, quotesPerMonth,
         showPaywall, hidePaywall, paywallVisible,
         startCheckout, openPortal, checkoutLoading,

@@ -658,7 +658,7 @@ export default function CommercialQuotePage() {
         title="Commercial Quote Calculator"
         subtitle="Build accurate quotes for offices, medical facilities, and more"
       />
-      <ProGate feature="Commercial Quoting">
+      <ProGate feature="Commercial Quoting" minTier="pro">
         <CommercialQuoteContent />
       </ProGate>
     </div>

@@ -1,18 +1,66 @@
-import { useSubscription } from "../lib/subscription";
+import { useSubscription, type PlanTier } from "../lib/subscription";
 import { useNavigate } from "react-router-dom";
-import { TrendingUp, ArrowRight, Lock } from "lucide-react";
+import { TrendingUp, ArrowRight, Lock, Shield } from "lucide-react";
+
+const TIER_CONFIG: Record<"growth" | "pro", {
+  label: string;
+  price: string;
+  icon: typeof TrendingUp;
+  features: string[];
+}> = {
+  growth: {
+    label: "Growth",
+    price: "$49/mo",
+    icon: TrendingUp,
+    features: [
+      "Unlimited quotes",
+      "AI quote builder",
+      "Automated follow-ups",
+      "Full CRM & customer management",
+      "Revenue dashboard",
+    ],
+  },
+  pro: {
+    label: "Pro",
+    price: "$99/mo",
+    icon: Shield,
+    features: [
+      "Everything in Growth",
+      "Commercial quote builder",
+      "Lead finder & outreach",
+      "Advanced automation rules",
+      "Jobber & QuickBooks integrations",
+    ],
+  },
+};
+
+const FEATURE_TAGLINES: Record<string, string> = {
+  "AI Quote Builder": "Generate accurate, professional quotes in seconds — not minutes.",
+  "Follow-Up Queue": "Never let a hot lead go cold. Automated nudges that win jobs.",
+  "Automations": "Set triggers and rules that run your business while you're on jobs.",
+  "Commercial Quoting": "Win bigger commercial contracts with professional proposals.",
+  "Lead Finder": "Find homeowners actively looking for cleaning services near you.",
+  "Revenue Dashboard": "See exactly what's earning and where your next dollar is coming from.",
+};
 
 export function ProGate({
   children,
   feature,
+  minTier = "growth",
 }: {
   children: React.ReactNode;
   feature: string;
+  minTier?: "growth" | "pro";
 }) {
-  const { isGrowth } = useSubscription();
+  const { isGrowth, isPro } = useSubscription();
   const navigate = useNavigate();
 
-  if (isGrowth) return <>{children}</>;
+  const hasAccess = minTier === "pro" ? isPro : isGrowth;
+  if (hasAccess) return <>{children}</>;
+
+  const config = TIER_CONFIG[minTier];
+  const Icon = config.icon;
+  const tagline = FEATURE_TAGLINES[feature] ?? `Upgrade to ${config.label} to unlock ${feature.toLowerCase()} and more.`;
 
   return (
     <div className="relative min-h-[60vh] flex items-center justify-center">
@@ -21,22 +69,33 @@ export function ProGate({
         <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-blue-600 flex items-center justify-center shadow-xl shadow-blue-600/25">
           <Lock className="w-7 h-7 text-white" />
         </div>
+
         <h2 className="text-2xl font-bold text-slate-900 mb-2">
-          {feature} is a Growth feature
+          {feature}
         </h2>
         <p className="text-slate-500 mb-6 text-sm leading-relaxed">
-          Upgrade to Growth to unlock {feature.toLowerCase()}, unlimited quotes, AI tools, and automated follow-ups — everything you need to close more jobs.
+          {tagline}
         </p>
+
+        <ul className="text-left mb-6 space-y-2">
+          {config.features.map((f) => (
+            <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
+              <Icon className="w-4 h-4 text-blue-600 shrink-0" />
+              {f}
+            </li>
+          ))}
+        </ul>
+
         <button
           onClick={() => navigate("/pricing")}
           className="inline-flex items-center gap-2 h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors shadow-lg shadow-blue-600/25"
         >
-          <TrendingUp className="w-4 h-4" />
-          See Growth plan
+          <Icon className="w-4 h-4" />
+          Upgrade to {config.label}
           <ArrowRight className="w-4 h-4" />
         </button>
         <p className="mt-4 text-xs text-slate-400">
-          7-day free trial&nbsp;&nbsp;·&nbsp;&nbsp;$49/mo&nbsp;&nbsp;·&nbsp;&nbsp;Cancel anytime
+          14-day free trial&nbsp;&nbsp;·&nbsp;&nbsp;{config.price}&nbsp;&nbsp;·&nbsp;&nbsp;Cancel anytime
         </p>
       </div>
     </div>

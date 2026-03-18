@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { useSubscription } from "../lib/subscription";
 import {
   PageHeader,
   Card,
@@ -67,6 +68,7 @@ function getProtectionScore(healthPercent: number, followUpCount: number, closeR
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { business } = useAuth();
+  const { isInFreeTrial, freeTrialDaysLeft } = useSubscription();
   const { data: quotes = [] } = useQuery<any[]>({ queryKey: ["/api/quotes"] });
   const { data: customers = [] } = useQuery<any[]>({ queryKey: ["/api/customers"] });
   const { data: jobs = [] } = useQuery<any[]>({ queryKey: ["/api/jobs"] });
@@ -178,6 +180,26 @@ export default function DashboardPage() {
           </Button>
         }
       />
+
+      {isInFreeTrial ? (
+        <button
+          onClick={() => navigate("/pricing")}
+          className="w-full text-left rounded-2xl p-4 mb-6 bg-blue-50 border border-blue-100 hover:bg-blue-100 transition-colors flex items-center gap-4"
+        >
+          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
+            <Zap className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-blue-900">
+              Free Trial — {freeTrialDaysLeft} day{freeTrialDaysLeft !== 1 ? "s" : ""} remaining
+            </p>
+            <p className="text-xs text-blue-600 mt-0.5">
+              Upgrade now to keep unlimited quoting, AI tools, and automated follow-ups.
+            </p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-blue-400 shrink-0" />
+        </button>
+      ) : null}
 
       {followUpQueueCount > 0 ? (
         <div className={`rounded-2xl p-5 lg:p-6 mb-6 ${riskState.class}`}>

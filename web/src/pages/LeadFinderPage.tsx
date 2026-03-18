@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { ProGate } from "../components/ProGate";
 
 const TABS = [
   { key: "new", label: "New" },
@@ -84,6 +85,7 @@ export default function LeadFinderPage() {
   }, [qc]);
 
   return (
+    <ProGate feature="Lead Finder" minTier="pro">
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-start justify-between mb-6">
         <div>
@@ -229,5 +231,6 @@ export default function LeadFinderPage() {
         </div>
       )}
     </div>
+    </ProGate>
   );
 }
