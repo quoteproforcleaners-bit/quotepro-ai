@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import { SubscriptionProvider } from "./lib/subscription";
 import { ThemeProvider } from "./lib/theme";
+import { WalkthroughProvider } from "./lib/walkthrough";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ProGate } from "./components/ProGate";
 import { Layout } from "./components/Layout";
@@ -59,6 +60,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+    <WalkthroughProvider>
     <SubscriptionProvider>
       <Routes>
         {/* Public marketing funnel — unauthenticated visitors land here */}
@@ -139,6 +141,7 @@ export default function App() {
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>
     </SubscriptionProvider>
+    </WalkthroughProvider>
     </ThemeProvider>
   );
 }

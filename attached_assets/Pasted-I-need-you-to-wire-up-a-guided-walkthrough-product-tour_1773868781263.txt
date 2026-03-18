@@ -1,0 +1,228 @@
+I need you to wire up a guided walkthrough / product tour in the web app so it mirrors the onboarding guidance experience in the iOS app.
+
+This is not just a tooltip task.
+I want a polished, guided, step-by-step walkthrough for the web app that helps new users understand the product, take action quickly, and activate into the core workflows.
+
+The goal is:
+- make the web app feel more premium
+- reduce confusion
+- guide users through the most important actions
+- mirror the guided walkthrough logic and sequencing from iOS as closely as possible
+- improve activation into quoting and revenue-driving workflows
+
+Do NOT break existing web app navigation, auth, state, or layouts.
+Before coding, first inspect the current project and identify:
+- where the iOS walkthrough/onboarding logic lives
+- whether there is an existing step config or onboarding model that can be reused
+- where the web app app-shell/layout/navigation is defined
+- whether the web app already has any tooltip/tour library installed
+- what the most important activation flows are on web
+- how to persist walkthrough completion/dismissal state
+Then implement carefully.
+
+==================================================
+PRIMARY GOAL
+==================================================
+
+Build a guided web walkthrough that feels like a real product tour, not cheap scattered tooltips.
+
+It should:
+- introduce the key parts of the product
+- guide the user through the most important areas
+- encourage action, not just explanation
+- be easy to dismiss, restart, and resume
+- be visually polished and aligned with QuotePro branding
+
+==================================================
+PRODUCT DIRECTION
+==================================================
+
+The walkthrough should focus on the highest-value workflows in the web app.
+
+Priority workflows:
+1. Dashboard / revenue overview
+2. New Quote / Quotes
+3. Send Intake / Quote Requests / Lead Capture
+4. Customers / CRM
+5. Price Settings / Quote Preferences
+6. AI tools that matter for revenue
+7. Follow-ups / Tasks / Reviews / Growth features
+8. Any other core action that gets users to value fast
+
+This should not be a generic “here is the sidebar” tour only.
+It should guide the user toward actually using the product.
+
+==================================================
+REQUIRED BEHAVIOR
+==================================================
+
+Implement a guided walkthrough with:
+
+- welcome / intro step
+- anchored step-by-step highlights
+- next / back / skip controls
+- progress indicator
+- dismiss option
+- completion state
+- restart walkthrough option somewhere in settings/help/account menu
+
+Persist walkthrough state so:
+- new users see it at the right time
+- existing users are not forced into it every time
+- users can restart it manually later
+
+Use local storage / user profile / app state persistence as appropriate.
+If user-level persistence already exists, prefer that over local-only.
+
+==================================================
+MATCH IOS AS CLOSELY AS POSSIBLE
+==================================================
+
+The walkthrough should follow the same high-level structure and product logic as the iOS guided walkthrough.
+
+Please inspect the iOS walkthrough and mirror:
+- order of concepts
+- messaging style
+- product terminology
+- activation logic
+- completion behavior
+
+If exact parity is not possible because web and iOS layouts differ, preserve the intent and sequence rather than blindly copying placements.
+
+==================================================
+WALKTHROUGH CONTENT STRATEGY
+==================================================
+
+Suggested walkthrough sequence for web:
+
+Step 1 — Welcome
+Explain what QuotePro helps with:
+- quote faster
+- close more jobs
+- organize customers
+- grow revenue
+
+Step 2 — Dashboard
+Show where users can track activity / revenue / pipeline
+
+Step 3 — Quotes
+Show where to create, manage, and send quotes
+
+Step 4 — Intake / Quote Requests
+Show how users can capture customer details faster
+
+Step 5 — Customers / CRM
+Show where customer records and history live
+
+Step 6 — Pricing / Preferences
+Show where quote logic and pricing settings are controlled
+
+Step 7 — Follow-ups / Growth tools
+Show how users stay on top of leads and win more work
+
+Step 8 — AI tools
+Highlight the most useful AI tools without overwhelming the user
+
+Step 9 — Call to action
+Prompt user to take a real next step such as:
+- create first quote
+- configure pricing
+- send intake
+- import customer
+depending on what makes most sense
+
+Do not overload each step with too much text.
+Each step should be concise, clear, and action-oriented.
+
+==================================================
+UX / DESIGN REQUIREMENTS
+==================================================
+
+The walkthrough must feel polished and premium.
+
+Requirements:
+- clean modal/card design
+- proper spotlight/highlight on target elements
+- overlay that dims the rest of the screen
+- smooth transitions
+- responsive behavior
+- avoid awkward clipping or overflow
+- handle sidebar/navigation layouts cleanly
+- avoid showing steps for elements not visible yet
+
+If navigation is required between steps, handle it intelligently:
+- route the user to the correct page before the next step
+- wait for the page/element to render before showing the step
+- do not show broken orphaned tooltips
+
+==================================================
+TECHNICAL REQUIREMENTS
+==================================================
+
+Please choose a robust implementation approach for the web app.
+
+Could be:
+- an existing tour library already in project
+- a new lightweight but solid tour library
+- or a custom implementation if truly needed
+
+But it must be:
+- maintainable
+- reliable
+- easy to edit later
+- easy to add/remove steps
+- not hacky
+
+Create a central walkthrough configuration file if possible, so steps are not scattered randomly across the codebase.
+
+==================================================
+STATE / TARGETING
+==================================================
+
+The walkthrough should be able to support:
+- first-time user auto-start
+- manual restart
+- partial completion
+- dismissal
+- completed state
+
+Optional but valuable:
+- show only after onboarding/login is complete
+- only show when the user lands in the main app
+- suppress for users who already clearly completed setup
+
+If the project already has onboarding/account setup status, use it.
+
+==================================================
+EDGE CASES
+==================================================
+
+Handle these gracefully:
+- user refreshes mid-tour
+- user dismisses tour
+- target element not found
+- screen size changes
+- sidebar collapsed / expanded
+- user navigates away manually
+- page content still loading
+
+Do not let the walkthrough break the app experience.
+
+==================================================
+DELIVERABLES
+==================================================
+
+When done, provide:
+- summary of approach used
+- where walkthrough config lives
+- where walkthrough state is persisted
+- how first-run logic works
+- how restart works
+- which web pages/screens are included
+- how the web walkthrough mirrors iOS
+- files changed
+- files created
+- any TODOs or follow-up recommendations
+
+Final instruction:
+Before coding, first inspect the iOS walkthrough flow and the web app structure, then summarize the exact implementation plan for bringing a guided walkthrough to the web app with strong UX and minimal fragility.

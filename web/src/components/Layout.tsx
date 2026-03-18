@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
 import { useTheme } from "../lib/theme";
+import { useWalkthrough } from "../lib/walkthrough";
+import { WalkthroughOverlay } from "./WalkthroughOverlay";
 import {
   LayoutDashboard,
   FileText,
@@ -113,9 +115,18 @@ export function Layout() {
   const { user, business, logout } = useAuth();
   const { isPro } = useSubscription();
   const { theme, toggleTheme } = useTheme();
+  const { isCompleted, isDismissed, startTour, resetTour } = useWalkthrough();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isCompleted && !isDismissed && location.pathname === "/dashboard") {
+      const timer = setTimeout(() => startTour(), 800);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
 
   const handleLogout = async () => {
     await logout();
@@ -192,6 +203,16 @@ export function Layout() {
           ))}
         </nav>
 
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => { resetTour(); setSidebarOpen(false); }}
+            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+          >
+            <BookOpen className="w-3.5 h-3.5 shrink-0 group-hover:text-primary-500 transition-colors" />
+            Product Tour
+          </button>
+        </div>
+
         {!isPro ? (
           <div className="mx-3 mb-3">
             <button
@@ -266,6 +287,8 @@ export function Layout() {
           </div>
         </main>
       </div>
+
+      <WalkthroughOverlay />
     </div>
   );
 }
