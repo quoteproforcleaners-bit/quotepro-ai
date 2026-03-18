@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
+import { useWebAIConsent } from "../lib/webAIConsent";
 import { apiPut, apiPost, apiGet, apiDelete, apiPatch } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import {
@@ -22,6 +23,7 @@ import {
   Webhook,
   Bot,
   Shield,
+  ExternalLink,
   Copy,
   Plus,
   User,
@@ -239,6 +241,7 @@ const LANGUAGE_OPTIONS = [
 export default function SettingsPage() {
   const { user, business, logout, refresh } = useAuth();
   const { isPro, isGrowth, isStarter, tier, startCheckout, openPortal, checkoutLoading } = useSubscription();
+  const { hasAIConsent, consentData, revokeAIConsent, requestAIConsent } = useWebAIConsent();
   const [portalError, setPortalError] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -1319,6 +1322,82 @@ export default function SettingsPage() {
                 </Button>
               </div>
             )}
+          </Card>
+
+          <Card>
+            <CardHeader title="Privacy &amp; Legal" icon={Shield} />
+            <div className="space-y-4 text-sm">
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <span className="text-slate-500">Privacy Policy</span>
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                >
+                  View <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <span className="text-slate-500">Terms of Use</span>
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                >
+                  View <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+              <div className="flex items-start justify-between py-2">
+                <div>
+                  <span className="text-slate-700 font-medium block">AI Data Processing</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">
+                    Data sent to OpenAI to power AI features
+                  </span>
+                  {consentData?.aiConsentAcceptedAt ? (
+                    <span className="text-xs text-slate-400 mt-0.5 block">
+                      Accepted{" "}
+                      {new Date(consentData.aiConsentAcceptedAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                      {consentData.consentVersion ? ` · v${consentData.consentVersion}` : ""}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0 ml-4">
+                  {hasAIConsent ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                        Enabled
+                      </span>
+                      <button
+                        onClick={revokeAIConsent}
+                        className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+                      >
+                        Revoke
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+                        Not enabled
+                      </span>
+                      <button
+                        onClick={requestAIConsent}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      >
+                        Enable
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           </Card>
 
           <Card>

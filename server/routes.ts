@@ -856,6 +856,56 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     });
   });
 
+  // ── Consent API ────────────────────────────────────────────────────────────
+  app.get("/api/consent", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await pool.query(
+        `SELECT ai_consent_accepted_at, terms_accepted_at, consent_version FROM users WHERE id = $1`,
+        [req.session.userId]
+      );
+      const row = result.rows[0] ?? {};
+      return res.json({
+        aiConsentAcceptedAt: row.ai_consent_accepted_at ?? null,
+        termsAcceptedAt: row.terms_accepted_at ?? null,
+        consentVersion: row.consent_version ?? null,
+      });
+    } catch (err) {
+      console.error("GET /api/consent error:", err);
+      return res.status(500).json({ message: "Failed to fetch consent" });
+    }
+  });
+
+  app.post("/api/consent", requireAuth, async (req: Request, res: Response) => {
+    const { type, version } = req.body as { type: "ai" | "terms" | "both"; version?: string };
+    const now = new Date();
+    const ver = version ?? "1.0";
+    try {
+      if (type === "ai") {
+        await pool.query(
+          `UPDATE users SET ai_consent_accepted_at = $1, consent_version = $2 WHERE id = $3`,
+          [now, ver, req.session.userId]
+        );
+      } else if (type === "terms") {
+        await pool.query(
+          `UPDATE users SET terms_accepted_at = $1, consent_version = $2 WHERE id = $3`,
+          [now, ver, req.session.userId]
+        );
+      } else if (type === "both") {
+        await pool.query(
+          `UPDATE users SET ai_consent_accepted_at = $1, terms_accepted_at = $1, consent_version = $2 WHERE id = $3`,
+          [now, ver, req.session.userId]
+        );
+      } else {
+        return res.status(400).json({ message: "Invalid consent type" });
+      }
+      return res.json({ ok: true, acceptedAt: now.toISOString() });
+    } catch (err) {
+      console.error("POST /api/consent error:", err);
+      return res.status(500).json({ message: "Failed to record consent" });
+    }
+  });
+  // ── End Consent API ────────────────────────────────────────────────────────
+
   app.post("/api/auth/delete-account", requireAuth, async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
@@ -10247,6 +10297,9 @@ initOAuthStatesTable();
 (async () => {
   try {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_consent_accepted_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version TEXT`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS started_at TIMESTAMP`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS update_token VARCHAR UNIQUE`);

@@ -21,6 +21,7 @@ import {
   SectionLabel,
 } from "../components/ui";
 import { ProGate } from "../components/ProGate";
+import { WebAIConsentGate } from "../components/WebAIConsentGate";
 import { apiRequest } from "../lib/api";
 
 type ObjectionType =
@@ -439,7 +440,9 @@ export default function ClosingAssistantPage() {
         subtitle="Paste a customer objection or upload a screenshot to generate a reply that closes the job."
       />
       <ProGate feature="Objection Assistant">
-        <ObjectionAssistantContent />
+        <WebAIConsentGate>
+          <ObjectionAssistantContent />
+        </WebAIConsentGate>
       </ProGate>
     </div>
   );

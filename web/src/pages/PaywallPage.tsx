@@ -161,6 +161,11 @@ export default function PaywallPage() {
                   <p className="text-center text-xs text-slate-400 pt-2">
                     Cancel anytime. No commitment.
                   </p>
+                  <p className="text-center text-[11px] text-slate-400 pt-1 leading-relaxed">
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Terms of Use</a>
+                    {" "}&middot;{" "}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Privacy Policy</a>
+                  </p>
                 </div>
               </div>
             </div>

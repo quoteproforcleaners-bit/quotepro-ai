@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { PageHeader, Card, CardHeader, Button, Alert } from "../components/ui";
 import { useSubscription } from "../lib/subscription";
+import { WebAIConsentGate } from "../components/WebAIConsentGate";
 
 const EXAMPLE_CHIPS = [
   "3 bed 2 bath house, first-time deep clean, 1 dog that sheds, kitchen is greasy.",
@@ -411,6 +412,7 @@ export default function WalkthroughAIPage() {
         subtitle="Paste walkthrough notes, texts, or property descriptions — AI extracts quote-ready details"
       />
 
+      <WebAIConsentGate>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4">
           <Card>
@@ -542,6 +544,7 @@ export default function WalkthroughAIPage() {
           </Card>
         </div>
       </div>
+      </WebAIConsentGate>
     </div>
   );
 }

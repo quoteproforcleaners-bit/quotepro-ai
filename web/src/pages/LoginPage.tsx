@@ -395,6 +395,11 @@ export default function LoginPage() {
                   Start free
                 </Link>
               </p>
+              <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Privacy Policy</a>
+                {" "}&middot;{" "}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Terms of Use</a>
+              </p>
             </div>
           </div>
         </div>

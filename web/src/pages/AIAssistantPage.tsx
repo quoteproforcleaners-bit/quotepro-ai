@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "../components/ui";
 import { ProGate } from "../components/ProGate";
+import { WebAIConsentGate } from "../components/WebAIConsentGate";
 
 interface Script {
   label: string;
@@ -389,7 +390,9 @@ export default function AIAssistantPage() {
         subtitle="AI sales coaching tailored to your cleaning business — scripts, follow-ups, objection handling, and more."
       />
       <ProGate feature="AI Sales Assistant">
-        <SalesAssistantChat />
+        <WebAIConsentGate>
+          <SalesAssistantChat />
+        </WebAIConsentGate>
       </ProGate>
     </div>
   );

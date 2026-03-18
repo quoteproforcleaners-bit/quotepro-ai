@@ -262,9 +262,25 @@ export default function RegisterPage() {
 
             <p className="text-xs text-slate-400 text-center mt-5 leading-relaxed">
               By creating an account you agree to our{" "}
-              <span className="underline cursor-pointer hover:text-slate-600 transition-colors">Terms of Service</span>{" "}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-slate-600 transition-colors"
+              >
+                Terms of Use
+              </a>{" "}
               and{" "}
-              <span className="underline cursor-pointer hover:text-slate-600 transition-colors">Privacy Policy</span>.
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-slate-600 transition-colors"
+              >
+                Privacy Policy
+              </a>
+              . AI-powered features process data via OpenAI — consent is
+              requested on first use.
             </p>
           </div>
         </div>
