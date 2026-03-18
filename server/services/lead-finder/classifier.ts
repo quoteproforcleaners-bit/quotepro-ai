@@ -95,6 +95,6 @@ export async function classifyLead(
 
 export function shouldStoreLead(result: ClassificationResult): boolean {
   if (result.classification === "yes") return true;
-  if (result.classification === "maybe" && result.confidence >= 60) return true;
+  if (result.classification === "maybe" && result.confidence >= 40) return true;
   return false;
 }

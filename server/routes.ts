@@ -9729,7 +9729,14 @@ Rules:
         const subreddits = (settings?.subreddits as string[]) ?? [];
 
         let posts = await fetchRedditLeads({ keywords, subreddits, targetCities });
-        if (!posts.length) posts = getMockLeads();
+        const usedLive = posts.length > 0;
+        if (!posts.length) posts = getMockLeads(targetCities);
+
+        const dayBucket = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+        posts = posts.map((p) => ({
+          ...p,
+          externalId: p.externalId.startsWith("mock_") ? `${p.externalId}_${dayBucket}` : p.externalId,
+        }));
 
         let stored = 0;
         let skipped = 0;
@@ -9773,7 +9780,7 @@ Rules:
           stored,
           skipped,
           rejected,
-          usedMock: !posts.length,
+          usedLive,
         });
       } catch (e: any) {
         console.error("[lead-finder poll]", e);
