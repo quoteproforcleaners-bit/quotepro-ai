@@ -118,7 +118,7 @@ export default function App() {
           <Route path="/lead-finder/settings" element={<ProGate feature="Local Lead Finder"><LeadFinderSettingsPage /></ProGate>} />
           <Route path="/lead-finder/:id" element={<ProGate feature="Local Lead Finder"><LeadFinderDetailPage /></ProGate>} />
           <Route path="/revenue" element={<ProGate feature="Revenue Intelligence"><RevenuePage /></ProGate>} />
-          <Route path="/closing-assistant" element={<ProGate feature="Closing Assistant"><ClosingAssistantPage /></ProGate>} />
+          <Route path="/closing-assistant" element={<ClosingAssistantPage />} />
           <Route path="/commercial-quote" element={<ProGate feature="Commercial Quoting"><CommercialQuotePage /></ProGate>} />
           <Route path="/reactivation" element={<ProGate feature="Reactivation Campaigns"><ReactivationPage /></ProGate>} />
           <Route path="/automations" element={<ProGate feature="Automations"><AutomationsHubPage /></ProGate>} />

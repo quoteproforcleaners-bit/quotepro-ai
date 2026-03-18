@@ -404,7 +404,7 @@ export default function RootStackNavigator() {
             name="ClosingAssistant"
             component={ClosingAssistantScreen}
             options={{
-              headerTitle: "Closing Assistant",
+              headerTitle: "Objection Assistant",
             }}
           />
           <Stack.Screen

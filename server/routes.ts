@@ -4563,6 +4563,10 @@ Rules:
   app.post("/api/ai/closing-message", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const {
+        objectionText,
+        objectionType: objType,
+        tone,
+        language: msgLanguage,
         quoteAmount,
         serviceType,
         frequency,
@@ -4571,12 +4575,10 @@ Rules:
         notes,
         pricingSummary,
         messageType,
-        tone,
-        language: msgLanguage,
       } = req.body;
 
-      if (!messageType || !tone) {
-        return res.status(400).json({ message: "Message type and tone are required" });
+      if (!tone) {
+        return res.status(400).json({ message: "Tone is required" });
       }
 
       const business = await getBusinessByOwner(req.session.userId!);
@@ -4584,69 +4586,124 @@ Rules:
         try {
           await createAnalyticsEvent({
             businessId: business.id,
-            eventName: "walkthrough_closing_message_generated",
-            properties: { messageType, tone, language: msgLanguage || "en" },
+            eventName: "objection_assistant_used",
+            properties: { objectionType: objType || messageType || "general", tone, language: msgLanguage || "en" },
           });
         } catch (_e) {}
       }
 
       const businessName = business?.companyName || "our company";
-
-      const languageMap: Record<string, string> = {
-        en: "English",
-        es: "Spanish",
-        pt: "Portuguese",
-        ru: "Russian",
-      };
+      const languageMap: Record<string, string> = { en: "English", es: "Spanish", pt: "Portuguese", ru: "Russian" };
       const targetLanguage = languageMap[msgLanguage || "en"] || "English";
 
-      const systemPrompt = `You are an expert sales copywriter for cleaning service businesses. Generate a closing message based on the given context.
+      const systemPrompt = `You are an elite AI sales assistant for cleaning businesses. Your job is to help the business owner craft the perfect response to a customer objection or hesitation so they can close more jobs.
+
+You will analyze the customer's message and generate a structured JSON response with:
+1. primaryReply — a ready-to-send message that addresses the objection and guides toward booking
+2. alternateReply — a different angle (e.g. softer, more direct, or differently framed)
+3. objectionType — classify the objection in 2-4 words (e.g., "Price objection", "Commitment hesitation", "Recurring resistance", "Deep clean resistance", "One-time preference")
+4. nextMove — a short tactical tip for what the business owner should do after sending the reply
 
 Rules:
-- Write in ${targetLanguage}.
-- Tone: ${tone}.
-- Message type: ${messageType.replace(/_/g, " ")}.
-- Keep the message concise and action-oriented.
-- For text messages, keep under 300 characters.
-- For emails, include a subject line on the first line prefixed with "Subject: ".
-- For follow-ups, reference the previous quote gently.
-- For objection handling, address common price concerns with value framing.
-- For recurring upsell, highlight savings and convenience of regular service.
-- For deep-clean-first, explain why an initial deep clean leads to better recurring results.
-- Never use placeholder brackets like [Name] — use the actual customer name if provided, or write naturally without a name.
-- Be genuine and human, not salesy or pushy.
-- Do NOT include any emojis.`;
+- Write ENTIRELY in ${targetLanguage}
+- Tone: ${tone}
+- Replies must feel human and genuine — never robotic or salesy
+- Keep replies concise and text-message ready (unless the context suggests email)
+- Reference cleaning-specific details: deep clean, recurring service, weekly/biweekly/monthly, quote amount, first-time clean
+- Use the customer's name if provided; otherwise write naturally without one
+- Business: ${businessName}
+- Do NOT use emojis
+- Do NOT use placeholder brackets like [Name]
+- Return ONLY a valid JSON object, no other text
+
+Return exactly this JSON structure:
+{
+  "primaryReply": "...",
+  "alternateReply": "...",
+  "objectionType": "...",
+  "nextMove": "..."
+}`;
 
       const contextParts: string[] = [];
-      if (customerName) contextParts.push(`Customer: ${customerName}`);
+      if (objectionText) contextParts.push(`Customer's message: "${objectionText}"`);
+      if (customerName) contextParts.push(`Customer name: ${customerName}`);
       if (quoteAmount) contextParts.push(`Quote amount: $${Number(quoteAmount).toFixed(2)}`);
-      if (serviceType) contextParts.push(`Service: ${serviceType}`);
-      if (frequency) contextParts.push(`Frequency: ${frequency}`);
+      if (serviceType) contextParts.push(`Service type: ${serviceType}`);
+      if (frequency) contextParts.push(`Cleaning frequency: ${frequency}`);
       if (addOns && Array.isArray(addOns) && addOns.length > 0) contextParts.push(`Add-ons: ${addOns.join(", ")}`);
-      if (notes) contextParts.push(`Notes: ${notes}`);
+      if (notes) contextParts.push(`Additional context: ${notes}`);
       if (pricingSummary) contextParts.push(`Pricing summary: ${pricingSummary}`);
-      contextParts.push(`Business name: ${businessName}`);
+      if (objType || messageType) contextParts.push(`Objection category: ${(objType || messageType || "").replace(/_/g, " ")}`);
 
       const userMessage = contextParts.length > 0
-        ? `Generate a ${messageType.replace(/_/g, " ")} with a ${tone} tone for this quote:\n\n${contextParts.join("\n")}`
-        : `Generate a generic ${messageType.replace(/_/g, " ")} with a ${tone} tone for a cleaning service quote.`;
+        ? `Generate an objection response with a ${tone} tone:\n\n${contextParts.join("\n")}`
+        : `Generate a sample price objection response with a ${tone} tone for a cleaning business. Example objection: "That's more than I expected."`;
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-nano",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
         ],
-        max_completion_tokens: 600,
+        max_completion_tokens: 800,
+        response_format: { type: "json_object" },
       });
 
       const content = completion.choices[0]?.message?.content;
       if (!content) return res.status(500).json({ message: "No response from AI" });
 
-      return res.json({ message: content.trim() });
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        return res.json({ message: content.trim(), primaryReply: content.trim() });
+      }
+
+      return res.json({
+        message: parsed.primaryReply || content.trim(),
+        primaryReply: parsed.primaryReply || "",
+        alternateReply: parsed.alternateReply || "",
+        objectionType: parsed.objectionType || "",
+        nextMove: parsed.nextMove || "",
+      });
     } catch (error: any) {
-      console.error("AI closing message error:", error);
-      return res.status(500).json({ message: "Failed to generate closing message" });
+      console.error("AI objection assistant error:", error);
+      return res.status(500).json({ message: "Failed to generate reply. Please try again." });
+    }
+  });
+
+  app.post("/api/ai/objection-extract", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { imageBase64, mimeType } = req.body;
+      if (!imageBase64) return res.status(400).json({ message: "Image is required" });
+
+      const dataUrl = `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Extract the visible text from this screenshot of a text message or chat conversation. Return ONLY the extracted text, preserving the conversation flow. Focus especially on the customer's most recent message or objection. Do not add any commentary.",
+              },
+              {
+                type: "image_url",
+                image_url: { url: dataUrl },
+              },
+            ] as any,
+          },
+        ],
+        max_completion_tokens: 400,
+      });
+
+      const extractedText = completion.choices[0]?.message?.content?.trim() || "";
+      return res.json({ text: extractedText });
+    } catch (error: any) {
+      console.error("Objection extract error:", error);
+      return res.status(500).json({ message: "Could not extract text from image. Please type the message manually." });
     }
   });
 

@@ -84,7 +84,7 @@ const navSections = [
   {
     label: "AI Tools",
     items: [
-      { to: "/closing-assistant", label: "Closing Assistant", icon: Zap, pro: true },
+      { to: "/closing-assistant", label: "Objection Assistant", icon: Zap, pro: true },
       { to: "/sales-strategy", label: "Sales Strategy", icon: Layers, pro: true },
       { to: "/automations", label: "Automations Hub", icon: Cpu, pro: true },
       { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true },
