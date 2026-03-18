@@ -164,26 +164,28 @@ export default function PaywallScreen() {
     return null;
   }, [currentOffering, selectedPlan, billing]);
 
+  // PRIMARY price = what is actually charged (Apple requires this to be most prominent)
   const displayPrice = useMemo(() => {
-    if (selectedPackage?.product?.priceString) return selectedPackage.product.priceString;
     if (billing === "annual" && planDef.supportsAnnual) {
-      return planDef.annualPerMonth ? `${planDef.annualPerMonth}/mo` : `${planDef.monthlyPrice}/mo`;
+      // Annual: show the billed total (e.g. "$470/year") — this IS the charge
+      if (selectedPackage?.product?.priceString) return `${selectedPackage.product.priceString}/year`;
+      return planDef.annualPrice ? `${planDef.annualPrice}/year` : `${planDef.monthlyPrice}/mo`;
     }
+    // Monthly: the monthly price IS the billed amount
+    if (selectedPackage?.product?.priceString) return `${selectedPackage.product.priceString}/mo`;
     return `${planDef.monthlyPrice}/mo`;
   }, [selectedPackage, billing, planDef]);
 
+  // SECONDARY note = subordinate info (monthly equivalent, savings, trial)
   const displayBilledNote = useMemo(() => {
-    if (billing === "annual" && planDef.supportsAnnual && planDef.savings) {
-      const annualTotal = selectedPackage?.product?.priceString
-        ? `billed ${selectedPackage.product.priceString}/year`
-        : `billed ${planDef.annualPrice}/year`;
-      return `${annualTotal} · ${planDef.savings}`;
+    if (billing === "annual" && planDef.supportsAnnual && planDef.annualPerMonth) {
+      return `${planDef.annualPerMonth}/mo · ${planDef.savings}`;
     }
     if (trialInfo.hasFreeTrial && trialInfo.trialDurationText && selectedPlan !== "starter") {
-      return `per month after ${trialInfo.trialDurationText} free trial`;
+      return `then ${planDef.monthlyPrice}/mo · billed monthly`;
     }
-    return "per month";
-  }, [billing, planDef, trialInfo, selectedPackage, selectedPlan]);
+    return "billed monthly";
+  }, [billing, planDef, trialInfo, selectedPlan]);
 
   const contextualHeader = triggerSource === "quote_limit"
     ? "You've hit your quote limit"
@@ -273,10 +275,10 @@ export default function PaywallScreen() {
     }
     if (selectedPlan === "starter") return "Start with Starter — $19/mo";
     if (selectedPlan === "growth") {
-      return billing === "annual" ? "Get Growth — 2 Months Free" : "Start Growth Plan — $49/mo";
+      return billing === "annual" ? `Get Growth — $470/year` : "Start Growth — $49/mo";
     }
     if (selectedPlan === "pro") {
-      return billing === "annual" ? "Get Pro — 2 Months Free" : "Go Pro — $99/mo";
+      return billing === "annual" ? `Get Pro — $950/year` : "Go Pro — $99/mo";
     }
     return `Get ${planDef.label}`;
   })();
