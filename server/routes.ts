@@ -3541,21 +3541,25 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const sent = await getQuotesByBusiness(business.id, { status: "sent" });
-      const pipelineValue = sent.reduce((sum, q) => sum + q.total, 0);
-      const expectedValue = sent.reduce((sum, q) => sum + (q.expectedValue || q.total * 0.5), 0);
-      const avgAge = sent.length > 0
-        ? sent.reduce((sum, q) => {
+      const [sentQuotes, viewedQuotes] = await Promise.all([
+        getQuotesByBusiness(business.id, { status: "sent" }),
+        getQuotesByBusiness(business.id, { status: "viewed" }),
+      ]);
+      const open = [...sentQuotes, ...viewedQuotes];
+      const pipelineValue = open.reduce((sum, q) => sum + q.total, 0);
+      const expectedValue = open.reduce((sum, q) => sum + (q.expectedValue || q.total * 0.5), 0);
+      const avgAge = open.length > 0
+        ? open.reduce((sum, q) => {
             const age = (Date.now() - (q.sentAt?.getTime() || q.createdAt.getTime())) / (1000 * 60 * 60 * 24);
             return sum + age;
-          }, 0) / sent.length
+          }, 0) / open.length
         : 0;
       return res.json({
         totalPipeline: Math.round(pipelineValue * 100) / 100,
         expectedValue: Math.round(expectedValue * 100) / 100,
-        openQuotes: sent.length,
+        openQuotes: open.length,
         avgAgeDays: Math.round(avgAge * 10) / 10,
-        quotes: sent.map(q => ({
+        quotes: open.map(q => ({
           ...q,
           ageDays: Math.round(((Date.now() - (q.sentAt?.getTime() || q.createdAt.getTime())) / (1000 * 60 * 60 * 24)) * 10) / 10,
         })),

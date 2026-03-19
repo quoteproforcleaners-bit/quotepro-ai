@@ -66,10 +66,20 @@ export default function JobsPage() {
     },
   });
 
+  const [calendarSyncing, setCalendarSyncing] = useState<string | null>(null);
+  const [calendarMsg, setCalendarMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   const syncCalendar = async (jobId: string) => {
+    setCalendarSyncing(jobId);
+    setCalendarMsg(null);
     try {
       await apiPost(`/api/google-calendar/sync-job`, { jobId });
-    } catch {}
+      setCalendarMsg({ ok: true, text: "Added to Google Calendar." });
+    } catch (err: any) {
+      setCalendarMsg({ ok: false, text: err?.message || "Calendar sync failed. Check your Google Calendar connection in Settings." });
+    } finally {
+      setCalendarSyncing(null);
+    }
   };
 
   return (
@@ -251,11 +261,17 @@ export default function JobsPage() {
                 variant="secondary"
                 icon={Calendar}
                 onClick={() => syncCalendar(selectedJob.id)}
+                loading={calendarSyncing === selectedJob.id}
                 size="sm"
               >
                 Sync to Calendar
               </Button>
             </div>
+            {calendarMsg && (
+              <div className={`mt-3 p-2.5 rounded-lg text-xs font-medium ${calendarMsg.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                {calendarMsg.text}
+              </div>
+            )}
           </div>
         ) : null}
       </Modal>
