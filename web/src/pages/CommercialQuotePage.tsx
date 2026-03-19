@@ -823,10 +823,11 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
         },
         lineItems: [
           {
+            name: `${tier.name} – ${freq?.label || walkthrough.frequency}`,
             description: `${tier.name} – ${freq?.label || walkthrough.frequency}`,
             quantity: calc.visitsPerMonth,
             unitPrice: tier.pricePerVisit,
-            total: tier.monthlyPrice,
+            totalPrice: tier.monthlyPrice,
           },
         ],
       });
