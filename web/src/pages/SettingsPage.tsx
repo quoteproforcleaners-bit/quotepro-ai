@@ -291,6 +291,7 @@ export default function SettingsPage() {
     minimumTicket: 100,
     taxRate: 0,
   });
+  const [addOnPrices, setAddOnPrices] = useState<Record<string, number>>({});
 
   const [prefsForm, setPrefsForm] = useState({
     dailyPulseEnabled: true,
@@ -355,6 +356,7 @@ export default function SettingsPage() {
         minimumTicket: pricing.minimumTicket || 100,
         taxRate: pricing.taxRate || 0,
       });
+      setAddOnPrices(pricing.addOnPrices || {});
     }
   }, [pricing]);
 
@@ -664,21 +666,29 @@ export default function SettingsPage() {
                     <input
                       type="number"
                       className="w-20 px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400"
-                      value={pricing?.addOnPrices?.[addon.key] || ""}
+                      value={addOnPrices[addon.key] ?? ""}
                       placeholder="0"
                       onChange={(e) => {
                         const val = e.target.value;
-                        updatePricing.mutate({
-                          addOnPrices: {
-                            ...(pricing?.addOnPrices || {}),
-                            [addon.key]: val ? Number(val) : 0,
-                          },
-                        });
+                        setAddOnPrices((p) => ({
+                          ...p,
+                          [addon.key]: val ? Number(val) : 0,
+                        }));
                       }}
                     />
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="mt-4">
+              <Button
+                icon={Save}
+                onClick={() => updatePricing.mutate({ addOnPrices })}
+                loading={updatePricing.isPending}
+                size="sm"
+              >
+                Save Add-on Prices
+              </Button>
             </div>
           </Card>
         </div>

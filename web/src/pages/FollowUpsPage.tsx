@@ -31,10 +31,19 @@ export default function FollowUpsPage() {
   const { data: followUps = [] } = useQuery<any[]>({
     queryKey: ["/api/follow-ups"],
   });
+  const { data: automations } = useQuery<any>({
+    queryKey: ["/api/automations"],
+  });
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [generatedMessages, setGeneratedMessages] = useState<
     Record<string, string>
   >({});
+
+  // Use automation rules thresholds — fall back to sensible defaults
+  const followUpAfterDays = 1; // Always wait at least 1 day before following up
+  const urgentAfterDays = automations?.quoteExpirationDays
+    ? Math.max(2, Math.floor(automations.quoteExpirationDays * 0.5))
+    : 5;
 
   const needsFollowUp = quotes
     .filter((q: any) => {
@@ -42,7 +51,7 @@ export default function FollowUpsPage() {
       const sentDate = new Date(q.sentAt || q.createdAt);
       const daysSince =
         (Date.now() - sentDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysSince > 1;
+      return daysSince > followUpAfterDays;
     })
     .sort((a: any, b: any) => {
       const daysA =
@@ -63,7 +72,7 @@ export default function FollowUpsPage() {
     const days =
       (Date.now() - new Date(q.sentAt || q.createdAt).getTime()) /
       (1000 * 60 * 60 * 24);
-    return days > 5;
+    return days > urgentAfterDays;
   }).length;
 
   const generateFollowUp = async (quote: any) => {
@@ -95,8 +104,8 @@ export default function FollowUpsPage() {
   };
 
   const getUrgency = (days: number) => {
-    if (days > 7) return "error";
-    if (days > 4) return "warning";
+    if (days > urgentAfterDays * 1.4) return "error";
+    if (days > urgentAfterDays) return "warning";
     return "info";
   };
 
@@ -123,7 +132,7 @@ export default function FollowUpsPage() {
           color="red"
         />
         <StatCard
-          label="Urgent (5+ days)"
+          label={`Urgent (${urgentAfterDays}+ days)`}
           value={urgentCount}
           icon={AlertTriangle}
           color="red"

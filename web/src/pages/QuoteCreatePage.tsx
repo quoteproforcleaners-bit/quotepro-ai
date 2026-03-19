@@ -350,6 +350,11 @@ export default function QuoteCreatePage() {
     addOns: {} as Record<string, boolean>,
   });
   const [preferredDate, setPreferredDate] = useState("");
+  const [aiScopes, setAiScopes] = useState<{good: string; better: string; best: string} | null>(null);
+  const [aiScopesLoading, setAiScopesLoading] = useState(false);
+  const [aiPricing, setAiPricing] = useState<any | null>(null);
+  const [aiPricingLoading, setAiPricingLoading] = useState(false);
+  const [aiPriceOverrides, setAiPriceOverrides] = useState<{good: number; better: number; best: number} | null>(null);
 
   const { data: customers = [] } = useQuery<any[]>({
     queryKey: ["/api/customers"],
@@ -376,6 +381,47 @@ export default function QuoteCreatePage() {
     services.frequency,
     pricing
   );
+
+  const generateAiScopes = async () => {
+    setAiScopesLoading(true);
+    try {
+      const res: any = await apiPost("/api/ai/quote-descriptions", {
+        homeDetails: property,
+        serviceTypes: {
+          good: quote.good.name,
+          better: quote.better.name,
+          best: quote.best.name,
+        },
+        addOns: services.addOns,
+        companyName: (pricing as any)?.companyName || undefined,
+      });
+      setAiScopes(res);
+    } catch {
+      // silently ignore — requirePro may block non-Growth/Pro users
+    }
+    setAiScopesLoading(false);
+  };
+
+  const generateAiPricing = async () => {
+    setAiPricingLoading(true);
+    try {
+      const res: any = await apiPost("/api/ai/pricing-suggestion", {
+        homeDetails: property,
+        addOns: services.addOns,
+        frequency: services.frequency,
+        currentPrices: {
+          good: quote.good.price,
+          better: quote.better.price,
+          best: quote.best.price,
+        },
+        pricingSettings: pricing,
+      });
+      setAiPricing(res);
+    } catch {
+      // silently ignore
+    }
+    setAiPricingLoading(false);
+  };
 
   const filteredCustomers = customers.filter((c: any) => {
     if (!customerSearch) return true;
@@ -414,13 +460,18 @@ export default function QuoteCreatePage() {
       : undefined;
 
     const selected = quote[selectedOption];
+    const goodPrice = aiPriceOverrides?.good ?? quote.good.price;
+    const betterPrice = aiPriceOverrides?.better ?? quote.better.price;
+    const bestPrice = aiPriceOverrides?.best ?? quote.best.price;
+    const finalPrices = { good: goodPrice, better: betterPrice, best: bestPrice };
+    const finalPrice = finalPrices[selectedOption];
 
     const quoteData = {
       customerId: cid || undefined,
       customerName: custName,
       status: "draft",
-      total: selected.price,
-      subtotal: selected.price,
+      total: finalPrice,
+      subtotal: finalPrice,
       tax: 0,
       propertyBeds: property.beds || 0,
       propertyBaths: (property.baths || 0) + (property.halfBaths || 0) * 0.5,
@@ -430,22 +481,22 @@ export default function QuoteCreatePage() {
       selectedOption,
       options: {
         good: {
-          price: quote.good.price,
+          price: goodPrice,
           firstCleanPrice: quote.good.firstCleanPrice ?? undefined,
           name: `Good - ${quote.good.name}`,
-          scope: quote.good.scope,
+          scope: aiScopes?.good || quote.good.scope,
         },
         better: {
-          price: quote.better.price,
+          price: betterPrice,
           firstCleanPrice: quote.better.firstCleanPrice ?? undefined,
           name: `Better - ${quote.better.name}`,
-          scope: quote.better.scope,
+          scope: aiScopes?.better || quote.better.scope,
         },
         best: {
-          price: quote.best.price,
+          price: bestPrice,
           firstCleanPrice: quote.best.firstCleanPrice ?? undefined,
           name: `Best - ${quote.best.name}`,
-          scope: quote.best.scope,
+          scope: aiScopes?.best || quote.best.scope,
         },
       },
       addOns: Object.fromEntries(
@@ -981,6 +1032,8 @@ export default function QuoteCreatePage() {
                 const data = quote[tier];
                 const isSelected = selectedOption === tier;
                 const isRecommended = recommendedOption === tier;
+                const displayPrice = aiPriceOverrides?.[tier] ?? data.price;
+                const aiScope = aiScopes?.[tier];
                 return (
                   <div key={tier} className="relative">
                     <button
@@ -1003,7 +1056,10 @@ export default function QuoteCreatePage() {
                       </div>
                       <p className="text-xs text-slate-500">{data.name}</p>
                       <p className="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
-                        ${data.price.toFixed(0)}
+                        ${displayPrice.toFixed(0)}
+                        {aiPriceOverrides ? (
+                          <span className="text-xs font-normal text-primary-500 ml-1.5">AI</span>
+                        ) : null}
                         {data.firstCleanPrice ? (
                           <span className="text-xs font-normal text-slate-400 ml-1">
                             /visit
@@ -1015,9 +1071,14 @@ export default function QuoteCreatePage() {
                           First visit: ${data.firstCleanPrice.toFixed(0)}
                         </p>
                       ) : null}
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                        {data.scope}
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-3">
+                        {aiScope ? aiScope : data.scope}
                       </p>
+                      {aiScope ? (
+                        <span className="inline-flex items-center gap-0.5 mt-1 text-[10px] text-primary-600 font-medium">
+                          <Sparkles className="w-2.5 h-2.5" /> AI Description
+                        </span>
+                      ) : null}
                       {isSelected ? (
                         <div className="mt-3 flex items-center gap-1 text-primary-600 text-xs font-medium">
                           <Check className="w-3.5 h-3.5" /> Selected
@@ -1041,6 +1102,93 @@ export default function QuoteCreatePage() {
                 );
               })}
             </div>
+
+            {/* AI Tools Row */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={Sparkles}
+                onClick={generateAiScopes}
+                loading={aiScopesLoading}
+              >
+                {aiScopes ? "Regenerate Descriptions" : "AI Describe Tiers"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={FileText}
+                onClick={generateAiPricing}
+                loading={aiPricingLoading}
+              >
+                {aiPricing ? "Refresh Price Insight" : "AI Suggest Prices"}
+              </Button>
+              {aiPriceOverrides ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setAiPriceOverrides(null)}
+                >
+                  Reset to Calculated Prices
+                </Button>
+              ) : null}
+            </div>
+
+            {/* AI Pricing Suggestion Panel */}
+            {aiPricing ? (
+              <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-primary-600" />
+                    <span className="text-sm font-semibold text-primary-900">AI Pricing Insight</span>
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                      aiPricing.confidence === "high"
+                        ? "bg-green-100 text-green-700"
+                        : aiPricing.confidence === "medium"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}>
+                      {aiPricing.confidence} confidence
+                    </span>
+                  </div>
+                </div>
+                {aiPricing.keyInsight ? (
+                  <p className="text-xs text-primary-700 italic">{aiPricing.keyInsight}</p>
+                ) : null}
+                <div className="grid grid-cols-3 gap-2">
+                  {(["good", "better", "best"] as const).map((tier) => {
+                    const suggestion = aiPricing[tier];
+                    const currentPrice = quote[tier].price;
+                    const diff = suggestion.suggestedPrice - currentPrice;
+                    return (
+                      <div key={tier} className="bg-white rounded-lg p-3">
+                        <p className="text-xs text-slate-500 capitalize mb-1">{tier}</p>
+                        <p className="text-lg font-bold text-slate-900">${suggestion.suggestedPrice}</p>
+                        <p className={`text-[11px] font-medium ${diff > 0 ? "text-green-600" : diff < 0 ? "text-red-500" : "text-slate-400"}`}>
+                          {diff > 0 ? `+$${diff.toFixed(0)}` : diff < 0 ? `-$${Math.abs(diff).toFixed(0)}` : "Same"}
+                        </p>
+                        {suggestion.reasoning ? (
+                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{suggestion.reasoning}</p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+                {aiPricing.overallAssessment ? (
+                  <p className="text-xs text-primary-800">{aiPricing.overallAssessment}</p>
+                ) : null}
+                <Button
+                  size="sm"
+                  onClick={() => setAiPriceOverrides({
+                    good: aiPricing.good.suggestedPrice,
+                    better: aiPricing.better.suggestedPrice,
+                    best: aiPricing.best.suggestedPrice,
+                  })}
+                >
+                  Apply AI Prices
+                </Button>
+              </div>
+            ) : null}
 
             <div className="bg-slate-50 rounded-xl p-5">
               <h3 className="font-semibold text-slate-900 text-sm mb-4">
