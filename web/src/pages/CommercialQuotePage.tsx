@@ -784,11 +784,43 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
       ].filter(Boolean).join("\n");
 
       const res = await apiRequest("POST", "/api/quotes", {
-        serviceType: `Commercial – ${FACILITY_TYPES.find((t) => t.value === facility.facilityType)?.label || facility.facilityType}`,
-        serviceAddress: facility.siteAddress,
-        customerName: facility.facilityName,
-        frequency: walkthrough.frequency,
+        // Required base fields (commercial quotes store data in propertyDetails)
+        propertyBeds: 0,
+        propertyBaths: 0,
+        propertySqft: facility.totalSqFt,
+        addOns: {},
+        selectedOption: "better",
+        options: {},
+        subtotal: tier.monthlyPrice,
+        tax: 0,
         total: tier.monthlyPrice,
+        frequencySelected: walkthrough.frequency,
+        status: "draft",
+        // Commercial-specific data stored in propertyDetails jsonb
+        propertyDetails: {
+          quoteType: "commercial",
+          facilityName: facility.facilityName,
+          contactName: facility.contactName,
+          siteAddress: facility.siteAddress,
+          facilityType: facility.facilityType,
+          facilityTypeLabel: FACILITY_TYPES.find((t) => t.value === facility.facilityType)?.label || facility.facilityType,
+          totalSqFt: facility.totalSqFt,
+          floors: facility.floors,
+          walkthrough,
+          laborEstimate: {
+            rawMinutes: laborEst.rawMinutes,
+            rawHours: laborEst.rawHours,
+            recommendedCleaners: laborEst.recommendedCleaners,
+            overrideHours: laborEst.overrideHours,
+          },
+          pricingConfig,
+          selectedTierIndex: selectedTier,
+          selectedTierName: tier.name,
+          tiers: tiers.map((t) => ({ name: t.name, pricePerVisit: t.pricePerVisit, monthlyPrice: t.monthlyPrice })),
+          frequency: walkthrough.frequency,
+          frequencyLabel: freq?.label || walkthrough.frequency,
+          notes,
+        },
         lineItems: [
           {
             description: `${tier.name} – ${freq?.label || walkthrough.frequency}`,
@@ -797,19 +829,6 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
             total: tier.monthlyPrice,
           },
         ],
-        notes,
-        status: "draft",
-        propertyDetails: {
-          quoteType: "commercial",
-          facilityType: facility.facilityType,
-          totalSqFt: facility.totalSqFt,
-          floors: facility.floors,
-          walkthrough,
-          laborEstimate: { rawMinutes: laborEst.rawMinutes, rawHours: laborEst.rawHours, recommendedCleaners: laborEst.recommendedCleaners, overrideHours: laborEst.overrideHours },
-          pricingConfig,
-          selectedTierIndex: selectedTier,
-          tiers: tiers.map((t) => ({ name: t.name, pricePerVisit: t.pricePerVisit, monthlyPrice: t.monthlyPrice })),
-        },
       });
       const quote = await res.json();
       navigate(`/quotes/${quote.id}`);
