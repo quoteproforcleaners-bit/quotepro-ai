@@ -10195,7 +10195,7 @@ Rules:
 
   app.get("/api/files", requireAuth, async (req: Request, res: Response) => {
     try {
-      const business = await getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const files = await db
         .select()
@@ -10210,7 +10210,7 @@ Rules:
 
   app.post("/api/files/upload", requireAuth, async (req: Request, res: Response) => {
     try {
-      const business = await getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
       const { fileData, originalName, fileType, fileSize, description, category } = req.body;
@@ -10249,7 +10249,7 @@ Rules:
 
   app.patch("/api/files/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const business = await getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const { description, category } = req.body;
       const [updated] = await db
@@ -10266,7 +10266,7 @@ Rules:
 
   app.delete("/api/files/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const business = await getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const [file] = await db
         .select()
@@ -10453,7 +10453,7 @@ Rules:
 
   app.get("/api/email-sequences/enrollments", requireAuth, async (req: Request, res: Response) => {
     try {
-      const business = await getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const enrollments = await db
         .select()
@@ -10468,7 +10468,7 @@ Rules:
 
   app.post("/api/email-sequences/:sequenceId/enroll", requireAuth, async (req: Request, res: Response) => {
     try {
-      const business = await getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
       const { sequenceId } = req.params;
@@ -10519,7 +10519,7 @@ Rules:
 
   app.post("/api/email-sequences/enrollments/:id/send-step", requireAuth, async (req: Request, res: Response) => {
     try {
-      const business = await getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
       const [enrollment] = await db
@@ -10605,7 +10605,7 @@ Rules:
 
   app.patch("/api/email-sequences/enrollments/:id/status", requireAuth, async (req: Request, res: Response) => {
     try {
-      const business = await getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const { status } = req.body;
       if (!["active", "paused", "cancelled"].includes(status)) return res.status(400).json({ message: "Invalid status" });
@@ -10623,7 +10623,7 @@ Rules:
 
   app.delete("/api/email-sequences/enrollments/:id", requireAuth, async (req: Request, res: Response) => {
     try {
-      const business = await getBusinessByUserId(req.session.userId!);
+      const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       await db
         .delete(sequenceEnrollments)
