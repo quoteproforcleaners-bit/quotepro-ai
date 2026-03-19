@@ -2,6 +2,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "../lib/queryClient";
 import { apiPut, apiDelete, apiPost, apiGet } from "../lib/api";
+import { useAuth } from "../lib/auth";
+import SendQuoteModal from "../components/SendQuoteModal";
 import {
   ExternalLink,
   Copy,
@@ -58,8 +60,10 @@ type MessageChannel = "email" | "sms";
 export default function QuoteDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { business } = useAuth();
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendModalOpen, setSendModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [aiDrafts, setAiDrafts] = useState<Record<string, string>>({});
   const [aiDraftLoading, setAiDraftLoading] = useState<string | null>(null);
@@ -196,14 +200,7 @@ export default function QuoteDetailPage() {
 
   const previewQuote = () => window.open(quoteUrl, "_blank");
 
-  const sendQuote = async () => {
-    setSending(true);
-    try {
-      await apiPost(`/api/quotes/${id}/send`, {});
-      queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
-    } catch {}
-    setSending(false);
-  };
+  const sendQuote = () => setSendModalOpen(true);
 
   const downloadPdf = () => {
     const pdfUrl =
@@ -431,7 +428,6 @@ export default function QuoteDetailPage() {
             <Button
               icon={Send}
               onClick={sendQuote}
-              loading={sending}
               size="sm"
             >
               Send Quote
@@ -1260,6 +1256,19 @@ export default function QuoteDetailPage() {
         confirmLabel="Delete"
         loading={deleteMutation.isPending}
       />
+
+      {sendModalOpen && quote ? (
+        <SendQuoteModal
+          quoteId={id!}
+          quote={quote}
+          business={business}
+          onClose={() => setSendModalOpen(false)}
+          onSent={() => {
+            queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
+            queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+          }}
+        />
+      ) : null}
     </div>
   );
 }

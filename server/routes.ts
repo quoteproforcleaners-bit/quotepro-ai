@@ -2877,7 +2877,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const { to, subject } = req.body;
+      const { to, cc, subject, customBody } = req.body;
       if (!to) {
         return res.status(400).json({ message: "to (recipient email) is required" });
       }
@@ -2980,9 +2980,20 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
         <!-- Header with company info -->
         <tr><td style="padding:32px 20px;text-align:center;border-bottom:1px solid #eeeeee;">
           ${business.logoUri ? `<div style="margin-bottom:16px;"><img src="${business.logoUri}" alt="${business.companyName}" style="max-height:50px;max-width:200px;"></div>` : ''}
-          <h1 style="margin:0;font-size:24px;font-weight:700;color:#333333;">Your Quote Options</h1>
-          <p style="margin:8px 0 0;font-size:14px;color:#666666;">Hi ${customerName}, please select the option that works best for you.</p>
+          <h1 style="margin:0;font-size:24px;font-weight:700;color:#333333;">${business.companyName || "QuotePro"}</h1>
         </td></tr>
+        ${customBody ? `
+        <!-- Custom email body -->
+        <tr><td style="padding:24px 32px;background-color:#ffffff;border-bottom:1px solid #eeeeee;">
+          <div style="font-size:15px;color:#333333;line-height:1.7;white-space:pre-wrap;">${customBody.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+        </td></tr>
+        <tr><td style="padding:16px 20px 8px;text-align:center;">
+          <h2 style="margin:0;font-size:18px;font-weight:700;color:#333333;">Your Quote Options</h2>
+          <p style="margin:8px 0 0;font-size:13px;color:#666666;">Select the option that works best for you.</p>
+        </td></tr>` : `
+        <tr><td style="padding:16px 20px;text-align:center;border-bottom:1px solid #eeeeee;">
+          <p style="margin:0;font-size:14px;color:#666666;">Hi ${customerName}, please select the option that works best for you.</p>
+        </td></tr>`}
         
         <!-- Property Info (if available) -->
         ${propertyInfoHtml}
@@ -3014,12 +3025,23 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
 </body>
 </html>`;
 
+      const personalization: any = { to: [{ email: to }] };
+      if (cc) {
+        const ccList = Array.isArray(cc) ? cc : [cc];
+        const validCc = ccList.filter((e: string) => e && e.includes("@"));
+        if (validCc.length > 0) personalization.cc = validCc.map((e: string) => ({ email: e }));
+      }
+
+      const plainBody = customBody
+        ? `${customBody}\n\nView your quote online: ${quoteUrl}`
+        : `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}`;
+
       const emailPayload: any = {
-        personalizations: [{ to: [{ email: to }] }],
+        personalizations: [personalization],
         from: { email: brandedFromEmail, name: fromName },
         subject: subject || `Your ${business.companyName || "QuotePro"} Quote`,
         content: [
-          { type: "text/plain", value: `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}` },
+          { type: "text/plain", value: plainBody },
           { type: "text/html", value: emailHtml },
         ],
       };
@@ -3057,7 +3079,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
         customerId: quote.customerId || undefined,
         channel: "email",
         direction: "outbound",
-        content: `Quote email sent to ${to}`,
+        content: `Quote email sent to ${to}${cc ? ` (cc: ${cc})` : ""}`,
         status: "sent",
       });
 
@@ -3065,6 +3087,87 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
     } catch (error: any) {
       console.error("Send quote email error:", error);
       return res.status(500).json({ message: "Failed to send quote email" });
+    }
+  });
+
+  // ─── AI Quote Email Generation ───
+  app.post("/api/quotes/:id/generate-email", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const quote = await getQuoteById(req.params.id);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { tone = "professional", extraInstructions } = req.body;
+
+      const customerName = (quote.propertyDetails as any)?.customerName || "there";
+      const companyName = business.companyName || "QuotePro";
+      const senderName = (business as any).senderName || companyName;
+      const options = (quote.options as any) || {};
+      const recommendedKey = (quote as any).recommendedOption || "better";
+      const recommendedOption = options[recommendedKey] || {};
+      const selectedKey = (quote as any).selectedOption || recommendedKey;
+      const selectedOption = options[selectedKey] || recommendedOption;
+      const frequency = (quote as any).frequencySelected || "one-time";
+      const total = Number(quote.total) || 0;
+      const propertyDetails = (quote.propertyDetails as any) || {};
+      const expiresAt = (quote as any).expiresAt;
+      const expirationStr = expiresAt ? new Date(expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : null;
+
+      const toneMap: Record<string, string> = {
+        professional: "professional and polished",
+        friendly: "friendly and conversational",
+        warm: "warm and personable",
+        concise: "brief and direct — no fluff",
+      };
+      const toneDesc = toneMap[tone] || toneMap.professional;
+
+      const systemPrompt = `You are a sales email writer for ${companyName}, a residential cleaning company. Write emails in a ${toneDesc} tone. Keep the email under 150 words. No emojis. Sound human, not like a template. Start directly — no "I hope this email finds you well." Return a JSON object with two fields: "subject" (string) and "body" (string, plain text with newlines).`;
+
+      const userPrompt = `Write a quote email to ${customerName}:
+- Recommended plan: "${selectedOption.name || "Standard Clean"}" at $${total.toFixed(0)}
+- Frequency: ${frequency}
+- Property: ${propertyDetails.beds ? `${propertyDetails.beds} bed` : ""} ${propertyDetails.baths ? `${propertyDetails.baths} bath` : ""}${propertyDetails.sqft ? ` ${propertyDetails.sqft} sqft` : ""}
+${expirationStr ? `- Quote expires: ${expirationStr}` : ""}
+${extraInstructions ? `- Extra context: ${extraInstructions}` : ""}
+- Sender: ${senderName} from ${companyName}
+
+The email should:
+1. Greet ${customerName} by name
+2. Reference their quote and the recommended package
+3. Create gentle urgency around the expiration if applicable
+4. Invite them to reply with questions
+5. Sign off warmly from ${senderName}`;
+
+      try {
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: { type: "json_object" },
+          max_completion_tokens: 400,
+        });
+
+        const content = completion.choices[0]?.message?.content;
+        if (!content) throw new Error("No AI response");
+
+        const parsed = JSON.parse(content);
+        return res.json({
+          subject: parsed.subject || `Your Cleaning Quote from ${companyName}`,
+          body: parsed.body || "",
+        });
+      } catch {
+        // Fallback non-AI template
+        const fallbackSubject = `Your Cleaning Quote from ${companyName}`;
+        const fallbackBody = `Hi ${customerName},\n\nThank you for the opportunity to provide your cleaning quote.\n\nBased on your property details, the recommended option is ${selectedOption.name || "Standard Clean"} at $${total.toFixed(0)}${expirationStr ? ` — valid until ${expirationStr}` : ""}.\n\nSimply reply to this email to get scheduled, or click the link to view your full quote online.\n\nLet us know if you have any questions!\n\nBest,\n${senderName}\n${companyName}`;
+        return res.json({ subject: fallbackSubject, body: fallbackBody });
+      }
+    } catch (error: any) {
+      console.error("Generate quote email error:", error);
+      return res.status(500).json({ message: "Failed to generate email" });
     }
   });
 
