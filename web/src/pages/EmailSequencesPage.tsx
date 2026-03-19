@@ -31,6 +31,7 @@ import {
 import { PageHeader, Card, Spinner, Badge } from "../components/ui";
 import { apiRequest } from "../lib/api";
 import { useQuery as useCustomersQuery } from "@tanstack/react-query";
+import FileAttachmentPicker from "../components/FileAttachmentPicker";
 
 interface SequenceStep {
   subject: string;
@@ -130,6 +131,8 @@ export default function EmailSequencesPage() {
   const [sendingStepId, setSendingStepId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [sendNextModal, setSendNextModal] = useState<{ enrollmentId: string; customerName: string } | null>(null);
+  const [sendNextFileIds, setSendNextFileIds] = useState<string[]>([]);
 
   const { data: sequences = [], isLoading: seqLoading } = useQuery<BuiltInSequence[]>({
     queryKey: ["/api/email-sequences/library"],
@@ -218,16 +221,29 @@ export default function EmailSequencesPage() {
     }
   };
 
-  const handleSendStep = async (enrollmentId: string) => {
+  const handleSendStep = async (enrollmentId: string, attachmentFileIds?: string[]) => {
     setSendingStepId(enrollmentId);
     try {
-      await apiRequest("POST", `/api/email-sequences/enrollments/${enrollmentId}/send-step`);
+      await apiRequest("POST", `/api/email-sequences/enrollments/${enrollmentId}/send-step`, {
+        attachmentFileIds: attachmentFileIds && attachmentFileIds.length > 0 ? attachmentFileIds : undefined,
+      });
       await queryClient.invalidateQueries({ queryKey: ["/api/email-sequences/enrollments"] });
     } catch (err: any) {
       alert(err.message || "Failed to send");
     } finally {
       setSendingStepId(null);
     }
+  };
+
+  const openSendNextModal = (enrollmentId: string, customerName: string) => {
+    setSendNextFileIds([]);
+    setSendNextModal({ enrollmentId, customerName });
+  };
+
+  const confirmSendNext = async () => {
+    if (!sendNextModal) return;
+    setSendNextModal(null);
+    await handleSendStep(sendNextModal.enrollmentId, sendNextFileIds);
   };
 
   const handleToggleStatus = async (enrollment: SequenceEnrollment) => {
@@ -503,7 +519,7 @@ export default function EmailSequencesPage() {
                           {!isComplete && !isCancelled && (
                             <>
                               <button
-                                onClick={() => handleSendStep(enrollment.id)}
+                                onClick={() => openSendNextModal(enrollment.id, enrollment.customerName)}
                                 disabled={sendingStepId === enrollment.id || enrollment.status === "paused"}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                                 title={enrollment.status === "paused" ? "Resume to send" : "Send next email now"}
@@ -738,6 +754,53 @@ export default function EmailSequencesPage() {
               >
                 {enrolling ? <Spinner /> : <UserPlus size={15} />}
                 {enrolling ? "Enrolling..." : "Enroll"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Next confirmation + attachment modal */}
+      {sendNextModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Send Next Email</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">To: {sendNextModal.customerName}</p>
+              </div>
+              <button
+                onClick={() => setSendNextModal(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                The next email in this sequence will be sent immediately. You can optionally attach files from your library.
+              </p>
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Attachments (optional)</p>
+                <FileAttachmentPicker
+                  selectedFileIds={sendNextFileIds}
+                  onChange={setSendNextFileIds}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 p-5 border-t border-slate-200 dark:border-slate-700">
+              <button
+                onClick={() => setSendNextModal(null)}
+                className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSendNext}
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
+              >
+                <Send size={14} />
+                Send Now
               </button>
             </div>
           </div>

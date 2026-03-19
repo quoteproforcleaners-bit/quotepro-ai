@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { apiPost } from "../lib/api";
 import { Button } from "./ui";
+import FileAttachmentPicker from "./FileAttachmentPicker";
 
 type Tone = "professional" | "friendly" | "warm" | "concise";
 
@@ -60,6 +61,7 @@ export default function SendQuoteModal({ quoteId, quote, business, onClose, onSe
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [attachmentFileIds, setAttachmentFileIds] = useState<string[]>([]);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const toInputRef = useRef<HTMLInputElement>(null);
@@ -112,6 +114,7 @@ export default function SendQuoteModal({ quoteId, quote, business, onClose, onSe
         cc: cc.trim() || undefined,
         subject,
         customBody: body || undefined,
+        attachmentFileIds: attachmentFileIds.length > 0 ? attachmentFileIds : undefined,
       });
       setSuccess(true);
       setTimeout(() => {
@@ -136,6 +139,7 @@ export default function SendQuoteModal({ quoteId, quote, business, onClose, onSe
         to: business.email,
         subject: `[TEST] ${subject}`,
         customBody: body || undefined,
+        attachmentFileIds: attachmentFileIds.length > 0 ? attachmentFileIds : undefined,
       });
       setError(null);
     } catch (e: any) {
@@ -321,14 +325,25 @@ export default function SendQuoteModal({ quoteId, quote, business, onClose, onSe
               <p className="text-xs text-slate-600 mt-1">The quote option cards will be appended automatically below your message.</p>
             </div>
 
-            {/* PDF attachment */}
-            <div className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div className="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center shrink-0">
-                <Paperclip className="w-4 h-4 text-red-400" />
+            {/* PDF attachment + file library attachments */}
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+              {/* Quote PDF row */}
+              <div className="flex items-center gap-3 px-4 py-3" style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center shrink-0">
+                  <Paperclip className="w-4 h-4 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">Quote PDF attached automatically</p>
+                  <p className="text-xs text-slate-500">quote-{quote?.customerName?.toLowerCase().replace(/\s+/g, "-") || quoteId.slice(0, 8)}.pdf</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-white">Quote PDF attached automatically</p>
-                <p className="text-xs text-slate-500">quote-{quote?.customerName?.toLowerCase().replace(/\s+/g, "-") || quoteId.slice(0, 8)}.pdf</p>
+              {/* Extra file library attachments */}
+              <div className="px-4 py-3" style={{ background: "rgba(255,255,255,0.02)" }}>
+                <FileAttachmentPicker
+                  selectedFileIds={attachmentFileIds}
+                  onChange={setAttachmentFileIds}
+                  dark
+                />
               </div>
             </div>
 

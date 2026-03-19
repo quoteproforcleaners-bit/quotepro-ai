@@ -2879,7 +2879,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const { to, cc, subject, customBody } = req.body;
+      const { to, cc, subject, customBody, attachmentFileIds } = req.body;
       if (!to) {
         return res.status(400).json({ message: "to (recipient email) is required" });
       }
@@ -3049,6 +3049,35 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       };
       if (replyToEmail) {
         emailPayload.reply_to = { email: replyToEmail, name: fromName };
+      }
+
+      // Attach files from the business file library
+      if (attachmentFileIds && Array.isArray(attachmentFileIds) && attachmentFileIds.length > 0) {
+        const fsLib = await import("fs");
+        const pathLib = await import("path");
+        const attachedFiles = await db
+          .select()
+          .from(businessFiles)
+          .where(and(eq(businessFiles.businessId, business.id)));
+        const requested = attachedFiles.filter(f => attachmentFileIds.includes(f.id));
+        const sgAttachments: any[] = [];
+        for (const f of requested) {
+          try {
+            const absPath = pathLib.join(process.cwd(), f.fileUrl);
+            const buf = fsLib.readFileSync(absPath);
+            sgAttachments.push({
+              content: buf.toString("base64"),
+              filename: f.originalName,
+              type: f.fileType || "application/octet-stream",
+              disposition: "attachment",
+            });
+          } catch (e) {
+            console.error("Failed to read attachment:", f.fileUrl, e);
+          }
+        }
+        if (sgAttachments.length > 0) {
+          emailPayload.attachments = sgAttachments;
+        }
       }
 
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -10561,18 +10590,47 @@ Rules:
       const bodyText = replacePlaceholders(step.body);
       const htmlBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;line-height:1.6;">${bodyText.replace(/\n/g, "<br>")}</div>`;
 
+      const seqEmailPayload: any = {
+        personalizations: [{ to: [{ email: enrollment.customerEmail, name: enrollment.customerName }] }],
+        from: { email: senderEmail, name: senderName },
+        subject,
+        content: [{ type: "text/plain", value: bodyText }, { type: "text/html", value: htmlBody }],
+      };
+
+      // Attach files from the business file library (if provided)
+      const { attachmentFileIds: seqAttachIds } = req.body;
+      if (seqAttachIds && Array.isArray(seqAttachIds) && seqAttachIds.length > 0) {
+        const fsLib2 = await import("fs");
+        const pathLib2 = await import("path");
+        const allBizFiles = await db.select().from(businessFiles).where(eq(businessFiles.businessId, business.id));
+        const requestedFiles = allBizFiles.filter(f => seqAttachIds.includes(f.id));
+        const sgFileAttachments: any[] = [];
+        for (const f of requestedFiles) {
+          try {
+            const absPath = pathLib2.join(process.cwd(), f.fileUrl);
+            const buf = fsLib2.readFileSync(absPath);
+            sgFileAttachments.push({
+              content: buf.toString("base64"),
+              filename: f.originalName,
+              type: f.fileType || "application/octet-stream",
+              disposition: "attachment",
+            });
+          } catch (e) {
+            console.error("Failed to read sequence attachment:", f.fileUrl, e);
+          }
+        }
+        if (sgFileAttachments.length > 0) {
+          seqEmailPayload.attachments = sgFileAttachments;
+        }
+      }
+
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${sgApiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: enrollment.customerEmail, name: enrollment.customerName }] }],
-          from: { email: senderEmail, name: senderName },
-          subject,
-          content: [{ type: "text/plain", value: bodyText }, { type: "text/html", value: htmlBody }],
-        }),
+        body: JSON.stringify(seqEmailPayload),
       });
 
       if (!sgRes.ok) {
