@@ -187,15 +187,15 @@ function DynamicHero(p: HeroProps) {
     : { label: "Keep it going", tip: "Recurring customers increase lifetime value. Use AI to position a recurring cleaning plan on your next call.", cta: "New Quote", path: "/quotes/new" };
 
   return (
-    <div className="rounded-2xl p-5 lg:p-6 mb-6 bg-emerald-50/60 border border-emerald-200/50">
+    <div className="rounded-2xl p-5 lg:p-6 mb-6 bg-emerald-50/60 dark:bg-emerald-900/20 border border-emerald-200/50 dark:border-emerald-700/50">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-            <CheckCircle className="w-5 h-5 text-emerald-600" />
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center shrink-0">
+            <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div>
-            <p className="font-bold text-slate-900">{hasActivity ? "Pipeline healthy — no revenue at risk." : "All caught up."}</p>
-            <p className="text-sm text-slate-500 mt-0.5">{nextAction.tip}</p>
+            <p className="font-bold text-slate-900 dark:text-slate-100">{hasActivity ? "Pipeline healthy — no revenue at risk." : "All caught up."}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{nextAction.tip}</p>
           </div>
         </div>
         <Button size="sm" onClick={() => navigate(nextAction.path)} className="shrink-0 hidden sm:flex">
@@ -204,8 +204,8 @@ function DynamicHero(p: HeroProps) {
       </div>
       <div className="mt-4">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-slate-500">Revenue Protection Score</span>
-          <span className="text-xs font-bold text-emerald-600">100/100 (A+)</span>
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Revenue Protection Score</span>
+          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">100/100 (A+)</span>
         </div>
         <ProgressBar value={100} color="emerald" size="sm" />
       </div>
@@ -271,49 +271,49 @@ function StartHereChecklist({ hasPricing, hasQuotes, hasCustomers, hasFollowUpAc
   if (allDone) return null;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white mb-6 overflow-hidden">
-      <div className="px-5 lg:px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 mb-6 overflow-hidden">
+      <div className="px-5 lg:px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
-            <Target className="w-4 h-4 text-primary-600" />
+          <div className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center">
+            <Target className="w-4 h-4 text-primary-600 dark:text-primary-400" />
           </div>
           <div>
-            <h2 className="font-bold text-slate-900 text-sm">Start Here — Build Your Revenue Engine</h2>
-            <p className="text-xs text-slate-500 mt-0.5">{completedCount} of {steps.length} steps complete</p>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm">Start Here — Build Your Revenue Engine</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{completedCount} of {steps.length} steps complete</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-24 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+          <div className="w-24 h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
             <div
               className="h-full bg-primary-500 rounded-full transition-all duration-500"
               style={{ width: `${(completedCount / steps.length) * 100}%` }}
             />
           </div>
-          <span className="text-xs font-semibold text-slate-500">{Math.round((completedCount / steps.length) * 100)}%</span>
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{Math.round((completedCount / steps.length) * 100)}%</span>
         </div>
       </div>
-      <div className="divide-y divide-slate-50">
+      <div className="divide-y divide-slate-100 dark:divide-slate-700">
         {steps.filter((s) => !s.done).slice(0, 3).map((step) => (
           <div key={step.id} className="flex items-center gap-4 px-5 lg:px-6 py-4">
-            <div className="w-8 h-8 rounded-full border-2 border-slate-200 flex items-center justify-center shrink-0">
-              <step.icon className="w-3.5 h-3.5 text-slate-400" />
+            <div className="w-8 h-8 rounded-full border-2 border-slate-200 dark:border-slate-600 flex items-center justify-center shrink-0">
+              <step.icon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800">{step.label}</p>
-              <p className="text-xs text-slate-500 mt-0.5 hidden sm:block">{step.description}</p>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{step.label}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 hidden sm:block">{step.description}</p>
             </div>
             <button
               onClick={() => navigate(step.path)}
-              className="text-xs font-semibold text-primary-600 hover:text-primary-700 whitespace-nowrap flex items-center gap-1 shrink-0"
+              className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 whitespace-nowrap flex items-center gap-1 shrink-0"
             >
               {step.cta} <ChevronRight className="w-3 h-3" />
             </button>
           </div>
         ))}
         {steps.filter((s) => s.done).length > 0 ? (
-          <div className="px-5 lg:px-6 py-3 bg-slate-50/60 flex items-center gap-2">
+          <div className="px-5 lg:px-6 py-3 bg-slate-50 dark:bg-slate-800/80 flex items-center gap-2 border-t border-slate-100 dark:border-slate-700">
             <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-xs text-slate-500">{steps.filter((s) => s.done).map((s) => s.label).join(", ")} — done</span>
+            <span className="text-xs text-slate-600 dark:text-slate-300">{steps.filter((s) => s.done).map((s) => s.label).join(", ")} — done</span>
           </div>
         ) : null}
       </div>
@@ -346,15 +346,15 @@ function TodaysRevenueMoves({ actions, navigate }: RevenueMovesProps) {
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
         <Zap className="w-4 h-4 text-amber-500" />
-        <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Today's Revenue Moves</h2>
-        <span className="text-xs text-slate-400">— act on these to grow faster</span>
+        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Today's Revenue Moves</h2>
+        <span className="text-xs text-slate-400 dark:text-slate-500">— act on these to grow faster</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {actions.map((action, i) => (
           <button
             key={i}
             onClick={() => navigate(action.path)}
-            className="text-left rounded-xl border border-slate-200 bg-white p-4 hover:border-primary-300 hover:shadow-sm transition-all group"
+            className="text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-sm transition-all group"
           >
             <div className="flex items-start gap-3">
               <div className={`w-9 h-9 rounded-lg ${action.iconBg} flex items-center justify-center shrink-0`}>
@@ -362,11 +362,11 @@ function TodaysRevenueMoves({ actions, navigate }: RevenueMovesProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${action.tagColor}`}>{action.tag}</div>
-                <p className="text-sm font-semibold text-slate-900 leading-snug">{action.title}</p>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{action.description}</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">{action.title}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{action.description}</p>
               </div>
             </div>
-            <div className="flex items-center gap-1 mt-3 text-xs font-semibold text-primary-600 group-hover:text-primary-700">
+            <div className="flex items-center gap-1 mt-3 text-xs font-semibold text-primary-600 dark:text-primary-400 group-hover:text-primary-700 dark:group-hover:text-primary-300">
               {action.cta} <ArrowRight className="w-3 h-3" />
             </div>
           </button>
@@ -407,14 +407,14 @@ function AIGrowthTools({ navigate }: { navigate: (path: string) => void }) {
           <button
             key={tool.label}
             onClick={() => navigate(`/ai-assistant?prompt=${encodeURIComponent(tool.prompt)}`)}
-            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-primary-50 hover:border-primary-200 border border-transparent transition-all text-left group"
+            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:border-primary-200 dark:hover:border-primary-700 border border-transparent dark:border-slate-700/50 transition-all text-left group"
           >
-            <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 group-hover:border-primary-300 transition-colors">
-              <tool.icon className="w-4 h-4 text-slate-500 group-hover:text-primary-600 transition-colors" />
+            <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center shrink-0 group-hover:border-primary-300 dark:group-hover:border-primary-600 transition-colors">
+              <tool.icon className="w-4 h-4 text-slate-500 dark:text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-800 group-hover:text-primary-700 transition-colors">{tool.label}</p>
-              <p className="text-[11px] text-slate-400 truncate">{tool.description}</p>
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors">{tool.label}</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{tool.description}</p>
             </div>
           </button>
         ))}
@@ -715,16 +715,16 @@ export default function DashboardPage() {
       {isInFreeTrial ? (
         <button
           onClick={() => navigate("/pricing")}
-          className="w-full text-left rounded-2xl p-4 mb-6 bg-blue-50 border border-blue-100 hover:bg-blue-100 transition-colors flex items-center gap-4"
+          className="w-full text-left rounded-2xl p-4 mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-4"
         >
           <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
             <Zap className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-blue-900">
+            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
               Free Trial — {freeTrialDaysLeft} day{freeTrialDaysLeft !== 1 ? "s" : ""} remaining
             </p>
-            <p className="text-xs text-blue-600 mt-0.5">
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
               Upgrade now to keep unlimited quoting, AI tools, and automated follow-ups.
             </p>
           </div>
@@ -813,13 +813,13 @@ export default function DashboardPage() {
                 <FunnelBar label="Accepted" count={stats?.acceptedQuotes || acceptedQuotes.length} total={funnelMax} color="bg-emerald-500" icon={CheckCircle} />
                 <FunnelBar label="Won" count={stats?.acceptedQuotes || acceptedQuotes.length} total={funnelMax} color="bg-green-600" icon={Award} />
               </div>
-              <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-100">
-                <span className="text-xs font-semibold text-slate-400">Close rate</span>
-                <span className="text-sm font-bold text-slate-900">{Math.round(closeRate)}%</span>
+              <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
+                <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">Close rate</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{Math.round(closeRate)}%</span>
                 {closeRate < 40 && closeRate > 0 ? (
-                  <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 px-1.5 py-0.5 rounded-full">below avg</span>
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">below avg</span>
                 ) : closeRate >= 50 ? (
-                  <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded-full">strong</span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">strong</span>
                 ) : null}
               </div>
             </>
@@ -842,21 +842,21 @@ export default function DashboardPage() {
                 strokeWidth={7}
                 color={closeRate >= 60 ? "emerald" : closeRate >= 40 ? "amber" : "red"}
               >
-                <span className="text-xl font-extrabold text-slate-900">{Math.round(closeRate)}%</span>
+                <span className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{Math.round(closeRate)}%</span>
               </MetricRing>
               <div className="flex-1">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <TrendingUp className={`w-4 h-4 ${closeRate >= 50 ? "text-emerald-500" : "text-slate-400"}`} />
-                  <span className="text-sm font-semibold text-slate-700">
+                  <TrendingUp className={`w-4 h-4 ${closeRate >= 50 ? "text-emerald-500" : "text-slate-400 dark:text-slate-500"}`} />
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                     {closeRate >= 60 ? "Great — keep it up" : closeRate >= 40 ? "Average — room to grow" : closeRate > 0 ? "Needs improvement" : "No data yet"}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-400 dark:text-slate-500">
                   {closeRate < 40 && closeRate > 0
                     ? "Follow up faster. Most cleaning jobs close within 48 hours of contact."
                     : `Based on ${(stats?.sentQuotes || sentQuotes.length)} quotes sent`}
                 </p>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                   Avg value: ${(stats?.avgQuoteValue || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
               </div>
@@ -868,50 +868,50 @@ export default function DashboardPage() {
           <CardHeader title="Today at a Glance" icon={Sparkles} />
           <div className="space-y-3">
             <div
-              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
               onClick={() => navigate("/follow-ups")}
             >
               <div className="flex items-center gap-2.5">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${followUpQueueCount > 0 ? "bg-amber-50" : "bg-slate-50"}`}>
-                  <PhoneMissed className={`w-4 h-4 ${followUpQueueCount > 0 ? "text-amber-600" : "text-slate-400"}`} />
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${followUpQueueCount > 0 ? "bg-amber-50 dark:bg-amber-900/30" : "bg-slate-50 dark:bg-slate-700"}`}>
+                  <PhoneMissed className={`w-4 h-4 ${followUpQueueCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-slate-500"}`} />
                 </div>
-                <span className="text-sm text-slate-600">Need follow-up</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">Need follow-up</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className={`text-sm font-bold ${followUpQueueCount > 0 ? "text-amber-600" : "text-slate-900"}`}>
+                <span className={`text-sm font-bold ${followUpQueueCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-slate-100"}`}>
                   {followUpQueueCount}
                 </span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
               </div>
             </div>
             <div
-              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
               onClick={() => navigate("/quotes")}
             >
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <Send className="w-4 h-4 text-blue-600" />
+                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Send className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 </div>
-                <span className="text-sm text-slate-600">Quotes out</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">Quotes out</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-slate-900">{sentQuotes.length + viewedQuotes.length}</span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{sentQuotes.length + viewedQuotes.length}</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
               </div>
             </div>
             <div
-              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
               onClick={() => navigate("/opportunities")}
             >
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <span className="text-sm text-slate-600">Won this month</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">Won this month</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-emerald-600">${monthlyRevenue.toLocaleString()}</span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${monthlyRevenue.toLocaleString()}</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
               </div>
             </div>
           </div>
@@ -926,14 +926,14 @@ export default function DashboardPage() {
         <Card>
           <CardHeader title="Follow-Up Streak" icon={Flame} />
           <div className="flex items-center gap-3 mb-3">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${currentStreak > 0 ? "bg-emerald-100" : "bg-slate-100"}`}>
-              <Target className={`w-6 h-6 ${currentStreak > 0 ? "text-emerald-600" : "text-slate-400"}`} />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${currentStreak > 0 ? "bg-emerald-100 dark:bg-emerald-800" : "bg-slate-100 dark:bg-slate-700"}`}>
+              <Target className={`w-6 h-6 ${currentStreak > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`} />
             </div>
             <div>
-              <p className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
                 {currentStreak} {currentStreak === 1 ? "day" : "days"}
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {currentStreak >= 7
                   ? "Elite discipline — top closers follow up every day."
                   : currentStreak >= 3
@@ -954,7 +954,7 @@ export default function DashboardPage() {
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
                       active
                         ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30"
-                        : "bg-slate-100 text-slate-400 border border-slate-200"
+                        : "bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-600"
                     }`}
                   >
                     {active ? <CheckCircle className="w-3.5 h-3.5" /> : null}
@@ -994,8 +994,8 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Quotes created</span>
-                <span className="text-sm font-bold text-slate-900">
+                <span className="text-sm text-slate-600 dark:text-slate-300">Quotes created</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   {quotes.filter((q: any) => {
                     const d = new Date(q.createdAt);
                     const now = new Date();
@@ -1005,8 +1005,8 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Quotes accepted</span>
-                <span className="text-sm font-bold text-emerald-600">
+                <span className="text-sm text-slate-600 dark:text-slate-300">Quotes accepted</span>
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                   {acceptedQuotes.filter((q: any) => {
                     const d = new Date(q.createdAt);
                     const now = new Date();
@@ -1016,27 +1016,27 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Revenue this month</span>
-                <span className="text-sm font-bold text-emerald-600">${monthlyRevenue.toLocaleString()}</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">Revenue this month</span>
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${monthlyRevenue.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Close rate</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">Close rate</span>
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm font-bold ${closeRate >= 50 ? "text-emerald-600" : closeRate >= 30 ? "text-amber-600" : "text-red-500"}`}>
+                  <span className={`text-sm font-bold ${closeRate >= 50 ? "text-emerald-600 dark:text-emerald-400" : closeRate >= 30 ? "text-amber-600 dark:text-amber-400" : "text-red-500 dark:text-red-400"}`}>
                     {Math.round(closeRate)}%
                   </span>
                   {closeRate < 40 && closeRate > 0 ? (
-                    <span className="text-[10px] text-amber-600">Follow up faster</span>
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400">Follow up faster</span>
                   ) : null}
                 </div>
               </div>
               {ratingSummary ? (
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="text-sm text-slate-600">Avg rating</span>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700">
+                  <span className="text-sm text-slate-600 dark:text-slate-300">Avg rating</span>
                   <div className="flex items-center gap-1.5">
                     <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                    <span className="text-sm font-bold text-slate-900">{(ratingSummary.average || 0).toFixed(1)}</span>
-                    <span className="text-xs text-slate-400">({ratingSummary.total || 0})</span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{(ratingSummary.average || 0).toFixed(1)}</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">({ratingSummary.total || 0})</span>
                   </div>
                 </div>
               ) : null}
@@ -1057,11 +1057,11 @@ export default function DashboardPage() {
 
       {/* 9. Recent Quotes */}
       <Card padding={false}>
-        <div className="flex items-center justify-between px-5 lg:px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-900">Recent Quotes</h2>
+        <div className="flex items-center justify-between px-5 lg:px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+          <h2 className="font-semibold text-slate-900 dark:text-slate-100">Recent Quotes</h2>
           <button
             onClick={() => navigate("/quotes")}
-            className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+            className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium flex items-center gap-1"
           >
             View all <ArrowRight className="w-3.5 h-3.5" />
           </button>
@@ -1082,12 +1082,12 @@ export default function DashboardPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="text-left px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Customer</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden sm:table-cell">Type</th>
-                  <th className="text-right px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Total</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell">Date</th>
+                <tr className="border-b border-slate-100 dark:border-slate-700">
+                  <th className="text-left px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">Type</th>
+                  <th className="text-right px-5 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                  <th className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:table-cell">Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -1095,17 +1095,17 @@ export default function DashboardPage() {
                   <tr
                     key={q.id}
                     onClick={() => navigate(`/quotes/${q.id}`)}
-                    className="border-b border-slate-50 hover:bg-slate-50/80 cursor-pointer transition-colors"
+                    className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50/80 dark:hover:bg-slate-700/30 cursor-pointer transition-colors"
                   >
-                    <td className="px-5 lg:px-6 py-3.5 font-medium text-slate-900">{q.customerName || "No customer"}</td>
-                    <td className="px-5 py-3.5 text-slate-500 capitalize hidden sm:table-cell">
+                    <td className="px-5 lg:px-6 py-3.5 font-medium text-slate-900 dark:text-slate-100">{q.customerName || "No customer"}</td>
+                    <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400 capitalize hidden sm:table-cell">
                       {(q.propertyDetails as any)?.quoteType || "residential"}
                     </td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-slate-900">${Number(q.total || 0).toLocaleString()}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-slate-900 dark:text-slate-100">${Number(q.total || 0).toLocaleString()}</td>
                     <td className="px-5 py-3.5">
                       <Badge status={q.status} dot />
                     </td>
-                    <td className="px-5 lg:px-6 py-3.5 text-right text-slate-500 hidden md:table-cell">
+                    <td className="px-5 lg:px-6 py-3.5 text-right text-slate-500 dark:text-slate-400 hidden md:table-cell">
                       {new Date(q.createdAt).toLocaleDateString()}
                     </td>
                   </tr>

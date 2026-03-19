@@ -67,7 +67,7 @@ export function Card({
   onClick?: () => void;
 }) {
   const base = {
-    default: "bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
+    default: "bg-white dark:bg-slate-800 rounded-xl border border-slate-200/80 dark:border-slate-700 shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
     glass: "glass-card rounded-xl",
     interactive: "card-interactive rounded-xl",
     elevated: "card-elevated rounded-xl",
@@ -96,8 +96,8 @@ export function CardHeader({
   return (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2">
-        {Icon ? <Icon className="w-4.5 h-4.5 text-slate-400" /> : null}
-        <h2 className="font-semibold text-slate-900">{title}</h2>
+        {Icon ? <Icon className="w-4.5 h-4.5 text-slate-400 dark:text-slate-500" /> : null}
+        <h2 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
         {badgeEl}
       </div>
       {actions}
@@ -472,21 +472,21 @@ export function StatCard({
   onClick?: () => void;
 }) {
   const colors = {
-    primary: "bg-primary-50 text-primary-600",
-    violet: "bg-violet-50 text-violet-600",
-    emerald: "bg-emerald-50 text-emerald-600",
-    amber: "bg-amber-50 text-amber-600",
-    red: "bg-red-50 text-red-600",
-    cyan: "bg-cyan-50 text-cyan-600",
+    primary: "bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400",
+    violet: "bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400",
+    emerald: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+    amber: "bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400",
+    red: "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400",
+    cyan: "bg-cyan-50 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400",
   };
   return (
     <Card variant={onClick ? "interactive" : "default"} onClick={onClick}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-slate-500 mb-2">{label}</p>
-          <p className="text-2xl font-bold text-slate-900 tracking-tight stat-number animate-count-up">{value}</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{label}</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight stat-number animate-count-up">{value}</p>
           {subtitle ? (
-            <p className="text-xs text-slate-400 mt-1.5">{subtitle}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">{subtitle}</p>
           ) : null}
           {trend ? (
             <p
