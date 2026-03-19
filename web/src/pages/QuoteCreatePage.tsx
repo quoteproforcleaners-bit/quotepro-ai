@@ -63,14 +63,9 @@ const DEFAULT_ADD_ON_PRICES: Record<string, number> = {
 };
 
 function getSqftBaseHours(sqft: number): number {
-  if (sqft <= 1000) return 1.5;
-  if (sqft <= 1500) return 2.5;
-  if (sqft <= 2000) return 3.0;
-  if (sqft <= 2500) return 3.5;
-  if (sqft <= 3000) return 4.0;
-  if (sqft <= 3500) return 4.5;
-  if (sqft <= 4000) return 5.0;
-  return 5.0 + Math.ceil((sqft - 4000) / 750);
+  // 40 min per 1000 sqft for standard clean (reference tier)
+  // touch-up uses 0.75× (30 min/1000), deep-clean uses 1.5× (60 min/1000), move-in/out uses 1.875× (75 min/1000)
+  return (sqft / 1000) * (40 / 60);
 }
 
 function getConditionMultiplier(score: number): number {
@@ -144,7 +139,7 @@ function calculateQuote(
     {
       id: "touch-up",
       name: "Touch Up",
-      multiplier: 0.7,
+      multiplier: 0.75,
       scope: "Quick surface cleaning",
     },
     {
