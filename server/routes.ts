@@ -10692,6 +10692,420 @@ Rules:
     }
   });
 
+  // =========================================================
+  // PRICING LOGIC ENGINE ROUTES
+  // =========================================================
+  const { runPricingEngine, buildDefaultRulesFromQuestionnaire } = await import("./pricingEngine");
+  const {
+    importedJobs,
+    pricingQuestionnaires,
+    pricingRules,
+    pricingAnalyses,
+    publishedPricingProfiles,
+  } = await import("../shared/schema");
+
+  // GET imported jobs
+  app.get("/api/pricing/jobs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const jobs = await db.select().from(importedJobs)
+        .where(eq(importedJobs.businessId, business.id))
+        .orderBy(desc(importedJobs.createdAt));
+      return res.json(jobs);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // POST create imported job
+  app.post("/api/pricing/jobs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { customerName, serviceType, sqft, beds, baths, halfBaths, conditionLevel, pets, frequency, addOns, zipCode, estimatedHours, crewSize, finalPrice, won, notes } = req.body;
+      if (finalPrice === undefined || finalPrice === null) return res.status(400).json({ message: "finalPrice is required" });
+      const [job] = await db.insert(importedJobs).values({
+        businessId: business.id,
+        customerName: customerName || "",
+        serviceType: serviceType || "standard",
+        sqft: sqft ? parseInt(sqft) : null,
+        beds: beds ? parseInt(beds) : null,
+        baths: baths ? parseFloat(baths) : null,
+        halfBaths: halfBaths ? parseInt(halfBaths) : 0,
+        conditionLevel: conditionLevel || "standard",
+        pets: pets === true || pets === "true",
+        frequency: frequency || "one-time",
+        addOns: addOns || [],
+        zipCode: zipCode || "",
+        estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
+        crewSize: crewSize ? parseInt(crewSize) : 1,
+        finalPrice: parseFloat(finalPrice),
+        won: won !== false && won !== "false",
+        notes: notes || "",
+        source: "manual",
+      }).returning();
+      return res.json(job);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // PUT update imported job
+  app.put("/api/pricing/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const updates: any = {};
+      const fields = ["customerName","serviceType","sqft","beds","baths","halfBaths","conditionLevel","pets","frequency","addOns","zipCode","estimatedHours","crewSize","finalPrice","won","notes"];
+      for (const f of fields) { if (req.body[f] !== undefined) updates[f] = req.body[f]; }
+      if (updates.sqft) updates.sqft = parseInt(updates.sqft);
+      if (updates.beds) updates.beds = parseInt(updates.beds);
+      if (updates.baths) updates.baths = parseFloat(updates.baths);
+      if (updates.halfBaths) updates.halfBaths = parseInt(updates.halfBaths);
+      if (updates.finalPrice) updates.finalPrice = parseFloat(updates.finalPrice);
+      const [updated] = await db.update(importedJobs).set(updates)
+        .where(and(eq(importedJobs.id, req.params.id), eq(importedJobs.businessId, business.id)))
+        .returning();
+      return res.json(updated);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // DELETE imported job
+  app.delete("/api/pricing/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      await db.delete(importedJobs).where(and(eq(importedJobs.id, req.params.id), eq(importedJobs.businessId, business.id)));
+      return res.json({ message: "Deleted" });
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // GET questionnaire
+  app.get("/api/pricing/questionnaire", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const [q] = await db.select().from(pricingQuestionnaires)
+        .where(eq(pricingQuestionnaires.businessId, business.id))
+        .orderBy(desc(pricingQuestionnaires.createdAt)).limit(1);
+      return res.json(q || null);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // POST / PUT questionnaire (upsert)
+  app.post("/api/pricing/questionnaire", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const [existing] = await db.select().from(pricingQuestionnaires).where(eq(pricingQuestionnaires.businessId, business.id)).limit(1);
+      const data = {
+        minJobPrice: parseFloat(req.body.minJobPrice) || 100,
+        targetHourlyRevenue: parseFloat(req.body.targetHourlyRevenue) || 50,
+        preferredCrewSize: parseInt(req.body.preferredCrewSize) || 1,
+        suppliesIncluded: req.body.suppliesIncluded !== false && req.body.suppliesIncluded !== "false",
+        recurringDiscount: parseFloat(req.body.recurringDiscount) || 10,
+        deepCleanMultiplier: parseFloat(req.body.deepCleanMultiplier) || 1.5,
+        moveOutMultiplier: parseFloat(req.body.moveOutMultiplier) || 1.75,
+        petSurcharge: parseFloat(req.body.petSurcharge) || 25,
+        travelSurcharge: parseFloat(req.body.travelSurcharge) || 0,
+        serviceAreas: req.body.serviceAreas || [],
+        addOnPricing: req.body.addOnPricing || [],
+        pricingByCondition: req.body.pricingByCondition !== false,
+        pricingByFrequency: req.body.pricingByFrequency !== false,
+        pricingBySqft: req.body.pricingBySqft !== false,
+        neverGoBelow: parseFloat(req.body.neverGoBelow) || 80,
+        notes: req.body.notes || "",
+        updatedAt: new Date(),
+      };
+      if (existing) {
+        const [updated] = await db.update(pricingQuestionnaires).set(data).where(eq(pricingQuestionnaires.id, existing.id)).returning();
+        return res.json(updated);
+      } else {
+        const [created] = await db.insert(pricingQuestionnaires).values({ businessId: business.id, ...data }).returning();
+        return res.json(created);
+      }
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // POST run AI analysis
+  app.post("/api/pricing/analyze", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const jobs = await db.select().from(importedJobs).where(eq(importedJobs.businessId, business.id));
+      if (jobs.length < 3) return res.status(400).json({ message: "Upload at least 3 past jobs before running analysis." });
+
+      const [q] = await db.select().from(pricingQuestionnaires).where(eq(pricingQuestionnaires.businessId, business.id)).limit(1);
+
+      // Create pending analysis record
+      const [analysis] = await db.insert(pricingAnalyses).values({
+        businessId: business.id,
+        status: "running",
+        jobCount: jobs.length,
+      }).returning();
+
+      // Build the AI prompt
+      const jobSummary = jobs.map(j =>
+        `- ${j.customerName || "Customer"}: ${j.serviceType}, ${j.sqft || "?"}sqft, ${j.beds}bd/${j.baths}ba, condition=${j.conditionLevel}, pets=${j.pets}, frequency=${j.frequency}, price=$${j.finalPrice}, won=${j.won}`
+      ).join("\n");
+
+      const questionnaireSummary = q ? `
+Questionnaire:
+- Min job price: $${q.minJobPrice}
+- Target hourly revenue: $${q.targetHourlyRevenue}/hr
+- Preferred crew size: ${q.preferredCrewSize}
+- Deep clean multiplier: ${q.deepCleanMultiplier}x
+- Move-out multiplier: ${q.moveOutMultiplier}x
+- Pet surcharge: $${q.petSurcharge}
+- Recurring discount: ${q.recurringDiscount}%
+- Never go below: $${q.neverGoBelow}
+` : "No questionnaire completed.";
+
+      const systemPrompt = `You are a pricing analyst for a residential cleaning business. Analyze the past jobs and questionnaire to produce structured pricing insights. Return ONLY valid JSON matching the schema exactly.`;
+
+      const userPrompt = `Analyze these ${jobs.length} past jobs for a cleaning business:
+
+${jobSummary}
+
+${questionnaireSummary}
+
+Return a JSON object with this exact structure:
+{
+  "inferredSummary": {
+    "avgPricePerSqft": number,
+    "avgStandardPrice": number,
+    "avgDeepCleanPrice": number,
+    "avgMoveOutPrice": number,
+    "estimatedHourlyRate": number,
+    "pricingStyle": "string describing overall approach",
+    "observations": ["array of 3-5 specific observations about current pricing patterns"]
+  },
+  "revenueOpportunities": [
+    {
+      "title": "short title",
+      "description": "explanation in plain English",
+      "estimatedImpact": "e.g. +$15-30 per job",
+      "confidence": "high|medium|low",
+      "dataPoints": "what data supports this suggestion"
+    }
+  ],
+  "recommendedRules": [
+    {
+      "label": "rule label",
+      "ruleType": "sqft_range|bed_adjustment|bath_adjustment|condition_multiplier|pet_surcharge|frequency_discount|minimum_floor|base_by_service",
+      "inputVariables": ["array of variable names"],
+      "formula": {"type": "fixed|per_unit|multiplier|range_lookup|percent_discount", "value": number_or_object},
+      "explanation": "plain English explanation",
+      "source": "ai-recommended",
+      "reasoning": "why this rule was inferred from the data"
+    }
+  ]
+}
+
+Focus on real patterns in the data. Flag jobs that appear underpriced relative to their size/complexity. Identify missing surcharges. Be specific.`;
+
+      let rawOutput = "";
+      let parsedOutput: any = {};
+
+      try {
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.3,
+        });
+        rawOutput = completion.choices[0]?.message?.content || "{}";
+        parsedOutput = JSON.parse(rawOutput);
+      } catch (aiErr: any) {
+        console.error("AI analysis error:", aiErr.message);
+        // Fallback: generate basic analysis from data
+        const avgPrice = jobs.reduce((s, j) => s + j.finalPrice, 0) / jobs.length;
+        const standardJobs = jobs.filter(j => j.serviceType === "standard");
+        const deepJobs = jobs.filter(j => j.serviceType === "deep-clean");
+        const sqftJobs = jobs.filter(j => j.sqft && j.sqft > 0);
+        const avgSqft = sqftJobs.length ? sqftJobs.reduce((s, j) => s + (j.sqft || 0), 0) / sqftJobs.length : 0;
+        const avgPricePerSqft = sqftJobs.length ? sqftJobs.reduce((s, j) => s + j.finalPrice / (j.sqft || 1), 0) / sqftJobs.length : 0;
+
+        parsedOutput = {
+          inferredSummary: {
+            avgPricePerSqft: Math.round(avgPricePerSqft * 100) / 100,
+            avgStandardPrice: standardJobs.length ? Math.round(standardJobs.reduce((s, j) => s + j.finalPrice, 0) / standardJobs.length) : avgPrice,
+            avgDeepCleanPrice: deepJobs.length ? Math.round(deepJobs.reduce((s, j) => s + j.finalPrice, 0) / deepJobs.length) : Math.round(avgPrice * 1.5),
+            avgMoveOutPrice: Math.round(avgPrice * 1.75),
+            estimatedHourlyRate: q?.targetHourlyRevenue || 50,
+            pricingStyle: "Primarily based on service type and home size",
+            observations: [
+              `Average job price is $${Math.round(avgPrice)}`,
+              `${standardJobs.length} standard cleans, ${deepJobs.length} deep cleans analyzed`,
+              avgSqft > 0 ? `Average home size is ${Math.round(avgSqft)} sq ft at $${(avgPricePerSqft).toFixed(2)}/sqft` : "Square footage data not consistently captured",
+              jobs.filter(j => j.pets).length > 0 ? `${jobs.filter(j => j.pets).length} pet homes found — ensure pet surcharge is applied` : "No pet homes in sample",
+            ],
+          },
+          revenueOpportunities: [
+            {
+              title: "Standardize Pet Surcharges",
+              description: "Some pet homes may not be consistently charged a surcharge. A flat $25-35 pet surcharge protects your margins on these jobs.",
+              estimatedImpact: "+$25-35 per pet home job",
+              confidence: "high",
+              dataPoints: `${jobs.filter(j => j.pets).length} pet home jobs found in your history`,
+            },
+            {
+              title: "Review Large Home Pricing",
+              description: "Homes over 2,000 sqft may not be priced proportionally to the time required.",
+              estimatedImpact: "+$20-50 per large home",
+              confidence: "medium",
+              dataPoints: `${jobs.filter(j => (j.sqft || 0) > 2000).length} large homes found in history`,
+            },
+          ],
+          recommendedRules: [],
+        };
+        rawOutput = JSON.stringify(parsedOutput);
+      }
+
+      // Update analysis with results
+      await db.update(pricingAnalyses).set({
+        status: "completed",
+        inferredSummary: parsedOutput.inferredSummary || {},
+        revenueOpportunities: parsedOutput.revenueOpportunities || [],
+        recommendedRules: parsedOutput.recommendedRules || [],
+        rawAiOutput: rawOutput,
+      }).where(eq(pricingAnalyses.id, analysis.id));
+
+      // Auto-generate default rules from questionnaire if no rules exist yet
+      const existingRules = await db.select().from(pricingRules).where(eq(pricingRules.businessId, business.id));
+      if (existingRules.length === 0 && q) {
+        const defaultRules = buildDefaultRulesFromQuestionnaire(q);
+        for (let i = 0; i < defaultRules.length; i++) {
+          await db.insert(pricingRules).values({ businessId: business.id, ...defaultRules[i] });
+        }
+        // Also add AI-recommended rules
+        const aiRules = parsedOutput.recommendedRules || [];
+        for (let i = 0; i < aiRules.length && i < 3; i++) {
+          const r = aiRules[i];
+          await db.insert(pricingRules).values({
+            businessId: business.id,
+            label: r.label || "AI Recommended Rule",
+            ruleType: r.ruleType || "minimum_floor",
+            inputVariables: r.inputVariables || [],
+            formula: r.formula || { type: "fixed", value: 0 },
+            explanation: r.explanation || "",
+            source: "ai-recommended",
+            active: false,
+            sortOrder: 100 + i,
+          });
+        }
+      }
+
+      const [finalAnalysis] = await db.select().from(pricingAnalyses).where(eq(pricingAnalyses.id, analysis.id));
+      return res.json(finalAnalysis);
+    } catch (e: any) {
+      console.error("Pricing analysis error:", e.message);
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET latest analysis
+  app.get("/api/pricing/analysis", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const [analysis] = await db.select().from(pricingAnalyses)
+        .where(eq(pricingAnalyses.businessId, business.id))
+        .orderBy(desc(pricingAnalyses.createdAt)).limit(1);
+      return res.json(analysis || null);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // GET pricing rules
+  app.get("/api/pricing/rules", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const rules = await db.select().from(pricingRules)
+        .where(eq(pricingRules.businessId, business.id))
+        .orderBy(pricingRules.sortOrder, pricingRules.createdAt);
+      return res.json(rules);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // PUT update pricing rule
+  app.put("/api/pricing/rules/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const updates: any = { updatedAt: new Date() };
+      const allowed = ["label","explanation","formula","active","sortOrder","source"];
+      for (const f of allowed) { if (req.body[f] !== undefined) updates[f] = req.body[f]; }
+      const [updated] = await db.update(pricingRules).set(updates)
+        .where(and(eq(pricingRules.id, req.params.id), eq(pricingRules.businessId, business.id)))
+        .returning();
+      return res.json(updated);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // DELETE pricing rule
+  app.delete("/api/pricing/rules/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      await db.delete(pricingRules).where(and(eq(pricingRules.id, req.params.id), eq(pricingRules.businessId, business.id)));
+      return res.json({ message: "Deleted" });
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // POST publish pricing profile
+  app.post("/api/pricing/publish", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const rules = await db.select().from(pricingRules)
+        .where(and(eq(pricingRules.businessId, business.id), eq(pricingRules.active, true)))
+        .orderBy(pricingRules.sortOrder);
+      if (rules.length === 0) return res.status(400).json({ message: "No active rules to publish." });
+      const [lastProfile] = await db.select().from(publishedPricingProfiles)
+        .where(eq(publishedPricingProfiles.businessId, business.id))
+        .orderBy(desc(publishedPricingProfiles.publishedAt)).limit(1);
+      const version = lastProfile ? (lastProfile.version || 1) + 1 : 1;
+      const [profile] = await db.insert(publishedPricingProfiles).values({
+        businessId: business.id,
+        version,
+        rules: rules,
+        changeSummary: req.body.changeSummary || `Published ${rules.length} pricing rules`,
+      }).returning();
+      return res.json(profile);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // GET published profile
+  app.get("/api/pricing/profile", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const [profile] = await db.select().from(publishedPricingProfiles)
+        .where(eq(publishedPricingProfiles.businessId, business.id))
+        .orderBy(desc(publishedPricingProfiles.publishedAt)).limit(1);
+      return res.json(profile || null);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // POST calculate quote
+  app.post("/api/pricing/calculate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const rules = await db.select().from(pricingRules)
+        .where(and(eq(pricingRules.businessId, business.id), eq(pricingRules.active, true)))
+        .orderBy(pricingRules.sortOrder);
+      if (rules.length === 0) return res.status(400).json({ message: "No pricing rules found. Set up and publish your pricing first." });
+      const job = req.body;
+      const result = runPricingEngine(job, rules as any);
+      return res.json(result);
+    } catch (e: any) { return res.status(500).json({ message: e.message }); }
+  });
+
+  // =========================================================
+
   return httpServer;
 }
 

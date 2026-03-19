@@ -1065,5 +1065,95 @@ export const sequenceEnrollments = pgTable("sequence_enrollments", {
 
 export type SequenceEnrollment = typeof sequenceEnrollments.$inferSelect;
 
+// ===== Pricing Logic Engine =====
+
+export const importedJobs = pgTable("imported_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  customerName: text("customer_name").default(""),
+  serviceType: text("service_type").default("standard"),
+  sqft: integer("sqft"),
+  beds: integer("beds"),
+  baths: real("baths"),
+  halfBaths: integer("half_baths").default(0),
+  conditionLevel: text("condition_level").default("standard"),
+  pets: boolean("pets").default(false),
+  frequency: text("frequency").default("one-time"),
+  addOns: jsonb("add_ons").default([]),
+  zipCode: text("zip_code").default(""),
+  estimatedHours: real("estimated_hours"),
+  crewSize: integer("crew_size").default(1),
+  finalPrice: real("final_price").notNull(),
+  won: boolean("won").default(true),
+  notes: text("notes").default(""),
+  source: text("source").default("manual"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const pricingQuestionnaires = pgTable("pricing_questionnaires", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  minJobPrice: real("min_job_price").default(100),
+  targetHourlyRevenue: real("target_hourly_revenue").default(50),
+  preferredCrewSize: integer("preferred_crew_size").default(1),
+  suppliesIncluded: boolean("supplies_included").default(true),
+  recurringDiscount: real("recurring_discount").default(10),
+  deepCleanMultiplier: real("deep_clean_multiplier").default(1.5),
+  moveOutMultiplier: real("move_out_multiplier").default(1.75),
+  petSurcharge: real("pet_surcharge").default(25),
+  travelSurcharge: real("travel_surcharge").default(0),
+  serviceAreas: jsonb("service_areas").default([]),
+  addOnPricing: jsonb("add_on_pricing").default([]),
+  pricingByCondition: boolean("pricing_by_condition").default(true),
+  pricingByFrequency: boolean("pricing_by_frequency").default(true),
+  pricingBySqft: boolean("pricing_by_sqft").default(true),
+  neverGoBelow: real("never_go_below").default(80),
+  notes: text("notes").default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const pricingRules = pgTable("pricing_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  label: text("label").notNull(),
+  ruleType: text("rule_type").notNull(),
+  inputVariables: jsonb("input_variables").default([]),
+  formula: jsonb("formula").notNull(),
+  explanation: text("explanation").default(""),
+  source: text("source").default("user"),
+  active: boolean("active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const pricingAnalyses = pgTable("pricing_analyses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  status: text("status").default("pending"),
+  jobCount: integer("job_count").default(0),
+  inferredSummary: jsonb("inferred_summary").default({}),
+  revenueOpportunities: jsonb("revenue_opportunities").default([]),
+  recommendedRules: jsonb("recommended_rules").default([]),
+  rawAiOutput: text("raw_ai_output").default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const publishedPricingProfiles = pgTable("published_pricing_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  version: integer("version").default(1),
+  rules: jsonb("rules").notNull().default([]),
+  publishedAt: timestamp("published_at").defaultNow().notNull(),
+  changeSummary: text("change_summary").default(""),
+});
+
+export type ImportedJob = typeof importedJobs.$inferSelect;
+export type PricingQuestionnaire = typeof pricingQuestionnaires.$inferSelect;
+export type PricingRule = typeof pricingRules.$inferSelect;
+export type PricingAnalysis = typeof pricingAnalyses.$inferSelect;
+export type PublishedPricingProfile = typeof publishedPricingProfiles.$inferSelect;
+
 // ===== AI Quote Assistant =====
 

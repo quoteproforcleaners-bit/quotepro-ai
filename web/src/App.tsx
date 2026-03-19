@@ -50,6 +50,7 @@ import ProSetupChecklistPage from "./pages/ProSetupChecklistPage";
 import AccountSettingsPage from "./pages/AccountSettingsPage";
 import FileLibraryPage from "./pages/FileLibraryPage";
 import EmailSequencesPage from "./pages/EmailSequencesPage";
+import PricingLogicPage from "./pages/PricingLogicPage";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -139,6 +140,7 @@ export default function App() {
           <Route path="/pro-setup" element={<ProSetupChecklistPage />} />
           <Route path="/file-library" element={<FileLibraryPage />} />
           <Route path="/email-sequences" element={<EmailSequencesPage />} />
+          <Route path="/pricing-logic" element={<PricingLogicPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/account-settings" element={<AccountSettingsPage />} />
         </Route>
