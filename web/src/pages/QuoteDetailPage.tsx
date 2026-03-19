@@ -553,28 +553,32 @@ export default function QuoteDetailPage() {
                   return (
                     <div
                       key={key}
-                      className={`flex items-center justify-between py-2.5 px-3 rounded-lg ${
-                        isSelected ? "bg-emerald-50/50" : "bg-slate-50/50"
+                      className={`flex items-center justify-between py-2.5 px-3 rounded-lg border ${
+                        isSelected
+                          ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-700/50"
+                          : "bg-white border-slate-200 dark:bg-slate-800/60 dark:border-slate-700"
                       }`}
                     >
                       <span
                         className={`text-sm ${
-                          isSelected ? "text-slate-900 font-medium" : "text-slate-400"
+                          isSelected
+                            ? "text-emerald-900 font-medium dark:text-emerald-100"
+                            : "text-slate-600 dark:text-slate-300"
                         }`}
                       >
                         {label}
                       </span>
                       <div className="flex items-center gap-2">
                         {price > 0 ? (
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
                             +${Number(price).toFixed(0)}
                           </span>
                         ) : null}
                         <span
                           className={`w-5 h-5 rounded-full flex items-center justify-center ${
                             isSelected
-                              ? "bg-emerald-100 text-emerald-600"
-                              : "bg-slate-100 text-slate-300"
+                              ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-800 dark:text-emerald-300"
+                              : "bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500"
                           }`}
                         >
                           {isSelected ? (
