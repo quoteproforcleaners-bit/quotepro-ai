@@ -1036,6 +1036,8 @@ export default function QuoteCreatePage() {
                       className={`w-full text-left rounded-xl border-2 p-5 transition-all ${
                         isSelected
                           ? "border-primary-500 bg-primary-50/50 shadow-sm shadow-primary-600/5"
+                          : aiPriceOverrides
+                          ? "border-emerald-400 hover:border-emerald-500"
                           : "border-slate-200 hover:border-slate-300"
                       }`}
                     >
@@ -1050,22 +1052,27 @@ export default function QuoteCreatePage() {
                         ) : null}
                       </div>
                       <p className="text-xs text-slate-500">{data.name}</p>
-                      <p className="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
-                        ${displayPrice.toFixed(0)}
-                        {aiPriceOverrides ? (
-                          <span className="text-xs font-normal text-primary-500 ml-1.5">AI</span>
-                        ) : null}
-                        {data.firstCleanPrice ? (
-                          <span className="text-xs font-normal text-slate-400 ml-1">
-                            /visit
-                          </span>
-                        ) : null}
-                      </p>
                       {data.firstCleanPrice ? (
-                        <p className="text-xs text-amber-600 font-medium mt-0.5">
-                          First visit: ${data.firstCleanPrice.toFixed(0)}
+                        <>
+                          <p className="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
+                            ${data.firstCleanPrice.toFixed(0)}
+                            <span className="text-xs font-normal text-slate-400 ml-1">first visit</span>
+                          </p>
+                          <p className="text-xs text-slate-500 font-medium mt-0.5">
+                            ${displayPrice.toFixed(0)}/visit thereafter
+                            {aiPriceOverrides ? (
+                              <span className="text-emerald-600 font-semibold ml-1">AI</span>
+                            ) : null}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
+                          ${displayPrice.toFixed(0)}
+                          {aiPriceOverrides ? (
+                            <span className="text-xs font-normal text-emerald-600 ml-1.5">AI</span>
+                          ) : null}
                         </p>
-                      ) : null}
+                      )}
                       <p className="text-xs text-slate-400 mt-1 line-clamp-3">
                         {aiScope ? aiScope : data.scope}
                       </p>
@@ -1106,6 +1113,7 @@ export default function QuoteCreatePage() {
                 icon={Sparkles}
                 onClick={generateAiScopes}
                 loading={aiScopesLoading}
+                className="!border-blue-400 !text-blue-700 hover:!border-blue-500 hover:!bg-blue-50"
               >
                 {aiScopes ? "Regenerate Descriptions" : "AI Describe Tiers"}
               </Button>
@@ -1115,6 +1123,7 @@ export default function QuoteCreatePage() {
                 icon={FileText}
                 onClick={generateAiPricing}
                 loading={aiPricingLoading}
+                className="!border-emerald-400 !text-emerald-700 hover:!border-emerald-500 hover:!bg-emerald-50"
               >
                 {aiPricing ? "Refresh Price Insight" : "AI Suggest Prices"}
               </Button>
@@ -1131,11 +1140,11 @@ export default function QuoteCreatePage() {
 
             {/* AI Pricing Suggestion Panel */}
             {aiPricing ? (
-              <div className="bg-primary-50 border border-primary-100 rounded-xl p-4 space-y-3">
+              <div className="bg-emerald-50 border-2 border-emerald-400 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-primary-600" />
-                    <span className="text-sm font-semibold text-primary-900">AI Pricing Insight</span>
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    <span className="text-sm font-semibold text-emerald-900">AI Pricing Insight</span>
                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
                       aiPricing.confidence === "high"
                         ? "bg-green-100 text-green-700"
@@ -1148,7 +1157,7 @@ export default function QuoteCreatePage() {
                   </div>
                 </div>
                 {aiPricing.keyInsight ? (
-                  <p className="text-xs text-primary-700 italic">{aiPricing.keyInsight}</p>
+                  <p className="text-xs text-emerald-700 italic">{aiPricing.keyInsight}</p>
                 ) : null}
                 <div className="grid grid-cols-3 gap-2">
                   {(["good", "better", "best"] as const).map((tier) => {
@@ -1170,7 +1179,7 @@ export default function QuoteCreatePage() {
                   })}
                 </div>
                 {aiPricing.overallAssessment ? (
-                  <p className="text-xs text-primary-800">{aiPricing.overallAssessment}</p>
+                  <p className="text-xs text-emerald-800">{aiPricing.overallAssessment}</p>
                 ) : null}
                 <Button
                   size="sm"
