@@ -432,12 +432,11 @@ export default function SettingsPage() {
 
   const handleSaveBranding = () => {
     updateBusiness.mutate({
-      ...businessForm,
-      senderName: brandingForm.senderName || null,
-      senderTitle: brandingForm.senderTitle || null,
-      bookingLink: brandingForm.bookingLink || null,
-      emailSignature: brandingForm.emailSignature || null,
-      smsSignature: brandingForm.smsSignature || null,
+      senderName: brandingForm.senderName || "",
+      senderTitle: brandingForm.senderTitle || "",
+      bookingLink: brandingForm.bookingLink || "",
+      emailSignature: brandingForm.emailSignature || "",
+      smsSignature: brandingForm.smsSignature || "",
     });
   };
 

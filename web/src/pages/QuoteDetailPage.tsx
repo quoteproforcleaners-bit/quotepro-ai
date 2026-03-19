@@ -62,7 +62,6 @@ export default function QuoteDetailPage() {
   const navigate = useNavigate();
   const { business } = useAuth();
   const [copied, setCopied] = useState(false);
-  const [sending, setSending] = useState(false);
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [aiDrafts, setAiDrafts] = useState<Record<string, string>>({});
