@@ -40,6 +40,8 @@ import {
   PlugZap,
   Moon,
   Sun,
+  FolderOpen,
+  MailOpen,
 } from "lucide-react";
 
 const PRO_ROUTES = [
@@ -80,6 +82,7 @@ const navSections = [
       { to: "/reviews-referrals", label: "Reviews & Referrals", icon: Star, pro: true },
       { to: "/lead-finder", label: "Lead Finder", icon: Radio, pro: true },
       { to: "/opportunities", label: "Opportunities", icon: Target, pro: true },
+      { to: "/email-sequences", label: "Email Sequences", icon: MailOpen },
     ],
   },
   {
@@ -105,6 +108,7 @@ const navSections = [
     label: "Resources",
     items: [
       { to: "/toolkit", label: "Toolkit", icon: Wrench },
+      { to: "/file-library", label: "File Library", icon: FolderOpen },
       { to: "/pro-setup", label: "Setup Checklist", icon: Clipboard },
     ],
   },

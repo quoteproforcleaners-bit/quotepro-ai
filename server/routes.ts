@@ -6,7 +6,9 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import OpenAI from "openai";
 import Stripe from "stripe";
-import { pool } from "./db";
+import { pool, db } from "./db";
+import { eq, and, desc } from "drizzle-orm";
+import { businessFiles, sequenceEnrollments } from "../shared/schema";
 import { google } from "googleapis";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableGoogleCalendarClient, isGoogleCalendarConnected } from "./googleCalendarClient";
@@ -10188,6 +10190,449 @@ Rules:
     }
   }, 60 * 60 * 1000);
 
+
+  // ===== FILE LIBRARY ROUTES =====
+
+  app.get("/api/files", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const files = await db
+        .select()
+        .from(businessFiles)
+        .where(eq(businessFiles.businessId, business.id))
+        .orderBy(desc(businessFiles.createdAt));
+      return res.json(files);
+    } catch (err: any) {
+      return res.status(500).json({ message: "Failed to fetch files" });
+    }
+  });
+
+  app.post("/api/files/upload", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { fileData, originalName, fileType, fileSize, description, category } = req.body;
+      if (!fileData || !originalName) return res.status(400).json({ message: "File data and name required" });
+
+      const fs = await import("fs");
+      const path = await import("path");
+      const uploadsDir = path.join(process.cwd(), "uploads", "business-files");
+      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+      const ext = originalName.split(".").pop() || "bin";
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const filePath = path.join(uploadsDir, fileName);
+
+      const base64Data = fileData.replace(/^data:[^;]+;base64,/, "");
+      fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+
+      const fileUrl = `/uploads/business-files/${fileName}`;
+      const [file] = await db.insert(businessFiles).values({
+        businessId: business.id,
+        originalName,
+        fileName,
+        fileType: fileType || "application/octet-stream",
+        fileSize: fileSize || 0,
+        fileUrl,
+        description: description || "",
+        category: category || "general",
+      }).returning();
+
+      return res.json(file);
+    } catch (err: any) {
+      console.error("File upload error:", err);
+      return res.status(500).json({ message: "Failed to upload file" });
+    }
+  });
+
+  app.patch("/api/files/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { description, category } = req.body;
+      const [updated] = await db
+        .update(businessFiles)
+        .set({ description: description || "", category: category || "general" })
+        .where(and(eq(businessFiles.id, req.params.id), eq(businessFiles.businessId, business.id)))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "File not found" });
+      return res.json(updated);
+    } catch (err: any) {
+      return res.status(500).json({ message: "Failed to update file" });
+    }
+  });
+
+  app.delete("/api/files/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const [file] = await db
+        .select()
+        .from(businessFiles)
+        .where(and(eq(businessFiles.id, req.params.id), eq(businessFiles.businessId, business.id)));
+      if (!file) return res.status(404).json({ message: "File not found" });
+
+      const fs = await import("fs");
+      const path = await import("path");
+      const filePath = path.join(process.cwd(), file.fileUrl);
+      try { fs.unlinkSync(filePath); } catch {}
+
+      await db.delete(businessFiles).where(eq(businessFiles.id, req.params.id));
+      return res.json({ message: "Deleted" });
+    } catch (err: any) {
+      return res.status(500).json({ message: "Failed to delete file" });
+    }
+  });
+
+  // ===== EMAIL SEQUENCES ROUTES =====
+
+  const BUILT_IN_SEQUENCES = [
+    {
+      id: "seq-welcome-new-customer",
+      name: "Welcome New Customer",
+      description: "Onboard new clients with a warm 3-step series that sets expectations and encourages their first review.",
+      category: "Onboarding",
+      icon: "star",
+      color: "blue",
+      steps: [
+        { subject: "Welcome to {{businessName}}! Here's what to expect", delayDays: 0, body: "Hi {{customerName}},\n\nWelcome aboard! We're thrilled to have you as a new customer.\n\nHere's what you can expect from us:\n- Thorough, professional cleaning every time\n- Fully vetted and insured cleaners\n- 100% satisfaction guarantee\n\nIf you have any questions before your first appointment, just reply to this email.\n\nLooking forward to making your home shine!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "How did your first clean go?", delayDays: 3, body: "Hi {{customerName}},\n\nWe hope your first clean with {{businessName}} went wonderfully!\n\nWe'd love to hear your thoughts. Your feedback helps us improve and serve you better.\n\nIf everything was great, we'd really appreciate a quick review — it means the world to a small business like ours:\n{{bookingLink}}\n\nIf anything fell short of your expectations, just reply to this email and we'll make it right.\n\nThank you for trusting us with your home!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Ready to make your cleaning recurring?", delayDays: 10, body: "Hi {{customerName}},\n\nWe've loved cleaning for you! Many of our customers find that scheduling recurring cleanings keeps their home consistently fresh without the hassle of rescheduling each time.\n\nWe offer weekly, bi-weekly, and monthly plans — and recurring clients get priority scheduling.\n\nInterested? Book your next visit here:\n{{bookingLink}}\n\nTalk soon!\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-spring-cleaning",
+      name: "Spring Cleaning Campaign",
+      description: "Seasonal campaign to re-engage existing clients and attract new ones with a spring cleaning special.",
+      category: "Seasonal",
+      icon: "sun",
+      color: "green",
+      steps: [
+        { subject: "Spring is here — is your home ready?", delayDays: 0, body: "Hi {{customerName}},\n\nSpring has arrived and there's no better time to refresh your home from top to bottom!\n\nOur Spring Deep Clean package covers all the spots that need extra attention after winter — baseboards, windows, behind appliances, and more.\n\nBook your spring clean now:\n{{bookingLink}}\n\nSpots are filling fast!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Last chance: Spring cleaning spots are almost gone", delayDays: 5, body: "Hi {{customerName}},\n\nJust a friendly reminder — our spring cleaning calendar is filling up quickly!\n\nDon't miss the chance to start the season with a sparkling clean home.\n\nBook now before we're fully booked:\n{{bookingLink}}\n\nWe'd love to help make your spring fresh and clean!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Still thinking about a spring clean?", delayDays: 10, body: "Hi {{customerName}},\n\nWe know life gets busy, but we wanted to reach out one more time.\n\nA thorough spring clean can make a real difference — less dust, better air quality, and a home you're proud of.\n\nWe still have a few openings. Claim yours here:\n{{bookingLink}}\n\nTalk soon!\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-mothers-day",
+      name: "Mother's Day Special",
+      description: "Gift-focused campaign promoting cleaning services as the perfect Mother's Day present.",
+      category: "Seasonal",
+      icon: "heart",
+      color: "pink",
+      steps: [
+        { subject: "Give Mom the gift of a clean home this Mother's Day", delayDays: 0, body: "Hi {{customerName}},\n\nMother's Day is coming up — and what better gift than a spotlessly clean home?\n\nGive the mom in your life the gift of relaxation with a professional cleaning from {{businessName}}.\n\nIt's thoughtful, practical, and something she'll truly appreciate.\n\nBook a Mother's Day clean here:\n{{bookingLink}}\n\nHappy early Mother's Day from all of us!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Mother's Day is almost here — have you booked Mom's clean?", delayDays: 5, body: "Hi {{customerName}},\n\nMother's Day is just around the corner!\n\nIf you're still searching for the perfect gift, a professional home cleaning is a wonderful way to show you care.\n\nOur team will leave her home looking and smelling amazing.\n\nBook now — limited spots remain:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Last call for Mother's Day cleaning gifts", delayDays: 9, body: "Hi {{customerName}},\n\nToday is your last chance to book a Mother's Day cleaning gift!\n\nWe have a very limited number of spots left before the holiday. Secure yours now:\n{{bookingLink}}\n\nWe'll make sure Mom's home is truly special.\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-fall-deep-clean",
+      name: "Fall Deep Clean",
+      description: "Encourage clients to do a thorough clean before the holiday season and colder months ahead.",
+      category: "Seasonal",
+      icon: "wind",
+      color: "orange",
+      steps: [
+        { subject: "Get your home ready for fall — book your deep clean", delayDays: 0, body: "Hi {{customerName}},\n\nFall is the perfect time to give your home a thorough refresh before the holiday season kicks in!\n\nOur Fall Deep Clean covers all the areas that tend to get overlooked during regular maintenance cleanings — vents, under furniture, kitchen appliances, and more.\n\nBook your fall deep clean now:\n{{bookingLink}}\n\nWarm regards,\n{{senderName}}\n{{businessName}}" },
+        { subject: "Holiday season is coming — is your home ready?", delayDays: 7, body: "Hi {{customerName}},\n\nWith the holidays approaching, you'll soon be hosting family and friends. Starting with a beautifully clean home makes all the difference!\n\nOur team can take care of the deep cleaning so you can focus on the fun parts of the season.\n\nSchedule your clean here:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Don't wait until the holidays — book your clean now", delayDays: 14, body: "Hi {{customerName}},\n\nWe're heading into the busiest time of year, and our calendar is filling up fast.\n\nBook now to lock in your preferred date before the holiday rush:\n{{bookingLink}}\n\nWe look forward to helping you enjoy a clean, stress-free home this season!\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-back-to-school",
+      name: "Back to School Clean",
+      description: "Target families getting back into routines after summer break with a reset cleaning campaign.",
+      category: "Seasonal",
+      icon: "book",
+      color: "purple",
+      steps: [
+        { subject: "Back to school = back to routine. Start fresh with a clean home!", delayDays: 0, body: "Hi {{customerName}},\n\nSchool's back in session — and that means schedules, homework, and busy evenings. The last thing you want to worry about is cleaning!\n\nLet us handle it so you can focus on what matters most.\n\nBook your back-to-school clean:\n{{bookingLink}}\n\nHere's to a great school year!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Busy with school? Let us take cleaning off your plate", delayDays: 6, body: "Hi {{customerName}},\n\nWe know back-to-school season can be hectic. Between drop-offs, activities, and work, cleaning often falls to the bottom of the list.\n\nThat's where we come in! Let our team keep your home fresh while you focus on your family.\n\nEasy booking here:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Set up a recurring clean for the school year", delayDays: 12, body: "Hi {{customerName}},\n\nMany of our busiest clients set up recurring cleanings at the start of the school year so they never have to think about it again!\n\nWeekly, bi-weekly, or monthly — we'll work around your schedule.\n\nBook your recurring plan now:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-win-back",
+      name: "Win Back Inactive Client",
+      description: "Re-engage clients who haven't booked in a while with a personalized outreach series.",
+      category: "Retention",
+      icon: "refresh-cw",
+      color: "indigo",
+      steps: [
+        { subject: "We miss you, {{customerName}}!", delayDays: 0, body: "Hi {{customerName}},\n\nIt's been a while since we've had the pleasure of cleaning your home, and we wanted to reach out!\n\nWe've made some improvements to our service and would love the chance to impress you again.\n\nBook a cleaning at your convenience:\n{{bookingLink}}\n\nWe hope to hear from you soon!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Still thinking about booking? We're here for you", delayDays: 7, body: "Hi {{customerName}},\n\nWe wanted to follow up and let you know we'd love to have you back as a client.\n\nIf there's anything that prevented you from booking last time — pricing, scheduling, or otherwise — we'd love to chat and see if we can find a solution that works for you.\n\nJust reply to this email, or book directly here:\n{{bookingLink}}\n\nWarmly,\n{{senderName}}\n{{businessName}}" },
+        { subject: "Last check-in from {{businessName}}", delayDays: 14, body: "Hi {{customerName}},\n\nThis is our last check-in, and we promise not to keep nudging you after this!\n\nIf you're ever ready for a fresh, professionally cleaned home, we'd be honored to help.\n\nWe're here whenever you need us:\n{{bookingLink}}\n\nWishing you all the best,\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-deep-clean-upsell",
+      name: "Deep Clean Upsell",
+      description: "Upsell regular cleaning clients to a premium deep clean service.",
+      category: "Growth",
+      icon: "zap",
+      color: "yellow",
+      steps: [
+        { subject: "Have you considered a deep clean? Here's why it's worth it", delayDays: 0, body: "Hi {{customerName}},\n\nYou've been a wonderful regular client, and we truly appreciate your loyalty!\n\nWe wanted to share something that many of our clients find incredibly valuable: our Deep Clean service.\n\nUnlike standard cleanings, our deep clean tackles the hidden spots — inside appliances, light fixtures, grout, behind furniture, and more. It's a full reset for your home.\n\nMany clients schedule one every season or after major events. Want to see what the difference feels like?\n\nBook a deep clean here:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Your home might be due for a deep clean — here's how to know", delayDays: 8, body: "Hi {{customerName}},\n\nHere are some signs it might be time for a deep clean:\n- It's been 6+ months since your last one\n- You're noticing buildup in hard-to-reach areas\n- You have guests coming or just moved in/out\n- Your standard clean doesn't feel thorough enough anymore\n\nOur deep clean goes far beyond the surface. Ready to experience it?\n\nBook now:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Ready for your deep clean?", delayDays: 14, body: "Hi {{customerName}},\n\nWe'd love to give your home the full treatment it deserves!\n\nOur deep clean clients consistently tell us it's one of the best decisions they've made. Schedule yours today:\n{{bookingLink}}\n\nLooking forward to hearing from you!\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-holiday-special",
+      name: "Holiday Cleaning Special",
+      description: "Promote holiday cleaning packages to help clients prepare their homes for holiday entertaining.",
+      category: "Seasonal",
+      icon: "gift",
+      color: "red",
+      steps: [
+        { subject: "Holiday entertaining? Let us get your home party-ready!", delayDays: 0, body: "Hi {{customerName}},\n\nThe holiday season is approaching, and if you're planning to host family and friends, there's no better time to get your home looking its absolute best!\n\nOur Holiday Clean package includes all the extra touches that make your home shine for guests — windows, baseboards, kitchen deep clean, and bathroom detail.\n\nBook your holiday clean:\n{{bookingLink}}\n\nWishing you a wonderful holiday season!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Hosting for the holidays? We've got you covered", delayDays: 6, body: "Hi {{customerName}},\n\nDon't let cleaning be one more thing on your holiday to-do list!\n\nLet our team handle it while you focus on decorating, cooking, and spending time with loved ones.\n\nWe're booking up fast for the holiday season — secure your spot now:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Final holiday cleaning spots available", delayDays: 12, body: "Hi {{customerName}},\n\nThis is it — our last available holiday cleaning slots are going fast!\n\nIf you want your home sparkling clean for the holidays, now is the time to book.\n\nDon't miss out:\n{{bookingLink}}\n\nHappy holidays from the entire {{businessName}} team!\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-new-year",
+      name: "New Year Fresh Start",
+      description: "Kick off the new year with a campaign encouraging clients to start fresh with a clean home.",
+      category: "Seasonal",
+      icon: "sunrise",
+      color: "cyan",
+      steps: [
+        { subject: "New year, fresh home — start 2025 clean!", delayDays: 0, body: "Hi {{customerName}},\n\nHappy New Year!\n\nWhat better way to kick off a fresh start than with a beautifully clean home?\n\nOur New Year Clean-Out package helps you declutter the old and welcome the new with a sparkling, refreshed living space.\n\nBook your new year clean:\n{{bookingLink}}\n\nHere's to a wonderful year ahead!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Still on your new year's list? Let us check 'clean home' off for you", delayDays: 8, body: "Hi {{customerName}},\n\nNew year resolutions are tricky — but a clean home doesn't have to be!\n\nLet us take this one off your plate so you can focus on the resolutions that matter most.\n\nBook your clean today:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Make clean home a habit this year — set up a recurring plan", delayDays: 15, body: "Hi {{customerName}},\n\nThe best way to always have a clean home? Schedule it so you never have to think about it!\n\nSet up a recurring cleaning plan with us this January and enjoy a fresh home all year long.\n\nChoose your plan here:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-referral-request",
+      name: "Referral Request Campaign",
+      description: "Ask your happiest clients to refer friends and family to grow your business.",
+      category: "Growth",
+      icon: "users",
+      color: "emerald",
+      steps: [
+        { subject: "Love your clean home? Share the love!", delayDays: 0, body: "Hi {{customerName}},\n\nWe hope you're loving your clean home! We've truly enjoyed working with you.\n\nIf you know anyone who could use a great cleaning service, we'd love a referral. Word of mouth means everything to a small business like ours.\n\nYou can share our booking link with them:\n{{bookingLink}}\n\nThank you so much for your continued support!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Know anyone who needs a cleaner? We appreciate your referrals!", delayDays: 10, body: "Hi {{customerName}},\n\nJust a friendly follow-up! If you have friends, family, or neighbors who are looking for a reliable cleaning service, we'd really appreciate you passing along our name.\n\nThey can book here:\n{{bookingLink}}\n\nThank you for being such a valued client!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "One last ask — do you know someone who needs a cleaner?", delayDays: 20, body: "Hi {{customerName}},\n\nWe truly value your business and your trust in us. If you've been happy with our service, the biggest compliment you can give us is referring a friend or neighbor.\n\nShare this link with anyone who might benefit:\n{{bookingLink}}\n\nThank you for helping us grow!\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-summer-refresh",
+      name: "Summer Refresh",
+      description: "Seasonal campaign for summer cleaning to target clients before vacation season ends.",
+      category: "Seasonal",
+      icon: "droplet",
+      color: "sky",
+      steps: [
+        { subject: "Beat the summer heat with a clean, fresh home", delayDays: 0, body: "Hi {{customerName}},\n\nSummer is in full swing — which means more foot traffic, open windows, and all the dust and pollen that comes with it!\n\nOur Summer Refresh clean helps you maintain a cool, clean home all season long.\n\nBook your summer refresh:\n{{bookingLink}}\n\nStay cool and enjoy the season!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Summer's almost over — get a clean-up before fall hits", delayDays: 14, body: "Hi {{customerName}},\n\nSummer is winding down, and it's a great time for a thorough clean before the fall season begins.\n\nGet ahead of it now while our schedule still has availability:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "End of summer clean — ready to book?", delayDays: 21, body: "Hi {{customerName}},\n\nAs summer comes to a close, treat yourself to a beautifully clean home before the busy fall season kicks off.\n\nBook your end-of-summer clean here:\n{{bookingLink}}\n\nThank you for your business!\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+    {
+      id: "seq-move-in-out",
+      name: "Move-In / Move-Out Clean",
+      description: "Target clients who are moving with a specialized move clean promotion.",
+      category: "Promotion",
+      icon: "home",
+      color: "teal",
+      steps: [
+        { subject: "Moving soon? We handle the cleaning so you don't have to", delayDays: 0, body: "Hi {{customerName}},\n\nMoving is stressful enough without worrying about cleaning!\n\nOur Move-In / Move-Out cleaning service ensures your old home is spotless for the next occupants and your new home is fresh and ready for you.\n\nWe handle all the deep work — inside cabinets, appliances, closets, and every corner.\n\nBook your move clean:\n{{bookingLink}}\n\nWishing you a smooth move!\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Need a move-out clean? We've got the details covered", delayDays: 5, body: "Hi {{customerName}},\n\nA thorough move-out clean is often required by landlords to get your full deposit back — and we make sure everything meets that standard.\n\nOur team covers every corner so you can focus on your next chapter.\n\nBook now:\n{{bookingLink}}\n\n{{senderName}}\n{{businessName}}" },
+        { subject: "Settled into your new home? Let us give it a fresh start", delayDays: 12, body: "Hi {{customerName}},\n\nHope the move went smoothly! Now that you're settling in, a professional move-in clean is a great way to start fresh in your new space.\n\nWe'd love to be your go-to cleaner in your new home!\n\nBook here:\n{{bookingLink}}\n\nWelcome to your new home!\n\n{{senderName}}\n{{businessName}}" },
+      ],
+    },
+  ];
+
+  app.get("/api/email-sequences/library", requireAuth, async (_req: Request, res: Response) => {
+    return res.json(BUILT_IN_SEQUENCES);
+  });
+
+  app.get("/api/email-sequences/enrollments", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const enrollments = await db
+        .select()
+        .from(sequenceEnrollments)
+        .where(eq(sequenceEnrollments.businessId, business.id))
+        .orderBy(desc(sequenceEnrollments.enrolledAt));
+      return res.json(enrollments);
+    } catch (err: any) {
+      return res.status(500).json({ message: "Failed to fetch enrollments" });
+    }
+  });
+
+  app.post("/api/email-sequences/:sequenceId/enroll", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { sequenceId } = req.params;
+      const seq = BUILT_IN_SEQUENCES.find(s => s.id === sequenceId);
+      if (!seq) return res.status(404).json({ message: "Sequence not found" });
+
+      const { contacts, notes } = req.body;
+      if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
+        return res.status(400).json({ message: "At least one contact required" });
+      }
+
+      const results = [];
+      for (const contact of contacts) {
+        const { customerName, customerEmail, customerId } = contact;
+        if (!customerName || !customerEmail) continue;
+
+        const existing = await db
+          .select()
+          .from(sequenceEnrollments)
+          .where(and(
+            eq(sequenceEnrollments.businessId, business.id),
+            eq(sequenceEnrollments.sequenceId, sequenceId),
+            eq(sequenceEnrollments.customerEmail, customerEmail),
+            eq(sequenceEnrollments.status, "active")
+          ));
+        if (existing.length > 0) continue;
+
+        const [enrollment] = await db.insert(sequenceEnrollments).values({
+          businessId: business.id,
+          sequenceId,
+          customerName,
+          customerEmail,
+          customerId: customerId || null,
+          status: "active",
+          currentStep: 0,
+          stepsCompleted: [],
+          notes: notes || "",
+        }).returning();
+        results.push(enrollment);
+      }
+
+      return res.json({ enrolled: results.length, enrollments: results });
+    } catch (err: any) {
+      console.error("Enroll error:", err);
+      return res.status(500).json({ message: "Failed to enroll contacts" });
+    }
+  });
+
+  app.post("/api/email-sequences/enrollments/:id/send-step", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const [enrollment] = await db
+        .select()
+        .from(sequenceEnrollments)
+        .where(and(eq(sequenceEnrollments.id, req.params.id), eq(sequenceEnrollments.businessId, business.id)));
+      if (!enrollment) return res.status(404).json({ message: "Enrollment not found" });
+      if (enrollment.status !== "active") return res.status(400).json({ message: "Enrollment is not active" });
+
+      const seq = BUILT_IN_SEQUENCES.find(s => s.id === enrollment.sequenceId);
+      if (!seq) return res.status(404).json({ message: "Sequence not found" });
+
+      const stepIndex = enrollment.currentStep;
+      if (stepIndex >= seq.steps.length) {
+        await db.update(sequenceEnrollments)
+          .set({ status: "completed", completedAt: new Date() })
+          .where(eq(sequenceEnrollments.id, enrollment.id));
+        return res.status(400).json({ message: "All steps already completed" });
+      }
+
+      const step = seq.steps[stepIndex];
+      const sgApiKey = process.env.SENDGRID_API_KEY;
+      if (!sgApiKey) return res.status(500).json({ message: "Email not configured" });
+
+      const bookingLink = business.bookingLink || "";
+      const senderName = business.senderName || business.companyName || "Your Cleaning Team";
+      const businessName = business.companyName || "Your Cleaning Company";
+      const senderEmail = business.contactEmail || "";
+      if (!senderEmail) return res.status(400).json({ message: "Business contact email not set" });
+
+      const replacePlaceholders = (text: string) =>
+        text
+          .replace(/\{\{customerName\}\}/g, enrollment.customerName)
+          .replace(/\{\{businessName\}\}/g, businessName)
+          .replace(/\{\{senderName\}\}/g, senderName)
+          .replace(/\{\{bookingLink\}\}/g, bookingLink);
+
+      const subject = replacePlaceholders(step.subject);
+      const bodyText = replacePlaceholders(step.body);
+      const htmlBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;line-height:1.6;">${bodyText.replace(/\n/g, "<br>")}</div>`;
+
+      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${sgApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: enrollment.customerEmail, name: enrollment.customerName }] }],
+          from: { email: senderEmail, name: senderName },
+          subject,
+          content: [{ type: "text/plain", value: bodyText }, { type: "text/html", value: htmlBody }],
+        }),
+      });
+
+      if (!sgRes.ok) {
+        const errText = await sgRes.text();
+        console.error("SendGrid sequence error:", sgRes.status, errText);
+        return res.status(502).json({ message: "Failed to send email" });
+      }
+
+      const completedSteps = Array.isArray(enrollment.stepsCompleted) ? enrollment.stepsCompleted : [];
+      const newCompleted = [...completedSteps, { stepIndex, sentAt: new Date().toISOString(), subject }];
+      const newStep = stepIndex + 1;
+      const isCompleted = newStep >= seq.steps.length;
+
+      await db.update(sequenceEnrollments)
+        .set({
+          currentStep: newStep,
+          stepsCompleted: newCompleted,
+          lastSentAt: new Date(),
+          status: isCompleted ? "completed" : "active",
+          completedAt: isCompleted ? new Date() : null,
+        })
+        .where(eq(sequenceEnrollments.id, enrollment.id));
+
+      return res.json({ message: "Email sent", stepIndex, isCompleted });
+    } catch (err: any) {
+      console.error("Send step error:", err);
+      return res.status(500).json({ message: "Failed to send step" });
+    }
+  });
+
+  app.patch("/api/email-sequences/enrollments/:id/status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { status } = req.body;
+      if (!["active", "paused", "cancelled"].includes(status)) return res.status(400).json({ message: "Invalid status" });
+      const [updated] = await db
+        .update(sequenceEnrollments)
+        .set({ status })
+        .where(and(eq(sequenceEnrollments.id, req.params.id), eq(sequenceEnrollments.businessId, business.id)))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Enrollment not found" });
+      return res.json(updated);
+    } catch (err: any) {
+      return res.status(500).json({ message: "Failed to update status" });
+    }
+  });
+
+  app.delete("/api/email-sequences/enrollments/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByUserId(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      await db
+        .delete(sequenceEnrollments)
+        .where(and(eq(sequenceEnrollments.id, req.params.id), eq(sequenceEnrollments.businessId, business.id)));
+      return res.json({ message: "Deleted" });
+    } catch (err: any) {
+      return res.status(500).json({ message: "Failed to delete enrollment" });
+    }
+  });
 
   return httpServer;
 }

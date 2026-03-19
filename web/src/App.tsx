@@ -48,6 +48,8 @@ import JobberPage from "./pages/JobberPage";
 import QuotePreferencesPage from "./pages/QuotePreferencesPage";
 import ProSetupChecklistPage from "./pages/ProSetupChecklistPage";
 import AccountSettingsPage from "./pages/AccountSettingsPage";
+import FileLibraryPage from "./pages/FileLibraryPage";
+import EmailSequencesPage from "./pages/EmailSequencesPage";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -135,6 +137,8 @@ export default function App() {
           <Route path="/jobber" element={<ProGate feature="Jobber Integration"><JobberPage /></ProGate>} />
           <Route path="/quote-preferences" element={<QuotePreferencesPage />} />
           <Route path="/pro-setup" element={<ProSetupChecklistPage />} />
+          <Route path="/file-library" element={<FileLibraryPage />} />
+          <Route path="/email-sequences" element={<EmailSequencesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/account-settings" element={<AccountSettingsPage />} />
         </Route>

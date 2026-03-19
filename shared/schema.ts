@@ -1030,5 +1030,40 @@ export type LeadFinderLead = typeof leadFinderLeads.$inferSelect;
 export type LeadFinderReply = typeof leadFinderReplies.$inferSelect;
 export type LeadFinderEvent = typeof leadFinderEvents.$inferSelect;
 
+// ===== File Library =====
+export const businessFiles = pgTable("business_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  originalName: text("original_name").notNull(),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: integer("file_size").notNull().default(0),
+  fileUrl: text("file_url").notNull(),
+  description: text("description").notNull().default(""),
+  category: text("category").notNull().default("general"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BusinessFile = typeof businessFiles.$inferSelect;
+
+// ===== Email Sequences =====
+export const sequenceEnrollments = pgTable("sequence_enrollments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  sequenceId: text("sequence_id").notNull(),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  customerId: varchar("customer_id").references(() => customers.id),
+  status: text("status").notNull().default("active"),
+  currentStep: integer("current_step").notNull().default(0),
+  stepsCompleted: jsonb("steps_completed").notNull().default(sql`'[]'::jsonb`),
+  enrolledAt: timestamp("enrolled_at").defaultNow().notNull(),
+  lastSentAt: timestamp("last_sent_at"),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes").notNull().default(""),
+});
+
+export type SequenceEnrollment = typeof sequenceEnrollments.$inferSelect;
+
 // ===== AI Quote Assistant =====
 
