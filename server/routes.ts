@@ -8679,6 +8679,41 @@ h2{color:#16a34a;margin:0 0 8px;font-size:20px}p{color:#64748b;margin:0;font-siz
     }
   });
 
+  app.get("/api/integrations/jobber/introspect-property-input", requireAuth, async (req: any, res) => {
+    try {
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No connection" });
+      await client.ensureValidToken();
+      const data = await (client as any).graphql(`
+        {
+          propertyInput: __type(name: "PropertyCreateInput") {
+            name kind inputFields { name type { name kind ofType { name kind ofType { name kind } } } }
+          }
+          propertyPayload: __type(name: "PropertyCreatePayload") {
+            name kind fields { name type { name kind ofType { name kind } } }
+          }
+          propertyMutation: __schema {
+            mutationType {
+              fields(includeDeprecated: true) {
+                name
+                args { name type { name kind ofType { name kind ofType { name kind } } } }
+              }
+            }
+          }
+        }
+      `);
+      const propMutation = data?.propertyMutation?.mutationType?.fields?.find((f: any) => f.name === "propertyCreate");
+      res.json({
+        PropertyCreateInput: data.propertyInput,
+        PropertyCreatePayload: data.propertyPayload,
+        propertyCreateArgs: propMutation?.args || [],
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.get("/api/integrations/jobber/introspect-mutations", requireAuth, async (req: any, res) => {
     try {
       const client = new JobberClient(req.session.userId);

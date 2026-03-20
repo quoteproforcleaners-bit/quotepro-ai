@@ -347,42 +347,68 @@ export class JobberClient {
     postalCode?: string;
     country?: string;
   }): Promise<string | null> {
-    // clientId is a direct arg; address fields go directly in input (not nested)
-    const mutation = `
-      mutation CreateProperty($clientId: ID!, $street: String, $city: String, $province: String, $postalCode: String, $country: String) {
-        propertyCreate(
-          clientId: $clientId
-          input: {
-            street: $street
-            city: $city
-            province: $province
-            postalCode: $postalCode
-            country: $country
-          }
-        ) {
-          properties { id }
-          userErrors { message path }
+    const esc = (s: string) => (s || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const street = esc(address.street || "N/A");
+    const city = esc(address.city || "");
+    const province = esc(address.province || "");
+    const postalCode = esc(address.postalCode || "");
+    const country = esc(address.country || "US");
+
+    // Try several input structures until one succeeds — Jobber schema varies by API version
+    const attempts = [
+      // 1. Flat fields directly in input (street1 variant — matches Jobber billingAddress naming)
+      `mutation { propertyCreate(clientId: "${clientId}", input: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }) { properties { id } userErrors { message path } } }`,
+      // 2. Flat fields with 'street' key
+      `mutation { propertyCreate(clientId: "${clientId}", input: { street: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }) { properties { id } userErrors { message path } } }`,
+      // 3. Nested under 'address' with street1
+      `mutation { propertyCreate(clientId: "${clientId}", input: { address: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" } }) { properties { id } userErrors { message path } } }`,
+      // 4. Empty input — Jobber may copy billing address from client
+      `mutation { propertyCreate(clientId: "${clientId}", input: {}) { properties { id } userErrors { message path } } }`,
+    ];
+
+    for (let i = 0; i < attempts.length; i++) {
+      try {
+        const data = await this.graphql(attempts[i]);
+        const result = data?.propertyCreate;
+        if (result?.userErrors?.length > 0) {
+          console.warn(`Jobber propertyCreate attempt ${i + 1} userErrors:`, result.userErrors);
+          continue;
         }
+        const id = result?.properties?.[0]?.id || null;
+        if (id) {
+          console.log(`Jobber propertyCreate attempt ${i + 1} succeeded with id ${id}`);
+          return id;
+        }
+      } catch (e: any) {
+        console.warn(`Jobber propertyCreate attempt ${i + 1} failed:`, e.message);
       }
-    `;
+    }
+    return null;
+  }
+
+  async introspectPropertyCreateInput(): Promise<void> {
     try {
-      const data = await this.graphql(mutation, {
-        clientId,
-        street: address.street || "N/A",
-        city: address.city || "",
-        province: address.province || "",
-        postalCode: address.postalCode || "",
-        country: address.country || "US",
-      });
-      const result = data?.propertyCreate;
-      if (result?.userErrors?.length > 0) {
-        console.warn("Jobber propertyCreate userErrors:", result.userErrors);
-        return null;
-      }
-      return result?.properties?.[0]?.id || null;
+      const data = await this.graphql(`
+        {
+          t: __type(name: "PropertyCreateInput") {
+            name
+            inputFields { name type { name kind ofType { name kind ofType { name kind } } } }
+          }
+          m: __schema {
+            mutationType {
+              fields(includeDeprecated: true) {
+                name
+                args { name type { name kind ofType { name kind ofType { name kind } } } }
+              }
+            }
+          }
+        }
+      `);
+      const propCreate = data?.m?.mutationType?.fields?.find((f: any) => f.name === "propertyCreate");
+      console.log("[Jobber schema] PropertyCreateInput fields:", JSON.stringify(data?.t?.inputFields, null, 2));
+      console.log("[Jobber schema] propertyCreate args:", JSON.stringify(propCreate?.args, null, 2));
     } catch (e: any) {
-      console.warn("Jobber propertyCreate failed:", e.message);
-      return null;
+      console.log("[Jobber schema] introspection failed:", e.message);
     }
   }
 
@@ -391,10 +417,13 @@ export class JobberClient {
     const existing = await this.getClientPropertyId(clientId);
     if (existing) return existing;
 
-    // 2. Parse the address string (e.g. "123 Main St, Springfield, IL 62701")
+    // 2. Log schema to diagnose correct input structure
+    await this.introspectPropertyCreateInput();
+
+    // 3. Parse the address string (e.g. "123 Main St, Springfield, IL 62701")
     const address = parseAddressString(addressStr || "");
 
-    // 3. Try to create a property
+    // 4. Try to create a property
     const created = await this.createProperty(clientId, address);
     if (created) return created;
 
