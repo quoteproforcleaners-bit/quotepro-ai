@@ -1,6 +1,25 @@
 import { pool } from "./db";
 import { encryptToken, decryptToken } from "./qbo-client";
 
+function parseAddressString(addr: string): { street?: string; city?: string; province?: string; postalCode?: string; country?: string } {
+  if (!addr || !addr.trim()) return {};
+  // Try "123 Main St, Springfield, IL 62701" or "123 Main St, Springfield, IL 62701, US"
+  const parts = addr.split(",").map((s) => s.trim());
+  if (parts.length >= 3) {
+    const street = parts[0];
+    const city = parts[1];
+    const stateZip = parts[2].trim().split(/\s+/);
+    const province = stateZip[0] || "";
+    const postalCode = stateZip[1] || "";
+    const country = parts[3] || "US";
+    return { street, city, province, postalCode, country };
+  }
+  if (parts.length === 2) {
+    return { street: parts[0], city: parts[1], country: "US" };
+  }
+  return { street: addr, country: "US" };
+}
+
 const JOBBER_AUTH_URL = "https://api.getjobber.com/api/oauth/authorize";
 const JOBBER_TOKEN_URL = "https://api.getjobber.com/api/oauth/token";
 const JOBBER_GRAPHQL_URL = "https://api.getjobber.com/api/graphql";
@@ -321,18 +340,80 @@ export class JobberClient {
     }
   }
 
+  async createProperty(clientId: string, address: {
+    street?: string;
+    city?: string;
+    province?: string;
+    postalCode?: string;
+    country?: string;
+  }): Promise<string | null> {
+    // Use inline input to avoid named-type validation errors
+    const mutation = `
+      mutation CreateProperty($clientId: ID!, $street: String, $city: String, $province: String, $postalCode: String, $country: String) {
+        propertyCreate(input: {
+          clientId: $clientId,
+          address: {
+            street: $street,
+            city: $city,
+            province: $province,
+            postalCode: $postalCode,
+            country: $country
+          }
+        }) {
+          property { id }
+          userErrors { message path }
+        }
+      }
+    `;
+    try {
+      const data = await this.graphql(mutation, {
+        clientId,
+        street: address.street || "N/A",
+        city: address.city || "",
+        province: address.province || "",
+        postalCode: address.postalCode || "",
+        country: address.country || "US",
+      });
+      const result = data?.propertyCreate;
+      if (result?.userErrors?.length > 0) {
+        console.warn("Jobber propertyCreate userErrors:", result.userErrors);
+        return null;
+      }
+      return result?.property?.id || null;
+    } catch (e: any) {
+      console.warn("Jobber propertyCreate failed:", e.message);
+      return null;
+    }
+  }
+
+  async getOrCreatePropertyId(clientId: string, addressStr?: string | null): Promise<string> {
+    // 1. Try to get existing property
+    const existing = await this.getClientPropertyId(clientId);
+    if (existing) return existing;
+
+    // 2. Parse the address string (e.g. "123 Main St, Springfield, IL 62701")
+    const address = parseAddressString(addressStr || "");
+
+    // 3. Try to create a property
+    const created = await this.createProperty(clientId, address);
+    if (created) return created;
+
+    throw new Error(
+      "Could not find or create a service property for this Jobber client. " +
+      "Please add a service address to the client in Jobber and try again."
+    );
+  }
+
   async createJob(input: {
     clientId: string;
     title: string;
     instructions?: string;
     total?: number;
+    addressStr?: string | null;
     lineItems?: Array<{ name: string; description?: string; unitPrice: string; quantity: number }>;
   }): Promise<{ id: string; jobNumber: number | null; title: string }> {
-    // Step 1: Get the client's property ID (required by Jobber API)
-    const propertyId = await this.getClientPropertyId(input.clientId);
-    if (!propertyId) {
-      throw new Error("Could not find a property for this Jobber client. Make sure the client has an address in Jobber.");
-    }
+    // Step 1: Get or create the property ID (required by Jobber API)
+    const propertyId = await this.getOrCreatePropertyId(input.clientId, input.addressStr);
 
     // Step 2: Create the job using the exact fields Jobber's API expects
     const mutation = `
@@ -610,6 +691,7 @@ export async function syncQuoteToJobber(
       title,
       instructions: noteLines.join("\n"),
       total: Number(total),
+      addressStr: quote.address as string | null,
       lineItems,
     });
 
