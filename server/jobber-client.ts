@@ -379,8 +379,7 @@ export async function syncQuoteToJobber(
             q.selected_option as "selectedOption", q.options,
             q.add_ons as "addOns", q.property_details as "propertyDetails",
             c.first_name as "firstName", c.last_name as "lastName",
-            c.email, c.phone, c.address, c.city, c.state, c.zip,
-            c.company as "company"
+            c.email, c.phone, c.address
      FROM quotes q
      LEFT JOIN customers c ON q.customer_id = c.id
      WHERE q.id = $1`,
@@ -410,14 +409,10 @@ export async function syncQuoteToJobber(
     } else {
       const addressParts: any = {};
       if (quote.address) addressParts.street1 = quote.address;
-      if (quote.city) addressParts.city = quote.city;
-      if (quote.state) addressParts.province = quote.state;
-      if (quote.zip) addressParts.postalCode = quote.zip;
 
       const jobberClient = await client.createClient({
         firstName,
         lastName,
-        companyName: quote.company || undefined,
         email: quote.email || undefined,
         phone: quote.phone || undefined,
         address: Object.keys(addressParts).length > 0 ? addressParts : undefined,
@@ -437,9 +432,8 @@ export async function syncQuoteToJobber(
       await logJobberSync(userId, quoteId, "create_client", { firstName, lastName }, { jobberClientId }, "ok");
     }
 
-    const serviceType = quote.serviceType || "Cleaning";
     const frequency = quote.frequency || "one-time";
-    const title = `${serviceType} - ${firstName} ${lastName}`;
+    const title = `Cleaning - ${firstName} ${lastName}`;
 
     const noteLines: string[] = [
       `Synced from QuotePro`,
