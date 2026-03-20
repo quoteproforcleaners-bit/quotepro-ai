@@ -294,6 +294,7 @@ export class JobberClient {
     clientId: string;
     title: string;
     instructions?: string;
+    lineItems?: Array<{ name: string; description?: string; unitPrice: string; quantity: number }>;
   }): Promise<{ id: string; jobNumber: number | null; title: string }> {
     const mutation = `
       mutation CreateJob($input: JobCreateInput!) {
@@ -317,6 +318,15 @@ export class JobberClient {
     };
 
     if (input.instructions) jobInput.instructions = input.instructions;
+
+    if (input.lineItems && input.lineItems.length > 0) {
+      jobInput.lineItems = input.lineItems.map((li) => ({
+        name: li.name,
+        ...(li.description ? { description: li.description } : {}),
+        unitPrice: parseFloat(li.unitPrice),
+        quantity: li.quantity,
+      }));
+    }
 
     const data = await this.graphql(mutation, { input: jobInput });
     const result = data.jobCreate;
@@ -433,32 +443,112 @@ export async function syncQuoteToJobber(
     }
 
     const frequency = quote.frequency || "one-time";
-    const title = `Cleaning - ${firstName} ${lastName}`;
 
+    // --- Smart title ---
+    const SERVICE_NAMES: Record<string, string> = {
+      good: "Standard Clean",
+      better: "Deep Clean",
+      best: "Premium Clean",
+    };
+    const FREQUENCY_LABELS: Record<string, string> = {
+      weekly: "Weekly",
+      "bi-weekly": "Bi-Weekly",
+      biweekly: "Bi-Weekly",
+      monthly: "Monthly",
+      "every-4-weeks": "Every 4 Weeks",
+      "one-time": "",
+      onetime: "",
+    };
+
+    const serviceName = SERVICE_NAMES[quote.selectedOption] || "Cleaning";
+    const frequencyTag = FREQUENCY_LABELS[frequency] ?? "";
+    const propertySummary = [
+      quote.beds ? `${quote.beds}bd` : null,
+      quote.baths ? `${quote.baths}ba` : null,
+      quote.sqft ? `${quote.sqft}sqft` : null,
+    ]
+      .filter(Boolean)
+      .join("/");
+
+    const titleParts = [
+      serviceName,
+      propertySummary || null,
+      frequencyTag || null,
+      `${firstName} ${lastName}`,
+    ].filter(Boolean);
+    const title = titleParts.join(" — ");
+
+    // --- Line items ---
+    const lineItems: Array<{ name: string; description?: string; unitPrice: string; quantity: number }> = [];
+
+    const options = quote.options as any;
+    const selectedTierData = options && quote.selectedOption ? options[quote.selectedOption] : null;
+    const tierPrice = selectedTierData
+      ? Number(selectedTierData.price ?? selectedTierData.subtotal ?? selectedTierData.total ?? quote.total)
+      : Number(quote.total);
+
+    const propertyDesc = [
+      propertySummary,
+      frequencyTag ? `${frequencyTag} service` : "One-time service",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    lineItems.push({
+      name: serviceName,
+      description: propertyDesc || undefined,
+      unitPrice: tierPrice.toFixed(2),
+      quantity: 1,
+    });
+
+    // Add-ons as individual line items
+    const addOns = quote.addOns as any;
+    const ADD_ON_PRICES: Record<string, number> = {
+      inside_oven: 35,
+      inside_fridge: 25,
+      interior_windows: 40,
+      laundry: 30,
+      dishes: 20,
+      baseboards: 20,
+      blinds: 25,
+      wall_spots: 15,
+      garage: 45,
+      patio: 35,
+      carpet_vacuum: 15,
+    };
+
+    if (addOns && typeof addOns === "object") {
+      for (const [key, val] of Object.entries(addOns)) {
+        if (val === true) {
+          const label = key
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+          const addOnPrice = ADD_ON_PRICES[key] ?? 0;
+          lineItems.push({
+            name: label,
+            unitPrice: addOnPrice.toFixed(2),
+            quantity: 1,
+          });
+        }
+      }
+    }
+
+    // --- Instructions block ---
     const noteLines: string[] = [
       `Synced from QuotePro`,
       `Quote Total: $${total}`,
-      `Frequency: ${frequency}`,
+      frequencyTag ? `Frequency: ${frequencyTag}` : "Service: One-time",
     ];
     if (quote.beds) noteLines.push(`Bedrooms: ${quote.beds}`);
     if (quote.baths) noteLines.push(`Bathrooms: ${quote.baths}`);
     if (quote.sqft) noteLines.push(`Sq Ft: ${quote.sqft}`);
-    if (quote.selectedOption) noteLines.push(`Selected Option: ${quote.selectedOption}`);
-
-    const addOns = quote.addOns as any;
-    if (addOns && typeof addOns === "object") {
-      const activeAddOns = Object.entries(addOns)
-        .filter(([_, v]) => v === true)
-        .map(([k]) => k.replace(/_/g, " "));
-      if (activeAddOns.length > 0) {
-        noteLines.push(`Add-ons: ${activeAddOns.join(", ")}`);
-      }
-    }
+    if (quote.address) noteLines.push(`Address: ${quote.address}`);
 
     const jobberJob = await client.createJob({
       clientId: jobberClientId,
       title,
       instructions: noteLines.join("\n"),
+      lineItems,
     });
 
     if (existingLink.rows.length > 0) {
