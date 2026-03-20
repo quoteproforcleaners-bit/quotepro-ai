@@ -1132,7 +1132,31 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const q = await getQuoteById(req.params.id);
       if (!q) return res.status(404).json({ message: "Quote not found" });
       const lineItems = await getLineItemsByQuote(q.id);
-      return res.json({ ...q, lineItems });
+      let customerAddress = "";
+      let customerName = "";
+      let customerEmail = "";
+      let customerPhone = "";
+      if (q.customerId) {
+        const custResult = await pool.query(
+          `SELECT address, first_name, last_name, email, phone FROM customers WHERE id = $1`,
+          [q.customerId]
+        );
+        if (custResult.rows.length > 0) {
+          const c = custResult.rows[0];
+          customerAddress = c.address || "";
+          customerName = [c.first_name, c.last_name].filter(Boolean).join(" ");
+          customerEmail = c.email || "";
+          customerPhone = c.phone || "";
+        }
+      }
+      return res.json({
+        ...q,
+        lineItems,
+        address: customerAddress,
+        customerName: customerName || (q.propertyDetails as any)?.customerName || "",
+        customerEmail: customerEmail || (q.propertyDetails as any)?.customerEmail || "",
+        customerPhone: customerPhone || (q.propertyDetails as any)?.customerPhone || "",
+      });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get quote" });
     }
