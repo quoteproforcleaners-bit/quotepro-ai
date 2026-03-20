@@ -354,16 +354,18 @@ export class JobberClient {
     const postalCode = esc(address.postalCode || "");
     const country = esc(address.country || "US");
 
-    // Try several input structures until one succeeds — Jobber schema varies by API version
+    // Schema introspection (from production logs) confirmed:
+    //   propertyCreate(clientId: EncodedId!, properties: [PropertyAttributes!]!)
+    // The arg is "properties" (a LIST), not "input". Try field name variants within PropertyAttributes.
     const attempts = [
-      // 1. Flat fields directly in input (street1 variant — matches Jobber billingAddress naming)
-      `mutation { propertyCreate(clientId: "${clientId}", input: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }) { properties { id } userErrors { message path } } }`,
-      // 2. Flat fields with 'street' key
-      `mutation { propertyCreate(clientId: "${clientId}", input: { street: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }) { properties { id } userErrors { message path } } }`,
-      // 3. Nested under 'address' with street1
-      `mutation { propertyCreate(clientId: "${clientId}", input: { address: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" } }) { properties { id } userErrors { message path } } }`,
-      // 4. Empty input — Jobber may copy billing address from client
-      `mutation { propertyCreate(clientId: "${clientId}", input: {}) { properties { id } userErrors { message path } } }`,
+      // 1. street1 (matches Jobber billingAddress naming convention)
+      `mutation { propertyCreate(clientId: "${clientId}", properties: [{ street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }]) { properties { id } userErrors { message path } } }`,
+      // 2. street (alternate spelling)
+      `mutation { propertyCreate(clientId: "${clientId}", properties: [{ street: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }]) { properties { id } userErrors { message path } } }`,
+      // 3. address nested under street1
+      `mutation { propertyCreate(clientId: "${clientId}", properties: [{ address: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" } }]) { properties { id } userErrors { message path } } }`,
+      // 4. Empty properties list — Jobber may copy billing address from client
+      `mutation { propertyCreate(clientId: "${clientId}", properties: [{}]) { properties { id } userErrors { message path } } }`,
     ];
 
     for (let i = 0; i < attempts.length; i++) {
@@ -390,7 +392,7 @@ export class JobberClient {
     try {
       const data = await this.graphql(`
         {
-          t: __type(name: "PropertyCreateInput") {
+          t: __type(name: "PropertyAttributes") {
             name
             inputFields { name type { name kind ofType { name kind ofType { name kind } } } }
           }
@@ -405,7 +407,7 @@ export class JobberClient {
         }
       `);
       const propCreate = data?.m?.mutationType?.fields?.find((f: any) => f.name === "propertyCreate");
-      console.log("[Jobber schema] PropertyCreateInput fields:", JSON.stringify(data?.t?.inputFields, null, 2));
+      console.log("[Jobber schema] PropertyAttributes fields:", JSON.stringify(data?.t?.inputFields, null, 2));
       console.log("[Jobber schema] propertyCreate args:", JSON.stringify(propCreate?.args, null, 2));
     } catch (e: any) {
       console.log("[Jobber schema] introspection failed:", e.message);
