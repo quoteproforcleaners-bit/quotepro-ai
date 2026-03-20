@@ -373,8 +373,9 @@ export async function syncQuoteToJobber(
   }
 
   const quoteResult = await pool.query(
-    `SELECT q.id, q.customer_id as "customerId", q.total, q.status, q.frequency,
-            q.service_type as "serviceType", q.beds, q.baths, q.sqft,
+    `SELECT q.id, q.customer_id as "customerId", q.total, q.status,
+            q.frequency_selected as "frequency",
+            q.property_beds as "beds", q.property_baths as "baths", q.property_sqft as "sqft",
             q.selected_option as "selectedOption", q.options,
             q.add_ons as "addOns", q.property_details as "propertyDetails",
             c.first_name as "firstName", c.last_name as "lastName",
