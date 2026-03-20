@@ -123,13 +123,12 @@ function ConnectionTab() {
       const res = await apiRequest("GET", "/api/integrations/jobber/connect");
       const data = await res.json();
       if (data.url) {
-        window.open(data.url, "_blank");
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ["/api/integrations/jobber/status"] });
-          refetch();
-        }, 3000);
+        window.location.href = data.url;
+        return;
       }
-    } catch {}
+    } catch (e: any) {
+      alert(e?.message || "Failed to start Jobber connection");
+    }
     setConnecting(false);
   };
 
@@ -264,13 +263,14 @@ function ConnectionTab() {
       )}
 
       <ConfirmModal
-        isOpen={confirmDisconnect}
+        open={confirmDisconnect}
         onClose={() => setConfirmDisconnect(false)}
         onConfirm={handleDisconnect}
         title="Disconnect Jobber"
-        message="Are you sure you want to disconnect your Jobber account? This will stop automatic job creation."
+        description="Are you sure you want to disconnect your Jobber account? This will stop automatic job creation."
         confirmLabel="Disconnect"
-        isDangerous
+        variant="danger"
+        loading={disconnecting}
       />
     </div>
   );
@@ -512,6 +512,18 @@ const TABS = [
 
 export default function JobberPage() {
   const [activeTab, setActiveTab] = useState("connection");
+  const [justConnected, setJustConnected] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("connected") === "1";
+  });
+
+  useEffect(() => {
+    if (justConnected) {
+      const t = setTimeout(() => setJustConnected(false), 5000);
+      window.history.replaceState({}, "", window.location.pathname);
+      return () => clearTimeout(t);
+    }
+  }, [justConnected]);
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -519,6 +531,12 @@ export default function JobberPage() {
         title="Jobber"
         subtitle="Sync quotes and import clients from Jobber"
       />
+      {justConnected && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+          <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+          <p className="text-sm font-medium text-emerald-800">Jobber connected successfully!</p>
+        </div>
+      )}
       <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
       <div>
         {activeTab === "connection" && <ConnectionTab />}

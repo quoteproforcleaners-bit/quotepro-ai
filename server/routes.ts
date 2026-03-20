@@ -8510,7 +8510,7 @@ init();
 
       await logJobberSync(resolvedUserId, null, "connect", {}, { success: true }, "ok");
 
-      res.send(`<!DOCTYPE html><html><head><title>Jobber Connected</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8f9fa;margin:0}.card{text-align:center;padding:40px;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,0.1);max-width:400px}h1{color:#16a34a;margin-bottom:8px}p{color:#64748b}</style></head><body><div class="card"><h1>Connected!</h1><p>Jobber is now connected to QuotePro. You can close this window and return to the app.</p></div></body></html>`);
+      res.redirect(`${protocol}://${host}/app/integrations/jobber?connected=1`);
     } catch (e: any) {
       console.error("Jobber callback error:", e);
       if (resolvedUserId) {
