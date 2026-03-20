@@ -347,20 +347,20 @@ export class JobberClient {
     postalCode?: string;
     country?: string;
   }): Promise<string | null> {
-    // Use inline input to avoid named-type validation errors
+    // clientId is a direct arg; address fields go directly in input (not nested)
     const mutation = `
       mutation CreateProperty($clientId: ID!, $street: String, $city: String, $province: String, $postalCode: String, $country: String) {
-        propertyCreate(input: {
-          clientId: $clientId,
-          address: {
-            street: $street,
-            city: $city,
-            province: $province,
-            postalCode: $postalCode,
+        propertyCreate(
+          clientId: $clientId
+          input: {
+            street: $street
+            city: $city
+            province: $province
+            postalCode: $postalCode
             country: $country
           }
-        }) {
-          property { id }
+        ) {
+          properties { id }
           userErrors { message path }
         }
       }
@@ -379,7 +379,7 @@ export class JobberClient {
         console.warn("Jobber propertyCreate userErrors:", result.userErrors);
         return null;
       }
-      return result?.property?.id || null;
+      return result?.properties?.[0]?.id || null;
     } catch (e: any) {
       console.warn("Jobber propertyCreate failed:", e.message);
       return null;
