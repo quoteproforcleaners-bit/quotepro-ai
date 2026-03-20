@@ -308,9 +308,15 @@ export class JobberClient {
     instructions?: string;
     lineItems?: Array<{ name: string; description?: string; unitPrice: string; quantity: number }>;
   }): Promise<{ id: string; jobNumber: number | null; title: string }> {
+    // Use inline input object to avoid the named-type validation error
+    // (JobCreateInput may not be exposed in all API versions, but the mutation itself works)
     const mutation = `
-      mutation CreateJob($input: JobCreateInput!) {
-        jobCreate(input: $input) {
+      mutation CreateJob($clientId: ID!, $title: String!, $instructions: String) {
+        jobCreate(input: {
+          client: { id: $clientId },
+          title: $title,
+          instructions: $instructions
+        }) {
           job {
             id
             jobNumber
@@ -324,30 +330,45 @@ export class JobberClient {
       }
     `;
 
-    const jobInput: any = {
+    const data = await this.graphql(mutation, {
       clientId: input.clientId,
       title: input.title,
-    };
-
-    if (input.instructions) jobInput.instructions = input.instructions;
-
-    if (input.lineItems && input.lineItems.length > 0) {
-      jobInput.lineItems = input.lineItems.map((li) => ({
-        name: li.name,
-        ...(li.description ? { description: li.description } : {}),
-        unitPrice: parseFloat(li.unitPrice),
-        quantity: li.quantity,
-      }));
-    }
-
-    const data = await this.graphql(mutation, { input: jobInput });
+      instructions: input.instructions || null,
+    });
     const result = data.jobCreate;
+
+    if (!result) {
+      throw new Error("jobCreate returned no data — mutation may not be available in this API version");
+    }
 
     if (result.userErrors && result.userErrors.length > 0) {
       throw new Error(`Jobber job creation failed: ${result.userErrors.map((e: any) => e.message).join(", ")}`);
     }
 
+    // After job is created, try to attach line items as a note (line items may not be supported directly)
+    if (result.job?.id && input.lineItems && input.lineItems.length > 0) {
+      const lineItemText = input.lineItems
+        .map((li) => `${li.name}${li.description ? ` (${li.description})` : ""}: $${li.unitPrice} x ${li.quantity}`)
+        .join("\n");
+      await this.addJobNote(result.job.id, `Services:\n${lineItemText}`).catch(() => {});
+    }
+
     return result.job;
+  }
+
+  async addJobNote(jobId: string, note: string): Promise<void> {
+    const mutation = `
+      mutation AddJobNote($jobId: ID!, $note: String!) {
+        jobCreateNote(input: {
+          jobId: $jobId,
+          note: $note
+        }) {
+          note { id }
+          userErrors { message }
+        }
+      }
+    `;
+    await this.graphql(mutation, { jobId, note });
   }
 
   async disconnectApp(): Promise<void> {

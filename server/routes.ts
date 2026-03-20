@@ -8646,6 +8646,25 @@ init();
     }
   });
 
+  app.get("/api/integrations/jobber/introspect-mutations", requireAuth, async (req: any, res) => {
+    try {
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No connection" });
+      await client.ensureValidToken();
+      const data = await (client as any).graphql(`
+        { __schema { mutationType { fields { name args { name type { name kind ofType { name kind } } } } } } }
+      `);
+      const fields = data.__schema?.mutationType?.fields || [];
+      const jobFields = fields.filter((f: any) =>
+        f.name.toLowerCase().includes("job") || f.name.toLowerCase().includes("request") || f.name.toLowerCase().includes("work")
+      );
+      res.json({ jobMutations: jobFields, allCount: fields.length });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.get("/api/integrations/jobber/dashboard-stats", requireAuth, async (req: any, res) => {
     try {
       const connResult = await pool.query(
