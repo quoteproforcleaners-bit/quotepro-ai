@@ -8510,7 +8510,16 @@ init();
 
       await logJobberSync(resolvedUserId, null, "connect", {}, { success: true }, "ok");
 
-      res.redirect(`${protocol}://${host}/app/integrations/jobber?connected=1`);
+      // Close the OAuth popup and notify the parent window
+      res.send(`<!DOCTYPE html><html><head><title>Jobber Connected</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f0fdf4}
+.card{text-align:center;padding:40px;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,0.1);max-width:360px}
+.icon{width:56px;height:56px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+h2{color:#16a34a;margin:0 0 8px;font-size:20px}p{color:#64748b;margin:0;font-size:14px}</style></head>
+<body><div class="card"><div class="icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+<h2>Jobber Connected!</h2><p>You can close this window.</p></div>
+<script>if(window.opener){window.opener.postMessage('jobber_connected','*');}setTimeout(()=>{window.close();},1500);</script>
+</body></html>`);
     } catch (e: any) {
       console.error("Jobber callback error:", e);
       if (resolvedUserId) {

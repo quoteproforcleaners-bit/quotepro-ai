@@ -302,20 +302,48 @@ export class JobberClient {
     return result.client;
   }
 
+  async getClientPropertyId(clientId: string): Promise<string | null> {
+    const query = `
+      query GetClientProperties($clientId: ID!) {
+        client(id: $clientId) {
+          properties {
+            nodes { id }
+          }
+        }
+      }
+    `;
+    try {
+      const data = await this.graphql(query, { clientId });
+      const nodes = data?.client?.properties?.nodes || [];
+      return nodes.length > 0 ? nodes[0].id : null;
+    } catch {
+      return null;
+    }
+  }
+
   async createJob(input: {
     clientId: string;
     title: string;
     instructions?: string;
+    total?: number;
     lineItems?: Array<{ name: string; description?: string; unitPrice: string; quantity: number }>;
   }): Promise<{ id: string; jobNumber: number | null; title: string }> {
-    // Use inline input object to avoid the named-type validation error
-    // (JobCreateInput may not be exposed in all API versions, but the mutation itself works)
+    // Step 1: Get the client's property ID (required by Jobber API)
+    const propertyId = await this.getClientPropertyId(input.clientId);
+    if (!propertyId) {
+      throw new Error("Could not find a property for this Jobber client. Make sure the client has an address in Jobber.");
+    }
+
+    // Step 2: Create the job using the exact fields Jobber's API expects
     const mutation = `
-      mutation CreateJob($clientId: ID!, $title: String!, $instructions: String) {
+      mutation CreateJob($propertyId: ID!, $title: String!, $instructions: String) {
         jobCreate(input: {
-          client: { id: $clientId },
+          propertyId: $propertyId,
           title: $title,
-          instructions: $instructions
+          instructions: $instructions,
+          invoicing: {
+            billingType: FLAT_RATE
+          }
         }) {
           job {
             id
@@ -331,26 +359,26 @@ export class JobberClient {
     `;
 
     const data = await this.graphql(mutation, {
-      clientId: input.clientId,
+      propertyId,
       title: input.title,
       instructions: input.instructions || null,
     });
     const result = data.jobCreate;
 
     if (!result) {
-      throw new Error("jobCreate returned no data — mutation may not be available in this API version");
+      throw new Error("jobCreate returned no data");
     }
-
     if (result.userErrors && result.userErrors.length > 0) {
       throw new Error(`Jobber job creation failed: ${result.userErrors.map((e: any) => e.message).join(", ")}`);
     }
 
-    // After job is created, try to attach line items as a note (line items may not be supported directly)
+    // Step 3: Attach line items as a job note (most compatible approach)
     if (result.job?.id && input.lineItems && input.lineItems.length > 0) {
       const lineItemText = input.lineItems
-        .map((li) => `${li.name}${li.description ? ` (${li.description})` : ""}: $${li.unitPrice} x ${li.quantity}`)
+        .map((li) => `• ${li.name}${li.description ? ` (${li.description})` : ""}: $${li.unitPrice}`)
         .join("\n");
-      await this.addJobNote(result.job.id, `Services:\n${lineItemText}`).catch(() => {});
+      const total = input.total ? `\nTotal: $${input.total.toFixed(2)}` : "";
+      await this.addJobNote(result.job.id, `Services:\n${lineItemText}${total}`).catch(() => {});
     }
 
     return result.job;
@@ -581,6 +609,7 @@ export async function syncQuoteToJobber(
       clientId: jobberClientId,
       title,
       instructions: noteLines.join("\n"),
+      total: Number(total),
       lineItems,
     });
 

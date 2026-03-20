@@ -114,22 +114,48 @@ function ConnectionTab() {
     queryKey: ["/api/integrations/jobber/status"],
   });
 
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.data === "jobber_connected") {
+        setConnecting(false);
+        queryClient.invalidateQueries({ queryKey: ["/api/integrations/jobber/status"] });
+        refetch();
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [queryClient, refetch]);
+
   const isConnected = jobberStatus?.connected === true;
   const needsReauth = jobberStatus?.status === "needs_reauth";
 
   const handleConnect = async () => {
+    // Open popup synchronously BEFORE the async call — browsers block window.open after async
+    const popup = window.open("about:blank", "jobber_oauth", "width=700,height=700,scrollbars=yes,resizable=yes");
     setConnecting(true);
     try {
       const res = await apiRequest("GET", "/api/integrations/jobber/connect");
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-        return;
+      if (data.url && popup) {
+        popup.location.href = data.url;
+        // Poll for popup closure then refresh status
+        const poll = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(poll);
+            setConnecting(false);
+            queryClient.invalidateQueries({ queryKey: ["/api/integrations/jobber/status"] });
+            refetch();
+          }
+        }, 500);
+      } else {
+        popup?.close();
+        setConnecting(false);
       }
     } catch (e: any) {
+      popup?.close();
       alert(e?.message || "Failed to start Jobber connection");
+      setConnecting(false);
     }
-    setConnecting(false);
   };
 
   const handleDisconnect = async () => {
