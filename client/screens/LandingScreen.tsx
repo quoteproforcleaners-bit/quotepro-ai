@@ -1,12 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   StyleSheet,
   Pressable,
   Image,
   Modal,
-  Platform,
+  ScrollView,
   useWindowDimensions,
+  Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -22,6 +23,18 @@ import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 const appIcon = require("../../assets/images/icon.png");
 
+const TRUST_BADGES = [
+  { icon: "check-circle" as const, label: "Built for cleaning companies" },
+  { icon: "award" as const, label: "Professional customer-facing quotes" },
+  { icon: "trending-up" as const, label: "Increase average ticket size" },
+];
+
+const PRICING_TIERS = [
+  { id: "good", label: "Good", price: "$180", desc: "Basic clean", popular: false },
+  { id: "better", label: "Better", price: "$240", desc: "Deep clean", popular: true },
+  { id: "best", label: "Best", price: "$320", desc: "Premium", popular: false },
+];
+
 const OUTCOME_FEATURES = [
   { icon: "zap" as const, titleKey: "winMoreJobs", descKey: "winMoreJobsDesc" },
   { icon: "bell" as const, titleKey: "neverMissFollowUps", descKey: "neverMissFollowUpsDesc" },
@@ -29,9 +42,204 @@ const OUTCOME_FEATURES = [
   { icon: "trending-up" as const, titleKey: "growRevenueFaster", descKey: "growRevenueFasterDesc" },
 ];
 
+function LanguageSelector({ language, setLanguage }: { language: Language; setLanguage: (l: Language) => void }) {
+  const { theme } = useTheme();
+  return (
+    <View style={styles.languageRow}>
+      {(Object.keys(LANGUAGE_LABELS) as Language[]).map((lang) => {
+        const active = language === lang;
+        return (
+          <Pressable
+            key={lang}
+            onPress={() => setLanguage(lang)}
+            style={[
+              styles.languageChip,
+              {
+                backgroundColor: active ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.06)",
+                borderColor: active ? theme.primary : "rgba(255,255,255,0.10)",
+              },
+            ]}
+          >
+            <ThemedText
+              type="small"
+              style={{
+                color: active ? theme.primary : "rgba(255,255,255,0.45)",
+                fontWeight: active ? "700" : "400",
+                fontSize: 12,
+              }}
+            >
+              {LANGUAGE_LABELS[lang]}
+            </ThemedText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function HeroSection() {
+  const { theme } = useTheme();
+  return (
+    <View style={styles.heroSection}>
+      <View style={styles.logoWrapper}>
+        <Image source={appIcon} style={styles.appLogo} />
+        <View style={styles.logoGlow} />
+      </View>
+      <ThemedText style={styles.appName}>QuotePro</ThemedText>
+      <ThemedText style={styles.headline}>
+        Close More Cleaning{"\n"}Jobs in 30 Seconds
+      </ThemedText>
+      <ThemedText style={[styles.subheadline, { color: "rgba(255,255,255,0.55)" }]}>
+        Create professional Good / Better / Best quotes{"\n"}that help customers say yes faster.
+      </ThemedText>
+    </View>
+  );
+}
+
+function TrustBadges() {
+  return (
+    <View style={styles.trustRow}>
+      {TRUST_BADGES.map((badge, i) => (
+        <View key={i} style={styles.trustBadge}>
+          <Feather name={badge.icon} size={12} color="#3B82F6" />
+          <ThemedText style={styles.trustLabel}>{badge.label}</ThemedText>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function SampleQuoteCard() {
+  const { theme } = useTheme();
+  const [selected, setSelected] = useState("better");
+
+  return (
+    <View style={styles.quoteCard}>
+      <View style={styles.quoteCardInner}>
+        <View style={styles.quoteCardHeader}>
+          <View style={styles.sampleBadge}>
+            <Feather name="eye" size={10} color="#3B82F6" />
+            <ThemedText style={styles.sampleBadgeText}>SEE WHAT YOUR CUSTOMER SEES</ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.propertyRow}>
+          <Feather name="home" size={13} color="rgba(255,255,255,0.4)" />
+          <ThemedText style={styles.propertyLabel}>3 bed / 2 bath home</ThemedText>
+        </View>
+
+        <View style={styles.tiersRow}>
+          {PRICING_TIERS.map((tier) => {
+            const isSelected = selected === tier.id;
+            return (
+              <Pressable
+                key={tier.id}
+                onPress={() => setSelected(tier.id)}
+                style={[
+                  styles.tierCard,
+                  isSelected
+                    ? { backgroundColor: "rgba(59,130,246,0.18)", borderColor: "#3B82F6" }
+                    : { backgroundColor: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.08)" },
+                ]}
+              >
+                {tier.popular ? (
+                  <View style={styles.popularPill}>
+                    <ThemedText style={styles.popularPillText}>POPULAR</ThemedText>
+                  </View>
+                ) : null}
+                <ThemedText
+                  style={[
+                    styles.tierLabel,
+                    { color: isSelected ? "#3B82F6" : "rgba(255,255,255,0.45)" },
+                  ]}
+                >
+                  {tier.label}
+                </ThemedText>
+                <ThemedText
+                  style={[
+                    styles.tierPrice,
+                    { color: isSelected ? "#FFFFFF" : "rgba(255,255,255,0.7)" },
+                  ]}
+                >
+                  {tier.price}
+                </ThemedText>
+                <ThemedText style={styles.tierDesc}>{tier.desc}</ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <ThemedText style={styles.quoteFootnote}>
+          Customers are more likely to choose mid-tier and premium options when presented clearly.
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
+function PrimaryCTA({ onPress }: { onPress: () => void }) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, { toValue: 0.97, useNativeDriver: true, speed: 50 }).start();
+  };
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
+  };
+
+  return (
+    <View style={styles.ctaWrapper}>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }], width: "100%" }}>
+        <Pressable
+          style={styles.primaryButton}
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          testID="button-create-free-quote"
+        >
+          <View style={styles.primaryButtonGlow} />
+          <Feather name="file-text" size={18} color="#FFFFFF" />
+          <ThemedText style={styles.primaryButtonText}>Create Free Quote</ThemedText>
+          <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
+        </Pressable>
+      </Animated.View>
+      <ThemedText style={styles.ctaSubtext}>No complicated setup</ThemedText>
+    </View>
+  );
+}
+
+function SecondaryCTA({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      style={styles.secondaryButton}
+      onPress={onPress}
+      testID="button-sign-in"
+    >
+      <Feather name="log-in" size={15} color="rgba(255,255,255,0.5)" />
+      <ThemedText style={styles.secondaryButtonText}>Sign In to Your Account</ThemedText>
+    </Pressable>
+  );
+}
+
+function ReassuranceFooter({ onWhyTap }: { onWhyTap: () => void }) {
+  return (
+    <View style={styles.footer}>
+      <ThemedText style={styles.reassuranceLine}>
+        Save quotes, send them to customers, and close jobs faster.
+      </ThemedText>
+      <ThemedText style={styles.testimonialLine}>
+        Cleaning companies use QuotePro to present higher-value options with confidence.
+      </ThemedText>
+      <Pressable onPress={onWhyTap} testID="button-why-account">
+        <ThemedText style={styles.whyLink}>Why create a free account?</ThemedText>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function LandingScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const { enterGuestMode } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -40,7 +248,7 @@ export default function LandingScreen() {
 
   const landing = t.landing;
   const isWide = width > 600;
-  const containerMaxWidth = isWide ? 540 : undefined;
+  const maxWidth = isWide ? 540 : undefined;
 
   const handleCreateQuote = () => {
     enterGuestMode();
@@ -52,177 +260,87 @@ export default function LandingScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <View
-        style={[
-          styles.content,
+    <View style={[styles.root, { backgroundColor: "#06060A" }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
           {
-            paddingTop: insets.top + Spacing.md,
-            paddingBottom: insets.bottom + Spacing.md,
-            maxWidth: containerMaxWidth,
+            paddingTop: insets.top + Spacing.sm,
+            paddingBottom: insets.bottom + Spacing.xl,
+            maxWidth: maxWidth,
             alignSelf: isWide ? "center" : undefined,
-            width: isWide ? containerMaxWidth : undefined,
+            width: isWide ? maxWidth : undefined,
           },
         ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.languageRow}>
-          {(Object.keys(LANGUAGE_LABELS) as Language[]).map((lang) => (
-            <Pressable
-              key={lang}
-              onPress={() => setLanguage(lang)}
-              style={[
-                styles.languageChip,
-                {
-                  borderColor: language === lang ? theme.primary : theme.border,
-                  backgroundColor: language === lang ? `${theme.primary}10` : "transparent",
-                },
-              ]}
-            >
-              <ThemedText
-                type="small"
-                style={{
-                  color: language === lang ? theme.primary : theme.textSecondary,
-                  fontWeight: language === lang ? "600" : "400",
-                }}
-              >
-                {LANGUAGE_LABELS[lang]}
-              </ThemedText>
-            </Pressable>
-          ))}
+        <LanguageSelector language={language} setLanguage={setLanguage} />
+        <HeroSection />
+        <TrustBadges />
+        <SampleQuoteCard />
+        <PrimaryCTA onPress={handleCreateQuote} />
+
+        <View style={styles.orDivider}>
+          <View style={styles.orLine} />
+          <ThemedText style={styles.orText}>or</ThemedText>
+          <View style={styles.orLine} />
         </View>
 
-        <View style={styles.branding}>
-          <Image source={appIcon} style={styles.appLogo} />
-          <ThemedText type="h2" style={[styles.appName, { color: theme.text }]}>
-            QuotePro
-          </ThemedText>
-          <ThemedText type="body" style={[styles.headline, { color: theme.textSecondary }]}>
-            {landing.tagline}
-          </ThemedText>
-        </View>
+        <SecondaryCTA onPress={handleSignIn} />
+        <ReassuranceFooter onWhyTap={() => setShowBenefits(true)} />
+      </ScrollView>
 
-        <View style={styles.previewCard}>
-          <View style={styles.sampleLabelRow}>
-            <View style={[styles.sampleBadge, { backgroundColor: theme.primary + "15" }]}>
-              <Feather name="eye" size={11} color={theme.primary} />
-              <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "700", fontSize: 10 }}>
-                {landing.sampleBadge || "SAMPLE"}
-              </ThemedText>
-            </View>
-          </View>
-          <ThemedText type="small" style={{ fontWeight: "700", textAlign: "center", marginBottom: 2 }}>
-            {landing.sampleTitle || "Example Quote Your Customer Sees"}
-          </ThemedText>
-          <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginBottom: Spacing.sm, fontSize: 11 }}>
-            {landing.sampleProperty || "3 bed / 2 bath home"}
-          </ThemedText>
-          <View style={styles.previewTiers}>
-            {[
-              { label: landing.previewGood || "Good", price: "$180" },
-              { label: landing.previewBetter || "Better", price: "$240", popular: true },
-              { label: landing.previewBest || "Best", price: "$320" },
-            ].map((tier, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.previewTier,
-                  {
-                    backgroundColor: tier.popular ? theme.primary + "15" : isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.01)",
-                    borderColor: tier.popular ? theme.primary : theme.border,
-                  },
-                ]}
-              >
-                <ThemedText type="caption" style={{ color: tier.popular ? theme.primary : theme.textSecondary, fontWeight: "600", fontSize: 10 }}>
-                  {tier.label}
-                </ThemedText>
-                <ThemedText type="subtitle" style={{ color: tier.popular ? theme.primary : theme.text, fontWeight: "700" }}>
-                  {tier.price}
-                </ThemedText>
-              </View>
-            ))}
-          </View>
-          <ThemedText type="caption" style={{ color: theme.textSecondary + "90", textAlign: "center", marginTop: Spacing.sm, fontSize: 10, lineHeight: 14 }}>
-            {landing.sampleFootnote || "These are sample customer-facing quote options, not app pricing."}
-          </ThemedText>
-        </View>
-
-        <View style={styles.buttonsSection}>
-          <Pressable
-            style={[styles.primaryButton, { backgroundColor: theme.primary }]}
-            onPress={handleCreateQuote}
-            testID="button-create-free-quote"
-          >
-            <Feather name="file-text" size={18} color="#FFFFFF" />
-            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: Spacing.sm }}>
-              {landing.createYourFirstQuote || "Create Your First Quote"}
-            </ThemedText>
-          </Pressable>
-
-          <View style={styles.divider}>
-            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-            <ThemedText type="small" style={{ marginHorizontal: Spacing.sm, color: theme.textSecondary }}>
-              {t.common.or}
-            </ThemedText>
-            <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-          </View>
-
-          <Pressable
-            style={[styles.secondaryButton, { borderColor: theme.border }]}
-            onPress={handleSignIn}
-            testID="button-sign-in"
-          >
-            <Feather name="log-in" size={16} color={theme.textSecondary} />
-            <ThemedText type="body" style={{ fontWeight: "600", marginLeft: Spacing.sm, color: theme.textSecondary }}>
-              {landing.signIn}
-            </ThemedText>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setShowBenefits(true)}
-            style={styles.benefitsLink}
-            testID="button-why-account"
-          >
-            <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
-              {landing.whyCreateAccount}
-            </ThemedText>
-          </Pressable>
-        </View>
-      </View>
-
-      <Modal visible={showBenefits} transparent animationType="fade">
+      <Modal visible={showBenefits} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => setShowBenefits(false)}>
-          <View style={[styles.modalContent, { backgroundColor: theme.backgroundDefault, maxWidth: containerMaxWidth, alignSelf: isWide ? "center" : undefined }]} onStartShouldSetResponder={() => true}>
+          <View
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: "#111118",
+                paddingBottom: insets.bottom + Spacing.lg,
+                maxWidth: maxWidth,
+                alignSelf: isWide ? "center" : undefined,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.modalDragHandle} />
             <View style={styles.modalHeader}>
-              <ThemedText type="subtitle" style={{ fontWeight: "700", flex: 1 }}>
-                {landing.benefitsTitle}
-              </ThemedText>
-              <Pressable onPress={() => setShowBenefits(false)} hitSlop={12}>
-                <Feather name="x" size={22} color={theme.textSecondary} />
+              <ThemedText style={styles.modalTitle}>{landing.benefitsTitle}</ThemedText>
+              <Pressable onPress={() => setShowBenefits(false)} hitSlop={16}>
+                <Feather name="x" size={20} color="rgba(255,255,255,0.4)" />
               </Pressable>
             </View>
             {OUTCOME_FEATURES.map((b, i) => (
-              <View key={i} style={[styles.benefitRow, i < OUTCOME_FEATURES.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.border } : undefined]}>
-                <View style={[styles.benefitIcon, { backgroundColor: `${theme.primary}12` }]}>
-                  <Feather name={b.icon} size={18} color={theme.primary} />
+              <View
+                key={i}
+                style={[
+                  styles.benefitRow,
+                  i < OUTCOME_FEATURES.length - 1 && { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
+                ]}
+              >
+                <View style={styles.benefitIcon}>
+                  <Feather name={b.icon} size={17} color="#3B82F6" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <ThemedText type="body" style={{ fontWeight: "600" }}>
+                  <ThemedText style={styles.benefitTitle}>
                     {landing[b.titleKey as keyof typeof landing]}
                   </ThemedText>
-                  <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                  <ThemedText style={styles.benefitDesc}>
                     {landing[b.descKey as keyof typeof landing]}
                   </ThemedText>
                 </View>
               </View>
             ))}
             <Pressable
-              style={[styles.primaryButton, { backgroundColor: theme.primary, marginTop: Spacing.lg }]}
+              style={styles.modalPrimaryButton}
               onPress={() => {
                 setShowBenefits(false);
                 handleSignIn();
               }}
             >
-              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+              <ThemedText style={styles.modalPrimaryButtonText}>
                 {landing.signUpNow}
               </ThemedText>
             </Pressable>
@@ -233,135 +351,369 @@ export default function LandingScreen() {
   );
 }
 
+const BLUE = "#3B82F6";
+
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: Spacing.xl,
-    justifyContent: "center",
+  scrollContent: {
+    paddingHorizontal: 24,
+    flexGrow: 1,
   },
+
   languageRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: Spacing.xs,
-    marginBottom: Spacing.md,
+    gap: 6,
+    marginBottom: 20,
     flexWrap: "wrap",
   },
   languageChip: {
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
   },
-  branding: {
+
+  heroSection: {
     alignItems: "center",
-    marginBottom: Spacing.md,
+    marginBottom: 20,
+  },
+  logoWrapper: {
+    position: "relative",
+    marginBottom: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   appLogo: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    marginBottom: Spacing.sm,
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+  },
+  logoGlow: {
+    position: "absolute",
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "rgba(59,130,246,0.18)",
+    zIndex: -1,
   },
   appName: {
-    fontSize: 26,
-    fontWeight: "800",
-    marginBottom: 2,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.5)",
+    letterSpacing: 2,
+    textTransform: "uppercase",
+    marginBottom: 14,
   },
   headline: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: "#FFFFFF",
     textAlign: "center",
-    maxWidth: 300,
+    lineHeight: 40,
+    letterSpacing: -0.5,
+    marginBottom: 10,
   },
-  previewCard: {
-    width: "100%",
-    marginBottom: Spacing.lg,
+  subheadline: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+    fontWeight: "400",
   },
-  sampleLabelRow: {
+
+  trustRow: {
+    gap: 6,
+    marginBottom: 24,
     alignItems: "center",
-    marginBottom: Spacing.xs,
+  },
+  trustBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  trustLabel: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: "400",
+  },
+
+  quoteCard: {
+    marginBottom: 24,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  quoteCardInner: {
+    padding: 18,
+  },
+  quoteCardHeader: {
+    alignItems: "center",
+    marginBottom: 14,
   },
   sampleBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 20,
+    backgroundColor: "rgba(59,130,246,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(59,130,246,0.2)",
   },
-  previewTiers: {
+  sampleBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: BLUE,
+    letterSpacing: 0.8,
+  },
+  propertyRow: {
     flexDirection: "row",
-    gap: Spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 14,
   },
-  previewTier: {
+  propertyLabel: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.4)",
+    fontWeight: "500",
+  },
+  tiersRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+  tierCard: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    borderRadius: 14,
     borderWidth: 1,
+    position: "relative",
   },
-  buttonsSection: {
+  popularPill: {
+    position: "absolute",
+    top: -10,
+    backgroundColor: BLUE,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  popularPillText: {
+    fontSize: 8,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  tierLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    marginBottom: 4,
+    marginTop: 4,
+    letterSpacing: 0.3,
+  },
+  tierPrice: {
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+    marginBottom: 2,
+  },
+  tierDesc: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.3)",
+    fontWeight: "400",
+  },
+  quoteFootnote: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.3)",
+    textAlign: "center",
+    lineHeight: 16,
+    fontStyle: "italic",
+  },
+
+  ctaWrapper: {
     alignItems: "center",
+    marginBottom: 12,
+    width: "100%",
   },
   primaryButton: {
     width: "100%",
-    height: 48,
-    borderRadius: BorderRadius.lg,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: BLUE,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
+    gap: 8,
+    overflow: "hidden",
+    shadowColor: BLUE,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 12,
   },
-  secondaryButton: {
-    width: "100%",
-    height: 44,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
+  primaryButtonGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: "50%",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 16,
+  },
+  primaryButtonText: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: -0.2,
+  },
+  ctaSubtext: {
+    marginTop: 8,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.3)",
+    fontWeight: "400",
+  },
+
+  orDivider: {
     flexDirection: "row",
-    opacity: 0.85,
-  },
-  divider: {
-    flexDirection: "row",
     alignItems: "center",
-    width: "100%",
-    marginVertical: Spacing.sm,
+    marginVertical: 14,
+    gap: 12,
   },
-  dividerLine: {
+  orLine: {
     flex: 1,
     height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
-  benefitsLink: {
-    marginTop: Spacing.sm,
-    paddingVertical: Spacing.xs,
+  orText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.25)",
+    fontWeight: "500",
   },
+
+  secondaryButton: {
+    width: "100%",
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 28,
+  },
+  secondaryButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.55)",
+  },
+
+  footer: {
+    alignItems: "center",
+    gap: 6,
+  },
+  reassuranceLine: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.35)",
+    textAlign: "center",
+    fontWeight: "400",
+    lineHeight: 18,
+  },
+  testimonialLine: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.22)",
+    textAlign: "center",
+    lineHeight: 17,
+    fontStyle: "italic",
+  },
+  whyLink: {
+    marginTop: 4,
+    fontSize: 13,
+    color: BLUE,
+    fontWeight: "600",
+  },
+
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    padding: Spacing.xl,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "flex-end",
   },
-  modalContent: {
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
+  modalSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    width: "100%",
+  },
+  modalDragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignSelf: "center",
+    marginBottom: 20,
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: Spacing.xl,
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    flex: 1,
   },
   benefitRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    paddingVertical: Spacing.md,
-    gap: Spacing.md,
+    paddingVertical: 14,
+    gap: 14,
   },
   benefitIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: "rgba(59,130,246,0.12)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  benefitTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 2,
+  },
+  benefitDesc: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.45)",
+    lineHeight: 18,
+  },
+  modalPrimaryButton: {
+    marginTop: 20,
+    width: "100%",
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: BLUE,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: BLUE,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  modalPrimaryButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 });
