@@ -26,6 +26,17 @@ export async function logJobberSync(
   }
 }
 
+const JOBBER_SCOPES = [
+  "read_clients",
+  "write_clients",
+  "read_jobs",
+  "write_jobs",
+  "read_invoices",
+  "write_invoices",
+  "read_quotes",
+  "write_quotes",
+].join(" ");
+
 export function buildJobberAuthUrl(redirectUri: string, state: string): string {
   const clientId = process.env.JOBBER_CLIENT_ID;
   if (!clientId) throw new Error("JOBBER_CLIENT_ID is not configured");
@@ -34,6 +45,7 @@ export function buildJobberAuthUrl(redirectUri: string, state: string): string {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
+    scope: JOBBER_SCOPES,
     state,
   });
 
