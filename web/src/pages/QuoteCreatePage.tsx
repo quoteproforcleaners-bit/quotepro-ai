@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { buildAddress } from "../lib/address";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiPost } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
@@ -327,7 +328,11 @@ export default function QuoteCreatePage() {
     lastName: "",
     email: "",
     phone: "",
-    address: "",
+    street: "",
+    city: "",
+    state: "",
+    zip: "",
+    country: "",
   });
   const [property, setProperty] = useState<PropertyState>({
     beds: 3,
@@ -441,7 +446,11 @@ export default function QuoteCreatePage() {
     let cid = customerId;
     if (newCustomer) {
       try {
-        const c: any = await createCustomerMutation.mutateAsync(customerForm);
+        const { street, city, state, zip, country, ...formRest } = customerForm;
+        const c: any = await createCustomerMutation.mutateAsync({
+          ...formRest,
+          address: buildAddress({ street, city, state, zip, country }),
+        });
         cid = c.id;
       } catch {
         return;
@@ -517,7 +526,7 @@ export default function QuoteCreatePage() {
         condition: conditionLabels[property.conditionScore] || "Average",
         customerName: custName || "",
         customerAddress:
-          selectedCustomer?.address || customerForm.address || "",
+          selectedCustomer?.address || buildAddress({ street: customerForm.street, city: customerForm.city, state: customerForm.state, zip: customerForm.zip, country: customerForm.country }) || "",
       },
       preferredDate: preferredDate || undefined,
     };
@@ -678,12 +687,6 @@ export default function QuoteCreatePage() {
                     placeholder: "(555) 123-4567",
                     type: "tel",
                   },
-                  {
-                    key: "address",
-                    label: "Property Address",
-                    placeholder: "123 Main St, City, ST",
-                    type: "text",
-                  },
                 ].map((f) => (
                   <div key={f.key}>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -703,6 +706,50 @@ export default function QuoteCreatePage() {
                     />
                   </div>
                 ))}
+                <div>
+                  <p className="text-sm font-medium text-slate-700 mb-2">Property Address</p>
+                  <div className="space-y-2.5">
+                    <input
+                      type="text"
+                      placeholder="Street"
+                      value={customerForm.street}
+                      onChange={(e) => setCustomerForm((p) => ({ ...p, street: e.target.value }))}
+                      className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+                    />
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <input
+                        type="text"
+                        placeholder="City"
+                        value={customerForm.city}
+                        onChange={(e) => setCustomerForm((p) => ({ ...p, city: e.target.value }))}
+                        className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+                      />
+                      <input
+                        type="text"
+                        placeholder="State"
+                        value={customerForm.state}
+                        onChange={(e) => setCustomerForm((p) => ({ ...p, state: e.target.value }))}
+                        className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <input
+                        type="text"
+                        placeholder="Zip / Postal Code"
+                        value={customerForm.zip}
+                        onChange={(e) => setCustomerForm((p) => ({ ...p, zip: e.target.value }))}
+                        className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Country (US)"
+                        value={customerForm.country}
+                        onChange={(e) => setCustomerForm((p) => ({ ...p, country: e.target.value }))}
+                        className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">
                     Preferred Date (optional)

@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiPut, apiDelete, apiPost } from "../lib/api";
+import { buildAddress, parseAddress } from "../lib/address";
 import { queryClient } from "../lib/queryClient";
 import {
   Save,
@@ -52,17 +53,26 @@ export default function CustomerDetailPage() {
     lastName: "",
     email: "",
     phone: "",
-    address: "",
+    street: "",
+    city: "",
+    state: "",
+    zip: "",
+    country: "",
   });
 
   useEffect(() => {
     if (customer) {
+      const addr = parseAddress(customer.address || "");
       setForm({
         firstName: customer.firstName || "",
         lastName: customer.lastName || "",
         email: customer.email || "",
         phone: customer.phone || "",
-        address: customer.address || "",
+        street: addr.street,
+        city: addr.city,
+        state: addr.state,
+        zip: addr.zip,
+        country: addr.country,
       });
     }
   }, [customer]);
@@ -210,18 +220,57 @@ export default function CustomerDetailPage() {
               />
               <div className="sm:col-span-2">
                 <Input
-                  label="Address"
-                  value={form.address}
+                  label="Street"
+                  value={form.street}
                   onChange={(e) =>
-                    setForm((p) => ({ ...p, address: e.target.value }))
+                    setForm((p) => ({ ...p, street: e.target.value }))
                   }
+                  placeholder="123 Main St"
                 />
               </div>
+              <Input
+                label="City"
+                value={form.city}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, city: e.target.value }))
+                }
+                placeholder="Springfield"
+              />
+              <Input
+                label="State"
+                value={form.state}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, state: e.target.value }))
+                }
+                placeholder="IL"
+              />
+              <Input
+                label="Zip / Postal Code"
+                value={form.zip}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, zip: e.target.value }))
+                }
+                placeholder="62701"
+              />
+              <Input
+                label="Country"
+                value={form.country}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, country: e.target.value }))
+                }
+                placeholder="US"
+              />
             </div>
             <div className="flex items-center gap-3 mt-5 pt-4 border-t border-slate-100">
               <Button
                 icon={Save}
-                onClick={() => updateMutation.mutate(form)}
+                onClick={() => {
+                  const { street, city, state, zip, country, ...rest } = form;
+                  updateMutation.mutate({
+                    ...rest,
+                    address: buildAddress({ street, city, state, zip, country }),
+                  });
+                }}
                 loading={updateMutation.isPending}
                 size="sm"
               >
