@@ -1,0 +1,83 @@
+I need you to debug and fully fix a Jobber integration issue in my software, QuotePro.
+
+Problem:
+When a customer ACCEPTS a quote inside QuotePro, the Jobber integration is supposed to create/sync the customer, quote/job data, and any required property/service address automatically.
+
+Right now, the accepted-quote flow is failing with this exact error:
+
+"Could not find or create a service property for this Jobber client. Please add a service address to the client in Jobber and try again."
+
+Important context:
+- The Jobber integration DOES work when the user clicks "Sync Job"
+- In that case, the quote and customer information sync successfully
+- The failure happens specifically in the accepted quote workflow
+- This suggests the accepted-quote flow is not creating, mapping, or passing the service address/property correctly, even though the manual sync flow is able to complete at least part of the sync
+
+What I need from you:
+1. Trace the full accepted-quote workflow end to end
+2. Compare it directly against the working "Sync Job" workflow
+3. Identify exactly where the two flows differ in:
+   - client creation/update
+   - service address mapping
+   - property creation
+   - Jobber API payload structure
+   - required field validation
+   - timing/race conditions
+   - null/undefined fallback behavior
+4. Fix the root cause, not just patch the symptom
+5. Add defensive handling so this does not fail silently again
+
+Specific things to investigate:
+- Is the accepted-quote flow sending the customer mailing address but not the service address?
+- Is it trying to create a Jobber service property before the client exists or before the address is saved?
+- Is there a mismatch between:
+  - customer address
+  - service address
+  - property address
+  - job location
+- Is the accepted-quote workflow using different field names or a different transformer than the "Sync Job" flow?
+- Is there conditional logic that skips property creation if one address component is missing?
+- Is the system assuming the Jobber client already has a service property when it does not?
+- Is there an async sequencing issue where property creation runs before client sync is complete?
+
+What I want you to do in the codebase:
+- Find the accepted-quote handler
+- Find the manual "Sync Job" handler
+- Compare both implementations line by line
+- Reuse the working address/property creation logic from the manual sync flow if appropriate
+- Centralize the Jobber client/property sync logic into shared reusable functions so both flows use the same path
+- Add robust logging around:
+  - quote ID
+  - customer ID
+  - Jobber client ID
+  - full address object being sent
+  - property/service address payload
+  - Jobber API request/response errors
+- Add validation before the Jobber call:
+  - if service address is missing, log exactly which field is missing
+  - fail with a clear actionable internal error
+- Make the accepted-quote flow resilient:
+  - if a Jobber client exists but no property exists, create the property
+  - if service address is missing but customer address exists, use the best valid fallback only if appropriate
+  - do not create duplicates if the property already exists
+
+Deliverables:
+1. Explain the root cause in plain English
+2. Show me the exact files/functions you changed
+3. Implement the fix
+4. Add logs so I can diagnose this in production if it ever happens again
+5. Tell me how to test it
+6. If needed, add a small regression test for:
+   - accepted quote with full service address
+   - accepted quote with customer address only
+   - existing Jobber client with no property
+   - manual sync and accepted sync both using same logic
+
+Success criteria:
+- When a customer accepts a quote, Jobber sync completes successfully
+- The Jobber client is created or updated correctly
+- The service property is found or created correctly
+- No manual "add service address in Jobber" step is required for normal valid quotes
+- The accepted-quote flow and manual sync flow behave consistently
+
+Do not just tell me possible causes. I want you to inspect the actual code, identify the precise root cause, make the fix, and summarize exactly what changed.

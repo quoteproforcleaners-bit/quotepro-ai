@@ -354,37 +354,45 @@ export class JobberClient {
     const postalCode = esc(address.postalCode || "");
     const country = esc(address.country || "US");
 
-    // Schema introspection (from production logs) confirmed:
-    //   propertyCreate(clientId: EncodedId!, properties: [PropertyAttributes!]!)
-    // The arg is "properties" (a LIST), not "input". Try field name variants within PropertyAttributes.
-    const attempts = [
-      // 1. street1 (matches Jobber billingAddress naming convention)
-      `mutation { propertyCreate(clientId: "${clientId}", properties: [{ street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }]) { properties { id } userErrors { message path } } }`,
-      // 2. street (alternate spelling)
-      `mutation { propertyCreate(clientId: "${clientId}", properties: [{ street: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }]) { properties { id } userErrors { message path } } }`,
-      // 3. address nested under street1
-      `mutation { propertyCreate(clientId: "${clientId}", properties: [{ address: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" } }]) { properties { id } userErrors { message path } } }`,
-      // 4. Empty properties list — Jobber may copy billing address from client
-      `mutation { propertyCreate(clientId: "${clientId}", properties: [{}]) { properties { id } userErrors { message path } } }`,
+    // Confirmed from production logs:
+    //   propertyCreate REQUIRES arg named "input" (PropertyCreateInput type)
+    //   PropertyAttributes has: address: AddressAttributes, contacts: [ContactCreateAttributes]
+    //   AddressAttributes likely uses street1 (matches Jobber's billingAddress convention)
+    //   PropertyCreateInput contains a field of type PropertyAttributes (exact field name unknown)
+    const addrBlock = `address: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }`;
+    const attempts: Array<[string, string]> = [
+      // 1. input.properties = list of PropertyAttributes (most likely based on naming)
+      [`mutation { propertyCreate(clientId: "${clientId}", input: { properties: [{ ${addrBlock} }] }) { properties { id } userErrors { message path } } }`, "input.properties[{address}]"],
+      // 2. input directly is list of PropertyAttributes
+      [`mutation { propertyCreate(clientId: "${clientId}", input: [{ ${addrBlock} }]) { properties { id } userErrors { message path } } }`, "input=[{address}]"],
+      // 3. input.property = single PropertyAttributes (singular field name)
+      [`mutation { propertyCreate(clientId: "${clientId}", input: { property: { ${addrBlock} } }) { properties { id } userErrors { message path } } }`, "input.property{address}"],
+      // 4. input.serviceAddress = AddressAttributes directly (alternate field name)
+      [`mutation { propertyCreate(clientId: "${clientId}", input: { serviceAddress: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" } }) { properties { id } userErrors { message path } } }`, "input.serviceAddress"],
+      // 5. Empty input — Jobber may create property from client billing address
+      [`mutation { propertyCreate(clientId: "${clientId}", input: {}) { properties { id } userErrors { message path } } }`, "input={}"],
     ];
 
     for (let i = 0; i < attempts.length; i++) {
+      const [mutation, label] = attempts[i];
       try {
-        const data = await this.graphql(attempts[i]);
+        const data = await this.graphql(mutation);
         const result = data?.propertyCreate;
         if (result?.userErrors?.length > 0) {
-          console.warn(`Jobber propertyCreate attempt ${i + 1} userErrors:`, result.userErrors);
+          console.warn(`[Jobber propertyCreate] attempt "${label}" userErrors:`, JSON.stringify(result.userErrors));
           continue;
         }
         const id = result?.properties?.[0]?.id || null;
         if (id) {
-          console.log(`Jobber propertyCreate attempt ${i + 1} succeeded with id ${id}`);
+          console.log(`[Jobber propertyCreate] attempt "${label}" succeeded, propertyId=${id}`);
           return id;
         }
+        console.warn(`[Jobber propertyCreate] attempt "${label}" returned no property id`);
       } catch (e: any) {
-        console.warn(`Jobber propertyCreate attempt ${i + 1} failed:`, e.message);
+        console.warn(`[Jobber propertyCreate] attempt "${label}" threw: ${e.message}`);
       }
     }
+    console.error("[Jobber propertyCreate] all attempts exhausted — property could not be created");
     return null;
   }
 
@@ -392,7 +400,15 @@ export class JobberClient {
     try {
       const data = await this.graphql(`
         {
-          t: __type(name: "PropertyAttributes") {
+          pci: __type(name: "PropertyCreateInput") {
+            name
+            inputFields { name type { name kind ofType { name kind ofType { name kind } } } }
+          }
+          pa: __type(name: "PropertyAttributes") {
+            name
+            inputFields { name type { name kind ofType { name kind ofType { name kind } } } }
+          }
+          aa: __type(name: "AddressAttributes") {
             name
             inputFields { name type { name kind ofType { name kind ofType { name kind } } } }
           }
@@ -407,8 +423,10 @@ export class JobberClient {
         }
       `);
       const propCreate = data?.m?.mutationType?.fields?.find((f: any) => f.name === "propertyCreate");
-      console.log("[Jobber schema] PropertyAttributes fields:", JSON.stringify(data?.t?.inputFields, null, 2));
-      console.log("[Jobber schema] propertyCreate args:", JSON.stringify(propCreate?.args, null, 2));
+      console.log("[Jobber schema] PropertyCreateInput fields:", JSON.stringify(data?.pci?.inputFields?.map((f: any) => f.name)));
+      console.log("[Jobber schema] PropertyAttributes fields:", JSON.stringify(data?.pa?.inputFields?.map((f: any) => f.name)));
+      console.log("[Jobber schema] AddressAttributes fields:", JSON.stringify(data?.aa?.inputFields?.map((f: any) => f.name)));
+      console.log("[Jobber schema] propertyCreate args:", JSON.stringify(propCreate?.args?.map((a: any) => ({ name: a.name, type: a.type?.name || a.type?.ofType?.name || a.type?.ofType?.ofType?.name }))));
     } catch (e: any) {
       console.log("[Jobber schema] introspection failed:", e.message);
     }
@@ -424,11 +442,13 @@ export class JobberClient {
 
     // 3. Parse the address string (e.g. "123 Main St, Springfield, IL 62701")
     const address = parseAddressString(addressStr || "");
+    console.log(`[Jobber getOrCreateProperty] clientId=${clientId} rawAddress="${addressStr}" parsed=${JSON.stringify(address)}`);
 
     // 4. Try to create a property
     const created = await this.createProperty(clientId, address);
     if (created) return created;
 
+    console.error(`[Jobber getOrCreateProperty] FAILED clientId=${clientId} address="${addressStr}"`);
     throw new Error(
       "Could not find or create a service property for this Jobber client. " +
       "Please add a service address to the client in Jobber and try again."
