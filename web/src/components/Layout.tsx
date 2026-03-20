@@ -215,7 +215,7 @@ export function Layout() {
 
         <div className="mx-3 mb-2">
           <a
-            href="https://apps.apple.com/app/quotepro/id6744854841"
+            href="https://apps.apple.com/us/app/quotepro-ai-cleaning-quotes/id6758575812"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl bg-black dark:bg-slate-950 border border-slate-200 dark:border-white/10 hover:opacity-85 transition-opacity"
