@@ -322,20 +322,18 @@ export class JobberClient {
   }
 
   async getClientPropertyId(clientId: string): Promise<string | null> {
-    const query = `
-      query GetClientProperties($clientId: ID!) {
-        client(id: $clientId) {
-          properties {
-            nodes { id }
-          }
-        }
-      }
-    `;
+    // Use inline clientId — typed variable $clientId: ID! causes EncodedId mismatch and silently throws
+    const query = `{ client(id: "${clientId}") { properties { nodes { id } } } }`;
     try {
-      const data = await this.graphql(query, { clientId });
+      const data = await this.graphql(query);
       const nodes = data?.client?.properties?.nodes || [];
-      return nodes.length > 0 ? nodes[0].id : null;
-    } catch {
+      if (nodes.length > 0) {
+        console.log(`[Jobber getClientPropertyId] found existing propertyId=${nodes[0].id} for clientId=${clientId}`);
+        return nodes[0].id;
+      }
+      return null;
+    } catch (e: any) {
+      console.warn(`[Jobber getClientPropertyId] query failed for clientId=${clientId}:`, e.message);
       return null;
     }
   }
@@ -380,6 +378,14 @@ export class JobberClient {
       const data = await this.graphql(mutation);
       const result = data?.propertyCreate;
       if (result?.userErrors?.length > 0) {
+        const alreadyExists = result.userErrors.some((e: any) =>
+          e.message?.toLowerCase().includes("already exists")
+        );
+        if (alreadyExists) {
+          // Property exists in Jobber but wasn't found by getClientPropertyId — re-fetch it now
+          console.log(`[Jobber propertyCreate] "already exists" — re-fetching existing property for clientId=${clientId}`);
+          return await this.getClientPropertyId(clientId);
+        }
         console.warn("[Jobber propertyCreate] userErrors:", JSON.stringify(result.userErrors));
         return null;
       }
