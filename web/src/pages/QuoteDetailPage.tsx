@@ -71,6 +71,8 @@ export default function QuoteDetailPage() {
   const [depositRequired, setDepositRequired] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [syncingJobber, setSyncingJobber] = useState(false);
+  const [syncingQbo, setSyncingQbo] = useState(false);
   const [expandedRec, setExpandedRec] = useState<number | null>(null);
   const [msgChannel, setMsgChannel] = useState<MessageChannel>("sms");
   const [msgPurpose, setMsgPurpose] = useState<MessagePurpose>("follow_up");
@@ -278,15 +280,29 @@ export default function QuoteDetailPage() {
   };
 
   const syncJobber = async () => {
+    setSyncingJobber(true);
     try {
-      await apiPost(`/api/integrations/jobber/sync-quote/${id}`, {});
-    } catch {}
+      const result: any = await apiPost(`/api/integrations/jobber/sync-quote/${id}`, { force: true });
+      alert(result?.message || "Successfully synced to Jobber.");
+    } catch (e: any) {
+      const msg = e?.message || "Failed to sync to Jobber";
+      alert(msg);
+    } finally {
+      setSyncingJobber(false);
+    }
   };
 
   const syncQbo = async () => {
+    setSyncingQbo(true);
     try {
-      await apiPost(`/api/integrations/qbo/create-invoice`, { quoteId: id });
-    } catch {}
+      const result: any = await apiPost(`/api/integrations/qbo/create-invoice`, { quoteId: id });
+      alert(result?.message || "QuickBooks invoice created successfully.");
+    } catch (e: any) {
+      const msg = e?.message || "Failed to create QBO invoice";
+      alert(msg);
+    } finally {
+      setSyncingQbo(false);
+    }
   };
 
   const optionLabels: Record<string, string> = {
@@ -1204,19 +1220,21 @@ export default function QuoteDetailPage() {
                 variant="secondary"
                 icon={RefreshCw}
                 onClick={syncJobber}
+                disabled={syncingJobber}
                 className="w-full justify-start"
                 size="sm"
               >
-                Sync to Jobber
+                {syncingJobber ? "Syncing..." : "Sync to Jobber"}
               </Button>
               <Button
                 variant="secondary"
                 icon={RefreshCw}
                 onClick={syncQbo}
+                disabled={syncingQbo}
                 className="w-full justify-start"
                 size="sm"
               >
-                Create QBO Invoice
+                {syncingQbo ? "Creating..." : "Create QBO Invoice"}
               </Button>
             </div>
           </Card>
