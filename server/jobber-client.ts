@@ -354,46 +354,42 @@ export class JobberClient {
     const postalCode = esc(address.postalCode || "");
     const country = esc(address.country || "US");
 
-    // Confirmed from production logs:
-    //   propertyCreate REQUIRES arg named "input" (PropertyCreateInput type)
-    //   PropertyAttributes has: address: AddressAttributes, contacts: [ContactCreateAttributes]
-    //   AddressAttributes likely uses street1 (matches Jobber's billingAddress convention)
-    //   PropertyCreateInput contains a field of type PropertyAttributes (exact field name unknown)
-    const addrBlock = `address: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" }`;
-    const attempts: Array<[string, string]> = [
-      // 1. input.properties = list of PropertyAttributes (most likely based on naming)
-      [`mutation { propertyCreate(clientId: "${clientId}", input: { properties: [{ ${addrBlock} }] }) { properties { id } userErrors { message path } } }`, "input.properties[{address}]"],
-      // 2. input directly is list of PropertyAttributes
-      [`mutation { propertyCreate(clientId: "${clientId}", input: [{ ${addrBlock} }]) { properties { id } userErrors { message path } } }`, "input=[{address}]"],
-      // 3. input.property = single PropertyAttributes (singular field name)
-      [`mutation { propertyCreate(clientId: "${clientId}", input: { property: { ${addrBlock} } }) { properties { id } userErrors { message path } } }`, "input.property{address}"],
-      // 4. input.serviceAddress = AddressAttributes directly (alternate field name)
-      [`mutation { propertyCreate(clientId: "${clientId}", input: { serviceAddress: { street1: "${street}", city: "${city}", province: "${province}", postalCode: "${postalCode}", country: "${country}" } }) { properties { id } userErrors { message path } } }`, "input.serviceAddress"],
-      // 5. Empty input — Jobber may create property from client billing address
-      [`mutation { propertyCreate(clientId: "${clientId}", input: {}) { properties { id } userErrors { message path } } }`, "input={}"],
-    ];
-
-    for (let i = 0; i < attempts.length; i++) {
-      const [mutation, label] = attempts[i];
-      try {
-        const data = await this.graphql(mutation);
-        const result = data?.propertyCreate;
-        if (result?.userErrors?.length > 0) {
-          console.warn(`[Jobber propertyCreate] attempt "${label}" userErrors:`, JSON.stringify(result.userErrors));
-          continue;
-        }
-        const id = result?.properties?.[0]?.id || null;
-        if (id) {
-          console.log(`[Jobber propertyCreate] attempt "${label}" succeeded, propertyId=${id}`);
-          return id;
-        }
-        console.warn(`[Jobber propertyCreate] attempt "${label}" returned no property id`);
-      } catch (e: any) {
-        console.warn(`[Jobber propertyCreate] attempt "${label}" threw: ${e.message}`);
+    // Confirmed correct structure from production schema introspection:
+    //   propertyCreate(clientId: EncodedId!, input: PropertyCreateInput!)
+    //   PropertyCreateInput fields: ["properties"]
+    //   PropertyAttributes fields: ["address","contacts","contactsToAssign","customFields","taxRateId","name"]
+    //   AddressAttributes fields: ["street1","street2","city","country","province","postalCode"]
+    const mutation = `mutation {
+      propertyCreate(clientId: "${clientId}", input: {
+        properties: [{
+          address: {
+            street1: "${street}",
+            city: "${city}",
+            province: "${province}",
+            postalCode: "${postalCode}",
+            country: "${country}"
+          }
+        }]
+      }) {
+        properties { id }
+        userErrors { message path }
       }
+    }`;
+
+    try {
+      const data = await this.graphql(mutation);
+      const result = data?.propertyCreate;
+      if (result?.userErrors?.length > 0) {
+        console.warn("[Jobber propertyCreate] userErrors:", JSON.stringify(result.userErrors));
+        return null;
+      }
+      const id = result?.properties?.[0]?.id || null;
+      if (id) console.log(`[Jobber propertyCreate] created propertyId=${id}`);
+      return id;
+    } catch (e: any) {
+      console.error("[Jobber propertyCreate] failed:", e.message);
+      return null;
     }
-    console.error("[Jobber propertyCreate] all attempts exhausted — property could not be created");
-    return null;
   }
 
   async introspectPropertyCreateInput(): Promise<void> {
@@ -437,14 +433,11 @@ export class JobberClient {
     const existing = await this.getClientPropertyId(clientId);
     if (existing) return existing;
 
-    // 2. Log schema to diagnose correct input structure
-    await this.introspectPropertyCreateInput();
-
-    // 3. Parse the address string (e.g. "123 Main St, Springfield, IL 62701")
+    // 2. Parse the address string (e.g. "123 Main St, Springfield, IL 62701")
     const address = parseAddressString(addressStr || "");
     console.log(`[Jobber getOrCreateProperty] clientId=${clientId} rawAddress="${addressStr}" parsed=${JSON.stringify(address)}`);
 
-    // 4. Try to create a property
+    // 3. Try to create a property
     const created = await this.createProperty(clientId, address);
     if (created) return created;
 
@@ -466,15 +459,21 @@ export class JobberClient {
     // Step 1: Get or create the property ID (required by Jobber API)
     const propertyId = await this.getOrCreatePropertyId(input.clientId, input.addressStr);
 
-    // Step 2: Create the job using the exact fields Jobber's API expects
+    // Step 2: Create the job
+    // - propertyId must be inline (EncodedId! not ID!) — typed variable causes type mismatch
+    // - invoicing requires invoicingType (BillingStrategy!) and invoicingSchedule (BillingFrequencyEnum!)
+    // - billingType is NOT a valid field on JobInvoicingAttributes
+    const titleEsc = (input.title || "Cleaning Service").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const instrEsc = (input.instructions || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     const mutation = `
-      mutation CreateJob($propertyId: ID!, $title: String!, $instructions: String) {
+      mutation {
         jobCreate(input: {
-          propertyId: $propertyId,
-          title: $title,
-          instructions: $instructions,
+          propertyId: "${propertyId}",
+          title: "${titleEsc}",
+          instructions: "${instrEsc}",
           invoicing: {
-            billingType: FLAT_RATE
+            invoicingType: FLAT_RATE,
+            invoicingSchedule: ONE_TIME
           }
         }) {
           job {
@@ -490,11 +489,7 @@ export class JobberClient {
       }
     `;
 
-    const data = await this.graphql(mutation, {
-      propertyId,
-      title: input.title,
-      instructions: input.instructions || null,
-    });
+    const data = await this.graphql(mutation);
     const result = data.jobCreate;
 
     if (!result) {
