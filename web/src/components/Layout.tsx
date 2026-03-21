@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import AppStoreQR from "./AppStoreQR";
 import { useAuth } from "../lib/auth";
@@ -125,6 +125,11 @@ export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!isCompleted && !isDismissed && location.pathname === "/dashboard") {
@@ -283,7 +288,7 @@ export function Layout() {
           <div className="flex-1" />
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 lg:p-8">
           <div className="max-w-7xl mx-auto animate-fade-in">
             <Outlet />
           </div>
