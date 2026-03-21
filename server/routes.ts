@@ -2975,7 +2975,16 @@ th{text-align:left;padding:12px;background:#f8f9fa;border-bottom:2px solid #dee2
 .total-row td{padding:14px;font-size:16px;font-weight:700;}
 .footer{margin-top:40px;text-align:center;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:16px;}
 .addons{display:flex;flex-wrap:wrap;gap:6px;}.addon-tag{background:#f0f4ff;color:${primaryColor};padding:4px 10px;border-radius:12px;font-size:11px;}
+#qp-print-bar{position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 8px rgba(0,0,0,0.08);}
+#qp-print-bar button{background:${primaryColor};color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+#qp-print-bar button:hover{opacity:0.9;}
+@media print{#qp-print-bar{display:none;}body{padding-top:40px;}}
 </style></head><body>
+<div id="qp-print-bar">
+  <span style="font-size:13px;color:#64748b;">Open in browser &rarr; File &rarr; Print &rarr; Save as PDF</span>
+  <button onclick="window.print()">Download PDF</button>
+</div>
+<div style="margin-top:56px;"></div>
 <div class="header">
 <div><div class="company">${business.companyName || "QuotePro"}</div>
 <div class="company-details">${business.email ? business.email + "<br>" : ""}${business.phone || ""}${business.address ? "<br>" + business.address : ""}</div></div>
@@ -3018,11 +3027,11 @@ ${growthSettings?.includeReviewOnPdf && growthSettings?.googleReviewLink?.trim()
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
       const gs = await getGrowthAutomationSettings(business.id);
       const html = await generateQuotePdfHtml(quote, business, gs);
 
-      return res.json({ html, customerName, total: quote.total });
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.send(html);
     } catch (error: any) {
       console.error("PDF generation error:", error);
       return res.status(500).json({ message: "Failed to generate PDF" });
@@ -3233,8 +3242,16 @@ th{text-align:left;padding:12px;background:#f8f9fa;border-bottom:2px solid #dee2
 .sig-line{border-bottom:1px solid #ccc;height:32px;margin-bottom:4px;}
 .sig-label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.5px;}
 .footer{margin-top:40px;text-align:center;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:16px;}
+#qp-print-bar{position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 8px rgba(0,0,0,0.08);}
+#qp-print-bar button{background:${primaryColor};color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+#qp-print-bar button:hover{opacity:0.9;}
+@media print{#qp-print-bar{display:none;}.page{padding-top:40px;}}
 </style></head><body>
-<div class="page">
+<div id="qp-print-bar">
+  <span style="font-size:13px;color:#64748b;">File &rarr; Print &rarr; Save as PDF in your browser</span>
+  <button onclick="window.print()">Download PDF</button>
+</div>
+<div class="page" style="padding-top:72px;">
 <div class="cover">
   <div class="company-name">${business.companyName || "QuotePro"}</div>
   <div class="company-details">${business.email ? business.email + " | " : ""}${business.phone || ""}${business.address ? " | " + business.address : ""}</div>
@@ -3338,12 +3355,8 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
 </div>
 </body></html>`;
 
-      return res.json({
-        html,
-        customerName,
-        facilityName,
-        total: pricing.monthlyPrice || quote.total,
-      });
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      return res.send(html);
     } catch (error: any) {
       console.error("Commercial PDF generation error:", error);
       return res.status(500).json({ message: "Failed to generate commercial PDF" });
