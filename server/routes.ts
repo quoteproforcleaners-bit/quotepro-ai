@@ -6919,7 +6919,24 @@ Respond with JSON: {"reply": string}`
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const list = await getReviewRequestsByBusiness(business.id);
-      return res.json(list);
+
+      // Enrich each request with the customer's display name
+      const customerIds = [...new Set(list.map((r: any) => r.customerId).filter(Boolean))];
+      let customerMap: Record<string, string> = {};
+      if (customerIds.length > 0) {
+        const allCustomers = await getCustomersByBusiness(business.id);
+        for (const c of allCustomers) {
+          const name = `${c.firstName || ""} ${c.lastName || ""}`.trim();
+          if (name) customerMap[c.id] = name;
+        }
+      }
+
+      const enriched = list.map((r: any) => ({
+        ...r,
+        customerName: customerMap[r.customerId] || null,
+      }));
+
+      return res.json(enriched);
     } catch (error: any) {
       console.error("Get review requests error:", error);
       return res.status(500).json({ message: "Failed to get review requests" });
