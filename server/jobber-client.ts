@@ -469,8 +469,8 @@ export class JobberClient {
 
     // Step 2: Create the job
     // - propertyId must be inline (EncodedId! not ID!) — typed variable causes type mismatch
-    // - invoicing requires invoicingType (BillingStrategy!) and invoicingSchedule (BillingFrequencyEnum!)
-    // - billingType is NOT a valid field on JobInvoicingAttributes
+    // - invoicing block omitted: BillingStrategy/BillingFrequencyEnum enum values vary by API version
+    //   and can be set manually in Jobber after sync. Job creates fine without it.
     const esc = (s: string) => s
       .replace(/\\/g, "\\\\")
       .replace(/"/g, '\\"')
@@ -484,11 +484,7 @@ export class JobberClient {
         jobCreate(input: {
           propertyId: "${propertyId}",
           title: "${titleEsc}",
-          instructions: "${instrEsc}",
-          invoicing: {
-            invoicingType: FLAT_RATE,
-            invoicingSchedule: ONE_TIME
-          }
+          instructions: "${instrEsc}"
         }) {
           job {
             id

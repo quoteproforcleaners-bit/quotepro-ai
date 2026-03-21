@@ -1,0 +1,89 @@
+The AI message generation in the WEB APP is unacceptable and must be rebuilt to match the same message quality, tone, structure, and generation logic used in the iOS app.
+
+Problem:
+The iOS app generates much better customer-facing messages.
+The web app messages sound generic, awkward, robotic, and low quality.
+I do NOT want the web app to invent its own style anymore.
+I want the web app to use the SAME AI message generation behavior as the iOS app.
+
+Your job:
+Audit both implementations and make the web app follow the iOS app’s exact approach for AI-generated customer messages.
+
+Scope:
+Message types include:
+- Send Quote
+- Follow Up
+- Thank You
+- Reminder
+- Upsell
+- Review Ask
+- Payment Issue
+
+What I need you to do:
+1. Find the iOS implementation for AI message generation
+2. Find the web app implementation for AI message generation
+3. Compare them in detail:
+   - prompt text
+   - system instructions
+   - user prompt format
+   - model selection
+   - temperature
+   - max tokens
+   - message context passed in
+   - formatting rules
+   - fallback logic
+   - post-processing
+4. Identify exactly why the iOS output is better
+5. Refactor the web app so it uses the SAME generation logic, prompt structure, constraints, and output style as iOS
+6. If possible, centralize this into a shared prompt/config so the two apps cannot drift apart again
+
+Non-negotiable requirement:
+The web app should not “approximate” the iOS behavior.
+It should mirror the iOS AI message generation as closely as possible.
+
+Important:
+Do not just make the web app prompts “better.”
+Do not invent a new messaging style.
+Do not leave the current web prompt in place with minor edits.
+I want the web app to adopt the iOS app’s proven message-generation system.
+
+Quality standard:
+Messages should feel like a real human wrote them.
+They should be short, natural, smooth, and conversion-friendly.
+No robotic fluff.
+No stiff corporate wording.
+No generic lines like:
+- “I hope this message finds you well”
+- “Just wanted to touch base”
+- “Looking forward to hearing from you”
+unless that exact language is also being intentionally used by the iOS app.
+
+Implementation requirements:
+- Trace the exact code path used by iOS for AI message generation
+- Reuse the same prompt construction and generation settings in the web app
+- Match the same personalization inputs where possible:
+  - customer first name
+  - quote amount
+  - service type
+  - company name
+  - context of the workflow
+- Match the same output cleanup/formatting rules as iOS
+- If the iOS app uses templates plus AI, port that structure exactly
+- If the iOS app uses hidden rules or style constraints, port them exactly
+
+Deliverables:
+1. Explain the root cause of why web outputs are worse than iOS
+2. Show me the exact files/functions for both implementations
+3. Update the web app to mirror the iOS app logic
+4. List every change made
+5. Give before/after examples for each message type
+6. Tell me how to verify the outputs are now aligned
+
+Success criteria:
+- Web app AI messages match the tone and quality of the iOS app
+- The web app no longer produces generic, awkward, templated messages
+- Both platforms behave consistently
+- Future prompt drift is prevented through shared logic/config
+
+Do not stop at analysis.
+Inspect the actual code, identify the differences, implement the fix, and summarize exactly what changed.

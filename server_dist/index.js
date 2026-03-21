@@ -5733,11 +5733,7 @@ var JobberClient = class {
         jobCreate(input: {
           propertyId: "${propertyId}",
           title: "${titleEsc}",
-          instructions: "${instrEsc}",
-          invoicing: {
-            invoicingType: FLAT_RATE,
-            invoicingSchedule: ONE_TIME
-          }
+          instructions: "${instrEsc}"
         }) {
           job {
             id
