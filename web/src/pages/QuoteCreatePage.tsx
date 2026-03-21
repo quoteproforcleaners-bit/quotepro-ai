@@ -359,6 +359,7 @@ export default function QuoteCreatePage() {
   const [manualEdits, setManualEdits] = useState<Set<string>>(new Set());
   const [editingTier, setEditingTier] = useState<"good" | "better" | "best" | null>(null);
   const [editingValue, setEditingValue] = useState<string>("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { data: customers = [] } = useQuery<any[]>({
     queryKey: ["/api/customers"],
@@ -376,6 +377,9 @@ export default function QuoteCreatePage() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
       navigate(`/quotes/${data.id}`);
+    },
+    onError: (err: any) => {
+      setSubmitError(err?.message || "Failed to create quote. Please try again.");
     },
   });
 
@@ -462,6 +466,7 @@ export default function QuoteCreatePage() {
   };
 
   const handleSubmit = async () => {
+    setSubmitError(null);
     let cid = customerId;
     if (newCustomer) {
       try {
@@ -1424,6 +1429,10 @@ export default function QuoteCreatePage() {
           </div>
         ) : null}
       </Card>
+
+      {submitError ? (
+        <Alert variant="error" title="Could not create quote" description={submitError} />
+      ) : null}
 
       <div className="flex justify-between">
         <Button

@@ -321,22 +321,35 @@ async function seedDemoUser() {
     const email = "demo@quotepro.com";
     const password = "Demo1234!";
     const existing = await pool.query(`SELECT id FROM users WHERE LOWER(email) = $1`, [email]);
+    let userId: string;
     if (existing.rows.length > 0) {
+      userId = existing.rows[0].id;
       await pool.query(
         `UPDATE users SET subscription_tier = 'pro' WHERE LOWER(email) = $1`,
         [email]
       );
       log(`Demo account refreshed: ${email}`);
-      return;
+    } else {
+      const passwordHash = await bcrypt.hash(password, 12);
+      userId = (await pool.query(`SELECT gen_random_uuid() AS id`)).rows[0].id;
+      await pool.query(
+        `INSERT INTO users (id, email, password_hash, name, subscription_tier, created_at)
+         VALUES ($1, $2, $3, $4, 'pro', NOW())`,
+        [userId, email, passwordHash, "Demo User"]
+      );
+      log(`Demo account created: ${email} / ${password}`);
     }
-    const passwordHash = await bcrypt.hash(password, 12);
-    const userId = (await pool.query(`SELECT gen_random_uuid() AS id`)).rows[0].id;
-    await pool.query(
-      `INSERT INTO users (id, email, password_hash, name, subscription_tier, created_at)
-       VALUES ($1, $2, $3, $4, 'pro', NOW())`,
-      [userId, email, passwordHash, "Demo User"]
-    );
-    log(`Demo account created: ${email} / ${password}`);
+    // Ensure the demo user has a business profile
+    const biz = await pool.query(`SELECT id FROM businesses WHERE owner_user_id = $1 LIMIT 1`, [userId]);
+    if (biz.rows.length === 0) {
+      const bizId = (await pool.query(`SELECT gen_random_uuid() AS id`)).rows[0].id;
+      await pool.query(
+        `INSERT INTO businesses (id, owner_user_id, company_name, sender_name, sender_title, booking_link, email_signature, sms_signature, primary_color, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
+        [bizId, userId, "Demo Cleaning Co", "Demo User", "Owner", "", "", "", "#6366f1"]
+      );
+      log(`Demo business profile created for: ${email}`);
+    }
   } catch (e: any) {
     console.error("seedDemoUser error:", e.message);
   }
