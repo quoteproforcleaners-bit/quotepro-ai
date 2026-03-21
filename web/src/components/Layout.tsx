@@ -104,6 +104,7 @@ const navSections = [
   },
   {
     label: "Integrations",
+    beta: true,
     items: [
       { to: "/qbo-settings", label: "QuickBooks Online", icon: BookOpen, pro: true },
       { to: "/jobber", label: "Jobber", icon: PlugZap, pro: true },
@@ -181,8 +182,11 @@ export function Layout() {
           {navSections.map((section, si) => (
             <div key={si} className={si > 0 ? "mt-5" : ""}>
               {section.label ? (
-                <p className="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <p className="px-3 mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   {section.label}
+                  {(section as any).beta ? (
+                    <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-red-500 text-white uppercase tracking-wider leading-none">Beta</span>
+                  ) : null}
                 </p>
               ) : null}
               <div className="space-y-0.5">
