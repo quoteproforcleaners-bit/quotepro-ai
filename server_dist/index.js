@@ -12365,18 +12365,66 @@ ${ownerName}`,
       const firstName = customerName?.split(" ")[0] || "there";
       const isEmail = msgChannel === "email";
       const lengthInstruction = isEmail ? "Write 2-3 short paragraphs. For email, start your response with 'Subject: <subject line>' on its own line, then a blank line, then the email body. End with a warm sign-off." : "Keep it under 200 characters. No subject line needed for SMS.";
-      const purposeInstructions = {
-        send_quote: `You are sending a new cleaning quote to the customer. Mention the quote total ($${total || "TBD"}) and invite them to review it. Encourage them to accept if it looks good. Be warm and professional.`,
-        follow_up: `The customer received a cleaning quote ($${total || "TBD"}) but hasn't responded yet. Write a friendly follow-up to check in, answer questions, and nudge them toward accepting. Don't be pushy.`,
-        thank_you: `The customer just accepted or completed a cleaning service. Write a sincere thank-you message. Express appreciation for choosing the business and mention you look forward to serving them again.`,
-        reminder: `The customer has an upcoming cleaning appointment. Write a friendly appointment reminder. Mention you're looking forward to seeing them and ask them to reach out with any questions.`,
-        upsell: `Write a message to an existing customer suggesting an add-on or upgrade to their regular cleaning (e.g., deep clean, inside oven, inside fridge, windows). Keep it enticing but low-pressure.`,
-        review_request: `The cleaning service was recently completed. Write a message asking the customer to leave an online review. Explain that reviews help the small business grow. Keep it short and genuine.`,
-        payment_failed: `There's an issue with the customer's payment for their cleaning service. Write a polite, non-accusatory message letting them know and asking them to update their payment method. Keep it friendly and professional.`
+      const purposePrompts = {
+        send_quote: `
+You just sent a cleaning quote to a customer. Write a short, casual message letting them know.
+- Mention the price naturally (e.g. "came out to $X")
+- Invite them to ask questions or get on the schedule
+- Sound like a confident, friendly business owner texting a client \u2014 not a customer service rep
+- Good example: "Hey ${firstName} \u2014 just sent over your quote, came out to $${total || "TBD"}. Let me know if you have any questions or want to lock in a date."
+`,
+        follow_up: `
+The customer got a quote but hasn't replied yet. Write a short, low-pressure follow-up.
+- Check in without sounding desperate or pushy
+- Keep it super brief \u2014 1-2 sentences max for SMS
+- Sound like a real person, not a bot
+- Good example: "Hey ${firstName}, just checking in \u2014 did you get a chance to look over the quote? Happy to answer any questions."
+`,
+        thank_you: `
+The cleaning job is done. Write a genuine thank-you to the customer.
+- Sound warm and real, not corporate
+- Keep it short and sincere
+- Optionally mention you'd love to help them again
+- Good example: "Thanks so much for having us today, ${firstName} \u2014 really appreciate it! Hope everything looks great."
+`,
+        reminder: `
+The customer has an upcoming cleaning appointment. Write a brief reminder.
+- Friendly and casual, not robotic
+- Mention you're looking forward to it
+- Keep it to 1-2 lines for SMS
+- Good example: "Hey ${firstName}, just a quick reminder we'll be there tomorrow. Looking forward to it \u2014 let us know if anything changes!"
+`,
+        upsell: `
+Write a message to an existing customer pitching a cleaning upgrade or add-on (deep clean, inside oven, fridge, windows, etc.).
+- Casual, low-pressure, value-focused
+- Don't oversell \u2014 just plant the seed
+- Good example: "Hey ${firstName}, we've been doing a great job keeping things fresh \u2014 ever thought about adding a deep clean or inside oven/fridge? Makes a huge difference. Happy to add it to your next visit if you're interested."
+`,
+        review_request: `
+The cleaning is done. Ask the customer for a review \u2014 short and genuine.
+- Sound like a real small business owner asking a favor, not a corporation
+- Keep it brief and make it easy for them to say yes
+- Good example: "Hey ${firstName}, so glad we could help today! If you have a sec, a quick Google review would mean the world to us \u2014 it really helps. Thanks so much!"
+`,
+        payment_failed: `
+There's a payment issue on the customer's account. Write a friendly heads-up.
+- Non-accusatory, matter-of-fact, easy to act on
+- Don't make it awkward \u2014 just let them know and make it easy to fix
+- Good example: "Hey ${firstName}, just wanted to give you a quick heads-up \u2014 looks like there was an issue processing your payment. No big deal, just let us know a good way to sort it out. Thanks!"
+`
       };
-      const purposeText = purposeInstructions[purpose] || `Write a professional cleaning business message to the customer.`;
-      const systemPrompt = `You are a friendly, professional message writer for a residential cleaning company. ${purposeText} Address the customer by their first name. ${lengthInstruction} Never use emojis. Be concise and human \u2014 avoid corporate jargon.`;
-      const userPrompt = `Customer first name: ${firstName}.${total ? ` Quote total: $${total}.` : ""}${status ? ` Quote status: ${status}.` : ""} Write the message now.`;
+      const purposeText = purposePrompts[purpose] || `Write a short, natural message from a cleaning business owner to a customer named ${firstName}. Sound human and conversational.`;
+      const systemPrompt = `You are a real cleaning business owner writing a message to a customer. Your tone is warm, confident, and natural \u2014 like texting a client, not writing a corporate email. Never use phrases like "I hope this message finds you well", "We're excited to", "Please review the details", or any other robotic filler. Keep it short, human, and to the point. ${lengthInstruction}
+
+${purposeText}
+
+Rules:
+- Use the customer's first name naturally (once, at the start)
+- Vary phrasing \u2014 don't sound templated
+- No fluff, no filler sentences
+- Max 3-4 sentences for email, 1-2 for SMS
+- For email: start with "Subject: " on line 1, blank line, then the body`;
+      const userPrompt = `Customer first name: ${firstName}.${total ? ` Quote total: $${total}.` : ""}${status ? ` Quote status: ${status}.` : ""} Write the message now. Output ONLY the message \u2014 no commentary, no labels, no explanation.`;
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [

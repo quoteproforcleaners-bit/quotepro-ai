@@ -1,0 +1,78 @@
+I need you to completely rewrite how AI-generated customer messages work in my app (QuotePro).
+
+Current problem:
+The messages sound generic, robotic, and templated. They do not feel like a real human wrote them, and they hurt trust and conversion.
+
+Goal:
+Generate short, natural, conversational messages that sound like they were written by a real cleaning business owner — not AI.
+
+Core requirements (VERY IMPORTANT):
+- Messages must feel human, warm, and natural
+- Avoid generic phrases like:
+  - "I hope this message finds you well"
+  - "We’re excited to"
+  - "Please review the details"
+- Keep messages concise (no fluff)
+- Write like a normal person texting or emailing a customer
+- Slightly casual tone (but still professional)
+- Flow should feel smooth, not stiff or scripted
+- No unnecessary filler sentences
+- Avoid repeating the same structure across messages
+- Vary phrasing so messages don’t feel templated
+- Personalize when possible (name, service, price, etc.)
+
+Message types to support:
+1. Send Quote
+2. Follow Up
+3. Thank You
+4. Reminder
+5. Upsell
+6. Review Ask
+7. Payment Issue
+
+For EACH message type:
+- Create a unique tone and intent
+- Optimize for conversion (getting reply, booking, or action)
+- Keep it short and clear
+
+Examples of GOOD tone:
+"Hey John — just sent over your quote. Let me know if you have any questions or want to get on the schedule 👍"
+
+"Hi Sarah, just checking in — did you get a chance to look over the quote?"
+
+"Thanks again for having us today — really appreciate it!"
+
+Examples of BAD tone (DO NOT DO THIS):
+"I hope this message finds you well. I'm pleased to share..."
+"We are excited to assist you with your cleaning needs..."
+
+Implementation instructions:
+- Replace the current prompt/template logic with improved generation rules
+- Use dynamic inputs:
+  - customer name
+  - service type
+  - price
+  - company name
+- Ensure output is:
+  - under ~3–5 sentences max
+  - readable at a glance
+  - mobile-friendly
+
+Advanced improvements:
+- Add slight variation so the same message type isn’t identical every time
+- Optionally include 2–3 variations and pick one randomly
+- Add light personality (but do NOT overdo it)
+
+Deliverables:
+1. New prompt/template logic for each message type
+2. Example outputs for each type
+3. Updated implementation code
+4. Explanation of how tone/quality is enforced
+
+Success criteria:
+- Messages feel like a real human wrote them
+- No robotic or corporate language
+- Cleaner, faster, more conversational
+- Higher likelihood of customer replying or booking
+
+Do NOT give me generic outputs. Rewrite the system so messages actually sound human and natural.
