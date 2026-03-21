@@ -7065,27 +7065,29 @@ Respond with JSON: {"reply": string}`
 
   app.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { messageType, customerContext, strategyProfile, escalationStage, channel, language: commLang } = req.body;
-      const msgChannel = channel || "sms";
-      const profile = strategyProfile || "warm";
-      const stage = escalationStage || 1;
+      const { purpose, channel, customerName, total, status, quoteId } = req.body;
+      const msgChannel = (channel || "sms") as string;
+      const firstName = customerName?.split(" ")[0] || "there";
+      const isEmail = msgChannel === "email";
+      const lengthInstruction = isEmail
+        ? "Write 2-3 short paragraphs. For email, start your response with 'Subject: <subject line>' on its own line, then a blank line, then the email body. End with a warm sign-off."
+        : "Keep it under 200 characters. No subject line needed for SMS.";
 
-      const toneMap: Record<string, string> = {
-        warm: "warm",
-        direct: "direct",
-        premium: "premium",
-        urgent: "urgent",
+      const purposeInstructions: Record<string, string> = {
+        send_quote: `You are sending a new cleaning quote to the customer. Mention the quote total ($${total || "TBD"}) and invite them to review it. Encourage them to accept if it looks good. Be warm and professional.`,
+        follow_up: `The customer received a cleaning quote ($${total || "TBD"}) but hasn't responded yet. Write a friendly follow-up to check in, answer questions, and nudge them toward accepting. Don't be pushy.`,
+        thank_you: `The customer just accepted or completed a cleaning service. Write a sincere thank-you message. Express appreciation for choosing the business and mention you look forward to serving them again.`,
+        reminder: `The customer has an upcoming cleaning appointment. Write a friendly appointment reminder. Mention you're looking forward to seeing them and ask them to reach out with any questions.`,
+        upsell: `Write a message to an existing customer suggesting an add-on or upgrade to their regular cleaning (e.g., deep clean, inside oven, inside fridge, windows). Keep it enticing but low-pressure.`,
+        review_request: `The cleaning service was recently completed. Write a message asking the customer to leave an online review. Explain that reviews help the small business grow. Keep it short and genuine.`,
+        payment_failed: `There's an issue with the customer's payment for their cleaning service. Write a polite, non-accusatory message letting them know and asking them to update their payment method. Keep it friendly and professional.`,
       };
-      const tone = toneMap[profile] || "warm";
 
-      const lengthInstruction = msgChannel === "sms"
-        ? "Keep under 240 characters."
-        : "Keep under 120 words.";
+      const purposeText = purposeInstructions[purpose] || `Write a professional cleaning business message to the customer.`;
 
-      const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
-      const systemPrompt = `You are a professional message writer for a residential cleaning business. Generate a ${msgChannel} message. Strategy: ${profile}. Escalation stage: ${stage} of 4. Message type: ${messageType}. Keep it ${tone} based on profile. ${lengthInstruction} Never be rude. Use the customer's first name.${langInstruction}`;
+      const systemPrompt = `You are a friendly, professional message writer for a residential cleaning company. ${purposeText} Address the customer by their first name. ${lengthInstruction} Never use emojis. Be concise and human — avoid corporate jargon.`;
 
-      const userPrompt = `Customer first name: ${customerContext?.firstName || "there"}. ${customerContext?.quoteTotal ? `Quote total: $${customerContext.quoteTotal}.` : ""} ${customerContext?.serviceType ? `Service type: ${customerContext.serviceType}.` : ""} ${customerContext?.lastServiceDate ? `Last service date: ${customerContext.lastServiceDate}.` : ""} ${customerContext?.homeSize ? `Home size: ${customerContext.homeSize}.` : ""}`;
+      const userPrompt = `Customer first name: ${firstName}.${total ? ` Quote total: $${total}.` : ""}${status ? ` Quote status: ${status}.` : ""} Write the message now.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
