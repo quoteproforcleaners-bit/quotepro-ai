@@ -84,7 +84,7 @@ const navSections = [
       { to: "/follow-ups", label: "Follow-ups", icon: Bell },
       { to: "/reactivation", label: "Reactivation", icon: RefreshCw, pro: true },
       { to: "/reviews-referrals", label: "Reviews & Referrals", icon: Star, pro: true },
-      { to: "/lead-finder", label: "Lead Finder", icon: Radio, pro: true, beta: true },
+      { to: "/lead-finder", label: "Lead Radar", icon: Radio, pro: true, beta: true },
       { to: "/opportunities", label: "Opportunities", icon: Target, pro: true },
       { to: "/email-sequences", label: "Email Sequences", icon: MailOpen },
     ],

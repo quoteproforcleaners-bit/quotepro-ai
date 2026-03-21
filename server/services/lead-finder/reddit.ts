@@ -11,29 +11,189 @@ export interface RedditPost {
   metadata: Record<string, any>;
 }
 
-const DEFAULT_KEYWORDS = [
-  "house cleaner",
-  "cleaning service",
-  "maid service",
-  "deep cleaning",
-  "move out cleaning",
-  "move-in cleaning",
-  "recurring cleaning",
-  "biweekly cleaning",
-  "recommend a cleaner",
-  "need a cleaner",
-  "cleaning quote",
-  "apartment cleaning",
-  "home cleaning",
+// ─── Keyword Packs ────────────────────────────────────────────────────────────
+
+export const KEYWORD_PACKS: Record<string, string[]> = {
+  recommendation: [
+    "house cleaner recommendation",
+    "cleaning service recommendation",
+    "maid service recommendation",
+    "recommend a cleaner",
+    "cleaning lady recommendation",
+    "good house cleaner",
+    "reliable house cleaner",
+    "who do you use for cleaning",
+    "anyone know a good cleaner",
+    "cleaner near me",
+    "looking for a house cleaner",
+    "looking for cleaning service",
+  ],
+  intent: [
+    "need a cleaner",
+    "need cleaning service",
+    "need a maid",
+    "looking for maid",
+    "hire a cleaner",
+    "hire cleaning service",
+    "cleaning quote",
+    "house cleaner",
+    "maid service",
+    "cleaning service",
+    "home cleaning",
+    "residential cleaning",
+  ],
+  service_type: [
+    "deep cleaning",
+    "deep clean",
+    "move out cleaning",
+    "move-out cleaning",
+    "move in cleaning",
+    "move-in cleaning",
+    "recurring cleaning",
+    "biweekly cleaning",
+    "weekly cleaning",
+    "bi-weekly cleaning",
+    "apartment cleaning",
+    "cleaning company",
+    "one time cleaning",
+  ],
+  high_value: [
+    "airbnb cleaning",
+    "airbnb cleaner",
+    "vacation rental cleaning",
+    "post construction cleaning",
+    "post-construction cleaning",
+    "estate cleaning",
+    "hoarder cleaning",
+    "commercial cleaning service",
+  ],
+};
+
+export const ALL_KEYWORDS = Object.values(KEYWORD_PACKS).flat();
+
+// ─── City → Subreddit mapping ─────────────────────────────────────────────────
+
+const CITY_SUBREDDIT_MAP: Record<string, string> = {
+  "austin": "Austin",
+  "chicago": "chicago",
+  "los angeles": "LosAngeles",
+  "la": "LosAngeles",
+  "new york": "nyc",
+  "nyc": "nyc",
+  "dallas": "Dallas",
+  "houston": "houston",
+  "phoenix": "phoenix",
+  "seattle": "Seattle",
+  "denver": "Denver",
+  "atlanta": "Atlanta",
+  "miami": "miami",
+  "boston": "boston",
+  "portland": "Portland",
+  "san francisco": "sanfrancisco",
+  "sf": "sanfrancisco",
+  "san antonio": "sanantonio",
+  "san diego": "sandiego",
+  "minneapolis": "Minneapolis",
+  "charlotte": "Charlotte",
+  "nashville": "nashville",
+  "las vegas": "vegaslocals",
+  "dc": "washingtondc",
+  "washington": "washingtondc",
+  "washington dc": "washingtondc",
+  "philadelphia": "philadelphia",
+  "philly": "philadelphia",
+  "tampa": "tampa",
+  "orlando": "orlando",
+  "cleveland": "Cleveland",
+  "columbus": "Columbus",
+  "indianapolis": "indianapolis",
+  "sacramento": "Sacramento",
+  "raleigh": "raleigh",
+  "richmond": "rva",
+  "jacksonville": "jacksonville",
+  "oklahoma city": "okc",
+  "louisville": "louisville",
+  "baltimore": "baltimore",
+  "milwaukee": "milwaukee",
+  "fort worth": "FortWorth",
+  "colorado springs": "ColoradoSprings",
+  "pittsburgh": "pittsburgh",
+  "salt lake city": "SaltLakeCity",
+  "kansas city": "kansascity",
+  "detroit": "Detroit",
+  "memphis": "memphis",
+  "omaha": "Omaha",
+  "tucson": "Tucson",
+};
+
+function getCitySubreddits(cities: string[]): string[] {
+  const found: string[] = [];
+  for (const city of cities) {
+    const key = city.toLowerCase().trim().replace(/,.*$/, "").trim();
+    const sub = CITY_SUBREDDIT_MAP[key];
+    if (sub && !found.includes(sub)) found.push(sub);
+  }
+  return found;
+}
+
+// ─── Base subreddits (topic-based) ───────────────────────────────────────────
+
+const BASE_SUBREDDITS = [
+  "homeowners",
+  "moving",
+  "firsttimehomebuyer",
+  "airbnb",
+  "landlord",
+  "PropertyManagement",
+  "Tenant",
+  "malelivingspace",
+  "femalelivingspace",
+  "personalfinance",
+  "ApartmentHacks",
+  "maid",
+  "domesticworkers",
 ];
 
-const DEFAULT_SUBREDDITS = [
-  "cleaningtips", "moving", "homeowners", "firsttimehomebuyer",
-  "landlord", "airbnb", "PropertyManagement", "Tenant",
-  "malelivingspace", "femalelivingspace", "personalfinance",
+// ─── HTTP helpers ─────────────────────────────────────────────────────────────
+
+async function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+const UA_LIST = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 ];
 
-function buildSearchUrl(query: string, subreddit?: string): string {
+function getUA() {
+  return UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
+}
+
+async function fetchWithTimeout(url: string, timeoutMs = 10000): Promise<Response | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": getUA(),
+        "Accept": "application/json, text/html, application/rss+xml, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+      },
+    });
+    clearTimeout(timer);
+    return res;
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+// ─── Reddit JSON API ──────────────────────────────────────────────────────────
+
+function buildJsonUrl(query: string, subreddit?: string): string {
   const encoded = encodeURIComponent(query);
   if (subreddit) {
     return `https://www.reddit.com/r/${subreddit}/search.json?q=${encoded}&restrict_sr=1&sort=new&limit=25&t=month`;
@@ -41,23 +201,10 @@ function buildSearchUrl(query: string, subreddit?: string): string {
   return `https://www.reddit.com/search.json?q=${encoded}&sort=new&limit=25&t=month`;
 }
 
-async function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-async function fetchRedditSearch(url: string): Promise<any[]> {
+async function fetchRedditJson(url: string): Promise<any[]> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; QuoteProBot/1.0; +https://getquotepro.ai)",
-        "Accept": "application/json",
-      },
-    });
-    clearTimeout(timeout);
-    if (!res.ok) return [];
+    const res = await fetchWithTimeout(url);
+    if (!res || !res.ok) return [];
     const json = await res.json();
     return json?.data?.children ?? [];
   } catch {
@@ -65,70 +212,195 @@ async function fetchRedditSearch(url: string): Promise<any[]> {
   }
 }
 
+// ─── Reddit RSS API ───────────────────────────────────────────────────────────
+
+function buildRssUrl(query: string, subreddit?: string): string {
+  const encoded = encodeURIComponent(query);
+  if (subreddit) {
+    return `https://www.reddit.com/r/${subreddit}/search.rss?q=${encoded}&restrict_sr=1&sort=new&t=month&limit=25`;
+  }
+  return `https://www.reddit.com/search.rss?q=${encoded}&sort=new&t=month&limit=25`;
+}
+
+function parseRssItem(item: string): { id: string; title: string; body: string; author: string; link: string; subreddit: string; postedAt: Date } | null {
+  const extract = (tag: string) => {
+    const match = item.match(new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]></${tag}>`, "i"))
+      ?? item.match(new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, "i"));
+    return match ? match[1].trim() : "";
+  };
+
+  const link = extract("link") || (item.match(/href="([^"]+reddit\.com[^"]+)"/)?.[1] ?? "");
+  const title = extract("title");
+  const body = extract("description").replace(/<[^>]+>/g, "").slice(0, 2000);
+  const author = extract("author");
+  const pubDate = extract("pubDate");
+  const postedAt = pubDate ? new Date(pubDate) : new Date();
+
+  // Extract subreddit from link
+  const subMatch = link.match(/reddit\.com\/r\/([^/]+)\//);
+  const subreddit = subMatch ? subMatch[1] : "";
+
+  // Extract post ID from link
+  const idMatch = link.match(/\/comments\/([a-z0-9]+)/);
+  const id = idMatch ? idMatch[1] : "";
+
+  if (!id || !title || title.length < 5) return null;
+
+  return { id, title, body, author, link, subreddit, postedAt };
+}
+
+async function fetchRedditRss(url: string): Promise<Array<{ id: string; title: string; body: string; author: string; link: string; subreddit: string; postedAt: Date }>> {
+  try {
+    const res = await fetchWithTimeout(url, 12000);
+    if (!res || !res.ok) return [];
+    const text = await res.text();
+    if (!text.includes("<item>")) return [];
+
+    const items = text.split("<item>").slice(1);
+    const results: Array<any> = [];
+    for (const item of items) {
+      const parsed = parseRssItem(item);
+      if (parsed) results.push(parsed);
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+// ─── Main fetch function ──────────────────────────────────────────────────────
+
 export async function fetchRedditLeads(params: {
   keywords?: string[];
   subreddits?: string[];
   targetCities?: string[];
 }): Promise<RedditPost[]> {
-  const keywords = (params.keywords ?? []).length > 0 ? params.keywords! : DEFAULT_KEYWORDS;
-  const subreddits = (params.subreddits ?? []).length > 0 ? params.subreddits! : DEFAULT_SUBREDDITS;
+  const userKeywords = (params.keywords ?? []).length > 0 ? params.keywords! : [];
   const cities = params.targetCities ?? [];
+  const citySubreddits = getCitySubreddits(cities);
 
+  // Build keyword list: user keywords + a rotating subset of defaults
+  const allKws = userKeywords.length > 0
+    ? [...new Set([...userKeywords, ...KEYWORD_PACKS.recommendation.slice(0, 4)])]
+    : ALL_KEYWORDS;
+
+  // Prioritize high-value keywords for city subreddit searches
+  const priorityKeywords = [
+    "house cleaner", "cleaning service", "maid service",
+    "need a cleaner", "cleaner recommendation", "deep cleaning",
+    "move out cleaning", "recurring cleaning", "looking for a cleaner",
+  ];
+
+  // Pick a good rotating subset to avoid hammering too many requests
+  const hour = new Date().getHours();
+  const kwOffset = (hour % 3) * 4;
+  const kwsToSearch = [
+    ...priorityKeywords.slice(0, 5),
+    ...allKws.filter((k) => !priorityKeywords.includes(k)).slice(kwOffset, kwOffset + 5),
+  ].slice(0, 10);
+
+  // Build user-configured or default subreddits (topic-based)
+  const userSubs = (params.subreddits ?? []).length > 0 ? params.subreddits! : BASE_SUBREDDITS;
+  const topicSubs = userSubs.slice(0, 6);
+
+  // Build search plan
+  const searches: Array<{ keyword: string; subreddit?: string; method: "json" | "rss" }> = [];
+
+  // 1. City subreddit searches (highest value — most specific)
+  if (citySubreddits.length > 0) {
+    for (const city of citySubreddits.slice(0, 3)) {
+      for (const kw of ["house cleaner", "cleaning service", "maid service", "cleaner recommendation"].slice(0, 3)) {
+        searches.push({ keyword: kw, subreddit: city, method: "rss" });
+      }
+    }
+    // Also add city name to global keyword search
+    for (const city of citySubreddits.slice(0, 2)) {
+      searches.push({ keyword: `cleaning service ${city}`, method: "rss" });
+    }
+  }
+
+  // 2. Topic subreddit + keyword combos (via RSS — more reliable)
+  for (const kw of kwsToSearch.slice(0, 4)) {
+    for (const sub of topicSubs.slice(0, 3)) {
+      searches.push({ keyword: kw, subreddit: sub, method: "rss" });
+    }
+  }
+
+  // 3. Global Reddit keyword searches (RSS)
+  for (const kw of kwsToSearch.slice(0, 6)) {
+    searches.push({ keyword: kw, method: "rss" });
+  }
+
+  // 4. JSON API as backup for first few keywords
+  for (const kw of kwsToSearch.slice(0, 3)) {
+    searches.push({ keyword: kw, method: "json" });
+  }
+
+  // Deduplicate and cap
   const seen = new Set<string>();
   const results: RedditPost[] = [];
+  const batchSize = Math.min(searches.length, 20);
 
-  const searches: Array<{ keyword: string; subreddit?: string }> = [];
+  for (let i = 0; i < batchSize; i++) {
+    if (i > 0) await sleep(200 + Math.random() * 150);
 
-  for (const kw of keywords.slice(0, 4)) {
-    searches.push({ keyword: kw });
-    for (const sub of subreddits.slice(0, 2)) {
-      searches.push({ keyword: kw, subreddit: sub });
+    const { keyword, subreddit, method } = searches[i];
+
+    let posts: Array<{ id: string; title: string; body: string; author: string; link: string; subreddit: string; postedAt: Date }> = [];
+
+    if (method === "rss") {
+      const url = buildRssUrl(keyword, subreddit);
+      const rssItems = await fetchRedditRss(url);
+      posts = rssItems;
+    } else {
+      const url = buildJsonUrl(keyword, subreddit);
+      const children = await fetchRedditJson(url);
+      posts = children
+        .map((child: any) => {
+          const d = child?.data;
+          if (!d?.id || !d?.title) return null;
+          return {
+            id: d.id,
+            title: d.title ?? "",
+            body: d.selftext ?? "",
+            author: d.author ?? "[deleted]",
+            link: `https://reddit.com${d.permalink}`,
+            subreddit: d.subreddit ?? (subreddit ?? ""),
+            postedAt: d.created_utc ? new Date(d.created_utc * 1000) : new Date(),
+          };
+        })
+        .filter(Boolean) as any[];
     }
-  }
 
-  for (const city of cities.slice(0, 3)) {
-    searches.push({ keyword: `house cleaner ${city}` });
-    searches.push({ keyword: `cleaning service ${city}` });
-    searches.push({ keyword: `maid service ${city}` });
-  }
+    for (const p of posts) {
+      if (!p.id || seen.has(p.id)) continue;
+      seen.add(p.id);
 
-  const batches = searches.slice(0, 8);
+      // Recency filter — only last 45 days
+      const ageMs = Date.now() - p.postedAt.getTime();
+      if (ageMs > 45 * 24 * 60 * 60 * 1000) continue;
 
-  for (let i = 0; i < batches.length; i++) {
-    if (i > 0) await sleep(300);
-    const { keyword, subreddit } = batches[i];
-    const url = buildSearchUrl(keyword, subreddit);
-    const posts = await fetchRedditSearch(url);
-
-    for (const child of posts) {
-      const post = child?.data;
-      if (!post?.id || !post?.title) continue;
-      if (seen.has(post.id)) continue;
-      seen.add(post.id);
-
-      const postedAt = post.created_utc ? new Date(post.created_utc * 1000) : new Date();
       results.push({
-        externalId: post.id,
-        subreddit: post.subreddit ?? "",
-        title: post.title ?? "",
-        body: post.selftext ?? "",
-        author: post.author ?? "[deleted]",
-        postUrl: `https://reddit.com${post.permalink}`,
-        permalink: post.permalink ?? "",
+        externalId: p.id,
+        subreddit: p.subreddit || subreddit || "",
+        title: p.title,
+        body: p.body,
+        author: p.author,
+        postUrl: p.link,
+        permalink: p.link,
         matchedKeyword: keyword,
-        postedAt,
-        metadata: {
-          score: post.score,
-          numComments: post.num_comments,
-          upvoteRatio: post.upvote_ratio,
-          flair: post.link_flair_text,
-        },
+        postedAt: p.postedAt,
+        metadata: { source: "reddit" },
       });
     }
+
+    if (results.length >= 60) break;
   }
 
   return results;
 }
+
+// ─── Mock / Demo Leads ────────────────────────────────────────────────────────
 
 export function getMockLeads(targetCities: string[] = []): RedditPost[] {
   const now = Date.now();
@@ -245,15 +517,15 @@ export function getMockLeads(targetCities: string[] = []): RedditPost[] {
     },
     {
       externalId: "mock_010",
-      subreddit: "cleaningtips",
-      title: "Inherited a house that hasn't been cleaned in years — hire a pro or DIY deep clean?",
-      body: "Just inherited a house from a relative. The place has not been properly cleaned in probably 3-4 years. Heavy grease in kitchen, mold in bathrooms, heavy dust everywhere. Should I hire a professional deep cleaning service first or is DIY feasible?",
-      author: "estate_cleanup_help",
-      postUrl: "https://reddit.com/r/cleaningtips/comments/mock011",
-      permalink: "/r/cleaningtips/comments/mock011",
-      matchedKeyword: "deep cleaning",
-      postedAt: h(18),
-      metadata: { score: 56, numComments: 47 },
+      subreddit: "ApartmentHacks",
+      title: "Worth splitting a cleaning service with my roommate? How do you handle the cost?",
+      body: "My roommate and I have a 2BR/2BA apartment. We're both really busy and the place gets gross. Is it worth hiring a maid service together? How do you coordinate? What's a reasonable monthly cost to budget?",
+      author: "apartment_roommates_help",
+      postUrl: "https://reddit.com/r/ApartmentHacks/comments/mock011",
+      permalink: "/r/ApartmentHacks/comments/mock011",
+      matchedKeyword: "maid service",
+      postedAt: h(4),
+      metadata: { score: 34, numComments: 29 },
     },
     {
       externalId: "mock_011",
@@ -279,66 +551,30 @@ export function getMockLeads(targetCities: string[] = []): RedditPost[] {
       postedAt: h(9),
       metadata: { score: 19, numComments: 15 },
     },
-    {
-      externalId: "mock_013",
-      subreddit: "femalelivingspace",
-      title: "Worth splitting a cleaning service with my roommate? How do you handle the cost?",
-      body: "My roommate and I have a 2BR/2BA apartment. We're both really busy and the place gets gross. Is it worth hiring a maid service together? How do you coordinate with a roommate for this? What's a reasonable monthly cost to budget?",
-      author: "apartment_roommates_help",
-      postUrl: "https://reddit.com/r/femalelivingspace/comments/mock014",
-      permalink: "/r/femalelivingspace/comments/mock014",
-      matchedKeyword: "maid service",
-      postedAt: h(4),
-      metadata: { score: 34, numComments: 29 },
-    },
-    {
-      externalId: "mock_014",
-      subreddit: "airbnb",
-      title: "How to automate Airbnb cleaning turnover scheduling? Need reliable system",
-      body: "Running 3 Airbnb units and turnover cleaning is my biggest headache. Have to manually coordinate cleaners every checkout. Is there a service that handles scheduling automatically? How do other hosts manage this?",
-      author: "airbnb_multi_host",
-      postUrl: "https://reddit.com/r/airbnb/comments/mock015",
-      permalink: "/r/airbnb/comments/mock015",
-      matchedKeyword: "cleaning service",
-      postedAt: h(7),
-      metadata: { score: 47, numComments: 41 },
-    },
-    {
-      externalId: "mock_015",
-      subreddit: "landlord",
-      title: "Post-renovation cleaning before new tenant — worth hiring professionals?",
-      body: "Just finished a kitchen and bathroom renovation. There's drywall dust, paint splatters, and construction debris throughout the 3BR house. New tenant moves in next week. Do I hire a professional post-construction cleaning crew or can I manage this myself?",
-      author: "landlord_renovator",
-      postUrl: "https://reddit.com/r/landlord/comments/mock016",
-      permalink: "/r/landlord/comments/mock016",
-      matchedKeyword: "cleaning service",
-      postedAt: h(26),
-      metadata: { score: 13, numComments: 10 },
-    },
   ];
 
   if (targetCities.length > 0) {
     const cityLeads: RedditPost[] = targetCities.slice(0, 3).flatMap((city, idx) => [
       {
         externalId: `mock_city_${idx}_a`,
-        subreddit: city.toLowerCase().replace(/\s+/g, ""),
+        subreddit: city.toLowerCase().replace(/[\s,]+/g, ""),
         title: `Recommendations for a reliable house cleaner in ${city}?`,
         body: `Looking for a trustworthy cleaning service in ${city} for biweekly service on our 3BR/2BA home. We have 1 dog and need someone reliable. Budget around $150-200 per visit. Any local recommendations from people who have used someone they love?`,
-        author: `${city.toLowerCase().replace(/\s+/g, "_")}_local`,
-        postUrl: `https://reddit.com/r/${city.toLowerCase().replace(/\s+/g, "")}/comments/mock_city_${idx}_a`,
-        permalink: `/r/${city.toLowerCase().replace(/\s+/g, "")}/comments/mock_city_${idx}_a`,
+        author: `${city.toLowerCase().replace(/[\s,]+/g, "_")}_local`,
+        postUrl: `https://reddit.com/r/${city.toLowerCase().replace(/[\s,]+/g, "")}/comments/mock_city_${idx}_a`,
+        permalink: `/r/${city.toLowerCase().replace(/[\s,]+/g, "")}/comments/mock_city_${idx}_a`,
         matchedKeyword: `house cleaner ${city}`,
         postedAt: new Date(now - (idx * 3 + 1) * 60 * 60 * 1000),
         metadata: { score: 8 + idx * 3, numComments: 6 + idx * 2 },
       },
       {
         externalId: `mock_city_${idx}_b`,
-        subreddit: city.toLowerCase().replace(/\s+/g, ""),
+        subreddit: city.toLowerCase().replace(/[\s,]+/g, ""),
         title: `Move-out cleaning in ${city} — anyone have a good service to recommend?`,
         body: `Moving out of my apartment in ${city} at end of the month. Need professional cleaning that will satisfy my landlord. 2BR/1BA, about 950 sq ft. Looking for quality service that provides a receipt for my landlord.`,
-        author: `renting_in_${city.toLowerCase().replace(/\s+/g, "")}_3`,
-        postUrl: `https://reddit.com/r/${city.toLowerCase().replace(/\s+/g, "")}/comments/mock_city_${idx}_b`,
-        permalink: `/r/${city.toLowerCase().replace(/\s+/g, "")}/comments/mock_city_${idx}_b`,
+        author: `renting_in_${city.toLowerCase().replace(/[\s,]+/g, "")}_3`,
+        postUrl: `https://reddit.com/r/${city.toLowerCase().replace(/[\s,]+/g, "")}/comments/mock_city_${idx}_b`,
+        permalink: `/r/${city.toLowerCase().replace(/[\s,]+/g, "")}/comments/mock_city_${idx}_b`,
         matchedKeyword: `cleaning service ${city}`,
         postedAt: new Date(now - (idx * 4 + 2) * 60 * 60 * 1000),
         metadata: { score: 5 + idx * 2, numComments: 4 + idx },

@@ -11361,8 +11361,12 @@ Rules:
         const subreddits = (settings?.subreddits as string[]) ?? [];
 
         let posts = await fetchRedditLeads({ keywords, subreddits, targetCities });
-        const usedLive = posts.length > 0;
-        if (!posts.length) posts = getMockLeads(targetCities);
+        const fetchedCount = posts.length;
+        const usedLive = fetchedCount > 0;
+
+        if (!posts.length) {
+          posts = getMockLeads(targetCities);
+        }
 
         const dayBucket = new Date().toISOString().slice(0, 10).replace(/-/g, "");
         posts = posts.map((p) => ({
@@ -11373,6 +11377,7 @@ Rules:
         let stored = 0;
         let skipped = 0;
         let rejected = 0;
+        const sourceBreakdown: Record<string, number> = {};
 
         for (const post of posts) {
           const classification = await classifyLead(post.title, post.body, post.subreddit);
@@ -11381,10 +11386,11 @@ Rules:
             continue;
           }
           const { score } = scoreLead(classification, post.postedAt);
+          const source = (post.metadata?.source as string) || "reddit";
           const { created } = await createLeadIfNotExists({
             userId: req.session.userId!,
             businessId: business.id,
-            source: "reddit",
+            source,
             externalId: post.externalId,
             subreddit: post.subreddit,
             title: post.title,
@@ -11400,19 +11406,26 @@ Rules:
             aiReason: classification.reason,
             leadScore: score,
             postedAt: post.postedAt,
-            metadata: post.metadata,
+            metadata: { ...post.metadata, urgency: classification.urgency },
           });
-          if (created) stored++;
-          else skipped++;
+          if (created) {
+            stored++;
+            sourceBreakdown[source] = (sourceBreakdown[source] ?? 0) + 1;
+          } else {
+            skipped++;
+          }
         }
 
         return res.json({
           ok: true,
           processed: posts.length,
+          fetched: fetchedCount,
           stored,
           skipped,
           rejected,
           usedLive,
+          sourceBreakdown,
+          hasCityTargeting: targetCities.length > 0,
         });
       } catch (e: any) {
         console.error("[lead-finder poll]", e);
