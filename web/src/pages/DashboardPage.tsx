@@ -100,13 +100,13 @@ function DynamicHero(p: HeroProps) {
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-3">
             <LayoutDashboard className="w-4 h-4 text-primary-200" />
-            <span className="text-xs font-bold uppercase tracking-wider text-primary-200">Getting Started</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-primary-200">Get Started</span>
           </div>
           <h2 className="text-2xl font-extrabold tracking-tight leading-tight mb-1">
             Your first $1,000 starts with one quote.
           </h2>
           <p className="text-sm text-primary-100 mb-5 max-w-md">
-            QuotePro turns your cleaning rates into professional quotes in under 2 minutes. Create your first one and start building a real pipeline.
+            QuotePro turns your cleaning rates into professional cleaning quotes in under 2 minutes. Create your first one and start building a real pipeline.
           </p>
           <div className="flex flex-wrap gap-3">
             <button
@@ -114,13 +114,13 @@ function DynamicHero(p: HeroProps) {
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-primary-700 font-bold text-sm shadow-lg hover:bg-primary-50 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Create First Quote
+              Create Your First Cleaning Quote
             </button>
             <button
               onClick={() => navigate("/settings?tab=pricing")}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-700/60 text-white font-semibold text-sm border border-primary-500 hover:bg-primary-700 transition-colors"
             >
-              Configure Pricing
+              Set Your Cleaning Rates
             </button>
           </div>
         </div>
@@ -146,10 +146,10 @@ function DynamicHero(p: HeroProps) {
           <span className="text-sm text-slate-500">at risk</span>
         </div>
         <p className="text-sm text-slate-600 mt-2">
-          {followUpQueueCount} {followUpQueueCount === 1 ? "quote" : "quotes"} slipping &middot; Oldest: {oldestQuoteDays} {oldestQuoteDays === 1 ? "day" : "days"}
+          {followUpQueueCount} sent {followUpQueueCount === 1 ? "quote" : "quotes"} awaiting a response &middot; Oldest: {oldestQuoteDays} {oldestQuoteDays === 1 ? "day" : "days"} out
         </p>
         <p className="text-xs text-slate-500 mt-1 italic">
-          Quotes sitting longer than 3 days are 40% less likely to close. If your close rate stays at {Math.round(closeRate || 45)}%, you're likely losing ~${estimatedLoss.toLocaleString()}.
+          Cleaning quotes older than 3 days close 40% less often. At your current close rate of {Math.round(closeRate || 45)}%, you're likely losing ~${estimatedLoss.toLocaleString()}.
         </p>
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1">
@@ -183,8 +183,8 @@ function DynamicHero(p: HeroProps) {
   const nextAction = closeRate < 40
     ? { label: "Low close rate", tip: "Follow up faster to close more. Most cleaning businesses win 40–60% of sent quotes.", cta: "Review Quotes", path: "/quotes" }
     : quotes.filter((q: any) => q.status === "draft").length > 0
-    ? { label: "Drafts waiting", tip: `You have ${quotes.filter((q: any) => q.status === "draft").length} draft quote(s) ready to send. Don't leave money in draft mode.`, cta: "Send Drafts", path: "/quotes" }
-    : { label: "Keep it going", tip: "Recurring customers increase lifetime value. Use AI to position a recurring cleaning plan on your next call.", cta: "New Quote", path: "/quotes/new" };
+    ? { label: "Drafts waiting", tip: `You have ${quotes.filter((q: any) => q.status === "draft").length} draft cleaning quote${quotes.filter((q: any) => q.status === "draft").length > 1 ? "s" : ""} ready to send. Unsent quotes don't close.`, cta: "Send Drafts", path: "/quotes" }
+    : { label: "Keep it going", tip: "Recurring clients drive predictable revenue. Use AI to pitch a recurring cleaning plan on your next job.", cta: "New Cleaning Quote", path: "/quotes/new" };
 
   return (
     <div className="rounded-2xl p-5 lg:p-6 mb-6 bg-emerald-50/60 dark:bg-emerald-900/20 border border-emerald-200/50 dark:border-emerald-700/50">
@@ -194,7 +194,7 @@ function DynamicHero(p: HeroProps) {
             <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">{hasActivity ? "Pipeline healthy — no revenue at risk." : "All caught up."}</p>
+            <p className="font-bold text-slate-900 dark:text-slate-100">{hasActivity ? "Quote pipeline is clean — no revenue at risk." : "All caught up."}</p>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{nextAction.tip}</p>
           </div>
         </div>
@@ -231,8 +231,8 @@ function StartHereChecklist({ hasPricing, hasQuotes, hasCustomers, hasFollowUpAc
     {
       id: "pricing",
       done: hasPricing,
-      label: "Configure your pricing",
-      description: "Set your cleaning rates so QuotePro can generate accurate quotes instantly.",
+      label: "Set your cleaning rates",
+      description: "Your rates drive every quote. Set them once and QuotePro handles the math.",
       cta: "Set Up Pricing",
       path: "/settings?tab=pricing",
       icon: DollarSign,
@@ -240,8 +240,8 @@ function StartHereChecklist({ hasPricing, hasQuotes, hasCustomers, hasFollowUpAc
     {
       id: "quote",
       done: hasQuotes,
-      label: "Create your first quote",
-      description: "Send a professional quote in under 2 minutes. It builds your pipeline immediately.",
+      label: "Create your first cleaning quote",
+      description: "Send a professional cleaning quote in under 2 minutes and start building your pipeline.",
       cta: "Create Quote",
       path: "/quotes/new",
       icon: FileText,
@@ -249,9 +249,9 @@ function StartHereChecklist({ hasPricing, hasQuotes, hasCustomers, hasFollowUpAc
     {
       id: "customer",
       done: hasCustomers,
-      label: "Add your first customer",
-      description: "Build your customer list so you can track jobs, quotes, and reviews in one place.",
-      cta: "Add Customer",
+      label: "Add your first cleaning client",
+      description: "Build your client list to track cleans, quotes, and reviews in one place.",
+      cta: "Add Client",
       path: "/customers/new",
       icon: Users,
     },
@@ -278,7 +278,7 @@ function StartHereChecklist({ hasPricing, hasQuotes, hasCustomers, hasFollowUpAc
             <Target className="w-4 h-4 text-primary-600 dark:text-primary-400" />
           </div>
           <div>
-            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm">Start Here — Build Your Revenue Engine</h2>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm">Set Up Your Cleaning Business</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{completedCount} of {steps.length} steps complete</p>
           </div>
         </div>
@@ -347,7 +347,7 @@ function TodaysRevenueMoves({ actions, navigate }: RevenueMovesProps) {
       <div className="flex items-center gap-2 mb-3">
         <Zap className="w-4 h-4 text-amber-500" />
         <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Today's Revenue Moves</h2>
-        <span className="text-xs text-slate-400 dark:text-slate-500">— act on these to grow faster</span>
+        <span className="text-xs text-slate-400 dark:text-slate-500">— your highest-impact actions right now</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {actions.map((action, i) => (
@@ -380,11 +380,11 @@ function TodaysRevenueMoves({ actions, navigate }: RevenueMovesProps) {
 
 function AIGrowthTools({ navigate }: { navigate: (path: string) => void }) {
   const tools = [
-    { icon: MessageSquare, label: "Handle objections", description: "Turn price pushback into closed deals.", prompt: "help me handle objections" },
-    { icon: Send, label: "Draft follow-up", description: "Write a winning follow-up message in seconds.", prompt: "draft a follow-up message" },
-    { icon: FileEdit, label: "Notes into quote", description: "Paste your walk-through notes, get a quote.", prompt: "turn my notes into a quote" },
-    { icon: Repeat, label: "Recurring upsell", description: "Generate a script to pitch recurring plans.", prompt: "recurring upsell script" },
-    { icon: RefreshCw, label: "Re-engage lost lead", description: "Bring back a lead that went quiet.", prompt: "re-engage lost lead" },
+    { icon: MessageSquare, label: "Handle objections", description: "Turn pricing pushback into closed cleaning jobs.", prompt: "help me handle objections" },
+    { icon: Send, label: "Draft follow-up", description: "Write a sharp follow-up message in seconds.", prompt: "draft a follow-up message" },
+    { icon: FileEdit, label: "Walk-through to quote", description: "Paste your site-visit notes, get a cleaning quote.", prompt: "turn my notes into a quote" },
+    { icon: Repeat, label: "Pitch a recurring plan", description: "Generate a script to upsell recurring cleans.", prompt: "recurring upsell script" },
+    { icon: RefreshCw, label: "Re-engage a lost client", description: "Bring back a prospect that went quiet.", prompt: "re-engage lost lead" },
   ];
 
   return (
@@ -452,8 +452,8 @@ function RevenueChart({ quotes }: { quotes: any[] }) {
       {!hasAnyRevenue ? (
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <TrendingUp className="w-8 h-8 text-slate-200 mb-2" />
-          <p className="text-sm font-semibold text-slate-500">No revenue won yet</p>
-          <p className="text-xs text-slate-400 mt-1">Send quotes and follow up — this chart fills as deals close.</p>
+          <p className="text-sm font-semibold text-slate-500">No accepted quotes yet</p>
+          <p className="text-xs text-slate-400 mt-1">Send quotes, follow up, and your accepted revenue builds here.</p>
         </div>
       ) : (
         <div className="flex items-end gap-2 h-40">
@@ -594,7 +594,7 @@ export default function DashboardPage() {
         iconColor: "text-primary-600",
         tag: "High Impact",
         tagColor: "text-primary-600",
-        title: "Create your first quote",
+        title: "Create your first cleaning quote",
         description: "One quote sets everything in motion. It takes under 2 minutes.",
         cta: "Create Quote",
         path: "/quotes/new",
@@ -636,8 +636,8 @@ export default function DashboardPage() {
         iconColor: "text-red-500",
         tag: "Coaching Tip",
         tagColor: "text-red-500",
-        title: "Close rate below target",
-        description: `At ${Math.round(closeRate)}%, you're leaving deals behind. Use AI to handle objections and craft better follow-ups.`,
+        title: "Quote close rate needs attention",
+        description: `At ${Math.round(closeRate)}%, you're leaving cleans on the table. Use AI to handle pricing objections and write sharper follow-ups.`,
         cta: "Use AI Assist",
         path: "/ai-assistant",
       });
@@ -664,8 +664,8 @@ export default function DashboardPage() {
         iconColor: "text-amber-500",
         tag: "Reputation",
         tagColor: "text-amber-600",
-        title: "Ask for your first review",
-        description: "Reviews build trust and win more jobs. One great review can pay for itself 10x.",
+        title: "Request your first client review",
+        description: "Reviews build trust and win more cleans. One great review can pay for itself 10x.",
         cta: "Get Reviews",
         path: "/reviews",
       });
@@ -678,8 +678,8 @@ export default function DashboardPage() {
         iconColor: "text-emerald-600",
         tag: "AI Tool",
         tagColor: "text-emerald-600",
-        title: "Turn notes into a quote",
-        description: "Paste your walk-through notes and AI builds a quote in seconds.",
+        title: "Turn walk-through notes into a quote",
+        description: "Paste your site-visit notes and AI builds a cleaning quote in seconds.",
         cta: "Try AI Assist",
         path: "/ai-assistant",
       });
@@ -690,13 +690,13 @@ export default function DashboardPage() {
 
   // ── Stat card subtitle helpers ─────────────────────────────────────────────
   const quoteSubtitle = quotes.length === 0
-    ? "Send your first quote to build pipeline"
+    ? "Create your first cleaning quote to build a pipeline"
     : `${draftQuotes.length} draft · ${sentQuotes.length} sent`;
   const customerSubtitle = customers.length === 0
-    ? "Add your first customer to get started"
+    ? "Add your first cleaning client to get started"
     : undefined;
   const revenueSubtitle = totalRevenue === 0
-    ? "Accepted quotes count toward revenue"
+    ? "Accepted cleaning quotes count toward revenue"
     : undefined;
 
   return (
@@ -725,7 +725,7 @@ export default function DashboardPage() {
               Free Trial — {freeTrialDaysLeft} day{freeTrialDaysLeft !== 1 ? "s" : ""} remaining
             </p>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-              Upgrade now to keep unlimited quoting, AI tools, and automated follow-ups.
+              Upgrade to keep unlimited cleaning quotes, AI tools, and automated follow-ups.
             </p>
           </div>
           <ChevronRight className="w-4 h-4 text-blue-400 shrink-0" />
@@ -764,21 +764,21 @@ export default function DashboardPage() {
       {/* 4. Core KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
-          label="Total Quotes"
+          label="Cleaning Quotes"
           value={quotes.length === 0 ? "0" : quotes.length}
           icon={FileText}
           color="primary"
           subtitle={quoteSubtitle}
         />
         <StatCard
-          label="Customers"
+          label="Clients"
           value={customers.length === 0 ? "0" : customers.length}
           icon={Users}
           color="violet"
           subtitle={customerSubtitle}
         />
         <StatCard
-          label="Active Jobs"
+          label="Scheduled Cleans"
           value={activeJobs.length}
           icon={Briefcase}
           color="amber"
@@ -796,11 +796,11 @@ export default function DashboardPage() {
       {/* 5. Sales Momentum / Close Rate / Today at a Glance */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <Card>
-          <CardHeader title="Sales Momentum" icon={TrendingUp} />
+          <CardHeader title="Quote Pipeline" icon={TrendingUp} />
           {quotes.length === 0 ? (
             <div className="py-4 text-center">
-              <p className="text-sm font-semibold text-slate-500">No quote activity yet</p>
-              <p className="text-xs text-slate-400 mt-1">Send quotes and track your funnel here.</p>
+              <p className="text-sm font-semibold text-slate-500">No quotes sent yet</p>
+              <p className="text-xs text-slate-400 mt-1">Send cleaning quotes and track your conversion funnel here.</p>
               <Button size="sm" icon={Plus} onClick={() => navigate("/quotes/new")} className="mt-3 mx-auto">
                 Create Quote
               </Button>
@@ -831,7 +831,7 @@ export default function DashboardPage() {
           {quotes.length === 0 ? (
             <div className="py-4 text-center">
               <p className="text-sm font-semibold text-slate-500">No quote activity yet</p>
-              <p className="text-xs text-slate-400 mt-1">Send quotes and follow up to start tracking close rate. Top cleaners close 40–60%.</p>
+              <p className="text-xs text-slate-400 mt-1">Send quotes and follow up to start tracking your close rate. Top cleaning companies close 40–60%.</p>
             </div>
           ) : (
             <div className="flex items-center gap-4">
@@ -986,7 +986,7 @@ export default function DashboardPage() {
           {quotes.length === 0 ? (
             <div className="py-4 text-center">
               <p className="text-sm font-semibold text-slate-500">No activity this week yet</p>
-              <p className="text-xs text-slate-400 mt-1">You're one quote away from building momentum. Consistent activity is what separates busy cleaners from growing businesses.</p>
+              <p className="text-xs text-slate-400 mt-1">The most successful cleaning businesses quote consistently, every week. One quote starts the momentum.</p>
               <Button size="sm" icon={Plus} onClick={() => navigate("/quotes/new")} className="mt-3 mx-auto">
                 Start This Week Right
               </Button>
@@ -994,7 +994,7 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600 dark:text-slate-300">Quotes created</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">Cleaning quotes sent</span>
                 <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   {quotes.filter((q: any) => {
                     const d = new Date(q.createdAt);
@@ -1048,7 +1048,7 @@ export default function DashboardPage() {
       {/* 8. Revenue Chart */}
       <Card className="mb-6">
         <CardHeader
-          title="Revenue Chart"
+          title="Accepted Revenue"
           icon={BarChart3}
           actions={<span className="text-xs text-slate-400">Last 6 months</span>}
         />
@@ -1070,12 +1070,12 @@ export default function DashboardPage() {
         {recentQuotes.length === 0 ? (
           <div className="px-6 py-10 text-center">
             <FileText className="w-8 h-8 text-slate-200 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-slate-500">No quotes sent yet</p>
+            <p className="text-sm font-semibold text-slate-500">No cleaning quotes sent yet</p>
             <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-              The fastest way to revenue is sending your first quote. It takes under 2 minutes.
+              The fastest path to revenue is sending your first cleaning quote. It takes under 2 minutes.
             </p>
             <Button icon={Plus} onClick={() => navigate("/quotes/new")} className="mt-4 mx-auto">
-              Create Your First Quote
+              Create Your First Cleaning Quote
             </Button>
           </div>
         ) : (
