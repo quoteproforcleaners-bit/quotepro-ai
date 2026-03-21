@@ -421,7 +421,7 @@ export default function IntakeRequestsPage() {
       setSendLinkName("");
       setTimeout(() => { setLinkSent(false); setSendLinkOpen(false); }, 2500);
     } catch (e: any) {
-      setSendErr("Failed to send. Check your SendGrid configuration.");
+      setSendErr(e?.message || "Email could not be delivered. Please try again or contact support.");
     } finally {
       setSendingLink(false);
     }

@@ -265,7 +265,6 @@ export default function SettingsPage() {
     address: "",
     sendgridApiKey: "" as string | null,
   });
-  const [showSgKey, setShowSgKey] = useState(false);
 
   const [brandingForm, setBrandingForm] = useState({
     senderName: "",
@@ -586,67 +585,27 @@ export default function SettingsPage() {
                 />
               </div>
 
-              {/* Email Delivery section */}
+              {/* Email sending info */}
               <div className="rounded-xl border border-slate-200 overflow-hidden">
                 <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
-                  <p className="font-semibold text-slate-800 text-sm">Email Delivery</p>
-                  <p className="text-slate-500 text-xs mt-0.5">Control who customers see as the sender of your quotes and messages</p>
+                  <p className="font-semibold text-slate-800 text-sm">How Your Emails Are Sent</p>
                 </div>
-                <div className="p-4 space-y-4">
-                  {/* Status callout */}
-                  {businessForm.sendgridApiKey ? (
-                    <div className="rounded-lg px-4 py-3 text-sm flex items-start gap-3" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                      <span className="text-green-500 mt-0.5">✓</span>
-                      <div>
-                        <p className="font-semibold text-green-800">Sending from your email</p>
-                        <p className="text-green-700 mt-0.5">Customers will see <strong>{businessForm.email || "your business email"}</strong> as the sender. Make sure that address is verified in your SendGrid account.</p>
-                        <a href="https://app.sendgrid.com/settings/sender_auth" target="_blank" rel="noopener noreferrer" className="text-green-700 underline font-medium text-xs mt-1 inline-block">
-                          Manage SendGrid sender verification →
-                        </a>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg px-4 py-3 text-sm" style={{ background: "#eff6ff", border: "1px solid #bfdbfe" }}>
-                      <p className="font-semibold text-blue-800">Currently sending from QuotePro's address</p>
-                      <p className="text-blue-700 mt-1 leading-relaxed">
-                        Emails send from <strong>quotes@getquotepro.ai</strong> with your company name. Customer replies are automatically forwarded to <strong>{businessForm.email || "your business email"}</strong>.
-                      </p>
-                      <p className="text-blue-700 mt-2 font-medium">To send from your own email address, add your SendGrid API key below.</p>
-                    </div>
-                  )}
-
-                  {/* API key input */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Your SendGrid API Key <span className="font-normal text-slate-400">(optional)</span></label>
-                    <div className="flex gap-2">
-                      <input
-                        type={showSgKey ? "text" : "password"}
-                        value={businessForm.sendgridApiKey || ""}
-                        onChange={(e) => setBusinessForm((p) => ({ ...p, sendgridApiKey: e.target.value || null }))}
-                        placeholder="SG.xxxxxxxxxxxxxxxxxxxx"
-                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg font-mono bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSgKey((v) => !v)}
-                        className="px-3 py-2 text-xs text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50"
-                      >
-                        {showSgKey ? "Hide" : "Show"}
-                      </button>
-                      {businessForm.sendgridApiKey && (
-                        <button
-                          type="button"
-                          onClick={() => setBusinessForm((p) => ({ ...p, sendgridApiKey: null }))}
-                          className="px-3 py-2 text-xs text-red-600 border border-red-100 rounded-lg hover:bg-red-50"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1.5">
-                      Create a SendGrid account at <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" className="underline">sendgrid.com</a>, then go to <strong>Settings → API Keys → Create API Key</strong> (Full Access or Mail Send permission). Your business email must be verified as a sender in that account.
-                    </p>
-                  </div>
+                <div className="p-4 space-y-3 text-sm text-slate-600 leading-relaxed">
+                  <p>
+                    When you send quotes, confirmations, or follow-ups, customers see your company name as the sender —
+                    <strong className="text-slate-800"> {businessForm.companyName || "your company name"}</strong>.
+                  </p>
+                  <p>
+                    Customer replies go directly to your business email:
+                    {businessForm.email ? (
+                      <strong className="text-slate-800"> {businessForm.email}</strong>
+                    ) : (
+                      <span className="text-amber-600 font-medium"> (add your email above so customers can reply to you)</span>
+                    )}
+                  </p>
+                  <p className="text-slate-400 text-xs">
+                    No extra setup needed — just keep your business name and email up to date above.
+                  </p>
                 </div>
               </div>
               <Input

@@ -193,18 +193,8 @@ export default function SendQuoteModal({ quoteId, quote, business, onClose, onSe
         ) : (
           <div className="px-6 py-5 space-y-5">
             {error ? (
-              <div className="rounded-xl bg-red-500/15 border border-red-500/30 px-4 py-3 text-sm text-red-300 space-y-2">
+              <div className="rounded-xl bg-red-500/15 border border-red-500/30 px-4 py-3 text-sm text-red-300">
                 <p>{error}</p>
-                {(error.toLowerCase().includes("not verified") || error.toLowerCase().includes("sender identity") || error.toLowerCase().includes("sendgrid")) ? (
-                  <a
-                    href="https://app.sendgrid.com/settings/sender_auth"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block text-red-200 underline font-medium"
-                  >
-                    Open SendGrid Sender Authentication →
-                  </a>
-                ) : null}
               </div>
             ) : null}
 

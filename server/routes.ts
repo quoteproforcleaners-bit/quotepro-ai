@@ -17,18 +17,24 @@ import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage
 import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "./calculator-engine";
 import { JobberClient, buildJobberAuthUrl, exchangeJobberCode, logJobberSync, syncQuoteToJobber } from "./jobber-client";
 
-const PLATFORM_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+// The single platform sending address used for all outbound tenant emails.
+// Tenants appear as the sender name; their business email is set as reply-to.
+const PLATFORM_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || "quote@getquotepro.ai";
 const PLATFORM_FROM_NAME = "QuotePro";
 
 /**
- * Returns the SendGrid API key and from-address to use for a given business.
+ * Returns the SendGrid API key, from-address, display name, and reply-to to
+ * use when sending an email on behalf of a business tenant.
  *
- * Multi-tenant logic:
- *  - If the business has supplied their own SendGrid API key, use it and send
- *    FROM their verified business email address (customer sees their email).
- *  - Otherwise, fall back to the platform API key and send FROM the platform
- *    address, with reply_to set to the business email so customers can still
- *    reply directly to the business owner.
+ * Default (all tenants):
+ *   from:     quote@getquotepro.ai
+ *   name:     <Tenant company name>
+ *   reply-to: <Tenant business email>
+ *
+ * Advanced (tenant supplies their own SendGrid key — future feature):
+ *   from:     <Tenant's verified email>
+ *   name:     <Tenant company name>
+ *   reply-to: (not needed — FROM is already theirs)
  */
 function getBusinessEmailSender(business: any): {
   apiKey: string;
@@ -37,22 +43,25 @@ function getBusinessEmailSender(business: any): {
   replyTo: string | null;
 } {
   const businessEmail = business?.email || "";
+  const companyName = business?.companyName || PLATFORM_FROM_NAME;
   const ownKey = business?.sendgridApiKey as string | null | undefined;
 
   if (ownKey) {
+    // Tenant has connected their own SendGrid account — send from their address
     return {
       apiKey: ownKey,
       fromEmail: businessEmail || PLATFORM_FROM_EMAIL,
-      fromName: business?.companyName || PLATFORM_FROM_NAME,
-      replyTo: null, // FROM IS already the business — no need to set reply_to
+      fromName: companyName,
+      replyTo: null,
     };
   }
 
+  // Default: send from platform address; replies route to tenant's business email
   return {
     apiKey: process.env.SENDGRID_API_KEY || "",
     fromEmail: PLATFORM_FROM_EMAIL,
-    fromName: business?.companyName ? `${business.companyName} via QuotePro` : PLATFORM_FROM_NAME,
-    replyTo: businessEmail || null, // Customer replies go to the business owner
+    fromName: companyName,
+    replyTo: businessEmail || null,
   };
 }
 
@@ -61,24 +70,35 @@ function getBusinessFromEmail(business: any): string {
   return getBusinessEmailSender(business).fromEmail;
 }
 
+/**
+ * Converts a raw SendGrid API error into a clean, tenant-friendly message.
+ * Infrastructure details (sender verification, API keys, etc.) are logged
+ * server-side but never exposed to the tenant.
+ */
 function parseSendGridError(errText: string, fromEmail: string): string {
+  // Log the raw error internally so the platform owner can diagnose it
+  console.error("[email] SendGrid raw error | from:", fromEmail, "| body:", errText);
   try {
     const errJson = JSON.parse(errText);
     if (errJson.errors && errJson.errors.length > 0) {
       const msgs: string[] = errJson.errors.map((e: any) => e.message as string);
-      const isVerificationError = msgs.some(
+      const isInfraError = msgs.some(
         (m) =>
           m.toLowerCase().includes("verified sender") ||
           m.toLowerCase().includes("sender identity") ||
-          m.toLowerCase().includes("does not match")
+          m.toLowerCase().includes("does not match") ||
+          m.toLowerCase().includes("api key") ||
+          m.toLowerCase().includes("authorization")
       );
-      if (isVerificationError) {
-        return `Your email address (${fromEmail}) is not verified as a sender in SendGrid. To fix this: log in to SendGrid → Settings → Sender Authentication → Single Sender Verification → add and verify ${fromEmail}. Once verified, emails will send instantly from your address.`;
+      if (isInfraError) {
+        // Platform configuration issue — don't expose internal details to tenant
+        return "Email delivery failed. Our team has been notified. Please try again shortly.";
       }
+      // Non-infrastructure errors (e.g. invalid recipient) can be shown
       return msgs.join("; ");
     }
   } catch {}
-  return "Failed to send email. Please check your SendGrid configuration.";
+  return "Email could not be delivered. Please try again or contact support.";
 }
 
 let stripe: Stripe | null = null;
@@ -1940,7 +1960,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         } else {
           const sgApiKey = process.env.SENDGRID_API_KEY;
           if (!sgApiKey) {
-            results.email = { success: false, message: "Email service not configured" };
+            results.email = { success: false, message: "Email delivery is not available. Please contact support." };
           } else {
             const subject = `Your ${serviceLabel} is confirmed for ${dateStr}`;
             const plainBody = [
@@ -3419,7 +3439,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
 
       const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
       if (!sgApiKey) {
-        return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings or add your own SendGrid API key in Settings." });
+        return res.status(503).json({ message: "Email delivery is not available. Please contact support." });
       }
 
       const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
@@ -3734,7 +3754,7 @@ The email should:
 
       const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
       if (!sgApiKey) {
-        return res.status(503).json({ message: "Email service not configured. Add your SendGrid API key in Settings to send from your email." });
+        return res.status(503).json({ message: "Email delivery is not available. Please contact support." });
       }
 
       const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
@@ -3938,7 +3958,7 @@ The email should:
 
     if (channel === "email") {
       const { apiKey: sgApiKey, fromEmail, fromName, replyTo } = getBusinessEmailSender(business);
-      if (!sgApiKey) return { success: false, message: "Email service not configured. Add your SendGrid API key in Settings." };
+      if (!sgApiKey) return { success: false, message: "Email delivery is not available. Please contact support." };
       const toEmail = customer?.email;
       if (!toEmail) return { success: false, message: "Customer email not found" };
       const quoteUrl = `${process.env.APP_URL || `https://${req.get("host")}`}/q/${quote.publicToken}`;
@@ -4775,7 +4795,7 @@ ${contextStr}`;
 
       const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
       if (!sgApiKey) {
-        return res.status(503).json({ message: "Email service not configured. Add your SendGrid API key in Settings to send from your email." });
+        return res.status(503).json({ message: "Email delivery is not available. Please contact support." });
       }
 
       let bodyContent = body;
@@ -7276,7 +7296,7 @@ Respond with JSON: {"reply": string}`
 
       if (isEmail) {
         const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
-        if (!sgApiKey) return res.status(503).json({ message: "Email service not configured. Add your SendGrid API key in Settings." });
+        if (!sgApiKey) return res.status(503).json({ message: "Email delivery is not available. Please contact support." });
 
         for (const customer of targetCustomers) {
           const email = customer.email;
@@ -11086,7 +11106,7 @@ Rules:
 </html>`;
 
       const { apiKey: sgApiKey, fromEmail, fromName: senderFromName, replyTo: intakeReplyTo } = getBusinessEmailSender(business);
-      if (!sgApiKey) return res.status(500).json({ message: "Email not configured. Add your SendGrid API key in Settings." });
+      if (!sgApiKey) return res.status(500).json({ message: "Email delivery is not available. Please contact support." });
 
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
@@ -12053,14 +12073,12 @@ Rules:
       }
 
       const step = seq.steps[stepIndex];
-      const sgApiKey = process.env.SENDGRID_API_KEY;
-      if (!sgApiKey) return res.status(500).json({ message: "Email not configured" });
 
       const bookingLink = business.bookingLink || "";
       const senderName = business.senderName || business.companyName || "Your Cleaning Team";
       const businessName = business.companyName || "Your Cleaning Company";
-      const senderEmail = business.contactEmail || "";
-      if (!senderEmail) return res.status(400).json({ message: "Business contact email not set" });
+      const { apiKey: seqSgKey, fromEmail: seqFromEmail, fromName: seqFromName, replyTo: seqReplyTo } = getBusinessEmailSender(business);
+      if (!seqSgKey) return res.status(503).json({ message: "Email delivery is not configured. Please contact support." });
 
       const replacePlaceholders = (text: string) =>
         text
@@ -12075,7 +12093,8 @@ Rules:
 
       const seqEmailPayload: any = {
         personalizations: [{ to: [{ email: enrollment.customerEmail, name: enrollment.customerName }] }],
-        from: { email: senderEmail, name: senderName },
+        from: { email: seqFromEmail, name: seqFromName },
+        ...(seqReplyTo ? { reply_to: { email: seqReplyTo, name: seqFromName } } : {}),
         subject,
         content: [{ type: "text/plain", value: bodyText }, { type: "text/html", value: htmlBody }],
       };
@@ -12110,7 +12129,7 @@ Rules:
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${sgApiKey}`,
+          Authorization: `Bearer ${seqSgKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(seqEmailPayload),
@@ -12119,7 +12138,7 @@ Rules:
       if (!sgRes.ok) {
         const errText = await sgRes.text();
         console.error("SendGrid sequence error:", sgRes.status, errText);
-        return res.status(502).json({ message: "Failed to send email" });
+        return res.status(502).json({ message: "Email could not be delivered. Please try again or contact support." });
       }
 
       const completedSteps = Array.isArray(enrollment.stepsCompleted) ? enrollment.stepsCompleted : [];
