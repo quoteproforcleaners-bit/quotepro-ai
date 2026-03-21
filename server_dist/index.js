@@ -14791,12 +14791,14 @@ ${business.companyName}`;
       const bodyText = customMessage?.trim() || defaultMessage;
       const sgApiKey = process.env.SENDGRID_API_KEY;
       if (!sgApiKey) return res.status(500).json({ message: "Email not configured" });
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           personalizations: [{ to: [{ email: toEmail.trim(), name: toName || "" }] }],
-          from: { email: business.email || "noreply@quotepro.app", name: business.companyName },
+          from: { email: fromEmail, name: business.companyName },
+          reply_to: business.email ? { email: business.email, name: business.companyName } : void 0,
           subject: `${business.companyName} \u2014 Your personalized quote`,
           content: [{ type: "text/plain", value: bodyText }]
         })
