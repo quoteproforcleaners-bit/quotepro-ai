@@ -72,11 +72,7 @@ export default function QuoteDetailPage() {
   const [depositRequired, setDepositRequired] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
-  const [syncingJobber, setSyncingJobber] = useState(false);
   const [syncingQbo, setSyncingQbo] = useState(false);
-  const [addressModalOpen, setAddressModalOpen] = useState(false);
-  const [addressInput, setAddressInput] = useState("");
-  const [savingAddress, setSavingAddress] = useState(false);
   const [expandedRec, setExpandedRec] = useState<number | null>(null);
   const [msgChannel, setMsgChannel] = useState<MessageChannel>("sms");
   const [msgPurpose, setMsgPurpose] = useState<MessagePurpose>("follow_up");
@@ -290,42 +286,6 @@ export default function QuoteDetailPage() {
     } catch {}
   };
 
-  const doJobberSync = async () => {
-    setSyncingJobber(true);
-    try {
-      const result: any = await apiPost(`/api/integrations/jobber/sync-quote/${id}`, { force: true });
-      alert(result?.message || "Successfully synced to Jobber.");
-    } catch (e: any) {
-      alert(e?.message || "Failed to sync to Jobber");
-    } finally {
-      setSyncingJobber(false);
-    }
-  };
-
-  const syncJobber = () => {
-    if (!quote?.address?.trim()) {
-      setAddressInput("");
-      setAddressModalOpen(true);
-      return;
-    }
-    doJobberSync();
-  };
-
-  const saveAddressAndSync = async () => {
-    if (!addressInput.trim()) return;
-    setSavingAddress(true);
-    try {
-      if (quote?.customerId) {
-        await apiPut(`/api/customers/${quote.customerId}`, { address: addressInput.trim() });
-      }
-      setAddressModalOpen(false);
-      await doJobberSync();
-    } catch (e: any) {
-      alert(e?.message || "Failed to save address");
-    } finally {
-      setSavingAddress(false);
-    }
-  };
 
   const syncQbo = async () => {
     setSyncingQbo(true);
@@ -1254,16 +1214,6 @@ export default function QuoteDetailPage() {
               <Button
                 variant="secondary"
                 icon={RefreshCw}
-                onClick={syncJobber}
-                disabled={syncingJobber}
-                className="w-full justify-start"
-                size="sm"
-              >
-                {syncingJobber ? "Syncing..." : "Sync to Jobber"}
-              </Button>
-              <Button
-                variant="secondary"
-                icon={RefreshCw}
                 onClick={syncQbo}
                 disabled={syncingQbo}
                 className="w-full justify-start"
@@ -1326,52 +1276,6 @@ export default function QuoteDetailPage() {
         />
       ) : null}
 
-      <Modal
-        open={addressModalOpen}
-        onClose={() => setAddressModalOpen(false)}
-        title="Service Address Required"
-        size="sm"
-        actions={
-          <div className="flex gap-3 justify-end">
-            <Button variant="ghost" onClick={() => setAddressModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={saveAddressAndSync}
-              disabled={!addressInput.trim() || savingAddress}
-              loading={savingAddress}
-            >
-              Save & Sync to Jobber
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            Jobber needs a service address to create the job. Enter the address
-            for this customer and it will be saved before syncing.
-          </p>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Service Address
-            </label>
-            <input
-              type="text"
-              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="123 Main St, City, State 12345"
-              value={addressInput}
-              onChange={(e) => setAddressInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && addressInput.trim() && !savingAddress) {
-                  saveAddressAndSync();
-                }
-              }}
-              autoFocus
-            />
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

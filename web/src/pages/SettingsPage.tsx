@@ -1149,16 +1149,6 @@ export default function SettingsPage() {
           <Card>
             <CardHeader title="Operations & Scheduling" icon={Calendar} />
             <IntegrationCard
-              name="Jobber"
-              description="Sync jobs, clients, and schedules"
-              icon={Zap}
-              statusUrl="/api/integrations/jobber/status"
-              connectUrl="/api/integrations/jobber/connect"
-              connectMethod="GET"
-              disconnectUrl="/api/integrations/jobber/disconnect"
-              color="orange"
-            />
-            <IntegrationCard
               name="Google Calendar"
               description="Sync jobs and appointments to your Google Calendar"
               icon={Calendar}

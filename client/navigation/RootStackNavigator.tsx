@@ -28,9 +28,6 @@ import CommercialQuoteCalculatorScreen from "@/screens/CommercialQuoteCalculator
 import ProSetupChecklistScreen from "@/screens/ProSetupChecklistScreen";
 import QBOSettingsScreen from "@/screens/QBOSettingsScreen";
 import QBOLogsScreen from "@/screens/QBOLogsScreen";
-import JobberSettingsScreen from "@/screens/JobberSettingsScreen";
-import JobberLogsScreen from "@/screens/JobberLogsScreen";
-import JobberImportScreen from "@/screens/JobberImportScreen";
 import IntakeQueueScreen from "@/screens/IntakeQueueScreen";
 import WalkthroughAIScreen from "@/screens/WalkthroughAIScreen";
 import WalkthroughResultsScreen from "@/screens/WalkthroughResultsScreen";
@@ -79,9 +76,6 @@ export type RootStackParamList = {
   CommercialQuote: { customerName?: string; customerAddress?: string } | undefined;
   QBOSettings: undefined;
   QBOLogs: undefined;
-  JobberSettings: undefined;
-  JobberLogs: undefined;
-  JobberImport: undefined;
   IntakeQueue: undefined;
   WalkthroughAI: undefined;
   WalkthroughResults: { extractedFields: any; assumptions: string[]; confidence: string; description: string };
@@ -349,27 +343,6 @@ export default function RootStackNavigator() {
             component={QBOLogsScreen}
             options={{
               headerTitle: "Sync History",
-            }}
-          />
-          <Stack.Screen
-            name="JobberSettings"
-            component={JobberSettingsScreen}
-            options={{
-              headerTitle: "Jobber",
-            }}
-          />
-          <Stack.Screen
-            name="JobberLogs"
-            component={JobberLogsScreen}
-            options={{
-              headerTitle: "Jobber Sync History",
-            }}
-          />
-          <Stack.Screen
-            name="JobberImport"
-            component={JobberImportScreen}
-            options={{
-              headerTitle: "Import Clients",
             }}
           />
           <Stack.Screen

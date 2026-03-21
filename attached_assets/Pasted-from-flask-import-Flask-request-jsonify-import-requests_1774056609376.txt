@@ -1,0 +1,110 @@
+from flask import Flask, request, jsonify
+import requests
+import os
+import json
+
+app = Flask(__name__)
+
+# === CONFIG: FILL THESE IN ===
+# Get these from your Jobber app in developer.getjobber.com
+JOBBER_ACCESS_TOKEN = os.environ.get("JOBBER_ACCESS_TOKEN")  # e.g., "your-long-bearer-token"
+JOBBER_GRAPHQL_URL = "https://api.getjobber.com/api/graphql"
+
+# Optional: Your Replit secret key for basic security (set in Secrets tab)
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET")  # e.g., "mysecret123" — match this in Zapier data if you add it
+
+@app.route('/webhook', methods=['POST'])
+def handle_webhook():
+    # Basic security: check secret if you set one
+    if WEBHOOK_SECRET:
+        received_secret = request.headers.get('X-Secret') or request.json.get('secret')
+        if received_secret != WEBHOOK_SECRET:
+            return jsonify({"error": "Invalid secret"}), 403
+
+    # Get the JSON payload from Zapier (it sends Jobber quote data)
+    data = request.json
+    print("Received from Zapier:", json.dumps(data, indent=2))  # Logs to console for debugging
+
+    # Extract key fields from Zapier → Jobber quote (adjust keys based on your Zap test)
+    # Zapier usually sends something like: quote_id, client_id, property_id, line_items, title, etc.
+    quote_id = data.get('quote_id') or data.get('id')  # Jobber quote ID
+    client_id = data.get('client_id')
+    property_id = data.get('property_id')
+    title = data.get('title', 'New Job from Approved Quote')
+    description = data.get('description', '')
+    line_items = data.get('line_items', [])  # List of dicts: [{'name': '...', 'quantity': 1, 'price': '...'}]
+
+    if not all([quote_id, client_id, property_id]):
+        return jsonify({"error": "Missing required fields (quote_id, client_id, property_id)"}), 400
+
+    # Build the GraphQL mutation to create a job
+    # (based on Jobber's schema: jobCreate mutation; link via quote if supported, or just copy data)
+    mutation = """
+    mutation CreateJobFromQuote($input: JobCreateInput!) {
+      jobCreate(input: $input) {
+        job {
+          id
+          jobNumber
+          title
+        }
+        userErrors {
+          message
+          path
+        }
+      }
+    }
+    """
+
+    # Input payload — customize as needed (most fields optional)
+    variables = {
+        "input": {
+            "title": title,
+            "description": description,
+            "clientId": client_id,
+            "propertyId": property_id,
+            # Optional: if Jobber allows linking quote directly (check your GraphQL playground)
+            # "quoteId": quote_id,  # Uncomment if schema supports it
+            "lineItems": [
+                {
+                    "name": item.get("name", "Service"),
+                    "quantity": item.get("quantity", 1),
+                    "price": item.get("price", "0.00")  # String or float
+                } for item in line_items
+            ],
+            # Add more fields: scheduledStartAt, teamIds, etc. if needed
+        }
+    }
+
+    headers = {
+        "Authorization": f"Bearer {JOBBER_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(
+            JOBBER_GRAPHQL_URL,
+            json={"query": mutation, "variables": variables},
+            headers=headers
+        )
+        resp_json = response.json()
+        print("Jobber API response:", json.dumps(resp_json, indent=2))
+
+        if "errors" in resp_json or resp_json.get("data", {}).get("jobCreate", {}).get("userErrors"):
+            return jsonify({"error": "Jobber API failed", "details": resp_json}), 500
+
+        return jsonify({
+            "status": "success",
+            "job_id": resp_json["data"]["jobCreate"]["job"]["id"],
+            "message": "Job created from approved quote!"
+        }), 200
+
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/')
+def home():
+    return "Webhook ready! Send POST to /webhook from Zapier."
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080, debug=True)

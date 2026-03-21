@@ -111,7 +111,6 @@ export default function QuoteDetailScreen() {
   const [calendarResult, setCalendarResult] = useState<{ icsContent: string; googleCalendarUrl: string } | null>(null);
 
   const [qboCreating, setQboCreating] = useState(false);
-  const [jobberSyncing, setJobberSyncing] = useState(false);
   const [showFollowUpEdit, setShowFollowUpEdit] = useState(false);
   const [followUpEditText, setFollowUpEditText] = useState("");
   const [followUpEditLoading, setFollowUpEditLoading] = useState(false);
@@ -154,14 +153,6 @@ export default function QuoteDetailScreen() {
     enabled: qboStatus?.status === "connected",
   });
 
-  const { data: jobberStatus } = useQuery<any>({
-    queryKey: ['/api/integrations/jobber/status'],
-  });
-
-  const { data: jobberSyncStatus, refetch: refetchJobberSync } = useQuery<any>({
-    queryKey: ['/api/integrations/jobber/sync-status', route.params.quoteId],
-    enabled: jobberStatus?.connected === true,
-  });
 
   useFocusEffect(
     useCallback(() => {
@@ -312,15 +303,6 @@ export default function QuoteDetailScreen() {
     updateMutation.mutate(data);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    if (newStatus === "accepted" && jobberStatus?.connected === true) {
-      if (jobberStatus?.autoSync) {
-        setSendSuccess("Job created in Jobber");
-        setTimeout(() => setSendSuccess(null), 3000);
-      } else {
-        setSendSuccess("Send to Jobber?");
-        setTimeout(() => setSendSuccess(null), 4000);
-      }
     }
   };
 
@@ -689,27 +671,6 @@ export default function QuoteDetailScreen() {
     }
   };
 
-  const handleJobberSync = async () => {
-    if (!quote || jobberSyncing) return;
-    setJobberSyncing(true);
-    trackEvent("jobber_sync_manual_clicked");
-    try {
-      const res = await apiRequest("POST", `/api/integrations/jobber/sync-quote/${quote.id}`);
-      const data = await res.json();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      refetchJobberSync();
-      setSendSuccess(`Synced to Jobber${data.jobberJobNumber ? ` #${data.jobberJobNumber}` : ""}`);
-      setTimeout(() => setSendSuccess(null), 3000);
-      trackEvent("jobber_sync_success");
-    } catch (e: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setSendSuccess("Jobber sync failed — tap Retry");
-      setTimeout(() => setSendSuccess(null), 4000);
-      trackEvent("jobber_sync_failed");
-    } finally {
-      setJobberSyncing(false);
-    }
-  };
 
   const handleGenerateInvoicePacket = async () => {
     if (!quote) return;
@@ -2149,47 +2110,6 @@ export default function QuoteDetailScreen() {
             )
           ) : null}
 
-          {jobberStatus?.connected === true ? (
-            jobberSyncStatus?.syncStatus === "success" ? (
-              <View
-                style={[styles.actionButton, { backgroundColor: "#16a34a15" }]}
-                testID="jobber-synced"
-              >
-                <Feather name="check-circle" size={20} color="#16a34a" />
-                <ThemedText type="small" style={{ marginTop: 4, color: "#16a34a" }}>
-                  Jobber {jobberSyncStatus.jobberJobNumber ? `#${jobberSyncStatus.jobberJobNumber}` : "Synced"}
-                </ThemedText>
-              </View>
-            ) : jobberSyncStatus?.syncStatus === "failed" ? (
-              <Pressable
-                onPress={handleJobberSync}
-                style={[styles.actionButton, { backgroundColor: `${theme.error}10` }]}
-                testID="jobber-retry-btn"
-                disabled={jobberSyncing}
-              >
-                {jobberSyncing ? (
-                  <ActivityIndicator size={20} color={theme.error} />
-                ) : (
-                  <Feather name="refresh-cw" size={20} color={theme.error} />
-                )}
-                <ThemedText type="small" style={{ marginTop: 4, color: theme.error }}>Retry Jobber</ThemedText>
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={handleJobberSync}
-                style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-                testID="jobber-sync-btn"
-                disabled={jobberSyncing}
-              >
-                {jobberSyncing ? (
-                  <ActivityIndicator size={20} color={theme.primary} />
-                ) : (
-                  <Feather name="briefcase" size={20} color={theme.primary} />
-                )}
-                <ThemedText type="small" style={{ marginTop: 4 }}>Jobber</ThemedText>
-              </Pressable>
-            )
-          ) : null}
 
           <Pressable
             onPress={handleDelete}
@@ -2233,111 +2153,6 @@ export default function QuoteDetailScreen() {
           ))}
         </View>
 
-        <SectionHeader title="Jobber Sync" />
-        <View
-          style={[
-            styles.detailsCard,
-            { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.md },
-          ]}
-          testID="jobber-sync-card"
-        >
-          {jobberStatus?.connected !== true ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.md }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: `${theme.primary}15`, alignItems: "center", justifyContent: "center" }}>
-                <Feather name="briefcase" size={18} color={theme.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                  Connect Jobber to sync accepted quotes into your operations workflow.
-                </ThemedText>
-              </View>
-            </View>
-          ) : jobberSyncing ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.md }}>
-              <ActivityIndicator size="small" color={theme.primary} />
-              <ThemedText type="body" style={{ fontWeight: "600" }}>Syncing...</ThemedText>
-            </View>
-          ) : jobberSyncStatus?.syncStatus === "success" ? (
-            <View style={{ gap: Spacing.sm }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
-                <Feather name="briefcase" size={18} color={theme.success} />
-                <ThemedText type="body" style={{ fontWeight: "600", flex: 1 }}>Jobber</ThemedText>
-                <View style={{ backgroundColor: `${theme.success}15`, paddingHorizontal: 10, paddingVertical: 3, borderRadius: BorderRadius.full }}>
-                  <ThemedText type="caption" style={{ color: theme.success, fontWeight: "600" }}>Synced</ThemedText>
-                </View>
-              </View>
-              {jobberSyncStatus.jobberJobNumber ? (
-                <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                  Job #{jobberSyncStatus.jobberJobNumber}
-                </ThemedText>
-              ) : null}
-              {jobberSyncStatus.createdAt ? (
-                <ThemedText type="caption" style={{ color: theme.textMuted }}>
-                  {new Date(jobberSyncStatus.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
-                </ThemedText>
-              ) : null}
-            </View>
-          ) : jobberSyncStatus?.syncStatus === "failed" ? (
-            <View style={{ gap: Spacing.sm }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
-                <Feather name="briefcase" size={18} color={theme.error} />
-                <ThemedText type="body" style={{ fontWeight: "600", flex: 1 }}>Jobber</ThemedText>
-                <View style={{ backgroundColor: `${theme.error}15`, paddingHorizontal: 10, paddingVertical: 3, borderRadius: BorderRadius.full }}>
-                  <ThemedText type="caption" style={{ color: theme.error, fontWeight: "600" }}>Failed</ThemedText>
-                </View>
-              </View>
-              {jobberSyncStatus.errorMessage ? (
-                <ThemedText type="small" style={{ color: theme.error }}>
-                  {jobberSyncStatus.errorMessage}
-                </ThemedText>
-              ) : null}
-              <Pressable
-                onPress={handleJobberSync}
-                style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, alignSelf: "flex-start", paddingVertical: Spacing.xs }}
-                testID="jobber-sync-retry-btn"
-              >
-                <Feather name="refresh-cw" size={14} color={theme.primary} />
-                <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>Retry Sync</ThemedText>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.md }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: `${theme.primary}15`, alignItems: "center", justifyContent: "center" }}>
-                <Feather name="briefcase" size={18} color={theme.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
-                  <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
-                  <View style={{ backgroundColor: `${theme.warning}15`, paddingHorizontal: 8, paddingVertical: 2, borderRadius: BorderRadius.full }}>
-                    <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "600" }}>Not Synced</ThemedText>
-                  </View>
-                </View>
-              </View>
-            </View>
-          )}
-          {jobberStatus?.connected !== true ? (
-            <Pressable
-              onPress={() => {
-                trackEvent("jobber_connect_cta_clicked", { source: "quote_detail" });
-                navigation.navigate("JobberSettings" as any);
-              }}
-              style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginTop: Spacing.md, alignSelf: "flex-start" }}
-              testID="jobber-connect-btn"
-            >
-              <Feather name="link" size={14} color={theme.primary} />
-              <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>Connect Jobber</ThemedText>
-            </Pressable>
-          ) : !jobberSyncing && jobberSyncStatus?.syncStatus !== "success" && jobberSyncStatus?.syncStatus !== "failed" ? (
-            <Pressable
-              onPress={handleJobberSync}
-              style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs, marginTop: Spacing.md, alignSelf: "flex-start" }}
-              testID="jobber-send-btn"
-            >
-              <Feather name="send" size={14} color={theme.primary} />
-              <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>Send to Jobber</ThemedText>
-            </Pressable>
-          ) : null}
-        </View>
 
         {growthSettings?.googleReviewLink?.trim() && (status === "accepted" || status === "sent") ? (
           <>

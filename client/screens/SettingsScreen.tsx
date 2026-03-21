@@ -190,9 +190,6 @@ export default function SettingsScreen() {
     queryKey: ["/api/stripe/status"],
   });
 
-  const { data: jobberDashStats } = useQuery<{ connected: boolean; jobsCreated?: number; totalSyncs?: number; autoSyncEnabled?: boolean }>({
-    queryKey: ["/api/integrations/jobber/dashboard-stats"],
-  });
 
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
@@ -1349,77 +1346,6 @@ export default function SettingsScreen() {
         </View>
       </Pressable>
 
-      <Pressable
-        onPress={() => navigation.navigate("JobberSettings" as any)}
-        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
-        testID="button-jobber-settings"
-      >
-        <View style={styles.settingsLinkContent}>
-          <View style={[styles.settingsLinkIcon, { backgroundColor: "#2563eb15" }]}>
-            <Feather name="briefcase" size={20} color="#2563eb" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>
-              Jobber
-            </ThemedText>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              Sync clients and jobs
-            </ThemedText>
-          </View>
-          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-        </View>
-      </Pressable>
-
-      {jobberDashStats?.connected !== true ? (
-        <View
-          style={[
-            styles.jobberMarketingCard,
-            { backgroundColor: `${theme.primary}08`, borderColor: `${theme.primary}20` },
-          ]}
-          testID="card-jobber-marketing"
-        >
-          <View style={styles.jobberMarketingHeader}>
-            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
-              <Feather name="briefcase" size={20} color={theme.primary} />
-            </View>
-            <ThemedText type="h4" style={{ flex: 1 }}>
-              Works with Jobber
-            </ThemedText>
-          </View>
-          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
-            Keep your operations in Jobber and use QuotePro to win more work, send smarter quotes, and move accepted jobs into your workflow faster.
-          </ThemedText>
-          <View style={styles.jobberBulletList}>
-            {[
-              "Turn accepted quotes into Jobber records",
-              "Sync work into your existing process",
-              "Keep revenue and operations connected",
-            ].map((text, i) => (
-              <View key={i} style={styles.jobberBulletRow}>
-                <View style={[styles.proFeatureCheck, { backgroundColor: `${theme.success}15` }]}>
-                  <Feather name="check" size={14} color={theme.success} />
-                </View>
-                <ThemedText type="small" style={{ flex: 1 }}>
-                  {text}
-                </ThemedText>
-              </View>
-            ))}
-          </View>
-          <Pressable
-            onPress={() => {
-              trackEvent("jobber_connect_cta_clicked", { source: "settings_marketing" });
-              navigation.navigate("JobberSettings" as any);
-            }}
-            style={[styles.upgradeBtn, { backgroundColor: theme.primary, marginTop: Spacing.lg }]}
-            testID="button-jobber-connect-marketing"
-          >
-            <Feather name="link" size={18} color="#FFFFFF" />
-            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 8 }}>
-              Connect Jobber
-            </ThemedText>
-          </Pressable>
-        </View>
-      ) : null}
 
       <Pressable
         onPress={() => navigation.navigate("SalesStrategy" as any)}
@@ -2276,25 +2202,5 @@ const styles = StyleSheet.create({
   deleteCancelBtn: {
     marginTop: Spacing.md,
     padding: Spacing.sm,
-  },
-  jobberMarketingCard: {
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  jobberMarketingHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
-  jobberBulletList: {
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
-  },
-  jobberBulletRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
   },
 });
