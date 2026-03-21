@@ -77,6 +77,10 @@ export default function QuoteDetailPage() {
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [syncingQbo, setSyncingQbo] = useState(false);
   const [syncingJobber, setSyncingJobber] = useState(false);
+  const [playChannels, setPlayChannels] = useState<Record<number, "sms" | "email">>({});
+  const [playDrafts, setPlayDrafts] = useState<Record<number, string>>({});
+  const [playGenerating, setPlayGenerating] = useState<Record<number, boolean>>({});
+  const [playSending, setPlaySending] = useState<Record<number, boolean>>({});
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewEmailSubject, setReviewEmailSubject] = useState("");
   const [reviewEmailContent, setReviewEmailContent] = useState("");
@@ -265,6 +269,65 @@ export default function QuoteDetailPage() {
       setAiDrafts((prev) => ({ ...prev, [key]: "Unable to generate message." }));
     }
     setAiDraftLoading(null);
+  };
+
+  const recTypeToPurpose = (type: string): MessagePurpose => {
+    switch (type) {
+      case "follow_up": return "follow_up";
+      case "review_request": return "review_request";
+      case "referral_ask": return "follow_up";
+      default: return "upsell";
+    }
+  };
+
+  const generatePlayDraft = async (recIndex: number, recType: string, channel: "sms" | "email") => {
+    setPlayGenerating((prev) => ({ ...prev, [recIndex]: true }));
+    const purpose = recTypeToPurpose(recType);
+    try {
+      const res: any = await apiPost("/api/ai/generate-message", {
+        purpose,
+        channel,
+        customerName: quote.customerName,
+        companyName: businessProfile?.companyName || "",
+        senderName: businessProfile?.senderName || "",
+        total: quote.total,
+        status: quote.status,
+        quoteLink: quote.publicToken ? `${window.location.origin}/q/${quote.publicToken}` : "",
+        bookingLink: businessProfile?.bookingLink || "",
+      });
+      const text = res.draft || res.message || "";
+      setPlayDrafts((prev) => ({ ...prev, [recIndex]: text }));
+    } catch {
+      setPlayDrafts((prev) => ({ ...prev, [recIndex]: "Unable to generate message." }));
+    }
+    setPlayGenerating((prev) => ({ ...prev, [recIndex]: false }));
+  };
+
+  const sendPlayMessage = async (rec: any, recIndex: number) => {
+    const channel = playChannels[recIndex] || "sms";
+    const draft = playDrafts[recIndex];
+    if (!draft?.trim()) return;
+    if (!quote?.customerId) {
+      showToast("No customer linked to this quote", "error");
+      return;
+    }
+    setPlaySending((prev) => ({ ...prev, [recIndex]: true }));
+    try {
+      await apiPost("/api/communications", {
+        customerId: quote.customerId,
+        type: channel,
+        channel,
+        content: draft,
+        ...(channel === "email" ? { subject: rec.title || "A message from us" } : {}),
+      });
+      recMutation.mutate({ recId: rec.id, status: "done" });
+      showToast(`${channel === "sms" ? "SMS" : "Email"} sent!`, "success");
+      setPlayDrafts((prev) => ({ ...prev, [recIndex]: "" }));
+      setExpandedRec(null);
+    } catch (e: any) {
+      showToast(e?.message || "Failed to send", "error");
+    }
+    setPlaySending((prev) => ({ ...prev, [recIndex]: false }));
   };
 
   const generateInvoicePacket = async () => {
@@ -707,32 +770,108 @@ export default function QuoteDetailPage() {
                       </div>
                     </button>
                     {expandedRec === i ? (
-                      <div className="px-4 pb-4 space-y-3">
-                        <p className="text-sm text-slate-600">{rec.rationale || rec.description}</p>
+                      <div className="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3">
+                        {/* Rationale */}
+                        <p className="text-sm text-slate-600 leading-relaxed">{rec.rationale || rec.description}</p>
                         {rec.suggestedDate ? (
                           <p className="text-xs text-slate-400">
                             Suggested: {new Date(rec.suggestedDate).toLocaleDateString()}
                           </p>
                         ) : null}
+
                         {rec.status !== "done" && rec.status !== "dismissed" ? (
-                          <div className="flex gap-2">
-                            <Button
-                              size="xs"
-                              variant="success"
-                              icon={CheckCircle}
-                              onClick={() => recMutation.mutate({ recId: rec.id, status: "done" })}
-                            >
-                              Done
-                            </Button>
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              icon={XCircle}
-                              onClick={() => recMutation.mutate({ recId: rec.id, status: "dismissed" })}
-                            >
-                              Dismiss
-                            </Button>
-                          </div>
+                          <>
+                            {/* Channel selector */}
+                            <div className="flex items-center gap-2">
+                              <div className="inline-flex bg-slate-100 rounded-lg p-0.5">
+                                <button
+                                  onClick={() => {
+                                    setPlayChannels((p) => ({ ...p, [i]: "sms" }));
+                                    setPlayDrafts((p) => ({ ...p, [i]: "" }));
+                                  }}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${(playChannels[i] || "sms") === "sms" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                                >
+                                  <Phone className="w-3 h-3" />
+                                  SMS
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setPlayChannels((p) => ({ ...p, [i]: "email" }));
+                                    setPlayDrafts((p) => ({ ...p, [i]: "" }));
+                                  }}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${playChannels[i] === "email" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                                >
+                                  <Mail className="w-3 h-3" />
+                                  Email
+                                </button>
+                              </div>
+                              <Button
+                                size="xs"
+                                variant="secondary"
+                                icon={Sparkles}
+                                loading={playGenerating[i]}
+                                onClick={() => generatePlayDraft(i, rec.type, playChannels[i] || "sms")}
+                              >
+                                Generate Draft
+                              </Button>
+                            </div>
+
+                            {/* AI Draft editor */}
+                            {playDrafts[i] ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1.5">
+                                  <Sparkles className="w-3 h-3 text-violet-500" />
+                                  <p className="text-xs font-semibold text-violet-700">AI Draft — edit before sending</p>
+                                </div>
+                                <textarea
+                                  value={playDrafts[i]}
+                                  onChange={(e) => setPlayDrafts((p) => ({ ...p, [i]: e.target.value }))}
+                                  rows={5}
+                                  className="w-full px-3 py-2 rounded-lg border border-violet-200 bg-violet-50 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none leading-relaxed"
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="xs"
+                                    variant="primary"
+                                    icon={Send}
+                                    loading={playSending[i]}
+                                    disabled={!playDrafts[i]?.trim()}
+                                    onClick={() => sendPlayMessage(rec, i)}
+                                  >
+                                    Send {(playChannels[i] || "sms") === "sms" ? "SMS" : "Email"}
+                                  </Button>
+                                  <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    icon={XCircle}
+                                    onClick={() => recMutation.mutate({ recId: rec.id, status: "dismissed" })}
+                                  >
+                                    Dismiss
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Before generating draft — just Done/Dismiss */
+                              <div className="flex gap-2">
+                                <Button
+                                  size="xs"
+                                  variant="success"
+                                  icon={CheckCircle}
+                                  onClick={() => recMutation.mutate({ recId: rec.id, status: "done" })}
+                                >
+                                  Mark Done
+                                </Button>
+                                <Button
+                                  size="xs"
+                                  variant="ghost"
+                                  icon={XCircle}
+                                  onClick={() => recMutation.mutate({ recId: rec.id, status: "dismissed" })}
+                                >
+                                  Dismiss
+                                </Button>
+                              </div>
+                            )}
+                          </>
                         ) : null}
                       </div>
                     ) : null}
