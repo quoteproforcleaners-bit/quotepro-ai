@@ -35,6 +35,9 @@ import {
   Globe,
   Briefcase,
   Sliders,
+  Upload,
+  Trash2,
+  Image,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -330,6 +333,69 @@ export default function SettingsPage() {
   const [commercialEnabled, setCommercialEnabled] = useState(false);
   const [appLanguage, setAppLanguage] = useState("en");
   const [commLanguage, setCommLanguage] = useState("en");
+  const [logoUri, setLogoUri] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+
+  const PRESET_LOGOS = [
+    {
+      id: "broom",
+      label: "Broom",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#2563EB"/><rect x="37" y="12" width="6" height="38" rx="3" fill="white"/><rect x="20" y="48" width="40" height="14" rx="7" fill="white" opacity="0.9"/><rect x="20" y="62" width="4" height="10" rx="2" fill="white" opacity="0.8"/><rect x="30" y="62" width="4" height="12" rx="2" fill="white" opacity="0.8"/><rect x="40" y="62" width="4" height="10" rx="2" fill="white" opacity="0.8"/><rect x="50" y="62" width="4" height="11" rx="2" fill="white" opacity="0.8"/><rect x="58" y="62" width="4" height="9" rx="2" fill="white" opacity="0.8"/></svg>`,
+    },
+    {
+      id: "mop",
+      label: "Mop",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#0D9488"/><rect x="37" y="10" width="6" height="42" rx="3" fill="white"/><rect x="20" y="50" width="40" height="10" rx="5" fill="white" opacity="0.9"/><rect x="22" y="60" width="5" height="12" rx="2.5" fill="white" opacity="0.75"/><rect x="31" y="60" width="5" height="14" rx="2.5" fill="white" opacity="0.75"/><rect x="40" y="60" width="5" height="11" rx="2.5" fill="white" opacity="0.75"/><rect x="49" y="60" width="5" height="13" rx="2.5" fill="white" opacity="0.75"/><rect x="58" y="60" width="5" height="10" rx="2.5" fill="white" opacity="0.75"/></svg>`,
+    },
+    {
+      id: "soap",
+      label: "Soap",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#7C3AED"/><rect x="14" y="40" width="52" height="28" rx="10" fill="white" opacity="0.9"/><rect x="24" y="52" width="32" height="4" rx="2" fill="#7C3AED" opacity="0.3"/><circle cx="26" cy="28" r="7" fill="white" opacity="0.65"/><circle cx="48" cy="22" r="5" fill="white" opacity="0.5"/><circle cx="62" cy="30" r="4" fill="white" opacity="0.55"/></svg>`,
+    },
+    {
+      id: "sparkles",
+      label: "Sparkles",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#D97706"/><path d="M40 14 L43.5 27 L57 27 L46 35 L49.5 48 L40 41 L30.5 48 L34 35 L23 27 L36.5 27 Z" fill="white"/><path d="M65 12 L66.5 17 L72 17 L68 20 L69.5 25 L65 22 L60.5 25 L62 20 L58 17 L63.5 17 Z" fill="white" opacity="0.7"/><path d="M16 55 L17.5 60 L23 60 L19 63 L20.5 68 L16 65 L11.5 68 L13 63 L9 60 L14.5 60 Z" fill="white" opacity="0.7"/></svg>`,
+    },
+    {
+      id: "spray",
+      label: "Spray",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#059669"/><rect x="32" y="34" width="20" height="30" rx="5" fill="white" opacity="0.9"/><rect x="32" y="26" width="12" height="11" rx="3" fill="white" opacity="0.85"/><rect x="20" y="30" width="14" height="6" rx="3" fill="white" opacity="0.8"/><rect x="16" y="24" width="6" height="10" rx="3" fill="white" opacity="0.75"/><circle cx="55" cy="22" r="3" fill="white" opacity="0.6"/><circle cx="61" cy="16" r="2.5" fill="white" opacity="0.5"/><circle cx="60" cy="28" r="2" fill="white" opacity="0.45"/></svg>`,
+    },
+    {
+      id: "bucket",
+      label: "Bucket",
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="16" fill="#0EA5E9"/><path d="M24 36 L31 72 L49 72 L56 36 Z" fill="white" opacity="0.9"/><rect x="20" y="29" width="40" height="10" rx="5" fill="white"/><path d="M30 29 Q40 14 50 29" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/><path d="M28 52 Q40 48 52 52" fill="none" stroke="#0EA5E9" stroke-width="3" opacity="0.4"/></svg>`,
+    },
+  ];
+
+  const uploadLogo = async (imageData: string | null) => {
+    setLogoUploading(true);
+    try {
+      const data = await apiPost<{ logoUri: string | null }>("/api/business/logo", { imageData });
+      setLogoUri(data.logoUri);
+      queryClient.invalidateQueries({ queryKey: ["/api/business"] });
+    } catch (e) {
+      console.error("Logo upload failed:", e);
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUri = ev.target?.result as string;
+      uploadLogo(dataUri);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const svgToDataUri = (svg: string) =>
+    `data:image/svg+xml,${encodeURIComponent(svg)}`;
 
   const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -388,6 +454,7 @@ export default function SettingsPage() {
       setPaymentMethods(methods);
       setAppLanguage((business as any).appLanguage || "en");
       setCommLanguage((business as any).commLanguage || "en");
+      setLogoUri((business as any).logoUri || null);
     }
   }, [business]);
 
@@ -781,6 +848,85 @@ export default function SettingsPage() {
 
       {tab === "branding" ? (
         <div className="max-w-2xl space-y-6">
+          {/* ─── Business Logo ─── */}
+          <Card>
+            <CardHeader title="Business Logo" icon={Image} />
+            <p className="text-sm text-slate-500 mb-5">
+              Your logo appears on customer-facing quotes when the "Show Logo" toggle is enabled in Quote Preferences.
+            </p>
+
+            {/* Current logo preview */}
+            {logoUri ? (
+              <div className="mb-5 flex items-center gap-4">
+                <img
+                  src={logoUri}
+                  alt="Business logo"
+                  className="h-16 w-16 rounded-xl object-contain border border-slate-200 bg-white p-1"
+                />
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Current logo</p>
+                  <button
+                    onClick={() => uploadLogo(null)}
+                    disabled={logoUploading}
+                    className="mt-1 flex items-center gap-1 text-xs text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 size={12} />
+                    Remove logo
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Preset icons */}
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+              Preset cleaning icons
+            </p>
+            <div className="flex flex-wrap gap-3 mb-5">
+              {PRESET_LOGOS.map((preset) => {
+                const uri = svgToDataUri(preset.svg);
+                const isActive = logoUri === uri;
+                return (
+                  <button
+                    key={preset.id}
+                    onClick={() => uploadLogo(uri)}
+                    disabled={logoUploading}
+                    title={preset.label}
+                    className={`rounded-xl border-2 p-1 transition-all ${
+                      isActive
+                        ? "border-blue-500 ring-2 ring-blue-200"
+                        : "border-slate-200 hover:border-blue-300"
+                    }`}
+                  >
+                    <img
+                      src={uri}
+                      alt={preset.label}
+                      className="h-12 w-12 rounded-lg object-contain"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom upload */}
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+              Upload your own logo
+            </p>
+            <label
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50 transition-colors ${logoUploading ? "opacity-50 pointer-events-none" : ""}`}
+            >
+              <Upload size={16} />
+              {logoUploading ? "Uploading…" : "Choose image (PNG, JPG, SVG)"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                className="sr-only"
+                onChange={handleLogoFileChange}
+                disabled={logoUploading}
+              />
+            </label>
+            <p className="mt-2 text-xs text-slate-400">Max recommended size: 400×400 px</p>
+          </Card>
+
           <Card>
             <CardHeader title="Sender Identity" icon={User} />
             <p className="text-sm text-slate-500 mb-4">

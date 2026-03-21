@@ -1068,6 +1068,47 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
+  // ─── Logo Upload ───
+  app.post("/api/business/logo", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { imageData } = req.body;
+
+      // Clear logo
+      if (!imageData) {
+        await updateBusiness(business.id, { logoUri: null } as any);
+        return res.json({ logoUri: null });
+      }
+
+      // SVG preset — store the data URI directly (small, safe)
+      if (imageData.startsWith("data:image/svg+xml")) {
+        await updateBusiness(business.id, { logoUri: imageData } as any);
+        return res.json({ logoUri: imageData });
+      }
+
+      // Raster image — save as file, return permanent URL
+      const fs = await import("fs");
+      const path = await import("path");
+      const uploadsDir = path.join(process.cwd(), "uploads", "logos");
+      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+      const ext = imageData.match(/^data:image\/(\w+);/)?.[1] || "png";
+      const fileName = `logo-${business.id}-${Date.now()}.${ext}`;
+      const filePath = path.join(uploadsDir, fileName);
+      const base64Data = imageData.replace(/^data:[^;]+;base64,/, "");
+      fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+
+      const logoUri = `/uploads/logos/${fileName}`;
+      await updateBusiness(business.id, { logoUri } as any);
+      return res.json({ logoUri });
+    } catch (err: any) {
+      console.error("Logo upload error:", err);
+      return res.status(500).json({ message: "Failed to upload logo" });
+    }
+  });
+
   app.get("/api/pricing", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
@@ -8314,7 +8355,7 @@ loadMonth(nextMo);
       }
 
       const conditionalSections: Record<string, boolean> = {
-        "logoUri": !!logoUri,
+        "logoUri": !!logoUri && (qpPublic?.showLogo !== false),
         "hasPropertyInfo": propertyPills.length > 0,
         "hasMultipleOptions": optionDataItems.length > 1,
         "hasSingleOption": optionDataItems.length === 1,
