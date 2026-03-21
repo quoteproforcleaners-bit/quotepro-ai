@@ -826,7 +826,12 @@ export default function SettingsScreen() {
               <Feather name="check-circle" size={20} color={theme.success} />
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
+                <View style={{ backgroundColor: "#FEE2E2", borderColor: "#FECACA", borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                  <ThemedText style={{ fontSize: 9, fontWeight: "800", color: "#DC2626", letterSpacing: 0.5 }}>BETA</ThemedText>
+                </View>
+              </View>
               <ThemedText type="small" style={{ color: theme.success }}>{t.common.connected}</ThemedText>
             </View>
             <Pressable onPress={handleDisconnectJobber} testID="button-disconnect-jobber">
@@ -845,7 +850,12 @@ export default function SettingsScreen() {
               <Feather name="upload-cloud" size={20} color={theme.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
+                <View style={{ backgroundColor: "#FEE2E2", borderColor: "#FECACA", borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                  <ThemedText style={{ fontSize: 9, fontWeight: "800", color: "#DC2626", letterSpacing: 0.5 }}>BETA</ThemedText>
+                </View>
+              </View>
               <ThemedText type="small" style={{ color: theme.textSecondary }}>Sync quotes as scheduled jobs</ThemedText>
             </View>
             <Feather name="chevron-right" size={20} color={theme.textSecondary} />
@@ -1401,9 +1411,12 @@ export default function SettingsScreen() {
             <Feather name="book-open" size={20} color="#16a34a" />
           </View>
           <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>
-              QuickBooks Online
-            </ThemedText>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>QuickBooks Online</ThemedText>
+              <View style={{ backgroundColor: "#FEE2E2", borderColor: "#FECACA", borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                <ThemedText style={{ fontSize: 9, fontWeight: "800", color: "#DC2626", letterSpacing: 0.5 }}>BETA</ThemedText>
+              </View>
+            </View>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
               Sync invoices and customers
             </ThemedText>

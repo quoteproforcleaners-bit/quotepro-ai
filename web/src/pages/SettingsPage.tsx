@@ -62,6 +62,7 @@ function IntegrationCard({
   connectMethod = "POST",
   disconnectMethod = "POST",
   color = "slate",
+  beta = false,
 }: {
   name: string;
   description: string;
@@ -72,6 +73,7 @@ function IntegrationCard({
   connectMethod?: string;
   disconnectMethod?: string;
   color?: string;
+  beta?: boolean;
 }) {
   const { data, isLoading, refetch } = useQuery<any>({
     queryKey: [statusUrl],
@@ -132,7 +134,14 @@ function IntegrationCard({
           <Icon className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h3 className="text-sm font-medium text-slate-900">{name}</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-medium text-slate-900">{name}</h3>
+            {beta ? (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-red-100 text-red-600 border border-red-200 leading-none">
+                BETA
+              </span>
+            ) : null}
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">{description}</p>
         </div>
       </div>
@@ -1153,6 +1162,7 @@ export default function SettingsPage() {
               connectMethod="GET"
               disconnectUrl="/api/integrations/qbo/disconnect"
               color="green"
+              beta
             />
           </Card>
           <Card>
@@ -1166,6 +1176,7 @@ export default function SettingsPage() {
               disconnectUrl="/api/integrations/jobber/disconnect"
               disconnectMethod="POST"
               color="green"
+              beta
             />
           </Card>
           <Card>
