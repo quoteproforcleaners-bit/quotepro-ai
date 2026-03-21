@@ -17,89 +17,12 @@ import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage
 import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "./calculator-engine";
 import { JobberClient, buildJobberAuthUrl, exchangeJobberCode, logJobberSync, syncQuoteToJobber } from "./jobber-client";
 
-// The single platform sending address used for all outbound tenant emails.
-// Tenants appear as the sender name; their business email is set as reply-to.
-const PLATFORM_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || "quote@getquotepro.ai";
-const PLATFORM_FROM_NAME = "QuotePro";
-
-/**
- * Returns the SendGrid API key, from-address, display name, and reply-to to
- * use when sending an email on behalf of a business tenant.
- *
- * Default (all tenants):
- *   from:     quote@getquotepro.ai
- *   name:     <Tenant company name>
- *   reply-to: <Tenant business email>
- *
- * Advanced (tenant supplies their own SendGrid key — future feature):
- *   from:     <Tenant's verified email>
- *   name:     <Tenant company name>
- *   reply-to: (not needed — FROM is already theirs)
- */
-function getBusinessEmailSender(business: any): {
-  apiKey: string;
-  fromEmail: string;
-  fromName: string;
-  replyTo: string | null;
-} {
-  const businessEmail = business?.email || "";
-  const companyName = business?.companyName || PLATFORM_FROM_NAME;
-  const ownKey = business?.sendgridApiKey as string | null | undefined;
-
-  if (ownKey) {
-    // Tenant has connected their own SendGrid account — send from their address
-    return {
-      apiKey: ownKey,
-      fromEmail: businessEmail || PLATFORM_FROM_EMAIL,
-      fromName: companyName,
-      replyTo: null,
-    };
-  }
-
-  // Default: send from platform address; replies route to tenant's business email
-  return {
-    apiKey: process.env.SENDGRID_API_KEY || "",
-    fromEmail: PLATFORM_FROM_EMAIL,
-    fromName: companyName,
-    replyTo: businessEmail || null,
-  };
-}
-
-/** @deprecated use getBusinessEmailSender instead */
-function getBusinessFromEmail(business: any): string {
-  return getBusinessEmailSender(business).fromEmail;
-}
-
-/**
- * Converts a raw SendGrid API error into a clean, tenant-friendly message.
- * Infrastructure details (sender verification, API keys, etc.) are logged
- * server-side but never exposed to the tenant.
- */
-function parseSendGridError(errText: string, fromEmail: string): string {
-  // Log the raw error internally so the platform owner can diagnose it
-  console.error("[email] SendGrid raw error | from:", fromEmail, "| body:", errText);
-  try {
-    const errJson = JSON.parse(errText);
-    if (errJson.errors && errJson.errors.length > 0) {
-      const msgs: string[] = errJson.errors.map((e: any) => e.message as string);
-      const isInfraError = msgs.some(
-        (m) =>
-          m.toLowerCase().includes("verified sender") ||
-          m.toLowerCase().includes("sender identity") ||
-          m.toLowerCase().includes("does not match") ||
-          m.toLowerCase().includes("api key") ||
-          m.toLowerCase().includes("authorization")
-      );
-      if (isInfraError) {
-        // Platform configuration issue — don't expose internal details to tenant
-        return "Email delivery failed. Our team has been notified. Please try again shortly.";
-      }
-      // Non-infrastructure errors (e.g. invalid recipient) can be shown
-      return msgs.join("; ");
-    }
-  } catch {}
-  return "Email could not be delivered. Please try again or contact support.";
-}
+import {
+  sendEmail,
+  getBusinessSendParams,
+  PLATFORM_FROM_EMAIL,
+  PLATFORM_FROM_NAME,
+} from "./mail";
 
 let stripe: Stripe | null = null;
 
@@ -1958,10 +1881,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         if (!toEmail) {
           results.email = { success: false, message: "No email address on file" };
         } else {
-          const sgApiKey = process.env.SENDGRID_API_KEY;
-          if (!sgApiKey) {
-            results.email = { success: false, message: "Email delivery is not available. Please contact support." };
-          } else {
+          {
             const subject = `Your ${serviceLabel} is confirmed for ${dateStr}`;
             const plainBody = [
               `Hi ${customerFirstName},`,
@@ -1981,8 +1901,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
             ].filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n");
 
             const primaryColor = (business as any).primaryColor || "#2563EB";
-            const { apiKey: apptSgKey, fromEmail, fromName: apptFromName, replyTo: apptReplyTo } = getBusinessEmailSender(business);
-            const apptSgApiKey = apptSgKey || process.env.SENDGRID_API_KEY;
+            const { fromName: apptFromName, replyTo: apptReplyTo } = getBusinessSendParams(business);
 
             const detailRows = [
               dateStr ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Date</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${dateStr}</td></tr>` : "",
@@ -1992,29 +1911,15 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
 
             const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;"><tr><td align="center"><table width="540" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.07);max-width:100%;"><tr><td style="background:${primaryColor};padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700">${companyName}</span></td></tr><tr><td style="padding:36px 32px 28px;"><div style="display:inline-block;background:#dcfce7;border-radius:20px;padding:5px 14px;margin-bottom:20px;"><span style="color:#16a34a;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Confirmed</span></div><h1 style="margin:0 0 10px;font-size:22px;font-weight:800;color:#0f172a;line-height:1.3">Your ${serviceLabel} is all set, ${customerFirstName}.</h1><p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.6">Here are your appointment details:</p><table cellpadding="0" cellspacing="0" style="border-left:3px solid ${primaryColor};padding-left:20px;margin-bottom:28px">${detailRows}</table><p style="margin:0 0 0;font-size:14px;color:#64748b;line-height:1.7">Need to reschedule or have a question? Simply reply to this email — we're happy to help.</p><p style="margin:24px 0 0;font-size:14px;color:#64748b;">We look forward to seeing you!<br><br><strong style="color:#0f172a;font-size:15px">${senderName}</strong><br><span style="color:#94a3b8">${companyName}</span></p></td></tr><tr><td style="padding:16px 32px 20px;border-top:1px solid #f1f5f9;"><p style="margin:0;font-size:11px;color:#cbd5e1;">Sent via QuotePro &mdash; Professional tools for cleaning businesses.</p></td></tr></table></td></tr></table></body></html>`;
 
-            const emailPayload: any = {
-              personalizations: [{ to: [{ email: toEmail }] }],
-              from: { email: fromEmail, name: apptFromName },
-              subject,
-              content: [
-                { type: "text/plain", value: plainBody },
-                { type: "text/html", value: htmlBody },
-              ],
-            };
-            if (apptReplyTo) {
-              emailPayload.reply_to = { email: apptReplyTo, name: apptFromName };
-            }
-
-            const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-              method: "POST",
-              headers: { Authorization: `Bearer ${apptSgApiKey}`, "Content-Type": "application/json" },
-              body: JSON.stringify(emailPayload),
-            });
-            if (!sgRes.ok) {
-              const errText = await sgRes.text();
-              console.error("Confirmation email error:", sgRes.status, errText);
-              results.email = { success: false, message: parseSendGridError(errText, fromEmail) };
-            } else {
+            try {
+              await sendEmail({
+                to: toEmail,
+                subject,
+                html: htmlBody,
+                text: plainBody,
+                fromName: apptFromName,
+                replyTo: apptReplyTo,
+              });
               results.email = { success: true, message: "Email sent" };
               await createCommunication({
                 businessId: business.id,
@@ -2025,6 +1930,9 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
                 templateKey: "appointment_confirmation",
                 status: "sent",
               });
+            } catch (mailErr: any) {
+              console.error("[mail] Confirmation email error:", mailErr);
+              results.email = { success: false, message: "Email could not be delivered. Please try again or contact support." };
             }
           }
         }
@@ -3437,10 +3345,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
         return res.status(400).json({ message: "to (recipient email) is required" });
       }
 
-      const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
-      if (!sgApiKey) {
-        return res.status(503).json({ message: "Email delivery is not available. Please contact support." });
-      }
+      const { fromName, replyTo: replyToEmail } = getBusinessSendParams(business);
 
       const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
       const gs = await getGrowthAutomationSettings(business.id);
@@ -3572,29 +3477,11 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
 </body>
 </html>`;
 
-      const personalization: any = { to: [{ email: to }] };
-      if (cc) {
-        const ccList = Array.isArray(cc) ? cc : [cc];
-        const validCc = ccList.filter((e: string) => e && e.includes("@"));
-        if (validCc.length > 0) personalization.cc = validCc.map((e: string) => ({ email: e }));
-      }
-
       const plainBody = customBody
         ? `${customBody}\n\nView your quote online: ${quoteUrl}`
         : `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}`;
 
-      const emailPayload: any = {
-        personalizations: [personalization],
-        from: { email: brandedFromEmail, name: fromName },
-        subject: subject || `Your ${business.companyName || "QuotePro"} Quote`,
-        content: [
-          { type: "text/plain", value: plainBody },
-          { type: "text/html", value: emailHtml },
-        ],
-        ...(replyToEmail ? { reply_to: { email: replyToEmail, name: fromName } } : {}),
-      };
-
-      // Attach files from the business file library
+      const mailAttachments: import("./mail").MailAttachment[] = [];
       if (attachmentFileIds && Array.isArray(attachmentFileIds) && attachmentFileIds.length > 0) {
         const fsLib = await import("fs");
         const pathLib = await import("path");
@@ -3603,42 +3490,42 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
           .from(businessFiles)
           .where(and(eq(businessFiles.businessId, business.id)));
         const requested = attachedFiles.filter(f => attachmentFileIds.includes(f.id));
-        const sgAttachments: any[] = [];
         for (const f of requested) {
           try {
             const absPath = pathLib.join(process.cwd(), f.fileUrl);
             const buf = fsLib.readFileSync(absPath);
-            sgAttachments.push({
-              content: buf.toString("base64"),
+            mailAttachments.push({
+              content: buf,
               filename: f.originalName,
-              type: f.fileType || "application/octet-stream",
-              disposition: "attachment",
+              contentType: f.fileType || "application/octet-stream",
             });
           } catch (e) {
             console.error("Failed to read attachment:", f.fileUrl, e);
           }
         }
-        if (sgAttachments.length > 0) {
-          emailPayload.attachments = sgAttachments;
-        }
       }
 
-      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${sgApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailPayload),
-      });
+      const validCc = cc
+        ? (Array.isArray(cc) ? cc : [cc]).filter((e: string) => e && e.includes("@"))
+        : [];
 
-      if (!sgRes.ok) {
-        const errText = await sgRes.text();
-        console.error("SendGrid error:", sgRes.status, errText);
-        return res.status(502).json({ message: parseSendGridError(errText, brandedFromEmail) });
+      try {
+        await sendEmail({
+          to,
+          cc: validCc.length > 0 ? validCc : undefined,
+          subject: subject || `Your ${business.companyName || "QuotePro"} Quote`,
+          html: emailHtml,
+          text: plainBody,
+          fromName,
+          replyTo: replyToEmail,
+          attachments: mailAttachments.length > 0 ? mailAttachments : undefined,
+        });
+      } catch (mailErr: any) {
+        console.error("[mail] Quote email error:", mailErr);
+        return res.status(502).json({ message: "Email could not be delivered. Please try again or contact support." });
       }
 
-      console.log(`Quote email sent via SendGrid: from=${brandedFromEmail}, to=${to}, quoteId=${quote.id}, status=${sgRes.status}`);
+      console.log(`[mail] Quote email sent to ${to} for quote ${quote.id}`);
 
       await createCommunication({
         businessId: business.id,
@@ -3752,10 +3639,7 @@ The email should:
         return res.status(400).json({ message: "Recipient email is required" });
       }
 
-      const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
-      if (!sgApiKey) {
-        return res.status(503).json({ message: "Email delivery is not available. Please contact support." });
-      }
+      const { fromName, replyTo: replyToEmail } = getBusinessSendParams(business);
 
       const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
       const primaryColor = (business as any).primaryColor || "#2563EB";
@@ -3839,35 +3723,21 @@ The email should:
 </body>
 </html>`;
 
-      const emailPayload: any = {
-        personalizations: [{ to: [{ email: to }] }],
-        from: { email: brandedFromEmail, name: fromName },
-        subject: subject || `Your ${business.companyName || "QuotePro"} Quote`,
-        content: [
-          { type: "text/plain", value: `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}` },
-          { type: "text/html", value: emailHtml },
-        ],
-      };
-      if (replyToEmail) {
-        emailPayload.reply_to = { email: replyToEmail, name: fromName };
+      try {
+        await sendEmail({
+          to,
+          subject: subject || `Your ${business.companyName || "QuotePro"} Quote`,
+          html: emailHtml,
+          text: `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}`,
+          fromName,
+          replyTo: replyToEmail,
+        });
+      } catch (mailErr: any) {
+        console.error("[mail] Onboarding quote email error:", mailErr);
+        return res.status(502).json({ message: "Email could not be delivered. Please try again or contact support." });
       }
 
-      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${sgApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailPayload),
-      });
-
-      if (!sgRes.ok) {
-        const errText = await sgRes.text();
-        console.error("SendGrid onboarding error:", sgRes.status, errText);
-        return res.status(502).json({ message: parseSendGridError(errText, brandedFromEmail) });
-      }
-
-      console.log(`Onboarding quote email sent: from=${brandedFromEmail}, to=${to}, quoteId=${quote.id}`);
+      console.log(`[mail] Onboarding quote email sent to ${to} for quote ${quote.id}`);
 
       await createCommunication({
         businessId: business.id,
@@ -3957,8 +3827,7 @@ The email should:
     const channel = comm.channel;
 
     if (channel === "email") {
-      const { apiKey: sgApiKey, fromEmail, fromName, replyTo } = getBusinessEmailSender(business);
-      if (!sgApiKey) return { success: false, message: "Email delivery is not available. Please contact support." };
+      const { fromName, replyTo } = getBusinessSendParams(business);
       const toEmail = customer?.email;
       if (!toEmail) return { success: false, message: "Customer email not found" };
       const quoteUrl = `${process.env.APP_URL || `https://${req.get("host")}`}/q/${quote.publicToken}`;
@@ -3968,22 +3837,11 @@ The email should:
       const subject = subjectMatch ? subjectMatch[1].trim() : `Following up on your quote from ${fromName}`;
       const body = subjectMatch ? messageText.replace(/^Subject:.*\n\n?/i, "").trim() : messageText;
       const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${body.split('\n').map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join('')}${quoteButtonHtml}</td></tr><tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
-      const emailPayload: any = {
-        personalizations: [{ to: [{ email: toEmail }] }],
-        from: { email: fromEmail, name: fromName },
-        subject,
-        content: [{ type: "text/plain", value: body }, { type: "text/html", value: htmlBody }],
-      };
-      if (replyTo) emailPayload.reply_to = { email: replyTo, name: fromName };
-      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify(emailPayload),
-      });
-      if (!sgRes.ok) {
-        const errText = await sgRes.text();
-        console.error("Follow-up email error:", sgRes.status, errText);
-        return { success: false, message: parseSendGridError(errText, fromEmail) };
+      try {
+        await sendEmail({ to: toEmail, subject, html: htmlBody, text: body, fromName, replyTo });
+      } catch (mailErr: any) {
+        console.error("[mail] Follow-up email error:", mailErr);
+        return { success: false, message: "Email could not be delivered. Please try again or contact support." };
       }
     } else {
       const twilioSid = process.env.TWILIO_ACCOUNT_SID;
@@ -4793,10 +4651,7 @@ ${contextStr}`;
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
-      if (!sgApiKey) {
-        return res.status(503).json({ message: "Email delivery is not available. Please contact support." });
-      }
+      const { fromName, replyTo: replyToEmail } = getBusinessSendParams(business);
 
       let bodyContent = body;
       let quoteButtonHtml = "";
@@ -4840,35 +4695,21 @@ ${contextStr}`;
 </body>
 </html>`;
 
-      const emailPayload: any = {
-        personalizations: [{ to: [{ email: to }] }],
-        from: { email: brandedFromEmail, name: fromName },
-        subject: subject || `Message from ${fromName}`,
-        content: [
-          { type: "text/plain", value: bodyContent },
-          { type: "text/html", value: htmlBody },
-        ],
-      };
-      if (replyToEmail) {
-        emailPayload.reply_to = { email: replyToEmail, name: fromName };
+      try {
+        await sendEmail({
+          to,
+          subject: subject || `Message from ${fromName}`,
+          html: htmlBody,
+          text: bodyContent,
+          fromName,
+          replyTo: replyToEmail,
+        });
+      } catch (mailErr: any) {
+        console.error("[mail] Send email error:", mailErr);
+        return res.status(502).json({ message: "Email could not be delivered. Please try again or contact support." });
       }
 
-      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${sgApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailPayload),
-      });
-
-      if (!sgRes.ok) {
-        const errText = await sgRes.text();
-        console.error("SendGrid error:", sgRes.status, errText);
-        return res.status(502).json({ message: parseSendGridError(errText, brandedFromEmail) });
-      }
-
-      console.log(`Email sent via SendGrid: from=${brandedFromEmail}, to=${to}, status=${sgRes.status}`);
+      console.log(`[mail] Email sent to ${to}`);
 
       await createCommunication({
         businessId: business.id,
@@ -7295,8 +7136,7 @@ Respond with JSON: {"reply": string}`
       const errors: string[] = [];
 
       if (isEmail) {
-        const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
-        if (!sgApiKey) return res.status(503).json({ message: "Email delivery is not available. Please contact support." });
+        const { fromName, replyTo: replyToEmail } = getBusinessSendParams(business);
 
         for (const customer of targetCustomers) {
           const email = customer.email;
@@ -7327,29 +7167,16 @@ Respond with JSON: {"reply": string}`
 </body></html>`;
 
           try {
-            const emailPayload: any = {
-              personalizations: [{ to: [{ email }] }],
-              from: { email: brandedFromEmail, name: fromName },
+            await sendEmail({
+              to: email,
               subject: personalizedSubject,
-              content: [
-                { type: "text/plain", value: personalizedContent },
-                { type: "text/html", value: htmlBody },
-              ],
-            };
-            if (replyToEmail) emailPayload.reply_to = { email: replyToEmail, name: fromName };
-
-            const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-              method: "POST",
-              headers: { "Authorization": `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
-              body: JSON.stringify(emailPayload),
+              html: htmlBody,
+              text: personalizedContent,
+              fromName,
+              replyTo: replyToEmail,
             });
-
-            if (sgRes.ok || sgRes.status === 202) {
-              sentCount++;
-              await createCommunication({ businessId: business.id, customerId: customer.id, channel: "email", direction: "outbound", content: personalizedContent, status: "sent" });
-            } else {
-              failCount++;
-            }
+            sentCount++;
+            await createCommunication({ businessId: business.id, customerId: customer.id, channel: "email", direction: "outbound", content: personalizedContent, status: "sent" });
           } catch (e) {
             failCount++;
           }
@@ -8836,17 +8663,14 @@ loadMonth(nextMo);
       const companyName = business?.companyName || "Your Cleaning Company";
       const confirmMsg = availability.confirmationMessage || `We look forward to seeing you! If you need to reschedule, please contact us.`;
 
-      const { apiKey: bookingSgKey, fromEmail: bookingFromEmail, fromName: bookingFromName, replyTo: bookingReplyTo } = getBusinessEmailSender(business);
-      const effectiveBookingKey = bookingSgKey || process.env.SENDGRID_API_KEY;
-      if (customerEmail && effectiveBookingKey) {
+      const { fromName: bookingFromName, replyTo: bookingReplyTo } = getBusinessSendParams(business);
+      if (customerEmail) {
         try {
-          const sgMail = await import("@sendgrid/mail");
-          (sgMail as any).default.setApiKey(effectiveBookingKey);
-          await (sgMail as any).default.send({
+          await sendEmail({
             to: customerEmail,
-            from: { name: bookingFromName, email: bookingFromEmail },
-            ...(bookingReplyTo ? { replyTo: bookingReplyTo } : {}),
             subject: `Your cleaning is booked for ${bookingDateStr}`,
+            fromName: bookingFromName,
+            replyTo: bookingReplyTo,
             html: `
               <div style="font-family:Inter,system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px">
                 <h1 style="font-size:24px;font-weight:800;color:#0F172A;margin:0 0 4px">You're all booked!</h1>
@@ -8865,7 +8689,7 @@ loadMonth(nextMo);
             `,
           });
         } catch (emailErr) {
-          console.error("Booking confirmation email failed:", emailErr);
+          console.error("[mail] Booking confirmation email failed:", emailErr);
         }
       }
 
@@ -11105,31 +10929,20 @@ Rules:
 </body>
 </html>`;
 
-      const { apiKey: sgApiKey, fromEmail, fromName: senderFromName, replyTo: intakeReplyTo } = getBusinessEmailSender(business);
-      if (!sgApiKey) return res.status(500).json({ message: "Email delivery is not available. Please contact support." });
+      const { fromName: senderFromName, replyTo: intakeReplyTo } = getBusinessSendParams(business);
 
-      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: toEmail.trim(), name: recipientName }] }],
-          from: { email: fromEmail, name: senderFromName || companyName },
-          ...(intakeReplyTo ? { reply_to: { email: intakeReplyTo, name: senderName } } : {}),
+      try {
+        await sendEmail({
+          to: toEmail.trim(),
           subject: `Your cleaning estimate from ${companyName}`,
-          content: [
-            { type: "text/plain", value: plainText },
-            { type: "text/html", value: htmlEmail },
-          ],
-          // Disable SendGrid click tracking — we use our own /r/:token short links
-          tracking_settings: {
-            click_tracking: { enable: false, enable_text: false },
-          },
-        }),
-      });
-      if (!sgRes.ok) {
-        const errText = await sgRes.text();
-        console.error("Send intake link email error:", errText);
-        return res.status(500).json({ message: parseSendGridError(errText, fromEmail) });
+          html: htmlEmail,
+          text: plainText,
+          fromName: senderFromName || companyName,
+          replyTo: intakeReplyTo,
+        });
+      } catch (mailErr: any) {
+        console.error("[mail] Intake link email error:", mailErr);
+        return res.status(500).json({ message: "Email could not be delivered. Please try again or contact support." });
       }
       res.json({ success: true });
     } catch (e: any) {
@@ -11183,10 +10996,10 @@ Rules:
           messageText = await generateFollowUpMessage(quote, customer, business, comm.channel);
         }
         if (comm.channel === "email") {
-          const { apiKey: sgApiKey, fromEmail, fromName, replyTo } = getBusinessEmailSender(business);
+          const { fromName, replyTo } = getBusinessSendParams(business);
           const toEmail = customer?.email;
-          if (!sgApiKey || !toEmail) {
-            await updateCommunication(comm.id, { status: "failed", errorMessage: !sgApiKey ? "No SendGrid key configured" : "No customer email" });
+          if (!toEmail) {
+            await updateCommunication(comm.id, { status: "failed", errorMessage: "No customer email" });
             continue;
           }
           const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
@@ -11196,21 +11009,11 @@ Rules:
           const subject = subjectMatch ? subjectMatch[1].trim() : `Following up on your quote from ${fromName}`;
           const body = subjectMatch ? messageText.replace(/^Subject:.*\n\n?/i, "").trim() : messageText;
           const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${body.split('\n').map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join('')}${quoteButtonHtml}</td></tr><tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
-          const emailPayload: any = {
-            personalizations: [{ to: [{ email: toEmail }] }],
-            from: { email: fromEmail, name: fromName },
-            subject,
-            content: [{ type: "text/plain", value: body }, { type: "text/html", value: htmlBody }],
-          };
-          if (replyTo) emailPayload.reply_to = { email: replyTo, name: fromName };
-          const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify(emailPayload),
-          });
-          if (!sgRes.ok) {
-            const errText = await sgRes.text();
-            await updateCommunication(comm.id, { status: "failed", errorMessage: errText.slice(0, 200) });
+          try {
+            await sendEmail({ to: toEmail, subject, html: htmlBody, text: body, fromName, replyTo });
+          } catch (mailErr: any) {
+            console.error("[mail] Auto follow-up email error:", mailErr);
+            await updateCommunication(comm.id, { status: "failed", errorMessage: String(mailErr?.message || mailErr).slice(0, 200) });
             continue;
           }
         } else {
@@ -11603,9 +11406,6 @@ Rules:
     const hour = now.getHours();
     if (hour < 7 || hour > 9) return; // Only 7-9am
 
-    const sgApiKey = process.env.SENDGRID_API_KEY;
-    if (!sgApiKey) return;
-    const platformFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
 
     try {
       const businessIds = await getAllBusinessIds();
@@ -11679,26 +11479,18 @@ Rules:
 </div>
 </body></html>`;
 
-          const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              personalizations: [{ to: [{ email: toEmail }] }],
-              from: { email: platformFromEmail, name: "QuotePro" },
+          try {
+            await sendEmail({
+              to: toEmail,
               subject: `Your week in review — ${stats.sentCount} quote${stats.sentCount !== 1 ? "s" : ""} sent, $${stats.revenueWon.toFixed(0)} won`,
-              content: [
-                { type: "text/plain", value: `${company_name} Weekly Snapshot\nQuotes Sent: ${stats.sentCount}\nWon: ${stats.acceptedCount}\nRevenue Won: $${stats.revenueWon.toFixed(2)}\nAll-Time Revenue: $${totalStats.totalRevenue.toFixed(2)}` },
-                { type: "text/html", value: emailHtml },
-              ],
-            }),
-          });
-
-          if (sgRes.ok) {
+              html: emailHtml,
+              text: `${company_name} Weekly Snapshot\nQuotes Sent: ${stats.sentCount}\nWon: ${stats.acceptedCount}\nRevenue Won: $${stats.revenueWon.toFixed(2)}\nAll-Time Revenue: $${totalStats.totalRevenue.toFixed(2)}`,
+              fromName: PLATFORM_FROM_NAME,
+            });
             await markWeeklyDigestSent(businessId);
             console.log(`[digest] Weekly digest sent to ${toEmail} for business ${businessId}`);
-          } else {
-            const err = await sgRes.text();
-            console.error(`[digest] SendGrid error for ${businessId}:`, err);
+          } catch (err) {
+            console.error(`[digest] Mail error for business ${businessId}:`, err);
           }
         } catch (e) {
           console.error(`[digest] Error for business ${businessId}:`, e);
@@ -12077,8 +11869,7 @@ Rules:
       const bookingLink = business.bookingLink || "";
       const senderName = business.senderName || business.companyName || "Your Cleaning Team";
       const businessName = business.companyName || "Your Cleaning Company";
-      const { apiKey: seqSgKey, fromEmail: seqFromEmail, fromName: seqFromName, replyTo: seqReplyTo } = getBusinessEmailSender(business);
-      if (!seqSgKey) return res.status(503).json({ message: "Email delivery is not configured. Please contact support." });
+      const { fromName: seqFromName, replyTo: seqReplyTo } = getBusinessSendParams(business);
 
       const replacePlaceholders = (text: string) =>
         text
@@ -12091,53 +11882,41 @@ Rules:
       const bodyText = replacePlaceholders(step.body);
       const htmlBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;line-height:1.6;">${bodyText.replace(/\n/g, "<br>")}</div>`;
 
-      const seqEmailPayload: any = {
-        personalizations: [{ to: [{ email: enrollment.customerEmail, name: enrollment.customerName }] }],
-        from: { email: seqFromEmail, name: seqFromName },
-        ...(seqReplyTo ? { reply_to: { email: seqReplyTo, name: seqFromName } } : {}),
-        subject,
-        content: [{ type: "text/plain", value: bodyText }, { type: "text/html", value: htmlBody }],
-      };
-
       // Attach files from the business file library (if provided)
       const { attachmentFileIds: seqAttachIds } = req.body;
+      const seqMailAttachments: import("./mail").MailAttachment[] = [];
       if (seqAttachIds && Array.isArray(seqAttachIds) && seqAttachIds.length > 0) {
         const fsLib2 = await import("fs");
         const pathLib2 = await import("path");
         const allBizFiles = await db.select().from(businessFiles).where(eq(businessFiles.businessId, business.id));
         const requestedFiles = allBizFiles.filter(f => seqAttachIds.includes(f.id));
-        const sgFileAttachments: any[] = [];
         for (const f of requestedFiles) {
           try {
             const absPath = pathLib2.join(process.cwd(), f.fileUrl);
             const buf = fsLib2.readFileSync(absPath);
-            sgFileAttachments.push({
-              content: buf.toString("base64"),
+            seqMailAttachments.push({
+              content: buf,
               filename: f.originalName,
-              type: f.fileType || "application/octet-stream",
-              disposition: "attachment",
+              contentType: f.fileType || "application/octet-stream",
             });
           } catch (e) {
             console.error("Failed to read sequence attachment:", f.fileUrl, e);
           }
         }
-        if (sgFileAttachments.length > 0) {
-          seqEmailPayload.attachments = sgFileAttachments;
-        }
       }
 
-      const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${seqSgKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(seqEmailPayload),
-      });
-
-      if (!sgRes.ok) {
-        const errText = await sgRes.text();
-        console.error("SendGrid sequence error:", sgRes.status, errText);
+      try {
+        await sendEmail({
+          to: enrollment.customerEmail,
+          subject,
+          html: htmlBody,
+          text: bodyText,
+          fromName: seqFromName,
+          replyTo: seqReplyTo,
+          attachments: seqMailAttachments.length > 0 ? seqMailAttachments : undefined,
+        });
+      } catch (mailErr: any) {
+        console.error("[mail] Sequence email error:", mailErr);
         return res.status(502).json({ message: "Email could not be delivered. Please try again or contact support." });
       }
 

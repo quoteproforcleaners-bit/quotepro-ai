@@ -1,0 +1,166 @@
+I need you to replace the current outbound email provider in QuotePro from SendGrid to Zoho, and refactor the email architecture so it works properly for a multi-tenant SaaS app.
+
+Goal:
+Stop using SendGrid for outbound customer emails and instead send mail through my Zoho mailbox/API using:
+quote@getquotepro.ai
+
+This needs to become the default sending identity for the platform.
+
+Important context:
+QuotePro is a multi-tenant SaaS app for cleaning businesses.
+Each tenant is a different cleaning company.
+Tenants need to send quotes, follow-ups, confirmations, reminders, review asks, and other customer-facing emails from inside the app.
+
+Current problem:
+The app currently throws sender verification/authentication errors because it is trying to use tenant email addresses as senders in a way that does not work for a multi-tenant system.
+This creates friction and exposes infrastructure-level issues to end users.
+
+New required architecture:
+- Replace SendGrid with Zoho SMTP or Zoho Mail API
+- All outbound mail should send from: quote@getquotepro.ai
+- The tenant’s business name should be used as the From display name when possible
+- The tenant’s business email should be used as Reply-To, not as the actual From email
+
+Example:
+From: Mike’s Cleaning <quote@getquotepro.ai>
+Reply-To: owner@mikescleaning.com
+
+This is the model I want implemented.
+
+What I need you to do:
+1. Audit the current email-sending implementation
+2. Find all places SendGrid is used
+3. Replace SendGrid with Zoho SMTP/API
+4. Refactor the email architecture so all outbound emails send from quote@getquotepro.ai
+5. Use tenant email only as Reply-To
+6. Remove any tenant-facing sender verification logic/messages
+7. Make the solution low-friction and production-ready
+
+Please investigate in the codebase:
+- all SendGrid dependencies
+- all SendGrid env vars
+- all mail helper/service files
+- all routes/server actions/functions that send email
+- all UI flows that trigger email sending
+- any current sender-authentication error handling
+- any tenant/company settings related to sender email
+- current email templates and email composition logic
+
+Preferred implementation:
+Use the best Zoho-supported sending method for this codebase and deployment environment.
+
+Priority order:
+1. Zoho Mail API if it is cleaner and more reliable
+2. Zoho SMTP if that is simpler/faster in the current stack
+
+Please decide the best option after inspecting the codebase and explain why.
+
+Requirements for the new email system:
+- actual sender email must always be quote@getquotepro.ai
+- tenant business name should appear as sender display name if available
+- tenant business email should be Reply-To if valid
+- fallback behavior should be sensible if tenant email is missing
+- all major outbound email flows must work with the new provider
+
+Outbound flows that must be updated:
+- send quote
+- follow-up emails
+- thank-you emails
+- reminders
+- upsell emails
+- review ask emails
+- payment issue emails
+- appointment confirmations
+- intake form emails
+- any other customer-facing mail sent by the app
+
+Tenant UX requirements:
+I do NOT want tenants to:
+- verify senders
+- log into SendGrid
+- deal with SPF/DKIM/provider instructions
+- see raw mail-provider errors
+
+Tenant experience should be:
+- enter business name
+- enter business email for reply-to
+- send email immediately from QuotePro
+
+If tenant email is missing or invalid:
+- show a clean in-app validation message
+- tell them to add a business reply-to email in settings
+- do not expose provider jargon
+
+Provider migration requirements:
+Please remove or refactor:
+- SendGrid SDK usage
+- SendGrid-specific service modules
+- SendGrid error messaging
+- any sender verification links/buttons/instructions in the UI
+- any assumptions that each tenant needs a verified sender identity
+
+Please add/implement:
+- Zoho mail service module
+- centralized outbound mail helper
+- clean config/env handling for Zoho credentials
+- reply-to logic
+- from-name logic
+- error logging and diagnostics
+- provider-agnostic structure where possible for future extensibility
+
+Environment/config needs:
+Please identify and document the exact environment variables needed for Zoho.
+Examples may include:
+- ZOHO_SMTP_HOST
+- ZOHO_SMTP_PORT
+- ZOHO_SMTP_USER
+- ZOHO_SMTP_PASS
+or Zoho API credentials if API is chosen
+
+Please update the code to use the correct env vars and document what I need to set.
+
+Architecture requirements:
+Please centralize email sending behind one reusable service so future provider changes are easy.
+The code should not have provider logic scattered everywhere.
+
+I want:
+- one mail service layer
+- provider adapter or clean abstraction if appropriate
+- consistent sendEmail interface used across the app
+
+Error-handling requirements:
+- log real technical errors internally
+- return clean user-facing errors
+- do not show Zoho/SMTP/provider internals to tenants
+- preserve user workflow if sending fails where appropriate
+- make sure failed sends are diagnosable by me
+
+Deliverables:
+1. Explain the root cause of the current SendGrid issue
+2. Explain why centralized sending from quote@getquotepro.ai is correct
+3. Decide whether Zoho SMTP or Zoho API is better for this app and explain why
+4. Implement the migration away from SendGrid
+5. Refactor all email flows to use Zoho
+6. Update any settings/UI that still assume tenant sender verification
+7. Show exact files/functions changed
+8. Document required environment variables and setup steps
+9. Explain how to test the full email flow end to end
+
+Success criteria:
+- SendGrid is no longer used for outbound customer emails
+- outbound email sends from quote@getquotepro.ai through Zoho
+- tenant business name appears in the sender display name when appropriate
+- replies go to the tenant’s business email
+- tenants do not need sender verification
+- the app no longer exposes provider-level verification errors
+- all major email flows work reliably in the multi-tenant app
+
+Important:
+Do not stop at analysis.
+Inspect the real code, implement the Zoho migration, refactor the email architecture, and summarize exactly what changed.
+
+Before coding, first explain:
+1. where SendGrid is currently wired in
+2. whether Zoho SMTP or Zoho API is the better implementation here
+3. how you will migrate the app safely
+Then implement it.
