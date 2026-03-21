@@ -79,7 +79,7 @@ ensurePreviewReachable = "/status"
 
 [userenv.shared]
 TWILIO_PHONE_NUMBER = "+19047887925"
-SENDGRID_FROM_EMAIL = "quotes@myreminder.ai"
+SENDGRID_FROM_EMAIL = "quotes@getquotepro.ai"
 QBO_ENCRYPTION_KEY = "e7439fed61c39dd5eb27f3242fb7fb7954db5d08a682371c5ffb269be807993f"
 JOBBER_CLIENT_ID = "e7801669-3119-4785-9668-e041e35324ad"
 ENABLE_JOBBER_INTEGRATION = "true"

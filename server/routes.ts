@@ -1789,7 +1789,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
             ].filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n");
 
             const primaryColor = (business as any).primaryColor || "#2563EB";
-            const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+            const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
 
             const detailRows = [
               dateStr ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Date</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${dateStr}</td></tr>` : "",
@@ -3236,7 +3236,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
         return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
       }
 
-      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
       const fromName = business.companyName || "QuotePro";
       const replyToEmail = business.email || undefined;
 
@@ -3568,7 +3568,7 @@ The email should:
         return res.status(503).json({ message: "Email service not configured" });
       }
 
-      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
       const fromName = business.companyName || "QuotePro";
       const replyToEmail = business.email || undefined;
 
@@ -3783,7 +3783,7 @@ The email should:
       if (!sgApiKey) return { success: false, message: "Email service not configured" };
       const toEmail = customer?.email;
       if (!toEmail) return { success: false, message: "Customer email not found" };
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
       const replyTo = business?.email;
       const fromName = business?.companyName || "QuotePro";
       const quoteUrl = `${process.env.APP_URL || `https://${req.get("host")}`}/q/${quote.publicToken}`;
@@ -4623,7 +4623,7 @@ ${contextStr}`;
         return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
       }
 
-      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
       const fromName = business.companyName || "QuotePro";
       const replyToEmail = business.email || undefined;
 
@@ -7138,7 +7138,7 @@ Respond with JSON: {"reply": string}`
         const sgApiKey = process.env.SENDGRID_API_KEY;
         if (!sgApiKey) return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
 
-        const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+        const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
         const fromName = business.companyName || "QuotePro";
         const replyToEmail = business.email || undefined;
         if (!replyToEmail) return res.status(400).json({ message: "Please add your email address in Settings before sending emails." });
@@ -10950,7 +10950,7 @@ Rules:
       const sgApiKey = process.env.SENDGRID_API_KEY;
       if (!sgApiKey) return res.status(500).json({ message: "Email not configured" });
 
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
@@ -11032,7 +11032,7 @@ Rules:
             await updateCommunication(comm.id, { status: "failed", errorMessage: !sgApiKey ? "No SendGrid key" : "No customer email" });
             continue;
           }
-          const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+          const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
           const fromName = business?.companyName || "QuotePro";
           const replyTo = business?.email;
           const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
@@ -11438,7 +11438,7 @@ Rules:
 
     const sgApiKey = process.env.SENDGRID_API_KEY;
     if (!sgApiKey) return;
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
 
     try {
       const businessIds = await getAllBusinessIds();
