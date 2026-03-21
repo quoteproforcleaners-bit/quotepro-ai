@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "../lib/api";
 import {
   AlertCircle, CheckCircle, Plus, Search, Users, X, Zap,
-  MessageSquare, Mail, Send, CalendarDays, MapPin, SkipForward,
+  MessageSquare, Mail, Send, CalendarDays, MapPin, SkipForward, Repeat,
 } from "lucide-react";
 import { Button } from "./ui";
 
@@ -282,6 +282,14 @@ export function QuickAddCleanPanel({
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
+  // ── Recurring state ─────────────────────────────────────────────────────────
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recFrequency, setRecFrequency] = useState<"weekly" | "biweekly" | "monthly" | "custom">("biweekly");
+  const [recInterval, setRecInterval] = useState("1");
+  const [recUnit, setRecUnit] = useState<"week" | "month">("week");
+  const [recHasEnd, setRecHasEnd] = useState(false);
+  const [recEndDate, setRecEndDate] = useState("");
+
   // ── Notify step state ───────────────────────────────────────────────────────
   const [step, setStep] = useState<PanelStep>("form");
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
@@ -318,6 +326,8 @@ export function QuickAddCleanPanel({
     setTime("09:00");
     setDuration("3");
     setTeamMembers([]); setTeamInput(""); setNotes(""); setError("");
+    setIsRecurring(false); setRecFrequency("biweekly"); setRecInterval("1"); setRecUnit("week");
+    setRecHasEnd(false); setRecEndDate("");
   }, [open]);
 
   useEffect(() => {
@@ -379,6 +389,18 @@ export function QuickAddCleanPanel({
       setStep("notify");
     },
     onError: (e: any) => setError(e?.message || "Failed to save"),
+  });
+
+  const saveSeriesMutation = useMutation({
+    mutationFn: (data: any) => apiPost("/api/recurring-series", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recurring-series"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes/unscheduled-accepted"] });
+      onClose();
+    },
+    onError: (e: any) => setError(e?.message || "Failed to save series"),
   });
 
   const handleSend = async () => {
@@ -443,6 +465,42 @@ export function QuickAddCleanPanel({
 
     if (!price.trim() || isNaN(Number(price))) { setError("Please enter a valid price."); return; }
 
+    const [y, mo, d] = date.split("-").map(Number);
+    const [hr, mn] = time.split(":").map(Number);
+    const startDt = new Date(y, mo - 1, d, hr, mn);
+    const endDt = new Date(startDt);
+    endDt.setHours(endDt.getHours() + parseFloat(duration));
+
+    if (isRecurring) {
+      // Build interval/frequency for series
+      let frequencyVal: string;
+      let intervalVal: number;
+      let unitVal: string;
+      if (recFrequency === "weekly") { frequencyVal = "weekly"; intervalVal = 1; unitVal = "week"; }
+      else if (recFrequency === "biweekly") { frequencyVal = "biweekly"; intervalVal = 2; unitVal = "week"; }
+      else if (recFrequency === "monthly") { frequencyVal = "monthly"; intervalVal = 1; unitVal = "month"; }
+      else { frequencyVal = "custom"; intervalVal = parseInt(recInterval) || 1; unitVal = recUnit; }
+
+      saveSeriesMutation.mutate({
+        customerId,
+        quoteId: prefill?.quoteId || null,
+        jobType: serviceType,
+        address,
+        total: Number(price),
+        internalNotes: notes,
+        teamMembers,
+        frequency: frequencyVal,
+        intervalValue: intervalVal,
+        intervalUnit: unitVal,
+        arrivalTime: time,
+        durationHours: parseFloat(duration),
+        startDate: date,
+        endDate: recHasEnd && recEndDate ? recEndDate : null,
+        status: "active",
+      });
+      return;
+    }
+
     // Stash contact info for the notify step
     setNotifyPhone(phone);
     setNotifyEmail(email);
@@ -452,11 +510,9 @@ export function QuickAddCleanPanel({
     setNotifySms(!!phone);
     setNotifyEmailChecked(!!email);
 
-    const [y, mo, d] = date.split("-").map(Number);
-    const [hr, mn] = time.split(":").map(Number);
-    const startDt = new Date(y, mo - 1, d, hr, mn);
-    const endDt = new Date(startDt);
-    endDt.setHours(endDt.getHours() + parseFloat(duration));
+    setNotifyDate(startDt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }));
+    setNotifyTime(startDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }));
+    setNotifyEndTime(endDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }));
 
     saveMutation.mutate({
       customerId,
@@ -692,6 +748,115 @@ export function QuickAddCleanPanel({
                 </div>
               </div>
 
+              {/* Recurring section */}
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  data-testid="btn-toggle-recurring"
+                  onClick={() => setIsRecurring((v) => !v)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold ${
+                    isRecurring
+                      ? "border-violet-500 bg-violet-50 text-violet-700"
+                      : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300"
+                  }`}
+                >
+                  <Repeat className={`w-4 h-4 ${isRecurring ? "text-violet-600" : "text-slate-400"}`} />
+                  <span className="flex-1 text-left">
+                    {isRecurring ? "Recurring series" : "Make this a recurring series"}
+                  </span>
+                  <div className={`w-10 h-5 rounded-full transition-colors flex items-center ${isRecurring ? "bg-violet-500" : "bg-slate-300"}`}>
+                    <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-0.5 ${isRecurring ? "translate-x-5" : "translate-x-0"}`} />
+                  </div>
+                </button>
+
+                {isRecurring ? (
+                  <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-4">
+                    <div>
+                      <p className="text-xs font-bold text-violet-600 uppercase tracking-wide mb-2">Frequency</p>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {(["weekly", "biweekly", "monthly", "custom"] as const).map((f) => (
+                          <button
+                            key={f}
+                            onClick={() => setRecFrequency(f)}
+                            data-testid={`btn-freq-${f}`}
+                            className={`py-2 rounded-lg text-xs font-bold border transition-all ${
+                              recFrequency === f
+                                ? "bg-violet-600 border-violet-600 text-white"
+                                : "border-violet-200 text-violet-600 hover:border-violet-400 bg-white"
+                            }`}
+                          >
+                            {f === "biweekly" ? "Bi-weekly" : f.charAt(0).toUpperCase() + f.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {recFrequency === "custom" ? (
+                      <div>
+                        <p className="text-xs font-bold text-violet-600 uppercase tracking-wide mb-2">Custom interval</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-violet-700">Every</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="52"
+                            data-testid="input-rec-interval"
+                            className="w-16 border border-violet-300 rounded-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-2 focus:ring-violet-400"
+                            value={recInterval}
+                            onChange={(e) => setRecInterval(e.target.value)}
+                          />
+                          <div className="flex gap-1">
+                            {(["week", "month"] as const).map((u) => (
+                              <button
+                                key={u}
+                                onClick={() => setRecUnit(u)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                                  recUnit === u
+                                    ? "bg-violet-600 text-white border-violet-600"
+                                    : "border-violet-200 text-violet-600 bg-white hover:border-violet-400"
+                                }`}
+                              >
+                                {u}s
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-violet-600 uppercase tracking-wide">End date</p>
+                        <button
+                          onClick={() => setRecHasEnd((v) => !v)}
+                          className={`text-xs font-semibold px-2 py-1 rounded-md transition-colors ${recHasEnd ? "bg-violet-200 text-violet-700" : "bg-white border border-violet-200 text-violet-500"}`}
+                        >
+                          {recHasEnd ? "Set" : "No end date"}
+                        </button>
+                      </div>
+                      {recHasEnd ? (
+                        <input
+                          type="date"
+                          data-testid="input-rec-end-date"
+                          className="w-full border border-violet-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-400"
+                          value={recEndDate}
+                          onChange={(e) => setRecEndDate(e.target.value)}
+                          min={date}
+                        />
+                      ) : null}
+                    </div>
+
+                    <div className="bg-white border border-violet-200 rounded-lg px-3 py-2 text-xs text-violet-700 font-medium">
+                      {recFrequency === "weekly" && `Repeats every week on the same day`}
+                      {recFrequency === "biweekly" && `Repeats every 2 weeks on the same day`}
+                      {recFrequency === "monthly" && `Repeats monthly on the same date`}
+                      {recFrequency === "custom" && `Repeats every ${recInterval || 1} ${recUnit}${(parseInt(recInterval) || 1) > 1 ? "s" : ""}`}
+                      {recHasEnd && recEndDate ? ` · until ${new Date(recEndDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : " · ongoing"}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
                   <Users className="w-3.5 h-3.5" /> Team Members
@@ -753,11 +918,11 @@ export function QuickAddCleanPanel({
             <div className="shrink-0 px-5 py-4 border-t border-slate-100">
               <Button
                 onClick={handleSave}
-                loading={saveMutation.isPending || createCustomerMutation.isPending}
-                className="w-full justify-center"
+                loading={saveMutation.isPending || saveSeriesMutation.isPending || createCustomerMutation.isPending}
+                className={`w-full justify-center ${isRecurring ? "bg-violet-600 hover:bg-violet-700" : ""}`}
                 data-testid="btn-save-quick-add"
               >
-                Save & Schedule Clean
+                {isRecurring ? "Create Recurring Series" : "Save & Schedule Clean"}
               </Button>
             </div>
           </>

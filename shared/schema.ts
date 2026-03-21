@@ -201,6 +201,33 @@ export const quoteLineItems = pgTable("quote_line_items", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const recurringCleanSeries = pgTable("recurring_clean_series", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  customerId: varchar("customer_id").references(() => customers.id),
+  quoteId: varchar("quote_id").references(() => quotes.id),
+  frequency: text("frequency").notNull().default("weekly"),
+  intervalValue: integer("interval_value").notNull().default(1),
+  intervalUnit: text("interval_unit").notNull().default("weeks"),
+  dayOfWeek: integer("day_of_week"),
+  dayOfMonth: integer("day_of_month"),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date"),
+  status: text("status").notNull().default("active"),
+  defaultPrice: real("default_price"),
+  jobType: text("job_type").notNull().default("regular"),
+  address: text("address").notNull().default(""),
+  durationHours: real("duration_hours").notNull().default(3),
+  teamMembers: jsonb("team_members").$type<string[]>().default([]),
+  internalNotes: text("internal_notes").notNull().default(""),
+  arrivalTime: text("arrival_time").notNull().default("09:00"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type RecurringCleanSeries = typeof recurringCleanSeries.$inferSelect;
+export type InsertRecurringCleanSeries = typeof recurringCleanSeries.$inferInsert;
+
 export const jobs = pgTable("jobs", {
   id: varchar("id")
     .primaryKey()
@@ -212,6 +239,9 @@ export const jobs = pgTable("jobs", {
     .references(() => customers.id),
   quoteId: varchar("quote_id")
     .references(() => quotes.id),
+  seriesId: varchar("series_id").references(() => recurringCleanSeries.id),
+  seriesException: boolean("series_exception").notNull().default(false),
+  skipped: boolean("skipped").notNull().default(false),
   jobType: text("job_type").notNull().default("regular"),
   status: text("status").notNull().default("scheduled"),
   startDatetime: timestamp("start_datetime").notNull(),

@@ -28,6 +28,9 @@ import {
   EyeOff,
   ArrowRight,
   Image as ImageIcon,
+  Repeat,
+  SkipForward,
+  AlertCircle,
 } from "lucide-react";
 import { apiPost, apiPut, apiGet, apiDelete } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
@@ -445,6 +448,28 @@ function OverviewTab({
   rateMutation,
 }: any) {
   const [ratingValue, setRatingValue] = useState(job.satisfactionRating || 0);
+  const [skipConfirm, setSkipConfirm] = useState(false);
+
+  const { data: series } = useQuery<any>({
+    queryKey: [`/api/recurring-series/${job.seriesId}`],
+    enabled: !!job.seriesId,
+  });
+
+  const skipMutation = useMutation({
+    mutationFn: () => apiPost(`/api/jobs/${job.id}/skip`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs/calendar"] });
+      setSkipConfirm(false);
+    },
+  });
+
+  const FREQ_LABEL: Record<string, string> = {
+    weekly: "Every week",
+    biweekly: "Every 2 weeks",
+    monthly: "Every month",
+    custom: "Custom interval",
+  };
 
   return (
     <div className="space-y-6">
@@ -546,6 +571,65 @@ function OverviewTab({
           <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
             <p className="text-sm text-slate-700 whitespace-pre-wrap">{job.internalNotes}</p>
           </div>
+        </div>
+      ) : null}
+
+      {job.seriesId ? (
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Repeat className="w-4 h-4 text-violet-600" />
+            <p className="text-sm font-semibold text-violet-700">Recurring Series</p>
+            {series ? (
+              <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${
+                series.status === "active" ? "bg-emerald-100 text-emerald-700" :
+                series.status === "paused" ? "bg-amber-100 text-amber-700" :
+                "bg-slate-100 text-slate-500"
+              }`}>
+                {series.status}
+              </span>
+            ) : null}
+          </div>
+          {series ? (
+            <p className="text-xs text-violet-600 font-medium">
+              {FREQ_LABEL[series.frequency] || series.frequency}
+              {series.arrivalTime ? ` · ${series.arrivalTime}` : ""}
+              {series.endDate ? ` · until ${new Date(series.endDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : " · ongoing"}
+            </p>
+          ) : null}
+          {job.skipped ? (
+            <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <AlertCircle className="w-3.5 h-3.5" />
+              This occurrence is skipped
+            </div>
+          ) : null}
+          {!job.skipped && job.status !== "completed" ? (
+            skipConfirm ? (
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-slate-600 flex-1">Skip this occurrence?</p>
+                <button
+                  onClick={() => skipMutation.mutate()}
+                  disabled={skipMutation.isPending}
+                  className="text-xs font-semibold px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
+                >
+                  {skipMutation.isPending ? "Skipping…" : "Yes, skip"}
+                </button>
+                <button
+                  onClick={() => setSkipConfirm(false)}
+                  className="text-xs font-semibold px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setSkipConfirm(true)}
+                className="flex items-center gap-1.5 text-xs text-violet-600 font-semibold hover:text-violet-800 transition-colors"
+              >
+                <SkipForward className="w-3.5 h-3.5" />
+                Skip this occurrence
+              </button>
+            )
+          ) : null}
         </div>
       ) : null}
 

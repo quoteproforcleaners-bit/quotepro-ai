@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, gte, lte, ilike, or, sql, isNotNull, isNull, lt } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, ilike, or, sql, isNotNull, isNull, lt, inArray } from "drizzle-orm";
 import { db, pool } from "./db";
 import {
   users,
@@ -8,6 +8,8 @@ import {
   quotes,
   quoteFollowUps,
   quoteLineItems,
+  recurringCleanSeries,
+  type RecurringCleanSeries,
   jobs,
   jobChecklistItems,
   jobPhotos,
@@ -507,6 +509,9 @@ export async function createJob(data: {
   businessId: string;
   customerId?: string;
   quoteId?: string;
+  seriesId?: string;
+  seriesException?: boolean;
+  skipped?: boolean;
   jobType: string;
   status?: string;
   startDatetime: Date;
@@ -515,6 +520,7 @@ export async function createJob(data: {
   internalNotes?: string;
   address?: string;
   total?: number;
+  teamMembers?: string[];
 }): Promise<Job> {
   const [j] = await db
     .insert(jobs)
@@ -522,6 +528,9 @@ export async function createJob(data: {
       businessId: data.businessId,
       customerId: data.customerId || null,
       quoteId: data.quoteId || null,
+      seriesId: data.seriesId || null,
+      seriesException: data.seriesException || false,
+      skipped: data.skipped || false,
       jobType: data.jobType,
       status: data.status || "scheduled",
       startDatetime: data.startDatetime,
@@ -530,6 +539,7 @@ export async function createJob(data: {
       internalNotes: data.internalNotes || "",
       address: data.address || "",
       total: data.total || null,
+      teamMembers: data.teamMembers || [],
     })
     .returning();
   return j;
@@ -562,6 +572,253 @@ export async function updateJob(
 
 export async function deleteJob(id: string): Promise<void> {
   await db.delete(jobs).where(eq(jobs.id, id));
+}
+
+// ─── Recurring Clean Series ────────────────────────────────────────────────
+
+function addWeeks(date: Date, n: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n * 7);
+  return d;
+}
+
+function addMonths(date: Date, n: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + n);
+  return d;
+}
+
+export function getOccurrenceDates(
+  series: RecurringCleanSeries,
+  from: Date,
+  to: Date
+): Date[] {
+  const results: Date[] = [];
+  const start = new Date(series.startDate + "T00:00:00");
+  const endDate = series.endDate ? new Date(series.endDate + "T00:00:00") : null;
+
+  let cursor = new Date(start);
+  const maxIter = 500;
+  let iter = 0;
+
+  while (cursor <= to && iter < maxIter) {
+    iter++;
+    if (endDate && cursor > endDate) break;
+
+    if (cursor >= from) {
+      results.push(new Date(cursor));
+    }
+
+    switch (series.frequency) {
+      case "weekly":
+        cursor = addWeeks(cursor, 1);
+        break;
+      case "biweekly":
+        cursor = addWeeks(cursor, 2);
+        break;
+      case "monthly":
+        cursor = addMonths(cursor, 1);
+        break;
+      case "custom":
+        if (series.intervalUnit === "months") {
+          cursor = addMonths(cursor, series.intervalValue || 1);
+        } else {
+          cursor = addWeeks(cursor, series.intervalValue || 1);
+        }
+        break;
+      default:
+        cursor = addWeeks(cursor, 1);
+    }
+  }
+
+  return results;
+}
+
+export async function generateSeriesJobs(
+  seriesId: string,
+  daysAhead = 90
+): Promise<void> {
+  const [series] = await db
+    .select()
+    .from(recurringCleanSeries)
+    .where(eq(recurringCleanSeries.id, seriesId));
+
+  if (!series || series.status === "cancelled") return;
+
+  const from = new Date();
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(from);
+  to.setDate(to.getDate() + daysAhead);
+
+  const occurrences = getOccurrenceDates(series, from, to);
+
+  const existing = await db
+    .select({ startDatetime: jobs.startDatetime })
+    .from(jobs)
+    .where(
+      and(
+        eq(jobs.seriesId, seriesId),
+        eq(jobs.skipped, false),
+        gte(jobs.startDatetime, from),
+        lte(jobs.startDatetime, to)
+      )
+    );
+
+  const existingDates = new Set(
+    existing.map((j) => j.startDatetime.toISOString().slice(0, 10))
+  );
+
+  const [hr, mn] = (series.arrivalTime || "09:00").split(":").map(Number);
+
+  for (const dateOnly of occurrences) {
+    const dateStr = dateOnly.toISOString().slice(0, 10);
+    if (existingDates.has(dateStr)) continue;
+
+    const start = new Date(dateStr + "T00:00:00");
+    start.setHours(hr, mn, 0, 0);
+    const end = new Date(start);
+    end.setHours(end.getHours() + (series.durationHours || 3));
+
+    await db.insert(jobs).values({
+      businessId: series.businessId,
+      customerId: series.customerId || null,
+      quoteId: series.quoteId || null,
+      seriesId: series.id,
+      seriesException: false,
+      skipped: false,
+      jobType: series.jobType,
+      status: "scheduled",
+      startDatetime: start,
+      endDatetime: end,
+      recurrence: series.frequency,
+      internalNotes: series.internalNotes || "",
+      address: series.address || "",
+      total: series.defaultPrice || null,
+      teamMembers: (series.teamMembers as string[]) || [],
+    });
+  }
+}
+
+export async function createRecurringSeries(data: {
+  businessId: string;
+  customerId?: string;
+  quoteId?: string;
+  frequency: string;
+  intervalValue?: number;
+  intervalUnit?: string;
+  startDate: string;
+  endDate?: string;
+  defaultPrice?: number;
+  jobType?: string;
+  address?: string;
+  durationHours?: number;
+  teamMembers?: string[];
+  internalNotes?: string;
+  arrivalTime?: string;
+}): Promise<RecurringCleanSeries> {
+  const [series] = await db
+    .insert(recurringCleanSeries)
+    .values({
+      businessId: data.businessId,
+      customerId: data.customerId || null,
+      quoteId: data.quoteId || null,
+      frequency: data.frequency,
+      intervalValue: data.intervalValue || 1,
+      intervalUnit: data.intervalUnit || "weeks",
+      startDate: data.startDate,
+      endDate: data.endDate || null,
+      status: "active",
+      defaultPrice: data.defaultPrice || null,
+      jobType: data.jobType || "regular",
+      address: data.address || "",
+      durationHours: data.durationHours || 3,
+      teamMembers: data.teamMembers || [],
+      internalNotes: data.internalNotes || "",
+      arrivalTime: data.arrivalTime || "09:00",
+    })
+    .returning();
+
+  await generateSeriesJobs(series.id, 90);
+  return series;
+}
+
+export async function getRecurringSeriesByBusiness(
+  businessId: string
+): Promise<RecurringCleanSeries[]> {
+  return db
+    .select()
+    .from(recurringCleanSeries)
+    .where(eq(recurringCleanSeries.businessId, businessId))
+    .orderBy(desc(recurringCleanSeries.createdAt));
+}
+
+export async function getRecurringSeriesById(
+  id: string
+): Promise<RecurringCleanSeries | undefined> {
+  const [s] = await db
+    .select()
+    .from(recurringCleanSeries)
+    .where(eq(recurringCleanSeries.id, id));
+  return s;
+}
+
+export async function updateRecurringSeries(
+  id: string,
+  data: Partial<{
+    frequency: string;
+    intervalValue: number;
+    intervalUnit: string;
+    startDate: string;
+    endDate: string | null;
+    status: string;
+    defaultPrice: number | null;
+    jobType: string;
+    address: string;
+    durationHours: number;
+    teamMembers: string[];
+    internalNotes: string;
+    arrivalTime: string;
+  }>,
+  regenerate = true
+): Promise<RecurringCleanSeries> {
+  const [series] = await db
+    .update(recurringCleanSeries)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(recurringCleanSeries.id, id))
+    .returning();
+
+  if (regenerate && series.status !== "cancelled") {
+    await generateSeriesJobs(series.id, 90);
+  }
+  return series;
+}
+
+export async function cancelRecurringSeries(id: string): Promise<void> {
+  await db
+    .update(recurringCleanSeries)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(eq(recurringCleanSeries.id, id));
+
+  await db
+    .update(jobs)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(
+      and(
+        eq(jobs.seriesId, id),
+        eq(jobs.status, "scheduled"),
+        eq(jobs.skipped, false),
+        eq(jobs.seriesException, false)
+      )
+    );
+}
+
+export async function skipSeriesOccurrence(jobId: string): Promise<Job> {
+  const [j] = await db
+    .update(jobs)
+    .set({ skipped: true, status: "cancelled", updatedAt: new Date() })
+    .where(eq(jobs.id, jobId))
+    .returning();
+  return j;
 }
 
 // ─── Job Checklist Items ───

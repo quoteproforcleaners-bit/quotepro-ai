@@ -176,6 +176,13 @@ import {
   getBookingAvailability,
   upsertBookingAvailability,
   generateBookingSlots,
+  createRecurringSeries,
+  getRecurringSeriesByBusiness,
+  getRecurringSeriesById,
+  updateRecurringSeries,
+  cancelRecurringSeries,
+  skipSeriesOccurrence,
+  generateSeriesJobs,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -1678,6 +1685,95 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       return res.json({ message: "Deleted" });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to delete job" });
+    }
+  });
+
+  // ─── Recurring Clean Series ────────────────────────────────────────────────
+
+  app.get("/api/recurring-series", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const list = await getRecurringSeriesByBusiness(business.id);
+      return res.json(list);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get recurring series" });
+    }
+  });
+
+  app.post("/api/recurring-series", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const series = await createRecurringSeries({ ...req.body, businessId: business.id });
+      return res.json(series);
+    } catch (error: any) {
+      console.error("Create recurring series error:", error);
+      return res.status(500).json({ message: "Failed to create recurring series" });
+    }
+  });
+
+  app.get("/api/recurring-series/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const series = await getRecurringSeriesById(req.params.id);
+      if (!series) return res.status(404).json({ message: "Series not found" });
+      return res.json(series);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get series" });
+    }
+  });
+
+  app.put("/api/recurring-series/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const series = await updateRecurringSeries(req.params.id, req.body, true);
+      return res.json(series);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update series" });
+    }
+  });
+
+  app.post("/api/recurring-series/:id/cancel", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await cancelRecurringSeries(req.params.id);
+      return res.json({ message: "Series cancelled" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to cancel series" });
+    }
+  });
+
+  app.post("/api/recurring-series/:id/pause", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await updateRecurringSeries(req.params.id, { status: "paused" }, false);
+      return res.json({ message: "Series paused" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to pause series" });
+    }
+  });
+
+  app.post("/api/recurring-series/:id/resume", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await updateRecurringSeries(req.params.id, { status: "active" }, true);
+      return res.json({ message: "Series resumed" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to resume series" });
+    }
+  });
+
+  app.post("/api/jobs/:id/skip", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const j = await skipSeriesOccurrence(req.params.id);
+      return res.json(j);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to skip occurrence" });
+    }
+  });
+
+  app.post("/api/recurring-series/:id/generate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await generateSeriesJobs(req.params.id, 90);
+      return res.json({ message: "Jobs generated" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to generate jobs" });
     }
   });
 

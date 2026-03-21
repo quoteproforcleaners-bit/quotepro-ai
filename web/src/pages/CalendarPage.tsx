@@ -16,6 +16,7 @@ import {
   AlertCircle,
   ExternalLink,
   RotateCcw,
+  Repeat,
 } from "lucide-react";
 import { PageHeader, Card, Button } from "../components/ui";
 import { QuickAddCleanPanel } from "../components/QuickAddCleanPanel";
@@ -132,6 +133,14 @@ function ScheduleModal({
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
 
+  // Recurring state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recFrequency, setRecFrequency] = useState<"weekly" | "biweekly" | "monthly" | "custom">("biweekly");
+  const [recInterval, setRecInterval] = useState("1");
+  const [recUnit, setRecUnit] = useState<"week" | "month">("week");
+  const [recHasEnd, setRecHasEnd] = useState(false);
+  const [recEndDate, setRecEndDate] = useState("");
+
   const scheduleMutation = useMutation({
     mutationFn: (data: any) => apiPost("/api/jobs", data),
     onSuccess: () => {
@@ -143,6 +152,18 @@ function ScheduleModal({
     onError: (e: any) => setError(e?.message || "Failed to schedule"),
   });
 
+  const seriesMutation = useMutation({
+    mutationFn: (data: any) => apiPost("/api/recurring-series", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes/unscheduled-accepted"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recurring-series"] });
+      onScheduled();
+    },
+    onError: (e: any) => setError(e?.message || "Failed to create series"),
+  });
+
   if (!quote) return null;
 
   const serviceLabel =
@@ -151,6 +172,35 @@ function ScheduleModal({
 
   const handleSubmit = () => {
     setError("");
+
+    if (isRecurring) {
+      let frequencyVal: string;
+      let intervalVal: number;
+      let unitVal: string;
+      if (recFrequency === "weekly") { frequencyVal = "weekly"; intervalVal = 1; unitVal = "week"; }
+      else if (recFrequency === "biweekly") { frequencyVal = "biweekly"; intervalVal = 2; unitVal = "week"; }
+      else if (recFrequency === "monthly") { frequencyVal = "monthly"; intervalVal = 1; unitVal = "month"; }
+      else { frequencyVal = "custom"; intervalVal = parseInt(recInterval) || 1; unitVal = recUnit; }
+
+      seriesMutation.mutate({
+        quoteId: quote.id,
+        customerId: quote.customerId,
+        jobType: serviceLabel,
+        address: quote.address,
+        total: quote.total,
+        internalNotes: notes,
+        frequency: frequencyVal,
+        intervalValue: intervalVal,
+        intervalUnit: unitVal,
+        arrivalTime: time,
+        durationHours: parseFloat(duration),
+        startDate: date,
+        endDate: recHasEnd && recEndDate ? recEndDate : null,
+        status: "active",
+      });
+      return;
+    }
+
     const start = new Date(`${date}T${time}:00`);
     const end = new Date(start);
     end.setHours(end.getHours() + parseFloat(duration || "2"));
@@ -254,6 +304,105 @@ function ScheduleModal({
             />
           </div>
 
+          {/* Recurring toggle */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setIsRecurring((v) => !v)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-sm font-semibold ${
+                isRecurring
+                  ? "border-violet-500 bg-violet-50 text-violet-700"
+                  : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300"
+              }`}
+            >
+              <Repeat className={`w-4 h-4 ${isRecurring ? "text-violet-600" : "text-slate-400"}`} />
+              <span className="flex-1 text-left">
+                {isRecurring ? "Recurring series" : "Make this recurring"}
+              </span>
+              <div className={`w-10 h-5 rounded-full transition-colors flex items-center ${isRecurring ? "bg-violet-500" : "bg-slate-300"}`}>
+                <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-0.5 ${isRecurring ? "translate-x-5" : "translate-x-0"}`} />
+              </div>
+            </button>
+
+            {isRecurring ? (
+              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-xs font-bold text-violet-600 uppercase tracking-wide mb-2">Frequency</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(["weekly", "biweekly", "monthly", "custom"] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setRecFrequency(f)}
+                        className={`py-2 rounded-lg text-xs font-bold border transition-all ${
+                          recFrequency === f
+                            ? "bg-violet-600 border-violet-600 text-white"
+                            : "border-violet-200 text-violet-600 hover:border-violet-400 bg-white"
+                        }`}
+                      >
+                        {f === "biweekly" ? "Bi-wkly" : f.charAt(0).toUpperCase() + f.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {recFrequency === "custom" ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-violet-700">Every</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="52"
+                      className="w-16 border border-violet-300 rounded-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-2 focus:ring-violet-400"
+                      value={recInterval}
+                      onChange={(e) => setRecInterval(e.target.value)}
+                    />
+                    <div className="flex gap-1">
+                      {(["week", "month"] as const).map((u) => (
+                        <button
+                          key={u}
+                          onClick={() => setRecUnit(u)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                            recUnit === u
+                              ? "bg-violet-600 text-white border-violet-600"
+                              : "border-violet-200 text-violet-600 bg-white hover:border-violet-400"
+                          }`}
+                        >
+                          {u}s
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setRecHasEnd((v) => !v)}
+                    className={`text-xs font-semibold px-2 py-1 rounded-md border transition-colors ${recHasEnd ? "bg-violet-200 text-violet-700 border-violet-300" : "bg-white border-violet-200 text-violet-500"}`}
+                  >
+                    {recHasEnd ? "Has end date" : "No end date"}
+                  </button>
+                  {recHasEnd ? (
+                    <input
+                      type="date"
+                      className="flex-1 border border-violet-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-violet-400"
+                      value={recEndDate}
+                      onChange={(e) => setRecEndDate(e.target.value)}
+                      min={date}
+                    />
+                  ) : null}
+                </div>
+
+                <p className="text-xs text-violet-700 font-medium bg-white border border-violet-200 rounded-lg px-3 py-2">
+                  {recFrequency === "weekly" && "Repeats every week"}
+                  {recFrequency === "biweekly" && "Repeats every 2 weeks"}
+                  {recFrequency === "monthly" && "Repeats monthly"}
+                  {recFrequency === "custom" && `Repeats every ${recInterval || 1} ${recUnit}${(parseInt(recInterval) || 1) > 1 ? "s" : ""}`}
+                  {recHasEnd && recEndDate ? ` · until ${new Date(recEndDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : " · ongoing"}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
           {error ? (
             <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-lg px-3 py-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -263,11 +412,11 @@ function ScheduleModal({
 
           <Button
             onClick={handleSubmit}
-            loading={scheduleMutation.isPending}
-            className="w-full justify-center"
+            loading={scheduleMutation.isPending || seriesMutation.isPending}
+            className={`w-full justify-center ${isRecurring ? "bg-violet-600 hover:bg-violet-700" : ""}`}
             size="md"
           >
-            Schedule Clean
+            {isRecurring ? "Create Recurring Series" : "Schedule Clean"}
           </Button>
         </div>
       </div>
