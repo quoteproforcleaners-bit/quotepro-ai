@@ -13,6 +13,7 @@ import {
   User,
   ArrowLeft,
   Mail,
+  Link,
 } from "lucide-react";
 import {
   PageHeader,
@@ -78,6 +79,7 @@ function ReviewsReferralsContent() {
   const [emailContent, setEmailContent] = useState("");
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
+  const [googleReviewLink, setGoogleReviewLink] = useState("");
 
   const { data: reviewRequests = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/review-requests"],
@@ -175,6 +177,11 @@ function ReviewsReferralsContent() {
   const handleSendEmail = async () => {
     if (!selectedCustomerId || !emailSubject || !emailContent) return;
     setSending(true);
+    const trimmedLink = googleReviewLink.trim();
+    let finalContent = emailContent;
+    if (trimmedLink && !emailContent.includes(trimmedLink)) {
+      finalContent = `${emailContent}\n\nLeave us a review: ${trimmedLink}`;
+    }
     try {
       await apiRequest("POST", "/api/review-requests", { customerId: selectedCustomerId });
       await apiRequest("POST", "/api/communications", {
@@ -182,7 +189,7 @@ function ReviewsReferralsContent() {
         type: "email",
         channel: "email",
         subject: emailSubject,
-        content: emailContent,
+        content: finalContent,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/review-requests"] });
       closeModal();
@@ -197,8 +204,18 @@ function ReviewsReferralsContent() {
     setEmailSubject("");
     setEmailContent("");
     setCustomerSearch("");
+    setGoogleReviewLink("");
     setGenerating(false);
     setSending(false);
+  };
+
+  const insertReviewLink = () => {
+    const trimmed = googleReviewLink.trim();
+    if (!trimmed) return;
+    const linkText = `\n\nLeave us a review: ${trimmed}`;
+    if (!emailContent.includes(trimmed)) {
+      setEmailContent((prev) => prev + linkText);
+    }
   };
 
   return (
@@ -330,12 +347,34 @@ function ReviewsReferralsContent() {
             ) : (
               <div className="space-y-3">
                 <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Google Review Link</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                      <input
+                        value={googleReviewLink}
+                        onChange={(e) => setGoogleReviewLink(e.target.value)}
+                        placeholder="Paste your Google review URL here..."
+                        className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <button
+                      onClick={insertReviewLink}
+                      disabled={!googleReviewLink.trim() || emailContent.includes(googleReviewLink.trim())}
+                      className="flex-shrink-0 px-3 py-2 text-xs font-medium rounded-lg border border-primary-200 text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Insert
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">The link will be appended to the email body automatically when sent.</p>
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Subject</label>
                   <Input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} placeholder="Email subject" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Body</label>
-                  <Textarea value={emailContent} onChange={(e) => setEmailContent(e.target.value)} rows={8} placeholder="Email content" />
+                  <Textarea value={emailContent} onChange={(e) => setEmailContent(e.target.value)} rows={7} placeholder="Email content" />
                 </div>
                 <div className="flex gap-2">
                   <button
