@@ -73,6 +73,7 @@ export default function QuoteDetailPage() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [syncingQbo, setSyncingQbo] = useState(false);
+  const [syncingJobber, setSyncingJobber] = useState(false);
   const [expandedRec, setExpandedRec] = useState<number | null>(null);
   const [msgChannel, setMsgChannel] = useState<MessageChannel>("sms");
   const [msgPurpose, setMsgPurpose] = useState<MessagePurpose>("follow_up");
@@ -286,6 +287,18 @@ export default function QuoteDetailPage() {
     } catch {}
   };
 
+
+  const syncJobber = async () => {
+    setSyncingJobber(true);
+    try {
+      const result: any = await apiPost(`/api/integrations/jobber/sync-quote-token/${id}`, {});
+      alert(result?.message || "Job created in Jobber.");
+    } catch (e: any) {
+      alert(e?.message || "Failed to sync to Jobber");
+    } finally {
+      setSyncingJobber(false);
+    }
+  };
 
   const syncQbo = async () => {
     setSyncingQbo(true);
@@ -1211,6 +1224,16 @@ export default function QuoteDetailPage() {
           <Card>
             <CardHeader title="Integrations" icon={Link2} />
             <div className="space-y-2">
+              <Button
+                variant="secondary"
+                icon={RefreshCw}
+                onClick={syncJobber}
+                disabled={syncingJobber}
+                className="w-full justify-start"
+                size="sm"
+              >
+                {syncingJobber ? "Syncing..." : "Sync to Jobber"}
+              </Button>
               <Button
                 variant="secondary"
                 icon={RefreshCw}

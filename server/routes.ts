@@ -9021,6 +9021,188 @@ h2{color:#16a34a;margin:0 0 8px;font-size:20px}p{color:#64748b;margin:0;font-siz
     }
   });
 
+  // ─── Jobber Personal API Token Integration ───
+  // Simpler alternative to OAuth: user pastes their Jobber personal access token
+  // from developer.getjobber.com. Uses typed variables like the Python reference approach.
+
+  async function jobberGQL(token: string, query: string, variables?: Record<string, any>) {
+    const res = await fetch("https://api.getjobber.com/api/graphql", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "X-JOBBER-GRAPHQL-VERSION": "2023-11-15",
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    if (!res.ok) throw new Error(`Jobber HTTP ${res.status}: ${await res.text()}`);
+    const json = await res.json();
+    if (json.errors?.length) throw new Error(`Jobber GraphQL errors: ${json.errors.map((e: any) => e.message).join(", ")}`);
+    return json.data;
+  }
+
+  async function jobberGetOrCreateClient(token: string, customer: { name?: string; email?: string; phone?: string }) {
+    // Search for existing client by email
+    if (customer.email) {
+      const data = await jobberGQL(token, `
+        query SearchClient {
+          clients(filter: { emails: "${customer.email}" }) {
+            nodes { id }
+          }
+        }
+      `);
+      const existing = data?.clients?.nodes?.[0]?.id;
+      if (existing) return existing;
+    }
+
+    // Create new client using typed variables (proven to work from class)
+    const nameParts = (customer.name || "Customer").trim().split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ") || "—";
+    const clientInput: any = { firstName, lastName };
+    if (customer.email) clientInput.emails = [{ description: "MAIN", primary: true, address: customer.email }];
+    if (customer.phone) clientInput.phones = [{ description: "MAIN", primary: true, number: customer.phone }];
+    const created = await jobberGQL(token, `
+      mutation CreateClient($input: ClientCreateInput!) {
+        clientCreate(input: $input) {
+          client { id }
+          userErrors { message }
+        }
+      }
+    `, { input: clientInput });
+    if (created?.clientCreate?.userErrors?.length) {
+      throw new Error(`Jobber client error: ${created.clientCreate.userErrors.map((e: any) => e.message).join(", ")}`);
+    }
+    return created?.clientCreate?.client?.id;
+  }
+
+  async function jobberGetOrCreateProperty(token: string, clientId: string, addressStr?: string | null) {
+    // Check for existing property (inline clientId — typed var causes EncodedId mismatch)
+    const propData = await jobberGQL(token, `{ client(id: "${clientId}") { properties { id } } }`);
+    const props = propData?.client?.properties || [];
+    const existing = (Array.isArray(props) ? props : [props])[0]?.id;
+    if (existing) return existing;
+
+    // Parse address
+    const parts = (addressStr || "").split(",").map((s: string) => s.trim());
+    const street = parts[0] || "N/A";
+    const city = parts[1] || "";
+    const stateZipRaw = (parts[2] || "").trim().split(/\s+/);
+    const province = stateZipRaw[0] || "";
+    const postalCode = stateZipRaw[1] || "";
+
+    const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const createProp = await jobberGQL(token, `mutation {
+      propertyCreate(clientId: "${clientId}", input: {
+        properties: [{ address: { street1: "${esc(street)}", city: "${esc(city)}", province: "${esc(province)}", postalCode: "${esc(postalCode)}", country: "US" } }]
+      }) {
+        properties { id }
+        userErrors { message }
+      }
+    }`);
+    const userErrors = createProp?.propertyCreate?.userErrors || [];
+    if (userErrors.length) {
+      const alreadyExists = userErrors.some((e: any) => e.message?.toLowerCase().includes("already exists"));
+      if (alreadyExists) return jobberGetOrCreateProperty(token, clientId, null);
+      throw new Error(`Jobber property error: ${userErrors.map((e: any) => e.message).join(", ")}`);
+    }
+    return createProp?.propertyCreate?.properties?.[0]?.id || null;
+  }
+
+  app.get("/api/integrations/jobber/token-status", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const token = (business as any).jobberApiToken;
+      res.json({ connected: !!token });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/integrations/jobber/save-token", requireAuth, requirePro as any, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { apiToken } = req.body;
+      await pool.query(
+        `UPDATE businesses SET jobber_api_token = $1 WHERE id = $2`,
+        [apiToken?.trim() || null, business.id]
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/integrations/jobber/sync-quote-token/:quoteId", requireAuth, requirePro as any, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const token = (business as any).jobberApiToken;
+      if (!token) return res.status(400).json({ message: "No Jobber API token configured. Add it in Settings → Integrations." });
+
+      const quote = await getQuoteById(req.params.quoteId);
+      if (!quote || quote.businessId !== business.id) return res.status(404).json({ message: "Quote not found" });
+
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+
+      // Step 1: Get or create Jobber client
+      const clientId = await jobberGetOrCreateClient(token, {
+        name: customer?.name,
+        email: customer?.email || undefined,
+        phone: customer?.phone || undefined,
+      });
+      if (!clientId) throw new Error("Could not find or create a Jobber client.");
+
+      // Step 2: Get or create property
+      const propertyId = await jobberGetOrCreateProperty(token, clientId, customer?.address || quote.address || null);
+      if (!propertyId) throw new Error("Could not find or create a Jobber property. Make sure the customer has a service address.");
+
+      // Step 3: Create job using $input: JobCreateInput! typed variable (Python approach)
+      const lineItems = (quote.lineItems as any[] || []).map((li: any) => ({
+        name: li.name || "Service",
+        quantity: li.quantity || 1,
+        unitPrice: String(li.unitPrice || li.price || "0.00"),
+      }));
+
+      const jobInput: any = {
+        clientId,
+        propertyId,
+        title: quote.title || `Cleaning Service — ${customer?.name || "Client"}`,
+        lineItems,
+      };
+      if (quote.notes) jobInput.instructions = quote.notes;
+
+      const jobData = await jobberGQL(token, `
+        mutation CreateJob($input: JobCreateInput!) {
+          jobCreate(input: $input) {
+            job { id jobNumber title }
+            userErrors { message path }
+          }
+        }
+      `, { input: jobInput });
+
+      const userErrors = jobData?.jobCreate?.userErrors || [];
+      if (userErrors.length) throw new Error(`Jobber job creation failed: ${userErrors.map((e: any) => e.message).join(", ")}`);
+
+      const job = jobData?.jobCreate?.job;
+      if (!job) throw new Error("jobCreate returned no job data");
+
+      // Record the job link
+      await pool.query(
+        `INSERT INTO jobber_job_links (id, quote_id, user_id, jobber_client_id, jobber_job_id, jobber_job_number, sync_status, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'success', NOW())
+         ON CONFLICT (quote_id) DO UPDATE SET jobber_job_id=$4, jobber_job_number=$5, sync_status='success'`,
+        [quote.id, req.session.userId!, clientId, job.id, String(job.jobNumber || "")]
+      );
+
+      res.json({ success: true, jobberJobId: job.id, jobberJobNumber: job.jobNumber, message: `Job #${job.jobNumber || ""} created in Jobber` });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ============ SMART QUOTE INTAKE ============
 
   // DB migration v1

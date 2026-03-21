@@ -111,6 +111,7 @@ export default function QuoteDetailScreen() {
   const [calendarResult, setCalendarResult] = useState<{ icsContent: string; googleCalendarUrl: string } | null>(null);
 
   const [qboCreating, setQboCreating] = useState(false);
+  const [jobberSyncing, setJobberSyncing] = useState(false);
   const [showFollowUpEdit, setShowFollowUpEdit] = useState(false);
   const [followUpEditText, setFollowUpEditText] = useState("");
   const [followUpEditLoading, setFollowUpEditLoading] = useState(false);
@@ -668,6 +669,22 @@ export default function QuoteDetailScreen() {
       Alert.alert("Error", e.message || "Failed to create QuickBooks invoice");
     } finally {
       setQboCreating(false);
+    }
+  };
+
+  const handleSyncToJobber = async () => {
+    if (!quote || jobberSyncing) return;
+    setJobberSyncing(true);
+    try {
+      const res = await apiRequest("POST", `/api/integrations/jobber/sync-quote-token/${quote.id}`, {});
+      const data = await res.json();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Synced to Jobber", data.message || `Job created in Jobber`);
+    } catch (e: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Error", e.message || "Failed to sync to Jobber");
+    } finally {
+      setJobberSyncing(false);
     }
   };
 
@@ -2110,6 +2127,19 @@ export default function QuoteDetailScreen() {
             )
           ) : null}
 
+          <Pressable
+            onPress={handleSyncToJobber}
+            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
+            testID="jobber-sync-btn"
+            disabled={jobberSyncing}
+          >
+            {jobberSyncing ? (
+              <ActivityIndicator size={20} color={theme.primary} />
+            ) : (
+              <Feather name="upload-cloud" size={20} color={theme.primary} />
+            )}
+            <ThemedText type="small" style={{ marginTop: 4 }}>Jobber</ThemedText>
+          </Pressable>
 
           <Pressable
             onPress={handleDelete}
