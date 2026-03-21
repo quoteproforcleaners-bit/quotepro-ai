@@ -4,17 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
 import {
-  PageHeader,
-  Card,
-  CardHeader,
-  Badge,
-  Button,
-  StatCard,
-  ProgressBar,
-  MetricRing,
-  FunnelBar,
-} from "../components/ui";
-import {
   FileText,
   Users,
   Briefcase,
@@ -42,292 +31,436 @@ import {
   FileEdit,
   Repeat,
   RefreshCw,
-  LayoutDashboard,
   TrendingDown,
+  Clock,
+  AlertCircle,
 } from "lucide-react";
+import { Button, Badge, Card, CardHeader, ProgressBar, MetricRing, FunnelBar } from "../components/ui";
 
-// ─── Revenue Protection Score ────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-function getRiskState(oldestDays: number) {
-  if (oldestDays >= 5)
-    return { label: "Critical", class: "risk-critical", badge: "critical" as const, color: "text-red-600", bg: "bg-red-50" };
-  if (oldestDays >= 3)
-    return { label: "Cold", class: "risk-cold", badge: "cold" as const, color: "text-orange-600", bg: "bg-orange-50" };
-  return { label: "Cooling", class: "risk-cooling", badge: "cooling" as const, color: "text-amber-600", bg: "bg-amber-50" };
+function fmt(n: number) {
+  return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
-function getProtectionScore(healthPercent: number, followUpCount: number, closeRate: number) {
-  if (followUpCount === 0) return { score: 100, grade: "A+" };
-  const healthWeight = healthPercent * 0.5;
-  const closeWeight = Math.min(closeRate, 100) * 0.3;
-  const responsiveness = followUpCount <= 2 ? 20 : followUpCount <= 5 ? 10 : 0;
-  const score = Math.round(healthWeight + closeWeight + responsiveness);
-  let grade = "F";
-  if (score >= 90) grade = "A";
-  else if (score >= 80) grade = "B+";
-  else if (score >= 70) grade = "B";
-  else if (score >= 60) grade = "C";
-  else if (score >= 50) grade = "D";
-  return { score, grade };
+function getHour() {
+  return new Date().getHours();
 }
 
-// ─── Dynamic Hero ─────────────────────────────────────────────────────────────
+function greeting() {
+  const h = getHour();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
-interface HeroProps {
-  isNewUser: boolean;
+function todayLabel() {
+  return new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
+
+// ─── Command Header ──────────────────────────────────────────────────────────
+
+function CommandHeader({
+  business,
+  monthRevenue,
+  weekJobs,
+  closeRate,
+  followUpQueueCount,
+  amountAtRisk,
+  oldestQuoteDays,
+  isInFreeTrial,
+  freeTrialDaysLeft,
+  navigate,
+}: {
+  business: any;
+  monthRevenue: number;
+  weekJobs: number;
+  closeRate: number;
   followUpQueueCount: number;
   amountAtRisk: number;
   oldestQuoteDays: number;
-  estimatedLoss: number;
-  closeRate: number;
-  protectionScore: { score: number; grade: string };
-  followUpHealthPercent: number;
-  quotes: any[];
-  totalRevenue: number;
+  isInFreeTrial: boolean;
+  freeTrialDaysLeft: number;
   navigate: (path: string) => void;
-}
+}) {
+  const hasRisk = followUpQueueCount > 0;
 
-function DynamicHero(p: HeroProps) {
-  const { isNewUser, followUpQueueCount, amountAtRisk, oldestQuoteDays, estimatedLoss, closeRate, protectionScore, quotes, navigate } = p;
-  const riskState = useMemo(() => getRiskState(oldestQuoteDays), [oldestQuoteDays]);
-  const scoreColor = protectionScore.score >= 90 ? "emerald" : protectionScore.score >= 70 ? "amber" : "red";
+  return (
+    <div className="rounded-2xl overflow-hidden mb-6 shadow-lg">
+      {/* Main header area */}
+      <div
+        className="relative px-6 py-6"
+        style={{
+          background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #1d4ed8 100%)",
+        }}
+      >
+        {/* Decorative radial glow */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at 70% -20%, rgba(99,102,241,0.3) 0%, transparent 60%)" }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at 100% 100%, rgba(37,99,235,0.2) 0%, transparent 50%)" }}
+        />
 
-  // State A — new user, zero quotes
-  if (isNewUser) {
-    return (
-      <div className="rounded-2xl p-6 mb-6 bg-gradient-to-br from-primary-600 to-primary-800 text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 80% 20%, white 0%, transparent 60%)" }} />
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-3">
-            <LayoutDashboard className="w-4 h-4 text-primary-200" />
-            <span className="text-xs font-bold uppercase tracking-wider text-primary-200">Get Started</span>
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center gap-5">
+          {/* Left: greeting */}
+          <div className="flex-1 min-w-0">
+            <p className="text-blue-300 text-xs font-bold uppercase tracking-widest mb-1">{todayLabel()}</p>
+            <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight">
+              {greeting()}{business?.companyName ? `, ${business.companyName}` : ""}
+            </h1>
+            <p className="text-blue-200 text-sm mt-1">
+              {monthRevenue > 0
+                ? `${fmt(monthRevenue)} won this month · keep the momentum`
+                : "Your cleaning business command center"}
+            </p>
           </div>
-          <h2 className="text-2xl font-extrabold tracking-tight leading-tight mb-1">
-            Your first $1,000 starts with one quote.
-          </h2>
-          <p className="text-sm text-primary-100 mb-5 max-w-md">
-            QuotePro turns your cleaning rates into professional cleaning quotes in under 2 minutes. Create your first one and start building a real pipeline.
-          </p>
-          <div className="flex flex-wrap gap-3">
+
+          {/* Right: CTA */}
+          <div className="flex items-center gap-3 shrink-0">
+            {isInFreeTrial ? (
+              <button
+                onClick={() => navigate("/pricing")}
+                className="text-xs font-semibold text-amber-300 border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 rounded-lg hover:bg-amber-400/20 transition-colors whitespace-nowrap"
+              >
+                Trial: {freeTrialDaysLeft}d left
+              </button>
+            ) : null}
             <button
               onClick={() => navigate("/quotes/new")}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-primary-700 font-bold text-sm shadow-lg hover:bg-primary-50 transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-primary-700 font-bold text-sm shadow-md hover:bg-blue-50 transition-all hover:shadow-lg active:scale-[0.98]"
             >
               <Plus className="w-4 h-4" />
-              Create Your First Cleaning Quote
-            </button>
-            <button
-              onClick={() => navigate("/settings?tab=pricing")}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary-700/60 text-white font-semibold text-sm border border-primary-500 hover:bg-primary-700 transition-colors"
-            >
-              Set Your Cleaning Rates
+              New Quote
             </button>
           </div>
+        </div>
+
+        {/* Stat pills row */}
+        <div className="relative z-10 flex flex-wrap gap-3 mt-5">
+          <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
+            <DollarSign className="w-4 h-4 text-emerald-300 shrink-0" />
+            <div>
+              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider">Month Revenue</p>
+              <p className="text-base font-black text-white leading-tight">{fmt(monthRevenue)}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
+            <Briefcase className="w-4 h-4 text-blue-300 shrink-0" />
+            <div>
+              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider">Jobs This Week</p>
+              <p className="text-base font-black text-white leading-tight">{weekJobs}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
+            <Target className="w-4 h-4 text-violet-300 shrink-0" />
+            <div>
+              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider">Close Rate</p>
+              <p className={`text-base font-black leading-tight ${closeRate >= 50 ? "text-emerald-300" : closeRate >= 35 ? "text-amber-300" : "text-red-300"}`}>
+                {closeRate > 0 ? `${Math.round(closeRate)}%` : "—"}
+              </p>
+            </div>
+          </div>
+          {followUpQueueCount > 0 ? (
+            <div className="flex items-center gap-2.5 bg-amber-400/15 backdrop-blur-sm border border-amber-400/30 rounded-xl px-4 py-2.5">
+              <PhoneMissed className="w-4 h-4 text-amber-300 shrink-0" />
+              <div>
+                <p className="text-[10px] font-bold text-amber-200 uppercase tracking-wider">At Risk</p>
+                <p className="text-base font-black text-amber-300 leading-tight">{fmt(amountAtRisk)}</p>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
-    );
-  }
 
-  // State B — has follow-ups needed (revenue at risk)
-  if (followUpQueueCount > 0) {
-    return (
-      <div className={`rounded-2xl p-5 lg:p-6 mb-6 ${riskState.class}`}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Revenue Leak Detector</span>
-          </div>
-          <Badge status={riskState.badge} label={riskState.label} />
-        </div>
-        <div className="flex items-baseline gap-2 mt-2">
-          <span className={`text-3xl font-extrabold tracking-tight ${riskState.color}`}>
-            ${amountAtRisk.toLocaleString()}
-          </span>
-          <span className="text-sm text-slate-500">at risk</span>
-        </div>
-        <p className="text-sm text-slate-600 mt-2">
-          {followUpQueueCount} sent {followUpQueueCount === 1 ? "quote" : "quotes"} awaiting a response &middot; Oldest: {oldestQuoteDays} {oldestQuoteDays === 1 ? "day" : "days"} out
-        </p>
-        <p className="text-xs text-slate-500 mt-1 italic">
-          Cleaning quotes older than 3 days close 40% less often. At your current close rate of {Math.round(closeRate || 45)}%, you're likely losing ~${estimatedLoss.toLocaleString()}.
-        </p>
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold text-slate-500">Revenue Protection Score</span>
-            <span className={`text-xs font-bold ${scoreColor === "emerald" ? "text-emerald-600" : scoreColor === "amber" ? "text-amber-600" : "text-red-600"}`}>
-              {protectionScore.score}/100 ({protectionScore.grade})
-            </span>
-          </div>
-          <ProgressBar value={protectionScore.score} color={scoreColor} size="sm" />
-        </div>
-        <div className="flex flex-wrap gap-3 mt-5">
-          <Button icon={Shield} variant="warning" onClick={() => navigate("/follow-ups")} className="flex-1 animate-pulse-glow">
-            Stop the Leak
-          </Button>
-          <Button icon={Bot} variant="ghost" onClick={() => navigate("/ai-assistant")} className="shrink-0">
-            Draft Follow-Up with AI
-          </Button>
-        </div>
+      {/* Alert ribbon */}
+      {hasRisk ? (
         <button
-          onClick={() => navigate("/quotes")}
-          className="text-sm text-primary-600 hover:text-primary-700 font-semibold mt-3 flex items-center gap-1 mx-auto"
+          onClick={() => navigate("/follow-ups")}
+          className="w-full flex items-center gap-3 px-6 py-3 bg-amber-500 hover:bg-amber-600 transition-colors text-left group"
         >
-          See what's leaking <ArrowRight className="w-3.5 h-3.5" />
+          <AlertTriangle className="w-4 h-4 text-amber-900 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-bold text-amber-900">
+              {followUpQueueCount} quote{followUpQueueCount > 1 ? "s" : ""} need follow-up
+            </span>
+            <span className="text-amber-800 text-sm"> · {fmt(amountAtRisk)} at risk · Oldest: {oldestQuoteDays} day{oldestQuoteDays !== 1 ? "s" : ""} out</span>
+          </div>
+          <span className="flex items-center gap-1 text-xs font-bold text-amber-900 whitespace-nowrap group-hover:gap-2 transition-all">
+            Act now <ArrowRight className="w-3.5 h-3.5" />
+          </span>
         </button>
-      </div>
-    );
-  }
-
-  // State C — active user, all caught up
-  const hasActivity = quotes.length > 0;
-  const nextAction = closeRate < 40
-    ? { label: "Low close rate", tip: "Follow up faster to close more. Most cleaning businesses win 40–60% of sent quotes.", cta: "Review Quotes", path: "/quotes" }
-    : quotes.filter((q: any) => q.status === "draft").length > 0
-    ? { label: "Drafts waiting", tip: `You have ${quotes.filter((q: any) => q.status === "draft").length} draft cleaning quote${quotes.filter((q: any) => q.status === "draft").length > 1 ? "s" : ""} ready to send. Unsent quotes don't close.`, cta: "Send Drafts", path: "/quotes" }
-    : { label: "Keep it going", tip: "Recurring clients drive predictable revenue. Use AI to pitch a recurring cleaning plan on your next job.", cta: "New Cleaning Quote", path: "/quotes/new" };
-
-  return (
-    <div className="rounded-2xl p-5 lg:p-6 mb-6 bg-emerald-50/60 dark:bg-emerald-900/20 border border-emerald-200/50 dark:border-emerald-700/50">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center shrink-0">
-            <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div>
-            <p className="font-bold text-slate-900 dark:text-slate-100">{hasActivity ? "Quote pipeline is clean — no revenue at risk." : "All caught up."}</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{nextAction.tip}</p>
-          </div>
-        </div>
-        <Button size="sm" onClick={() => navigate(nextAction.path)} className="shrink-0 hidden sm:flex">
-          {nextAction.cta}
-        </Button>
-      </div>
-      <div className="mt-4">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Revenue Protection Score</span>
-          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">100/100 (A+)</span>
-        </div>
-        <ProgressBar value={100} color="emerald" size="sm" />
-      </div>
-      <Button size="sm" onClick={() => navigate(nextAction.path)} className="mt-4 w-full sm:hidden">
-        {nextAction.cta}
-      </Button>
+      ) : null}
     </div>
   );
 }
 
-// ─── Start Here Checklist ────────────────────────────────────────────────────
+// ─── KPI Card ────────────────────────────────────────────────────────────────
 
-interface ChecklistProps {
-  hasPricing: boolean;
-  hasQuotes: boolean;
-  hasCustomers: boolean;
-  hasFollowUpActivity: boolean;
-  navigate: (path: string) => void;
+interface KPICardProps {
+  label: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: "emerald" | "blue" | "amber" | "violet" | "red";
+  badge?: string;
+  badgePositive?: boolean;
+  onClick?: () => void;
 }
 
-function StartHereChecklist({ hasPricing, hasQuotes, hasCustomers, hasFollowUpActivity, navigate }: ChecklistProps) {
-  const steps = [
-    {
-      id: "pricing",
-      done: hasPricing,
-      label: "Set your cleaning rates",
-      description: "Your rates drive every quote. Set them once and QuotePro handles the math.",
-      cta: "Set Up Pricing",
-      path: "/settings?tab=pricing",
-      icon: DollarSign,
-    },
-    {
-      id: "quote",
-      done: hasQuotes,
-      label: "Create your first cleaning quote",
-      description: "Send a professional cleaning quote in under 2 minutes and start building your pipeline.",
-      cta: "Create Quote",
-      path: "/quotes/new",
-      icon: FileText,
-    },
-    {
-      id: "customer",
-      done: hasCustomers,
-      label: "Add your first cleaning client",
-      description: "Build your client list to track cleans, quotes, and reviews in one place.",
-      cta: "Add Client",
-      path: "/customers/new",
-      icon: Users,
-    },
-    {
-      id: "followup",
-      done: hasFollowUpActivity,
-      label: "Activate follow-up automation",
-      description: "Most cleaning jobs close faster when followed up within 48 hours. Turn it on now.",
-      cta: "Review Follow-Ups",
-      path: "/follow-ups",
-      icon: Zap,
-    },
-  ];
+const KPI_COLORS = {
+  emerald: {
+    bg: "bg-gradient-to-br from-emerald-50 to-emerald-50/30",
+    border: "border-emerald-200",
+    icon: "bg-emerald-100 text-emerald-600",
+    value: "text-emerald-700",
+    label: "text-emerald-600",
+    sub: "text-emerald-500",
+  },
+  blue: {
+    bg: "bg-gradient-to-br from-blue-50 to-blue-50/30",
+    border: "border-blue-200",
+    icon: "bg-blue-100 text-blue-600",
+    value: "text-blue-700",
+    label: "text-blue-600",
+    sub: "text-blue-400",
+  },
+  amber: {
+    bg: "bg-gradient-to-br from-amber-50 to-amber-50/30",
+    border: "border-amber-200",
+    icon: "bg-amber-100 text-amber-600",
+    value: "text-amber-700",
+    label: "text-amber-600",
+    sub: "text-amber-400",
+  },
+  violet: {
+    bg: "bg-gradient-to-br from-violet-50 to-violet-50/30",
+    border: "border-violet-200",
+    icon: "bg-violet-100 text-violet-600",
+    value: "text-violet-700",
+    label: "text-violet-600",
+    sub: "text-violet-400",
+  },
+  red: {
+    bg: "bg-gradient-to-br from-red-50 to-red-50/30",
+    border: "border-red-200",
+    icon: "bg-red-100 text-red-600",
+    value: "text-red-700",
+    label: "text-red-600",
+    sub: "text-red-400",
+  },
+};
 
-  const completedCount = steps.filter((s) => s.done).length;
-  const allDone = completedCount === steps.length;
-  if (allDone) return null;
-
+function KPICard({ label, value, subtitle, icon: Icon, color, badge, badgePositive, onClick }: KPICardProps) {
+  const c = KPI_COLORS[color];
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 mb-6 overflow-hidden">
-      <div className="px-5 lg:px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center">
-            <Target className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-          </div>
-          <div>
-            <h2 className="font-bold text-slate-900 dark:text-slate-100 text-sm">Set Up Your Cleaning Business</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{completedCount} of {steps.length} steps complete</p>
-          </div>
+    <div
+      onClick={onClick}
+      className={`rounded-2xl border p-5 ${c.bg} ${c.border} ${onClick ? "cursor-pointer hover:shadow-md active:scale-[0.99]" : ""} transition-all duration-200`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${c.icon}`}>
+          <Icon className="w-5 h-5" />
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-24 h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-            <div
-              className="h-full bg-primary-500 rounded-full transition-all duration-500"
-              style={{ width: `${(completedCount / steps.length) * 100}%` }}
-            />
-          </div>
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{Math.round((completedCount / steps.length) * 100)}%</span>
-        </div>
-      </div>
-      <div className="divide-y divide-slate-100 dark:divide-slate-700">
-        {steps.filter((s) => !s.done).slice(0, 3).map((step) => (
-          <div key={step.id} className="flex items-center gap-4 px-5 lg:px-6 py-4">
-            <div className="w-8 h-8 rounded-full border-2 border-slate-200 dark:border-slate-600 flex items-center justify-center shrink-0">
-              <step.icon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{step.label}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 hidden sm:block">{step.description}</p>
-            </div>
-            <button
-              onClick={() => navigate(step.path)}
-              className="text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 whitespace-nowrap flex items-center gap-1 shrink-0"
-            >
-              {step.cta} <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-        ))}
-        {steps.filter((s) => s.done).length > 0 ? (
-          <div className="px-5 lg:px-6 py-3 bg-slate-50 dark:bg-slate-800/80 flex items-center gap-2 border-t border-slate-100 dark:border-slate-700">
-            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-xs text-slate-600 dark:text-slate-300">{steps.filter((s) => s.done).map((s) => s.label).join(", ")} — done</span>
-          </div>
+        {badge ? (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+            badgePositive
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : "bg-amber-50 text-amber-700 border-amber-200"
+          }`}>
+            {badge}
+          </span>
         ) : null}
       </div>
+      <p className={`text-2xl lg:text-3xl font-black tracking-tight leading-none ${c.value}`}>
+        {value}
+      </p>
+      <p className={`text-xs font-bold uppercase tracking-wider mt-2 ${c.label}`}>{label}</p>
+      {subtitle ? (
+        <p className={`text-xs mt-1 ${c.sub}`}>{subtitle}</p>
+      ) : null}
     </div>
   );
 }
 
-// ─── Today's Revenue Moves ────────────────────────────────────────────────────
+// ─── Today's Operations ───────────────────────────────────────────────────────
+
+function TodayOperations({
+  todayJobs,
+  todayRevenue,
+  unscheduledAccepted,
+  navigate,
+}: {
+  todayJobs: any[];
+  todayRevenue: number;
+  unscheduledAccepted: number;
+  navigate: (path: string) => void;
+}) {
+  const nextJob = todayJobs.find((j: any) => j.status !== "completed") || todayJobs[0];
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden mb-6 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Today</span>
+          <span className="text-xs text-slate-400">— {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</span>
+        </div>
+        <button
+          onClick={() => navigate("/calendar")}
+          className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1"
+        >
+          Calendar <ChevronRight className="w-3 h-3" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-slate-100">
+        {/* Today's cleans */}
+        <div className="p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+              <Briefcase className="w-3.5 h-3.5 text-blue-600" />
+            </div>
+            <span className="text-xs text-slate-500 font-medium">Cleans Today</span>
+          </div>
+          <p className="text-2xl font-black text-slate-900">{todayJobs.length}</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {todayJobs.filter((j: any) => j.status === "completed").length} completed
+          </p>
+        </div>
+
+        {/* Revenue today */}
+        <div className="p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+              <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+            </div>
+            <span className="text-xs text-slate-500 font-medium">Revenue Today</span>
+          </div>
+          <p className="text-2xl font-black text-emerald-700">{fmt(todayRevenue)}</p>
+          <p className="text-xs text-emerald-500 mt-0.5">scheduled</p>
+        </div>
+
+        {/* Next clean */}
+        <div className="p-5 col-span-2 lg:col-span-1">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
+              <Clock className="w-3.5 h-3.5 text-violet-600" />
+            </div>
+            <span className="text-xs text-slate-500 font-medium">Next Clean</span>
+          </div>
+          {nextJob ? (
+            <>
+              <p className="text-sm font-bold text-slate-900 leading-tight">
+                {new Date(nextJob.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5 truncate">{nextJob.address || "No address"}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-bold text-slate-400">None scheduled</p>
+              <button
+                onClick={() => navigate("/calendar")}
+                className="text-xs text-primary-600 font-medium hover:text-primary-700 mt-0.5"
+              >
+                Schedule a clean
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Unscheduled accepted */}
+        <div
+          className={`p-5 cursor-pointer transition-colors ${unscheduledAccepted > 0 ? "bg-amber-50/60 hover:bg-amber-50" : "hover:bg-slate-50"}`}
+          onClick={() => navigate("/quotes?filter=accepted")}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${unscheduledAccepted > 0 ? "bg-amber-100" : "bg-slate-50"}`}>
+              <AlertCircle className={`w-3.5 h-3.5 ${unscheduledAccepted > 0 ? "text-amber-600" : "text-slate-400"}`} />
+            </div>
+            <span className={`text-xs font-medium ${unscheduledAccepted > 0 ? "text-amber-600" : "text-slate-500"}`}>Needs Scheduling</span>
+          </div>
+          <p className={`text-2xl font-black ${unscheduledAccepted > 0 ? "text-amber-700" : "text-slate-900"}`}>{unscheduledAccepted}</p>
+          <p className={`text-xs mt-0.5 ${unscheduledAccepted > 0 ? "text-amber-500" : "text-slate-400"}`}>accepted quotes</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Attention Panel ──────────────────────────────────────────────────────────
+
+interface AttentionItem {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  count: number;
+  description: string;
+  path: string;
+  severity: "critical" | "warning" | "info";
+}
+
+function AttentionPanel({ items, navigate }: { items: AttentionItem[]; navigate: (path: string) => void }) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 flex items-start gap-3">
+        <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
+          <CheckCircle className="w-4 h-4 text-white" />
+        </div>
+        <div>
+          <p className="font-bold text-emerald-800 text-sm">All clear — great job</p>
+          <p className="text-xs text-emerald-600 mt-0.5">No urgent items. Your pipeline is healthy and you're caught up on follow-ups.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const SEVERITY = {
+    critical: { bg: "bg-red-50", border: "border-red-200", icon: "bg-red-100 text-red-600", dot: "bg-red-500", label: "text-red-700" },
+    warning: { bg: "bg-amber-50", border: "border-amber-200", icon: "bg-amber-100 text-amber-600", dot: "bg-amber-400", label: "text-amber-700" },
+    info: { bg: "bg-blue-50", border: "border-blue-200", icon: "bg-blue-100 text-blue-600", dot: "bg-blue-400", label: "text-blue-700" },
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Needs Attention</p>
+      {items.map((item, i) => {
+        const s = SEVERITY[item.severity];
+        return (
+          <button
+            key={i}
+            onClick={() => navigate(item.path)}
+            className={`w-full text-left rounded-xl border p-3.5 flex items-start gap-3 hover:shadow-sm transition-all ${s.bg} ${s.border} group`}
+          >
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${s.icon}`}>
+              <item.icon className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold ${s.label}`}>{item.label}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                <span className={`text-xs font-black ${s.label}`}>{item.count}</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{item.description}</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0 mt-1" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Revenue Moves ────────────────────────────────────────────────────────────
 
 interface RevenueAction {
   icon: React.ComponentType<any>;
   iconBg: string;
   iconColor: string;
   tag: string;
+  tagBg: string;
   tagColor: string;
   title: string;
   description: string;
@@ -335,41 +468,201 @@ interface RevenueAction {
   path: string;
 }
 
-interface RevenueMovesProps {
-  actions: RevenueAction[];
-  navigate: (path: string) => void;
-}
-
-function TodaysRevenueMoves({ actions, navigate }: RevenueMovesProps) {
+function TodaysRevenueMoves({ actions, navigate }: { actions: RevenueAction[]; navigate: (path: string) => void }) {
   if (actions.length === 0) return null;
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
-        <Zap className="w-4 h-4 text-amber-500" />
-        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Today's Revenue Moves</h2>
-        <span className="text-xs text-slate-400 dark:text-slate-500">— your highest-impact actions right now</span>
+        <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center">
+          <Zap className="w-3.5 h-3.5 text-amber-600" />
+        </div>
+        <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Revenue Moves</h2>
+        <span className="text-xs text-slate-400">— highest-impact actions right now</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {actions.map((action, i) => (
           <button
             key={i}
             onClick={() => navigate(action.path)}
-            className="text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-sm transition-all group"
+            className="text-left rounded-2xl border border-slate-200 bg-white p-4 hover:border-primary-300 hover:shadow-md transition-all group active:scale-[0.99]"
           >
-            <div className="flex items-start gap-3">
-              <div className={`w-9 h-9 rounded-lg ${action.iconBg} flex items-center justify-center shrink-0`}>
-                <action.icon className={`w-4.5 h-4.5 ${action.iconColor}`} />
+            <div className="flex items-start gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-xl ${action.iconBg} flex items-center justify-center shrink-0`}>
+                <action.icon className={`w-5 h-5 ${action.iconColor}`} />
               </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${action.tagColor}`}>{action.tag}</div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">{action.title}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{action.description}</p>
-              </div>
+              <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-full mt-0.5 ${action.tagBg} ${action.tagColor}`}>
+                {action.tag}
+              </span>
             </div>
-            <div className="flex items-center gap-1 mt-3 text-xs font-semibold text-primary-600 dark:text-primary-400 group-hover:text-primary-700 dark:group-hover:text-primary-300">
+            <p className="text-sm font-bold text-slate-900 leading-snug mb-1">{action.title}</p>
+            <p className="text-xs text-slate-500 leading-relaxed">{action.description}</p>
+            <div className="flex items-center gap-1 mt-3 text-xs font-bold text-primary-600 group-hover:text-primary-700 group-hover:gap-2 transition-all">
               {action.cta} <ArrowRight className="w-3 h-3" />
             </div>
           </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Pipeline Card ────────────────────────────────────────────────────────────
+
+function PipelineCard({
+  sentCount,
+  viewedCount,
+  acceptedCount,
+  closeRate,
+  avgValue,
+  navigate,
+}: {
+  sentCount: number;
+  viewedCount: number;
+  acceptedCount: number;
+  closeRate: number;
+  avgValue: number;
+  navigate: (path: string) => void;
+}) {
+  const max = Math.max(sentCount, viewedCount, acceptedCount, 1);
+
+  const stages = [
+    { label: "Sent", count: sentCount, color: "from-blue-500 to-blue-600", icon: Send, textColor: "text-blue-600" },
+    { label: "Viewed", count: viewedCount, color: "from-violet-500 to-violet-600", icon: Eye, textColor: "text-violet-600" },
+    { label: "Accepted", count: acceptedCount, color: "from-emerald-500 to-emerald-600", icon: CheckCircle, textColor: "text-emerald-600" },
+  ];
+
+  if (sentCount === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center px-4">
+        <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
+          <TrendingUp className="w-6 h-6 text-slate-300" />
+        </div>
+        <p className="text-sm font-bold text-slate-500">Pipeline is empty</p>
+        <p className="text-xs text-slate-400 mt-1 max-w-xs">Create and send cleaning quotes to start tracking your conversion funnel.</p>
+        <button
+          onClick={() => navigate("/quotes/new")}
+          className="mt-3 flex items-center gap-1.5 text-xs font-bold text-primary-600 hover:text-primary-700"
+        >
+          <Plus className="w-3.5 h-3.5" /> Create Quote
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="space-y-3 mb-4">
+        {stages.map((stage) => {
+          const pct = Math.max((stage.count / max) * 100, stage.count > 0 ? 6 : 0);
+          return (
+            <div key={stage.label} className="flex items-center gap-3">
+              <div className={`w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0`}>
+                <stage.icon className={`w-3.5 h-3.5 ${stage.textColor}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-slate-600">{stage.label}</span>
+                  <span className={`text-xs font-black ${stage.textColor}`}>{stage.count}</span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full bg-gradient-to-r ${stage.color} rounded-full transition-all duration-700`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+        <div className="bg-slate-50 rounded-xl p-3 text-center">
+          <p className={`text-xl font-black ${closeRate >= 50 ? "text-emerald-600" : closeRate >= 35 ? "text-amber-600" : "text-red-500"}`}>
+            {Math.round(closeRate)}%
+          </p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Close Rate</p>
+          {closeRate < 40 && closeRate > 0 ? (
+            <p className="text-[10px] text-amber-500 mt-0.5">below avg</p>
+          ) : closeRate >= 50 ? (
+            <p className="text-[10px] text-emerald-500 mt-0.5">excellent</p>
+          ) : null}
+        </div>
+        <div className="bg-slate-50 rounded-xl p-3 text-center">
+          <p className="text-xl font-black text-slate-900">{fmt(avgValue)}</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Avg Value</p>
+        </div>
+      </div>
+
+      <button
+        onClick={() => navigate("/quotes")}
+        className="w-full mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-primary-600 hover:text-primary-700 py-2 rounded-xl hover:bg-primary-50 transition-colors"
+      >
+        View all quotes <ArrowRight className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// ─── Start Here Checklist ────────────────────────────────────────────────────
+
+function StartHereChecklist({
+  hasPricing,
+  hasQuotes,
+  hasCustomers,
+  hasFollowUpActivity,
+  navigate,
+}: {
+  hasPricing: boolean;
+  hasQuotes: boolean;
+  hasCustomers: boolean;
+  hasFollowUpActivity: boolean;
+  navigate: (path: string) => void;
+}) {
+  const steps = [
+    { id: "pricing", done: hasPricing, label: "Set your cleaning rates", cta: "Set Up Pricing", path: "/settings?tab=pricing", icon: DollarSign },
+    { id: "quote", done: hasQuotes, label: "Create your first cleaning quote", cta: "Create Quote", path: "/quotes/new", icon: FileText },
+    { id: "customer", done: hasCustomers, label: "Add your first cleaning client", cta: "Add Client", path: "/customers/new", icon: Users },
+    { id: "followup", done: hasFollowUpActivity, label: "Activate follow-up automation", cta: "Review Follow-Ups", path: "/follow-ups", icon: Zap },
+  ];
+  const completedCount = steps.filter((s) => s.done).length;
+  const allDone = completedCount === steps.length;
+  if (allDone) return null;
+  const pct = Math.round((completedCount / steps.length) * 100);
+
+  return (
+    <div className="rounded-2xl border border-primary-200 bg-primary-50/40 overflow-hidden mb-6">
+      <div className="px-5 py-4 border-b border-primary-100 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-primary-100 flex items-center justify-center">
+            <Target className="w-4 h-4 text-primary-600" />
+          </div>
+          <div>
+            <h2 className="font-bold text-primary-900 text-sm">Get QuotePro Running</h2>
+            <p className="text-xs text-primary-600 mt-0.5">{completedCount} of {steps.length} steps complete</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-28 h-1.5 rounded-full bg-primary-100 overflow-hidden">
+            <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-xs font-bold text-primary-600">{pct}%</span>
+        </div>
+      </div>
+      <div className="divide-y divide-primary-100">
+        {steps.filter((s) => !s.done).slice(0, 3).map((step) => (
+          <div key={step.id} className="flex items-center gap-4 px-5 py-3.5">
+            <div className="w-8 h-8 rounded-full border-2 border-primary-200 flex items-center justify-center shrink-0">
+              <step.icon className="w-3.5 h-3.5 text-primary-400" />
+            </div>
+            <p className="text-sm font-semibold text-slate-800 flex-1">{step.label}</p>
+            <button
+              onClick={() => navigate(step.path)}
+              className="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center gap-1 shrink-0"
+            >
+              {step.cta} <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
         ))}
       </div>
     </div>
@@ -380,46 +673,50 @@ function TodaysRevenueMoves({ actions, navigate }: RevenueMovesProps) {
 
 function AIGrowthTools({ navigate }: { navigate: (path: string) => void }) {
   const tools = [
-    { icon: MessageSquare, label: "Handle objections", description: "Turn pricing pushback into closed cleaning jobs.", prompt: "help me handle objections" },
+    { icon: MessageSquare, label: "Handle objections", description: "Turn pricing pushback into closed jobs.", prompt: "help me handle objections" },
     { icon: Send, label: "Draft follow-up", description: "Write a sharp follow-up message in seconds.", prompt: "draft a follow-up message" },
-    { icon: FileEdit, label: "Walk-through to quote", description: "Paste your site-visit notes, get a cleaning quote.", prompt: "turn my notes into a quote" },
-    { icon: Repeat, label: "Pitch a recurring plan", description: "Generate a script to upsell recurring cleans.", prompt: "recurring upsell script" },
+    { icon: FileEdit, label: "Walk-through to quote", description: "Paste site-visit notes, get a quote.", prompt: "turn my notes into a quote" },
+    { icon: Repeat, label: "Pitch recurring plan", description: "Generate an upsell script for recurring cleans.", prompt: "recurring upsell script" },
     { icon: RefreshCw, label: "Re-engage a lost client", description: "Bring back a prospect that went quiet.", prompt: "re-engage lost lead" },
   ];
 
   return (
-    <Card className="mb-6">
-      <CardHeader
-        title="AI Revenue Assist"
-        icon={Bot}
-        actions={
-          <button
-            onClick={() => navigate("/ai-assistant")}
-            className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1"
-          >
-            Open AI <ArrowRight className="w-3 h-3" />
-          </button>
-        }
-      />
-      <p className="text-xs text-slate-500 mb-4 -mt-1">AI-powered actions that directly drive revenue for your cleaning business.</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden mb-6 shadow-sm">
+      <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-primary-900 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
+            <Bot className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-white">AI Revenue Assist</h2>
+            <p className="text-[10px] text-blue-200 mt-0.5">Powered by QuotePro AI</p>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/ai-assistant")}
+          className="flex items-center gap-1.5 text-xs font-semibold text-blue-200 hover:text-white transition-colors"
+        >
+          Open AI <ArrowRight className="w-3 h-3" />
+        </button>
+      </div>
+      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
         {tools.map((tool) => (
           <button
             key={tool.label}
             onClick={() => navigate(`/ai-assistant?prompt=${encodeURIComponent(tool.prompt)}`)}
-            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:border-primary-200 dark:hover:border-primary-700 border border-transparent dark:border-slate-700/50 transition-all text-left group"
+            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-primary-50 hover:border-primary-200 border border-slate-100 transition-all text-left group"
           >
-            <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center shrink-0 group-hover:border-primary-300 dark:group-hover:border-primary-600 transition-colors">
-              <tool.icon className="w-4 h-4 text-slate-500 dark:text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors" />
+            <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 group-hover:border-primary-300 transition-colors">
+              <tool.icon className="w-4 h-4 text-slate-400 group-hover:text-primary-600 transition-colors" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors">{tool.label}</p>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{tool.description}</p>
+              <p className="text-xs font-bold text-slate-700 group-hover:text-primary-700 transition-colors">{tool.label}</p>
+              <p className="text-[10px] text-slate-400 truncate mt-0.5">{tool.description}</p>
             </div>
           </button>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -446,42 +743,51 @@ function RevenueChart({ quotes }: { quotes: any[] }) {
 
   const maxRevenue = Math.max(...monthlyData.map((m) => m.revenue), 1);
   const hasAnyRevenue = monthlyData.some((m) => m.revenue > 0);
+  const total6mo = monthlyData.reduce((s, m) => s + m.revenue, 0);
 
   return (
     <div>
       {!hasAnyRevenue ? (
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <TrendingUp className="w-8 h-8 text-slate-200 mb-2" />
-          <p className="text-sm font-semibold text-slate-500">No accepted quotes yet</p>
-          <p className="text-xs text-slate-400 mt-1">Send quotes, follow up, and your accepted revenue builds here.</p>
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-3">
+            <BarChart3 className="w-7 h-7 text-slate-300" />
+          </div>
+          <p className="text-sm font-bold text-slate-500">No revenue history yet</p>
+          <p className="text-xs text-slate-400 mt-1 max-w-xs">Accept cleaning quotes and your revenue chart builds here automatically.</p>
         </div>
       ) : (
-        <div className="flex items-end gap-2 h-40">
-          {monthlyData.map((m, i) => {
-            const height = Math.max((m.revenue / maxRevenue) * 100, m.revenue > 0 ? 4 : 0);
-            const isCurrentMonth = i === monthlyData.length - 1;
-            return (
-              <div key={m.label} className="flex-1 flex flex-col items-center gap-1.5 group relative">
-                <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap pointer-events-none">
-                  ${m.revenue.toLocaleString()}
+        <>
+          <div className="flex items-end gap-2 h-36">
+            {monthlyData.map((m, i) => {
+              const h = Math.max((m.revenue / maxRevenue) * 100, m.revenue > 0 ? 5 : 0);
+              const isCurrent = i === monthlyData.length - 1;
+              return (
+                <div key={m.label} className="flex-1 flex flex-col items-center gap-1.5 group relative">
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-xs px-2 py-1 rounded-lg whitespace-nowrap pointer-events-none shadow-lg z-10">
+                    {fmt(m.revenue)}
+                  </div>
+                  <div className="w-full flex items-end justify-center" style={{ height: "100%" }}>
+                    <div
+                      className={`w-full max-w-[36px] rounded-t-lg transition-all duration-700 ease-out ${
+                        isCurrent
+                          ? "bg-gradient-to-t from-primary-700 to-primary-400 shadow-md shadow-primary-200"
+                          : "bg-gradient-to-t from-slate-200 to-slate-100 group-hover:from-primary-200 group-hover:to-primary-100"
+                      }`}
+                      style={{ height: `${h}%`, minHeight: m.revenue > 0 ? "5px" : "0px" }}
+                    />
+                  </div>
+                  <span className={`text-[10px] font-bold ${isCurrent ? "text-primary-600" : "text-slate-400"}`}>
+                    {m.label}
+                  </span>
                 </div>
-                <div className="w-full flex items-end justify-center" style={{ height: "100%" }}>
-                  <div
-                    className={`w-full max-w-[40px] rounded-t-md transition-all duration-700 ease-out ${
-                      isCurrentMonth
-                        ? "bg-gradient-to-t from-primary-600 to-primary-400"
-                        : "bg-gradient-to-t from-slate-200 to-slate-100 group-hover:from-primary-200 group-hover:to-primary-100"
-                    }`}
-                    style={{ height: `${height}%`, minHeight: m.revenue > 0 ? "4px" : "0px" }}
-                  />
-                </div>
-                <span className={`text-[10px] font-medium ${isCurrentMonth ? "text-primary-600 font-bold" : "text-slate-400"}`}>
-                  {m.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+            <span className="text-xs text-slate-400">6-month total</span>
+            <span className="text-sm font-black text-emerald-600">{fmt(total6mo)}</span>
+          </div>
+        </>
       )}
     </div>
   );
@@ -539,41 +845,41 @@ export default function DashboardPage() {
   const currentStreak = streakData?.currentStreak || 0;
   const longestStreak = streakData?.longestStreak || 0;
 
-  const followUpHealthPercent = useMemo(() => {
-    if (followUpQueueCount === 0) return 100;
-    const recentlyFollowedUp = followUpQueue.filter((q: any) => {
-      if (!q.lastFollowUpAt) return false;
-      const daysSince = (Date.now() - new Date(q.lastFollowUpAt).getTime()) / (1000 * 60 * 60 * 24);
-      return daysSince <= 2;
-    }).length;
-    return Math.round((recentlyFollowedUp / followUpQueueCount) * 100);
-  }, [followUpQueue, followUpQueueCount]);
+  // Today's jobs
+  const todayStr = new Date().toDateString();
+  const todayJobs = useMemo(() =>
+    jobs.filter((j: any) => j.startDatetime && new Date(j.startDatetime).toDateString() === todayStr),
+    [jobs, todayStr]
+  );
+  const todayRevenue = todayJobs.reduce((s: number, j: any) => s + (Number(j.total) || 0), 0);
 
-  const protectionScore = useMemo(() => getProtectionScore(followUpHealthPercent, followUpQueueCount, closeRate), [followUpHealthPercent, followUpQueueCount, closeRate]);
+  // Weekly jobs count
+  const weekJobs = useMemo(() => {
+    const now = Date.now();
+    const weekStart = now - 7 * 24 * 60 * 60 * 1000;
+    return jobs.filter((j: any) => j.startDatetime && new Date(j.startDatetime).getTime() >= weekStart).length;
+  }, [jobs]);
 
-  const estimatedLoss = useMemo(() => {
-    if (followUpQueueCount === 0) return 0;
-    const rate = closeRate > 0 ? closeRate / 100 : 0.45;
-    return Math.round(amountAtRisk * (1 - rate));
-  }, [amountAtRisk, closeRate, followUpQueueCount]);
+  // Monthly revenue (accepted quotes this month)
+  const monthlyRevenue = useMemo(() => acceptedQuotes.filter((q: any) => {
+    const d = new Date(q.createdAt);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).reduce((s: number, q: any) => s + (Number(q.total) || 0), 0), [acceptedQuotes]);
 
-  const funnelMax = Math.max(stats?.sentQuotes || sentQuotes.length, viewedQuotes.length, stats?.acceptedQuotes || acceptedQuotes.length, 1);
+  // Pipeline value (unscheduled accepted quotes)
+  const unscheduledAccepted = useMemo(() => {
+    const scheduledQuoteIds = new Set(jobs.map((j: any) => j.quoteId).filter(Boolean));
+    return acceptedQuotes.filter((q: any) => !scheduledQuoteIds.has(q.id)).length;
+  }, [acceptedQuotes, jobs]);
 
-  const monthlyRevenue = acceptedQuotes
-    .filter((q: any) => {
-      const d = new Date(q.createdAt);
-      const now = new Date();
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    })
-    .reduce((s: number, q: any) => s + (Number(q.total) || 0), 0);
-
-  const recentQuotes = [...quotes]
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 6);
-
-  const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-  const streakDaysToShow = Math.min(currentStreak, 7);
-  const scoreColor = protectionScore.score >= 90 ? "emerald" : protectionScore.score >= 70 ? "amber" : "red";
+  const pipelineValue = useMemo(() =>
+    acceptedQuotes.filter((q: any) => {
+      const scheduledQuoteIds = new Set(jobs.map((j: any) => j.quoteId).filter(Boolean));
+      return !scheduledQuoteIds.has(q.id);
+    }).reduce((s: number, q: any) => s + (Number(q.total) || 0), 0),
+    [acceptedQuotes, jobs]
+  );
 
   // ── User maturity flags ────────────────────────────────────────────────────
   const isNewUser = quotes.length === 0;
@@ -583,6 +889,64 @@ export default function DashboardPage() {
   const hasFollowUpActivity = currentStreak > 0 || followUpQueueCount > 0;
   const showChecklist = !hasQuotes || !hasCustomers || !hasFollowUpActivity;
 
+  const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+  const streakDaysToShow = Math.min(currentStreak, 7);
+
+  // ── Close rate determination for KPI color ────────────────────────────────
+  const closeRateColor: "emerald" | "amber" | "red" =
+    closeRate >= 50 ? "emerald" : closeRate >= 30 ? "amber" : "red";
+
+  // ── Attention items ────────────────────────────────────────────────────────
+  const attentionItems = useMemo<AttentionItem[]>(() => {
+    const items: AttentionItem[] = [];
+
+    if (followUpQueueCount > 0) {
+      items.push({
+        icon: PhoneMissed,
+        label: "Follow-ups needed",
+        count: followUpQueueCount,
+        description: `${fmt(amountAtRisk)} in sent quotes not yet responded to.`,
+        path: "/follow-ups",
+        severity: oldestQuoteDays >= 5 ? "critical" : oldestQuoteDays >= 3 ? "warning" : "warning",
+      });
+    }
+
+    if (draftQuotes.length > 0) {
+      items.push({
+        icon: Send,
+        label: "Drafts ready to send",
+        count: draftQuotes.length,
+        description: "Unsent quotes can't close. Send them today.",
+        path: "/quotes",
+        severity: "warning",
+      });
+    }
+
+    if (unscheduledAccepted > 0) {
+      items.push({
+        icon: Calendar,
+        label: "Accepted, not scheduled",
+        count: unscheduledAccepted,
+        description: `${fmt(pipelineValue)} in accepted quotes awaiting scheduling.`,
+        path: "/quotes?filter=accepted",
+        severity: "info",
+      });
+    }
+
+    if (closeRate > 0 && closeRate < 30) {
+      items.push({
+        icon: TrendingDown,
+        label: "Close rate below average",
+        count: Math.round(closeRate),
+        description: "Under 30% — follow up faster to close more cleans.",
+        path: "/quotes",
+        severity: "warning",
+      });
+    }
+
+    return items.slice(0, 4);
+  }, [followUpQueueCount, amountAtRisk, draftQuotes, unscheduledAccepted, pipelineValue, closeRate, oldestQuoteDays]);
+
   // ── Today's Revenue Moves ──────────────────────────────────────────────────
   const revenueActions = useMemo<RevenueAction[]>(() => {
     const actions: RevenueAction[] = [];
@@ -590,12 +954,13 @@ export default function DashboardPage() {
     if (!hasQuotes) {
       actions.push({
         icon: Plus,
-        iconBg: "bg-primary-50",
+        iconBg: "bg-primary-100",
         iconColor: "text-primary-600",
         tag: "High Impact",
-        tagColor: "text-primary-600",
+        tagBg: "bg-primary-100",
+        tagColor: "text-primary-700",
         title: "Create your first cleaning quote",
-        description: "One quote sets everything in motion. It takes under 2 minutes.",
+        description: "One quote sets everything in motion. Under 2 minutes to build.",
         cta: "Create Quote",
         path: "/quotes/new",
       });
@@ -604,12 +969,13 @@ export default function DashboardPage() {
     if (followUpQueueCount > 0) {
       actions.push({
         icon: PhoneMissed,
-        iconBg: "bg-amber-50",
+        iconBg: "bg-amber-100",
         iconColor: "text-amber-600",
         tag: "Revenue Risk",
-        tagColor: "text-amber-600",
+        tagBg: "bg-amber-100",
+        tagColor: "text-amber-700",
         title: `Follow up with ${followUpQueueCount} lead${followUpQueueCount > 1 ? "s" : ""}`,
-        description: `$${amountAtRisk.toLocaleString()} is waiting for a response. Most deals close within 48 hours of follow-up.`,
+        description: `${fmt(amountAtRisk)} is waiting for your response. Most deals close within 48 hours.`,
         cta: "Review Follow-Ups",
         path: "/follow-ups",
       });
@@ -618,12 +984,13 @@ export default function DashboardPage() {
     if (draftQuotes.length > 0) {
       actions.push({
         icon: Send,
-        iconBg: "bg-blue-50",
+        iconBg: "bg-blue-100",
         iconColor: "text-blue-600",
         tag: "Ready to Send",
-        tagColor: "text-blue-600",
+        tagBg: "bg-blue-100",
+        tagColor: "text-blue-700",
         title: `Send ${draftQuotes.length} draft quote${draftQuotes.length > 1 ? "s" : ""}`,
-        description: "Drafts sitting unsent earn nothing. Send them and start the clock on closing.",
+        description: "Drafts sitting unsent earn nothing. Send them and start the clock.",
         cta: "View Drafts",
         path: "/quotes",
       });
@@ -632,12 +999,13 @@ export default function DashboardPage() {
     if (closeRate > 0 && closeRate < 35) {
       actions.push({
         icon: TrendingDown,
-        iconBg: "bg-red-50",
+        iconBg: "bg-red-100",
         iconColor: "text-red-500",
         tag: "Coaching Tip",
-        tagColor: "text-red-500",
+        tagBg: "bg-red-100",
+        tagColor: "text-red-700",
         title: "Quote close rate needs attention",
-        description: `At ${Math.round(closeRate)}%, you're leaving cleans on the table. Use AI to handle pricing objections and write sharper follow-ups.`,
+        description: `At ${Math.round(closeRate)}%, you're leaving cleans on the table. Use AI to write sharper follow-ups.`,
         cta: "Use AI Assist",
         path: "/ai-assistant",
       });
@@ -646,12 +1014,13 @@ export default function DashboardPage() {
     if (hasQuotes && !hasFollowUpActivity) {
       actions.push({
         icon: Zap,
-        iconBg: "bg-violet-50",
+        iconBg: "bg-violet-100",
         iconColor: "text-violet-600",
         tag: "Growth Move",
-        tagColor: "text-violet-600",
+        tagBg: "bg-violet-100",
+        tagColor: "text-violet-700",
         title: "Activate follow-up automation",
-        description: "Businesses that follow up within 48 hours win 2x more quotes. Turn it on.",
+        description: "Businesses that follow up within 48 hours win 2x more quotes.",
         cta: "Set Up Follow-Ups",
         path: "/follow-ups",
       });
@@ -660,12 +1029,13 @@ export default function DashboardPage() {
     if (hasQuotes && hasCustomers && ratingSummary && (ratingSummary.total || 0) === 0) {
       actions.push({
         icon: Star,
-        iconBg: "bg-amber-50",
+        iconBg: "bg-amber-100",
         iconColor: "text-amber-500",
         tag: "Reputation",
-        tagColor: "text-amber-600",
+        tagBg: "bg-amber-100",
+        tagColor: "text-amber-700",
         title: "Request your first client review",
-        description: "Reviews build trust and win more cleans. One great review can pay for itself 10x.",
+        description: "Reviews build trust and win more cleans. One review can pay for itself 10x.",
         cta: "Get Reviews",
         path: "/reviews",
       });
@@ -674,10 +1044,11 @@ export default function DashboardPage() {
     if (hasQuotes && hasCustomers && actions.length < 2) {
       actions.push({
         icon: Bot,
-        iconBg: "bg-emerald-50",
+        iconBg: "bg-emerald-100",
         iconColor: "text-emerald-600",
         tag: "AI Tool",
-        tagColor: "text-emerald-600",
+        tagBg: "bg-emerald-100",
+        tagColor: "text-emerald-700",
         title: "Turn walk-through notes into a quote",
         description: "Paste your site-visit notes and AI builds a cleaning quote in seconds.",
         cta: "Try AI Assist",
@@ -688,66 +1059,31 @@ export default function DashboardPage() {
     return actions.slice(0, 3);
   }, [hasQuotes, followUpQueueCount, amountAtRisk, draftQuotes, closeRate, hasFollowUpActivity, hasCustomers, ratingSummary]);
 
-  // ── Stat card subtitle helpers ─────────────────────────────────────────────
-  const quoteSubtitle = quotes.length === 0
-    ? "Create your first cleaning quote to build a pipeline"
-    : `${draftQuotes.length} draft · ${sentQuotes.length} sent`;
-  const customerSubtitle = customers.length === 0
-    ? "Add your first cleaning client to get started"
-    : undefined;
-  const revenueSubtitle = totalRevenue === 0
-    ? "Accepted cleaning quotes count toward revenue"
-    : undefined;
+  const recentQuotes = useMemo(() =>
+    [...quotes]
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 6),
+    [quotes]
+  );
 
   return (
-    <div>
-      <PageHeader
-        title="Dashboard"
-        subtitle={`Welcome back${business?.companyName ? `, ${business.companyName}` : ""}`}
-        actions={
-          <Button icon={Plus} onClick={() => navigate("/quotes/new")}>
-            New Quote
-          </Button>
-        }
-      />
+    <div className="max-w-7xl mx-auto">
 
-      {/* Free trial banner */}
-      {isInFreeTrial ? (
-        <button
-          onClick={() => navigate("/pricing")}
-          className="w-full text-left rounded-2xl p-4 mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-4"
-        >
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
-            <Zap className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-              Free Trial — {freeTrialDaysLeft} day{freeTrialDaysLeft !== 1 ? "s" : ""} remaining
-            </p>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-              Upgrade to keep unlimited cleaning quotes, AI tools, and automated follow-ups.
-            </p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-blue-400 shrink-0" />
-        </button>
-      ) : null}
-
-      {/* 1. Dynamic Hero */}
-      <DynamicHero
-        isNewUser={isNewUser}
+      {/* 1. Command Header */}
+      <CommandHeader
+        business={business}
+        monthRevenue={monthlyRevenue}
+        weekJobs={weekJobs}
+        closeRate={closeRate}
         followUpQueueCount={followUpQueueCount}
         amountAtRisk={amountAtRisk}
         oldestQuoteDays={oldestQuoteDays}
-        estimatedLoss={estimatedLoss}
-        closeRate={closeRate}
-        protectionScore={protectionScore}
-        followUpHealthPercent={followUpHealthPercent}
-        quotes={quotes}
-        totalRevenue={totalRevenue}
+        isInFreeTrial={isInFreeTrial}
+        freeTrialDaysLeft={freeTrialDaysLeft}
         navigate={navigate}
       />
 
-      {/* 2. Start Here Checklist (new users / low setup) */}
+      {/* 2. Setup checklist for new users */}
       {showChecklist ? (
         <StartHereChecklist
           hasPricing={hasPricing || hasQuotes}
@@ -758,336 +1094,284 @@ export default function DashboardPage() {
         />
       ) : null}
 
-      {/* 3. Today's Revenue Moves */}
-      <TodaysRevenueMoves actions={revenueActions} navigate={navigate} />
-
-      {/* 4. Core KPI Cards */}
+      {/* 3. KPI Momentum Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Cleaning Quotes"
-          value={quotes.length === 0 ? "0" : quotes.length}
-          icon={FileText}
-          color="primary"
-          subtitle={quoteSubtitle}
-        />
-        <StatCard
-          label="Clients"
-          value={customers.length === 0 ? "0" : customers.length}
-          icon={Users}
-          color="violet"
-          subtitle={customerSubtitle}
-        />
-        <StatCard
-          label="Scheduled Cleans"
-          value={activeJobs.length}
-          icon={Briefcase}
-          color="amber"
-          subtitle={`${jobs.length} total`}
-        />
-        <StatCard
+        <KPICard
           label="Revenue Won"
+          value={fmt(totalRevenue)}
+          subtitle={`${fmt(monthlyRevenue)} this month`}
           icon={DollarSign}
           color="emerald"
-          value={`$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
-          subtitle={revenueSubtitle}
+          badge={totalRevenue > 0 ? "Live" : undefined}
+          badgePositive
+          onClick={() => navigate("/opportunities")}
+        />
+        <KPICard
+          label="Active Jobs"
+          value={activeJobs.length}
+          subtitle={`${jobs.length} total scheduled`}
+          icon={Briefcase}
+          color="blue"
+          onClick={() => navigate("/jobs")}
+        />
+        <KPICard
+          label="Close Rate"
+          value={closeRate > 0 ? `${Math.round(closeRate)}%` : "—"}
+          subtitle={
+            closeRate >= 50 ? "Excellent performance" :
+            closeRate >= 35 ? "Room to improve" :
+            closeRate > 0 ? "Needs attention" :
+            "Send quotes to start tracking"
+          }
+          icon={Target}
+          color={closeRateColor}
+          badge={closeRate >= 50 ? "Strong" : closeRate > 0 && closeRate < 35 ? "Low" : undefined}
+          badgePositive={closeRate >= 50}
+          onClick={() => navigate("/quotes")}
+        />
+        <KPICard
+          label="Pipeline Value"
+          value={fmt(pipelineValue)}
+          subtitle={`${unscheduledAccepted} accepted, need scheduling`}
+          icon={TrendingUp}
+          color={unscheduledAccepted > 0 ? "amber" : "violet"}
+          badge={unscheduledAccepted > 0 ? `${unscheduledAccepted} pending` : undefined}
+          badgePositive={false}
+          onClick={() => navigate("/quotes?filter=accepted")}
         />
       </div>
 
-      {/* 5. Sales Momentum / Close Rate / Today at a Glance */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <CardHeader title="Quote Pipeline" icon={TrendingUp} />
-          {quotes.length === 0 ? (
-            <div className="py-4 text-center">
-              <p className="text-sm font-semibold text-slate-500">No quotes sent yet</p>
-              <p className="text-xs text-slate-400 mt-1">Send cleaning quotes and track your conversion funnel here.</p>
-              <Button size="sm" icon={Plus} onClick={() => navigate("/quotes/new")} className="mt-3 mx-auto">
-                Create Quote
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-3">
-                <FunnelBar label="Sent" count={stats?.sentQuotes || sentQuotes.length} total={funnelMax} color="bg-blue-500" icon={Send} />
-                <FunnelBar label="Viewed" count={viewedQuotes.length} total={funnelMax} color="bg-violet-500" icon={Eye} />
-                <FunnelBar label="Accepted" count={stats?.acceptedQuotes || acceptedQuotes.length} total={funnelMax} color="bg-emerald-500" icon={CheckCircle} />
-                <FunnelBar label="Won" count={stats?.acceptedQuotes || acceptedQuotes.length} total={funnelMax} color="bg-green-600" icon={Award} />
-              </div>
-              <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-slate-100 dark:border-slate-700">
-                <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">Close rate</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{Math.round(closeRate)}%</span>
-                {closeRate < 40 && closeRate > 0 ? (
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">below avg</span>
-                ) : closeRate >= 50 ? (
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">strong</span>
-                ) : null}
-              </div>
-            </>
-          )}
-        </Card>
+      {/* 4. Today Operations */}
+      <TodayOperations
+        todayJobs={todayJobs}
+        todayRevenue={todayRevenue}
+        unscheduledAccepted={unscheduledAccepted}
+        navigate={navigate}
+      />
 
-        <Card>
-          <CardHeader title="Close Rate" icon={Target} />
-          {quotes.length === 0 ? (
-            <div className="py-4 text-center">
-              <p className="text-sm font-semibold text-slate-500">No quote activity yet</p>
-              <p className="text-xs text-slate-400 mt-1">Send quotes and follow up to start tracking your close rate. Top cleaning companies close 40–60%.</p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-4">
-              <MetricRing
-                value={closeRate}
-                max={100}
-                size={90}
-                strokeWidth={7}
-                color={closeRate >= 60 ? "emerald" : closeRate >= 40 ? "amber" : "red"}
-              >
-                <span className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{Math.round(closeRate)}%</span>
-              </MetricRing>
-              <div className="flex-1">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <TrendingUp className={`w-4 h-4 ${closeRate >= 50 ? "text-emerald-500" : "text-slate-400 dark:text-slate-500"}`} />
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    {closeRate >= 60 ? "Great — keep it up" : closeRate >= 40 ? "Average — room to grow" : closeRate > 0 ? "Needs improvement" : "No data yet"}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  {closeRate < 40 && closeRate > 0
-                    ? "Follow up faster. Most cleaning jobs close within 48 hours of contact."
-                    : `Based on ${(stats?.sentQuotes || sentQuotes.length)} quotes sent`}
-                </p>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                  Avg value: ${(stats?.avgQuoteValue || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                </p>
-              </div>
-            </div>
-          )}
-        </Card>
+      {/* 5. Revenue Moves */}
+      <TodaysRevenueMoves actions={revenueActions} navigate={navigate} />
 
-        <Card>
-          <CardHeader title="Today at a Glance" icon={Sparkles} />
-          <div className="space-y-3">
-            <div
-              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
-              onClick={() => navigate("/follow-ups")}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${followUpQueueCount > 0 ? "bg-amber-50 dark:bg-amber-900/30" : "bg-slate-50 dark:bg-slate-700"}`}>
-                  <PhoneMissed className={`w-4 h-4 ${followUpQueueCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-slate-500"}`} />
-                </div>
-                <span className="text-sm text-slate-600 dark:text-slate-300">Need follow-up</span>
+      {/* 6. Pipeline + Attention Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
+        <div className="lg:col-span-3 rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className={`text-sm font-bold ${followUpQueueCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-slate-900 dark:text-slate-100"}`}>
-                  {followUpQueueCount}
-                </span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
-              </div>
+              <h2 className="font-bold text-slate-800 text-sm">Quote Pipeline</h2>
             </div>
-            <div
-              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
-              onClick={() => navigate("/quotes")}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-                  <Send className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <span className="text-sm text-slate-600 dark:text-slate-300">Quotes out</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{sentQuotes.length + viewedQuotes.length}</span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
-              </div>
-            </div>
-            <div
-              className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
-              onClick={() => navigate("/opportunities")}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <span className="text-sm text-slate-600 dark:text-slate-300">Won this month</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${monthlyRevenue.toLocaleString()}</span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
-              </div>
-            </div>
+            <span className="text-xs text-slate-400">{quotes.length} total quotes</span>
           </div>
-        </Card>
+          <div className="p-5">
+            <PipelineCard
+              sentCount={stats?.sentQuotes || sentQuotes.length}
+              viewedCount={viewedQuotes.length}
+              acceptedCount={stats?.acceptedQuotes || acceptedQuotes.length}
+              closeRate={closeRate}
+              avgValue={stats?.avgQuoteValue || 0}
+              navigate={navigate}
+            />
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 space-y-3">
+          <AttentionPanel items={attentionItems} navigate={navigate} />
+        </div>
       </div>
 
-      {/* 6. AI Revenue Assist */}
+      {/* 7. AI Growth Tools */}
       <AIGrowthTools navigate={navigate} />
 
-      {/* 7. Follow-Up Streak + Weekly Recap */}
+      {/* 8. Follow-Up Streak + Weekly Recap */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <Card>
-          <CardHeader title="Follow-Up Streak" icon={Flame} />
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${currentStreak > 0 ? "bg-emerald-100 dark:bg-emerald-800" : "bg-slate-100 dark:bg-slate-700"}`}>
-              <Target className={`w-6 h-6 ${currentStreak > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`} />
+        {/* Streak */}
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2.5">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${currentStreak > 0 ? "bg-emerald-100" : "bg-slate-100"}`}>
+              <Flame className={`w-3.5 h-3.5 ${currentStreak > 0 ? "text-emerald-600" : "text-slate-400"}`} />
             </div>
-            <div>
-              <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-                {currentStreak} {currentStreak === 1 ? "day" : "days"}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {currentStreak >= 7
-                  ? "Elite discipline — top closers follow up every day."
-                  : currentStreak >= 3
-                  ? "Building momentum. Keep going — streaks compound."
-                  : currentStreak > 0
-                  ? "Good start. Daily follow-up doubles close rates."
-                  : "Your streak starts with one follow-up today."}
-              </p>
-            </div>
+            <h2 className="font-bold text-slate-800 text-sm">Follow-Up Streak</h2>
+            {currentStreak > 0 ? (
+              <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                {currentStreak} day{currentStreak !== 1 ? "s" : ""}
+              </span>
+            ) : null}
           </div>
-
-          <div className="flex gap-1.5 mt-3">
-            {weekDays.map((day, i) => {
-              const active = i < streakDaysToShow;
-              return (
-                <div key={day} className="flex-1 flex flex-col items-center gap-1">
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                      active
-                        ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30"
-                        : "bg-slate-100 dark:bg-slate-700 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-600"
-                    }`}
-                  >
-                    {active ? <CheckCircle className="w-3.5 h-3.5" /> : null}
-                  </div>
-                  <span className={`text-[10px] font-semibold ${active ? "text-emerald-600" : "text-slate-400"}`}>{day}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          {longestStreak > 0 ? (
-            <p className="text-xs text-slate-400 mt-3">
-              Best streak: {longestStreak} {longestStreak === 1 ? "day" : "days"} — a {longestStreak >= 7 ? "great" : "solid"} run
-            </p>
-          ) : null}
-
-          <Button
-            icon={Zap}
-            variant={currentStreak > 0 ? "success" : "primary"}
-            onClick={() => navigate("/follow-ups")}
-            className="w-full mt-4"
-          >
-            {currentStreak > 0 ? "Keep streak alive" : "Start your streak today"}
-          </Button>
-        </Card>
-
-        <Card>
-          <CardHeader title="Weekly Recap" icon={Calendar} />
-          {quotes.length === 0 ? (
-            <div className="py-4 text-center">
-              <p className="text-sm font-semibold text-slate-500">No activity this week yet</p>
-              <p className="text-xs text-slate-400 mt-1">The most successful cleaning businesses quote consistently, every week. One quote starts the momentum.</p>
-              <Button size="sm" icon={Plus} onClick={() => navigate("/quotes/new")} className="mt-3 mx-auto">
-                Start This Week Right
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600 dark:text-slate-300">Cleaning quotes sent</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  {quotes.filter((q: any) => {
-                    const d = new Date(q.createdAt);
-                    const now = new Date();
-                    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                    return d >= weekAgo;
-                  }).length}
+          <div className="p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${currentStreak > 0 ? "bg-emerald-100" : "bg-slate-100"}`}>
+                <span className={`text-2xl font-black ${currentStreak > 0 ? "text-emerald-700" : "text-slate-400"}`}>
+                  {currentStreak}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600 dark:text-slate-300">Quotes accepted</span>
-                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                  {acceptedQuotes.filter((q: any) => {
-                    const d = new Date(q.createdAt);
-                    const now = new Date();
-                    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                    return d >= weekAgo;
-                  }).length}
-                </span>
+              <div>
+                <p className="text-sm font-bold text-slate-800">
+                  {currentStreak >= 7 ? "Elite discipline" : currentStreak >= 3 ? "Building momentum" : currentStreak > 0 ? "Good start" : "Start your streak"}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {currentStreak >= 7 ? "Top closers follow up every day." : currentStreak >= 3 ? "Keep going — streaks compound." : currentStreak > 0 ? "Daily follow-up doubles close rates." : "One follow-up starts the momentum."}
+                </p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600 dark:text-slate-300">Revenue this month</span>
-                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">${monthlyRevenue.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600 dark:text-slate-300">Close rate</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-bold ${closeRate >= 50 ? "text-emerald-600 dark:text-emerald-400" : closeRate >= 30 ? "text-amber-600 dark:text-amber-400" : "text-red-500 dark:text-red-400"}`}>
-                    {Math.round(closeRate)}%
-                  </span>
-                  {closeRate < 40 && closeRate > 0 ? (
-                    <span className="text-[10px] text-amber-600 dark:text-amber-400">Follow up faster</span>
-                  ) : null}
-                </div>
-              </div>
-              {ratingSummary ? (
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700">
-                  <span className="text-sm text-slate-600 dark:text-slate-300">Avg rating</span>
-                  <div className="flex items-center gap-1.5">
-                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{(ratingSummary.average || 0).toFixed(1)}</span>
-                    <span className="text-xs text-slate-400 dark:text-slate-500">({ratingSummary.total || 0})</span>
-                  </div>
-                </div>
-              ) : null}
             </div>
-          )}
-        </Card>
+            <div className="flex gap-1.5">
+              {weekDays.map((day, i) => {
+                const active = i < streakDaysToShow;
+                return (
+                  <div key={day} className="flex-1 flex flex-col items-center gap-1">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${active ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200" : "bg-slate-100 text-slate-300"}`}>
+                      {active ? <CheckCircle className="w-4 h-4" /> : null}
+                    </div>
+                    <span className={`text-[9px] font-bold ${active ? "text-emerald-600" : "text-slate-300"}`}>{day}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {longestStreak > 0 ? (
+              <p className="text-xs text-slate-400 mt-3">Best: {longestStreak} day{longestStreak !== 1 ? "s" : ""}</p>
+            ) : null}
+            <button
+              onClick={() => navigate("/follow-ups")}
+              className={`w-full mt-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                currentStreak > 0
+                  ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-200"
+                  : "bg-primary-600 hover:bg-primary-700 text-white"
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              {currentStreak > 0 ? "Keep streak alive" : "Start your streak today"}
+            </button>
+          </div>
+        </div>
+
+        {/* Weekly Recap */}
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-violet-50 flex items-center justify-center">
+              <Calendar className="w-3.5 h-3.5 text-violet-600" />
+            </div>
+            <h2 className="font-bold text-slate-800 text-sm">Weekly Recap</h2>
+          </div>
+          <div className="p-5">
+            {quotes.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm font-bold text-slate-400">No activity this week yet</p>
+                <p className="text-xs text-slate-400 mt-1">Quote consistently — it's how the best cleaning businesses grow.</p>
+                <button
+                  onClick={() => navigate("/quotes/new")}
+                  className="mt-3 flex items-center gap-1.5 mx-auto text-xs font-bold text-primary-600 hover:text-primary-700"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Create a Quote
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {[
+                  {
+                    label: "Quotes sent this week",
+                    value: quotes.filter((q: any) => {
+                      const d = new Date(q.createdAt);
+                      return Date.now() - d.getTime() <= 7 * 24 * 60 * 60 * 1000;
+                    }).length,
+                    color: "text-slate-900",
+                  },
+                  {
+                    label: "Quotes accepted this week",
+                    value: acceptedQuotes.filter((q: any) => {
+                      const d = new Date(q.createdAt);
+                      return Date.now() - d.getTime() <= 7 * 24 * 60 * 60 * 1000;
+                    }).length,
+                    color: "text-emerald-600",
+                  },
+                  { label: "Revenue this month", value: fmt(monthlyRevenue), color: "text-emerald-600" },
+                  {
+                    label: "Close rate",
+                    value: closeRate > 0 ? `${Math.round(closeRate)}%` : "—",
+                    color: closeRate >= 50 ? "text-emerald-600" : closeRate >= 35 ? "text-amber-600" : "text-red-500",
+                  },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0">
+                    <span className="text-sm text-slate-500">{row.label}</span>
+                    <span className={`text-sm font-black ${row.color}`}>{row.value}</span>
+                  </div>
+                ))}
+                {ratingSummary ? (
+                  <div className="flex items-center justify-between py-2.5">
+                    <span className="text-sm text-slate-500">Avg client rating</span>
+                    <div className="flex items-center gap-1.5">
+                      <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                      <span className="text-sm font-black text-slate-900">{(ratingSummary.average || 0).toFixed(1)}</span>
+                      <span className="text-xs text-slate-400">({ratingSummary.total || 0})</span>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* 8. Revenue Chart */}
-      <Card className="mb-6">
-        <CardHeader
-          title="Accepted Revenue"
-          icon={BarChart3}
-          actions={<span className="text-xs text-slate-400">Last 6 months</span>}
-        />
-        <RevenueChart quotes={quotes} />
-      </Card>
+      {/* 9. Revenue Chart */}
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm mb-6">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+            </div>
+            <h2 className="font-bold text-slate-800 text-sm">Accepted Revenue</h2>
+          </div>
+          <span className="text-xs text-slate-400">Last 6 months</span>
+        </div>
+        <div className="p-5">
+          <RevenueChart quotes={quotes} />
+        </div>
+      </div>
 
-      {/* 9. Recent Quotes */}
-      <Card padding={false}>
-        <div className="flex items-center justify-between px-5 lg:px-6 py-4 border-b border-slate-100 dark:border-slate-700">
-          <h2 className="font-semibold text-slate-900 dark:text-slate-100">Recent Quotes</h2>
+      {/* 10. Recent Quotes */}
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
+            </div>
+            <h2 className="font-bold text-slate-800 text-sm">Recent Quotes</h2>
+          </div>
           <button
             onClick={() => navigate("/quotes")}
-            className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 font-medium flex items-center gap-1"
+            className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1"
           >
             View all <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {recentQuotes.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            <FileText className="w-8 h-8 text-slate-200 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-slate-500">No cleaning quotes sent yet</p>
+          <div className="px-6 py-12 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto mb-4">
+              <FileText className="w-7 h-7 text-slate-300" />
+            </div>
+            <p className="text-sm font-bold text-slate-500">No quotes yet</p>
             <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-              The fastest path to revenue is sending your first cleaning quote. It takes under 2 minutes.
+              Send your first cleaning quote in under 2 minutes and start building your pipeline.
             </p>
-            <Button icon={Plus} onClick={() => navigate("/quotes/new")} className="mt-4 mx-auto">
-              Create Your First Cleaning Quote
-            </Button>
+            <button
+              onClick={() => navigate("/quotes/new")}
+              className="mt-4 flex items-center gap-2 mx-auto px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-bold transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create Your First Quote
+            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-700">
-                  <th className="text-left px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Customer</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">Type</th>
-                  <th className="text-right px-5 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total</th>
-                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                  <th className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:table-cell">Date</th>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:table-cell">Type</th>
+                  <th className="text-right px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                  <th className="text-right px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:table-cell">Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -1095,17 +1379,19 @@ export default function DashboardPage() {
                   <tr
                     key={q.id}
                     onClick={() => navigate(`/quotes/${q.id}`)}
-                    className="border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50/80 dark:hover:bg-slate-700/30 cursor-pointer transition-colors"
+                    className="border-b border-slate-50 hover:bg-primary-50/50 cursor-pointer transition-colors last:border-0 group"
                   >
-                    <td className="px-5 lg:px-6 py-3.5 font-medium text-slate-900 dark:text-slate-100">{q.customerName || "No customer"}</td>
-                    <td className="px-5 py-3.5 text-slate-500 dark:text-slate-400 capitalize hidden sm:table-cell">
+                    <td className="px-5 py-3.5 font-semibold text-slate-900 group-hover:text-primary-700 transition-colors">
+                      {q.customerName || "No customer"}
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-400 capitalize hidden sm:table-cell text-xs">
                       {(q.propertyDetails as any)?.quoteType || "residential"}
                     </td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-slate-900 dark:text-slate-100">${Number(q.total || 0).toLocaleString()}</td>
+                    <td className="px-5 py-3.5 text-right font-black text-slate-900">${Number(q.total || 0).toLocaleString()}</td>
                     <td className="px-5 py-3.5">
                       <Badge status={q.status} dot />
                     </td>
-                    <td className="px-5 lg:px-6 py-3.5 text-right text-slate-500 dark:text-slate-400 hidden md:table-cell">
+                    <td className="px-5 py-3.5 text-right text-xs text-slate-400 hidden md:table-cell">
                       {new Date(q.createdAt).toLocaleDateString()}
                     </td>
                   </tr>
@@ -1114,7 +1400,10 @@ export default function DashboardPage() {
             </table>
           </div>
         )}
-      </Card>
+      </div>
+
+      {/* Bottom spacing */}
+      <div className="h-8" />
     </div>
   );
 }

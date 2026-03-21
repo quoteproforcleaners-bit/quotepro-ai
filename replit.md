@@ -46,6 +46,19 @@ When a quote is sent, the system automatically schedules a follow-up message to 
 UI: "Follow-Up Automation" section in `QuoteDetailScreen.tsx` (mobile) and `QuoteDetailPage.tsx` (web), visible only for `sent` quotes.
 API routes: `GET /api/quotes/:id/scheduled-followups`, `POST /api/communications/:id/send-now`, `PUT /api/communications/:id`, `DELETE /api/communications/:id`, `POST /api/quotes/:id/followup-preview`.
 
+### Web Dashboard (DashboardPage.tsx)
+The web dashboard (`web/src/pages/DashboardPage.tsx`) was fully redesigned as a premium "Revenue Command Center". Sections top to bottom:
+1. **CommandHeader** — dark gradient hero (slate-900 → primary-800) with business greeting, glass stat pills (Month Revenue, Jobs This Week, Close Rate, At Risk), and a white "New Quote" CTA. Shows an amber alert ribbon when follow-ups are at risk.
+2. **StartHereChecklist** — shown for new/low-setup users only (steps: set rates, create quote, add client, activate follow-ups).
+3. **KPI Row** — 4 tinted gradient cards: "Revenue Won" (emerald), "Active Jobs" (blue), "Close Rate" (dynamic color), "Pipeline Value" (amber/violet).
+4. **TodayOperations** — 4-cell strip: Cleans Today, Revenue Today, Next Clean, Needs Scheduling.
+5. **TodaysRevenueMoves** — up to 3 dynamic action cards based on current business state.
+6. **Pipeline + Attention** — 5-col grid: `PipelineCard` (3 cols) with funnel bars + close rate/avg value stats, `AttentionPanel` (2 cols) with severity-coded action items.
+7. **AIGrowthTools** — dark-header card with 5 AI quick-launch buttons.
+8. **Follow-Up Streak + Weekly Recap** — side-by-side cards.
+9. **Revenue Chart** — 6-month bar chart with hover tooltips.
+10. **Recent Quotes** — table with hover highlight and clickable rows.
+
 ## External Dependencies
 
 ### Core Framework
