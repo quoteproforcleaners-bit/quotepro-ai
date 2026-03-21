@@ -1358,6 +1358,8 @@ export default function QuoteDetailPage() {
           address: quote.propertyDetails?.customerAddress || '',
           total: quote.total,
           jobType: quote.options?.[quote.selectedOption]?.name || 'regular',
+          customerPhone: quote.customerPhone || '',
+          customerEmail: quote.customerEmail || '',
         } : undefined}
       />
 

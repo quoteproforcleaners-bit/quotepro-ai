@@ -1650,6 +1650,181 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
+  // ─── Appointment Confirmation ─────────────────────────────────────────────
+
+  app.post("/api/jobs/:id/send-confirmation", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const customer = (job as any).customerId ? await getCustomerById((job as any).customerId) : null;
+      const { channels = ["sms", "email"] } = req.body as { channels: string[] };
+
+      const customerFirstName = customer?.firstName || "there";
+      const companyName = (business as any).companyName || "your cleaning company";
+      const senderName = (business as any).senderName || companyName;
+      const address = (job as any).address || "";
+      const jobTypeRaw = (job as any).jobType || "regular";
+      const serviceLabels: Record<string, string> = {
+        "regular": "cleaning", "deep-clean": "deep clean", "move-in": "move-in clean",
+        "move-out": "move-out clean", "post-construction": "post-construction clean", "airbnb": "turnover clean",
+      };
+      const serviceLabel = serviceLabels[jobTypeRaw] || "cleaning";
+
+      const startDt: Date | null = (job as any).startDatetime ? new Date((job as any).startDatetime) : null;
+      const endDt: Date | null = (job as any).endDatetime ? new Date((job as any).endDatetime) : null;
+
+      const dateStr = startDt
+        ? startDt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+        : "";
+      const timeStr = startDt
+        ? startDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+        : "";
+      const endTimeStr = endDt
+        ? endDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+        : "";
+      const arrivalWindow = endTimeStr ? `${timeStr} – ${endTimeStr}` : timeStr;
+
+      const results: Record<string, { success: boolean; message: string }> = {};
+
+      // ── SMS ────────────────────────────────────────────────────────────────
+      if (channels.includes("sms")) {
+        const toPhone = customer?.phone;
+        if (!toPhone) {
+          results.sms = { success: false, message: "No phone number on file" };
+        } else {
+          const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+          const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+          const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+          if (!twilioSid || !twilioToken || !twilioFrom) {
+            results.sms = { success: false, message: "SMS service not configured" };
+          } else {
+            const smsParts = [
+              `Hi ${customerFirstName} — your ${serviceLabel} is confirmed`,
+              dateStr ? ` for ${dateStr}` : "",
+              arrivalWindow ? ` with an arrival window of ${arrivalWindow}` : "",
+              address ? ` at ${address}` : "",
+              `. Reply with any questions. – ${senderName}`,
+            ];
+            const smsBody = smsParts.join("").slice(0, 160);
+            const twilioRes = await fetch(
+              `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({ From: twilioFrom, To: toPhone, Body: smsBody }).toString(),
+              }
+            );
+            if (!twilioRes.ok) {
+              const errText = await twilioRes.text();
+              console.error("Confirmation SMS error:", twilioRes.status, errText);
+              results.sms = { success: false, message: "Failed to send SMS" };
+            } else {
+              results.sms = { success: true, message: "SMS sent" };
+              await createCommunication({
+                businessId: business.id,
+                customerId: customer?.id || undefined,
+                jobId: job.id,
+                channel: "sms",
+                content: smsBody,
+                templateKey: "appointment_confirmation",
+                status: "sent",
+              });
+            }
+          }
+        }
+      }
+
+      // ── Email ──────────────────────────────────────────────────────────────
+      if (channels.includes("email")) {
+        const toEmail = customer?.email;
+        if (!toEmail) {
+          results.email = { success: false, message: "No email address on file" };
+        } else {
+          const sgApiKey = process.env.SENDGRID_API_KEY;
+          if (!sgApiKey) {
+            results.email = { success: false, message: "Email service not configured" };
+          } else {
+            const subject = `Your ${serviceLabel} is confirmed for ${dateStr}`;
+            const plainBody = [
+              `Hi ${customerFirstName},`,
+              "",
+              `Your ${serviceLabel} is confirmed. Here are your appointment details:`,
+              "",
+              dateStr ? `Date:     ${dateStr}` : "",
+              arrivalWindow ? `Arrival:  ${arrivalWindow}` : "",
+              address ? `Location: ${address}` : "",
+              "",
+              "If you need to reschedule or have any questions, simply reply to this email.",
+              "",
+              "We look forward to seeing you soon!",
+              "",
+              senderName,
+              companyName,
+            ].filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n");
+
+            const primaryColor = (business as any).primaryColor || "#2563EB";
+            const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
+
+            const detailRows = [
+              dateStr ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Date</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${dateStr}</td></tr>` : "",
+              arrivalWindow ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Arrival</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${arrivalWindow}</td></tr>` : "",
+              address ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;vertical-align:top;white-space:nowrap">Location</td><td style="padding:8px 0;font-size:15px;color:#0f172a">${address}</td></tr>` : "",
+            ].filter(Boolean).join("");
+
+            const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;"><tr><td align="center"><table width="540" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.07);max-width:100%;"><tr><td style="background:${primaryColor};padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700">${companyName}</span></td></tr><tr><td style="padding:36px 32px 28px;"><div style="display:inline-block;background:#dcfce7;border-radius:20px;padding:5px 14px;margin-bottom:20px;"><span style="color:#16a34a;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Confirmed</span></div><h1 style="margin:0 0 10px;font-size:22px;font-weight:800;color:#0f172a;line-height:1.3">Your ${serviceLabel} is all set, ${customerFirstName}.</h1><p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.6">Here are your appointment details:</p><table cellpadding="0" cellspacing="0" style="border-left:3px solid ${primaryColor};padding-left:20px;margin-bottom:28px">${detailRows}</table><p style="margin:0 0 0;font-size:14px;color:#64748b;line-height:1.7">Need to reschedule or have a question? Simply reply to this email — we're happy to help.</p><p style="margin:24px 0 0;font-size:14px;color:#64748b;">We look forward to seeing you!<br><br><strong style="color:#0f172a;font-size:15px">${senderName}</strong><br><span style="color:#94a3b8">${companyName}</span></p></td></tr><tr><td style="padding:16px 32px 20px;border-top:1px solid #f1f5f9;"><p style="margin:0;font-size:11px;color:#cbd5e1;">Sent via QuotePro &mdash; Professional tools for cleaning businesses.</p></td></tr></table></td></tr></table></body></html>`;
+
+            const emailPayload: any = {
+              personalizations: [{ to: [{ email: toEmail }] }],
+              from: { email: fromEmail, name: companyName },
+              subject,
+              content: [
+                { type: "text/plain", value: plainBody },
+                { type: "text/html", value: htmlBody },
+              ],
+            };
+            if ((business as any).email) {
+              emailPayload.reply_to = { email: (business as any).email, name: companyName };
+            }
+
+            const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify(emailPayload),
+            });
+            if (!sgRes.ok) {
+              const errText = await sgRes.text();
+              console.error("Confirmation email error:", sgRes.status, errText);
+              results.email = { success: false, message: "Failed to send email" };
+            } else {
+              results.email = { success: true, message: "Email sent" };
+              await createCommunication({
+                businessId: business.id,
+                customerId: customer?.id || undefined,
+                jobId: job.id,
+                channel: "email",
+                content: plainBody,
+                templateKey: "appointment_confirmation",
+                status: "sent",
+              });
+            }
+          }
+        }
+      }
+
+      return res.json({ results });
+    } catch (error: any) {
+      console.error("Send confirmation error:", error);
+      return res.status(500).json({ message: "Failed to send confirmation" });
+    }
+  });
+
   // ─── Job Checklist ───
 
   app.post("/api/jobs/:jobId/checklist", requireAuth, async (req: Request, res: Response) => {
