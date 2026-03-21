@@ -1188,20 +1188,18 @@ export default function QuoteCreatePage() {
             {/* AI Pricing Suggestion Panel */}
             {aiPricing ? (
               <div className="bg-emerald-50 border-2 border-emerald-400 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-emerald-600" />
-                    <span className="text-sm font-semibold text-emerald-900">AI Pricing Insight</span>
-                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                      aiPricing.confidence === "high"
-                        ? "bg-green-100 text-green-700"
-                        : aiPricing.confidence === "medium"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}>
-                      {aiPricing.confidence} confidence
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-sm font-semibold text-emerald-900">AI Pricing Insight</span>
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                    aiPricing.confidence === "high"
+                      ? "bg-green-100 text-green-700"
+                      : aiPricing.confidence === "medium"
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-slate-100 text-slate-600"
+                  }`}>
+                    {aiPricing.confidence} confidence
+                  </span>
                 </div>
                 {aiPricing.keyInsight ? (
                   <p className="text-xs text-emerald-700 italic">{aiPricing.keyInsight}</p>
@@ -1209,17 +1207,21 @@ export default function QuoteCreatePage() {
                 <div className="grid grid-cols-3 gap-2">
                   {(["good", "better", "best"] as const).map((tier) => {
                     const suggestion = aiPricing[tier];
-                    const currentPrice = quote[tier].price;
-                    const diff = suggestion.suggestedPrice - currentPrice;
+                    const basePrice = (aiPricing.baselinePrices as any)?.[tier] ?? quote[tier].price;
+                    const diff = suggestion.suggestedPrice - basePrice;
+                    const isAboveBase = diff > 0;
+                    const isAtBase = suggestion.flooredToBase || diff === 0;
                     return (
-                      <div key={tier} className="bg-white rounded-lg p-3">
+                      <div key={tier} className={`rounded-lg p-3 border ${isAboveBase ? "bg-white border-green-200" : "bg-white border-slate-100"}`}>
                         <p className="text-xs text-slate-500 capitalize mb-1">{tier}</p>
                         <p className="text-lg font-bold text-slate-900">${suggestion.suggestedPrice}</p>
-                        <p className={`text-[11px] font-medium ${diff > 0 ? "text-green-600" : diff < 0 ? "text-red-500" : "text-slate-400"}`}>
-                          {diff > 0 ? `+$${diff.toFixed(0)}` : diff < 0 ? `-$${Math.abs(diff).toFixed(0)}` : "Same"}
-                        </p>
+                        {isAboveBase ? (
+                          <p className="text-[11px] font-semibold text-green-600">+${diff.toFixed(0)} above base</p>
+                        ) : isAtBase ? (
+                          <p className="text-[11px] font-medium text-slate-400">Base price</p>
+                        ) : null}
                         {suggestion.reasoning ? (
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{suggestion.reasoning}</p>
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{suggestion.reasoning}</p>
                         ) : null}
                       </div>
                     );
@@ -1228,16 +1230,19 @@ export default function QuoteCreatePage() {
                 {aiPricing.overallAssessment ? (
                   <p className="text-xs text-emerald-800">{aiPricing.overallAssessment}</p>
                 ) : null}
-                <Button
-                  size="sm"
-                  onClick={() => setAiPriceOverrides({
-                    good: aiPricing.good.suggestedPrice,
-                    better: aiPricing.better.suggestedPrice,
-                    best: aiPricing.best.suggestedPrice,
-                  })}
-                >
-                  Apply AI Prices
-                </Button>
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    onClick={() => setAiPriceOverrides({
+                      good: aiPricing.good.suggestedPrice,
+                      better: aiPricing.better.suggestedPrice,
+                      best: aiPricing.best.suggestedPrice,
+                    })}
+                  >
+                    Apply AI Prices
+                  </Button>
+                  <p className="text-[11px] text-slate-400">AI prices are always at or above your formula minimum.</p>
+                </div>
               </div>
             ) : null}
 

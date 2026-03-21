@@ -10073,12 +10073,20 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
         });
       }
       const historyContext = businessHistory ? `Business stats: ${businessHistory.totalQuotes || 0} quotes sent, ${businessHistory.acceptRate || 0}% acceptance rate, avg quote $${businessHistory.avgQuote || 0}, hourly rate $${ps?.hourlyRate || 55}. ${businessHistory.recentAccepted ? `Recent accepted quotes ranged $${businessHistory.recentAcceptedMin}-$${businessHistory.recentAcceptedMax}.` : ""}` : `Hourly rate: $${ps?.hourlyRate || 55}. No historical data available.`;
-      const systemPrompt = `You are a pricing strategist for residential cleaning. Suggest optimal Good/Better/Best prices. Be concise. Round to nearest $5. Respond with JSON: {"good":{"suggestedPrice":number,"reasoning":"1 sentence"},"better":{"suggestedPrice":number,"reasoning":"1 sentence"},"best":{"suggestedPrice":number,"reasoning":"1 sentence"},"overallAssessment":"1-2 sentences","confidence":"low"|"medium"|"high","keyInsight":"1 sentence"}`;
+      const systemPrompt = `You are a pricing strategist for residential cleaning. The "base prices" shown are the MINIMUM prices calculated by the business owner's own pricing formula \u2014 your suggested prices must NEVER be lower than these base prices. You may suggest higher prices when market factors, property difficulty, add-ons, or business history justify it. Round to nearest $5.
+
+CRITICAL RULES:
+1. suggestedPrice must always be >= the base price for that tier. Never suggest a lower price.
+2. If you cannot justify a higher price, match the base price exactly.
+3. Your reasoning must explicitly compare to the base price and explain WHY the price is higher (or why the base is already optimal).
+4. Be specific about what factors drive the price up (pet shedding, condition score, add-ons, market positioning).
+
+Respond with JSON: {"good":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"better":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"best":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"overallAssessment":"1-2 sentences","confidence":"low"|"medium"|"high","keyInsight":"1 sentence"}`;
       const userPrompt = `Property: ${propertyDesc}
 Frequency: ${frequency || "one-time"}
 Add-ons: ${addOnsList.length > 0 ? addOnsList.join(", ") : "none"}
 
-Current prices:
+BASE PRICES (your formula minimum \u2014 never go below these):
 - Good: $${currentPrices.good}
 - Better: $${currentPrices.better}
 - Best: $${currentPrices.best}
@@ -10091,7 +10099,7 @@ ${historyContext}`;
           { role: "user", content: userPrompt }
         ],
         response_format: { type: "json_object" },
-        max_completion_tokens: 300
+        max_completion_tokens: 400
       });
       const content = completion.choices[0]?.message?.content;
       if (!content) return res.status(500).json({ message: "No response from AI" });
@@ -10101,13 +10109,33 @@ ${historyContext}`;
       } catch {
         return res.status(500).json({ message: "Invalid AI response" });
       }
+      const floorPrice = (aiPrice, base) => {
+        const ai = typeof aiPrice === "number" && !isNaN(aiPrice) ? aiPrice : base;
+        return Math.max(Math.round(ai / 5) * 5, base);
+      };
+      const goodPrice = floorPrice(parsed.good?.suggestedPrice, currentPrices.good);
+      const betterPrice = floorPrice(parsed.better?.suggestedPrice, currentPrices.better);
+      const bestPrice = floorPrice(parsed.best?.suggestedPrice, currentPrices.best);
       return res.json({
-        good: { suggestedPrice: parsed.good?.suggestedPrice || currentPrices.good, reasoning: parsed.good?.reasoning || "" },
-        better: { suggestedPrice: parsed.better?.suggestedPrice || currentPrices.better, reasoning: parsed.better?.reasoning || "" },
-        best: { suggestedPrice: parsed.best?.suggestedPrice || currentPrices.best, reasoning: parsed.best?.reasoning || "" },
+        good: {
+          suggestedPrice: goodPrice,
+          reasoning: parsed.good?.reasoning || "",
+          flooredToBase: goodPrice === currentPrices.good
+        },
+        better: {
+          suggestedPrice: betterPrice,
+          reasoning: parsed.better?.reasoning || "",
+          flooredToBase: betterPrice === currentPrices.better
+        },
+        best: {
+          suggestedPrice: bestPrice,
+          reasoning: parsed.best?.reasoning || "",
+          flooredToBase: bestPrice === currentPrices.best
+        },
         overallAssessment: parsed.overallAssessment || "",
         confidence: parsed.confidence || "medium",
-        keyInsight: parsed.keyInsight || ""
+        keyInsight: parsed.keyInsight || "",
+        baselinePrices: { good: currentPrices.good, better: currentPrices.better, best: currentPrices.best }
       });
     } catch (error) {
       console.error("AI pricing suggestion error:", error);
