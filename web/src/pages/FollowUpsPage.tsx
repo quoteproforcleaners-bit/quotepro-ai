@@ -194,11 +194,11 @@ export default function FollowUpsPage() {
                   </div>
                 </div>
                 {generatedMessages[q.id] ? (
-                  <div className="mt-3 bg-blue-50 rounded-lg p-3">
-                    <p className="text-xs font-medium text-blue-700 mb-1">
+                  <div className="mt-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg p-3 border border-blue-200 dark:border-blue-800/50">
+                    <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
                       Suggested follow-up
                     </p>
-                    <p className="text-sm text-blue-900 whitespace-pre-wrap">
+                    <p className="text-sm text-blue-900 dark:text-slate-200 whitespace-pre-wrap">
                       {generatedMessages[q.id]}
                     </p>
                     <button

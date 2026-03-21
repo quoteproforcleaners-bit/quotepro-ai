@@ -753,19 +753,19 @@ export default function QuoteDetailPage() {
               </Button>
 
               {aiDrafts[currentDraftKey] ? (
-                <div className="bg-gradient-to-br from-violet-50 to-blue-50 rounded-xl p-4 border border-violet-100">
+                <div className="bg-violet-50 dark:bg-violet-950/40 rounded-xl p-4 border border-violet-200 dark:border-violet-800/50">
                   <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-3.5 h-3.5 text-violet-600" />
-                    <p className="text-xs font-semibold text-violet-700">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-500 dark:text-violet-400" />
+                    <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">
                       AI {msgChannel === "email" ? "Email" : "SMS"} Draft
                     </p>
                   </div>
-                  <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                  <p className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
                     {aiDrafts[currentDraftKey]}
                   </p>
                   <button
                     onClick={() => navigator.clipboard.writeText(aiDrafts[currentDraftKey])}
-                    className="text-xs text-violet-600 font-medium mt-3 hover:text-violet-800 flex items-center gap-1"
+                    className="text-xs text-violet-600 dark:text-violet-400 font-medium mt-3 hover:text-violet-800 dark:hover:text-violet-300 flex items-center gap-1"
                   >
                     <Copy className="w-3 h-3" />
                     Copy to clipboard
