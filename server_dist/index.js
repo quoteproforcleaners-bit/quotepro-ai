@@ -17225,8 +17225,10 @@ function getDeleteAccountHTML() {
 }
 
 // server/index.ts
+init_db();
 import * as fs from "fs";
 import * as path from "path";
+import bcrypt2 from "bcryptjs";
 var app = express();
 var log = console.log;
 function setupCors(app2) {
@@ -17467,6 +17469,31 @@ function setupErrorHandler(app2) {
     return res.status(status).json({ message });
   });
 }
+async function seedDemoUser() {
+  try {
+    const email = "demo@quotepro.com";
+    const password = "Demo1234!";
+    const existing = await pool.query(`SELECT id FROM users WHERE LOWER(email) = $1`, [email]);
+    if (existing.rows.length > 0) {
+      await pool.query(
+        `UPDATE users SET subscription_tier = 'pro' WHERE LOWER(email) = $1`,
+        [email]
+      );
+      log(`Demo account refreshed: ${email}`);
+      return;
+    }
+    const passwordHash = await bcrypt2.hash(password, 12);
+    const userId = (await pool.query(`SELECT gen_random_uuid() AS id`)).rows[0].id;
+    await pool.query(
+      `INSERT INTO users (id, email, password_hash, name, subscription_tier, created_at)
+       VALUES ($1, $2, $3, $4, 'pro', NOW())`,
+      [userId, email, passwordHash, "Demo User"]
+    );
+    log(`Demo account created: ${email} / ${password}`);
+  } catch (e) {
+    console.error("seedDemoUser error:", e.message);
+  }
+}
 (async () => {
   setupCors(app);
   setupBodyParsing(app);
@@ -17474,6 +17501,7 @@ function setupErrorHandler(app2) {
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
   setupErrorHandler(app);
+  await seedDemoUser();
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {
