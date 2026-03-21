@@ -1574,7 +1574,19 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         from: from ? new Date(from) : undefined,
         to: to ? new Date(to) : undefined,
       });
-      return res.json(list);
+      const customerIds = [...new Set(list.map((j) => j.customerId).filter(Boolean))] as string[];
+      const customerMap: Record<string, string> = {};
+      if (customerIds.length > 0) {
+        const customerList = await getCustomersByBusiness(business.id);
+        for (const c of customerList) {
+          customerMap[String(c.id)] = [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || c.name || "";
+        }
+      }
+      const enriched = list.map((j) => ({
+        ...j,
+        customerName: j.customerId ? (customerMap[String(j.customerId)] || null) : null,
+      }));
+      return res.json(enriched);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get jobs" });
     }

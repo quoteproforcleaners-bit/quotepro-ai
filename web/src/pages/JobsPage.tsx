@@ -92,7 +92,7 @@ export default function JobsPage() {
                   >
                     <td className="px-5 lg:px-6 py-3.5">
                       <p className="font-medium text-slate-900">
-                        {j.title || "Cleaning Job"}
+                        {j.customerName || j.title || "Cleaning Job"}
                       </p>
                       {j.address ? (
                         <p className="text-xs text-slate-400 mt-0.5 hidden sm:block flex items-center gap-1">
