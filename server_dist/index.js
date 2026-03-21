@@ -12416,6 +12416,33 @@ ${ownerName}`,
       return res.status(500).json({ message: "Failed to submit rating" });
     }
   });
+  async function createShortLink(destinationUrl, businessId, label) {
+    const token = crypto2.randomBytes(4).toString("base64url").slice(0, 7);
+    await pool.query(
+      `INSERT INTO short_links (token, destination_url, business_id, label, created_at, expires_at)
+       VALUES ($1, $2, $3, $4, NOW(), NOW() + INTERVAL '90 days')
+       ON CONFLICT (token) DO NOTHING`,
+      [token, destinationUrl, businessId || null, label || null]
+    );
+    return token;
+  }
+  app2.get("/r/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const result = await pool.query(
+        `UPDATE short_links SET click_count = click_count + 1
+         WHERE token = $1 AND (expires_at IS NULL OR expires_at > NOW())
+         RETURNING destination_url`,
+        [token]
+      );
+      if (!result.rows[0]) {
+        return res.status(404).send("Link not found or expired.");
+      }
+      return res.redirect(301, result.rows[0].destination_url);
+    } catch (e) {
+      return res.status(500).send("Redirect failed.");
+    }
+  });
   app2.get("/rate/:token", async (req, res) => {
     try {
       const job = await getJobByRatingToken(req.params.token);
@@ -14730,24 +14757,107 @@ Rules:
     try {
       const business = await getBusinessByOwner(req.session.userId);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const { toEmail, toName, customMessage } = req.body;
+      const { toEmail, toName } = req.body;
       if (!toEmail?.trim()) return res.status(400).json({ message: "Email is required" });
       const intakeCode = await ensureIntakeCode(business.id);
-      const reqHost = req.headers.host || req.hostname;
+      const reqHost = req.headers["x-forwarded-host"] || req.headers.host || req.hostname;
       const reqProto = req.headers["x-forwarded-proto"] || req.protocol || "https";
-      const intakeUrl = `${reqProto}://${reqHost}/intake/${intakeCode}`;
+      const appBase = `${reqProto}://${reqHost}`;
+      const intakeUrl = `${appBase}/intake/${intakeCode}`;
+      const shortToken = await createShortLink(intakeUrl, business.id, "intake-form");
+      const shortUrl = `${appBase}/r/${shortToken}`;
       const recipientName = (toName || "there").trim();
-      const defaultMessage = `Hi ${recipientName},
+      const firstName = recipientName.split(" ")[0];
+      const companyName = business.companyName || "Your Cleaning Company";
+      const brandColor = business.primaryColor || "#2563EB";
+      const senderName = business.senderName || companyName;
+      const plainText = `Hi ${firstName},
 
-${business.companyName} would like to give you a personalized cleaning quote. Please fill out this quick form so we can prepare an accurate estimate:
+${companyName} would like to prepare a personalized cleaning quote for you. It only takes about 2 minutes to complete:
 
-${intakeUrl}
+${shortUrl}
 
-It only takes about 2 minutes.
+Once you submit, we'll put together an accurate estimate based on your home.
 
 Thanks,
-${business.companyName}`;
-      const bodyText = customMessage?.trim() || defaultMessage;
+${senderName}`;
+      const htmlEmail = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>${companyName} \u2014 Your Cleaning Quote</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F1F5F9;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:${brandColor};border-radius:16px 16px 0 0;padding:32px 40px;text-align:center;">
+              <p style="margin:0;font-size:13px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.7);">Cleaning Quote Request</p>
+              <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">${companyName}</h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background:#ffffff;padding:40px 40px 32px;">
+              <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0F172A;letter-spacing:-0.3px;">Hi ${firstName},</p>
+              <p style="margin:16px 0 0;font-size:16px;line-height:1.65;color:#334155;">We'd love to put together a personalized cleaning quote for you. To make sure we get the details right, please fill out our quick estimate form \u2014 it takes about <strong>2 minutes</strong>.</p>
+
+              <!-- CTA Button -->
+              <table cellpadding="0" cellspacing="0" border="0" style="margin:32px 0;">
+                <tr>
+                  <td style="background:${brandColor};border-radius:10px;">
+                    <a href="${shortUrl}" target="_blank" style="display:inline-block;padding:16px 36px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:-0.1px;">Get My Free Estimate &rarr;</a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0;font-size:14px;line-height:1.6;color:#64748B;">Once you submit, we'll review your details and get back to you with a tailored quote. No commitment required.</p>
+            </td>
+          </tr>
+
+          <!-- Trust bar -->
+          <tr>
+            <td style="background:#F8FAFC;border-top:1px solid #E2E8F0;border-bottom:1px solid #E2E8F0;padding:20px 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="33%" style="text-align:center;padding:0 8px;">
+                    <p style="margin:0;font-size:20px;">&#10003;</p>
+                    <p style="margin:4px 0 0;font-size:12px;font-weight:600;color:#475569;">Takes 2 minutes</p>
+                  </td>
+                  <td width="33%" style="text-align:center;padding:0 8px;border-left:1px solid #E2E8F0;border-right:1px solid #E2E8F0;">
+                    <p style="margin:0;font-size:20px;">&#128274;</p>
+                    <p style="margin:4px 0 0;font-size:12px;font-weight:600;color:#475569;">Private &amp; secure</p>
+                  </td>
+                  <td width="33%" style="text-align:center;padding:0 8px;">
+                    <p style="margin:0;font-size:20px;">&#128504;</p>
+                    <p style="margin:4px 0 0;font-size:12px;font-weight:600;color:#475569;">No commitment</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#ffffff;border-radius:0 0 16px 16px;padding:24px 40px;text-align:center;">
+              <p style="margin:0;font-size:13px;color:#94A3B8;">Questions? Reply to this email \u2014 we're happy to help.</p>
+              <p style="margin:12px 0 0;font-size:11px;color:#CBD5E1;">Sent by ${senderName} via QuotePro &bull; <a href="${intakeUrl}" style="color:#94A3B8;text-decoration:none;">View form directly</a></p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
       const sgApiKey = process.env.SENDGRID_API_KEY;
       if (!sgApiKey) return res.status(500).json({ message: "Email not configured" });
       const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@myreminder.ai";
@@ -14755,11 +14865,18 @@ ${business.companyName}`;
         method: "POST",
         headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          personalizations: [{ to: [{ email: toEmail.trim(), name: toName || "" }] }],
-          from: { email: fromEmail, name: business.companyName },
-          reply_to: business.email ? { email: business.email, name: business.companyName } : void 0,
-          subject: `${business.companyName} \u2014 Your personalized quote`,
-          content: [{ type: "text/plain", value: bodyText }]
+          personalizations: [{ to: [{ email: toEmail.trim(), name: recipientName }] }],
+          from: { email: fromEmail, name: companyName },
+          reply_to: business.email ? { email: business.email, name: senderName } : void 0,
+          subject: `Your cleaning estimate from ${companyName}`,
+          content: [
+            { type: "text/plain", value: plainText },
+            { type: "text/html", value: htmlEmail }
+          ],
+          // Disable SendGrid click tracking — we use our own /r/:token short links
+          tracking_settings: {
+            click_tracking: { enable: false, enable_text: false }
+          }
         })
       });
       if (!sgRes.ok) {
