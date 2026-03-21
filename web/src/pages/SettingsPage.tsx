@@ -574,7 +574,7 @@ export default function SettingsPage() {
                   }
                 />
                 <Input
-                  label="Email"
+                  label="Email (used as your sender address)"
                   type="email"
                   value={businessForm.email}
                   onChange={(e) =>
@@ -582,6 +582,28 @@ export default function SettingsPage() {
                   }
                 />
               </div>
+              {businessForm.email ? (
+                <div className="rounded-lg px-4 py-3 text-sm" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+                  <p className="font-semibold text-amber-800 mb-1">Sender verification required</p>
+                  <p className="text-amber-700 leading-relaxed">
+                    Emails will send from <strong>{businessForm.email}</strong>. For this to work, you must verify this address as a sender in SendGrid:
+                  </p>
+                  <ol className="text-amber-700 mt-2 ml-4 list-decimal space-y-0.5">
+                    <li>Log in to your SendGrid account</li>
+                    <li>Go to <strong>Settings → Sender Authentication</strong></li>
+                    <li>Click <strong>Single Sender Verification</strong></li>
+                    <li>Add and verify <strong>{businessForm.email}</strong></li>
+                  </ol>
+                  <a
+                    href="https://app.sendgrid.com/settings/sender_auth"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-2 text-amber-800 underline font-medium hover:text-amber-900"
+                  >
+                    Open SendGrid Sender Authentication →
+                  </a>
+                </div>
+              ) : null}
               <Input
                 label="Address"
                 value={businessForm.address}

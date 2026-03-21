@@ -17,6 +17,30 @@ import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage
 import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "./calculator-engine";
 import { JobberClient, buildJobberAuthUrl, exchangeJobberCode, logJobberSync, syncQuoteToJobber } from "./jobber-client";
 
+function getBusinessFromEmail(business: any): string {
+  return business?.email || process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+}
+
+function parseSendGridError(errText: string, fromEmail: string): string {
+  try {
+    const errJson = JSON.parse(errText);
+    if (errJson.errors && errJson.errors.length > 0) {
+      const msgs: string[] = errJson.errors.map((e: any) => e.message as string);
+      const isVerificationError = msgs.some(
+        (m) =>
+          m.toLowerCase().includes("verified sender") ||
+          m.toLowerCase().includes("sender identity") ||
+          m.toLowerCase().includes("does not match")
+      );
+      if (isVerificationError) {
+        return `Your email address (${fromEmail}) is not verified as a sender in SendGrid. To fix this: log in to SendGrid → Settings → Sender Authentication → Single Sender Verification → add and verify ${fromEmail}. Once verified, emails will send instantly from your address.`;
+      }
+      return msgs.join("; ");
+    }
+  } catch {}
+  return "Failed to send email. Please check your SendGrid configuration.";
+}
+
 let stripe: Stripe | null = null;
 
 async function initStripeClient() {
@@ -1897,7 +1921,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
             ].filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n");
 
             const primaryColor = (business as any).primaryColor || "#2563EB";
-            const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+            const fromEmail = getBusinessFromEmail(business);
 
             const detailRows = [
               dateStr ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Date</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${dateStr}</td></tr>` : "",
@@ -1928,7 +1952,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
             if (!sgRes.ok) {
               const errText = await sgRes.text();
               console.error("Confirmation email error:", sgRes.status, errText);
-              results.email = { success: false, message: "Failed to send email" };
+              results.email = { success: false, message: parseSendGridError(errText, fromEmail) };
             } else {
               results.email = { success: true, message: "Email sent" };
               await createCommunication({
@@ -3344,11 +3368,10 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
         return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
       }
 
-      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+      const brandedFromEmail = getBusinessFromEmail(business);
       const fromName = business.companyName || "QuotePro";
-      const replyToEmail = business.email || undefined;
 
-      if (!replyToEmail) {
+      if (!business.email) {
         return res.status(400).json({ success: false, message: "Please add your email address in Settings before sending emails." });
       }
 
@@ -3502,9 +3525,6 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
           { type: "text/html", value: emailHtml },
         ],
       };
-      if (replyToEmail) {
-        emailPayload.reply_to = { email: replyToEmail, name: fromName };
-      }
 
       // Attach files from the business file library
       if (attachmentFileIds && Array.isArray(attachmentFileIds) && attachmentFileIds.length > 0) {
@@ -3547,14 +3567,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       if (!sgRes.ok) {
         const errText = await sgRes.text();
         console.error("SendGrid error:", sgRes.status, errText);
-        let errorDetail = "Failed to send email";
-        try {
-          const errJson = JSON.parse(errText);
-          if (errJson.errors && errJson.errors.length > 0) {
-            errorDetail = errJson.errors.map((e: any) => e.message).join("; ");
-          }
-        } catch {}
-        return res.status(502).json({ message: errorDetail });
+        return res.status(502).json({ message: parseSendGridError(errText, brandedFromEmail) });
       }
 
       console.log(`Quote email sent via SendGrid: from=${brandedFromEmail}, to=${to}, quoteId=${quote.id}, status=${sgRes.status}`);
@@ -3676,7 +3689,7 @@ The email should:
         return res.status(503).json({ message: "Email service not configured" });
       }
 
-      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+      const brandedFromEmail = getBusinessFromEmail(business);
       const fromName = business.companyName || "QuotePro";
       const replyToEmail = business.email || undefined;
 
@@ -3787,14 +3800,7 @@ The email should:
       if (!sgRes.ok) {
         const errText = await sgRes.text();
         console.error("SendGrid onboarding error:", sgRes.status, errText);
-        let errorDetail = "Failed to send email";
-        try {
-          const errJson = JSON.parse(errText);
-          if (errJson.errors && errJson.errors.length > 0) {
-            errorDetail = errJson.errors.map((e: any) => e.message).join("; ");
-          }
-        } catch {}
-        return res.status(502).json({ message: errorDetail });
+        return res.status(502).json({ message: parseSendGridError(errText, brandedFromEmail) });
       }
 
       console.log(`Onboarding quote email sent: from=${brandedFromEmail}, to=${to}, quoteId=${quote.id}`);
@@ -3891,7 +3897,7 @@ The email should:
       if (!sgApiKey) return { success: false, message: "Email service not configured" };
       const toEmail = customer?.email;
       if (!toEmail) return { success: false, message: "Customer email not found" };
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+      const fromEmail = getBusinessFromEmail(business);
       const replyTo = business?.email;
       const fromName = business?.companyName || "QuotePro";
       const quoteUrl = `${process.env.APP_URL || `https://${req.get("host")}`}/q/${quote.publicToken}`;
@@ -3916,7 +3922,7 @@ The email should:
       if (!sgRes.ok) {
         const errText = await sgRes.text();
         console.error("Follow-up email error:", sgRes.status, errText);
-        return { success: false, message: "Failed to send follow-up email" };
+        return { success: false, message: parseSendGridError(errText, fromEmail) };
       }
     } else {
       const twilioSid = process.env.TWILIO_ACCOUNT_SID;
@@ -4731,7 +4737,7 @@ ${contextStr}`;
         return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
       }
 
-      const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+      const brandedFromEmail = getBusinessFromEmail(business);
       const fromName = business.companyName || "QuotePro";
       const replyToEmail = business.email || undefined;
 
@@ -4806,17 +4812,10 @@ ${contextStr}`;
       if (!sgRes.ok) {
         const errText = await sgRes.text();
         console.error("SendGrid error:", sgRes.status, errText);
-        let errorDetail = "Failed to send email";
-        try {
-          const errJson = JSON.parse(errText);
-          if (errJson.errors && errJson.errors.length > 0) {
-            errorDetail = errJson.errors.map((e: any) => e.message).join("; ");
-          }
-        } catch {}
-        return res.status(502).json({ message: errorDetail });
+        return res.status(502).json({ message: parseSendGridError(errText, brandedFromEmail) });
       }
 
-      console.log(`Email sent via SendGrid: from=${brandedFromEmail}, to=${to}, replyTo=${replyToEmail}, status=${sgRes.status}`);
+      console.log(`Email sent via SendGrid: from=${brandedFromEmail}, to=${to}, status=${sgRes.status}`);
 
       await createCommunication({
         businessId: business.id,
@@ -7246,7 +7245,7 @@ Respond with JSON: {"reply": string}`
         const sgApiKey = process.env.SENDGRID_API_KEY;
         if (!sgApiKey) return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
 
-        const brandedFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+        const brandedFromEmail = getBusinessFromEmail(business);
         const fromName = business.companyName || "QuotePro";
         const replyToEmail = business.email || undefined;
         if (!replyToEmail) return res.status(400).json({ message: "Please add your email address in Settings before sending emails." });
@@ -11058,7 +11057,7 @@ Rules:
       const sgApiKey = process.env.SENDGRID_API_KEY;
       if (!sgApiKey) return res.status(500).json({ message: "Email not configured" });
 
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+      const fromEmail = getBusinessFromEmail(business);
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
@@ -11078,9 +11077,9 @@ Rules:
         }),
       });
       if (!sgRes.ok) {
-        const err = await sgRes.text();
-        console.error("Send intake link email error:", err);
-        return res.status(500).json({ message: "Failed to send email" });
+        const errText = await sgRes.text();
+        console.error("Send intake link email error:", errText);
+        return res.status(500).json({ message: parseSendGridError(errText, fromEmail) });
       }
       res.json({ success: true });
     } catch (e: any) {
@@ -11140,7 +11139,7 @@ Rules:
             await updateCommunication(comm.id, { status: "failed", errorMessage: !sgApiKey ? "No SendGrid key" : "No customer email" });
             continue;
           }
-          const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+          const fromEmail = getBusinessFromEmail(business);
           const fromName = business?.companyName || "QuotePro";
           const replyTo = business?.email;
           const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
@@ -11559,7 +11558,7 @@ Rules:
 
     const sgApiKey = process.env.SENDGRID_API_KEY;
     if (!sgApiKey) return;
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+    const platformFromEmail = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
 
     try {
       const businessIds = await getAllBusinessIds();
@@ -11638,7 +11637,7 @@ Rules:
             headers: { "Authorization": `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               personalizations: [{ to: [{ email: toEmail }] }],
-              from: { email: fromEmail, name: "QuotePro" },
+              from: { email: platformFromEmail, name: "QuotePro" },
               subject: `Your week in review — ${stats.sentCount} quote${stats.sentCount !== 1 ? "s" : ""} sent, $${stats.revenueWon.toFixed(0)} won`,
               content: [
                 { type: "text/plain", value: `${company_name} Weekly Snapshot\nQuotes Sent: ${stats.sentCount}\nWon: ${stats.acceptedCount}\nRevenue Won: $${stats.revenueWon.toFixed(2)}\nAll-Time Revenue: $${totalStats.totalRevenue.toFixed(2)}` },
