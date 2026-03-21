@@ -8982,6 +8982,31 @@ loadMonth(nextMo);
     }
   });
 
+  app.get("/api/invoice-packets/:id/csv", requireAuth, async (req: any, res) => {
+    try {
+      const packet = await getInvoicePacketById(req.params.id);
+      if (!packet || packet.businessId !== req.businessId) return res.status(404).json({ error: "Not found" });
+      const csv = (packet as any).csvText || "";
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="invoice-${(packet as any).invoiceNumber || packet.id}.csv"`);
+      res.send(csv);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/invoice-packets/:id/pdf", requireAuth, async (req: any, res) => {
+    try {
+      const packet = await getInvoicePacketById(req.params.id);
+      if (!packet || packet.businessId !== req.businessId) return res.status(404).json({ error: "Not found" });
+      const html = (packet as any).pdfHtml || "<p>No invoice content</p>";
+      res.setHeader("Content-Type", "text/html");
+      res.send(html);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // ==================== CALENDAR EVENT STUBS ====================
 
   app.post("/api/quotes/:id/calendar-event", requireAuth, async (req: any, res) => {

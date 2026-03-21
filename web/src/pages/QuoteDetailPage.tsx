@@ -75,6 +75,7 @@ export default function QuoteDetailPage() {
   const [depositRequired, setDepositRequired] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [generatedPacket, setGeneratedPacket] = useState<{ id: string; invoiceNumber: string } | null>(null);
   const [syncingQbo, setSyncingQbo] = useState(false);
   const [syncingJobber, setSyncingJobber] = useState(false);
   const [playChannels, setPlayChannels] = useState<Record<number, "sms" | "email">>({});
@@ -358,9 +359,15 @@ export default function QuoteDetailPage() {
   const generateInvoicePacket = async () => {
     setInvoiceLoading(true);
     try {
-      await apiPost(`/api/quotes/${id}/invoice-packet`, {});
+      const res: any = await apiPost(`/api/quotes/${id}/invoice-packet`, {});
+      const packet = res?.packet;
+      if (!packet?.id) throw new Error("No packet returned");
+      setGeneratedPacket({ id: packet.id, invoiceNumber: packet.invoiceNumber || packet.id });
+      showToast("Invoice packet generated!", "success");
       queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
-    } catch {}
+    } catch (e: any) {
+      showToast(e?.message || "Failed to generate invoice packet", "error");
+    }
     setInvoiceLoading(false);
   };
 
@@ -1398,6 +1405,33 @@ export default function QuoteDetailPage() {
               >
                 Generate Invoice Packet
               </Button>
+              {generatedPacket ? (
+                <div className="rounded-lg bg-green-50 border border-green-200 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-green-800 flex items-center gap-1.5">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    {generatedPacket.invoiceNumber} ready
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    <a
+                      href={`/api/invoice-packets/${generatedPacket.id}/csv`}
+                      download
+                      className="flex items-center gap-1.5 text-xs text-green-700 font-medium hover:text-green-900 hover:underline"
+                    >
+                      <FileText className="w-3 h-3" />
+                      Download CSV (QuickBooks import)
+                    </a>
+                    <a
+                      href={`/api/invoice-packets/${generatedPacket.id}/pdf`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 text-xs text-green-700 font-medium hover:text-green-900 hover:underline"
+                    >
+                      <Download className="w-3 h-3" />
+                      View Invoice PDF
+                    </a>
+                  </div>
+                </div>
+              ) : null}
               <Button
                 variant="ghost"
                 icon={Trash2}
