@@ -5725,8 +5725,9 @@ var JobberClient = class {
   }
   async createJob(input) {
     const propertyId = await this.getOrCreatePropertyId(input.clientId, input.addressStr);
-    const titleEsc = (input.title || "Cleaning Service").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    const instrEsc = (input.instructions || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const esc = (s) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t");
+    const titleEsc = esc(input.title || "Cleaning Service");
+    const instrEsc = esc(input.instructions || "");
     const mutation = `
       mutation {
         jobCreate(input: {

@@ -471,8 +471,14 @@ export class JobberClient {
     // - propertyId must be inline (EncodedId! not ID!) — typed variable causes type mismatch
     // - invoicing requires invoicingType (BillingStrategy!) and invoicingSchedule (BillingFrequencyEnum!)
     // - billingType is NOT a valid field on JobInvoicingAttributes
-    const titleEsc = (input.title || "Cleaning Service").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    const instrEsc = (input.instructions || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const esc = (s: string) => s
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r")
+      .replace(/\t/g, "\\t");
+    const titleEsc = esc(input.title || "Cleaning Service");
+    const instrEsc = esc(input.instructions || "");
     const mutation = `
       mutation {
         jobCreate(input: {
