@@ -5,6 +5,7 @@ import { apiPut, apiDelete, apiPost, apiGet } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import SendQuoteModal from "../components/SendQuoteModal";
 import EditQuoteModal from "../components/EditQuoteModal";
+import DispatchCard from "../components/DispatchCard";
 import {
   ExternalLink,
   Copy,
@@ -125,6 +126,11 @@ export default function QuoteDetailPage() {
 
   const { data: businessProfile } = useQuery<any>({
     queryKey: ["/api/business"],
+  });
+
+  const { data: quoteCustomer } = useQuery<any>({
+    queryKey: [`/api/customers/${quote?.customerId}`],
+    enabled: !!quote?.customerId,
   });
 
   const { data: automationRules, refetch: refetchAutomation } = useQuery<any>({
@@ -1032,6 +1038,22 @@ export default function QuoteDetailPage() {
               ) : null}
             </div>
           </Card>
+
+          {(details.customerAddress || quote.customerName) ? (
+            <DispatchCard
+              data={{
+                customerName: quote.customerName,
+                address: details.customerAddress,
+                serviceType: opts.better?.name || opts.good?.name || opts.best?.name || undefined,
+                total: quote.total,
+                phone: quoteCustomer?.phone || undefined,
+                email: quoteCustomer?.email || undefined,
+                customerId: quote.customerId || undefined,
+                notes: quote.notes || undefined,
+              }}
+              onToast={showToast}
+            />
+          ) : null}
 
           {quote.status === "sent" ? (
             <Card>

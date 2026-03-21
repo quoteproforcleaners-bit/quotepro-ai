@@ -18,6 +18,7 @@ import {
   Shield,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import DispatchCard from "../components/DispatchCard";
 import {
   PageHeader,
   Card,
@@ -418,6 +419,18 @@ export default function CustomerDetailPage() {
               </div>
             </div>
           </Card>
+
+          {customer.address ? (
+            <DispatchCard
+              data={{
+                customerName: `${customer.firstName || ""} ${customer.lastName || ""}`.trim() || undefined,
+                address: customer.address,
+                phone: customer.phone || undefined,
+                email: customer.email || undefined,
+                customerId: customer.id,
+              }}
+            />
+          ) : null}
 
           <Card>
             <CardHeader title="AI Assistant" icon={Sparkles} />

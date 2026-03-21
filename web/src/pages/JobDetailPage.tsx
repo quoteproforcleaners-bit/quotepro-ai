@@ -33,6 +33,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { apiPost, apiPut, apiGet, apiDelete } from "../lib/api";
+import DispatchCard from "../components/DispatchCard";
 import { queryClient } from "../lib/queryClient";
 import {
   PageHeader,
@@ -49,6 +50,7 @@ import {
   Modal,
   Textarea,
   SegmentedControl,
+  Toast,
 } from "../components/ui";
 
 const STATUS_FLOW = [
@@ -82,6 +84,7 @@ export default function JobDetailPage() {
   const [messageType, setMessageType] = useState("en_route");
   const [generatedMessage, setGeneratedMessage] = useState("");
   const [messageError, setMessageError] = useState("");
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" | "info" } | null>(null);
 
   const { data: job, isLoading } = useQuery<any>({
     queryKey: ["/api/jobs", id],
@@ -105,6 +108,11 @@ export default function JobDetailPage() {
     queryKey: ["/api/jobs", id, "notes"],
     queryFn: () => apiGet(`/api/jobs/${id}/notes`),
     enabled: !!id,
+  });
+
+  const { data: jobCustomer } = useQuery<any>({
+    queryKey: [`/api/customers/${job?.customerId}`],
+    enabled: !!job?.customerId,
   });
 
   const updateStatusMutation = useMutation({
@@ -427,6 +435,14 @@ export default function JobDetailPage() {
           )}
         </div>
       </Modal>
+
+      {toast ? (
+        <Toast
+          message={toast.message}
+          variant={toast.variant}
+          onClose={() => setToast(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -534,6 +550,25 @@ function OverviewTab({
           </div>
         ) : null}
       </div>
+
+      {(job.address || job.customerName) ? (
+        <DispatchCard
+          data={{
+            customerName: job.customerName || (jobCustomer ? `${jobCustomer.firstName || ""} ${jobCustomer.lastName || ""}`.trim() : undefined),
+            address: job.address || undefined,
+            serviceType: job.title || job.type || undefined,
+            scheduledDate: job.startDatetime || undefined,
+            startTime: job.startDatetime || undefined,
+            endTime: job.endDatetime || undefined,
+            total: job.total || undefined,
+            phone: jobCustomer?.phone || undefined,
+            email: jobCustomer?.email || undefined,
+            customerId: job.customerId || undefined,
+            notes: job.notes || undefined,
+          }}
+          onToast={(msg, variant) => setToast({ message: msg, variant: variant || "success" })}
+        />
+      ) : null}
 
       <div>
         <div className="flex items-center justify-between mb-2">
