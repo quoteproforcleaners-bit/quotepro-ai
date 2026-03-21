@@ -12,6 +12,7 @@ import {
   Loader2,
   User,
   ArrowLeft,
+  Mail,
 } from "lucide-react";
 import {
   PageHeader,
@@ -265,7 +266,7 @@ function ReviewsReferralsContent() {
       </Card>
 
       <Modal
-        isOpen={modalOpen}
+        open={modalOpen}
         onClose={closeModal}
         title={modalStep === "pick-customer" ? "Select a Customer" : "Review Request Email"}
       >
