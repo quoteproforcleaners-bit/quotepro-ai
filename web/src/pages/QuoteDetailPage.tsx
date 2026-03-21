@@ -289,17 +289,17 @@ export default function QuoteDetailPage() {
 
 
   const { data: jobberStatus } = useQuery<{ connected: boolean }>({
-    queryKey: ["/api/integrations/jobber/token-status"],
+    queryKey: ["/api/integrations/jobber/status"],
   });
 
   const syncJobber = async () => {
     if (!jobberStatus?.connected) {
-      navigate("/settings?tab=integrations");
+      navigate("/app/settings?tab=integrations");
       return;
     }
     setSyncingJobber(true);
     try {
-      const result: any = await apiPost(`/api/integrations/jobber/sync-quote-token/${id}`, {});
+      const result: any = await apiPost(`/api/integrations/jobber/sync-quote/${id}`, {});
       alert(result?.message || "Job created in Jobber.");
     } catch (e: any) {
       alert(e?.message || "Failed to sync to Jobber");

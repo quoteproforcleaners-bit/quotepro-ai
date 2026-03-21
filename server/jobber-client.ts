@@ -467,39 +467,32 @@ export class JobberClient {
     // Step 1: Get or create the property ID (required by Jobber API)
     const propertyId = await this.getOrCreatePropertyId(input.clientId, input.addressStr);
 
-    // Step 2: Create the job
-    // - propertyId must be inline (EncodedId! not ID!) — typed variable causes type mismatch
-    // - invoicing.billingStrategy is required by Jobber's API; INVOICE_AFTER_EACH_VISIT is correct for one-off jobs
-    const esc = (s: string) => s
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r")
-      .replace(/\t/g, "\\t");
-    const titleEsc = esc(input.title || "Cleaning Service");
-    const instrEsc = esc(input.instructions || "");
+    // Step 2: Create the job using typed $input: JobCreateInput! variable.
+    // - propertyId inline (EncodedId) avoids ID type mismatch, but inside JobCreateInput it resolves correctly.
+    // - NO invoicing fields — Jobber's API does not require them and they cause userErrors.
+    const jobInput: Record<string, any> = {
+      propertyId,
+      title: input.title || "Cleaning Service",
+    };
+    if (input.instructions) jobInput.instructions = input.instructions;
+    if (input.lineItems && input.lineItems.length > 0) {
+      jobInput.lineItems = input.lineItems.map((li) => ({
+        name: li.name,
+        quantity: li.quantity || 1,
+        unitPrice: String(li.unitPrice || "0.00"),
+      }));
+    }
+
     const mutation = `
-      mutation {
-        jobCreate(input: {
-          propertyId: "${propertyId}",
-          title: "${titleEsc}",
-          instructions: "${instrEsc}",
-          invoicing: { invoicingType: INVOICE_AFTER_EACH_VISIT, invoicingSchedule: ONE_TIME }
-        }) {
-          job {
-            id
-            jobNumber
-            title
-          }
-          userErrors {
-            message
-            path
-          }
+      mutation CreateJob($input: JobCreateInput!) {
+        jobCreate(input: $input) {
+          job { id jobNumber title }
+          userErrors { message path }
         }
       }
     `;
 
-    const data = await this.graphql(mutation);
+    const data = await this.graphql(mutation, { input: jobInput });
     const result = data.jobCreate;
 
     if (!result) {

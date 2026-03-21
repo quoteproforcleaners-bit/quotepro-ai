@@ -112,8 +112,8 @@ export default function QuoteDetailScreen() {
 
   const [qboCreating, setQboCreating] = useState(false);
   const [jobberSyncing, setJobberSyncing] = useState(false);
-  const { data: jobberTokenStatus } = useQuery<{ connected: boolean }>({
-    queryKey: ["/api/integrations/jobber/token-status"],
+  const { data: jobberStatus } = useQuery<{ connected: boolean; status?: string }>({
+    queryKey: ["/api/integrations/jobber/status"],
   });
   const [showFollowUpEdit, setShowFollowUpEdit] = useState(false);
   const [followUpEditText, setFollowUpEditText] = useState("");
@@ -677,10 +677,10 @@ export default function QuoteDetailScreen() {
 
   const handleSyncToJobber = async () => {
     if (!quote || jobberSyncing) return;
-    if (!jobberTokenStatus?.connected) {
+    if (!jobberStatus?.connected) {
       Alert.alert(
         "Jobber Not Connected",
-        "Add your Jobber API token in Settings to sync quotes.",
+        "Connect your Jobber account in Settings to sync quotes.",
         [
           { text: "Cancel", style: "cancel" },
           { text: "Open Settings", onPress: () => navigation.navigate("Settings" as any) },
@@ -690,7 +690,7 @@ export default function QuoteDetailScreen() {
     }
     setJobberSyncing(true);
     try {
-      const res = await apiRequest("POST", `/api/integrations/jobber/sync-quote-token/${quote.id}`, {});
+      const res = await apiRequest("POST", `/api/integrations/jobber/sync-quote/${quote.id}`, {});
       const data = await res.json();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Synced to Jobber", data.message || `Job created in Jobber`);

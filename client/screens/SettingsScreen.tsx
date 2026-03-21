@@ -193,27 +193,34 @@ export default function SettingsScreen() {
 
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
-  const [jobberTokenInput, setJobberTokenInput] = useState("");
-  const [savingJobberToken, setSavingJobberToken] = useState(false);
-  const [jobberTokenSaved, setJobberTokenSaved] = useState(false);
-  const { data: jobberTokenStatus } = useQuery<{ connected: boolean }>({
-    queryKey: ["/api/integrations/jobber/token-status"],
+  const { data: jobberStatus, refetch: refetchJobberStatus } = useQuery<{ connected: boolean; status?: string }>({
+    queryKey: ["/api/integrations/jobber/status"],
   });
 
-  const handleSaveJobberToken = async () => {
-    if (!jobberTokenInput.trim() || savingJobberToken) return;
-    setSavingJobberToken(true);
+  const handleConnectJobber = async () => {
     try {
-      await apiRequest("POST", "/api/integrations/jobber/save-token", { apiToken: jobberTokenInput });
-      setJobberTokenSaved(true);
-      setJobberTokenInput("");
-      queryClient.invalidateQueries({ queryKey: ["/api/integrations/jobber/token-status"] });
-      setTimeout(() => setJobberTokenSaved(false), 3000);
+      const url = new URL("/api/integrations/jobber/connect", getApiUrl()).toString();
+      await WebBrowser.openAuthSessionAsync(url, undefined, { showInRecents: true });
+      refetchJobberStatus();
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Failed to save token");
-    } finally {
-      setSavingJobberToken(false);
+      Alert.alert("Error", e.message || "Failed to open Jobber connection");
     }
+  };
+
+  const handleDisconnectJobber = async () => {
+    Alert.alert("Disconnect Jobber", "Are you sure you want to disconnect Jobber?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Disconnect", style: "destructive", onPress: async () => {
+          try {
+            await apiRequest("POST", "/api/integrations/jobber/disconnect", {});
+            refetchJobberStatus();
+          } catch (e: any) {
+            Alert.alert("Error", e.message || "Failed to disconnect Jobber");
+          }
+        }
+      }
+    ]);
   };
 
   const [showVenmoModal, setShowVenmoModal] = useState(false);
@@ -810,49 +817,39 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
-      {/* Jobber Personal API Token */}
-      <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border, flexDirection: "column", alignItems: "stretch", gap: Spacing.sm }]}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
-          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
-            <Feather name="upload-cloud" size={20} color={theme.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
-            <ThemedText type="small" style={{ color: jobberTokenStatus?.connected ? theme.success : theme.textSecondary }}>
-              {jobberTokenStatus?.connected ? "Connected" : "Paste your personal API token"}
-            </ThemedText>
+      {jobberStatus?.connected ? (
+        <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.success}15` }]}>
+              <Feather name="check-circle" size={20} color={theme.success} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
+              <ThemedText type="small" style={{ color: theme.success }}>{t.common.connected}</ThemedText>
+            </View>
+            <Pressable onPress={handleDisconnectJobber} testID="button-disconnect-jobber">
+              <ThemedText type="small" style={{ color: theme.error }}>{t.settings.disconnect}</ThemedText>
+            </Pressable>
           </View>
         </View>
-        <View style={{ flexDirection: "row", gap: Spacing.sm }}>
-          <TextInput
-            style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-            placeholder={jobberTokenStatus?.connected ? "Token saved — paste to update" : "Jobber API token"}
-            placeholderTextColor={theme.textSecondary}
-            value={jobberTokenInput}
-            onChangeText={setJobberTokenInput}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Pressable
-            onPress={handleSaveJobberToken}
-            disabled={!jobberTokenInput.trim() || savingJobberToken}
-            style={{ backgroundColor: theme.primary, paddingHorizontal: Spacing.md, borderRadius: BorderRadius.sm, justifyContent: "center", opacity: (!jobberTokenInput.trim() || savingJobberToken) ? 0.4 : 1 }}
-          >
-            <ThemedText type="small" style={{ color: "#fff", fontWeight: "600" }}>
-              {jobberTokenSaved ? "Saved!" : savingJobberToken ? "..." : "Save"}
-            </ThemedText>
-          </Pressable>
-        </View>
-        {jobberTokenStatus?.connected ? (
-          <Pressable onPress={async () => {
-            await apiRequest("POST", "/api/integrations/jobber/save-token", { apiToken: "" });
-            queryClient.invalidateQueries({ queryKey: ["/api/integrations/jobber/token-status"] });
-          }}>
-            <ThemedText type="small" style={{ color: theme.error }}>Remove token</ThemedText>
-          </Pressable>
-        ) : null}
-      </View>
+      ) : (
+        <Pressable
+          onPress={handleConnectJobber}
+          style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+          testID="button-connect-jobber"
+        >
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="upload-cloud" size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>Sync quotes as scheduled jobs</ThemedText>
+            </View>
+            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+          </View>
+        </Pressable>
+      )}
 
       {stripeStatus?.connected ? (
         <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>

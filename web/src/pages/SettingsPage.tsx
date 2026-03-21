@@ -241,6 +241,7 @@ export default function SettingsPage() {
   const [tab, setTab] = useState(() => searchParams.get("tab") || "business");
   const [saved, setSaved] = useState(false);
   const [savedSection, setSavedSection] = useState("");
+  const [jobberJustConnected] = useState(() => searchParams.get("jobber") === "connected");
 
   const showSaved = (section: string) => {
     setSaved(true);
@@ -319,12 +320,6 @@ export default function SettingsPage() {
   const [commercialEnabled, setCommercialEnabled] = useState(false);
   const [appLanguage, setAppLanguage] = useState("en");
   const [commLanguage, setCommLanguage] = useState("en");
-  const [jobberTokenInput, setJobberTokenInput] = useState("");
-  const [savingJobberToken, setSavingJobberToken] = useState(false);
-  const [jobberTokenSaved, setJobberTokenSaved] = useState(false);
-  const { data: jobberTokenStatus } = useQuery<{ connected: boolean }>({
-    queryKey: ["/api/integrations/jobber/token-status"],
-  });
 
   useEffect(() => {
     if (business) {
@@ -1131,6 +1126,12 @@ export default function SettingsPage() {
 
       {tab === "integrations" ? (
         <div className="max-w-2xl space-y-6">
+          {jobberJustConnected ? (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">
+              <CheckCircle size={16} className="text-emerald-600 shrink-0" />
+              Jobber connected successfully — your quotes will now sync as jobs.
+            </div>
+          ) : null}
           <Card>
             <CardHeader title="Payment & Accounting" icon={CreditCard} />
             <IntegrationCard
@@ -1156,67 +1157,17 @@ export default function SettingsPage() {
           </Card>
           <Card>
             <CardHeader title="Jobber" icon={Zap} />
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                {jobberTokenStatus?.connected ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
-                    <CheckCircle size={11} /> Connected
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-0.5">
-                    <XCircle size={11} /> Not connected
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-slate-500">
-                Paste your personal API token from{" "}
-                <a href="https://developer.getjobber.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                  developer.getjobber.com
-                </a>{" "}
-                to sync accepted quotes as jobs in Jobber.
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={jobberTokenInput}
-                  onChange={(e) => setJobberTokenInput(e.target.value)}
-                  placeholder={jobberTokenStatus?.connected ? "Token saved — paste new token to update" : "Paste your Jobber API token"}
-                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={async () => {
-                    setSavingJobberToken(true);
-                    try {
-                      await apiPost("/api/integrations/jobber/save-token", { apiToken: jobberTokenInput });
-                      setJobberTokenSaved(true);
-                      setJobberTokenInput("");
-                      queryClient.invalidateQueries({ queryKey: ["/api/integrations/jobber/token-status"] });
-                      setTimeout(() => setJobberTokenSaved(false), 3000);
-                    } catch (e: any) {
-                      alert(e?.message || "Failed to save token");
-                    } finally {
-                      setSavingJobberToken(false);
-                    }
-                  }}
-                  disabled={!jobberTokenInput.trim() || savingJobberToken}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  {jobberTokenSaved ? "Saved!" : savingJobberToken ? "Saving..." : "Save"}
-                </button>
-              </div>
-              {jobberTokenStatus?.connected && (
-                <button
-                  onClick={async () => {
-                    if (!confirm("Remove Jobber API token?")) return;
-                    await apiPost("/api/integrations/jobber/save-token", { apiToken: "" });
-                    queryClient.invalidateQueries({ queryKey: ["/api/integrations/jobber/token-status"] });
-                  }}
-                  className="text-xs text-red-500 hover:text-red-700"
-                >
-                  Remove token
-                </button>
-              )}
-            </div>
+            <IntegrationCard
+              name="Jobber"
+              description="Sync accepted quotes directly to Jobber as scheduled jobs"
+              icon={Zap}
+              statusUrl="/api/integrations/jobber/status"
+              connectUrl="/api/integrations/jobber/connect"
+              connectMethod="GET"
+              disconnectUrl="/api/integrations/jobber/disconnect"
+              disconnectMethod="POST"
+              color="green"
+            />
           </Card>
           <Card>
             <CardHeader title="Operations & Scheduling" icon={Calendar} />
