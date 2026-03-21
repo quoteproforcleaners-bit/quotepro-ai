@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
 import { apiPut, apiPost, apiGet, apiDelete, apiPatch } from "../lib/api";
@@ -236,7 +237,8 @@ export default function SettingsPage() {
   const { user, business, refresh } = useAuth();
   const { isPro, isGrowth, isStarter, tier, startCheckout, checkoutLoading } = useSubscription();
   const navigate = useNavigate();
-  const [tab, setTab] = useState("business");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => searchParams.get("tab") || "business");
   const [saved, setSaved] = useState(false);
   const [savedSection, setSavedSection] = useState("");
 

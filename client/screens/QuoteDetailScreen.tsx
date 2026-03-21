@@ -112,6 +112,9 @@ export default function QuoteDetailScreen() {
 
   const [qboCreating, setQboCreating] = useState(false);
   const [jobberSyncing, setJobberSyncing] = useState(false);
+  const { data: jobberTokenStatus } = useQuery<{ connected: boolean }>({
+    queryKey: ["/api/integrations/jobber/token-status"],
+  });
   const [showFollowUpEdit, setShowFollowUpEdit] = useState(false);
   const [followUpEditText, setFollowUpEditText] = useState("");
   const [followUpEditLoading, setFollowUpEditLoading] = useState(false);
@@ -674,6 +677,17 @@ export default function QuoteDetailScreen() {
 
   const handleSyncToJobber = async () => {
     if (!quote || jobberSyncing) return;
+    if (!jobberTokenStatus?.connected) {
+      Alert.alert(
+        "Jobber Not Connected",
+        "Add your Jobber API token in Settings to sync quotes.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open Settings", onPress: () => navigation.navigate("Settings" as any) },
+        ]
+      );
+      return;
+    }
     setJobberSyncing(true);
     try {
       const res = await apiRequest("POST", `/api/integrations/jobber/sync-quote-token/${quote.id}`, {});

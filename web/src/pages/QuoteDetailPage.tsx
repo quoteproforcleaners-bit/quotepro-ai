@@ -288,7 +288,15 @@ export default function QuoteDetailPage() {
   };
 
 
+  const { data: jobberStatus } = useQuery<{ connected: boolean }>({
+    queryKey: ["/api/integrations/jobber/token-status"],
+  });
+
   const syncJobber = async () => {
+    if (!jobberStatus?.connected) {
+      navigate("/settings?tab=integrations");
+      return;
+    }
     setSyncingJobber(true);
     try {
       const result: any = await apiPost(`/api/integrations/jobber/sync-quote-token/${id}`, {});
@@ -1232,7 +1240,7 @@ export default function QuoteDetailPage() {
                 className="w-full justify-start"
                 size="sm"
               >
-                {syncingJobber ? "Syncing..." : "Sync to Jobber"}
+                {syncingJobber ? "Syncing..." : jobberStatus?.connected ? "Sync to Jobber" : "Connect Jobber"}
               </Button>
               <Button
                 variant="secondary"
