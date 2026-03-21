@@ -1,34 +1,25 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   Briefcase,
-  Clock,
-  CheckCircle,
-  Play,
-  Calendar,
   MapPin,
   DollarSign,
   User,
+  Calendar,
 } from "lucide-react";
-import { apiPost } from "../lib/api";
-import { queryClient } from "../lib/queryClient";
 import {
   PageHeader,
   Card,
-  CardHeader,
   Badge,
-  Button,
   Tabs,
   EmptyState,
   Spinner,
-  Modal,
 } from "../components/ui";
 
 export default function JobsPage() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState("all");
-  const [selectedJob, setSelectedJob] = useState<any>(null);
   const { data: jobs = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/jobs"],
   });
@@ -49,38 +40,6 @@ export default function JobsPage() {
         new Date(b.scheduledDate || b.createdAt).getTime() -
         new Date(a.scheduledDate || a.createdAt).getTime()
     );
-
-  const startMutation = useMutation({
-    mutationFn: (jobId: string) => apiPost(`/api/jobs/${jobId}/start`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      setSelectedJob(null);
-    },
-  });
-
-  const completeMutation = useMutation({
-    mutationFn: (jobId: string) => apiPost(`/api/jobs/${jobId}/complete`, {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
-      setSelectedJob(null);
-    },
-  });
-
-  const [calendarSyncing, setCalendarSyncing] = useState<string | null>(null);
-  const [calendarMsg, setCalendarMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const syncCalendar = async (jobId: string) => {
-    setCalendarSyncing(jobId);
-    setCalendarMsg(null);
-    try {
-      await apiPost(`/api/google-calendar/sync-job`, { jobId });
-      setCalendarMsg({ ok: true, text: "Added to Google Calendar." });
-    } catch (err: any) {
-      setCalendarMsg({ ok: false, text: err?.message || "Calendar sync failed. Check your Google Calendar connection in Settings." });
-    } finally {
-      setCalendarSyncing(null);
-    }
-  };
 
   return (
     <div>
@@ -136,26 +95,44 @@ export default function JobsPage() {
                         {j.title || "Cleaning Job"}
                       </p>
                       {j.address ? (
-                        <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">
+                        <p className="text-xs text-slate-400 mt-0.5 hidden sm:block flex items-center gap-1">
+                          <MapPin className="w-3 h-3 inline" />
                           {j.address}
                         </p>
                       ) : null}
                     </td>
                     <td className="px-5 py-3.5 text-slate-600 hidden sm:table-cell">
-                      {j.customerName || <span className="text-slate-300">&mdash;</span>}
+                      {j.customerName ? (
+                        <span className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          {j.customerName}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">&mdash;</span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5">
                       <Badge status={j.status} dot />
                     </td>
                     <td className="px-5 py-3.5 text-slate-500 hidden md:table-cell">
-                      {j.scheduledDate
-                        ? new Date(j.scheduledDate).toLocaleDateString()
-                        : <span className="text-slate-300">&mdash;</span>}
+                      {j.scheduledDate ? (
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          {new Date(j.scheduledDate).toLocaleDateString()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">&mdash;</span>
+                      )}
                     </td>
                     <td className="px-5 lg:px-6 py-3.5 text-right font-semibold text-slate-900 hidden lg:table-cell">
-                      {j.total
-                        ? `$${Number(j.total).toLocaleString()}`
-                        : <span className="text-slate-300">&mdash;</span>}
+                      {j.total ? (
+                        <span className="flex items-center justify-end gap-1">
+                          <DollarSign className="w-3.5 h-3.5 text-slate-400" />
+                          {Number(j.total).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">&mdash;</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -164,117 +141,6 @@ export default function JobsPage() {
           </div>
         )}
       </Card>
-
-      <Modal
-        open={!!selectedJob}
-        onClose={() => setSelectedJob(null)}
-        title={selectedJob?.title || "Job Details"}
-        size="md"
-      >
-        {selectedJob ? (
-          <div className="space-y-5">
-            <div className="flex items-center gap-2">
-              <Badge status={selectedJob.status} dot />
-              {selectedJob.isRecurring ? (
-                <Badge status="info" label="Recurring" />
-              ) : null}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {selectedJob.customerName ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center">
-                    <User className="w-4 h-4 text-slate-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Customer</p>
-                    <p className="text-sm font-medium text-slate-900">
-                      {selectedJob.customerName}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-              {selectedJob.scheduledDate ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center">
-                    <Calendar className="w-4 h-4 text-slate-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Scheduled</p>
-                    <p className="text-sm font-medium text-slate-900">
-                      {new Date(selectedJob.scheduledDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-              {selectedJob.address ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center">
-                    <MapPin className="w-4 h-4 text-slate-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Location</p>
-                    <p className="text-sm font-medium text-slate-900">
-                      {selectedJob.address}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-              {selectedJob.total ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center">
-                    <DollarSign className="w-4 h-4 text-slate-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Amount</p>
-                    <p className="text-sm font-semibold text-slate-900">
-                      ${Number(selectedJob.total).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex gap-2 pt-4 border-t border-slate-100">
-              {selectedJob.status === "scheduled" ? (
-                <Button
-                  icon={Play}
-                  onClick={() => startMutation.mutate(selectedJob.id)}
-                  loading={startMutation.isPending}
-                  size="sm"
-                >
-                  Start Job
-                </Button>
-              ) : null}
-              {selectedJob.status === "in_progress" ? (
-                <Button
-                  icon={CheckCircle}
-                  variant="success"
-                  onClick={() => completeMutation.mutate(selectedJob.id)}
-                  loading={completeMutation.isPending}
-                  size="sm"
-                >
-                  Complete Job
-                </Button>
-              ) : null}
-              <Button
-                variant="secondary"
-                icon={Calendar}
-                onClick={() => syncCalendar(selectedJob.id)}
-                loading={calendarSyncing === selectedJob.id}
-                size="sm"
-              >
-                Sync to Calendar
-              </Button>
-            </div>
-            {calendarMsg && (
-              <div className={`mt-3 p-2.5 rounded-lg text-xs font-medium ${calendarMsg.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-                {calendarMsg.text}
-              </div>
-            )}
-          </div>
-        ) : null}
-      </Modal>
     </div>
   );
 }

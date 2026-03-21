@@ -1,0 +1,113 @@
+I need you to extend the scheduling workflow in QuotePro so that after an app user creates/schedules a job from an accepted quote, they can immediately text and/or email the customer their appointment confirmation.
+
+Goal:
+Close the loop after scheduling by giving the user an easy final step to notify the customer that their cleaning appointment is confirmed.
+
+Core use case:
+- User creates a job from an accepted quote
+- User selects date/time window and assigns team
+- Job is saved to the schedule/calendar
+- Then the app prompts the user to notify the customer
+- User can send SMS, email, both, or skip
+
+This should feel like a natural part of the scheduling flow, not a bolted-on feature.
+
+Main requirements:
+1. Add a final “Notify Customer” step after scheduling a job from an accepted quote
+2. Allow these options:
+   - Send SMS
+   - Send Email
+   - Send Both
+   - Skip for now
+3. If both phone and email exist, default to SMS + Email selected
+4. If only one contact method exists, only show/enable that method
+5. If neither exists, explain clearly why notification cannot be sent
+6. Save the job first, then trigger notification sending
+7. Show success/failure feedback after send
+
+Also support this flow for Quick Add Clean if it is already built or partially built:
+- after manually scheduling a clean, offer the same notification step
+
+Message content should include:
+- customer first name
+- service date
+- arrival window / time if available
+- service address
+- service type if available
+- company name
+- simple contact/reschedule language
+
+Message quality requirements:
+- sound human and professional
+- concise
+- premium
+- clear and reassuring
+- not robotic or generic
+
+Example SMS tone:
+“Hi John — your cleaning is confirmed for Tuesday, March 26 with an arrival window of 9–11 AM. We’re scheduled for 123 Main St. Reply here if you need anything. – Mike’s Cleaning”
+
+Example email:
+- properly formatted
+- premium and clean
+- mobile-friendly
+- strong subject line like:
+  “Your cleaning is confirmed for Tuesday, March 26”
+
+UX requirements:
+Please choose the best UX and implement it.
+Preferred options:
+- a final step in the scheduling modal with checkboxes for SMS/email before save
+OR
+- a success modal right after save that asks whether to notify the customer
+
+Pick the better flow based on the existing codebase, but keep it fast and smooth.
+
+Rules:
+- Do not make the user leave the scheduling flow
+- Do not require extra navigation
+- Do not send messages before the appointment is actually saved
+- If sending fails, keep the job scheduled and show clear error feedback
+- If data is missing, explain what is missing
+
+Data and tracking requirements:
+Please store/log:
+- whether appointment confirmation was sent
+- which channel was used (sms/email/both)
+- sent timestamp
+- delivery attempt result if available
+- any error state if send failed
+
+Implementation requirements:
+1. Inspect the current accepted quote → job creation / schedule flow
+2. Find the current SMS/email sending architecture already used in QuotePro
+3. Reuse existing messaging infrastructure if possible
+4. Add appointment confirmation templates for SMS and email
+5. Wire notification sending into the post-scheduling flow
+6. Make the feature work end to end
+
+Please also think through:
+- whether this should only apply to accepted quotes or also quick-added jobs
+- whether message sending should default on or be optional
+- how to handle missing phone/email cleanly
+- how to make the templates reusable later for reminders and “on my way” texts
+
+Deliverables:
+1. Explain the recommended UX in plain English
+2. Identify the exact files/components/functions changed
+3. Implement appointment confirmation sending after scheduling
+4. Add SMS and email templates
+5. Show before/after flow
+6. Explain how to test the full flow end to end
+
+Success criteria:
+- After scheduling a job, the app user can immediately notify the customer
+- SMS/email confirmations are easy to send
+- The customer receives a polished appointment confirmation
+- The job remains scheduled even if notification fails
+- The workflow feels premium, fast, and complete
+- The feature is reusable for future reminders and follow-up automations
+
+Important:
+Do not stop at suggesting ideas.
+Inspect the real code, implement the feature, and summarize exactly what changed.

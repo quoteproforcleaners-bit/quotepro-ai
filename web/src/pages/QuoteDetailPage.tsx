@@ -54,6 +54,7 @@ import {
   Timeline,
   Toggle,
   ProgressBar,
+  Toast,
 } from "../components/ui";
 import { QuickAddCleanPanel } from "../components/QuickAddCleanPanel";
 
@@ -84,6 +85,11 @@ export default function QuoteDetailPage() {
   const [followUpSendingNow, setFollowUpSendingNow] = useState(false);
   const [followUpPreviewLoading, setFollowUpPreviewLoading] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" | "info" } | null>(null);
+
+  const showToast = (message: string, variant: "success" | "error" | "info" = "success") => {
+    setToast({ message, variant });
+  };
 
   const { data: quote, isLoading } = useQuery<any>({
     queryKey: [`/api/quotes/${id}`],
@@ -307,15 +313,15 @@ export default function QuoteDetailPage() {
 
   const syncJobber = async () => {
     if (!jobberStatus?.connected) {
-      navigate("/app/settings?tab=integrations");
+      navigate("/settings?tab=integrations");
       return;
     }
     setSyncingJobber(true);
     try {
       const result: any = await apiPost(`/api/integrations/jobber/sync-quote/${id}`, {});
-      alert(result?.message || "Job created in Jobber.");
+      showToast(result?.message || "Job created in Jobber.", "success");
     } catch (e: any) {
-      alert(e?.message || "Failed to sync to Jobber");
+      showToast(e?.message || "Failed to sync to Jobber", "error");
     } finally {
       setSyncingJobber(false);
     }
@@ -325,10 +331,9 @@ export default function QuoteDetailPage() {
     setSyncingQbo(true);
     try {
       const result: any = await apiPost(`/api/integrations/qbo/create-invoice`, { quoteId: id });
-      alert(result?.message || "QuickBooks invoice created successfully.");
+      showToast(result?.message || "QuickBooks invoice created successfully.", "success");
     } catch (e: any) {
-      const msg = e?.message || "Failed to create QBO invoice";
-      alert(msg);
+      showToast(e?.message || "Failed to create QBO invoice", "error");
     } finally {
       setSyncingQbo(false);
     }
@@ -875,7 +880,7 @@ export default function QuoteDetailPage() {
                                     const res = await apiPost(`/api/communications/${fu.id}/send-now`, {});
                                     refetchFollowUps();
                                   } catch (e: any) {
-                                    alert(e?.message || "Failed to send");
+                                    showToast(e?.message || "Failed to send", "error");
                                   } finally {
                                     setFollowUpSendingNow(false);
                                   }
@@ -1356,6 +1361,13 @@ export default function QuoteDetailPage() {
         } : undefined}
       />
 
+      {toast ? (
+        <Toast
+          message={toast.message}
+          variant={toast.variant}
+          onClose={() => setToast(null)}
+        />
+      ) : null}
     </div>
   );
 }

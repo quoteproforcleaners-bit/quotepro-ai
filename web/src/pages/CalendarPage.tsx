@@ -882,7 +882,7 @@ export default function CalendarPage() {
             <button
               onClick={() => {
                 if (!isGrowth) {
-                  alert("Quick Add Clean requires the Growth plan. Upgrade to unlock instant scheduling.");
+                  navigate("/pricing");
                   return;
                 }
                 setShowQuickAdd(true);
