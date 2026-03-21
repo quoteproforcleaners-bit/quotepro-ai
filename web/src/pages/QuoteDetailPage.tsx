@@ -81,6 +81,7 @@ export default function QuoteDetailPage() {
   const [playDrafts, setPlayDrafts] = useState<Record<number, string>>({});
   const [playGenerating, setPlayGenerating] = useState<Record<number, boolean>>({});
   const [playSending, setPlaySending] = useState<Record<number, boolean>>({});
+  const [aiCommsSending, setAiCommsSending] = useState(false);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewEmailSubject, setReviewEmailSubject] = useState("");
   const [reviewEmailContent, setReviewEmailContent] = useState("");
@@ -269,6 +270,30 @@ export default function QuoteDetailPage() {
       setAiDrafts((prev) => ({ ...prev, [key]: "Unable to generate message." }));
     }
     setAiDraftLoading(null);
+  };
+
+  const sendAiDraft = async () => {
+    const draft = aiDrafts[currentDraftKey];
+    if (!draft?.trim()) return;
+    if (!quote?.customerId) {
+      showToast("No customer linked to this quote", "error");
+      return;
+    }
+    setAiCommsSending(true);
+    try {
+      await apiPost("/api/communications", {
+        customerId: quote.customerId,
+        type: msgChannel,
+        channel: msgChannel,
+        content: draft,
+        ...(msgChannel === "email" ? { subject: `${messagePurposes.find((m) => m.value === msgPurpose)?.label || "Message"} — ${quote.customerName || ""}`.trim() } : {}),
+      });
+      showToast(`${msgChannel === "sms" ? "SMS" : "Email"} sent!`, "success");
+      setAiDrafts((prev) => ({ ...prev, [currentDraftKey]: "" }));
+    } catch (e: any) {
+      showToast(e?.message || "Failed to send", "error");
+    }
+    setAiCommsSending(false);
   };
 
   const recTypeToPurpose = (type: string): MessagePurpose => {
@@ -935,23 +960,39 @@ export default function QuoteDetailPage() {
               </Button>
 
               {aiDrafts[currentDraftKey] ? (
-                <div className="bg-violet-50 dark:bg-violet-950/40 rounded-xl p-4 border border-violet-200 dark:border-violet-800/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-3.5 h-3.5 text-violet-500 dark:text-violet-400" />
-                    <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">
-                      AI {msgChannel === "email" ? "Email" : "SMS"} Draft
+                <div className="rounded-xl border border-violet-200 bg-violet-50 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-500" />
+                    <p className="text-xs font-semibold text-violet-700">
+                      AI {msgChannel === "email" ? "Email" : "SMS"} Draft — edit before sending
                     </p>
                   </div>
-                  <p className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
-                    {aiDrafts[currentDraftKey]}
-                  </p>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(aiDrafts[currentDraftKey])}
-                    className="text-xs text-violet-600 dark:text-violet-400 font-medium mt-3 hover:text-violet-800 dark:hover:text-violet-300 flex items-center gap-1"
-                  >
-                    <Copy className="w-3 h-3" />
-                    Copy to clipboard
-                  </button>
+                  <textarea
+                    value={aiDrafts[currentDraftKey]}
+                    onChange={(e) => setAiDrafts((prev) => ({ ...prev, [currentDraftKey]: e.target.value }))}
+                    rows={8}
+                    className="w-full px-4 pb-3 bg-transparent text-sm text-slate-800 focus:outline-none resize-none leading-relaxed"
+                  />
+                  <div className="px-4 pb-4 flex gap-2 border-t border-violet-200 pt-3">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      icon={Send}
+                      loading={aiCommsSending}
+                      disabled={!aiDrafts[currentDraftKey]?.trim()}
+                      onClick={sendAiDraft}
+                    >
+                      Send {msgChannel === "sms" ? "SMS" : "Email"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAiDrafts((prev) => ({ ...prev, [currentDraftKey]: "" }))}
+                      disabled={aiCommsSending}
+                    >
+                      Clear
+                    </Button>
+                  </div>
                 </div>
               ) : null}
             </div>
