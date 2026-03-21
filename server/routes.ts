@@ -17,8 +17,48 @@ import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage
 import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "./calculator-engine";
 import { JobberClient, buildJobberAuthUrl, exchangeJobberCode, logJobberSync, syncQuoteToJobber } from "./jobber-client";
 
+const PLATFORM_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+const PLATFORM_FROM_NAME = "QuotePro";
+
+/**
+ * Returns the SendGrid API key and from-address to use for a given business.
+ *
+ * Multi-tenant logic:
+ *  - If the business has supplied their own SendGrid API key, use it and send
+ *    FROM their verified business email address (customer sees their email).
+ *  - Otherwise, fall back to the platform API key and send FROM the platform
+ *    address, with reply_to set to the business email so customers can still
+ *    reply directly to the business owner.
+ */
+function getBusinessEmailSender(business: any): {
+  apiKey: string;
+  fromEmail: string;
+  fromName: string;
+  replyTo: string | null;
+} {
+  const businessEmail = business?.email || "";
+  const ownKey = business?.sendgridApiKey as string | null | undefined;
+
+  if (ownKey) {
+    return {
+      apiKey: ownKey,
+      fromEmail: businessEmail || PLATFORM_FROM_EMAIL,
+      fromName: business?.companyName || PLATFORM_FROM_NAME,
+      replyTo: null, // FROM IS already the business — no need to set reply_to
+    };
+  }
+
+  return {
+    apiKey: process.env.SENDGRID_API_KEY || "",
+    fromEmail: PLATFORM_FROM_EMAIL,
+    fromName: business?.companyName ? `${business.companyName} via QuotePro` : PLATFORM_FROM_NAME,
+    replyTo: businessEmail || null, // Customer replies go to the business owner
+  };
+}
+
+/** @deprecated use getBusinessEmailSender instead */
 function getBusinessFromEmail(business: any): string {
-  return business?.email || process.env.SENDGRID_FROM_EMAIL || "quotes@getquotepro.ai";
+  return getBusinessEmailSender(business).fromEmail;
 }
 
 function parseSendGridError(errText: string, fromEmail: string): string {
@@ -1921,7 +1961,8 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
             ].filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n");
 
             const primaryColor = (business as any).primaryColor || "#2563EB";
-            const fromEmail = getBusinessFromEmail(business);
+            const { apiKey: apptSgKey, fromEmail, fromName: apptFromName, replyTo: apptReplyTo } = getBusinessEmailSender(business);
+            const apptSgApiKey = apptSgKey || process.env.SENDGRID_API_KEY;
 
             const detailRows = [
               dateStr ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Date</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${dateStr}</td></tr>` : "",
@@ -1933,20 +1974,20 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
 
             const emailPayload: any = {
               personalizations: [{ to: [{ email: toEmail }] }],
-              from: { email: fromEmail, name: companyName },
+              from: { email: fromEmail, name: apptFromName },
               subject,
               content: [
                 { type: "text/plain", value: plainBody },
                 { type: "text/html", value: htmlBody },
               ],
             };
-            if ((business as any).email) {
-              emailPayload.reply_to = { email: (business as any).email, name: companyName };
+            if (apptReplyTo) {
+              emailPayload.reply_to = { email: apptReplyTo, name: apptFromName };
             }
 
             const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
               method: "POST",
-              headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
+              headers: { Authorization: `Bearer ${apptSgApiKey}`, "Content-Type": "application/json" },
               body: JSON.stringify(emailPayload),
             });
             if (!sgRes.ok) {
@@ -3376,16 +3417,9 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
         return res.status(400).json({ message: "to (recipient email) is required" });
       }
 
-      const sgApiKey = process.env.SENDGRID_API_KEY;
+      const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
       if (!sgApiKey) {
-        return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
-      }
-
-      const brandedFromEmail = getBusinessFromEmail(business);
-      const fromName = business.companyName || "QuotePro";
-
-      if (!business.email) {
-        return res.status(400).json({ success: false, message: "Please add your email address in Settings before sending emails." });
+        return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings or add your own SendGrid API key in Settings." });
       }
 
       const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
@@ -3537,6 +3571,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
           { type: "text/plain", value: plainBody },
           { type: "text/html", value: emailHtml },
         ],
+        ...(replyToEmail ? { reply_to: { email: replyToEmail, name: fromName } } : {}),
       };
 
       // Attach files from the business file library
@@ -3697,14 +3732,10 @@ The email should:
         return res.status(400).json({ message: "Recipient email is required" });
       }
 
-      const sgApiKey = process.env.SENDGRID_API_KEY;
+      const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
       if (!sgApiKey) {
-        return res.status(503).json({ message: "Email service not configured" });
+        return res.status(503).json({ message: "Email service not configured. Add your SendGrid API key in Settings to send from your email." });
       }
-
-      const brandedFromEmail = getBusinessFromEmail(business);
-      const fromName = business.companyName || "QuotePro";
-      const replyToEmail = business.email || undefined;
 
       const customerName = (quote.propertyDetails as any)?.customerName || "Customer";
       const primaryColor = (business as any).primaryColor || "#2563EB";
@@ -3906,13 +3937,10 @@ The email should:
     const channel = comm.channel;
 
     if (channel === "email") {
-      const sgApiKey = process.env.SENDGRID_API_KEY;
-      if (!sgApiKey) return { success: false, message: "Email service not configured" };
+      const { apiKey: sgApiKey, fromEmail, fromName, replyTo } = getBusinessEmailSender(business);
+      if (!sgApiKey) return { success: false, message: "Email service not configured. Add your SendGrid API key in Settings." };
       const toEmail = customer?.email;
       if (!toEmail) return { success: false, message: "Customer email not found" };
-      const fromEmail = getBusinessFromEmail(business);
-      const replyTo = business?.email;
-      const fromName = business?.companyName || "QuotePro";
       const quoteUrl = `${process.env.APP_URL || `https://${req.get("host")}`}/q/${quote.publicToken}`;
       const primaryColor = (business as any)?.primaryColor || "#2563EB";
       const quoteButtonHtml = `<div style="margin-top:24px;text-align:center;"><a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Accept Your Quote</a></div>`;
@@ -4745,17 +4773,9 @@ ${contextStr}`;
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const sgApiKey = process.env.SENDGRID_API_KEY;
+      const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
       if (!sgApiKey) {
-        return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
-      }
-
-      const brandedFromEmail = getBusinessFromEmail(business);
-      const fromName = business.companyName || "QuotePro";
-      const replyToEmail = business.email || undefined;
-
-      if (!replyToEmail) {
-        return res.status(400).json({ success: false, message: "Please add your email address in Settings before sending emails. This ensures customer replies go directly to you." });
+        return res.status(503).json({ message: "Email service not configured. Add your SendGrid API key in Settings to send from your email." });
       }
 
       let bodyContent = body;
@@ -7255,13 +7275,8 @@ Respond with JSON: {"reply": string}`
       const errors: string[] = [];
 
       if (isEmail) {
-        const sgApiKey = process.env.SENDGRID_API_KEY;
-        if (!sgApiKey) return res.status(503).json({ message: "Email service not configured. Please connect SendGrid in settings." });
-
-        const brandedFromEmail = getBusinessFromEmail(business);
-        const fromName = business.companyName || "QuotePro";
-        const replyToEmail = business.email || undefined;
-        if (!replyToEmail) return res.status(400).json({ message: "Please add your email address in Settings before sending emails." });
+        const { apiKey: sgApiKey, fromEmail: brandedFromEmail, fromName, replyTo: replyToEmail } = getBusinessEmailSender(business);
+        if (!sgApiKey) return res.status(503).json({ message: "Email service not configured. Add your SendGrid API key in Settings." });
 
         for (const customer of targetCustomers) {
           const email = customer.email;
@@ -8801,13 +8816,16 @@ loadMonth(nextMo);
       const companyName = business?.companyName || "Your Cleaning Company";
       const confirmMsg = availability.confirmationMessage || `We look forward to seeing you! If you need to reschedule, please contact us.`;
 
-      if (customerEmail && process.env.SENDGRID_API_KEY) {
+      const { apiKey: bookingSgKey, fromEmail: bookingFromEmail, fromName: bookingFromName, replyTo: bookingReplyTo } = getBusinessEmailSender(business);
+      const effectiveBookingKey = bookingSgKey || process.env.SENDGRID_API_KEY;
+      if (customerEmail && effectiveBookingKey) {
         try {
           const sgMail = await import("@sendgrid/mail");
-          (sgMail as any).default.setApiKey(process.env.SENDGRID_API_KEY);
+          (sgMail as any).default.setApiKey(effectiveBookingKey);
           await (sgMail as any).default.send({
             to: customerEmail,
-            from: { name: companyName, email: "noreply@quotepro.app" },
+            from: { name: bookingFromName, email: bookingFromEmail },
+            ...(bookingReplyTo ? { replyTo: bookingReplyTo } : {}),
             subject: `Your cleaning is booked for ${bookingDateStr}`,
             html: `
               <div style="font-family:Inter,system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px">
@@ -11067,17 +11085,16 @@ Rules:
 </body>
 </html>`;
 
-      const sgApiKey = process.env.SENDGRID_API_KEY;
-      if (!sgApiKey) return res.status(500).json({ message: "Email not configured" });
+      const { apiKey: sgApiKey, fromEmail, fromName: senderFromName, replyTo: intakeReplyTo } = getBusinessEmailSender(business);
+      if (!sgApiKey) return res.status(500).json({ message: "Email not configured. Add your SendGrid API key in Settings." });
 
-      const fromEmail = getBusinessFromEmail(business);
       const sgRes = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: { Authorization: `Bearer ${sgApiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           personalizations: [{ to: [{ email: toEmail.trim(), name: recipientName }] }],
-          from: { email: fromEmail, name: companyName },
-          reply_to: business.email ? { email: business.email, name: senderName } : undefined,
+          from: { email: fromEmail, name: senderFromName || companyName },
+          ...(intakeReplyTo ? { reply_to: { email: intakeReplyTo, name: senderName } } : {}),
           subject: `Your cleaning estimate from ${companyName}`,
           content: [
             { type: "text/plain", value: plainText },
@@ -11146,15 +11163,12 @@ Rules:
           messageText = await generateFollowUpMessage(quote, customer, business, comm.channel);
         }
         if (comm.channel === "email") {
-          const sgApiKey = process.env.SENDGRID_API_KEY;
+          const { apiKey: sgApiKey, fromEmail, fromName, replyTo } = getBusinessEmailSender(business);
           const toEmail = customer?.email;
           if (!sgApiKey || !toEmail) {
-            await updateCommunication(comm.id, { status: "failed", errorMessage: !sgApiKey ? "No SendGrid key" : "No customer email" });
+            await updateCommunication(comm.id, { status: "failed", errorMessage: !sgApiKey ? "No SendGrid key configured" : "No customer email" });
             continue;
           }
-          const fromEmail = getBusinessFromEmail(business);
-          const fromName = business?.companyName || "QuotePro";
-          const replyTo = business?.email;
           const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
           const primaryColor = (business as any)?.primaryColor || "#2563EB";
           const quoteButtonHtml = `<div style="margin-top:24px;text-align:center;"><a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Accept Your Quote</a></div>`;

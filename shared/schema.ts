@@ -53,6 +53,7 @@ export const businesses = pgTable("businesses", {
   appLanguage: varchar("app_language", { length: 10 }).default("en"),
   commLanguage: varchar("comm_language", { length: 10 }).default("en"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
+  sendgridApiKey: text("sendgrid_api_key"),
   stripeAccountId: text("stripe_account_id"),
   stripeOnboardingComplete: boolean("stripe_onboarding_complete").notNull().default(false),
   venmoHandle: text("venmo_handle"),

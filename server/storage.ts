@@ -179,6 +179,7 @@ export async function updateBusiness(
     paymentOptions: unknown;
     paymentNotes: string | null;
     quotePreferences: unknown;
+    sendgridApiKey: string | null;
   }>
 ): Promise<Business> {
   const [business] = await db
