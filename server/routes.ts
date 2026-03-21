@@ -2388,6 +2388,10 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     res.redirect(301, `/j/${req.params.token}`);
   });
 
+  app.get("/live-update/:token", (req: Request, res: Response) => {
+    res.redirect(301, `/j/${req.params.token}`);
+  });
+
   app.get("/j/:token", async (req: Request, res: Response) => {
     try {
       const { token } = req.params;
