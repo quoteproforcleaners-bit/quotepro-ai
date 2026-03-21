@@ -1409,7 +1409,7 @@ export default function QuoteCreatePage() {
                   </span>
                   <div className="text-right">
                     <div className="text-2xl font-bold text-primary-600 tracking-tight">
-                      ${quote[selectedOption].price.toFixed(0)}
+                      ${(aiPriceOverrides?.[selectedOption] ?? quote[selectedOption].price).toFixed(0)}
                       {quote[selectedOption].firstCleanPrice ? (
                         <span className="text-sm font-normal text-slate-400 ml-1">
                           /visit
