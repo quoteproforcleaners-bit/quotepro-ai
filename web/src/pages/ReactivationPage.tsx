@@ -421,7 +421,7 @@ function ReactivationContent() {
       )}
 
       <Modal
-        isOpen={modalOpen}
+        open={modalOpen}
         onClose={closeModal}
         title={
           modalStep === "templates"

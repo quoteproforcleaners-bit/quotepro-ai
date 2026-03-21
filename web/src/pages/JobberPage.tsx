@@ -462,7 +462,7 @@ function ImportTab() {
         </div>
       )}
 
-      <Modal isOpen={resultModal !== null} onClose={() => setResultModal(null)} title="Import Complete">
+      <Modal open={resultModal !== null} onClose={() => setResultModal(null)} title="Import Complete">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
             <CheckCircle className="w-8 h-8 text-emerald-600" />

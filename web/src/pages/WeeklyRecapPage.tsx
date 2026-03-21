@@ -239,7 +239,7 @@ function WeeklyRecapContent() {
         </>
       )}
 
-      <Modal isOpen={goalModalOpen} onClose={() => setGoalModalOpen(false)} title="Choose a Goal">
+      <Modal open={goalModalOpen} onClose={() => setGoalModalOpen(false)} title="Choose a Goal">
         <div className="space-y-2">
           {GOAL_OPTIONS.map((option, idx) => {
             const isSelected = preferences?.weeklyGoal === option.goal && preferences?.weeklyGoalTarget === option.target;

@@ -331,7 +331,7 @@ export default function QBOSettingsPage() {
       )}
 
       <ConfirmModal
-        isOpen={confirmDisconnect}
+        open={confirmDisconnect}
         onClose={() => setConfirmDisconnect(false)}
         onConfirm={handleDisconnect}
         title="Disconnect QuickBooks"
