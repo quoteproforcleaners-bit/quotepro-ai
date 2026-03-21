@@ -42,6 +42,16 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
+
+/** Returns a language instruction to append to any AI system prompt. */
+function getLangInstruction(langCode: string | null | undefined): string {
+  switch ((langCode || "en").toLowerCase()) {
+    case "es": return " Write the entire response in Spanish.";
+    case "pt": return " Write the entire response in Portuguese (Brazilian).";
+    case "ru": return " Write the entire response in Russian.";
+    default:   return " Write the entire response in English.";
+  }
+}
 import {
   getUserById,
   getUserByEmail,
@@ -2313,7 +2323,8 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const { type, customerName, companyName, senderName, updateLink, language: commLang } = req.body;
       if (!type) return res.status(400).json({ message: "type is required" });
 
-      const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
+      const jobMsgBusiness = await getBusinessByOwner(req.session.userId!);
+      const langInstruction = getLangInstruction(commLang || (jobMsgBusiness as any)?.commLanguage);
       const name = customerName || "there";
       const sender = senderName || "your cleaning team";
       const company = companyName || "our company";
@@ -3790,12 +3801,13 @@ The email should:
     const msgType = channel === "email" ? "email" : "SMS";
     const maxLen = channel === "email" ? 200 : 160;
     const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
+    const followUpLangInstruction = getLangInstruction(business?.commLanguage);
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `Write a ${msgType} follow-up (under ${maxLen} chars for SMS) for "${business?.companyName || "our cleaning company"}". Quote is $${quote.total} sent ${ageDays} days ago. Quote link: ${quoteUrl}. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}". For email: start with "Subject: " then blank line then body. Do NOT put the raw URL in the email body; a button will be added automatically.`
+          content: `Write a ${msgType} follow-up (under ${maxLen} chars for SMS) for "${business?.companyName || "our cleaning company"}". Quote is $${quote.total} sent ${ageDays} days ago. Quote link: ${quoteUrl}. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}". For email: start with "Subject: " then blank line then body. Do NOT put the raw URL in the email body; a button will be added automatically.${followUpLangInstruction}`
         },
         {
           role: "user",
@@ -4468,7 +4480,7 @@ The email should:
 
       const msgType = channel === "email" ? "email" : "SMS";
       const maxLen = channel === "email" ? 200 : 160;
-      const langInstruction = commLang === "es" ? " Write the message entirely in Spanish." : " Write the message entirely in English.";
+      const langInstruction = getLangInstruction(commLang || (business as any)?.commLanguage);
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -7322,8 +7334,8 @@ Respond with JSON: {"reply": string}`
 
       const targetDesc = segment === "dormant" ? "past customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired" : "customers";
       const customInstruction = customPrompt?.trim() ? ` Focus: ${customPrompt.trim()}.` : "";
-      
-      const systemPrompt = `Write a short marketing email for "${businessName}" (${ownerName}) to ${targetDesc}. Theme: "${campaignName}".${customInstruction} Rules: first line "Subject: ..." then blank line then body under 60 words in 3 short paragraphs. Use [Customer] as name. Sign off as ${signOff}. No links, no emojis. End with "Reply to book".`;
+      const campaignLangInstruction = getLangInstruction((business as any).commLanguage);
+      const systemPrompt = `Write a short marketing email for "${businessName}" (${ownerName}) to ${targetDesc}. Theme: "${campaignName}".${customInstruction} Rules: first line "Subject: ..." then blank line then body under 60 words in 3 short paragraphs. Use [Customer] as name. Sign off as ${signOff}. No links, no emojis. End with "Reply to book".${campaignLangInstruction}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -7370,7 +7382,8 @@ Respond with JSON: {"reply": string}`
         ? `Include this Google review link in the email naturally: ${googleReviewLink} — encourage them to click it to leave a review.`
         : `No links/URLs. Ask them to reply with their feedback or leave a review.`;
 
-      const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. ${linkInstruction} No emojis. Keep it personal and genuine.`;
+      const reviewLangInstruction = getLangInstruction((business as any).commLanguage);
+      const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. ${linkInstruction} No emojis. Keep it personal and genuine.${reviewLangInstruction}`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -7426,9 +7439,10 @@ Respond with JSON: {"reply": string}`
       const msgType = (channel || "sms") as string;
       const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
 
+      const genMsgBusiness = await getBusinessByOwner(req.session.userId!);
       const quoteContext = total ? ` Quote total: $${total}.` : "";
       const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
-      const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
+      const langInstruction = getLangInstruction(commLang || (genMsgBusiness as any)?.commLanguage);
 
       let systemPrompt: string;
       let userPrompt: string;
