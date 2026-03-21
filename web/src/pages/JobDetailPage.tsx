@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../lib/auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Briefcase,
@@ -67,6 +68,7 @@ function getStatusIndex(status: string): number {
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { business } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [noteContent, setNoteContent] = useState("");
   const [noteCustomerVisible, setNoteCustomerVisible] = useState(false);
@@ -76,6 +78,7 @@ export default function JobDetailPage() {
   const [messageModal, setMessageModal] = useState(false);
   const [messageType, setMessageType] = useState("en_route");
   const [generatedMessage, setGeneratedMessage] = useState("");
+  const [messageError, setMessageError] = useState("");
 
   const { data: job, isLoading } = useQuery<any>({
     queryKey: ["/api/jobs", id],
@@ -155,12 +158,18 @@ export default function JobDetailPage() {
         customerName: job?.customer
           ? `${job.customer.firstName} ${job.customer.lastName}`.trim()
           : "Customer",
+        companyName: business?.companyName || "",
+        senderName: business?.senderName || "",
         updateLink: job?.updateToken
           ? `${window.location.origin}/live-update/${job.updateToken}`
           : "",
       }),
     onSuccess: (data: any) => {
-      setGeneratedMessage(data.message || data.sms || "");
+      setMessageError("");
+      setGeneratedMessage(data.message || "");
+    },
+    onError: () => {
+      setMessageError("Failed to generate message. Please try again.");
     },
   });
 
@@ -290,6 +299,8 @@ export default function JobDetailPage() {
               generateTokenMutation={generateTokenMutation}
               onGenerateMessage={(type: string) => {
                 setMessageType(type);
+                setGeneratedMessage("");
+                setMessageError("");
                 setMessageModal(true);
                 generateMessageMutation.mutate(type);
               }}
@@ -359,44 +370,58 @@ export default function JobDetailPage() {
 
       <Modal
         open={messageModal}
-        onClose={() => setMessageModal(false)}
+        onClose={() => { setMessageModal(false); setGeneratedMessage(""); setMessageError(""); }}
         title="AI Message Draft"
         size="md"
       >
         <div className="space-y-4">
           <div className="flex gap-2 flex-wrap">
-            {["en_route", "started", "in_progress", "completed"].map((t) => (
+            {(["en_route", "started", "in_progress", "completed"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => {
                   setMessageType(t);
+                  setGeneratedMessage("");
+                  setMessageError("");
                   generateMessageMutation.mutate(t);
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
                   messageType === t
-                    ? "bg-primary-50 text-primary-700"
+                    ? "bg-primary-50 text-primary-700 ring-1 ring-primary-200"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                {t.replace(/[_-]/g, " ")}
+                {t.replace(/_/g, " ")}
               </button>
             ))}
           </div>
           {generateMessageMutation.isPending ? (
-            <Spinner size="sm" />
+            <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
+              <Spinner size="sm" />
+              <span>Generating message...</span>
+            </div>
+          ) : messageError ? (
+            <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm text-red-600">
+              {messageError}
+            </div>
           ) : generatedMessage ? (
             <div className="relative">
-              <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-700 whitespace-pre-wrap">
+              <div className="bg-slate-50 rounded-lg p-4 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
                 {generatedMessage}
               </div>
               <button
                 onClick={() => copyToClipboard(generatedMessage)}
                 className="absolute top-2 right-2 p-1.5 rounded-md bg-white shadow-sm hover:bg-slate-100 transition-colors"
+                title="Copy to clipboard"
               >
                 <Copy className="w-3.5 h-3.5 text-slate-500" />
               </button>
             </div>
-          ) : null}
+          ) : (
+            <p className="text-sm text-slate-400 italic py-1">
+              Select a status above to generate a customer message.
+            </p>
+          )}
         </div>
       </Modal>
     </div>

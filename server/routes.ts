@@ -2210,20 +2210,30 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
   app.post("/api/ai/job-update-message", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const { type, customerName, companyName, senderName, updateLink, language: commLang } = req.body;
-      if (!type || !updateLink) return res.status(400).json({ message: "type and updateLink are required" });
+      if (!type) return res.status(400).json({ message: "type is required" });
 
       const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
+      const name = customerName || "there";
+      const sender = senderName || "your cleaning team";
+      const company = companyName || "our company";
+      const linkPart = updateLink ? ` Track it live: ${updateLink}` : "";
 
-      let systemPrompt: string;
-      let userPrompt: string;
+      const STATUS_CONTEXT: Record<string, string> = {
+        en_route: `We are on our way and will arrive shortly.${linkPart}`,
+        started: `We have arrived and are getting started on your home.${linkPart}`,
+        in_progress: `We are currently cleaning your home and making great progress.${linkPart}`,
+        completed: `We have finished cleaning your home — everything looks great!${linkPart}`,
+        sms: `Your live service update page is ready.${linkPart}`,
+      };
 
-      if (type === "sms") {
-        systemPrompt = `Write a very short SMS (2-3 sentences max) for a cleaning company. No emojis. Be warm but extremely brief. IMPORTANT: Start with "Hi ${customerName || "there"}, this is ${senderName || "your team"} from ${companyName || "our company"}." Then one short sentence about tracking their service, then the link. Nothing else.${langInstruction}`;
-        userPrompt = `SMS with this link: ${updateLink}. Reply with ONLY the message text. Keep it under 200 characters excluding the link.`;
-      } else {
-        systemPrompt = `Write a short professional email (under 120 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No emojis. Include this link: ${updateLink}. Start with "Subject: " on line 1, blank line, then body. IMPORTANT: The greeting MUST introduce the sender and company name, e.g. "Hi [name], this is [sender] from ${companyName || "our company"}"${langInstruction}`;
-        userPrompt = `Email telling ${customerName || "Customer"} their live service update page is ready. They can view real-time service details, progress updates, checklist items, and completion photos. Reply with ONLY the email, nothing else.`;
-      }
+      const statusDetail = STATUS_CONTEXT[type] || `Your service is in progress.${linkPart}`;
+
+      const isSmsType = type === "sms";
+      const systemPrompt = isSmsType
+        ? `Write a very short SMS (2-3 sentences max) for a cleaning company. No emojis. Be warm but extremely brief. Start with "Hi ${name}, this is ${sender} from ${company}." Then one short sentence about the update. Nothing else.${langInstruction}`
+        : `Write a short, warm text message (3-5 sentences) that a cleaner would send to a customer. No subject line. No emojis. No formal email format. Sign off with just "${sender}". Start with "Hi ${name}," — do NOT use email structure.${langInstruction}`;
+
+      const userPrompt = `Customer update: ${statusDetail} Reply with ONLY the message text, nothing else.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -2231,12 +2241,12 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_completion_tokens: type === "sms" ? 100 : 250,
+        max_completion_tokens: 150,
       });
 
       const content = completion.choices[0]?.message?.content;
       if (!content) return res.status(500).json({ message: "No response from AI" });
-      return res.json({ draft: content.trim() });
+      return res.json({ message: content.trim() });
     } catch (error: any) {
       console.error("Job update message error:", error);
       return res.status(500).json({ message: "Failed to generate message" });
