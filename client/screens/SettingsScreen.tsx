@@ -199,8 +199,10 @@ export default function SettingsScreen() {
 
   const handleConnectJobber = async () => {
     try {
-      const url = new URL("/api/integrations/jobber/connect", getApiUrl()).toString();
-      await WebBrowser.openAuthSessionAsync(url, undefined, { showInRecents: true });
+      const res = await apiRequest("GET", "/api/integrations/jobber/connect");
+      const data = await res.json();
+      if (!data.url) throw new Error("No OAuth URL returned");
+      await WebBrowser.openAuthSessionAsync(data.url, undefined, { showInRecents: true });
       refetchJobberStatus();
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to open Jobber connection");

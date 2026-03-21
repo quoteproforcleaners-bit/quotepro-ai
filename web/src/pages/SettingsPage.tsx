@@ -1163,7 +1163,6 @@ export default function SettingsPage() {
               icon={Zap}
               statusUrl="/api/integrations/jobber/status"
               connectUrl="/api/integrations/jobber/connect"
-              connectMethod="GET"
               disconnectUrl="/api/integrations/jobber/disconnect"
               disconnectMethod="POST"
               color="green"
