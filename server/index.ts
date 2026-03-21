@@ -249,9 +249,26 @@ function configureExpoAndLanding(app: express.Application) {
         if (!r.rows.length) {
           return res.status(404).type("html").send(`<!DOCTYPE html><html><head><title>Not Found</title></head><body style="font-family:sans-serif;text-align:center;padding:80px 20px"><h2>Quote Request Page Not Found</h2><p>This link may have changed or been removed.</p></body></html>`);
         }
-        const { intake_code, public_quote_enabled, company_name } = r.rows[0];
+        let { intake_code, public_quote_enabled, company_name } = r.rows[0];
         if (!public_quote_enabled) {
           return res.status(410).type("html").send(`<!DOCTYPE html><html><head><title>Not Available</title></head><body style="font-family:sans-serif;text-align:center;padding:80px 20px"><h2>${company_name}</h2><p>Online quote requests are currently turned off.</p></body></html>`);
+        }
+        // If intake_code is null (business created before migration), use slug as fallback identifier
+        // and generate a code in the background for next time
+        if (!intake_code) {
+          try {
+            const biz = await pool.query(`SELECT id FROM businesses WHERE public_quote_slug = $1 LIMIT 1`, [slug]);
+            if (biz.rows[0]?.id) {
+              const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+              let newCode = "";
+              for (let i = 0; i < 8; i++) newCode += chars[Math.floor(Math.random() * chars.length)];
+              await pool.query(`UPDATE businesses SET intake_code = $1 WHERE id = $2 AND (intake_code IS NULL)`, [newCode, biz.rows[0].id]);
+              intake_code = newCode;
+            }
+          } catch (_) {}
+          if (!intake_code) {
+            return res.redirect(302, `/intake/${slug}`);
+          }
         }
         return res.redirect(302, `/intake/${intake_code}`);
       } catch (e) {
