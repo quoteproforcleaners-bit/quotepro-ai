@@ -194,6 +194,10 @@ export default function QuoteDetailPage() {
     },
   });
 
+  const { data: jobberStatus } = useQuery<{ connected: boolean }>({
+    queryKey: ["/api/integrations/jobber/status"],
+  });
+
   if (isLoading) return <Spinner />;
 
   if (!quote) {
@@ -305,11 +309,6 @@ export default function QuoteDetailPage() {
       });
     } catch {}
   };
-
-
-  const { data: jobberStatus } = useQuery<{ connected: boolean }>({
-    queryKey: ["/api/integrations/jobber/status"],
-  });
 
   const syncJobber = async () => {
     if (!jobberStatus?.connected) {
