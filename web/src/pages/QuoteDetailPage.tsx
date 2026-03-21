@@ -4,6 +4,7 @@ import { queryClient } from "../lib/queryClient";
 import { apiPut, apiDelete, apiPost, apiGet } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import SendQuoteModal from "../components/SendQuoteModal";
+import EditQuoteModal from "../components/EditQuoteModal";
 import {
   ExternalLink,
   Copy,
@@ -39,6 +40,7 @@ import {
   ChevronUp,
   Zap,
   Receipt,
+  Pencil,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -76,6 +78,7 @@ export default function QuoteDetailPage() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [generatedPacket, setGeneratedPacket] = useState<{ id: string; invoiceNumber: string } | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [syncingQbo, setSyncingQbo] = useState(false);
   const [syncingJobber, setSyncingJobber] = useState(false);
   const [playChannels, setPlayChannels] = useState<Record<number, "sms" | "email">>({});
@@ -1386,6 +1389,17 @@ export default function QuoteDetailPage() {
                   Mark as Sent
                 </Button>
               ) : null}
+              {quote.status !== "accepted" ? (
+                <Button
+                  variant="primary"
+                  icon={Pencil}
+                  onClick={() => setEditModalOpen(true)}
+                  className="w-full justify-start"
+                  size="sm"
+                >
+                  Edit Quote
+                </Button>
+              ) : null}
               <Button
                 variant="secondary"
                 icon={Download}
@@ -1596,6 +1610,14 @@ export default function QuoteDetailPage() {
             queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
             queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
           }}
+        />
+      ) : null}
+
+      {editModalOpen && quote ? (
+        <EditQuoteModal
+          open={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          quote={quote}
         />
       ) : null}
 
