@@ -323,13 +323,15 @@ export class JobberClient {
 
   async getClientPropertyId(clientId: string): Promise<string | null> {
     // Use inline clientId — typed variable $clientId: ID! causes EncodedId mismatch and silently throws
-    const query = `{ client(id: "${clientId}") { properties { nodes { id } } } }`;
+    // properties is a direct list on client, not a Relay connection (no .nodes)
+    const query = `{ client(id: "${clientId}") { properties { id } } }`;
     try {
       const data = await this.graphql(query);
-      const nodes = data?.client?.properties?.nodes || [];
-      if (nodes.length > 0) {
-        console.log(`[Jobber getClientPropertyId] found existing propertyId=${nodes[0].id} for clientId=${clientId}`);
-        return nodes[0].id;
+      const props = data?.client?.properties || [];
+      const list = Array.isArray(props) ? props : [props];
+      if (list.length > 0 && list[0]?.id) {
+        console.log(`[Jobber getClientPropertyId] found existing propertyId=${list[0].id} for clientId=${clientId}`);
+        return list[0].id;
       }
       return null;
     } catch (e: any) {
