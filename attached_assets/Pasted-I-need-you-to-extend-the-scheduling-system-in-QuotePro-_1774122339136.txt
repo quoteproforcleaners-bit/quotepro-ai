@@ -1,0 +1,219 @@
+I need you to extend the scheduling system in QuotePro to support recurring customers and recurring clean scheduling.
+
+Goal:
+Allow the app user to mark a customer/job as recurring and choose a recurrence pattern such as:
+- Weekly
+- Biweekly
+- Monthly
+- Custom
+
+This needs to be a real scheduling feature, not just a label.
+
+Core use case:
+When scheduling a clean, the user should be able to choose whether this is:
+- One-time
+- Recurring
+
+If recurring is selected, the user should be able to define the cadence and have future cleans generated and managed properly inside QuotePro.
+
+Main requirements:
+1. Add recurring scheduling support to the scheduling flow
+2. Support these recurrence options:
+   - Weekly
+   - Biweekly
+   - Monthly
+   - Custom
+3. Let the user mark a customer as recurring as part of scheduling
+4. Future recurring cleans should appear in the schedule/calendar
+5. Recurring jobs should stay tied to the same customer record
+6. The recurrence system must be editable later
+7. It must be easy to pause, skip, reschedule, or stop recurrence
+
+Important:
+Do NOT implement this as a fake “frequency” tag only.
+This needs to create real recurring scheduled cleans/jobs in a structured way.
+
+Where this should work:
+- from accepted quote → Put on Schedule
+- from Quick Add Clean on the Schedule page
+- ideally when editing an existing scheduled job too
+
+User flow:
+1. User schedules a clean
+2. User selects:
+   - One-time
+   - Recurring
+3. If recurring is selected, show recurrence options:
+   - Weekly
+   - Every 2 weeks
+   - Monthly
+   - Custom
+4. User chooses start date and arrival window/time
+5. If custom is selected, allow flexible rule setup
+6. Save recurring schedule
+7. Calendar populates future cleans accordingly
+
+Recurring logic requirements:
+Please design and implement the best architecture for recurring scheduling.
+
+At minimum, recurring setup should support:
+- start date
+- frequency
+- selected day(s) where relevant
+- optional end date
+- no end date option
+- arrival window/time
+- assigned team members if possible
+- service type
+- price
+- notes
+
+Custom recurrence should support practical business use cases such as:
+- every X weeks
+- every X months
+- specific weekday pattern if feasible
+- monthly by date (e.g. 1st of month)
+- monthly by week/day if feasible later
+
+Please implement the best MVP that is actually useful and scalable.
+
+Critical product behaviors:
+- recurring jobs should generate future scheduled cleans in the calendar
+- avoid duplicate generation
+- editing one occurrence should not necessarily break the whole series unless intended
+- support editing:
+  - this occurrence only
+  - entire series
+  - this and future occurrences if feasible
+- support skipping a single occurrence
+- support pausing/canceling the series
+
+Pricing logic:
+Please think carefully about price behavior for recurring jobs.
+
+Recommended logic:
+- recurring jobs should default to the agreed recurring clean price
+- that price should carry through to future occurrences unless manually overridden
+- if a single occurrence is edited, it should be possible to override that one instance price if needed
+
+Examples:
+- Mrs. Smith is weekly at $140
+- John Doe is biweekly at $180
+- Acme Office is monthly at $325
+- A custom recurring client is every 3 weeks
+
+Calendar requirements:
+- future recurring cleans should show in the calendar
+- recurring jobs should be visually distinguishable if useful
+- clicking an occurrence should show:
+  - customer
+  - price
+  - recurrence info
+  - assigned team
+  - ability to edit/skip/reschedule
+
+Data model requirements:
+Please do this cleanly and scalably.
+
+I need you to inspect the existing QuotePro codebase and determine the best approach:
+- whether to store a recurring series record plus generated job instances
+- how to tie occurrences to a recurring parent
+- how to prevent duplicate future events
+- how to handle edits and exceptions
+- how to keep reporting/revenue logic accurate
+
+Do NOT build this in a fragile way.
+
+Recommended architecture:
+- recurring series entity/table/model
+- scheduled job instances linked to recurring series
+- exception handling for modified/skipped occurrences
+- background or deterministic future generation logic
+- ability to generate occurrences within a rolling future window
+
+Generation behavior:
+Please choose and implement the best approach, but likely:
+- generate occurrences for the next 60–90 days
+OR
+- generate on demand based on view range
+Explain which approach you choose and why.
+
+Editing requirements:
+Need support for:
+1. Edit a single occurrence
+2. Edit the entire recurring series
+3. Skip one clean
+4. Pause recurrence
+5. Cancel recurring schedule
+
+If full “this and future” logic is too much initially, explain and implement the cleanest scalable MVP.
+
+UI/UX requirements:
+This needs to feel premium and simple.
+Do not make recurring setup confusing.
+
+Suggested UX:
+- Recurrence toggle in scheduling flow:
+  - One-time
+  - Recurring
+- If recurring:
+  - clear frequency pills/dropdown
+  - additional options shown only when needed
+- concise human-readable summary such as:
+  - Repeats every week on Tuesday
+  - Repeats every 2 weeks on Friday
+  - Repeats monthly on the 15th
+- edit recurrence from job details
+
+What I want you to do:
+1. Audit the current scheduling/calendar/jobs/customer architecture
+2. Design the correct recurring scheduling architecture
+3. Implement recurring scheduling in the UI
+4. Implement the backend/data model changes
+5. Generate recurring future cleans properly
+6. Support editing/skipping/canceling recurrence
+7. Ensure the calendar reflects recurring jobs correctly
+8. Keep pricing/customer/team data tied together properly
+
+Files/code investigation:
+Please find and inspect:
+- schedule/calendar page
+- quick add clean workflow
+- accepted quote → put on schedule workflow
+- jobs data model
+- customers data model
+- team member assignment logic
+- any existing recurrence/frequency fields
+- revenue calculations
+
+Deliverables:
+1. Explain the best recurring scheduling architecture in plain English
+2. Show the proposed UX for one-time vs recurring
+3. Implement weekly, biweekly, monthly, and custom recurrence
+4. Add recurring support to accepted quote scheduling and Quick Add Clean
+5. Add recurrence management to job details/edit flow
+6. Show exact files/components/functions changed
+7. Explain how to test:
+   - one-time clean
+   - weekly recurring clean
+   - biweekly recurring clean
+   - monthly recurring clean
+   - custom recurring clean
+   - edit one occurrence
+   - edit series
+   - skip occurrence
+   - cancel recurrence
+
+Success criteria:
+- user can easily make a customer recurring during scheduling
+- weekly/biweekly/monthly/custom recurrence works
+- future cleans show up properly on the calendar
+- recurring jobs stay tied to the customer and price correctly
+- the recurrence system is editable and operationally useful
+- the feature feels premium and production-ready, not hacked together
+
+Important:
+Do not stop at analysis or mock UI.
+Inspect the real code, implement recurring scheduling properly, and summarize exactly what changed.
+
+Before coding, first propose the recommended architecture and UX for recurring scheduling, then implement it.
