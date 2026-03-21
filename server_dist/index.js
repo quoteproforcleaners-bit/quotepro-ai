@@ -5734,7 +5734,7 @@ var JobberClient = class {
           propertyId: "${propertyId}",
           title: "${titleEsc}",
           instructions: "${instrEsc}",
-          invoicing: { billingStrategy: INVOICE_AFTER_EACH_VISIT }
+          invoicing: { invoicingType: INVOICE_AFTER_EACH_VISIT, invoicingSchedule: ONE_TIME }
         }) {
           job {
             id
