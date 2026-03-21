@@ -1074,6 +1074,25 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
+  // ─── Settings (aggregated view for quote detail page) ───
+
+  app.get("/api/settings", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const growth = await getGrowthAutomationSettings(business.id);
+      return res.json({
+        venmoHandle: business.venmoHandle || null,
+        cashAppTag: (business as any).cashappHandle || null,
+        googleReviewUrl: growth?.googleReviewLink || null,
+        referralOfferAmount: growth?.referralOfferAmount || null,
+      });
+    } catch (error: any) {
+      console.error("Get settings error:", error);
+      return res.status(500).json({ message: "Failed to get settings" });
+    }
+  });
+
   // ─── Customers ───
 
   app.get("/api/customers", requireAuth, async (req: Request, res: Response) => {

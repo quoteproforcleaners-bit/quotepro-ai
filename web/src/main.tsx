@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./lib/auth";
 import { queryClient } from "./lib/queryClient";
+import { WebErrorBoundary } from "./components/WebErrorBoundary";
 import App from "./App";
 import "./index.css";
 
@@ -14,12 +15,14 @@ const basename = isIntakePath ? "/" : "/app";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter basename={basename}>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </QueryClientProvider>
-    </BrowserRouter>
+    <WebErrorBoundary>
+      <BrowserRouter basename={basename}>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </QueryClientProvider>
+      </BrowserRouter>
+    </WebErrorBoundary>
   </React.StrictMode>
 );
