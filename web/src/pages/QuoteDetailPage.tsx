@@ -77,6 +77,11 @@ export default function QuoteDetailPage() {
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [syncingQbo, setSyncingQbo] = useState(false);
   const [syncingJobber, setSyncingJobber] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewEmailSubject, setReviewEmailSubject] = useState("");
+  const [reviewEmailContent, setReviewEmailContent] = useState("");
+  const [reviewGenerating, setReviewGenerating] = useState(false);
+  const [reviewSending, setReviewSending] = useState(false);
   const [expandedRec, setExpandedRec] = useState<number | null>(null);
   const [msgChannel, setMsgChannel] = useState<MessageChannel>("sms");
   const [msgPurpose, setMsgPurpose] = useState<MessagePurpose>("follow_up");
@@ -299,15 +304,48 @@ export default function QuoteDetailPage() {
     setCalendarLoading(false);
   };
 
-  const sendReviewRequest = async () => {
+  const openReviewModal = async () => {
+    setReviewEmailSubject("We'd love your feedback!");
+    setReviewEmailContent("");
+    setReviewModalOpen(true);
+    setReviewGenerating(true);
     try {
-      await apiPost(`/api/review-requests`, {
-        quoteId: Number(id),
-        customerName: quote.customerName,
-        customerEmail: quote.customerEmail,
-        customerPhone: quote.customerPhone,
+      const res: any = await apiPost("/api/ai/generate-review-email", {});
+      const subject = res.subject || "We'd love your feedback!";
+      const rawBody = res.content || res.body || "";
+      const body = rawBody.replace(/^Subject:\s*.+?\n/i, "").trim();
+      setReviewEmailSubject(subject);
+      setReviewEmailContent(body || "Thank you for trusting us with your home! We'd love it if you could take a moment to share your experience with a quick review. It means the world to a small business like ours.");
+    } catch {
+      setReviewEmailContent("Thank you for trusting us with your home! We'd love it if you could take a moment to share your experience with a quick review. It means the world to a small business like ours.");
+    } finally {
+      setReviewGenerating(false);
+    }
+  };
+
+  const handleSendReview = async () => {
+    if (!quote?.customerId) {
+      showToast("No customer linked to this quote", "error");
+      return;
+    }
+    setReviewSending(true);
+    try {
+      await apiPost("/api/review-requests", { customerId: quote.customerId });
+      await apiPost("/api/communications", {
+        customerId: quote.customerId,
+        type: "email",
+        channel: "email",
+        subject: reviewEmailSubject,
+        content: reviewEmailContent,
       });
-    } catch {}
+      queryClient.invalidateQueries({ queryKey: ["/api/review-requests"] });
+      setReviewModalOpen(false);
+      showToast("Review request sent!", "success");
+    } catch (e: any) {
+      showToast(e?.message || "Failed to send review request", "error");
+    } finally {
+      setReviewSending(false);
+    }
   };
 
   const syncJobber = async () => {
@@ -1233,7 +1271,7 @@ export default function QuoteDetailPage() {
                   <Button
                     variant="secondary"
                     icon={Star}
-                    onClick={sendReviewRequest}
+                    onClick={openReviewModal}
                     className="w-full justify-start"
                     size="sm"
                   >
@@ -1346,6 +1384,72 @@ export default function QuoteDetailPage() {
           }}
         />
       ) : null}
+
+      {/* Review Request Modal */}
+      <Modal
+        open={reviewModalOpen}
+        onClose={() => !reviewSending && setReviewModalOpen(false)}
+        title="Send Review Request"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500">
+            An AI-drafted email will be sent to{" "}
+            <span className="font-medium text-slate-700">
+              {quote?.customerName || "the customer"}
+            </span>{" "}
+            asking for a review.
+          </p>
+
+          {reviewGenerating ? (
+            <div className="flex items-center gap-3 py-6 justify-center text-slate-500">
+              <Spinner className="w-5 h-5" />
+              <span className="text-sm">Drafting your review request…</span>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Subject</label>
+                <input
+                  type="text"
+                  value={reviewEmailSubject}
+                  onChange={(e) => setReviewEmailSubject(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Message</label>
+                <textarea
+                  value={reviewEmailContent}
+                  onChange={(e) => setReviewEmailContent(e.target.value)}
+                  rows={8}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 resize-none"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <Button
+              variant="ghost"
+              onClick={() => setReviewModalOpen(false)}
+              disabled={reviewSending}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={Star}
+              onClick={handleSendReview}
+              loading={reviewSending}
+              disabled={reviewGenerating || !reviewEmailContent.trim()}
+              className="flex-1"
+            >
+              Send Request
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Quick Add Clean Panel */}
       <QuickAddCleanPanel
