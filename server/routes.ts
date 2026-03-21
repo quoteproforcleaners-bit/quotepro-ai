@@ -173,6 +173,9 @@ import {
   getWeeklyQuoteStats,
   getAllBusinessIds,
   markReviewRequestSent,
+  getBookingAvailability,
+  upsertBookingAvailability,
+  generateBookingSlots,
 } from "./storage";
 import {
   getChannelConnectionsByBusiness,
@@ -7517,7 +7520,345 @@ init();
 
       if (q.status === "accepted") {
         const acceptedDate = q.acceptedAt ? new Date(q.acceptedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
-        return res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Accepted</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.08)}.icon{width:72px;height:72px;border-radius:50%;background:#DCFCE7;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:32px;color:#16A34A}h1{font-size:22px;font-weight:800;color:#0F172A;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}.brand{color:${brandColor};font-weight:600}.total{font-size:32px;font-weight:800;color:#16A34A;margin:16px 0;letter-spacing:-1px}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>You're All Set!</h1><p>You accepted this quote from <span class="brand">${companyName}</span>${acceptedDate ? ` on ${acceptedDate}` : ""}.</p><div class="total">$${Number(q.total).toFixed(2)}</div><p>We'll be in touch to confirm your appointment.</p>${business?.phone ? `<p style="margin-top:16px"><a href="tel:${business.phone}" style="color:${brandColor};text-decoration:none;font-weight:600">${business.phone}</a></p>` : ""}</div></body></html>`);
+        const bookingSettings = await getBookingAvailability(q.businessId).catch(() => null);
+        const bookingEnabled = !!(bookingSettings?.enabled);
+        const existingJobs = await getJobsByBusiness(q.businessId, { quoteId: q.id }).catch(() => []);
+        const alreadyBooked = existingJobs.length > 0;
+        const existingJob = alreadyBooked ? existingJobs[0] : null;
+        const details = (q.propertyDetails || {}) as any;
+        const customerAddr = escHtml(customer?.address || details?.address || details?.customerAddress || "");
+        const prefilledName = escHtml(customer ? `${customer.firstName} ${customer.lastName}`.trim() : details?.acceptanceSignature || "");
+        const serviceLabel = escHtml((q.options as any)?.[q.selectedOption || ""]?.name || "Cleaning Service");
+        const confirmMsg = escHtml(bookingSettings?.confirmationMessage || "We look forward to seeing you! If you need to reschedule, please contact us.");
+        const phoneNum = escHtml(business?.phone || "");
+        const custPhone = escHtml(customer?.phone || details?.acceptedPhone || "");
+
+        if (alreadyBooked && existingJob) {
+          const bookedStart = new Date(existingJob.startDatetime);
+          const bookedEnd = existingJob.endDatetime ? new Date(existingJob.endDatetime) : null;
+          const bookedDateStr = bookedStart.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+          const bookedTimeStr = bookedStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+          const bookedEndStr = bookedEnd ? bookedEnd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }) : "";
+          return res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Cleaning Booked</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;background:linear-gradient(135deg,#F0FDF4 0%,#ECFDF5 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.wrap{max-width:440px;width:100%}.card{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.08)}.top{background:linear-gradient(135deg,#16A34A,#15803D);padding:32px 24px;text-align:center;color:#fff}.checkWrap{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px}.top h1{font-size:22px;font-weight:800;letter-spacing:-0.5px}.top p{font-size:14px;opacity:0.85;margin-top:4px}.body{padding:24px}.detailRow{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #F1F5F9}.detailRow:last-child{border-bottom:none}.dIcon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}.dText strong{display:block;font-size:14px;font-weight:700;color:#0F172A}.dText span{font-size:13px;color:#64748B}.confirmBox{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:16px;margin-top:16px;text-align:center}.confirmBox p{font-size:14px;color:#166534;line-height:1.5}.phone{display:block;text-align:center;margin-top:16px;color:${brandColor};font-weight:600;font-size:15px;text-decoration:none}</style></head><body><div class="wrap"><div class="card"><div class="top"><div class="checkWrap">&#10003;</div><h1>Your Clean is Booked!</h1><p>${companyName} is confirmed for your home.</p></div><div class="body"><div class="detailRow"><div class="dIcon" style="background:#EFF6FF">&#128197;</div><div class="dText"><strong>${bookedDateStr}</strong><span>${bookedTimeStr}${bookedEndStr ? ` – ${bookedEndStr}` : ""}</span></div></div>${customerAddr ? `<div class="detailRow"><div class="dIcon" style="background:#F0FDF4">&#128205;</div><div class="dText"><strong>Location</strong><span>${customerAddr}</span></div></div>` : ""}<div class="detailRow"><div class="dIcon" style="background:#FFF7ED">&#129529;</div><div class="dText"><strong>${serviceLabel}</strong><span>$${Number(q.total || 0).toFixed(2)}</span></div></div><div class="confirmBox"><p>${confirmMsg}</p></div>${phoneNum ? `<a href="tel:${phoneNum}" class="phone">${phoneNum}</a>` : ""}</div></div></div></body></html>`);
+        }
+
+        if (!bookingEnabled) {
+          return res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Quote Accepted</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;background:#F8FAFC;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}.card{background:#fff;border-radius:16px;padding:48px 32px;text-align:center;max-width:420px;width:100%;box-shadow:0 4px 12px rgba(0,0,0,0.08)}.icon{width:72px;height:72px;border-radius:50%;background:#DCFCE7;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:32px;color:#16A34A}h1{font-size:22px;font-weight:800;color:#0F172A;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}.brand{color:${brandColor};font-weight:600}.total{font-size:32px;font-weight:800;color:#16A34A;margin:16px 0;letter-spacing:-1px}</style></head><body><div class="card"><div class="icon">&#10003;</div><h1>You're All Set!</h1><p>You accepted this quote from <span class="brand">${companyName}</span>${acceptedDate ? ` on ${acceptedDate}` : ""}.</p><div class="total">$${Number(q.total).toFixed(2)}</div><p>We'll be in touch to confirm your appointment.</p>${phoneNum ? `<p style="margin-top:16px"><a href="tel:${phoneNum}" style="color:${brandColor};text-decoration:none;font-weight:600">${phoneNum}</a></p>` : ""}</div></body></html>`);
+        }
+
+        // Booking portal — full interactive booking UI
+        const token = escHtml(req.params.token);
+        return res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Book Your Clean – ${companyName}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:linear-gradient(135deg,#F8FAFC 0%,#EFF6FF 100%);min-height:100vh;padding:0 0 40px}
+.header{background:linear-gradient(135deg,${brandColor},${brandColor}DD);padding:28px 20px 24px;text-align:center;color:#fff}
+.headerInner{max-width:480px;margin:0 auto}
+.checkBadge{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px}
+.header h1{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+.header p{font-size:14px;opacity:0.88;margin-top:4px}
+.summaryBar{background:rgba(255,255,255,0.15);border-radius:10px;padding:10px 16px;margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.summaryBar span{font-size:13px;opacity:0.9}
+.summaryBar strong{font-size:16px;font-weight:800}
+.wrap{max-width:480px;margin:0 auto;padding:0 16px}
+.card{background:#fff;border-radius:16px;margin-top:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06)}
+.cardHeader{padding:16px 20px;border-bottom:1px solid #F1F5F9;display:flex;align-items:center;gap:10px}
+.cardHeader .step{width:28px;height:28px;border-radius:50%;background:${brandColor};color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cardHeader h2{font-size:15px;font-weight:700;color:#0F172A}
+.cardBody{padding:16px 20px}
+.monthNav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.monthNav h3{font-size:15px;font-weight:700;color:#0F172A}
+.navBtn{border:none;background:#F8FAFC;border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#64748B}
+.navBtn:hover{background:#F1F5F9}
+.calGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dayLabel{font-size:11px;font-weight:600;color:#94A3B8;text-align:center;padding:4px 0}
+.dayCell{aspect-ratio:1;border-radius:8px;border:none;background:transparent;cursor:pointer;font-size:13px;font-weight:500;color:#CBD5E1;display:flex;align-items:center;justify-content:center;position:relative;transition:all .15s}
+.dayCell.available{background:#F0FDF4;color:#166534;font-weight:600;cursor:pointer}
+.dayCell.available:hover{background:#DCFCE7;transform:scale(1.05)}
+.dayCell.selected{background:${brandColor}!important;color:#fff!important;font-weight:700}
+.dayCell.today{border:2px solid ${brandColor}}
+.dayCell.disabled{color:#E2E8F0;cursor:default}
+.dot{width:5px;height:5px;border-radius:50%;background:${brandColor};position:absolute;bottom:4px;left:50%;transform:translateX(-50%)}
+.slotsGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.slotBtn{border:2px solid #E2E8F0;background:#fff;border-radius:10px;padding:12px 8px;cursor:pointer;text-align:center;transition:all .15s}
+.slotBtn:hover{border-color:${brandColor};background:#EFF6FF}
+.slotBtn.selected{border-color:${brandColor};background:${brandColor};color:#fff}
+.slotBtn .slotTime{font-size:14px;font-weight:700;display:block}
+.slotBtn .slotDur{font-size:11px;opacity:0.7;display:block;margin-top:2px}
+.empty{text-align:center;padding:24px;color:#94A3B8;font-size:14px}
+.formGroup{margin-bottom:16px}
+.formGroup label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
+.formGroup input{width:100%;border:1.5px solid #E2E8F0;border-radius:10px;padding:12px 14px;font-size:15px;font-family:inherit;transition:border .15s;outline:none}
+.formGroup input:focus{border-color:${brandColor};box-shadow:0 0 0 3px ${brandColor}22}
+.bookBtn{width:100%;background:${brandColor};color:#fff;border:none;border-radius:12px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;transition:all .15s;font-family:inherit}
+.bookBtn:hover{opacity:0.92;transform:translateY(-1px)}
+.bookBtn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.selectedSummary{background:#F8FAFC;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:14px;color:#374151;display:flex;align-items:center;gap:8px}
+.selectedSummary strong{color:#0F172A}
+.loading{text-align:center;padding:32px;color:#94A3B8;font-size:14px}
+.spinner{width:24px;height:24px;border:3px solid #E2E8F0;border-top-color:${brandColor};border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.successCard{background:#fff;border-radius:16px;margin-top:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.06)}
+.successTop{background:linear-gradient(135deg,#16A34A,#15803D);padding:32px 24px;text-align:center;color:#fff}
+.successTop h1{font-size:22px;font-weight:800;margin-top:12px}
+.successTop p{font-size:14px;opacity:0.88;margin-top:4px}
+.successBody{padding:20px}
+.detRow{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #F1F5F9}
+.detRow:last-child{border-bottom:none}
+.detIcon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}
+.detText strong{display:block;font-size:14px;font-weight:700;color:#0F172A}
+.detText span{font-size:13px;color:#64748B}
+.confirmNote{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:14px;margin-top:16px;font-size:14px;color:#166534;line-height:1.5;text-align:center}
+.errorMsg{background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 14px;font-size:14px;color:#DC2626;margin-bottom:12px}
+@media(max-width:400px){.slotsGrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="headerInner">
+    ${logoUri ? `<img src="${logoUri}" style="height:36px;margin-bottom:10px;border-radius:6px" alt="${companyName}">` : ""}
+    <div class="checkBadge">&#10003;</div>
+    <h1>Quote Accepted!</h1>
+    <p>${companyName} is ready to get started.</p>
+    <div class="summaryBar">
+      <span>${serviceLabel || "Cleaning Service"}</span>
+      <strong>$${Number(q.total || 0).toFixed(2)}</strong>
+    </div>
+  </div>
+</div>
+<div class="wrap" id="app">
+
+  <div class="card" id="calCard">
+    <div class="cardHeader">
+      <div class="step">1</div>
+      <h2>Pick a date for your clean</h2>
+    </div>
+    <div class="cardBody">
+      <div class="monthNav">
+        <button class="navBtn" id="prevMonth">&#8592;</button>
+        <h3 id="monthLabel"></h3>
+        <button class="navBtn" id="nextMonth">&#8594;</button>
+      </div>
+      <div class="calGrid" id="calGrid"></div>
+      <div id="slotsSection" style="display:none;margin-top:16px">
+        <div id="slotsLabel" style="font-size:13px;font-weight:600;color:#64748B;margin-bottom:10px"></div>
+        <div class="slotsGrid" id="slotsGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="confirmCard" style="display:none">
+    <div class="cardHeader">
+      <div class="step">2</div>
+      <h2>Confirm your details</h2>
+    </div>
+    <div class="cardBody">
+      <div class="selectedSummary" id="selectedSummary"></div>
+      <div id="errorMsg" class="errorMsg" style="display:none"></div>
+      <div class="formGroup">
+        <label>Your name</label>
+        <input type="text" id="custName" placeholder="Full name" value="${prefilledName}" autocomplete="name">
+      </div>
+      <div class="formGroup">
+        <label>Phone number <span style="color:#94A3B8;font-weight:400">(optional)</span></label>
+        <input type="tel" id="custPhone" placeholder="(555) 000-0000" value="${custPhone}" autocomplete="tel">
+      </div>
+      <button class="bookBtn" id="bookBtn" onclick="submitBooking()">Confirm My Booking</button>
+      <button style="background:none;border:none;color:#94A3B8;font-size:13px;cursor:pointer;width:100%;margin-top:10px;font-family:inherit" onclick="showStep1()">Choose a different date</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const TOKEN = '${token}';
+let availableSlotsByDate = {};
+let currentMonth = new Date();
+currentMonth.setDate(1);
+let selectedDate = null;
+let selectedSlot = null;
+let loadedMonths = {};
+
+function pad(n){return String(n).padStart(2,'0')}
+function fmtMonth(d){return d.toLocaleDateString('en-US',{month:'long',year:'numeric'})}
+function dateKey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function monthKey(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)}
+
+async function loadMonth(d){
+  const mk=monthKey(d);
+  if(loadedMonths[mk]) return;
+  loadedMonths[mk]=true;
+  try{
+    const r=await fetch('/q/'+TOKEN+'/booking-slots?month='+mk);
+    const data=await r.json();
+    if(data.slots){
+      data.slots.forEach(function(item){
+        availableSlotsByDate[item.date]=item.slots;
+      });
+    }
+  }catch(e){console.error(e)}
+  renderCal();
+}
+
+function renderCal(){
+  document.getElementById('monthLabel').textContent=fmtMonth(currentMonth);
+  const grid=document.getElementById('calGrid');
+  grid.innerHTML='';
+  const days=['Su','Mo','Tu','We','Th','Fr','Sa'];
+  days.forEach(function(d){
+    const el=document.createElement('div');
+    el.className='dayLabel';
+    el.textContent=d;
+    grid.appendChild(el);
+  });
+  const year=currentMonth.getFullYear();
+  const month=currentMonth.getMonth();
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const today=new Date();
+  today.setHours(0,0,0,0);
+  for(let i=0;i<firstDay;i++){
+    const el=document.createElement('div');
+    el.className='dayCell disabled';
+    grid.appendChild(el);
+  }
+  for(let day=1;day<=daysInMonth;day++){
+    const d=new Date(year,month,day);
+    const dk=dateKey(d);
+    const el=document.createElement('div');
+    el.className='dayCell';
+    el.textContent=day;
+    const hasSlots=availableSlotsByDate[dk] && availableSlotsByDate[dk].length>0;
+    const isPast=d<today;
+    if(isPast){
+      el.classList.add('disabled');
+    } else if(hasSlots){
+      el.classList.add('available');
+      const dot=document.createElement('div');
+      dot.className='dot';
+      el.appendChild(dot);
+      if(dk===selectedDate) el.classList.add('selected');
+      el.onclick=function(){selectDate(dk,d)};
+    } else {
+      el.classList.add('disabled');
+    }
+    const todayKey=dateKey(today);
+    if(dk===todayKey) el.classList.add('today');
+    grid.appendChild(el);
+  }
+}
+
+function selectDate(dk,d){
+  selectedDate=dk;
+  selectedSlot=null;
+  renderCal();
+  const slots=availableSlotsByDate[dk]||[];
+  const sec=document.getElementById('slotsSection');
+  const label=document.getElementById('slotsLabel');
+  const sg=document.getElementById('slotsGrid');
+  sec.style.display='block';
+  label.textContent=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})+'  — pick a time:';
+  sg.innerHTML='';
+  if(slots.length===0){
+    sg.innerHTML='<div class="empty" style="grid-column:span 2">No slots available for this day.</div>';
+    return;
+  }
+  slots.forEach(function(slot){
+    const btn=document.createElement('button');
+    btn.className='slotBtn';
+    const parts=slot.label.split('–');
+    btn.innerHTML='<span class="slotTime">'+(parts[0]||slot.label).trim()+'</span><span class="slotDur">– '+(parts[1]||'').trim()+'</span>';
+    btn.onclick=function(){
+      document.querySelectorAll('.slotBtn').forEach(function(b){b.classList.remove('selected')});
+      btn.classList.add('selected');
+      selectedSlot=slot;
+      showStep2();
+    };
+    sg.appendChild(btn);
+  });
+}
+
+function showStep2(){
+  if(!selectedSlot) return;
+  document.getElementById('calCard').style.display='none';
+  document.getElementById('confirmCard').style.display='block';
+  document.getElementById('errorMsg').style.display='none';
+  const d=new Date(selectedSlot.start);
+  const dateStr=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  document.getElementById('selectedSummary').innerHTML='&#128197; <span><strong>'+dateStr+'</strong> &nbsp;&#8226;&nbsp; '+selectedSlot.label+'</span>';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function showStep1(){
+  document.getElementById('confirmCard').style.display='none';
+  document.getElementById('calCard').style.display='block';
+}
+
+async function submitBooking(){
+  const name=document.getElementById('custName').value.trim();
+  const phone=document.getElementById('custPhone').value.trim();
+  const errEl=document.getElementById('errorMsg');
+  if(!name){errEl.textContent='Please enter your name.';errEl.style.display='block';return;}
+  if(!selectedSlot){errEl.textContent='Please select a time slot.';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  const btn=document.getElementById('bookBtn');
+  btn.disabled=true;btn.textContent='Booking...';
+  try{
+    const r=await fetch('/q/'+TOKEN+'/book',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({slotStart:selectedSlot.start,slotEnd:selectedSlot.end,customerName:name,customerPhone:phone})
+    });
+    const data=await r.json();
+    if(!r.ok || !data.success){
+      errEl.textContent=data.error||'Something went wrong. Please try again.';
+      errEl.style.display='block';
+      btn.disabled=false;btn.textContent='Confirm My Booking';
+      return;
+    }
+    showSuccess(data,name);
+  }catch(e){
+    errEl.textContent='Connection error. Please try again.';
+    errEl.style.display='block';
+    btn.disabled=false;btn.textContent='Confirm My Booking';
+  }
+}
+
+function showSuccess(data,name){
+  const app=document.getElementById('app');
+  app.innerHTML='<div class="successCard"><div class="successTop"><div class="checkBadge" style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:24px">&#10003;</div><h1>You\'re all booked!</h1><p>See you soon, '+escH(name)+'.</p></div><div class="successBody"><div class="detRow"><div class="detIcon" style="background:#EFF6FF">&#128197;</div><div class="detText"><strong>'+escH(data.bookingDate)+'</strong><span>'+escH(data.bookingTime)+'</span></div></div>'+(data.address?'<div class="detRow"><div class="detIcon" style="background:#F0FDF4">&#128205;</div><div class="detText"><strong>Location</strong><span>'+escH(data.address)+'</span></div></div>':'')+'<div class="detRow"><div class="detIcon" style="background:#FFF7ED">&#129529;</div><div class="detText"><strong>${serviceLabel}</strong><span>$${Number(q.total||0).toFixed(2)}</span></div></div><div class="confirmNote">'+escH(data.confirmationMessage||'We look forward to seeing you!')+'</div>${phoneNum ? `<a href="tel:${phoneNum}" style="display:block;text-align:center;margin-top:16px;color:${brandColor};font-weight:600;font-size:15px;text-decoration:none">${phoneNum}</a>` : ""}</div></div>';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function escH(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+document.getElementById('prevMonth').onclick=function(){
+  currentMonth.setMonth(currentMonth.getMonth()-1);
+  renderCal();
+  loadMonth(new Date(currentMonth));
+};
+document.getElementById('nextMonth').onclick=function(){
+  currentMonth.setMonth(currentMonth.getMonth()+1);
+  renderCal();
+  loadMonth(new Date(currentMonth));
+};
+
+renderCal();
+loadMonth(new Date(currentMonth));
+const nextMo=new Date(currentMonth);
+nextMo.setMonth(nextMo.getMonth()+1);
+loadMonth(nextMo);
+</script>
+</body>
+</html>`);
       }
 
       const opts = (q.options || {}) as any;
@@ -8013,6 +8354,222 @@ init();
       return res.json({ ok: true });
     } catch (_e) {
       return res.json({ ok: true });
+    }
+  });
+
+  // ==================== SELF-BOOKING PORTAL (PUBLIC) ====================
+
+  app.get("/q/:token/booking-slots", async (req: Request, res: Response) => {
+    try {
+      const q = await getQuoteByToken(req.params.token);
+      if (!q) return res.status(404).json({ error: "Quote not found" });
+      if (q.status !== "accepted") return res.json({ slots: [], enabled: false });
+
+      const monthParam = req.query.month as string;
+      let fromDate: Date, toDate: Date;
+      if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+        const [y, m] = monthParam.split("-").map(Number);
+        fromDate = new Date(y, m - 1, 1);
+        toDate = new Date(y, m, 0);
+      } else {
+        fromDate = new Date();
+        toDate = new Date(fromDate.getFullYear(), fromDate.getMonth() + 2, 0);
+      }
+
+      const availability = await getBookingAvailability(q.businessId);
+      if (!availability || !availability.enabled) {
+        return res.json({ enabled: false, slots: [] });
+      }
+
+      const slots = await generateBookingSlots(q.businessId, fromDate, toDate);
+      return res.json({ enabled: true, slots });
+    } catch (e) {
+      console.error("booking-slots error:", e);
+      return res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.post("/q/:token/book", async (req: Request, res: Response) => {
+    try {
+      const q = await getQuoteByToken(req.params.token);
+      if (!q) return res.status(404).json({ error: "Quote not found" });
+      if (q.status !== "accepted") return res.status(400).json({ error: "Quote must be accepted before booking" });
+
+      const availability = await getBookingAvailability(q.businessId);
+      if (!availability || !availability.enabled) {
+        return res.status(400).json({ error: "Self-booking is not available for this business" });
+      }
+
+      // Prevent duplicate bookings
+      const existingJobs = await getJobsByBusiness(q.businessId, { quoteId: q.id });
+      if (existingJobs.length > 0) {
+        return res.status(409).json({ error: "A booking already exists for this quote", jobId: existingJobs[0].id });
+      }
+
+      const { slotStart, slotEnd, customerName, customerPhone } = req.body;
+      if (!slotStart || !customerName?.trim()) {
+        return res.status(400).json({ error: "Missing required booking details" });
+      }
+
+      const startDatetime = new Date(slotStart);
+      const endDatetime = slotEnd ? new Date(slotEnd) : new Date(startDatetime.getTime() + (availability.slotDurationHours || 3) * 60 * 60 * 1000);
+
+      if (isNaN(startDatetime.getTime())) {
+        return res.status(400).json({ error: "Invalid slot time" });
+      }
+
+      const business = await db_getBusinessById(q.businessId);
+      const customer = q.customerId ? await getCustomerById(q.customerId) : null;
+      const details = (q.propertyDetails || {}) as any;
+      const address = customer?.address || details?.address || details?.customerAddress || "";
+      const serviceLabel = (q.options as any)?.[q.selectedOption || ""]?.name || "Cleaning Service";
+
+      const job = await createJob({
+        businessId: q.businessId,
+        customerId: q.customerId || undefined,
+        quoteId: q.id,
+        jobType: serviceLabel,
+        status: "scheduled",
+        startDatetime,
+        endDatetime,
+        address,
+        total: q.total ? Number(q.total) : undefined,
+        internalNotes: `Self-booked by customer via quote link.`,
+      });
+
+      // Update quote with booking info
+      await updateQuote(q.id, {
+        propertyDetails: {
+          ...details,
+          selfBookedAt: new Date().toISOString(),
+          selfBookedName: customerName.trim(),
+          selfBookedPhone: customerPhone || "",
+        },
+      });
+
+      // Update customer phone if provided
+      if (customerPhone && q.customerId) {
+        try { await updateCustomer(q.customerId, { phone: customerPhone }); } catch (_) {}
+      }
+
+      // Send confirmation email if customer has email
+      const customerEmail = customer?.email;
+      const bookingDateStr = startDatetime.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const bookingTimeStr = startDatetime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+      const endTimeStr = endDatetime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+      const companyName = business?.companyName || "Your Cleaning Company";
+      const confirmMsg = availability.confirmationMessage || `We look forward to seeing you! If you need to reschedule, please contact us.`;
+
+      if (customerEmail && process.env.SENDGRID_API_KEY) {
+        try {
+          const sgMail = await import("@sendgrid/mail");
+          (sgMail as any).default.setApiKey(process.env.SENDGRID_API_KEY);
+          await (sgMail as any).default.send({
+            to: customerEmail,
+            from: { name: companyName, email: "noreply@quotepro.app" },
+            subject: `Your cleaning is booked for ${bookingDateStr}`,
+            html: `
+              <div style="font-family:Inter,system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px">
+                <h1 style="font-size:24px;font-weight:800;color:#0F172A;margin:0 0 4px">You're all booked!</h1>
+                <p style="font-size:15px;color:#64748B;margin:0 0 24px">Here are the details for your upcoming clean:</p>
+                <div style="background:#F8FAFC;border-radius:12px;padding:20px;margin-bottom:20px">
+                  <div style="display:flex;gap:12px;margin-bottom:12px">
+                    <span style="font-size:20px">&#128197;</span>
+                    <div><strong style="color:#0F172A">${bookingDateStr}</strong><br/><span style="color:#64748B">${bookingTimeStr} – ${endTimeStr}</span></div>
+                  </div>
+                  ${address ? `<div style="display:flex;gap:12px;margin-bottom:12px"><span style="font-size:20px">&#128205;</span><div><strong style="color:#0F172A">${address}</strong></div></div>` : ""}
+                  <div style="display:flex;gap:12px"><span style="font-size:20px">&#128246;</span><div><strong style="color:#0F172A">${serviceLabel}</strong><br/><span style="color:#64748B">$${Number(q.total || 0).toFixed(2)}</span></div></div>
+                </div>
+                <p style="font-size:14px;color:#64748B">${confirmMsg}</p>
+                <p style="font-size:14px;color:#64748B;margin-top:16px">— ${business?.senderName || companyName}</p>
+              </div>
+            `,
+          });
+        } catch (emailErr) {
+          console.error("Booking confirmation email failed:", emailErr);
+        }
+      }
+
+      // Push notification to business owner
+      try {
+        if (business?.userId) {
+          const tokens = await getPushTokensByUser(business.userId);
+          const notifName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : customerName.trim();
+          for (const tokenRow of tokens) {
+            try {
+              await fetch("https://exp.host/--/api/v2/push/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: tokenRow.token,
+                  title: "New Booking!",
+                  body: `${notifName} self-booked a clean for ${bookingDateStr}`,
+                  data: { type: "job_created", jobId: job.id },
+                }),
+              });
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
+
+      return res.json({
+        success: true,
+        jobId: job.id,
+        bookingDate: bookingDateStr,
+        bookingTime: `${bookingTimeStr} – ${endTimeStr}`,
+        address,
+        confirmationMessage: confirmMsg,
+      });
+    } catch (e: any) {
+      console.error("booking error:", e);
+      return res.status(500).json({ error: e?.message || "Failed to create booking" });
+    }
+  });
+
+  // ==================== BOOKING AVAILABILITY SETTINGS (AUTHENTICATED) ====================
+
+  app.get("/api/booking-availability", requireAuth, async (req: any, res) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      const settings = await getBookingAvailability(business.id);
+      return res.json(settings || {
+        enabled: false,
+        allowedDays: [1, 2, 3, 4, 5],
+        timeWindows: [{ start: "08:00", end: "17:00" }],
+        slotDurationHours: 3,
+        slotIntervalHours: 2,
+        minNoticeHours: 24,
+        maxJobsPerDay: 4,
+        blackoutDates: [],
+        serviceAreaNotes: "",
+        confirmationMessage: "",
+      });
+    } catch (e) {
+      return res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.put("/api/booking-availability", requireAuth, async (req: any, res) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      const { enabled, allowedDays, timeWindows, slotDurationHours, slotIntervalHours, minNoticeHours, maxJobsPerDay, blackoutDates, serviceAreaNotes, confirmationMessage } = req.body;
+      const updated = await upsertBookingAvailability(business.id, {
+        enabled: typeof enabled === "boolean" ? enabled : undefined,
+        allowedDays: Array.isArray(allowedDays) ? allowedDays.map(Number) : undefined,
+        timeWindows: Array.isArray(timeWindows) ? timeWindows : undefined,
+        slotDurationHours: slotDurationHours !== undefined ? Number(slotDurationHours) : undefined,
+        slotIntervalHours: slotIntervalHours !== undefined ? Number(slotIntervalHours) : undefined,
+        minNoticeHours: minNoticeHours !== undefined ? Number(minNoticeHours) : undefined,
+        maxJobsPerDay: maxJobsPerDay !== undefined ? Number(maxJobsPerDay) : undefined,
+        blackoutDates: Array.isArray(blackoutDates) ? blackoutDates : undefined,
+        serviceAreaNotes: serviceAreaNotes !== undefined ? String(serviceAreaNotes) : undefined,
+        confirmationMessage: confirmationMessage !== undefined ? String(confirmationMessage) : undefined,
+      });
+      return res.json(updated);
+    } catch (e) {
+      return res.status(500).json({ error: "Server error" });
     }
   });
 

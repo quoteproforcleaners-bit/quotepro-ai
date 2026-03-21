@@ -21,6 +21,7 @@ import {
   analyticsEvents,
   badges,
   salesRecommendations,
+  bookingAvailabilitySettings,
   type User,
   type Business,
   type PricingSettingsRow,
@@ -2565,5 +2566,149 @@ export async function logLeadFinderEvent(
 export async function getBusinessById(id: string): Promise<Business | undefined> {
   const [b] = await db.select().from(businesses).where(eq(businesses.id, id));
   return b;
+}
+
+// ===== Self-Booking Availability =====
+
+export async function getBookingAvailability(businessId: string) {
+  const [row] = await db
+    .select()
+    .from(bookingAvailabilitySettings)
+    .where(eq(bookingAvailabilitySettings.businessId, businessId));
+  return row || null;
+}
+
+export async function upsertBookingAvailability(businessId: string, data: {
+  enabled?: boolean;
+  allowedDays?: number[];
+  timeWindows?: { start: string; end: string }[];
+  slotDurationHours?: number;
+  slotIntervalHours?: number;
+  minNoticeHours?: number;
+  maxJobsPerDay?: number;
+  blackoutDates?: string[];
+  serviceAreaNotes?: string;
+  confirmationMessage?: string;
+}) {
+  const existing = await getBookingAvailability(businessId);
+  if (existing) {
+    const [updated] = await db
+      .update(bookingAvailabilitySettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(bookingAvailabilitySettings.businessId, businessId))
+      .returning();
+    return updated;
+  } else {
+    const [created] = await db
+      .insert(bookingAvailabilitySettings)
+      .values({ businessId, ...data })
+      .returning();
+    return created;
+  }
+}
+
+export async function generateBookingSlots(
+  businessId: string,
+  fromDate: Date,
+  toDate: Date
+): Promise<{ date: string; slots: { start: string; end: string; label: string }[] }[]> {
+  const settings = await getBookingAvailability(businessId);
+  if (!settings || !settings.enabled) return [];
+
+  const allowedDays = settings.allowedDays || [1, 2, 3, 4, 5];
+  const timeWindows = (settings.timeWindows as any[]) || [{ start: "08:00", end: "17:00" }];
+  const slotDuration = (settings.slotDurationHours || 3) * 60;
+  const slotInterval = (settings.slotIntervalHours || 2) * 60;
+  const minNoticeMs = (settings.minNoticeHours || 24) * 60 * 60 * 1000;
+  const maxPerDay = settings.maxJobsPerDay || 4;
+  const blackoutDates = settings.blackoutDates || [];
+
+  const minAllowedStart = new Date(Date.now() + minNoticeMs);
+
+  // Fetch existing jobs in range
+  const existingJobs = await db
+    .select({ startDatetime: jobs.startDatetime, endDatetime: jobs.endDatetime })
+    .from(jobs)
+    .where(
+      and(
+        eq(jobs.businessId, businessId),
+        gte(jobs.startDatetime, fromDate),
+        lte(jobs.startDatetime, toDate)
+      )
+    );
+
+  const jobCountByDay: Record<string, number> = {};
+  for (const j of existingJobs) {
+    const dayKey = j.startDatetime.toISOString().slice(0, 10);
+    jobCountByDay[dayKey] = (jobCountByDay[dayKey] || 0) + 1;
+  }
+
+  const results: { date: string; slots: { start: string; end: string; label: string }[] }[] = [];
+
+  const current = new Date(fromDate);
+  current.setHours(0, 0, 0, 0);
+
+  while (current <= toDate) {
+    const dayOfWeek = current.getDay();
+    const dateStr = current.toISOString().slice(0, 10);
+
+    if (allowedDays.includes(dayOfWeek) && !blackoutDates.includes(dateStr)) {
+      const dayJobCount = jobCountByDay[dateStr] || 0;
+      if (dayJobCount < maxPerDay) {
+        const daySlots: { start: string; end: string; label: string }[] = [];
+
+        for (const window of timeWindows) {
+          const [startH, startM] = window.start.split(":").map(Number);
+          const [endH, endM] = window.end.split(":").map(Number);
+          const windowStart = startH * 60 + startM;
+          const windowEnd = endH * 60 + endM;
+
+          let slotStart = windowStart;
+          while (slotStart + slotDuration <= windowEnd) {
+            const slotEnd = slotStart + slotDuration;
+
+            const slotStartDate = new Date(current);
+            slotStartDate.setHours(Math.floor(slotStart / 60), slotStart % 60, 0, 0);
+            const slotEndDate = new Date(current);
+            slotEndDate.setHours(Math.floor(slotEnd / 60), slotEnd % 60, 0, 0);
+
+            // Check min notice
+            if (slotStartDate > minAllowedStart) {
+              // Check overlap with existing jobs
+              const overlaps = existingJobs.some(j => {
+                const jStart = new Date(j.startDatetime).getTime();
+                const jEnd = j.endDatetime ? new Date(j.endDatetime).getTime() : jStart + 3 * 60 * 60 * 1000;
+                return slotStartDate.getTime() < jEnd && slotEndDate.getTime() > jStart;
+              });
+
+              if (!overlaps) {
+                const fmtTime = (minutes: number) => {
+                  const h = Math.floor(minutes / 60);
+                  const m = minutes % 60;
+                  const ampm = h >= 12 ? "PM" : "AM";
+                  const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+                  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+                };
+                daySlots.push({
+                  start: slotStartDate.toISOString(),
+                  end: slotEndDate.toISOString(),
+                  label: `${fmtTime(slotStart)} – ${fmtTime(slotEnd)}`,
+                });
+              }
+            }
+            slotStart += slotInterval;
+          }
+        }
+
+        if (daySlots.length > 0) {
+          results.push({ date: dateStr, slots: daySlots });
+        }
+      }
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  return results;
 }
 

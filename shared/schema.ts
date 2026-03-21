@@ -1155,5 +1155,26 @@ export type PricingRule = typeof pricingRules.$inferSelect;
 export type PricingAnalysis = typeof pricingAnalyses.$inferSelect;
 export type PublishedPricingProfile = typeof publishedPricingProfiles.$inferSelect;
 
+// ===== Self-Booking Portal =====
+
+export const bookingAvailabilitySettings = pgTable("booking_availability_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().unique().references(() => businesses.id),
+  enabled: boolean("enabled").notNull().default(false),
+  allowedDays: integer("allowed_days").array().notNull().default([1, 2, 3, 4, 5]),
+  timeWindows: jsonb("time_windows").notNull().default([{ start: "08:00", end: "17:00" }]),
+  slotDurationHours: real("slot_duration_hours").notNull().default(3),
+  slotIntervalHours: real("slot_interval_hours").notNull().default(2),
+  minNoticeHours: integer("min_notice_hours").notNull().default(24),
+  maxJobsPerDay: integer("max_jobs_per_day").notNull().default(4),
+  blackoutDates: text("blackout_dates").array().notNull().default([]),
+  serviceAreaNotes: text("service_area_notes").notNull().default(""),
+  confirmationMessage: text("confirmation_message").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BookingAvailabilitySettings = typeof bookingAvailabilitySettings.$inferSelect;
+
 // ===== AI Quote Assistant =====
 

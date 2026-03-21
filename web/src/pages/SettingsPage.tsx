@@ -330,6 +330,34 @@ export default function SettingsPage() {
   const [appLanguage, setAppLanguage] = useState("en");
   const [commLanguage, setCommLanguage] = useState("en");
 
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const [bookingForm, setBookingForm] = useState({
+    enabled: false,
+    allowedDays: [1, 2, 3, 4, 5] as number[],
+    timeWindows: [{ start: "08:00", end: "17:00" }] as { start: string; end: string }[],
+    slotDurationHours: 3,
+    slotIntervalHours: 2,
+    minNoticeHours: 24,
+    maxJobsPerDay: 4,
+    blackoutDates: [] as string[],
+    serviceAreaNotes: "",
+    confirmationMessage: "",
+  });
+  const [newBlackout, setNewBlackout] = useState("");
+
+  const { data: bookingAvailability, isLoading: bookingLoading } = useQuery<any>({
+    queryKey: ["/api/booking-availability"],
+  });
+
+  const saveBooking = useMutation({
+    mutationFn: (data: any) => apiPut("/api/booking-availability", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/booking-availability"] });
+      showSaved("booking");
+    },
+  });
+
   useEffect(() => {
     if (business) {
       setBusinessForm({
@@ -400,6 +428,25 @@ export default function SettingsPage() {
       });
     }
   }, [growthSettings]);
+
+  useEffect(() => {
+    if (bookingAvailability) {
+      setBookingForm({
+        enabled: bookingAvailability.enabled ?? false,
+        allowedDays: bookingAvailability.allowedDays || [1, 2, 3, 4, 5],
+        timeWindows: bookingAvailability.timeWindows?.length
+          ? bookingAvailability.timeWindows
+          : [{ start: "08:00", end: "17:00" }],
+        slotDurationHours: bookingAvailability.slotDurationHours ?? 3,
+        slotIntervalHours: bookingAvailability.slotIntervalHours ?? 2,
+        minNoticeHours: bookingAvailability.minNoticeHours ?? 24,
+        maxJobsPerDay: bookingAvailability.maxJobsPerDay ?? 4,
+        blackoutDates: bookingAvailability.blackoutDates || [],
+        serviceAreaNotes: bookingAvailability.serviceAreaNotes || "",
+        confirmationMessage: bookingAvailability.confirmationMessage || "",
+      });
+    }
+  }, [bookingAvailability]);
 
   const updateBusiness = useMutation({
     mutationFn: (data: any) => apiPut("/api/business", data),
@@ -483,6 +530,7 @@ export default function SettingsPage() {
     "automations",
     "reviews",
     "features",
+    "booking",
     "integrations",
     "developer",
   ];
@@ -1130,6 +1178,270 @@ export default function SettingsPage() {
               </div>
             </div>
           </Card>
+        </div>
+      ) : null}
+
+      {tab === "booking" ? (
+        <div className="max-w-2xl space-y-6">
+          {!isPro && !isGrowth ? (
+            <div className="px-4 py-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+              <Calendar className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Growth or Pro plan required</p>
+                <p className="text-sm text-amber-700 mt-0.5">Self-booking lets accepted customers pick their own appointment time. Upgrade to enable it.</p>
+                <Button size="sm" className="mt-3" onClick={() => startCheckout("growth")}>Upgrade to Growth</Button>
+              </div>
+            </div>
+          ) : null}
+          <Card>
+            <CardHeader title="Self-Booking Portal" icon={Calendar} />
+            <p className="text-sm text-slate-500 mb-4">
+              When enabled, customers who accept a quote will see a calendar and can book their own appointment — no back-and-forth needed.
+            </p>
+            {bookingLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400 py-4">
+                <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+                Loading...
+              </div>
+            ) : (
+              <SettingRow label="Enable self-booking" description="Customers can schedule their own appointment after accepting a quote">
+                <Toggle
+                  checked={bookingForm.enabled}
+                  onChange={(v) => {
+                    if (!isPro && !isGrowth) return;
+                    setBookingForm((f) => ({ ...f, enabled: v }));
+                  }}
+                />
+              </SettingRow>
+            )}
+          </Card>
+
+          <Card>
+            <CardHeader title="Available Days" icon={Calendar} />
+            <p className="text-sm text-slate-500 mb-4">Which days of the week can customers book appointments?</p>
+            <div className="flex flex-wrap gap-2">
+              {DAY_NAMES.map((name, idx) => {
+                const selected = bookingForm.allowedDays.includes(idx);
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setBookingForm((f) => ({
+                        ...f,
+                        allowedDays: selected
+                          ? f.allowedDays.filter((d) => d !== idx)
+                          : [...f.allowedDays, idx].sort((a, b) => a - b),
+                      }));
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
+                      selected
+                        ? "bg-primary-50 text-primary-700 border-primary-300"
+                        : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Time Windows" icon={Clock} />
+            <p className="text-sm text-slate-500 mb-4">Set the hours when appointments can be booked. You can add multiple windows per day.</p>
+            <div className="space-y-3">
+              {bookingForm.timeWindows.map((win, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <div className="flex-1 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">Start</label>
+                      <Input
+                        type="time"
+                        value={win.start}
+                        onChange={(e) => {
+                          const updated = [...bookingForm.timeWindows];
+                          updated[idx] = { ...updated[idx], start: e.target.value };
+                          setBookingForm((f) => ({ ...f, timeWindows: updated }));
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 mb-1">End</label>
+                      <Input
+                        type="time"
+                        value={win.end}
+                        onChange={(e) => {
+                          const updated = [...bookingForm.timeWindows];
+                          updated[idx] = { ...updated[idx], end: e.target.value };
+                          setBookingForm((f) => ({ ...f, timeWindows: updated }));
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {bookingForm.timeWindows.length > 1 ? (
+                    <button
+                      onClick={() => setBookingForm((f) => ({ ...f, timeWindows: f.timeWindows.filter((_, i) => i !== idx) }))}
+                      className="text-red-400 hover:text-red-600 transition-colors mt-4 text-lg"
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              <button
+                onClick={() => setBookingForm((f) => ({ ...f, timeWindows: [...f.timeWindows, { start: "08:00", end: "17:00" }] }))}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1 mt-1"
+              >
+                <Plus size={14} /> Add time window
+              </button>
+            </div>
+
+            <Divider />
+
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Slot duration (hrs)</label>
+                <p className="text-xs text-slate-400 mb-2">How long is each job slot?</p>
+                <Input
+                  type="number"
+                  min={1}
+                  max={12}
+                  step={0.5}
+                  value={bookingForm.slotDurationHours}
+                  onChange={(e) => setBookingForm((f) => ({ ...f, slotDurationHours: parseFloat(e.target.value) || 3 }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Slot interval (hrs)</label>
+                <p className="text-xs text-slate-400 mb-2">Gap between available start times</p>
+                <Input
+                  type="number"
+                  min={0.5}
+                  max={12}
+                  step={0.5}
+                  value={bookingForm.slotIntervalHours}
+                  onChange={(e) => setBookingForm((f) => ({ ...f, slotIntervalHours: parseFloat(e.target.value) || 2 }))}
+                />
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Booking Rules" icon={Settings} />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Minimum notice (hours)</label>
+                <p className="text-xs text-slate-400 mb-2">How far in advance must customers book?</p>
+                <Input
+                  type="number"
+                  min={1}
+                  max={168}
+                  value={bookingForm.minNoticeHours}
+                  onChange={(e) => setBookingForm((f) => ({ ...f, minNoticeHours: parseInt(e.target.value) || 24 }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Max bookings per day</label>
+                <p className="text-xs text-slate-400 mb-2">Maximum number of jobs that can be scheduled on the same day</p>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={bookingForm.maxJobsPerDay}
+                  onChange={(e) => setBookingForm((f) => ({ ...f, maxJobsPerDay: parseInt(e.target.value) || 4 }))}
+                />
+              </div>
+
+              <Divider />
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Blackout dates</label>
+                <p className="text-xs text-slate-400 mb-2">Dates when no bookings are available (holidays, vacations, etc.)</p>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    type="date"
+                    value={newBlackout}
+                    onChange={(e) => setNewBlackout(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      if (newBlackout && !bookingForm.blackoutDates.includes(newBlackout)) {
+                        setBookingForm((f) => ({ ...f, blackoutDates: [...f.blackoutDates, newBlackout].sort() }));
+                        setNewBlackout("");
+                      }
+                    }}
+                  >
+                    <Plus size={14} /> Add
+                  </Button>
+                </div>
+                {bookingForm.blackoutDates.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {bookingForm.blackoutDates.map((date) => (
+                      <span
+                        key={date}
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-full text-sm text-slate-600"
+                      >
+                        {new Date(date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        <button
+                          onClick={() => setBookingForm((f) => ({ ...f, blackoutDates: f.blackoutDates.filter((d) => d !== date) }))}
+                          className="text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No blackout dates set</p>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader title="Customer Messaging" icon={MessageSquare} />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Confirmation message</label>
+                <p className="text-xs text-slate-400 mb-2">Shown to customers after they book and included in the confirmation email</p>
+                <Textarea
+                  value={bookingForm.confirmationMessage}
+                  onChange={(e) => setBookingForm((f) => ({ ...f, confirmationMessage: e.target.value }))}
+                  placeholder="We look forward to seeing you! If you need to reschedule, please contact us..."
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Service area notes</label>
+                <p className="text-xs text-slate-400 mb-2">Optional note shown on the booking page (e.g., "We service the Denver metro area")</p>
+                <Input
+                  value={bookingForm.serviceAreaNotes}
+                  onChange={(e) => setBookingForm((f) => ({ ...f, serviceAreaNotes: e.target.value }))}
+                  placeholder="We service Denver, Aurora, Lakewood, and surrounding areas"
+                />
+              </div>
+            </div>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => saveBooking.mutate(bookingForm)}
+              disabled={saveBooking.isPending}
+            >
+              {saveBooking.isPending ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2"><Save size={14} /> Save Booking Settings</span>
+              )}
+            </Button>
+          </div>
         </div>
       ) : null}
 
