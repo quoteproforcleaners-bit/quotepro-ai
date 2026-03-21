@@ -10,6 +10,7 @@ import CustomerDetailScreen from "@/screens/CustomerDetailScreen";
 import PricingScreen from "@/screens/PricingScreen";
 import PaywallScreen from "@/screens/PaywallScreen";
 import JobDetailScreen from "@/screens/JobDetailScreen";
+import JobsScreen from "@/screens/JobsScreen";
 import AIAssistantScreen from "@/screens/AIAssistantScreen";
 import FollowUpQueueScreen from "@/screens/FollowUpQueueScreen";
 import WeeklyRecapScreen from "@/screens/WeeklyRecapScreen";
@@ -52,6 +53,7 @@ export type RootStackParamList = {
   GuestQuoteCalculator: undefined;
   Onboarding: undefined;
   Main: undefined;
+  AllJobs: undefined;
   QuoteCalculator: { prefillCustomer?: { name: string; phone: string; email: string; address: string; customerId: string }; editQuoteId?: string; editQuoteData?: any } | undefined;
   QuoteDetail: { quoteId: string };
   CustomerDetail: { customerId: string };
@@ -200,6 +202,13 @@ export default function RootStackNavigator() {
             component={CustomerDetailScreen}
             options={{
               headerTitle: "Customer",
+            }}
+          />
+          <Stack.Screen
+            name="AllJobs"
+            component={JobsScreen}
+            options={{
+              headerTitle: "All Jobs",
             }}
           />
           <Stack.Screen

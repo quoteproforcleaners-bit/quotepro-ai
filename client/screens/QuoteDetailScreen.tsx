@@ -110,6 +110,13 @@ export default function QuoteDetailScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [calendarResult, setCalendarResult] = useState<{ icsContent: string; googleCalendarUrl: string } | null>(null);
 
+  const [showScheduleJobModal, setShowScheduleJobModal] = useState(false);
+  const [scheduleJobDate, setScheduleJobDate] = useState(new Date());
+  const [showScheduleDatePicker, setShowScheduleDatePicker] = useState(false);
+  const [showScheduleTimePicker, setShowScheduleTimePicker] = useState(false);
+  const [scheduleJobDuration, setScheduleJobDuration] = useState<"1.5" | "2" | "3" | "4">("3");
+  const [scheduleJobNotes, setScheduleJobNotes] = useState("");
+
   const [qboCreating, setQboCreating] = useState(false);
   const [jobberSyncing, setJobberSyncing] = useState(false);
   const { data: jobberStatus } = useQuery<{ connected: boolean; status?: string }>({
@@ -128,6 +135,18 @@ export default function QuoteDetailScreen() {
   const { data: stats } = useQuery<any>({
     queryKey: ['/api/reports/stats'],
   });
+
+  const { data: linkedJobs = [] } = useQuery<any[]>({
+    queryKey: ['/api/jobs', { quoteId: route.params.quoteId }],
+    queryFn: async () => {
+      const url = new URL(`/api/jobs`, getApiUrl());
+      url.searchParams.set("quoteId", route.params.quoteId);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      return res.json();
+    },
+    enabled: !!route.params.quoteId,
+  });
+  const linkedJob = linkedJobs?.[0] || null;
 
   const { data: growthSettings } = useQuery<any>({
     queryKey: ['/api/growth-automation-settings'],
@@ -275,6 +294,26 @@ export default function QuoteDetailScreen() {
     },
   });
 
+  const scheduleJobMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const url = new URL("/api/jobs", getApiUrl());
+      const res = await apiRequest("POST", url.toString(), data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs', { quoteId: route.params.quoteId }] });
+      queryClient.invalidateQueries({ queryKey: ['/api/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/quotes/unscheduled-accepted'] });
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      setShowScheduleJobModal(false);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error", e?.message || "Failed to schedule");
+    },
+  });
+
   const handleRequestPayment = async () => {
     try {
       setPaymentLoading(true);
@@ -304,7 +343,13 @@ export default function QuoteDetailScreen() {
       data.acceptedAt = new Date().toISOString();
       data.acceptedSource = "manual";
     }
-    updateMutation.mutate(data);
+    updateMutation.mutate(data, {
+      onSuccess: () => {
+        if (newStatus === "accepted" && !linkedJob) {
+          setTimeout(() => setShowScheduleJobModal(true), 500);
+        }
+      },
+    });
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -2057,6 +2102,26 @@ export default function QuoteDetailScreen() {
             <ThemedText type="small" style={{ marginTop: 4 }}>Export PDF</ThemedText>
           </Pressable>
 
+          {status === "accepted" && !linkedJob ? (
+            <Pressable
+              onPress={() => setShowScheduleJobModal(true)}
+              style={[styles.actionButton, { backgroundColor: `${theme.primary}15` }]}
+              testID="schedule-clean-btn"
+            >
+              <Feather name="calendar" size={20} color={theme.primary} />
+              <ThemedText type="small" style={{ marginTop: 4, color: theme.primary, fontWeight: "700" }}>Schedule</ThemedText>
+            </Pressable>
+          ) : null}
+          {linkedJob ? (
+            <Pressable
+              onPress={() => navigation.navigate("JobDetail", { jobId: linkedJob.id })}
+              style={[styles.actionButton, { backgroundColor: `${theme.success}15` }]}
+              testID="view-job-btn"
+            >
+              <Feather name="calendar" size={20} color={theme.success} />
+              <ThemedText type="small" style={{ marginTop: 4, color: theme.success, fontWeight: "700" }}>View Job</ThemedText>
+            </Pressable>
+          ) : null}
           <Pressable
             onPress={async () => {
               const link = `${getPublicBaseUrl()}/q/${quote.publicToken}`;
@@ -2792,9 +2857,161 @@ export default function QuoteDetailScreen() {
         onDismiss={() => setShowReviewModal(false)}
       />
 
+      {/* Schedule Clean Modal */}
+      <Modal
+        visible={showScheduleJobModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowScheduleJobModal(false)}
+      >
+        <View style={schedStyles.overlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowScheduleJobModal(false)} />
+          <View style={[schedStyles.sheet, { backgroundColor: theme.backgroundDefault }]}>
+            <View style={[schedStyles.handle, { backgroundColor: theme.border }]} />
+            <View style={[schedStyles.header, { backgroundColor: theme.primary }]}>
+              <ThemedText style={schedStyles.headerLabel}>Schedule This Clean</ThemedText>
+              <ThemedText style={schedStyles.headerCustomer}>
+                {quote?.customerName || quote?.propertyDetails?.customerName || "Customer"}
+              </ThemedText>
+              <Pressable onPress={() => setShowScheduleJobModal(false)} style={schedStyles.closeBtn} hitSlop={8}>
+                <Feather name="x" size={20} color="rgba(255,255,255,0.7)" />
+              </Pressable>
+            </View>
+            <ScrollView style={schedStyles.body} keyboardShouldPersistTaps="handled">
+              {/* Date + Time */}
+              <View style={schedStyles.row}>
+                <Pressable
+                  onPress={() => { setShowScheduleDatePicker(true); setShowScheduleTimePicker(false); }}
+                  style={[schedStyles.field, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
+                >
+                  <Feather name="calendar" size={14} color={theme.textSecondary} />
+                  <View>
+                    <ThemedText style={[schedStyles.fieldLabel, { color: theme.textSecondary }]}>Date</ThemedText>
+                    <ThemedText style={schedStyles.fieldVal}>
+                      {scheduleJobDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+                <Pressable
+                  onPress={() => { setShowScheduleTimePicker(true); setShowScheduleDatePicker(false); }}
+                  style={[schedStyles.field, { borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
+                >
+                  <Feather name="clock" size={14} color={theme.textSecondary} />
+                  <View>
+                    <ThemedText style={[schedStyles.fieldLabel, { color: theme.textSecondary }]}>Time</ThemedText>
+                    <ThemedText style={schedStyles.fieldVal}>
+                      {scheduleJobDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              </View>
+              {showScheduleDatePicker || showScheduleTimePicker ? (
+                <View style={{ alignItems: "center", marginBottom: Spacing.md }}>
+                  <DateTimePicker
+                    value={scheduleJobDate}
+                    mode={showScheduleDatePicker ? "date" : "time"}
+                    display="spinner"
+                    onChange={(_e, selected) => {
+                      if (selected) setScheduleJobDate(selected);
+                      if (Platform.OS === "android") {
+                        setShowScheduleDatePicker(false);
+                        setShowScheduleTimePicker(false);
+                      }
+                    }}
+                    textColor={theme.text}
+                  />
+                  {Platform.OS === "ios" ? (
+                    <Button
+                      onPress={() => { setShowScheduleDatePicker(false); setShowScheduleTimePicker(false); }}
+                      style={{ marginTop: Spacing.sm }}
+                    >Done</Button>
+                  ) : null}
+                </View>
+              ) : null}
+              {/* Duration */}
+              <ThemedText style={[schedStyles.sectionLabel, { color: theme.textSecondary }]}>Duration</ThemedText>
+              <View style={schedStyles.durationRow}>
+                {(["1.5", "2", "3", "4"] as const).map((h) => (
+                  <Pressable
+                    key={h}
+                    onPress={() => setScheduleJobDuration(h)}
+                    style={[
+                      schedStyles.durBtn,
+                      {
+                        backgroundColor: scheduleJobDuration === h ? theme.primary : theme.backgroundSecondary,
+                        borderColor: scheduleJobDuration === h ? theme.primary : theme.border,
+                      },
+                    ]}
+                  >
+                    <ThemedText style={[schedStyles.durBtnText, { color: scheduleJobDuration === h ? "#fff" : theme.text }]}>
+                      {h}h
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+              {/* Notes */}
+              <ThemedText style={[schedStyles.sectionLabel, { color: theme.textSecondary }]}>Internal Notes (optional)</ThemedText>
+              <TextInput
+                value={scheduleJobNotes}
+                onChangeText={setScheduleJobNotes}
+                placeholder="Access instructions, special requests…"
+                placeholderTextColor={theme.textSecondary}
+                multiline
+                numberOfLines={3}
+                style={[schedStyles.notesInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.backgroundSecondary }]}
+              />
+              <Button
+                onPress={() => {
+                  const end = new Date(scheduleJobDate);
+                  end.setHours(end.getHours() + parseFloat(scheduleJobDuration));
+                  const serviceLabel =
+                    quote?.options?.[quote?.selectedOption]?.name ||
+                    (quote?.selectedOption ? `${quote.selectedOption.charAt(0).toUpperCase()}${quote.selectedOption.slice(1)} Service` : "Cleaning");
+                  scheduleJobMutation.mutate({
+                    quoteId: route.params.quoteId,
+                    customerId: quote?.customerId || null,
+                    jobType: serviceLabel,
+                    startDatetime: scheduleJobDate.toISOString(),
+                    endDatetime: end.toISOString(),
+                    address: quote?.propertyDetails?.customerAddress || "",
+                    total: quote?.total,
+                    status: "scheduled",
+                    internalNotes: scheduleJobNotes,
+                  });
+                }}
+                disabled={scheduleJobMutation.isPending}
+                style={{ marginTop: Spacing.md, marginBottom: Spacing.xl }}
+              >
+                {scheduleJobMutation.isPending ? "Scheduling…" : "Confirm Schedule"}
+              </Button>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
+
+const schedStyles = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "85%", overflow: "hidden" },
+  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginVertical: 10 },
+  header: { padding: Spacing.lg, paddingTop: Spacing.md },
+  headerLabel: { fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
+  headerCustomer: { fontSize: 18, fontWeight: "800", color: "#fff", marginTop: 2 },
+  closeBtn: { position: "absolute", right: Spacing.lg, top: Spacing.md },
+  body: { padding: Spacing.lg },
+  row: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.md },
+  field: { flex: 1, flexDirection: "row", alignItems: "center", gap: Spacing.sm, padding: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1 },
+  fieldLabel: { fontSize: 10, fontWeight: "600", textTransform: "uppercase" },
+  fieldVal: { fontSize: 13, fontWeight: "600", marginTop: 1 },
+  sectionLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: Spacing.sm, marginTop: Spacing.sm },
+  durationRow: { flexDirection: "row", gap: Spacing.sm, marginBottom: Spacing.md },
+  durBtn: { flex: 1, paddingVertical: 10, borderRadius: BorderRadius.md, borderWidth: 1, alignItems: "center" },
+  durBtnText: { fontSize: 14, fontWeight: "700" },
+  notesInput: { borderWidth: 1, borderRadius: BorderRadius.md, padding: Spacing.sm, fontSize: 14, textAlignVertical: "top", minHeight: 72 },
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -13,6 +13,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  CalendarDays,
   Home,
   Bed,
   Bath,
@@ -81,6 +82,12 @@ export default function QuoteDetailPage() {
   const [followUpEditText, setFollowUpEditText] = useState("");
   const [followUpSendingNow, setFollowUpSendingNow] = useState(false);
   const [followUpPreviewLoading, setFollowUpPreviewLoading] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleDuration, setScheduleDuration] = useState("3");
+  const [scheduleNotes, setScheduleNotes] = useState("");
+  const [scheduleError, setScheduleError] = useState("");
 
   const { data: quote, isLoading } = useQuery<any>({
     queryKey: [`/api/quotes/${id}`],
@@ -142,11 +149,32 @@ export default function QuoteDetailPage() {
     onSuccess: () => { refetchFollowUps(); setFollowUpEditOpen(false); },
   });
 
+  const { data: linkedJobs = [] } = useQuery<any[]>({
+    queryKey: [`/api/jobs`, { quoteId: id }],
+    queryFn: () =>
+      fetch(`/api/jobs?quoteId=${id}`, { credentials: "include" }).then((r) => r.json()),
+    enabled: !!id,
+  });
+
+  const linkedJob = linkedJobs?.[0] || null;
+
+  const scheduleMutation = useMutation({
+    mutationFn: (data: any) => apiPost("/api/jobs", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/jobs`, { quoteId: id }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quotes/unscheduled-accepted"] });
+      setScheduleModalOpen(false);
+    },
+    onError: (e: any) => setScheduleError(e?.message || "Failed to schedule"),
+  });
+
   const statusMutation = useMutation({
     mutationFn: (status: string) => apiPut(`/api/quotes/${id}`, { status }),
-    onSuccess: () => {
+    onSuccess: (_data, status) => {
       queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      if (status === "accepted") setScheduleModalOpen(true);
     },
   });
 
@@ -1089,6 +1117,28 @@ export default function QuoteDetailPage() {
           <Card>
             <CardHeader title="Actions" />
             <div className="space-y-2">
+              {quote.status === "accepted" && !linkedJob ? (
+                <Button
+                  variant="primary"
+                  icon={CalendarDays}
+                  onClick={() => setScheduleModalOpen(true)}
+                  className="w-full justify-start"
+                  size="sm"
+                >
+                  Schedule This Clean
+                </Button>
+              ) : null}
+              {linkedJob ? (
+                <Button
+                  variant="secondary"
+                  icon={CalendarDays}
+                  onClick={() => navigate(`/jobs/${linkedJob.id}`)}
+                  className="w-full justify-start"
+                  size="sm"
+                >
+                  View Scheduled Job
+                </Button>
+              ) : null}
               {quote.status !== "accepted" ? (
                 <Button
                   variant="success"
@@ -1305,6 +1355,114 @@ export default function QuoteDetailPage() {
             queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
           }}
         />
+      ) : null}
+
+      {scheduleModalOpen ? (
+        <Modal
+          open={scheduleModalOpen}
+          onClose={() => setScheduleModalOpen(false)}
+          title="Schedule This Clean"
+        >
+          <div className="space-y-4">
+            <div className="bg-slate-50 rounded-lg px-3 py-2.5">
+              <p className="text-xs text-slate-400 mb-0.5">Customer</p>
+              <p className="text-sm font-semibold text-slate-800">
+                {quote?.customerName || quote?.propertyDetails?.customerName || "Customer"}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">Date</label>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">Arrival Time</label>
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Estimated Duration</label>
+              <div className="grid grid-cols-4 gap-2">
+                {["1.5", "2", "3", "4"].map((h) => (
+                  <button
+                    key={h}
+                    onClick={() => setScheduleDuration(h)}
+                    className={`h-9 text-xs font-medium rounded-lg border transition-all ${
+                      scheduleDuration === h
+                        ? "bg-primary-600 border-primary-600 text-white"
+                        : "bg-white border-slate-200 text-slate-600 hover:border-primary-300"
+                    }`}
+                  >
+                    {h}h
+                  </button>
+                ))}
+              </div>
+            </div>
+            {quote?.propertyDetails?.customerAddress ? (
+              <div className="bg-slate-50 rounded-lg px-3 py-2.5">
+                <p className="text-xs text-slate-400 mb-0.5">Service address</p>
+                <p className="text-sm text-slate-700">{quote.propertyDetails.customerAddress}</p>
+              </div>
+            ) : null}
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Internal Notes (optional)</label>
+              <textarea
+                value={scheduleNotes}
+                onChange={(e) => setScheduleNotes(e.target.value)}
+                placeholder="Access instructions, special requests…"
+                rows={2}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+              />
+            </div>
+            {scheduleError ? (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{scheduleError}</p>
+            ) : null}
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="secondary"
+                onClick={() => setScheduleModalOpen(false)}
+                className="flex-1 justify-center"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setScheduleError("");
+                  const start = new Date(`${scheduleDate}T${scheduleTime}:00`);
+                  const end = new Date(start);
+                  end.setHours(end.getHours() + parseFloat(scheduleDuration || "2"));
+                  const serviceLabel = quote?.options?.[quote?.selectedOption]?.name ||
+                    (quote?.selectedOption ? `${quote.selectedOption.charAt(0).toUpperCase()}${quote.selectedOption.slice(1)} Service` : "Cleaning");
+                  scheduleMutation.mutate({
+                    quoteId: id,
+                    customerId: quote?.customerId || null,
+                    jobType: serviceLabel,
+                    startDatetime: start.toISOString(),
+                    endDatetime: end.toISOString(),
+                    address: quote?.propertyDetails?.customerAddress || "",
+                    total: quote?.total,
+                    status: "scheduled",
+                    internalNotes: scheduleNotes,
+                  });
+                }}
+                loading={scheduleMutation.isPending}
+                className="flex-1 justify-center"
+              >
+                Schedule Clean
+              </Button>
+            </div>
+          </div>
+        </Modal>
       ) : null}
 
     </div>

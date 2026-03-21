@@ -1450,16 +1450,92 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
+  // ─── Calendar jobs (date-range with customer names joined) ───
+  app.get("/api/jobs/calendar", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { from, to } = req.query as any;
+      const jobs = await getJobsByBusiness(business.id, {
+        from: from ? new Date(from) : undefined,
+        to: to ? new Date(to) : undefined,
+      });
+      // Enrich with customer names
+      const enriched = await Promise.all(
+        jobs.map(async (j) => {
+          let customerName = "";
+          let customerPhone = "";
+          if (j.customerId) {
+            const c = await getCustomerById(j.customerId);
+            if (c) {
+              customerName = `${c.firstName} ${c.lastName}`.trim();
+              customerPhone = c.phone || "";
+            }
+          }
+          // If no customer name, try to get from linked quote
+          if (!customerName && j.quoteId) {
+            const q = await getQuoteById(j.quoteId);
+            if (q) customerName = (q as any).customerName || "";
+          }
+          return { ...j, customerName, customerPhone };
+        })
+      );
+      return res.json(enriched);
+    } catch (error: any) {
+      console.error("Calendar jobs error:", error);
+      return res.status(500).json({ message: "Failed to get calendar jobs" });
+    }
+  });
+
+  // ─── Accepted quotes with no linked scheduled job ───
+  app.get("/api/quotes/unscheduled-accepted", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const result = await pool.query(
+        `SELECT q.*, c.first_name AS customer_first_name, c.last_name AS customer_last_name
+         FROM quotes q
+         LEFT JOIN customers c ON c.id = q.customer_id
+         WHERE q.business_id = $1
+           AND q.status = 'accepted'
+           AND NOT EXISTS (
+             SELECT 1 FROM jobs j WHERE j.quote_id = q.id
+           )
+         ORDER BY q.accepted_at DESC NULLS LAST
+         LIMIT 50`,
+        [business.id]
+      );
+      return res.json(result.rows.map((r: any) => ({
+        id: r.id,
+        customerName: r.customer_first_name
+          ? `${r.customer_first_name} ${r.customer_last_name || ""}`.trim()
+          : r.customer_name || "Unknown Customer",
+        customerId: r.customer_id,
+        total: r.total,
+        selectedOption: r.selected_option,
+        options: r.options,
+        frequencySelected: r.frequency_selected,
+        propertyDetails: r.property_details,
+        acceptedAt: r.accepted_at,
+        address: r.property_details?.customerAddress || "",
+      })));
+    } catch (error: any) {
+      console.error("Unscheduled accepted quotes error:", error);
+      return res.status(500).json({ message: "Failed to get unscheduled quotes" });
+    }
+  });
+
   // ─── Jobs ───
 
   app.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const { status, customerId, from, to } = req.query as any;
+      const { status, customerId, quoteId, from, to } = req.query as any;
       const list = await getJobsByBusiness(business.id, {
         status,
         customerId,
+        quoteId,
         from: from ? new Date(from) : undefined,
         to: to ? new Date(to) : undefined,
       });

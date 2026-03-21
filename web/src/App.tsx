@@ -21,6 +21,7 @@ import CustomerDetailPage from "./pages/CustomerDetailPage";
 import CustomerCreatePage from "./pages/CustomerCreatePage";
 import JobsPage from "./pages/JobsPage";
 import JobDetailPage from "./pages/JobDetailPage";
+import CalendarPage from "./pages/CalendarPage";
 import SettingsPage from "./pages/SettingsPage";
 import FollowUpsPage from "./pages/FollowUpsPage";
 import OpportunitiesPage from "./pages/OpportunitiesPage";
@@ -114,6 +115,7 @@ export default function App() {
           <Route path="/customers/:id" element={<ProGate feature="Customer Management"><CustomerDetailPage /></ProGate>} />
           <Route path="/jobs" element={<ProGate feature="Job Management"><JobsPage /></ProGate>} />
           <Route path="/jobs/:id" element={<ProGate feature="Job Management"><JobDetailPage /></ProGate>} />
+          <Route path="/calendar" element={<ProGate feature="Job Management"><CalendarPage /></ProGate>} />
           <Route path="/growth" element={<ProGate feature="Growth Dashboard"><GrowthDashboardPage /></ProGate>} />
           <Route path="/follow-ups" element={<FollowUpsPage />} />
           <Route path="/opportunities" element={<ProGate feature="Opportunities"><OpportunitiesPage /></ProGate>} />

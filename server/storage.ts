@@ -476,11 +476,12 @@ export async function deleteLineItemsByQuote(quoteId: string): Promise<void> {
 
 export async function getJobsByBusiness(
   businessId: string,
-  opts?: { status?: string; customerId?: string; from?: Date; to?: Date }
+  opts?: { status?: string; customerId?: string; quoteId?: string; from?: Date; to?: Date }
 ): Promise<Job[]> {
   const conditions = [eq(jobs.businessId, businessId)];
   if (opts?.status) conditions.push(eq(jobs.status, opts.status));
   if (opts?.customerId) conditions.push(eq(jobs.customerId, opts.customerId));
+  if (opts?.quoteId) conditions.push(eq(jobs.quoteId, opts.quoteId));
   if (opts?.from) conditions.push(gte(jobs.startDatetime, opts.from));
   if (opts?.to) conditions.push(lte(jobs.startDatetime, opts.to));
 

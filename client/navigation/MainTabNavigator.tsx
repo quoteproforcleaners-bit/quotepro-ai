@@ -29,7 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
 import QuotesScreen from "@/screens/QuotesScreen";
-import JobsScreen from "@/screens/JobsScreen";
+import CalendarScreen from "@/screens/CalendarScreen";
 import GrowthDashboardScreen from "@/screens/GrowthDashboardScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -228,6 +228,16 @@ function QuotesHeaderRight() {
   );
 }
 
+function CalendarHeaderRight() {
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { theme } = useTheme();
+  return (
+    <HeaderButton onPress={() => navigation.navigate("AllJobs")}>
+      <Feather name="list" size={20} color={theme.primary} />
+    </HeaderButton>
+  );
+}
+
 function WrappedSettings(props: any) {
   return (
     <ErrorBoundary>
@@ -349,10 +359,11 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="JobsTab"
-        component={JobsScreen}
+        component={CalendarScreen}
         options={{
-          title: t.tabs.jobs,
-          headerTitle: t.tabs.jobs,
+          title: "Schedule",
+          headerTitle: "Schedule",
+          headerRight: () => <CalendarHeaderRight />,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="calendar" color={color} size={size} focused={focused} />
           ),
