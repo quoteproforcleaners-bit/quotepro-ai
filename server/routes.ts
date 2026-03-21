@@ -1657,6 +1657,17 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
+  app.get("/api/jobs/quote/:quoteId", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const list = await getJobsByBusiness(business.id, { quoteId: req.params.quoteId });
+      return res.json(list);
+    } catch (err: any) {
+      return res.status(500).json({ message: "Failed to get jobs for quote" });
+    }
+  });
+
   app.get("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const j = await getJobById(req.params.id);

@@ -245,11 +245,13 @@ export function QuickAddCleanPanel({
   onClose,
   prefill,
   defaultDate,
+  onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   prefill?: QuickAddPrefill;
   defaultDate?: Date;
+  onSaved?: (job: any) => void;
 }) {
   const queryClient = useQueryClient();
 
@@ -373,6 +375,10 @@ export function QuickAddCleanPanel({
       queryClient.invalidateQueries({ queryKey: ["/api/jobs/calendar"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/quotes/unscheduled-accepted"] });
+      if (prefill?.quoteId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/jobs/quote/${prefill.quoteId}`] });
+      }
+      onSaved?.(savedJob);
 
       setSavedJobId(savedJob.id);
 

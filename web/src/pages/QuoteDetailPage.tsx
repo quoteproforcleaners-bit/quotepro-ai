@@ -101,7 +101,7 @@ export default function QuoteDetailPage() {
   });
 
   const { data: calendarEvents } = useQuery<any[]>({
-    queryKey: [`/api/calendar-events/quote/${id}`],
+    queryKey: [`/api/jobs/quote/${id}`],
     enabled: !!quote,
   });
 
@@ -1198,8 +1198,7 @@ export default function QuoteDetailPage() {
               <Button
                 variant="secondary"
                 icon={Calendar}
-                onClick={createCalendarEvent}
-                loading={calendarLoading}
+                onClick={() => setScheduleModalOpen(true)}
                 className="w-full justify-start"
                 size="sm"
               >
@@ -1210,11 +1209,13 @@ export default function QuoteDetailPage() {
                   <p className="text-xs text-slate-400 mb-2">Scheduled events</p>
                   {calendarEvents.map((ev: any, i: number) => (
                     <div key={i} className="flex items-center gap-2 py-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-xs text-slate-600 truncate">{ev.title}</span>
-                      {ev.startDate ? (
-                        <span className="text-xs text-slate-400 shrink-0">
-                          {new Date(ev.startDate).toLocaleDateString()}
+                      <CalendarDays className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      <span className="text-xs text-slate-700 truncate font-medium">
+                        {ev.jobType ? ev.jobType.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) : "Cleaning"}
+                      </span>
+                      {ev.startDatetime ? (
+                        <span className="text-xs text-slate-400 shrink-0 ml-auto">
+                          {new Date(ev.startDatetime).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </span>
                       ) : null}
                     </div>
