@@ -1,0 +1,144 @@
+I need you to completely redesign the customer intake-form email experience in QuotePro.
+
+Current problem:
+When we send a quote intake form to a customer, the email looks cheap, plain, poorly formatted, and not premium at all.
+The link in the email is also extremely long and ugly, which hurts trust and makes the message feel spammy.
+
+Example issues to fix:
+- ugly raw long URL in the body
+- poor formatting
+- weak copy
+- no visual hierarchy
+- does not feel premium
+- not branded enough
+- low trust / low conversion
+
+Goal:
+Make this email feel premium, polished, trustworthy, and high-converting — like a modern SaaS + luxury service brand.
+It should look beautiful in Gmail and other major email clients.
+
+What I want:
+1. Replace the ugly plain-text style with a properly formatted HTML email
+2. Shorten the long intake-form link so customers do not see a giant SendGrid/tracking URL
+3. Improve the copy so it sounds polished, warm, clear, and professional
+4. Make the email visually premium:
+   - clean spacing
+   - better typography hierarchy
+   - branded button CTA
+   - subtle emojis where appropriate
+   - modern layout
+   - trust-building language
+5. Ensure it still works well in email clients like Gmail
+6. Keep it mobile-friendly
+
+Link-shortening requirements:
+I want you to implement a proper solution for shortening the intake form URL.
+
+Please evaluate and implement the best option:
+- preferably a branded short link using our own domain/subdomain if possible
+- if not, integrate a URL shortener service
+- TinyURL is acceptable as a fallback, but a branded short domain is preferred
+- the visible CTA should be something clean like:
+  - Complete Your Quote Form
+  - Start Your Estimate
+  - Finish My Quote
+
+Important:
+Do NOT just hide the long URL behind anchor text and call it fixed.
+I want the underlying link generation improved if possible, not just the display text.
+
+Please investigate the best implementation approach in this codebase:
+- whether we can generate a short redirect route ourselves
+- whether we should store a short token in our database and redirect internally
+- whether we should integrate TinyURL or another shortening service
+- whether tracking parameters can be handled more cleanly
+- whether SendGrid click tracking is causing the ugly link appearance and how to improve that without breaking analytics
+
+Preferred architecture:
+Best case:
+- Generate a short internal tokenized link such as:
+  https://quotepro.ai/q/abc123
+  or
+  https://go.quotepro.ai/abc123
+- Redirect that short link to the real intake-form URL
+- Preserve tracking if needed
+- Make the system reusable for future customer emails
+
+Email design requirements:
+The new email should feel:
+- premium
+- clean
+- modern
+- trustworthy
+- high-end
+- polished
+- easy to skim
+
+Design guidance:
+- use branded HTML email, not plain text
+- strong headline
+- short supporting copy
+- prominent CTA button
+- optional secondary fallback link in small text
+- tasteful emoji use only (not cheesy)
+- nice footer/signature
+- spacing that breathes
+- not cluttered
+
+Tone:
+- warm
+- confident
+- professional
+- human
+- premium
+- concise
+
+Avoid:
+- spammy wording
+- generic robotic phrasing
+- walls of text
+- overly playful language
+- too many emojis
+- cheap-looking styling
+
+Deliverables:
+1. Find the code responsible for generating the intake-form email
+2. Redesign the email template as premium HTML
+3. Improve the email copy
+4. Implement a real short-link solution
+5. Explain which short-link approach you chose and why
+6. Show the exact files/functions changed
+7. Give me before/after examples
+8. Tell me how to test it in Gmail and mobile
+
+Technical requirements:
+- Use table-based email-safe HTML where appropriate for compatibility
+- Inline styles if needed for email client support
+- Ensure dark/light mode still looks acceptable
+- Buttons should render well across major email clients
+- Include plain-text fallback version too
+- Make sure the sender name / subject line also feel premium
+
+Suggested email direction:
+Subject examples:
+- Your Personalized Cleaning Quote
+- A Few Quick Details for Your Quote
+- Let’s Finalize Your Cleaning Estimate
+
+Body direction:
+- greet customer by first name
+- explain in one or two clear sentences why they’re receiving this
+- emphasize it only takes about 2 minutes
+- use a strong CTA button
+- reassure them it helps us prepare an accurate quote
+- keep it elegant and simple
+
+Success criteria:
+- The email looks premium and professional in Gmail
+- The CTA is clear and visually appealing
+- The customer no longer sees a giant ugly URL
+- The experience feels more trustworthy and conversion-friendly
+- The implementation is reusable for other QuotePro emails
+
+Do not just suggest ideas.
+Inspect the code, implement the new premium email template, implement the short-link solution, and summarize exactly what changed.

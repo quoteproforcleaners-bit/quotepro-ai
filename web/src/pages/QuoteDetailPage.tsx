@@ -103,6 +103,10 @@ export default function QuoteDetailPage() {
     queryKey: ["/api/settings"],
   });
 
+  const { data: businessProfile } = useQuery<any>({
+    queryKey: ["/api/business"],
+  });
+
   const { data: automationRules, refetch: refetchAutomation } = useQuery<any>({
     queryKey: ["/api/automations"],
   });
@@ -220,15 +224,18 @@ export default function QuoteDetailPage() {
     setAiDraftLoading(key);
     try {
       const res = await apiPost(`/api/ai/generate-message`, {
-        context: "quote",
         purpose,
         channel,
-        quoteId: id,
         customerName: quote.customerName,
+        companyName: businessProfile?.companyName || "",
+        senderName: businessProfile?.senderName || "",
         total: quote.total,
         status: quote.status,
+        quoteLink: quote.publicToken ? `${window.location.origin}/q/${quote.publicToken}` : "",
+        bookingLink: businessProfile?.bookingLink || "",
       });
-      setAiDrafts((prev) => ({ ...prev, [key]: (res as any).message || "" }));
+      const text = (res as any).draft || (res as any).message || "";
+      setAiDrafts((prev) => ({ ...prev, [key]: text }));
     } catch {
       setAiDrafts((prev) => ({ ...prev, [key]: "Unable to generate message." }));
     }

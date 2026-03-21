@@ -4900,6 +4900,20 @@ Return exactly this JSON structure:
     }
   });
 
+  // Shared purpose descriptions — single source of truth for both iOS and web message generation
+  const SHARED_PURPOSE_DESCRIPTIONS: Record<string, string> = {
+    send_quote: "sending a new quote to the customer for the first time - be enthusiastic, highlight the value and services included, mention the quote is ready for them to review, and encourage them to accept. If a quote link is available, invite them to click it to view and accept",
+    initial_quote: "sending an initial quote - be enthusiastic and highlight value",
+    follow_up: "a gentle follow-up on a previously sent quote - be polite and not pushy",
+    thank_you: "thanking the customer for their business - be grateful and warm",
+    booking_confirmation: "confirming a booking - be professional and include key details",
+    reschedule: "requesting or confirming a reschedule - be understanding and accommodating",
+    payment_failed: "notifying the customer that their payment could not be processed - be polite and professional, avoid blaming the customer, keep the tone helpful, encourage quick resolution, mention they can retry the payment. If a payment link or quote link is available include it. Keep under 120 words",
+    reminder: "reminding the customer about an upcoming cleaning appointment - be friendly and brief, mention you're looking forward to it, ask them to reach out with any changes",
+    upsell: "suggesting an add-on or upgrade to an existing customer (e.g. deep clean, inside oven, inside fridge, windows) - be casual and low-pressure, just plant the seed, don't oversell",
+    review_request: "asking a happy customer to leave an online review - sound like a real small business owner asking a genuine favor, keep it short and make it easy to say yes",
+  };
+
   app.post("/api/ai/communication-draft", requireAuth, requirePro as any, async (req: Request, res: Response) => {
     try {
       const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;
@@ -4908,17 +4922,7 @@ Return exactly this JSON structure:
         return res.status(400).json({ message: "type and purpose are required" });
       }
 
-      const purposeDescriptions: Record<string, string> = {
-        send_quote: "sending a new quote to the customer for the first time - be enthusiastic, highlight the value and services included, mention the quote is ready for them to review, and encourage them to accept. If a quote link is available, invite them to click it to view and accept",
-        initial_quote: "sending an initial quote - be enthusiastic and highlight value",
-        follow_up: "a gentle follow-up on a previously sent quote - be polite and not pushy",
-        thank_you: "thanking the customer for their business - be grateful and warm",
-        booking_confirmation: "confirming a booking - be professional and include key details",
-        reschedule: "requesting or confirming a reschedule - be understanding and accommodating",
-        payment_failed: "notifying the customer that their payment could not be processed - be polite and professional, avoid blaming the customer, keep the tone helpful, encourage quick resolution, mention they can retry the payment. If a payment link or quote link is available include it. Keep under 120 words",
-      };
-
-      const purposeInstruction = purposeDescriptions[purpose] || `purpose: ${purpose}`;
+      const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
 
       const quoteContext = quoteDetails
         ? ` Quote: ${quoteDetails.selectedOption || "Cleaning"} $${quoteDetails.price || ""}. ${quoteDetails.scope || ""}. ${quoteDetails.propertyInfo || ""}.`
@@ -7065,77 +7069,24 @@ Respond with JSON: {"reply": string}`
 
   app.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { purpose, channel, customerName, total, status, quoteId } = req.body;
-      const msgChannel = (channel || "sms") as string;
-      const firstName = customerName?.split(" ")[0] || "there";
-      const isEmail = msgChannel === "email";
-      const lengthInstruction = isEmail
-        ? "Write 2-3 short paragraphs. For email, start your response with 'Subject: <subject line>' on its own line, then a blank line, then the email body. End with a warm sign-off."
-        : "Keep it under 200 characters. No subject line needed for SMS.";
+      const { purpose, channel, customerName, companyName, senderName, total, status, quoteLink, bookingLink, paymentMethodsText, language: commLang } = req.body;
+      const msgType = (channel || "sms") as string;
+      const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
 
-      const purposePrompts: Record<string, string> = {
-        send_quote: `
-You just sent a cleaning quote to a customer. Write a short, casual message letting them know.
-- Mention the price naturally (e.g. "came out to $X")
-- Invite them to ask questions or get on the schedule
-- Sound like a confident, friendly business owner texting a client — not a customer service rep
-- Good example: "Hey ${firstName} — just sent over your quote, came out to $${total || "TBD"}. Let me know if you have any questions or want to lock in a date."
-`,
-        follow_up: `
-The customer got a quote but hasn't replied yet. Write a short, low-pressure follow-up.
-- Check in without sounding desperate or pushy
-- Keep it super brief — 1-2 sentences max for SMS
-- Sound like a real person, not a bot
-- Good example: "Hey ${firstName}, just checking in — did you get a chance to look over the quote? Happy to answer any questions."
-`,
-        thank_you: `
-The cleaning job is done. Write a genuine thank-you to the customer.
-- Sound warm and real, not corporate
-- Keep it short and sincere
-- Optionally mention you'd love to help them again
-- Good example: "Thanks so much for having us today, ${firstName} — really appreciate it! Hope everything looks great."
-`,
-        reminder: `
-The customer has an upcoming cleaning appointment. Write a brief reminder.
-- Friendly and casual, not robotic
-- Mention you're looking forward to it
-- Keep it to 1-2 lines for SMS
-- Good example: "Hey ${firstName}, just a quick reminder we'll be there tomorrow. Looking forward to it — let us know if anything changes!"
-`,
-        upsell: `
-Write a message to an existing customer pitching a cleaning upgrade or add-on (deep clean, inside oven, fridge, windows, etc.).
-- Casual, low-pressure, value-focused
-- Don't oversell — just plant the seed
-- Good example: "Hey ${firstName}, we've been doing a great job keeping things fresh — ever thought about adding a deep clean or inside oven/fridge? Makes a huge difference. Happy to add it to your next visit if you're interested."
-`,
-        review_request: `
-The cleaning is done. Ask the customer for a review — short and genuine.
-- Sound like a real small business owner asking a favor, not a corporation
-- Keep it brief and make it easy for them to say yes
-- Good example: "Hey ${firstName}, so glad we could help today! If you have a sec, a quick Google review would mean the world to us — it really helps. Thanks so much!"
-`,
-        payment_failed: `
-There's a payment issue on the customer's account. Write a friendly heads-up.
-- Non-accusatory, matter-of-fact, easy to act on
-- Don't make it awkward — just let them know and make it easy to fix
-- Good example: "Hey ${firstName}, just wanted to give you a quick heads-up — looks like there was an issue processing your payment. No big deal, just let us know a good way to sort it out. Thanks!"
-`,
-      };
+      const quoteContext = total ? ` Quote total: $${total}.` : "";
+      const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
+      const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
 
-      const purposeText = purposePrompts[purpose] || `Write a short, natural message from a cleaning business owner to a customer named ${firstName}. Sound human and conversational.`;
+      let systemPrompt: string;
+      let userPrompt: string;
 
-      const systemPrompt = `You are a real cleaning business owner writing a message to a customer. Your tone is warm, confident, and natural — like texting a client, not writing a corporate email. Never use phrases like "I hope this message finds you well", "We're excited to", "Please review the details", or any other robotic filler. Keep it short, human, and to the point. ${lengthInstruction}
-
-${purposeText}
-
-Rules:
-- Use the customer's first name naturally (once, at the start)
-- Vary phrasing — don't sound templated
-- No fluff, no filler sentences
-- Max 3-4 sentences for email, 1-2 for SMS
-- For email: start with "Subject: " on line 1, blank line, then the body`;
-
-      const userPrompt = `Customer first name: ${firstName}.${total ? ` Quote total: $${total}.` : ""}${status ? ` Quote status: ${status}.` : ""} Write the message now. Output ONLY the message — no commentary, no labels, no explanation.`;
+      if (msgType === "sms") {
+        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
+        userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
+      } else {
+        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Do NOT include the raw URL in the email body. Instead, write a sentence like "You can view and accept your quote by clicking the link below." A styled button with the link will be automatically added after your email.` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+        userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
+      }
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -7143,10 +7094,15 @@ Rules:
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        max_completion_tokens: msgType === "sms" ? 100 : 250,
       });
 
-      const generatedMessage = completion.choices[0]?.message?.content?.trim() || "";
-      return res.json({ message: generatedMessage, channel: msgChannel });
+      let draft = completion.choices[0]?.message?.content?.trim() || "";
+      if (draft.startsWith('"') && draft.endsWith('"')) draft = draft.slice(1, -1);
+      if (draft.startsWith('{')) { try { const p = JSON.parse(draft); draft = p.draft || p.message || draft; } catch {} }
+      draft = draft.replace(/\\n/g, '\n');
+
+      return res.json({ message: draft, draft });
     } catch (error: any) {
       console.error("AI generate message error:", error);
       return res.status(500).json({ message: "Failed to generate message" });
