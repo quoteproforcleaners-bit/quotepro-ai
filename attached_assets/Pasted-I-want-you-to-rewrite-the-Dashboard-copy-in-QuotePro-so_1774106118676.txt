@@ -1,0 +1,121 @@
+I want you to rewrite the Dashboard copy in QuotePro so it feels clearly built for cleaning businesses — but still premium, modern, and software-first.
+
+Important:
+Do NOT make it cheesy, overly niche, or cluttered.
+Do NOT slap “for cleaners” everywhere.
+Do NOT make it feel like a generic CRM either.
+
+The goal is to make the dashboard instantly feel like:
+“This platform was built specifically for cleaning business owners.”
+
+Positioning target:
+QuotePro should feel like premium vertical SaaS for residential/commercial cleaning businesses.
+Think:
+- clean
+- polished
+- operational
+- revenue-focused
+- trustworthy
+- built for pros
+
+Current problem:
+The dashboard looks good, but a lot of the copy feels too generic.
+It could be mistaken for a generic quoting or CRM tool.
+I want the copy to naturally reflect cleaning businesses and cleaning workflows.
+
+What I need you to do:
+1. Audit all visible dashboard copy
+2. Rewrite the copy so it subtly but clearly signals that QuotePro is for cleaning professionals
+3. Keep the UI clean and premium
+4. Improve clarity, hierarchy, and conversion
+5. Do not overdo the niche language
+
+Voice/tone requirements:
+- premium
+- concise
+- confident
+- operational
+- professional
+- modern SaaS
+- built for real business owners
+- no fluff
+- no corny startup copy
+- no cheesy cleaning puns
+
+What I want rewritten:
+Please review and improve all major dashboard copy including:
+- page title / subtitle
+- hero card eyebrow text
+- hero headline
+- hero supporting text
+- primary CTA text
+- secondary CTA text
+- onboarding/checklist section title
+- onboarding/checklist descriptions
+- progress / setup language
+- “Today’s Revenue Moves” section title/subtitle
+- empty states if present
+- any other visible dashboard labels that feel generic
+
+Strategic direction:
+Use cleaning-specific language naturally where it improves clarity, such as:
+- cleaning quote
+- cleaning rates
+- cleaning clients
+- cleaning jobs
+- scheduled cleans
+- recurring revenue
+- booked jobs
+But do it selectively and tastefully.
+
+Examples of the type of direction I want:
+Instead of:
+- “Create your first quote”
+Prefer:
+- “Create your first cleaning quote”
+
+Instead of:
+- “Add your first customer”
+Prefer:
+- “Add your first cleaning client”
+
+Instead of generic hero copy:
+- make it about turning cleaning quotes into booked jobs and recurring revenue
+
+What I want from the new dashboard copy:
+- it should be obvious this is for cleaning businesses
+- it should still feel premium and professional
+- it should reinforce action and setup
+- it should make the product feel like a revenue operating system for cleaners WITHOUT literally saying that in a cheesy way
+
+Do NOT use:
+- “#1 software for cleaners”
+- “cleaning empire”
+- cheesy hype language
+- forced emojis
+- marketing fluff
+- anything that makes the app feel less premium
+
+I want you to provide:
+1. A full proposed rewrite of the dashboard copy
+2. The exact text for each visible area
+3. Recommendations for any tiny UI label changes that improve positioning
+4. Then implement the new copy in the codebase
+5. Show me the exact files/components changed
+
+If useful, you may also recommend one subtle line under the dashboard title such as:
+- Built for residential cleaning businesses
+- Built for modern cleaning companies
+But only if it truly improves the page and doesn’t clutter the UI
+
+Success criteria:
+- a cleaning business owner immediately understands QuotePro is built for them
+- the dashboard still feels polished and modern
+- copy feels sharper, more specific, and more revenue-oriented
+- no cheesy or overbranded language
+- the product feels more niche and valuable without sacrificing elegance
+
+Important final instruction:
+First propose the revised dashboard copy in a clean before/after format.
+Then implement it in the app once the rewrite is strong.
+Do not just suggest ideas — actually update the dashboard copy in code and summarize what changed.

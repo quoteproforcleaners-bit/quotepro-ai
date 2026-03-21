@@ -26,6 +26,8 @@ import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { useSubscription } from "@/context/SubscriptionContext";
+import { QuickAddCleanModal } from "@/components/QuickAddCleanModal";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -553,10 +555,12 @@ export default function CalendarScreen() {
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const queryClient = useQueryClient();
+  const { isGrowth, isInFreeTrial } = useSubscription();
 
   const [currentMonth, setCurrentMonth] = useState(startOfDay(new Date()));
   const [selectedDay, setSelectedDay] = useState(startOfDay(new Date()));
   const [scheduleQuote, setScheduleQuote] = useState<UnscheduledQuote | null>(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   // Compute date range for fetch
   const { from, to } = useMemo(() => {
@@ -609,6 +613,8 @@ export default function CalendarScreen() {
     [navigation]
   );
 
+  const canQuickAdd = isGrowth || isInFreeTrial;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
@@ -617,7 +623,7 @@ export default function CalendarScreen() {
           styles.content,
           {
             paddingTop: headerHeight + Spacing.md,
-            paddingBottom: tabBarHeight + Spacing.xl,
+            paddingBottom: tabBarHeight + Spacing.xl + 72,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -645,7 +651,32 @@ export default function CalendarScreen() {
         )}
       </ScrollView>
 
-      {/* Schedule modal */}
+      {/* Quick Add FAB */}
+      <Pressable
+        onPress={() => {
+          if (!canQuickAdd) {
+            Alert.alert("Growth Plan Required", "Quick Add Clean is available on the Growth plan. Upgrade to unlock instant scheduling.");
+            return;
+          }
+          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setShowQuickAdd(true);
+        }}
+        style={[
+          styles.fab,
+          {
+            backgroundColor: theme.primary,
+            bottom: tabBarHeight + Spacing.lg,
+            right: Spacing.lg,
+            opacity: canQuickAdd ? 1 : 0.65,
+          },
+        ]}
+        testID="btn-quick-add-clean"
+      >
+        <Feather name="plus" size={22} color="#fff" />
+        <ThemedText style={styles.fabLabel}>Quick Add Clean</ThemedText>
+      </Pressable>
+
+      {/* Schedule modal (from unscheduled banner) */}
       {scheduleQuote ? (
         <ScheduleModal
           quote={scheduleQuote}
@@ -653,6 +684,13 @@ export default function CalendarScreen() {
           onClose={() => setScheduleQuote(null)}
         />
       ) : null}
+
+      {/* Quick Add Clean modal */}
+      <QuickAddCleanModal
+        visible={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+        prefilledDate={selectedDay}
+      />
     </View>
   );
 }
@@ -663,6 +701,22 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { flex: 1 },
   content: { paddingHorizontal: Spacing.md, gap: Spacing.md },
+
+  fab: {
+    position: "absolute",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 13,
+    borderRadius: BorderRadius.full,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabLabel: { fontSize: 14, fontWeight: "700", color: "#fff" },
 
   calendarCard: { padding: Spacing.md },
 

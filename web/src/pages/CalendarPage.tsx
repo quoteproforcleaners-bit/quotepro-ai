@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiPost, apiPut } from "../lib/api";
@@ -18,6 +18,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { PageHeader, Card, Button } from "../components/ui";
+import { QuickAddCleanPanel } from "../components/QuickAddCleanPanel";
+import { useSubscription } from "../lib/subscription";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -756,16 +758,17 @@ function UnscheduledPanel({
   );
 }
 
-// ─── Main Calendar Page ──────────────────────────────────────────────────────
 
 export default function CalendarPage() {
   const navigate = useNavigate();
+  const { isGrowth } = useSubscription();
   const [view, setView] = useState<CalendarView>("month");
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
   const [scheduleQuote, setScheduleQuote] = useState<UnscheduledQuote | null>(null);
   const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
   const [selectedJob, setSelectedJob] = useState<CalendarJob | null>(null);
   const [rescheduleJob, setRescheduleJob] = useState<CalendarJob | null>(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   // Compute date range to fetch
   const { from, to } = useMemo(() => {
@@ -857,7 +860,8 @@ export default function CalendarPage() {
         {/* Calendar toolbar */}
         <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
           {/* View switcher */}
-          <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
             {(["month", "week", "day"] as CalendarView[]).map((v) => (
               <button
                 key={v}
@@ -872,6 +876,28 @@ export default function CalendarPage() {
                 <span className="capitalize">{v}</span>
               </button>
             ))}
+            </div>
+
+            {/* Quick Add Clean button */}
+            <button
+              onClick={() => {
+                if (!isGrowth) {
+                  alert("Quick Add Clean requires the Growth plan. Upgrade to unlock instant scheduling.");
+                  return;
+                }
+                setShowQuickAdd(true);
+              }}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm ${
+                isGrowth
+                  ? "bg-primary-600 hover:bg-primary-700 text-white shadow-primary-200"
+                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
+              }`}
+              title={isGrowth ? "Quick Add Clean" : "Requires Growth plan"}
+              data-testid="btn-quick-add-clean"
+            >
+              <Plus className="w-4 h-4" />
+              Quick Add Clean
+            </button>
           </div>
 
           {/* Nav controls */}
@@ -938,6 +964,13 @@ export default function CalendarPage() {
           onSaved={() => setRescheduleJob(null)}
         />
       ) : null}
+
+      {/* Quick Add Clean Panel */}
+      <QuickAddCleanPanel
+        open={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+        defaultDate={currentDate}
+      />
     </div>
   );
 }

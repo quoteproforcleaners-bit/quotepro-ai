@@ -1099,6 +1099,19 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
+  app.get("/api/customers/:id/last-job", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const customerJobs = await getJobsByBusiness(business.id, { customerId: req.params.id });
+      const sorted = customerJobs.sort((a, b) => new Date(b.startDatetime).getTime() - new Date(a.startDatetime).getTime());
+      const lastJob = sorted[0] || null;
+      return res.json(lastJob);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get last job" });
+    }
+  });
+
   app.post("/api/customers", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);

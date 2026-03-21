@@ -229,6 +229,7 @@ export const jobs = pgTable("jobs", {
   ratingToken: varchar("rating_token").default(sql`gen_random_uuid()`),
   updateToken: varchar("update_token").unique(),
   detailedStatus: text("detailed_status").notNull().default("scheduled"),
+  teamMembers: jsonb("team_members").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

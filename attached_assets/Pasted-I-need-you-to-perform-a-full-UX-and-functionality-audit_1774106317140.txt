@@ -1,0 +1,176 @@
+I need you to perform a full UX and functionality audit of QuotePro to identify and fix dead buttons, dead links, non-working CTAs, and misleading interactive UI elements across the app.
+
+Problem:
+There are multiple places in the app where buttons, icons, links, cards, arrows, edit controls, and CTAs appear clickable but do nothing, are partially implemented, or are wired incorrectly.
+This makes the product feel unfinished and hurts trust.
+
+Example:
+On the Weekly Recap page, there are controls like navigation arrows, goal/edit actions, and other UI elements that may appear interactive but do not actually work.
+
+Your job:
+Audit the entire software and find every dead or misleading interactive element, then fix them properly.
+
+What I mean by “dead button”:
+- button appears clickable but has no action
+- link goes nowhere
+- icon button has no handler
+- CTA opens nothing
+- control is visible but feature is not implemented
+- click target exists but throws an error
+- button is disabled visually but not intentionally
+- interactive element has placeholder behavior only
+- form action does not submit/save correctly
+- calendar navigation/edit controls do nothing
+- tabs/switches are wired incorrectly
+- empty state CTA is visible but broken
+- modal trigger does nothing
+- edit pencil/settings/manage buttons don’t work
+- arrows for previous/next periods do nothing
+- buttons silently fail
+
+What I need you to do:
+1. Audit the entire app for interactive elements
+2. Identify all dead buttons / dead links / broken controls
+3. Categorize each one:
+   - fully dead
+   - partially implemented
+   - broken due to missing handler
+   - broken due to routing
+   - broken due to state/data issue
+   - intentionally not ready but exposed in UI
+4. Fix the ones that should work
+5. For features not yet implemented, do NOT leave deceptive clickable controls visible
+6. Replace unfinished interactions with one of these:
+   - fully implement the feature if feasible
+   - hide the control
+   - disable it clearly with proper tooltip/label like “Coming soon”
+   - route to the correct screen
+7. Make the app feel polished and intentional everywhere
+
+Audit scope:
+I want a broad audit across the product, including but not limited to:
+- Dashboard
+- Quotes
+- Commercial Quote
+- Customers
+- Jobs
+- Schedule
+- Quote Preferences
+- Price Settings
+- Revenue
+- Growth Hub
+- Weekly Recap
+- Tasks Queue
+- Follow-ups
+- Reactivation
+- Reviews & Referrals
+- Lead Finder
+- Opportunities
+- Email Sequences
+- all modals, drawers, tabs, dropdown actions, empty states, and cards
+
+Specific things to inspect:
+- all visible buttons
+- icon-only buttons
+- edit pencils
+- navigation arrows
+- page-level CTAs
+- hero buttons
+- empty-state action buttons
+- tabs
+- filters
+- dropdown menu actions
+- modal open buttons
+- save/update buttons
+- card click actions
+- sidebar items
+- secondary text links
+- pagination
+- calendar controls
+- recap navigation controls
+- goal-setting/edit controls
+- AI generation buttons
+- copy/share buttons
+- integration buttons
+- schedule/reschedule actions
+
+Important product standard:
+If a control is visible, it should either:
+- work properly, or
+- be clearly marked/handled intentionally
+
+No more fake interactivity.
+
+Implementation requirements:
+1. Inspect the real codebase thoroughly
+2. Find all components/pages with clickable UI
+3. Trace their handlers, routes, and side effects
+4. Identify missing onClick handlers, broken routes, placeholder callbacks, TODO implementations, and no-op functions
+5. Fix the behavior end to end
+6. Remove or clearly mark unfinished features so users are not misled
+
+Code patterns to look for:
+- buttons with no onClick
+- onClick={() => {}}
+- placeholder handlers
+- TODO comments
+- disabled logic missing
+- links with "#"
+- handlers that reference unimplemented functions
+- swallowed errors
+- modal state never opening
+- route pushes to missing pages
+- actions blocked by missing data with no user feedback
+- controls rendered unconditionally even when feature is unavailable
+
+What I want as output:
+1. A full audit report of dead/broken interactive elements
+2. A list grouped by page/component
+3. For each issue:
+   - what the control is
+   - where it is
+   - why it is broken
+   - how you fixed it
+4. Then implement the fixes in code
+5. Show the exact files/functions/components changed
+6. Tell me what was fixed vs hidden vs marked “Coming soon”
+
+Behavior rules:
+- If a feature can be completed quickly and correctly, implement it
+- If a feature is not ready, do not fake it
+- If data is required before action is possible, show proper user feedback
+- If an action is unavailable, make that state obvious
+- Maintain premium UX throughout
+
+UX requirements:
+- no misleading clickable elements
+- proper hover/cursor states
+- proper disabled states
+- clear feedback for unavailable actions
+- no silent failures
+- clean empty states
+- intentional product feel
+
+Testing requirements:
+Please also:
+- test every major page for clickable elements
+- verify that navigation arrows work where present
+- verify save/edit buttons function
+- verify empty-state CTAs function
+- verify icon buttons and action menus function
+- verify mobile/responsive breakpoints if relevant
+- verify no console errors on click
+
+Success criteria:
+- no dead buttons remain in the visible product
+- every visible interactive control either works or is clearly unavailable
+- the app feels much more polished and trustworthy
+- no misleading fake controls remain
+- broken UX is turned into intentional UX
+
+Important:
+Do not stop at analysis.
+Do not just produce a report.
+Actually inspect the code, implement the fixes, and summarize exactly what changed.
+
+Before coding, first produce an audit checklist and systematically work through the app page by page so nothing gets missed.
