@@ -382,6 +382,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Temporary admin route — grant Pro tier to any user by email
+  app.get("/api/admin/grant-pro", async (req: Request, res: Response) => {
+    const { email, secret } = req.query as { email?: string; secret?: string };
+    if (secret !== "qp-admin-2024-xK9m") {
+      return res.status(403).send("Forbidden");
+    }
+    if (!email) {
+      return res.status(400).send("Missing email param");
+    }
+    try {
+      const result = await pool.query(
+        `UPDATE users SET subscription_tier = 'pro' WHERE LOWER(email) = LOWER($1) RETURNING email, subscription_tier`,
+        [email]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).send(`No user found with email: ${email}`);
+      }
+      return res.send(`<h2 style="font-family:sans-serif;color:#16a34a">Done! ${result.rows[0].email} is now on the Pro plan.</h2>`);
+    } catch (e: any) {
+      return res.status(500).send(e.message);
+    }
+  });
+
   app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
       const { email, password, name } = req.body;
