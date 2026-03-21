@@ -469,8 +469,7 @@ export class JobberClient {
 
     // Step 2: Create the job
     // - propertyId must be inline (EncodedId! not ID!) — typed variable causes type mismatch
-    // - invoicing block omitted: BillingStrategy/BillingFrequencyEnum enum values vary by API version
-    //   and can be set manually in Jobber after sync. Job creates fine without it.
+    // - invoicing.billingStrategy is required by Jobber's API; INVOICE_AFTER_EACH_VISIT is correct for one-off jobs
     const esc = (s: string) => s
       .replace(/\\/g, "\\\\")
       .replace(/"/g, '\\"')
@@ -484,7 +483,8 @@ export class JobberClient {
         jobCreate(input: {
           propertyId: "${propertyId}",
           title: "${titleEsc}",
-          instructions: "${instrEsc}"
+          instructions: "${instrEsc}",
+          invoicing: { billingStrategy: INVOICE_AFTER_EACH_VISIT }
         }) {
           job {
             id

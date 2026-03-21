@@ -5733,7 +5733,8 @@ var JobberClient = class {
         jobCreate(input: {
           propertyId: "${propertyId}",
           title: "${titleEsc}",
-          instructions: "${instrEsc}"
+          instructions: "${instrEsc}",
+          invoicing: { billingStrategy: INVOICE_AFTER_EACH_VISIT }
         }) {
           job {
             id
