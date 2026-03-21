@@ -14,6 +14,7 @@ import {
   Search,
   Sparkles,
   FileText,
+  Pencil,
 } from "lucide-react";
 import { PageHeader, Card, CardHeader, Button, Badge, Alert } from "../components/ui";
 
@@ -355,6 +356,9 @@ export default function QuoteCreatePage() {
   const [aiPricing, setAiPricing] = useState<any | null>(null);
   const [aiPricingLoading, setAiPricingLoading] = useState(false);
   const [aiPriceOverrides, setAiPriceOverrides] = useState<{good: number; better: number; best: number} | null>(null);
+  const [manualEdits, setManualEdits] = useState<Set<string>>(new Set());
+  const [editingTier, setEditingTier] = useState<"good" | "better" | "best" | null>(null);
+  const [editingValue, setEditingValue] = useState<string>("");
 
   const { data: customers = [] } = useQuery<any[]>({
     queryKey: ["/api/customers"],
@@ -381,6 +385,21 @@ export default function QuoteCreatePage() {
     services.frequency,
     pricing
   );
+
+  const commitPriceEdit = (tier: "good" | "better" | "best") => {
+    const parsed = parseFloat(editingValue.replace(/[^0-9.]/g, ""));
+    if (!isNaN(parsed) && parsed > 0) {
+      const base = {
+        good: aiPriceOverrides?.good ?? quote.good.price,
+        better: aiPriceOverrides?.better ?? quote.better.price,
+        best: aiPriceOverrides?.best ?? quote.best.price,
+      };
+      setAiPriceOverrides({ ...base, [tier]: Math.round(parsed) });
+      setManualEdits((prev) => new Set(prev).add(tier));
+    }
+    setEditingTier(null);
+    setEditingValue("");
+  };
 
   const generateAiScopes = async () => {
     setAiScopesLoading(true);
@@ -1105,20 +1124,84 @@ export default function QuoteCreatePage() {
                             ${data.firstCleanPrice.toFixed(0)}
                             <span className="text-xs font-normal text-slate-400 ml-1">first visit</span>
                           </p>
-                          <p className="text-xs text-slate-500 font-medium mt-0.5">
-                            ${displayPrice.toFixed(0)}/visit thereafter
-                            {aiPriceOverrides ? (
-                              <span className="text-emerald-600 font-semibold ml-1">AI</span>
+                          <div
+                            className="flex items-center gap-1 mt-0.5 group/price cursor-text"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingTier(tier);
+                              setEditingValue(String(displayPrice.toFixed(0)));
+                            }}
+                          >
+                            {editingTier === tier ? (
+                              <input
+                                autoFocus
+                                type="number"
+                                min={1}
+                                value={editingValue}
+                                onChange={(e) => setEditingValue(e.target.value)}
+                                onBlur={() => commitPriceEdit(tier)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") commitPriceEdit(tier);
+                                  if (e.key === "Escape") { setEditingTier(null); setEditingValue(""); }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-20 text-sm font-semibold text-slate-900 border border-primary-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                              />
+                            ) : (
+                              <p className="text-xs text-slate-500 font-medium">
+                                ${displayPrice.toFixed(0)}/visit thereafter
+                                {manualEdits.has(tier) ? (
+                                  <span className="text-primary-600 font-semibold ml-1">Edited</span>
+                                ) : aiPriceOverrides ? (
+                                  <span className="text-emerald-600 font-semibold ml-1">AI</span>
+                                ) : null}
+                              </p>
+                            )}
+                            {editingTier !== tier ? (
+                              <Pencil className="w-3 h-3 text-slate-300 group-hover/price:text-primary-500 transition-colors" />
                             ) : null}
-                          </p>
+                          </div>
                         </>
                       ) : (
-                        <p className="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
-                          ${displayPrice.toFixed(0)}
-                          {aiPriceOverrides ? (
-                            <span className="text-xs font-normal text-emerald-600 ml-1.5">AI</span>
-                          ) : null}
-                        </p>
+                        <div
+                          className="flex items-center gap-1.5 mt-2 group/price cursor-text"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTier(tier);
+                            setEditingValue(String(displayPrice.toFixed(0)));
+                          }}
+                        >
+                          {editingTier === tier ? (
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-2xl font-bold text-slate-900 tracking-tight">$</span>
+                              <input
+                                autoFocus
+                                type="number"
+                                min={1}
+                                value={editingValue}
+                                onChange={(e) => setEditingValue(e.target.value)}
+                                onBlur={() => commitPriceEdit(tier)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") commitPriceEdit(tier);
+                                  if (e.key === "Escape") { setEditingTier(null); setEditingValue(""); }
+                                }}
+                                className="w-24 text-2xl font-bold text-slate-900 border border-primary-400 rounded px-2 py-0.5 tracking-tight focus:outline-none focus:ring-1 focus:ring-primary-500"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-2xl font-bold text-slate-900 tracking-tight">
+                                ${displayPrice.toFixed(0)}
+                                {manualEdits.has(tier) ? (
+                                  <span className="text-xs font-normal text-primary-600 ml-1.5">Edited</span>
+                                ) : aiPriceOverrides ? (
+                                  <span className="text-xs font-normal text-emerald-600 ml-1.5">AI</span>
+                                ) : null}
+                              </p>
+                              <Pencil className="w-3.5 h-3.5 text-slate-300 group-hover/price:text-primary-500 transition-colors mb-0.5" />
+                            </>
+                          )}
+                        </div>
                       )}
                       <p className="text-xs text-slate-400 mt-1 line-clamp-3">
                         {aiScope ? aiScope : data.scope}
@@ -1178,7 +1261,7 @@ export default function QuoteCreatePage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setAiPriceOverrides(null)}
+                  onClick={() => { setAiPriceOverrides(null); setManualEdits(new Set()); }}
                 >
                   Reset to Calculated Prices
                 </Button>
