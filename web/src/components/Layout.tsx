@@ -84,7 +84,7 @@ const navSections = [
       { to: "/follow-ups", label: "Follow-ups", icon: Bell },
       { to: "/reactivation", label: "Reactivation", icon: RefreshCw, pro: true },
       { to: "/reviews-referrals", label: "Reviews & Referrals", icon: Star, pro: true },
-      { to: "/lead-finder", label: "Lead Finder", icon: Radio, pro: true },
+      { to: "/lead-finder", label: "Lead Finder", icon: Radio, pro: true, beta: true },
       { to: "/opportunities", label: "Opportunities", icon: Target, pro: true },
       { to: "/email-sequences", label: "Email Sequences", icon: MailOpen },
     ],
@@ -205,6 +205,9 @@ export function Layout() {
                   >
                     <item.icon className="w-[18px] h-[18px] shrink-0" />
                     <span className="flex-1">{item.label}</span>
+                    {(item as any).beta ? (
+                      <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-red-500 text-white uppercase tracking-wider leading-none">Beta</span>
+                    ) : null}
                     {item.pro && !isPro ? (
                       <Lock className="w-3.5 h-3.5 text-slate-300 group-hover:text-primary-400 transition-colors" />
                     ) : null}
