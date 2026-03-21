@@ -64,23 +64,22 @@ export function ProGate({
 
   return (
     <div className="relative min-h-[60vh] flex items-center justify-center">
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-50/0 via-slate-50/80 to-slate-50 pointer-events-none" />
-      <div className="relative text-center max-w-md mx-auto px-6">
+      <div className="relative text-center max-w-md mx-auto px-6 py-10 rounded-2xl bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700">
         <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-blue-600 flex items-center justify-center shadow-xl shadow-blue-600/25">
           <Lock className="w-7 h-7 text-white" />
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
           {feature}
         </h2>
-        <p className="text-slate-500 mb-6 text-sm leading-relaxed">
+        <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm leading-relaxed">
           {tagline}
         </p>
 
         <ul className="text-left mb-6 space-y-2">
           {config.features.map((f) => (
-            <li key={f} className="flex items-center gap-2 text-sm text-slate-700">
-              <Icon className="w-4 h-4 text-blue-600 shrink-0" />
+            <li key={f} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <Icon className="w-4 h-4 text-blue-500 shrink-0" />
               {f}
             </li>
           ))}
@@ -94,7 +93,7 @@ export function ProGate({
           Upgrade to {config.label}
           <ArrowRight className="w-4 h-4" />
         </button>
-        <p className="mt-4 text-xs text-slate-400">
+        <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
           14-day free trial&nbsp;&nbsp;·&nbsp;&nbsp;{config.price}&nbsp;&nbsp;·&nbsp;&nbsp;Cancel anytime
         </p>
       </div>
@@ -116,19 +115,19 @@ export function StarterGate({
 
   return (
     <div className="relative min-h-[40vh] flex items-center justify-center">
-      <div className="relative text-center max-w-md mx-auto px-6">
-        <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-slate-100 flex items-center justify-center">
-          <Lock className="w-5 h-5 text-slate-500" />
+      <div className="relative text-center max-w-md mx-auto px-6 py-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm">
+        <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+          <Lock className="w-5 h-5 text-slate-500 dark:text-slate-400" />
         </div>
-        <h2 className="text-lg font-bold text-slate-900 mb-2">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
           {feature} requires a subscription
         </h2>
-        <p className="text-slate-500 mb-4 text-sm">
+        <p className="text-slate-500 dark:text-slate-400 mb-4 text-sm">
           Pick a plan to start using {feature.toLowerCase()}.
         </p>
         <button
           onClick={() => navigate("/pricing")}
-          className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition-colors"
+          className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500 text-white text-sm font-semibold transition-colors"
         >
           View plans
           <ArrowRight className="w-4 h-4" />
