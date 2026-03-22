@@ -1322,6 +1322,77 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
   // ─── Schedule Publication ───────────────────────────────────────────────
 
   // Helpers for schedule publish emails
+  const JOB_TYPE_EMAIL_LABEL: Record<string, string> = {
+    regular: "Regular Clean",
+    deep_clean: "Deep Clean",
+    move_out: "Move-Out Clean",
+    move_in: "Move-In Clean",
+    post_construction: "Post-Construction",
+    office: "Office Clean",
+    airbnb: "Airbnb Turnover",
+    other: "Other",
+  };
+
+  function buildJobCardEmail(j: any, cleanerName: string): string {
+    const time = new Date(j.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    const endDt = j.endDatetime ? new Date(j.endDatetime) : null;
+    const endTime = endDt ? endDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
+    const teammates = (j.teamMemberNames || []).filter((n: string) => n && n !== cleanerName);
+    const mapLink = j.address ? `https://maps.google.com/?q=${encodeURIComponent(j.address)}` : null;
+    const typeLabel = JOB_TYPE_EMAIL_LABEL[j.jobType] || j.jobType || "Clean";
+    const hours = j.durationHours ? (j.durationHours % 1 === 0 ? `${j.durationHours}h` : `${Math.floor(j.durationHours)}h ${Math.round((j.durationHours % 1) * 60)}m`) : null;
+
+    return `
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+  <tr>
+    <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="background:#f3f4f6;padding:10px 16px;border-bottom:1px solid #e5e7eb;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-size:16px;font-weight:700;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                  ${time}${endTime ? ` &ndash; ${endTime}` : ""}
+                </td>
+                ${hours ? `<td align="right" style="font-size:12px;color:#9ca3af;font-weight:500;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${hours}</td>` : ""}
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:14px 16px;">
+            <div style="display:inline-block;font-size:11px;font-weight:600;color:#4f46e5;background:#eef2ff;border-radius:4px;padding:3px 8px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${typeLabel}</div>
+            ${j.address ? `
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+              <tr>
+                <td valign="top" width="20" style="padding-top:1px;color:#9ca3af;font-size:14px;">&#128205;</td>
+                <td>
+                  <div style="font-size:15px;color:#111827;line-height:1.4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${j.address}</div>
+                  ${mapLink ? `<a href="${mapLink}" style="font-size:13px;color:#4f46e5;text-decoration:none;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Get directions &rarr;</a>` : ""}
+                </td>
+              </tr>
+            </table>` : ""}
+            ${teammates.length > 0 ? `
+            <div style="font-size:14px;color:#6b7280;margin-bottom:6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+              With: <strong style="color:#374151;">${teammates.join(" &amp; ")}</strong>
+            </div>` : ""}
+            ${j.cleanerNotes ? `
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
+              <tr>
+                <td style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;">
+                  <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Note from office</div>
+                  <div style="font-size:14px;color:#78350f;line-height:1.5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${j.cleanerNotes}</div>
+                </td>
+              </tr>
+            </table>` : ""}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>`;
+  }
+
   function buildCleanerEmailHtml(opts: {
     cleanerName: string;
     weekLabel: string;
@@ -1339,61 +1410,142 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       if (!grouped[day]) grouped[day] = [];
       grouped[day].push(j);
     }
-
     const daysWithJobs = dayOrder.filter(d => grouped[d]);
     const totalJobs = jobs.length;
     const estHours = jobs.reduce((acc, j) => acc + (j.durationHours || 3), 0);
-
-    const jobRows = daysWithJobs.map(day => {
-      const dayJobs = grouped[day].sort((a: any, b: any) =>
-        new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime()
-      );
-      const jobsHtml = dayJobs.map((j: any) => {
-        const time = new Date(j.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-        const teammates = (j.teamMemberNames || []).filter((n: string) => n !== cleanerName);
-        const mapLink = j.address ? `https://maps.google.com/?q=${encodeURIComponent(j.address)}` : null;
-        return `
-          <div style="background:#f8fafc;border-left:3px solid #6366f1;padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:10px;">
-            <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:4px;">${time} — ${j.customerName || "Client"}</div>
-            ${j.address ? `<div style="color:#475569;font-size:14px;margin-bottom:4px;">📍 ${j.address}${mapLink ? ` &nbsp;<a href="${mapLink}" style="color:#6366f1;font-size:12px;">Get directions</a>` : ""}</div>` : ""}
-            ${j.jobType ? `<div style="color:#475569;font-size:14px;margin-bottom:4px;">Service: ${j.jobType}</div>` : ""}
-            ${teammates.length > 0 ? `<div style="color:#475569;font-size:14px;margin-bottom:4px;">Teammate${teammates.length > 1 ? "s" : ""}: ${teammates.join(", ")}</div>` : ""}
-            ${j.cleanerNotes ? `<div style="color:#64748b;font-size:13px;margin-top:6px;padding:8px 10px;background:#fff;border-radius:6px;border:1px solid #e2e8f0;">📝 ${j.cleanerNotes}</div>` : ""}
-          </div>`;
-      }).join("");
-      return `<div style="margin-bottom:24px;"><div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">${day}</div>${jobsHtml}</div>`;
-    }).join("");
-
+    const estHoursLabel = estHours % 1 === 0 ? `${estHours}h` : `${estHours.toFixed(1)}h`;
     const ackUrl = `https://${domain}/schedule-ack/${ackToken}`;
 
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your Schedule</title></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-<div style="max-width:600px;margin:0 auto;padding:20px 16px;">
-  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
-    <div style="background:linear-gradient(135deg,#6366f1,#4f46e5);padding:28px 32px;">
-      <div style="font-size:13px;color:rgba(255,255,255,0.75);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em;">${companyName}</div>
-      <div style="font-size:24px;font-weight:700;color:white;margin-bottom:2px;">Your Schedule</div>
-      <div style="font-size:15px;color:rgba(255,255,255,0.85);">${weekLabel}</div>
-    </div>
-    <div style="padding:28px 32px;">
-      <p style="font-size:16px;color:#334155;margin-bottom:24px;">Hi ${cleanerName},<br><br>Here is your schedule for <strong>${weekLabel}</strong>.</p>
-      ${jobRows}
-      <div style="background:#f8fafc;border-radius:12px;padding:16px 20px;margin:24px 0;">
-        <div style="font-size:14px;font-weight:600;color:#475569;margin-bottom:6px;">Weekly Summary</div>
-        <div style="font-size:15px;color:#0f172a;">${totalJobs} job${totalJobs !== 1 ? "s" : ""} this week &nbsp;·&nbsp; Est. ${estHours.toFixed(1)} hrs</div>
-      </div>
-      <div style="margin-top:28px;">
-        <a href="${ackUrl}" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;font-weight:600;font-size:15px;padding:13px 28px;border-radius:10px;text-decoration:none;margin-bottom:12px;">Acknowledge Schedule</a>
-        <div style="margin-top:8px;">
-          <a href="${ackUrl}" style="color:#6366f1;font-size:13px;text-decoration:none;">View schedule online →</a>
-        </div>
-      </div>
-    </div>
-    <div style="background:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;">
-      <p style="font-size:12px;color:#94a3b8;margin:0;">Sent by ${companyName} via QuotePro. <a href="${ackUrl}?flag=1" style="color:#94a3b8;">Flag an issue</a></p>
-    </div>
-  </div>
-</div></body></html>`;
+    const dayBlocks = daysWithJobs.map(day => {
+      const dayJobs = [...grouped[day]].sort((a, b) =>
+        new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime()
+      );
+      const jobCards = dayJobs.map(j => buildJobCardEmail(j, cleanerName)).join("");
+      return `
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+  <tr>
+    <td>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+        <tr>
+          <td style="padding-bottom:8px;border-bottom:2px solid #111827;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-size:19px;font-weight:800;color:#111827;letter-spacing:-0.02em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${day}</td>
+                <td align="right" style="font-size:12px;color:#9ca3af;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${dayJobs.length} job${dayJobs.length !== 1 ? "s" : ""}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      ${jobCards}
+    </td>
+  </tr>
+</table>`;
+    }).join("");
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Schedule &mdash; ${weekLabel}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;-webkit-font-smoothing:antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;min-height:100%;">
+    <tr>
+      <td align="center" style="padding:24px 16px 40px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#4f46e5;border-radius:16px 16px 0 0;padding:28px 28px 24px;">
+              <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${companyName}</div>
+              <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.03em;line-height:1.1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Your Schedule</div>
+              <div style="font-size:15px;color:rgba(255,255,255,0.75);margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${weekLabel}</div>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="background:#ffffff;padding:24px 28px 4px;">
+              <div style="font-size:16px;color:#374151;line-height:1.6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                Hi <strong>${cleanerName}</strong>, here&rsquo;s what&rsquo;s on your plate this week.
+              </div>
+            </td>
+          </tr>
+
+          <!-- Summary bar -->
+          <tr>
+            <td style="background:#ffffff;padding:16px 28px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:10px;">
+                <tr>
+                  <td align="center" style="padding:14px 8px;border-right:1px solid #e5e7eb;">
+                    <div style="font-size:22px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${totalJobs}</div>
+                    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-top:2px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Jobs</div>
+                  </td>
+                  <td align="center" style="padding:14px 8px;border-right:1px solid #e5e7eb;">
+                    <div style="font-size:22px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${estHoursLabel}</div>
+                    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-top:2px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Est. Hours</div>
+                  </td>
+                  <td align="center" style="padding:14px 8px;">
+                    <div style="font-size:22px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${daysWithJobs.length}</div>
+                    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-top:2px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Days</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr><td style="background:#ffffff;padding:0 28px;"><div style="height:1px;background:#f3f4f6;"></div></td></tr>
+
+          <!-- Schedule by day -->
+          <tr>
+            <td style="background:#ffffff;padding:24px 28px 8px;">
+              ${dayBlocks}
+            </td>
+          </tr>
+
+          <!-- CTA -->
+          <tr>
+            <td style="background:#ffffff;padding:8px 28px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:12px;">
+                    <a href="${ackUrl}"
+                      style="display:inline-block;background:#4f46e5;color:#ffffff;font-size:17px;font-weight:700;text-decoration:none;padding:16px 40px;border-radius:12px;letter-spacing:-0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                      Got It &mdash; I&rsquo;m Good to Go
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center">
+                    <a href="${ackUrl}?flag=1" style="font-size:13px;color:#9ca3af;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                      Have an issue? Let us know
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f9fafb;border-top:1px solid #e5e7eb;border-radius:0 0 16px 16px;padding:16px 28px;">
+              <div style="font-size:12px;color:#9ca3af;line-height:1.5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                Sent by ${companyName} via QuotePro.
+                &nbsp;&bull;&nbsp;
+                <a href="${ackUrl}" style="color:#9ca3af;text-decoration:underline;">View online</a>
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
   }
 
   function buildCleanerUpdateEmailHtml(opts: {
@@ -1403,35 +1555,118 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     companyName: string;
     ackToken: string;
     domain: string;
+    allJobs?: any[];
   }): string {
-    const { cleanerName, weekLabel, changedJobs, companyName, ackToken, domain } = opts;
+    const { cleanerName, weekLabel, changedJobs, companyName, ackToken, domain, allJobs } = opts;
     const ackUrl = `https://${domain}/schedule-ack/${ackToken}`;
-    const jobsHtml = changedJobs.map((j: any) => {
+    const totalJobs = allJobs?.length || changedJobs.length;
+    const estHours = (allJobs || changedJobs).reduce((a, j) => a + (j.durationHours || 3), 0);
+    const estHoursLabel = estHours % 1 === 0 ? `${estHours}h` : `${estHours.toFixed(1)}h`;
+
+    const changedJobsHtml = changedJobs.map((j: any) => {
       const time = new Date(j.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      return `<div style="background:#fef3c7;border-left:3px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:10px;">
-        <div style="font-weight:600;color:#0f172a;">${time} — ${j.customerName || "Client"}</div>
-        ${j.address ? `<div style="color:#475569;font-size:14px;">${j.address}</div>` : ""}
-        ${j.changeNote ? `<div style="color:#92400e;font-size:13px;margin-top:4px;">${j.changeNote}</div>` : ""}
-      </div>`;
+      return `
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:10px;">
+  <tr>
+    <td style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 16px;">
+      <div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${time}${j.customerName ? ` &mdash; ${j.customerName}` : ""}</div>
+      ${j.address ? `<div style="font-size:14px;color:#6b7280;margin-bottom:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${j.address}</div>` : ""}
+      ${j.changeNote ? `<div style="font-size:13px;color:#92400e;font-weight:600;margin-top:4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${j.changeNote}</div>` : ""}
+    </td>
+  </tr>
+</table>`;
     }).join("");
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-<div style="max-width:600px;margin:0 auto;padding:20px 16px;">
-  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
-    <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:24px 32px;">
-      <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-bottom:4px;">${companyName}</div>
-      <div style="font-size:22px;font-weight:700;color:white;">Schedule Update</div>
-      <div style="font-size:14px;color:rgba(255,255,255,0.85);">${weekLabel}</div>
-    </div>
-    <div style="padding:28px 32px;">
-      <p style="font-size:15px;color:#334155;">Hi ${cleanerName},<br><br>Your schedule for <strong>${weekLabel}</strong> has been updated:</p>
-      ${jobsHtml}
-      <div style="margin-top:24px;">
-        <a href="${ackUrl}" style="display:inline-block;background:#f59e0b;color:white;font-weight:600;font-size:15px;padding:12px 24px;border-radius:10px;text-decoration:none;">View Updated Schedule</a>
-      </div>
-    </div>
-  </div>
-</div></body></html>`;
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule Update &mdash; ${weekLabel}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;-webkit-font-smoothing:antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;min-height:100%;">
+    <tr>
+      <td align="center" style="padding:24px 16px 40px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#d97706;border-radius:16px 16px 0 0;padding:24px 28px 20px;">
+              <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${companyName}</div>
+              <div style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Schedule Updated</div>
+              <div style="font-size:14px;color:rgba(255,255,255,0.8);margin-top:3px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${weekLabel}</div>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="background:#ffffff;padding:24px 28px 20px;">
+              <div style="font-size:16px;color:#374151;line-height:1.6;margin-bottom:20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                Hi <strong>${cleanerName}</strong>, your schedule for <strong>${weekLabel}</strong> has changed. Here&rsquo;s what&rsquo;s different:
+              </div>
+              ${changedJobsHtml}
+            </td>
+          </tr>
+
+          <!-- Summary -->
+          <tr>
+            <td style="background:#ffffff;padding:0 28px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:10px;">
+                <tr>
+                  <td align="center" style="padding:12px 8px;border-right:1px solid #e5e7eb;">
+                    <div style="font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${totalJobs}</div>
+                    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-top:1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Total Jobs</div>
+                  </td>
+                  <td align="center" style="padding:12px 8px;">
+                    <div style="font-size:20px;font-weight:800;color:#111827;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${estHoursLabel}</div>
+                    <div style="font-size:11px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-top:1px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Est. Hours</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CTA -->
+          <tr>
+            <td style="background:#ffffff;padding:0 28px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding-bottom:12px;">
+                    <a href="${ackUrl}"
+                      style="display:inline-block;background:#d97706;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;padding:15px 36px;border-radius:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                      View Updated Schedule
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center">
+                    <a href="${ackUrl}?flag=1" style="font-size:13px;color:#9ca3af;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                      Have an issue? Let us know
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f9fafb;border-top:1px solid #e5e7eb;border-radius:0 0 16px 16px;padding:16px 28px;">
+              <div style="font-size:12px;color:#9ca3af;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+                Sent by ${companyName} via QuotePro.
+                &nbsp;&bull;&nbsp;
+                <a href="${ackUrl}" style="color:#9ca3af;text-decoration:underline;">View full schedule online</a>
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
   }
 
   // GET /api/schedule/week-jobs — get all jobs in a week with employee details
@@ -1764,14 +1999,65 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       if (!notif) return res.status(404).json({ message: "Schedule not found" });
 
       const snap = notif.cleanerSnapshotJson as any;
+
+      // Prefer snapshot data; fall back to live DB lookup if snapshot is empty
+      let jobs: any[] = snap.jobs || [];
+      let weekLabel: string = snap.weekLabel || "";
+      let isUpdate = snap.isUpdate || false;
+
+      if (jobs.length === 0 || !weekLabel) {
+        // Look up publication to get week range
+        const [pub] = await db.select().from(schedulePublications)
+          .where(eq(schedulePublications.id, notif.publicationId));
+        if (pub) {
+          const weekStart = new Date(pub.weekStart);
+          const weekEnd = new Date(pub.weekEnd);
+          const fmtOpts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+          weekLabel = `${weekStart.toLocaleDateString("en-US", fmtOpts)} – ${weekEnd.toLocaleDateString("en-US", { ...fmtOpts, year: "numeric" })}`;
+          isUpdate = (pub.versionNumber || 1) > 1;
+
+          // Load this cleaner's jobs for the week
+          const allJobs = await getJobsByBusiness(notif.businessId, { from: weekStart, to: weekEnd });
+          const allEmployees = await db.select().from(employees).where(eq(employees.businessId, notif.businessId));
+          const empMap = Object.fromEntries(allEmployees.map(e => [e.id, e]));
+
+          const myJobs = allJobs.filter(j =>
+            !j.skipped &&
+            j.status !== "cancelled" &&
+            ((j.teamMembers || []) as string[]).includes(notif.cleanerId)
+          );
+
+          jobs = await Promise.all(myJobs.map(async j => {
+            let customerName = "";
+            if (j.customerId) {
+              const c = await getCustomerById(j.customerId);
+              if (c) customerName = `${c.firstName} ${c.lastName}`.trim();
+            }
+            const teamMemberNames = ((j.teamMembers || []) as string[])
+              .map((id: string) => empMap[id]?.name || "").filter(Boolean);
+            return {
+              ...j,
+              customerName,
+              teamMemberNames,
+              durationHours: j.endDatetime
+                ? (new Date(j.endDatetime).getTime() - new Date(j.startDatetime).getTime()) / 3600000
+                : 3,
+            };
+          }));
+        }
+      }
+
       return res.json({
         cleanerName: notif.cleanerName,
-        weekLabel: snap.weekLabel || "",
-        jobs: snap.jobs || [],
+        weekLabel,
+        jobs,
         ackStatus: notif.ackStatus,
+        issueMessage: notif.issueMessage || "",
         acknowledgedAt: notif.acknowledgedAt,
+        isUpdate,
       });
     } catch (error: any) {
+      console.error("Ack GET error:", error);
       return res.status(500).json({ message: "Failed to load schedule" });
     }
   });

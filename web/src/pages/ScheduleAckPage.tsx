@@ -1,33 +1,235 @@
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { CheckCircle2, AlertCircle, CalendarDays, Clock } from "lucide-react";
+import { CheckCircle2, AlertTriangle, MapPin, Clock, Users, FileText, ChevronDown, ChevronUp, X } from "lucide-react";
 
 const DAY_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-function JobCard({ job }: { job: any }) {
+const JOB_TYPE_LABEL: Record<string, string> = {
+  regular: "Regular Clean",
+  deep_clean: "Deep Clean",
+  move_out: "Move-Out Clean",
+  move_in: "Move-In Clean",
+  post_construction: "Post-Construction",
+  office: "Office Clean",
+  airbnb: "Airbnb Turnover",
+  other: "Other",
+};
+
+function formatDuration(hours: number) {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function JobCard({ job, myName }: { job: any; myName: string }) {
+  const [noteOpen, setNoteOpen] = useState(false);
   const dt = new Date(job.startDatetime);
   const time = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const day = DAY_ORDER[dt.getDay()];
+  const endDt = job.endDatetime ? new Date(job.endDatetime) : null;
+  const endTime = endDt ? endDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
   const mapUrl = job.address ? `https://maps.google.com/?q=${encodeURIComponent(job.address)}` : null;
-  const teammates = (job.teamMemberNames || []).filter((n: string) => n !== "");
+  const teammates = (job.teamMemberNames || []).filter((n: string) => n && n !== myName);
+  const label = JOB_TYPE_LABEL[job.jobType] || job.jobType || "Clean";
 
   return (
-    <div className="border-l-4 border-indigo-400 pl-4 py-2">
-      <div className="font-semibold text-slate-800">{time} — {job.customerName || "Client"}</div>
-      {job.address ? (
-        <div className="text-slate-500 text-sm mt-0.5">
-          {job.address}
-          {mapUrl ? <> · <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline-offset-2 underline text-xs">Directions</a></> : null}
+    <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #e8eaed", overflow: "hidden", marginBottom: 12 }}>
+      {/* Time bar */}
+      <div style={{ background: "#f8f9fa", padding: "12px 16px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", gap: 8 }}>
+        <Clock size={14} color="#6b7280" />
+        <span style={{ fontSize: 15, fontWeight: 700, color: "#111827", letterSpacing: "-0.01em" }}>
+          {time}{endTime ? ` – ${endTime}` : ""}
+        </span>
+        {job.durationHours ? (
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "#9ca3af", fontWeight: 500 }}>
+            {formatDuration(job.durationHours)}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Job info */}
+      <div style={{ padding: "14px 16px" }}>
+        {/* Service type badge */}
+        <div style={{ display: "inline-block", fontSize: 11, fontWeight: 600, color: "#4f46e5", background: "#eef2ff", borderRadius: 6, padding: "3px 8px", marginBottom: 10, letterSpacing: "0.02em", textTransform: "uppercase" }}>
+          {label}
         </div>
-      ) : null}
-      {job.jobType ? <div className="text-slate-500 text-sm">Service: {job.jobType}</div> : null}
-      {teammates.length > 0 ? <div className="text-slate-500 text-sm">Teammate{teammates.length > 1 ? "s" : ""}: {teammates.join(", ")}</div> : null}
-      {job.cleanerNotes ? (
-        <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
-          Note: {job.cleanerNotes}
+
+        {/* Address */}
+        {job.address ? (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 10 }}>
+            <MapPin size={16} color="#9ca3af" style={{ marginTop: 1, flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 15, color: "#111827", fontWeight: 500, lineHeight: 1.4 }}>{job.address}</div>
+              {mapUrl ? (
+                <a
+                  href={mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: 13, color: "#4f46e5", textDecoration: "none", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 3, marginTop: 3 }}
+                >
+                  Get directions
+                </a>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Teammates */}
+        {teammates.length > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <Users size={15} color="#9ca3af" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: 14, color: "#6b7280" }}>
+              With {teammates.join(" & ")}
+            </span>
+          </div>
+        ) : null}
+
+        {/* Notes toggle */}
+        {job.cleanerNotes ? (
+          <div style={{ marginTop: 8 }}>
+            <button
+              onClick={() => setNoteOpen(o => !o)}
+              style={{ background: "none", border: "none", padding: "6px 0", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#92400e" }}
+            >
+              <FileText size={13} color="#92400e" />
+              Note from office
+              {noteOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
+            {noteOpen ? (
+              <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px", fontSize: 14, color: "#78350f", lineHeight: 1.5, marginTop: 4 }}>
+                {job.cleanerNotes}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DaySection({ day, jobs, myName }: { day: string; jobs: any[]; myName: string }) {
+  const sorted = [...jobs].sort((a, b) => new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime());
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: "#111827", letterSpacing: "-0.02em" }}>{day}</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af", background: "#f3f4f6", borderRadius: 20, padding: "2px 10px" }}>
+          {sorted.length} job{sorted.length !== 1 ? "s" : ""}
         </div>
-      ) : null}
+      </div>
+      {sorted.map((j, i) => <JobCard key={i} job={j} myName={myName} />)}
+    </div>
+  );
+}
+
+function IssueSheet({ onSubmit, onCancel, isPending }: { onSubmit: (msg: string) => void; onCancel: () => void; isPending: boolean }) {
+  const [msg, setMsg] = useState("");
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div style={{ background: "#fff", width: "100%", maxWidth: 480, borderRadius: "20px 20px 0 0", padding: "28px 20px 40px", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>Flag an Issue</div>
+          <button onClick={onCancel} style={{ background: "#f3f4f6", border: "none", borderRadius: 20, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <X size={16} color="#6b7280" />
+          </button>
+        </div>
+        <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 16, lineHeight: 1.5 }}>
+          Tell your office what's going on — they'll get back to you.
+        </p>
+        <textarea
+          value={msg}
+          onChange={e => setMsg(e.target.value)}
+          placeholder="e.g. I can't make Tuesday, I have a conflict with the Thursday morning job..."
+          rows={4}
+          style={{ width: "100%", padding: "12px 14px", border: "2px solid #e5e7eb", borderRadius: 12, fontSize: 15, color: "#111827", outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box", lineHeight: 1.5 }}
+          autoFocus
+        />
+        <button
+          onClick={() => onSubmit(msg)}
+          disabled={isPending || !msg.trim()}
+          style={{ marginTop: 14, width: "100%", background: isPending || !msg.trim() ? "#e5e7eb" : "#dc2626", color: isPending || !msg.trim() ? "#9ca3af" : "#fff", border: "none", borderRadius: 14, padding: "16px 0", fontSize: 16, fontWeight: 700, cursor: isPending || !msg.trim() ? "not-allowed" : "pointer", transition: "background 0.15s" }}
+        >
+          {isPending ? "Sending..." : "Send to Office"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div style={{ minHeight: "100dvh", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 36, height: 36, border: "3px solid #e5e7eb", borderTopColor: "#4f46e5", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+function ErrorScreen({ message }: { message?: string }) {
+  return (
+    <div style={{ minHeight: "100dvh", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+      <div style={{ textAlign: "center", maxWidth: 320 }}>
+        <div style={{ width: 56, height: 56, background: "#fee2e2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+          <AlertTriangle size={24} color="#dc2626" />
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 8 }}>Link Not Found</div>
+        <div style={{ fontSize: 15, color: "#6b7280", lineHeight: 1.6 }}>
+          {message || "This link may be expired or invalid. Contact your office for your schedule."}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmedScreen({ name, weekLabel, ackStatus, issueMessage }: { name: string; weekLabel: string; ackStatus: string; issueMessage?: string }) {
+  if (ackStatus === "issue") {
+    return (
+      <div style={{ minHeight: "100dvh", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+        <div style={{ textAlign: "center", maxWidth: 320 }}>
+          <div style={{ width: 64, height: 64, background: "#fef3c7", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <AlertTriangle size={30} color="#d97706" />
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#111827", marginBottom: 8 }}>Issue Reported</div>
+          <div style={{ fontSize: 15, color: "#6b7280", lineHeight: 1.6, marginBottom: 16 }}>
+            Your office has been notified about your schedule for <strong>{weekLabel}</strong>.
+          </div>
+          {issueMessage ? (
+            <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "#78350f", textAlign: "left", lineHeight: 1.5 }}>
+              "{issueMessage}"
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+  if (ackStatus === "unavailable") {
+    return (
+      <div style={{ minHeight: "100dvh", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+        <div style={{ textAlign: "center", maxWidth: 320 }}>
+          <div style={{ width: 64, height: 64, background: "#fee2e2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            <X size={30} color="#dc2626" />
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#111827", marginBottom: 8 }}>Marked Unavailable</div>
+          <div style={{ fontSize: 15, color: "#6b7280", lineHeight: 1.6 }}>
+            Your office knows you're unavailable for this week. They'll follow up with you.
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ minHeight: "100dvh", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}>
+      <div style={{ textAlign: "center", maxWidth: 320 }}>
+        <div style={{ width: 64, height: 64, background: "#d1fae5", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+          <CheckCircle2 size={32} color="#059669" />
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: "#111827", marginBottom: 8 }}>You're confirmed!</div>
+        <div style={{ fontSize: 15, color: "#6b7280", lineHeight: 1.6 }}>
+          Thanks, <strong>{name}</strong>. Your schedule for <strong>{weekLabel}</strong> is confirmed. See you out there.
+        </div>
+      </div>
     </div>
   );
 }
@@ -35,17 +237,17 @@ function JobCard({ job }: { job: any }) {
 export default function ScheduleAckPage() {
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
-  const [submitted, setSubmitted] = useState(false);
-  const [showIssueForm, setShowIssueForm] = useState(searchParams.get("flag") === "1");
-  const [issueMessage, setIssueMessage] = useState("");
+  const [showIssue, setShowIssue] = useState(searchParams.get("flag") === "1");
+  const [done, setDone] = useState<{ status: string; msg?: string } | null>(null);
   const [error, setError] = useState("");
 
   const { data, isLoading, isError } = useQuery<any>({
     queryKey: ["/api/schedule/ack", token],
-    queryFn: () => fetch(`/api/schedule/ack/${token}`).then(r => {
-      if (!r.ok) throw new Error("Not found");
-      return r.json();
-    }),
+    queryFn: () =>
+      fetch(`/api/schedule/ack/${token}`).then(r => {
+        if (!r.ok) throw new Error("Not found");
+        return r.json();
+      }),
   });
 
   const ackMutation = useMutation({
@@ -55,49 +257,26 @@ export default function ScheduleAckPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to submit");
+      if (!res.ok) throw new Error("Failed");
       return res.json();
     },
-    onSuccess: () => setSubmitted(true),
-    onError: () => setError("Failed to submit response. Please try again."),
+    onSuccess: (_r, vars) => {
+      setShowIssue(false);
+      setDone({ status: vars.action, msg: vars.issueMessage });
+    },
+    onError: () => setError("Something went wrong. Please try again."),
   });
 
-  const handleAck = (action: "acknowledged" | "issue" | "unavailable", msg?: string) => {
-    setError("");
-    ackMutation.mutate({ action, issueMessage: msg || "" });
-  };
+  if (isLoading) return <LoadingScreen />;
+  if (isError) return <ErrorScreen />;
 
-  if (isLoading) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  const alreadyDone = done || (data?.ackStatus && data.ackStatus !== "pending");
+  if (alreadyDone) {
+    const status = done?.status || data?.ackStatus;
+    const msg = done?.msg || data?.issueMessage;
+    return <ConfirmedScreen name={data?.cleanerName || ""} weekLabel={data?.weekLabel || ""} ackStatus={status} issueMessage={msg} />;
+  }
 
-  if (isError) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="text-center max-w-sm">
-        <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <AlertCircle className="w-8 h-8 text-rose-500" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-800 mb-2">Schedule Not Found</h2>
-        <p className="text-slate-500 text-sm">This link may have expired or is invalid. Contact your office for your schedule.</p>
-      </div>
-    </div>
-  );
-
-  if (submitted || data?.ackStatus === "acknowledged") return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="text-center max-w-sm">
-        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <CheckCircle2 className="w-10 h-10 text-emerald-600" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-800 mb-2">Got it, {data?.cleanerName}!</h2>
-        <p className="text-slate-500 text-sm">Your schedule for <strong>{data?.weekLabel}</strong> has been acknowledged. See you out there!</p>
-      </div>
-    </div>
-  );
-
-  // Group jobs by day
   const jobs: any[] = data?.jobs || [];
   const grouped: Record<string, any[]> = {};
   for (const j of jobs) {
@@ -108,123 +287,120 @@ export default function ScheduleAckPage() {
   const daysWithJobs = DAY_ORDER.filter(d => grouped[d]);
   const totalJobs = jobs.length;
   const estHours = jobs.reduce((a, j) => a + (j.durationHours || 3), 0);
+  const myName = data?.cleanerName || "";
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div style={{ minHeight: "100dvh", background: "#f9fafb", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      {/* Issue sheet overlay */}
+      {showIssue ? (
+        <IssueSheet
+          isPending={ackMutation.isPending}
+          onCancel={() => setShowIssue(false)}
+          onSubmit={msg => ackMutation.mutate({ action: "issue", issueMessage: msg })}
+        />
+      ) : null}
+
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 py-8 text-white">
-        <div className="max-w-lg mx-auto">
-          <p className="text-indigo-200 text-sm font-medium mb-1">Your Schedule</p>
-          <h1 className="text-2xl font-bold mb-1">{data?.weekLabel}</h1>
-          <p className="text-indigo-200 text-sm">Hi {data?.cleanerName}</p>
+      <div style={{ background: "#4f46e5", padding: "28px 20px 24px", position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ maxWidth: 480, margin: "0 auto" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
+            Your Schedule
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.2 }}>
+            {data?.weekLabel}
+          </div>
+          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", marginTop: 4 }}>
+            Hi {myName}
+          </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-5 py-6 space-y-6">
-        {/* Already flagged / unavailable state */}
-        {(data?.ackStatus === "issue" || data?.ackStatus === "unavailable") && !submitted ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <p className="text-amber-800 font-semibold text-sm">
-              {data?.ackStatus === "issue" ? "You previously flagged an issue with this schedule." : "You marked yourself as unavailable."}
-            </p>
+      {/* Summary bar */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb" }}>
+        <div style={{ maxWidth: 480, margin: "0 auto", display: "flex", padding: "0 20px" }}>
+          {[
+            { value: totalJobs, label: "Jobs" },
+            { value: `${estHours.toFixed(1)}h`, label: "Est. hours" },
+            { value: daysWithJobs.length, label: "Days" },
+          ].map(({ value, label }) => (
+            <div key={label} style={{ flex: 1, textAlign: "center", padding: "14px 0" }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#111827", letterSpacing: "-0.02em" }}>{value}</div>
+              <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 2 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "24px 16px 180px" }}>
+        {/* Updated banner */}
+        {data?.isUpdate ? (
+          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "12px 16px", marginBottom: 20, display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <AlertTriangle size={16} color="#d97706" style={{ marginTop: 2, flexShrink: 0 }} />
+            <div style={{ fontSize: 14, color: "#92400e", lineHeight: 1.5 }}>
+              <strong>Schedule updated.</strong> Your office has made changes — please review carefully.
+            </div>
           </div>
         ) : null}
 
-        {/* Summary */}
-        <div className="flex gap-4">
-          <div className="flex-1 bg-white rounded-xl border border-slate-100 p-4 text-center shadow-sm">
-            <div className="text-2xl font-bold text-slate-900">{totalJobs}</div>
-            <div className="text-xs text-slate-500 mt-0.5">Jobs</div>
-          </div>
-          <div className="flex-1 bg-white rounded-xl border border-slate-100 p-4 text-center shadow-sm">
-            <div className="text-2xl font-bold text-slate-900">{estHours.toFixed(1)}</div>
-            <div className="text-xs text-slate-500 mt-0.5">Est. Hours</div>
-          </div>
-          <div className="flex-1 bg-white rounded-xl border border-slate-100 p-4 text-center shadow-sm">
-            <div className="text-2xl font-bold text-slate-900">{daysWithJobs.length}</div>
-            <div className="text-xs text-slate-500 mt-0.5">Days</div>
+        {/* Days */}
+        {daysWithJobs.length > 0
+          ? daysWithJobs.map(day => <DaySection key={day} day={day} jobs={grouped[day]} myName={myName} />)
+          : (
+            <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
+              <div style={{ fontSize: 15 }}>No jobs found for this week.</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>Contact your office for details.</div>
+            </div>
+          )
+        }
+      </div>
+
+      {/* Sticky bottom CTA */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #e5e7eb", padding: "16px 20px 32px", zIndex: 20 }}>
+        <div style={{ maxWidth: 480, margin: "0 auto" }}>
+          {error ? (
+            <div style={{ fontSize: 13, color: "#dc2626", marginBottom: 10, textAlign: "center" }}>{error}</div>
+          ) : null}
+          <button
+            onClick={() => ackMutation.mutate({ action: "acknowledged" })}
+            disabled={ackMutation.isPending}
+            style={{
+              width: "100%",
+              background: ackMutation.isPending ? "#a5b4fc" : "#4f46e5",
+              color: "#fff",
+              border: "none",
+              borderRadius: 14,
+              padding: "17px 0",
+              fontSize: 17,
+              fontWeight: 700,
+              cursor: ackMutation.isPending ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              letterSpacing: "-0.01em",
+              transition: "background 0.15s",
+            }}
+          >
+            <CheckCircle2 size={20} />
+            {ackMutation.isPending ? "Confirming..." : "Got It — I'm Good to Go"}
+          </button>
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <button
+              onClick={() => setShowIssue(true)}
+              style={{ flex: 1, background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12, padding: "13px 0", fontSize: 14, fontWeight: 600, color: "#374151", cursor: "pointer" }}
+            >
+              Flag an Issue
+            </button>
+            <button
+              onClick={() => ackMutation.mutate({ action: "unavailable" })}
+              disabled={ackMutation.isPending}
+              style={{ flex: 1, background: "#f9fafb", border: "1px solid #fecaca", borderRadius: 12, padding: "13px 0", fontSize: 14, fontWeight: 600, color: "#dc2626", cursor: "pointer" }}
+            >
+              I'm Unavailable
+            </button>
           </div>
         </div>
-
-        {/* Schedule by day */}
-        {daysWithJobs.map(day => (
-          <div key={day} className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-              <h3 className="font-bold text-slate-800">{day}</h3>
-            </div>
-            <div className="px-4 py-3 space-y-4">
-              {(grouped[day] || []).sort((a, b) => new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime()).map((j, i) => (
-                <JobCard key={i} job={j} />
-              ))}
-            </div>
-          </div>
-        ))}
-
-        {jobs.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">
-            <CalendarDays className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No jobs found for this week</p>
-          </div>
-        ) : null}
-
-        {/* Acknowledge / Flag section */}
-        {showIssueForm ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-            <h3 className="font-bold text-slate-800">Flag an Issue</h3>
-            <textarea
-              value={issueMessage}
-              onChange={e => setIssueMessage(e.target.value)}
-              placeholder="Describe the issue (e.g. conflict, I can't make Tuesday, etc.)"
-              rows={3}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-            />
-            {error ? <p className="text-rose-600 text-sm">{error}</p> : null}
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleAck("issue", issueMessage)}
-                disabled={ackMutation.isPending}
-                className="flex-1 py-3 bg-rose-600 text-white font-semibold rounded-xl text-sm hover:bg-rose-700 disabled:opacity-50 transition-colors"
-              >
-                {ackMutation.isPending ? "Submitting..." : "Submit Issue"}
-              </button>
-              <button
-                onClick={() => setShowIssueForm(false)}
-                className="px-4 py-3 border border-slate-200 text-slate-600 font-medium rounded-xl text-sm hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
-            <h3 className="font-bold text-slate-800">Confirm Your Schedule</h3>
-            <p className="text-slate-500 text-sm">Review your jobs above and let us know you're good to go.</p>
-            {error ? <p className="text-rose-600 text-sm">{error}</p> : null}
-            <button
-              onClick={() => handleAck("acknowledged")}
-              disabled={ackMutation.isPending}
-              className="w-full py-3.5 bg-indigo-600 text-white font-bold rounded-xl text-base hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              {ackMutation.isPending ? "Confirming..." : "Acknowledge Schedule"}
-            </button>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowIssueForm(true)}
-                className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-medium rounded-xl text-sm hover:bg-slate-50 transition-colors"
-              >
-                Flag an Issue
-              </button>
-              <button
-                onClick={() => handleAck("unavailable")}
-                disabled={ackMutation.isPending}
-                className="flex-1 py-2.5 border border-amber-200 text-amber-700 font-medium rounded-xl text-sm hover:bg-amber-50 transition-colors"
-              >
-                I'm Unavailable
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
