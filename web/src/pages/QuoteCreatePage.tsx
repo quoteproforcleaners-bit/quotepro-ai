@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { buildAddress } from "../lib/address";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiPost } from "../lib/api";
+import { apiPost, apiRequest } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import {
   ArrowLeft,
@@ -314,7 +314,9 @@ function StepperButton({
 
 export default function QuoteCreatePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState(0);
+  const [intakeId, setIntakeId] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState("");
   const [newCustomer, setNewCustomer] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -361,6 +363,52 @@ export default function QuoteCreatePage() {
   const [editingValue, setEditingValue] = useState<string>("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Pre-fill from intake request URL params
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get("intakeId");
+    if (!id) return;
+
+    setIntakeId(id);
+    setNewCustomer(true);
+
+    // Customer info
+    const fullName = (params.get("name") || "").trim();
+    const spaceIdx = fullName.indexOf(" ");
+    const firstName = spaceIdx > -1 ? fullName.slice(0, spaceIdx) : fullName;
+    const lastName = spaceIdx > -1 ? fullName.slice(spaceIdx + 1) : "";
+
+    setCustomerForm((prev) => ({
+      ...prev,
+      firstName,
+      lastName,
+      email: params.get("email") || "",
+      phone: params.get("phone") || "",
+      street: params.get("address") || "",
+    }));
+
+    // Property
+    const beds = parseInt(params.get("beds") || "");
+    const baths = parseFloat(params.get("baths") || "");
+    const sqft = parseInt(params.get("sqft") || "");
+    const petType = params.get("petType") || "none";
+
+    setProperty((prev) => ({
+      ...prev,
+      ...(beds > 0 ? { beds } : {}),
+      ...(baths > 0 ? { baths: Math.floor(baths), halfBaths: baths % 1 >= 0.5 ? 1 : 0 } : {}),
+      ...(sqft > 0 ? { sqft } : {}),
+      petType: ["none", "cat", "dog", "multiple"].includes(petType) ? petType : "none",
+    }));
+
+    // Frequency
+    const freq = params.get("frequency");
+    if (freq && ["one-time", "weekly", "biweekly", "monthly"].includes(freq)) {
+      setServices((prev) => ({ ...prev, frequency: freq }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { data: customers = [] } = useQuery<any[]>({
     queryKey: ["/api/customers"],
   });
@@ -374,8 +422,17 @@ export default function QuoteCreatePage() {
 
   const createQuoteMutation = useMutation({
     mutationFn: (data: any) => apiPost("/api/quotes", data),
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/intake-requests/count"] });
+      if (intakeId) {
+        try {
+          await apiRequest("PATCH", `/api/intake-requests/${intakeId}`, { status: "converted" });
+          queryClient.invalidateQueries({ queryKey: ["/api/intake-requests"] });
+        } catch {
+          // non-fatal — quote was created successfully
+        }
+      }
       navigate(`/quotes/${data.id}`);
     },
     onError: (err: any) => {
@@ -603,6 +660,19 @@ export default function QuoteCreatePage() {
       <Card className="mb-6">
         {step === 0 ? (
           <div className="space-y-4">
+            {intakeId ? (
+              <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                  <FileText className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">Pre-filled from quote request</p>
+                  <p className="text-xs text-blue-600 mt-0.5">
+                    Customer info, property details, and frequency have been mapped automatically. Review and adjust as needed before continuing.
+                  </p>
+                </div>
+              </div>
+            ) : null}
             <CardHeader title="Select Customer" icon={FileText} />
             {!newCustomer ? (
               <div className="space-y-3">
