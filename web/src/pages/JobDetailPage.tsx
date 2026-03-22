@@ -296,6 +296,8 @@ export default function JobDetailPage() {
               addNoteMutation={addNoteMutation}
               deleteNoteMutation={deleteNoteMutation}
               rateMutation={rateMutation}
+              jobCustomer={jobCustomer}
+              onToast={(msg: string, variant: any) => setToast({ message: msg, variant: variant || "success" })}
             />
           ) : activeTab === "progress" ? (
             <ProgressTab
@@ -462,6 +464,8 @@ function OverviewTab({
   addNoteMutation,
   deleteNoteMutation,
   rateMutation,
+  jobCustomer,
+  onToast,
 }: any) {
   const [ratingValue, setRatingValue] = useState(job.satisfactionRating || 0);
   const [skipConfirm, setSkipConfirm] = useState(false);
@@ -566,7 +570,7 @@ function OverviewTab({
             customerId: job.customerId || undefined,
             notes: job.notes || undefined,
           }}
-          onToast={(msg, variant) => setToast({ message: msg, variant: variant || "success" })}
+          onToast={onToast}
         />
       ) : null}
 
