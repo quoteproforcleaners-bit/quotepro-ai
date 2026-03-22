@@ -1,0 +1,382 @@
+Now build the cleaner-facing communication layer for the “Publish Schedule” feature in the QuotePro web app.
+
+This includes:
+1. the cleaner schedule email design
+2. the secure cleaner schedule web view
+3. the acknowledgment / issue reporting flow
+4. update emails for republished schedule changes
+
+This experience should feel clean, mobile-friendly, simple, and highly usable for field staff.
+
+PRODUCT GOAL
+
+When a cleaner receives their weekly schedule, it should be:
+- easy to read on a phone
+- clearly organized by day
+- immediately actionable
+- simple to acknowledge
+- easy to flag an issue if needed
+- resilient to schedule updates
+
+This should not feel like a generic transactional email.
+It should feel like a polished operational tool.
+
+PRIMARY USER
+
+Cleaner / team member receiving their weekly job schedule.
+
+Many cleaners may:
+- read on mobile
+- skim quickly
+- not be highly technical
+- need clarity more than complexity
+
+Design accordingly.
+
+CORE DELIVERABLES
+
+Build:
+
+1. INITIAL WEEKLY SCHEDULE EMAIL
+Sent when admin first publishes the schedule
+
+2. SCHEDULE UPDATE EMAIL
+Sent when admin republishes and the cleaner is affected by changes
+
+3. SECURE CLEANER SCHEDULE WEB VIEW
+Accessible from tokenized link in email
+
+4. ACKNOWLEDGMENT FLOW
+Cleaner can respond:
+- Got it
+- I have an issue
+- I’m unavailable
+
+5. ADMIN-VISIBLE RESPONSE TRACKING
+Cleaner responses should be stored and shown back in the admin schedule status view
+
+EMAIL DESIGN REQUIREMENTS
+
+The weekly email must be:
+- mobile-first
+- cleanly spaced
+- easy to scan
+- grouped by day
+- visually clear without being cluttered
+- branded and professional
+- simple enough for operational use
+
+EMAIL CONTENT REQUIREMENTS
+
+Initial schedule email should include:
+
+Header:
+- title: “Your Schedule for [Week Range]”
+- cleaner name
+- short intro
+
+Main content:
+- jobs grouped by day
+- each job card or section includes:
+  - time / arrival window
+  - customer name
+  - service address
+  - service type
+  - teammates if relevant
+  - cleaner-facing notes
+  - estimated duration if available
+
+Summary section:
+- total number of jobs
+- estimated total weekly hours if available
+- week range
+
+CTA section:
+- Acknowledge Schedule
+- View Full Schedule
+- Report an Issue
+
+Optional:
+- contact/admin name if needed
+- reminder to review carefully
+
+EMAIL DESIGN STYLE
+
+The visual design should be:
+- modern
+- readable
+- operational
+- trustworthy
+- lightly branded
+- not overdesigned
+
+Use:
+- clear hierarchy
+- day dividers
+- job cards or clean list rows
+- obvious CTA buttons
+- mobile-safe spacing
+- dark text on light background for readability
+
+Do NOT:
+- cram too much into one dense table
+- use tiny text
+- create a desktop-only email
+- expose internal office notes
+
+UPDATE EMAIL REQUIREMENTS
+
+When a published schedule changes and the cleaner is affected, send an update email.
+
+The update email should:
+- clearly say this is an update
+- explain only what changed
+- avoid re-sending unnecessary noise
+- make it easy to view updated schedule and acknowledge the new version if needed
+
+Example content:
+Subject:
+Update to Your Schedule for Thursday
+
+Body:
+Your schedule has been updated for the week of March 25–29.
+
+Changes:
+- Johnson Home moved from 10:00 AM to 11:30 AM
+- New teammate: Ashley
+- Added one new Friday job
+
+CTA:
+- View Updated Schedule
+- Acknowledge Update
+- Report an Issue
+
+SECURE CLEANER WEB VIEW
+
+Create a secure, lightweight schedule page accessible from a tokenized link in the email.
+
+This page should:
+- be mobile-friendly first
+- show only the cleaner’s own schedule
+- show only the relevant publication/version
+- allow acknowledgment
+- allow issue reporting
+- display if the schedule has already been acknowledged
+- display if an updated version supersedes a previous one
+
+The page should include:
+- week range
+- cleaner name
+- grouped jobs by day
+- time, customer, address, service type, teammates, notes
+- summary stats
+- acknowledgment controls
+- issue reporting controls
+
+The design should feel like a lightweight companion app page:
+- simple
+- elegant
+- touch-friendly
+- fast to load
+- not cluttered
+
+ACKNOWLEDGMENT UX
+
+Support these acknowledgment actions:
+
+1. Got It
+Marks the schedule as acknowledged
+
+2. I Have an Issue
+Opens a simple issue form such as:
+- message box
+- optional issue types:
+  - scheduling conflict
+  - unavailable
+  - wrong assignment
+  - timing issue
+  - other
+
+3. I’m Unavailable
+A faster structured response indicating the cleaner cannot cover all or part of the schedule
+
+After response, show a clean confirmation state:
+- “Thanks — your response has been recorded.”
+- or “You’ve already acknowledged this schedule.”
+
+ADMIN TRACKING REQUIREMENTS
+
+Responses from cleaners should be persisted and shown in admin views.
+
+Track:
+- sent time
+- opened if available
+- acknowledgment status
+- acknowledgment timestamp
+- issue flagged
+- issue message
+- unavailable flag
+- latest publication version acknowledged
+
+TOKEN / SECURITY REQUIREMENTS
+
+The cleaner schedule link should be secure.
+
+Implement a safe tokenized access pattern such as:
+- unique per notification or cleaner-publication record
+- time-safe and hard to guess
+- scoped only to that cleaner’s schedule
+- no login required if token is valid
+OR use authenticated access if the product architecture already supports a cleaner portal
+
+Important:
+A cleaner should never be able to view:
+- another cleaner’s schedule
+- office-only notes
+- other team schedules
+- broader customer/company records beyond what’s needed for the assignment
+
+LANGUAGE / LOCALIZATION READINESS
+
+Architect the cleaner email and schedule page so they can later support preferred language if needed.
+If QuotePro’s multilingual system is already available, use the cleaner/customer preferred language support where appropriate.
+
+At minimum:
+- avoid hardcoded copy in templates
+- structure text for translation readiness
+
+MOBILE-FIRST REQUIREMENTS
+
+This is extremely important.
+
+The majority of cleaners will likely read this on a phone.
+
+Optimize for:
+- single-column layout
+- large tap targets
+- compact but readable job cards
+- obvious buttons
+- low cognitive load
+- minimal friction
+
+Do not design this like a desktop admin screen.
+
+RECOMMENDED UX DETAILS
+
+Add nice touches such as:
+- status badge: “Published” / “Updated”
+- small day summary count
+- address tap-to-map links if possible
+- teammate badges
+- note callouts
+- acknowledgment success state
+- “Last updated” timestamp
+
+If feasible, include:
+- “Add to calendar” architecture placeholder
+- “Call office” quick action placeholder
+
+COMPONENT REQUIREMENTS
+
+Build reusable components where helpful:
+- weekly schedule email template
+- schedule update email template
+- day group component
+- job card component
+- acknowledgment action panel
+- issue form
+- status confirmation block
+
+TECHNICAL REQUIREMENTS
+
+Use the existing QuotePro web architecture wherever possible.
+
+Implement:
+- email template rendering
+- secure token generation and validation
+- cleaner schedule web route/page
+- acknowledgment endpoints/actions
+- issue submission handling
+- updated schedule rendering
+- version-aware display
+
+DATA REQUIREMENTS
+
+Use the publish/versioning models from the main feature.
+Persist cleaner responses in the appropriate notification/acknowledgment tables.
+
+Handle:
+- first publish
+- republish/update
+- already acknowledged schedule
+- schedule superseded by newer version
+- invalid or expired token gracefully
+
+EDGE CASES TO HANDLE
+
+1. Cleaner clicks old link after a newer schedule version exists
+- show clear message
+- redirect or offer latest schedule if appropriate
+
+2. Cleaner acknowledges, then schedule changes later
+- previous acknowledgment should remain tied to old version
+- new version may require new acknowledgment
+
+3. Missing email data
+- fail gracefully in admin tracking
+
+4. No jobs assigned on some days
+- simply omit empty days or show clean structure
+
+5. Invalid token
+- show safe error state
+- do not leak any schedule data
+
+TESTING REQUIREMENTS
+
+Add tests for:
+- email rendering content
+- token generation/validation
+- cleaner schedule page scoping
+- acknowledgment submission
+- issue reporting
+- old-version behavior
+- update email generation
+- mobile-safe rendering basics if feasible
+
+SEED / DEMO DATA
+
+Create realistic seeded demo scenarios including:
+- one cleaner with a full weekly schedule
+- one cleaner with a republished updated schedule
+- one acknowledged schedule
+- one issue-reported schedule
+- one outdated link scenario
+
+QUALITY BAR
+
+This should feel polished enough that a real cleaning company could rely on it operationally.
+It should be simple for cleaners, useful for managers, and resilient when schedules change.
+
+DELIVERABLES
+
+I want:
+1. initial weekly schedule email template
+2. update schedule email template
+3. secure cleaner schedule web page
+4. acknowledgment flow
+5. issue reporting flow
+6. admin-trackable response persistence
+7. secure token handling
+8. demo data
+9. tests
+10. README updates if needed
+
+START BY
+
+1. designing the cleaner email structure
+2. building the secure tokenized schedule page
+3. implementing acknowledgment actions
+4. implementing update email handling
+5. wiring responses back into admin status tracking
+6. testing edge cases

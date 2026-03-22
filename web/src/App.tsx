@@ -55,6 +55,8 @@ import FileLibraryPage from "./pages/FileLibraryPage";
 import EmailSequencesPage from "./pages/EmailSequencesPage";
 import PricingLogicPage from "./pages/PricingLogicPage";
 import EmployeesPage from "./pages/EmployeesPage";
+import SchedulePublishPage from "./pages/SchedulePublishPage";
+import ScheduleAckPage from "./pages/ScheduleAckPage";
 
 export default function App() {
   const { isAuthenticated, isLoading, business } = useAuth();
@@ -127,6 +129,7 @@ export default function App() {
           <Route path="/jobs/:id" element={<ProGate feature="Job Management"><JobDetailPage /></ProGate>} />
           <Route path="/employees" element={<EmployeesPage />} />
           <Route path="/calendar" element={<ProGate feature="Job Management"><CalendarPage /></ProGate>} />
+          <Route path="/schedule-publish" element={<SchedulePublishPage />} />
           <Route path="/growth" element={<ProGate feature="Growth Dashboard"><GrowthDashboardPage /></ProGate>} />
           <Route path="/follow-ups" element={<FollowUpsPage />} />
           <Route path="/opportunities" element={<ProGate feature="Opportunities"><OpportunitiesPage /></ProGate>} />
@@ -160,6 +163,9 @@ export default function App() {
 
         {/* Public intake form — no auth required */}
         <Route path="/intake/:businessId" element={<IntakePage />} />
+
+        {/* Public cleaner schedule acknowledgment page */}
+        <Route path="/schedule-ack/:token" element={<ScheduleAckPage />} />
 
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>

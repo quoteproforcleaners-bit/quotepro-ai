@@ -558,6 +558,7 @@ export async function updateJob(
     endDatetime: Date | null;
     recurrence: string;
     internalNotes: string;
+    cleanerNotes: string;
     address: string;
     total: number | null;
     startedAt: Date | null;

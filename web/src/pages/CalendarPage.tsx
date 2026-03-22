@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiPost, apiPut } from "../lib/api";
+import { apiPost, apiPut, apiRequest } from "../lib/api";
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,6 +17,11 @@ import {
   ExternalLink,
   RotateCcw,
   Repeat,
+  Send,
+  CheckCircle2,
+  Users,
+  RefreshCw,
+  History,
 } from "lucide-react";
 import { PageHeader, Card, Button } from "../components/ui";
 import { QuickAddCleanPanel } from "../components/QuickAddCleanPanel";
@@ -908,6 +913,248 @@ function UnscheduledPanel({
 }
 
 
+// ─── Publish Schedule Modal ─────────────────────────────────────────────────
+
+function PublishScheduleModal({
+  weekStart,
+  weekEnd,
+  weekLabel,
+  onClose,
+  onPublished,
+}: {
+  weekStart: string;
+  weekEnd: string;
+  weekLabel: string;
+  onClose: () => void;
+  onPublished: () => void;
+}) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [notes, setNotes] = useState("");
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState("");
+
+  const { data: preview, isLoading } = useQuery<any>({
+    queryKey: ["/api/schedule/week-jobs", weekStart],
+    queryFn: () =>
+      fetch(`/api/schedule/week-jobs?weekStart=${encodeURIComponent(weekStart)}`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  const { data: prevPubs = [] } = useQuery<any[]>({
+    queryKey: ["/api/schedule/publications", weekStart],
+    queryFn: () =>
+      fetch(`/api/schedule/publications?weekStart=${encodeURIComponent(weekStart)}`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  const hasPublished = prevPubs.length > 0;
+  const latestPub = prevPubs[0];
+
+  const publishMutation = useMutation({
+    mutationFn: (data: any) => apiPost("/api/schedule/publish", data),
+    onSuccess: (data: any) => {
+      setResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/schedule/publications"] });
+    },
+    onError: (e: any) => setError(e?.message || "Failed to publish schedule"),
+  });
+
+  const handlePublish = () => {
+    setError("");
+    publishMutation.mutate({ weekStart, weekEnd, notes, publishScope: "all" });
+  };
+
+  const warnings = preview?.warnings || [];
+  const totalJobs = preview?.totalJobs || 0;
+  const totalCleaners = preview?.totalCleaners || 0;
+  const cleaners = preview?.cleaners || [];
+
+  const canPublish = !isLoading && totalJobs > 0;
+
+  if (result) {
+    const sentCount = result.results?.filter((r: any) => r.status === "sent").length || 0;
+    const failedCount = result.results?.filter((r: any) => r.status === "failed").length || 0;
+    const skippedCount = result.results?.filter((r: any) => r.status === "skipped").length || 0;
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="p-6 text-center">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-1">Schedule Published</h2>
+            <p className="text-slate-500 text-sm mb-5">Version {result.versionNumber} — {result.weekLabel}</p>
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="bg-slate-50 rounded-xl p-3">
+                <div className="text-2xl font-bold text-emerald-600">{sentCount}</div>
+                <div className="text-xs text-slate-500 mt-0.5">Sent</div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3">
+                <div className="text-2xl font-bold text-amber-500">{skippedCount}</div>
+                <div className="text-xs text-slate-500 mt-0.5">Skipped</div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-3">
+                <div className="text-2xl font-bold text-rose-500">{failedCount}</div>
+                <div className="text-xs text-slate-500 mt-0.5">Failed</div>
+              </div>
+            </div>
+            {result.results && result.results.map((r: any) => (
+              <div key={r.cleanerId} className="flex items-center justify-between text-sm py-1.5 border-b border-slate-50 last:border-0">
+                <span className="text-slate-700 font-medium">{r.name}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  r.status === "sent" ? "bg-emerald-100 text-emerald-700" :
+                  r.status === "skipped" ? "bg-amber-100 text-amber-700" :
+                  "bg-rose-100 text-rose-700"
+                }`}>{r.status}</span>
+              </div>
+            ))}
+          </div>
+          <div className="px-6 pb-6 flex gap-3">
+            <button
+              onClick={() => { onPublished(); navigate("/schedule-publish"); }}
+              className="flex-1 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 transition-colors"
+            >
+              View Status Dashboard
+            </button>
+            <button onClick={() => { onPublished(); onClose(); }} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">Done</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">{hasPublished ? "Republish Schedule" : "Publish Schedule"}</h2>
+            <p className="text-slate-500 text-sm mt-0.5">{weekLabel}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+              <span className="ml-3 text-slate-500 text-sm">Analyzing schedule...</span>
+            </div>
+          ) : (
+            <>
+              {/* Version warning */}
+              {hasPublished ? (
+                <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <RefreshCw className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-amber-800 text-sm font-medium">This week was already published (v{latestPub?.versionNumber})</p>
+                    <p className="text-amber-700 text-xs mt-0.5">Republishing will send updated schedules to all assigned cleaners.</p>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-slate-900">{totalJobs}</div>
+                  <div className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Jobs This Week</div>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-slate-900">{totalCleaners}</div>
+                  <div className="text-xs text-slate-500 mt-1 uppercase tracking-wide">Cleaners to Notify</div>
+                </div>
+              </div>
+
+              {/* Cleaners list */}
+              {cleaners.length > 0 ? (
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 mb-2">Cleaners receiving schedule:</p>
+                  <div className="space-y-2">
+                    {cleaners.map((c: any) => (
+                      <div key={c.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 bg-primary-100 rounded-full flex items-center justify-center text-xs font-bold text-primary-700">
+                            {c.name.charAt(0)}
+                          </div>
+                          <span className="text-sm font-medium text-slate-800">{c.name}</span>
+                          <span className="text-xs text-slate-400">{c.jobCount} job{c.jobCount !== 1 ? "s" : ""}</span>
+                        </div>
+                        {c.hasEmail ? (
+                          <span className="text-xs text-emerald-600 font-medium">✓ Email</span>
+                        ) : (
+                          <span className="text-xs text-rose-500 font-medium">No email</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Warnings */}
+              {warnings.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-slate-700">Warnings:</p>
+                  {warnings.map((w: string, i: number) => (
+                    <div key={i} className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                      <p className="text-amber-800 text-sm">{w}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* No jobs */}
+              {totalJobs === 0 ? (
+                <div className="text-center py-4 text-slate-400">
+                  <Calendar className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No jobs scheduled for this week</p>
+                </div>
+              ) : null}
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Internal notes (optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g. Holiday week — double-check all arrival times"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                />
+              </div>
+
+              {error ? (
+                <p className="text-rose-600 text-sm bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>
+              ) : null}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-slate-100 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handlePublish}
+            disabled={!canPublish || publishMutation.isPending}
+            className="flex-1 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          >
+            {publishMutation.isPending ? (
+              <><div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" /> Sending...</>
+            ) : (
+              <><Send className="w-4 h-4" /> {hasPublished ? "Republish" : "Publish"} & Send</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CalendarPage() {
   const navigate = useNavigate();
   const { isGrowth } = useSubscription();
@@ -918,6 +1165,10 @@ export default function CalendarPage() {
   const [selectedJob, setSelectedJob] = useState<CalendarJob | null>(null);
   const [rescheduleJob, setRescheduleJob] = useState<CalendarJob | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+
+  const currentWeekStart = useMemo(() => startOfWeek(currentDate).toISOString().slice(0, 10), [currentDate]);
+  const currentWeekEnd = useMemo(() => addDays(startOfWeek(currentDate), 6).toISOString().slice(0, 10), [currentDate]);
 
   // Compute date range to fetch
   const { from, to } = useMemo(() => {
@@ -1047,6 +1298,27 @@ export default function CalendarPage() {
               <Plus className="w-4 h-4" />
               Quick Add Clean
             </button>
+
+            {/* Publish Schedule button — week view only */}
+            {view === "week" ? (
+              <button
+                onClick={() => setShowPublishModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm shadow-emerald-200"
+                data-testid="btn-publish-schedule"
+              >
+                <Send className="w-4 h-4" />
+                Publish Schedule
+              </button>
+            ) : null}
+
+            {/* Status dashboard shortcut */}
+            <button
+              onClick={() => navigate("/schedule-publish")}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors"
+              title="View publish history & delivery status"
+            >
+              <History className="w-4 h-4" />
+            </button>
           </div>
 
           {/* Nav controls */}
@@ -1092,6 +1364,17 @@ export default function CalendarPage() {
           preselectedDate={scheduleDate}
           onClose={() => setScheduleQuote(null)}
           onScheduled={() => setScheduleQuote(null)}
+        />
+      ) : null}
+
+      {/* Publish Schedule Modal */}
+      {showPublishModal ? (
+        <PublishScheduleModal
+          weekStart={currentWeekStart}
+          weekEnd={currentWeekEnd}
+          weekLabel={headerLabel}
+          onClose={() => setShowPublishModal(false)}
+          onPublished={() => setShowPublishModal(false)}
         />
       ) : null}
 

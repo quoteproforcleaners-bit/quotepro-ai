@@ -8,7 +8,7 @@ import OpenAI from "openai";
 import Stripe from "stripe";
 import { pool, db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
-import { businessFiles, sequenceEnrollments, employees } from "../shared/schema";
+import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications } from "../shared/schema";
 import { google } from "googleapis";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableGoogleCalendarClient, isGoogleCalendarConnected } from "./googleCalendarClient";
@@ -1316,6 +1316,485 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       return res.json({ message: "Deleted" });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to delete employee" });
+    }
+  });
+
+  // ─── Schedule Publication ───────────────────────────────────────────────
+
+  // Helpers for schedule publish emails
+  function buildCleanerEmailHtml(opts: {
+    cleanerName: string;
+    weekLabel: string;
+    jobs: any[];
+    ackToken: string;
+    companyName: string;
+    domain: string;
+  }): string {
+    const { cleanerName, weekLabel, jobs, ackToken, companyName, domain } = opts;
+    const dayOrder = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const grouped: Record<string, any[]> = {};
+    for (const j of jobs) {
+      const dt = new Date(j.startDatetime);
+      const day = dayOrder[dt.getDay()];
+      if (!grouped[day]) grouped[day] = [];
+      grouped[day].push(j);
+    }
+
+    const daysWithJobs = dayOrder.filter(d => grouped[d]);
+    const totalJobs = jobs.length;
+    const estHours = jobs.reduce((acc, j) => acc + (j.durationHours || 3), 0);
+
+    const jobRows = daysWithJobs.map(day => {
+      const dayJobs = grouped[day].sort((a: any, b: any) =>
+        new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime()
+      );
+      const jobsHtml = dayJobs.map((j: any) => {
+        const time = new Date(j.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        const teammates = (j.teamMemberNames || []).filter((n: string) => n !== cleanerName);
+        const mapLink = j.address ? `https://maps.google.com/?q=${encodeURIComponent(j.address)}` : null;
+        return `
+          <div style="background:#f8fafc;border-left:3px solid #6366f1;padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:10px;">
+            <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:4px;">${time} — ${j.customerName || "Client"}</div>
+            ${j.address ? `<div style="color:#475569;font-size:14px;margin-bottom:4px;">📍 ${j.address}${mapLink ? ` &nbsp;<a href="${mapLink}" style="color:#6366f1;font-size:12px;">Get directions</a>` : ""}</div>` : ""}
+            ${j.jobType ? `<div style="color:#475569;font-size:14px;margin-bottom:4px;">Service: ${j.jobType}</div>` : ""}
+            ${teammates.length > 0 ? `<div style="color:#475569;font-size:14px;margin-bottom:4px;">Teammate${teammates.length > 1 ? "s" : ""}: ${teammates.join(", ")}</div>` : ""}
+            ${j.cleanerNotes ? `<div style="color:#64748b;font-size:13px;margin-top:6px;padding:8px 10px;background:#fff;border-radius:6px;border:1px solid #e2e8f0;">📝 ${j.cleanerNotes}</div>` : ""}
+          </div>`;
+      }).join("");
+      return `<div style="margin-bottom:24px;"><div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0;">${day}</div>${jobsHtml}</div>`;
+    }).join("");
+
+    const ackUrl = `https://${domain}/schedule-ack/${ackToken}`;
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your Schedule</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:20px 16px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#6366f1,#4f46e5);padding:28px 32px;">
+      <div style="font-size:13px;color:rgba(255,255,255,0.75);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em;">${companyName}</div>
+      <div style="font-size:24px;font-weight:700;color:white;margin-bottom:2px;">Your Schedule</div>
+      <div style="font-size:15px;color:rgba(255,255,255,0.85);">${weekLabel}</div>
+    </div>
+    <div style="padding:28px 32px;">
+      <p style="font-size:16px;color:#334155;margin-bottom:24px;">Hi ${cleanerName},<br><br>Here is your schedule for <strong>${weekLabel}</strong>.</p>
+      ${jobRows}
+      <div style="background:#f8fafc;border-radius:12px;padding:16px 20px;margin:24px 0;">
+        <div style="font-size:14px;font-weight:600;color:#475569;margin-bottom:6px;">Weekly Summary</div>
+        <div style="font-size:15px;color:#0f172a;">${totalJobs} job${totalJobs !== 1 ? "s" : ""} this week &nbsp;·&nbsp; Est. ${estHours.toFixed(1)} hrs</div>
+      </div>
+      <div style="margin-top:28px;">
+        <a href="${ackUrl}" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;font-weight:600;font-size:15px;padding:13px 28px;border-radius:10px;text-decoration:none;margin-bottom:12px;">Acknowledge Schedule</a>
+        <div style="margin-top:8px;">
+          <a href="${ackUrl}" style="color:#6366f1;font-size:13px;text-decoration:none;">View schedule online →</a>
+        </div>
+      </div>
+    </div>
+    <div style="background:#f8fafc;padding:16px 32px;border-top:1px solid #e2e8f0;">
+      <p style="font-size:12px;color:#94a3b8;margin:0;">Sent by ${companyName} via QuotePro. <a href="${ackUrl}?flag=1" style="color:#94a3b8;">Flag an issue</a></p>
+    </div>
+  </div>
+</div></body></html>`;
+  }
+
+  function buildCleanerUpdateEmailHtml(opts: {
+    cleanerName: string;
+    weekLabel: string;
+    changedJobs: any[];
+    companyName: string;
+    ackToken: string;
+    domain: string;
+  }): string {
+    const { cleanerName, weekLabel, changedJobs, companyName, ackToken, domain } = opts;
+    const ackUrl = `https://${domain}/schedule-ack/${ackToken}`;
+    const jobsHtml = changedJobs.map((j: any) => {
+      const time = new Date(j.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      return `<div style="background:#fef3c7;border-left:3px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:10px;">
+        <div style="font-weight:600;color:#0f172a;">${time} — ${j.customerName || "Client"}</div>
+        ${j.address ? `<div style="color:#475569;font-size:14px;">${j.address}</div>` : ""}
+        ${j.changeNote ? `<div style="color:#92400e;font-size:13px;margin-top:4px;">${j.changeNote}</div>` : ""}
+      </div>`;
+    }).join("");
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:20px 16px;">
+  <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#f59e0b,#d97706);padding:24px 32px;">
+      <div style="font-size:13px;color:rgba(255,255,255,0.8);margin-bottom:4px;">${companyName}</div>
+      <div style="font-size:22px;font-weight:700;color:white;">Schedule Update</div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.85);">${weekLabel}</div>
+    </div>
+    <div style="padding:28px 32px;">
+      <p style="font-size:15px;color:#334155;">Hi ${cleanerName},<br><br>Your schedule for <strong>${weekLabel}</strong> has been updated:</p>
+      ${jobsHtml}
+      <div style="margin-top:24px;">
+        <a href="${ackUrl}" style="display:inline-block;background:#f59e0b;color:white;font-weight:600;font-size:15px;padding:12px 24px;border-radius:10px;text-decoration:none;">View Updated Schedule</a>
+      </div>
+    </div>
+  </div>
+</div></body></html>`;
+  }
+
+  // GET /api/schedule/week-jobs — get all jobs in a week with employee details
+  app.get("/api/schedule/week-jobs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { weekStart } = req.query as { weekStart: string };
+      if (!weekStart) return res.status(400).json({ message: "weekStart required" });
+
+      const start = new Date(weekStart);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+
+      const allJobs = await getJobsByBusiness(business.id, { from: start, to: end });
+      const allEmployees = await db.select().from(employees).where(eq(employees.businessId, business.id));
+      const empMap = Object.fromEntries(allEmployees.map(e => [e.id, e]));
+
+      const enriched = await Promise.all(allJobs.filter(j => !j.skipped).map(async (j) => {
+        let customerName = "";
+        if (j.customerId) {
+          const c = await getCustomerById(j.customerId);
+          if (c) customerName = `${c.firstName} ${c.lastName}`.trim();
+        }
+        if (!customerName && j.quoteId) {
+          const q = await getQuoteById(j.quoteId);
+          if (q) customerName = (q as any).customerName || "";
+        }
+        const teamMemberNames = ((j.teamMembers || []) as string[]).map((id: string) => empMap[id]?.name || "").filter(Boolean);
+        const teamMemberEmails = ((j.teamMembers || []) as string[]).map((id: string) => empMap[id]?.email || "").filter(Boolean);
+        return { ...j, customerName, teamMemberNames, teamMemberEmails, durationHours: j.endDatetime ? (new Date(j.endDatetime).getTime() - new Date(j.startDatetime).getTime()) / 3600000 : 3 };
+      }));
+
+      // Validation warnings
+      const warnings: string[] = [];
+      const unassigned = enriched.filter(j => !j.teamMembers || (j.teamMembers as string[]).length === 0);
+      if (unassigned.length > 0) warnings.push(`${unassigned.length} job(s) have no cleaners assigned`);
+
+      const noTime = enriched.filter(j => !j.startDatetime);
+      if (noTime.length > 0) warnings.push(`${noTime.length} job(s) are missing a scheduled time`);
+
+      const noAddress = enriched.filter(j => !j.address);
+      if (noAddress.length > 0) warnings.push(`${noAddress.length} job(s) are missing an address`);
+
+      // Cleaners involved
+      const cleanerMap: Record<string, { employee: any; jobs: any[] }> = {};
+      for (const j of enriched) {
+        for (const empId of (j.teamMembers || []) as string[]) {
+          if (!cleanerMap[empId]) cleanerMap[empId] = { employee: empMap[empId], jobs: [] };
+          cleanerMap[empId].jobs.push(j);
+        }
+      }
+
+      const cleanersWithNoEmail = Object.values(cleanerMap).filter(c => !c.employee?.email);
+      if (cleanersWithNoEmail.length > 0) warnings.push(`${cleanersWithNoEmail.length} cleaner(s) have no email address`);
+
+      // Double-booking check
+      for (const [empId, { employee, jobs: empJobs }] of Object.entries(cleanerMap)) {
+        for (let i = 0; i < empJobs.length; i++) {
+          for (let k = i + 1; k < empJobs.length; k++) {
+            const aStart = new Date(empJobs[i].startDatetime).getTime();
+            const aEnd = empJobs[i].endDatetime ? new Date(empJobs[i].endDatetime).getTime() : aStart + 3 * 3600000;
+            const bStart = new Date(empJobs[k].startDatetime).getTime();
+            const bEnd = empJobs[k].endDatetime ? new Date(empJobs[k].endDatetime).getTime() : bStart + 3 * 3600000;
+            if (aStart < bEnd && bStart < aEnd) {
+              warnings.push(`${employee?.name || empId} is double-booked`);
+            }
+          }
+        }
+      }
+
+      return res.json({
+        jobs: enriched,
+        cleaners: Object.entries(cleanerMap).map(([id, { employee, jobs }]) => ({
+          id,
+          name: employee?.name || "Unknown",
+          email: employee?.email || "",
+          hasEmail: !!(employee?.email),
+          jobCount: jobs.length,
+        })),
+        warnings,
+        totalJobs: enriched.length,
+        totalCleaners: Object.keys(cleanerMap).length,
+      });
+    } catch (error: any) {
+      console.error("Schedule week-jobs error:", error);
+      return res.status(500).json({ message: "Failed to get week jobs" });
+    }
+  });
+
+  // GET /api/schedule/publications — list publications for a week
+  app.get("/api/schedule/publications", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { weekStart } = req.query as { weekStart?: string };
+
+      let pubs;
+      if (weekStart) {
+        pubs = await db.select().from(schedulePublications)
+          .where(and(eq(schedulePublications.businessId, business.id), eq(schedulePublications.weekStart, weekStart)))
+          .orderBy(desc(schedulePublications.createdAt));
+      } else {
+        pubs = await db.select().from(schedulePublications)
+          .where(eq(schedulePublications.businessId, business.id))
+          .orderBy(desc(schedulePublications.createdAt))
+          .limit(20);
+      }
+
+      return res.json(pubs);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get publications" });
+    }
+  });
+
+  // GET /api/schedule/publications/:pubId — get publication details with notifications
+  app.get("/api/schedule/publications/:pubId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const [pub] = await db.select().from(schedulePublications)
+        .where(and(eq(schedulePublications.id, req.params.pubId), eq(schedulePublications.businessId, business.id)));
+      if (!pub) return res.status(404).json({ message: "Publication not found" });
+
+      const notifications = await db.select().from(cleanerScheduleNotifications)
+        .where(eq(cleanerScheduleNotifications.publicationId, pub.id))
+        .orderBy(cleanerScheduleNotifications.cleanerName);
+
+      return res.json({ ...pub, notifications });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get publication" });
+    }
+  });
+
+  // POST /api/schedule/publish — publish or republish schedule for a week
+  app.post("/api/schedule/publish", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const userId = req.session.userId!;
+
+      const { weekStart, weekEnd, notes, publishScope } = req.body as {
+        weekStart: string; weekEnd: string; notes?: string; publishScope?: string;
+      };
+      if (!weekStart || !weekEnd) return res.status(400).json({ message: "weekStart and weekEnd required" });
+
+      const start = new Date(weekStart);
+      const end = new Date(weekStart);
+      end.setDate(end.getDate() + 7);
+
+      const allJobs = await getJobsByBusiness(business.id, { from: start, to: end });
+      const allEmployees = await db.select().from(employees).where(eq(employees.businessId, business.id));
+      const empMap = Object.fromEntries(allEmployees.map(e => [e.id, e]));
+
+      const validJobs = allJobs.filter(j => !j.skipped && j.startDatetime);
+      const enrichedJobs = await Promise.all(validJobs.map(async (j) => {
+        let customerName = "";
+        if (j.customerId) {
+          const c = await getCustomerById(j.customerId);
+          if (c) customerName = `${c.firstName} ${c.lastName}`.trim();
+        }
+        if (!customerName && j.quoteId) {
+          const q = await getQuoteById(j.quoteId);
+          if (q) customerName = (q as any).customerName || "";
+        }
+        const teamMemberNames = ((j.teamMembers || []) as string[]).map((id: string) => empMap[id]?.name || "").filter(Boolean);
+        return { ...j, customerName, teamMemberNames, durationHours: j.endDatetime ? (new Date(j.endDatetime).getTime() - new Date(j.startDatetime).getTime()) / 3600000 : 3 };
+      }));
+
+      // Build cleaner → jobs map
+      const cleanerJobMap: Record<string, any[]> = {};
+      for (const j of enrichedJobs) {
+        for (const empId of (j.teamMembers || []) as string[]) {
+          if (!cleanerJobMap[empId]) cleanerJobMap[empId] = [];
+          cleanerJobMap[empId].push(j);
+        }
+      }
+
+      // Determine version number
+      const prevPubs = await db.select().from(schedulePublications)
+        .where(and(eq(schedulePublications.businessId, business.id), eq(schedulePublications.weekStart, weekStart)))
+        .orderBy(desc(schedulePublications.versionNumber)).limit(1);
+      const versionNumber = prevPubs.length > 0 ? prevPubs[0].versionNumber + 1 : 1;
+
+      // Format week label
+      const wStart = new Date(weekStart);
+      const wEnd = new Date(weekEnd);
+      const weekLabel = `${wStart.toLocaleDateString("en-US", { month: "long", day: "numeric" })} – ${wEnd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`;
+
+      // Create publication
+      const [pub] = await db.insert(schedulePublications).values({
+        businessId: business.id,
+        weekStart,
+        weekEnd,
+        versionNumber,
+        publishedBy: userId,
+        publishScope: publishScope || "all",
+        snapshotJson: enrichedJobs as any,
+        notes: notes || "",
+        totalJobs: enrichedJobs.length,
+        totalCleaners: Object.keys(cleanerJobMap).length,
+      }).returning();
+
+      const domain = process.env.EXPO_PUBLIC_DOMAIN || `localhost:5000`;
+      const fromName = business.companyName || "QuotePro";
+      const results: any[] = [];
+
+      for (const [empId, empJobs] of Object.entries(cleanerJobMap)) {
+        const emp = empMap[empId];
+        if (!emp) continue;
+
+        const cleanerSnapshot = {
+          cleanerName: emp.name,
+          weekLabel,
+          jobs: empJobs.map(j => ({
+            id: j.id, customerName: j.customerName, address: j.address,
+            startDatetime: j.startDatetime, endDatetime: j.endDatetime,
+            jobType: j.jobType, cleanerNotes: j.cleanerNotes, teamMemberNames: j.teamMemberNames,
+            durationHours: j.durationHours,
+          })),
+        };
+
+        // Create notification record first to get ack token
+        const [notif] = await db.insert(cleanerScheduleNotifications).values({
+          publicationId: pub.id,
+          businessId: business.id,
+          cleanerId: emp.id,
+          cleanerName: emp.name,
+          cleanerEmail: emp.email || "",
+          sendStatus: emp.email ? "pending" : "skipped",
+          cleanerSnapshotJson: cleanerSnapshot as any,
+        }).returning();
+
+        if (!emp.email) {
+          results.push({ cleanerId: emp.id, name: emp.name, status: "skipped", reason: "no email" });
+          continue;
+        }
+
+        const emailHtml = buildCleanerEmailHtml({
+          cleanerName: emp.name,
+          weekLabel,
+          jobs: empJobs,
+          ackToken: notif.ackToken!,
+          companyName: fromName,
+          domain,
+        });
+
+        try {
+          await sendEmail({
+            to: emp.email,
+            subject: `Your Schedule for ${weekLabel} (v${versionNumber})`,
+            html: emailHtml,
+            fromName,
+            replyTo: business.email || null,
+          });
+
+          await db.update(cleanerScheduleNotifications)
+            .set({ sendStatus: "sent", sentAt: new Date() })
+            .where(eq(cleanerScheduleNotifications.id, notif.id));
+
+          results.push({ cleanerId: emp.id, name: emp.name, email: emp.email, status: "sent" });
+        } catch (emailErr: any) {
+          await db.update(cleanerScheduleNotifications)
+            .set({ sendStatus: "failed" })
+            .where(eq(cleanerScheduleNotifications.id, notif.id));
+          results.push({ cleanerId: emp.id, name: emp.name, email: emp.email, status: "failed", error: emailErr.message });
+        }
+      }
+
+      return res.json({ publication: pub, results, weekLabel, versionNumber });
+    } catch (error: any) {
+      console.error("Schedule publish error:", error);
+      return res.status(500).json({ message: "Failed to publish schedule" });
+    }
+  });
+
+  // POST /api/schedule/publications/:pubId/resend/:notifId — resend to a specific cleaner
+  app.post("/api/schedule/publications/:pubId/resend/:notifId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const [pub] = await db.select().from(schedulePublications)
+        .where(and(eq(schedulePublications.id, req.params.pubId), eq(schedulePublications.businessId, business.id)));
+      if (!pub) return res.status(404).json({ message: "Publication not found" });
+
+      const [notif] = await db.select().from(cleanerScheduleNotifications)
+        .where(and(eq(cleanerScheduleNotifications.id, req.params.notifId), eq(cleanerScheduleNotifications.publicationId, pub.id)));
+      if (!notif) return res.status(404).json({ message: "Notification not found" });
+      if (!notif.cleanerEmail) return res.status(400).json({ message: "Cleaner has no email" });
+
+      const snap = notif.cleanerSnapshotJson as any;
+      const domain = process.env.EXPO_PUBLIC_DOMAIN || `localhost:5000`;
+      const fromName = business.companyName || "QuotePro";
+
+      const emailHtml = buildCleanerEmailHtml({
+        cleanerName: snap.cleanerName || notif.cleanerName,
+        weekLabel: snap.weekLabel || `Week of ${pub.weekStart}`,
+        jobs: snap.jobs || [],
+        ackToken: notif.ackToken!,
+        companyName: fromName,
+        domain,
+      });
+
+      await sendEmail({
+        to: notif.cleanerEmail,
+        subject: `[Resent] Your Schedule for ${snap.weekLabel || pub.weekStart}`,
+        html: emailHtml,
+        fromName,
+        replyTo: business.email || null,
+      });
+
+      await db.update(cleanerScheduleNotifications)
+        .set({ sendStatus: "sent", sentAt: new Date() })
+        .where(eq(cleanerScheduleNotifications.id, notif.id));
+
+      return res.json({ message: "Resent" });
+    } catch (error: any) {
+      console.error("Resend error:", error);
+      return res.status(500).json({ message: "Failed to resend" });
+    }
+  });
+
+  // GET /api/schedule/ack/:token — public: get cleaner's schedule for ack page
+  app.get("/api/schedule/ack/:token", async (req: Request, res: Response) => {
+    try {
+      const [notif] = await db.select().from(cleanerScheduleNotifications)
+        .where(eq(cleanerScheduleNotifications.ackToken, req.params.token));
+      if (!notif) return res.status(404).json({ message: "Schedule not found" });
+
+      const snap = notif.cleanerSnapshotJson as any;
+      return res.json({
+        cleanerName: notif.cleanerName,
+        weekLabel: snap.weekLabel || "",
+        jobs: snap.jobs || [],
+        ackStatus: notif.ackStatus,
+        acknowledgedAt: notif.acknowledgedAt,
+      });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to load schedule" });
+    }
+  });
+
+  // POST /api/schedule/ack/:token — public: cleaner acknowledges or flags issue
+  app.post("/api/schedule/ack/:token", async (req: Request, res: Response) => {
+    try {
+      const [notif] = await db.select().from(cleanerScheduleNotifications)
+        .where(eq(cleanerScheduleNotifications.ackToken, req.params.token));
+      if (!notif) return res.status(404).json({ message: "Schedule not found" });
+
+      const { action, issueMessage } = req.body as { action: "acknowledged" | "issue" | "unavailable"; issueMessage?: string };
+
+      await db.update(cleanerScheduleNotifications).set({
+        ackStatus: action,
+        acknowledgedAt: new Date(),
+        issueMessage: issueMessage || "",
+        updatedAt: new Date(),
+      }).where(eq(cleanerScheduleNotifications.id, notif.id));
+
+      return res.json({ message: "Response recorded" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to record response" });
     }
   });
 

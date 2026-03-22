@@ -262,6 +262,7 @@ export const jobs = pgTable("jobs", {
   updateToken: varchar("update_token").unique(),
   detailedStatus: text("detailed_status").notNull().default("scheduled"),
   teamMembers: jsonb("team_members").$type<string[]>().default([]),
+  cleanerNotes: text("cleaner_notes").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1230,3 +1231,43 @@ export type BookingAvailabilitySettings = typeof bookingAvailabilitySettings.$in
 
 // ===== AI Quote Assistant =====
 
+
+// ===== Schedule Publications =====
+
+export const schedulePublications = pgTable("schedule_publications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  weekStart: text("week_start").notNull(),
+  weekEnd: text("week_end").notNull(),
+  versionNumber: integer("version_number").notNull().default(1),
+  publishedBy: varchar("published_by").notNull().references(() => users.id),
+  publishScope: text("publish_scope").notNull().default("all"),
+  snapshotJson: jsonb("snapshot_json").notNull().default({}),
+  notes: text("notes").notNull().default(""),
+  totalJobs: integer("total_jobs").notNull().default(0),
+  totalCleaners: integer("total_cleaners").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type SchedulePublication = typeof schedulePublications.$inferSelect;
+
+export const cleanerScheduleNotifications = pgTable("cleaner_schedule_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  publicationId: varchar("publication_id").notNull().references(() => schedulePublications.id, { onDelete: "cascade" }),
+  businessId: varchar("business_id").notNull(),
+  cleanerId: varchar("cleaner_id").notNull().references(() => employees.id),
+  cleanerName: text("cleaner_name").notNull(),
+  cleanerEmail: text("cleaner_email").notNull().default(""),
+  ackToken: varchar("ack_token").unique().default(sql`gen_random_uuid()`),
+  sendStatus: text("send_status").notNull().default("pending"),
+  sentAt: timestamp("sent_at"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  ackStatus: text("ack_status").notNull().default("pending"),
+  issueMessage: text("issue_message").notNull().default(""),
+  cleanerSnapshotJson: jsonb("cleaner_snapshot_json").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type CleanerScheduleNotification = typeof cleanerScheduleNotifications.$inferSelect;
