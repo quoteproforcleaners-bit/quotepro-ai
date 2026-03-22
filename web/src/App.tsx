@@ -52,6 +52,7 @@ import AccountSettingsPage from "./pages/AccountSettingsPage";
 import FileLibraryPage from "./pages/FileLibraryPage";
 import EmailSequencesPage from "./pages/EmailSequencesPage";
 import PricingLogicPage from "./pages/PricingLogicPage";
+import EmployeesPage from "./pages/EmployeesPage";
 
 export default function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="/customers/:id" element={<ProGate feature="Customer Management"><CustomerDetailPage /></ProGate>} />
           <Route path="/jobs" element={<ProGate feature="Job Management"><JobsPage /></ProGate>} />
           <Route path="/jobs/:id" element={<ProGate feature="Job Management"><JobDetailPage /></ProGate>} />
+          <Route path="/employees" element={<EmployeesPage />} />
           <Route path="/calendar" element={<ProGate feature="Job Management"><CalendarPage /></ProGate>} />
           <Route path="/growth" element={<ProGate feature="Growth Dashboard"><GrowthDashboardPage /></ProGate>} />
           <Route path="/follow-ups" element={<FollowUpsPage />} />

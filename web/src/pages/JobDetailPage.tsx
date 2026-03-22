@@ -569,6 +569,7 @@ function OverviewTab({
             email: jobCustomer?.email || undefined,
             customerId: job.customerId || undefined,
             notes: job.notes || undefined,
+            jobId: job.id,
           }}
           onToast={onToast}
         />

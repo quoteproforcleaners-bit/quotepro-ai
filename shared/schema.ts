@@ -265,6 +265,24 @@ export const jobs = pgTable("jobs", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const employees = pgTable("employees", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  name: text("name").notNull(),
+  phone: text("phone").notNull().default(""),
+  email: text("email").notNull().default(""),
+  role: text("role").notNull().default(""),
+  status: text("status").notNull().default("active"),
+  notes: text("notes").notNull().default(""),
+  color: text("color").notNull().default("#6366f1"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const jobChecklistItems = pgTable("job_checklist_items", {
   id: varchar("id")
     .primaryKey()
@@ -715,6 +733,7 @@ export type QuoteRow = typeof quotes.$inferSelect;
 export type QuoteFollowUp = typeof quoteFollowUps.$inferSelect;
 export type QuoteLineItem = typeof quoteLineItems.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
+export type Employee = typeof employees.$inferSelect;
 export type JobChecklistItem = typeof jobChecklistItems.$inferSelect;
 export type JobPhoto = typeof jobPhotos.$inferSelect;
 export type PushToken = typeof pushTokens.$inferSelect;

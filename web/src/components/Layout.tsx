@@ -45,6 +45,7 @@ import {
   FolderOpen,
   MailOpen,
   Brain,
+  UserCog,
 } from "lucide-react";
 
 const PRO_ROUTES = [
@@ -69,6 +70,7 @@ const navSections = [
       { to: "/commercial-quote", label: "Commercial Quote", icon: Building2, pro: true },
       { to: "/customers", label: "Customers", icon: Users, pro: true },
       { to: "/jobs", label: "Jobs", icon: Briefcase, pro: true },
+      { to: "/employees", label: "Team Members", icon: UserCog },
       { to: "/calendar", label: "Schedule", icon: CalendarDays, pro: true },
       { to: "/quote-preferences", label: "Quote Preferences", icon: Sliders },
       { to: "/settings", label: "Price Settings", icon: Settings },

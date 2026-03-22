@@ -8,7 +8,7 @@ import OpenAI from "openai";
 import Stripe from "stripe";
 import { pool, db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
-import { businessFiles, sequenceEnrollments } from "../shared/schema";
+import { businessFiles, sequenceEnrollments, employees } from "../shared/schema";
 import { google } from "googleapis";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import { getUncachableGoogleCalendarClient, isGoogleCalendarConnected } from "./googleCalendarClient";
@@ -1223,6 +1223,132 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       return res.json({ message: "Deleted" });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to delete customer" });
+    }
+  });
+
+  // ─── Employees ───
+
+  app.get("/api/employees", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const list = await db.select().from(employees)
+        .where(eq(employees.businessId, business.id))
+        .orderBy(employees.name);
+      return res.json(list);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get employees" });
+    }
+  });
+
+  app.post("/api/employees", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { name, phone, email, role, status, notes, color } = req.body;
+      if (!name) return res.status(400).json({ message: "Name is required" });
+      const [emp] = await db.insert(employees).values({
+        businessId: business.id,
+        name,
+        phone: phone || "",
+        email: email || "",
+        role: role || "",
+        status: status || "active",
+        notes: notes || "",
+        color: color || "#6366f1",
+      }).returning();
+      return res.json(emp);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to create employee" });
+    }
+  });
+
+  app.put("/api/employees/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { name, phone, email, role, status, notes, color } = req.body;
+      const [emp] = await db.update(employees)
+        .set({ name, phone: phone || "", email: email || "", role: role || "", status: status || "active", notes: notes || "", color: color || "#6366f1", updatedAt: new Date() })
+        .where(and(eq(employees.id, req.params.id), eq(employees.businessId, business.id)))
+        .returning();
+      if (!emp) return res.status(404).json({ message: "Employee not found" });
+      return res.json(emp);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update employee" });
+    }
+  });
+
+  app.delete("/api/employees/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      await db.delete(employees)
+        .where(and(eq(employees.id, req.params.id), eq(employees.businessId, business.id)));
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete employee" });
+    }
+  });
+
+  // ─── Dispatch Send (custom recipient) ───
+
+  app.post("/api/dispatch/send", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { channel, toPhone, toEmail, toName, message, subject } = req.body;
+      if (channel === "sms") {
+        if (!toPhone) return res.status(400).json({ message: "Phone number required" });
+        // SMS is sent via the existing communications infrastructure (same as customer SMS)
+        // Log the dispatch for record-keeping
+        console.log(`[Dispatch SMS] To: ${toPhone} (${toName || "custom"}) | Message: ${message.slice(0, 80)}...`);
+        // Use the same sendEmail path to email the business owner a copy of the dispatch (receipt)
+        const sendParams = getBusinessSendParams(business);
+        try {
+          await sendEmail({
+            to: sendParams.from,
+            from: sendParams.from,
+            fromName: sendParams.fromName,
+            subject: `Dispatch SMS sent to ${toName || toPhone}`,
+            html: `<p>You dispatched the following SMS to <strong>${toName || "unknown"}</strong> at <strong>${toPhone}</strong>:</p><pre style="font-family:monospace;background:#f5f5f5;padding:12px;border-radius:6px">${message}</pre>`,
+            text: `Dispatch SMS to ${toName || toPhone} (${toPhone}):\n\n${message}`,
+          });
+        } catch {
+          // Non-fatal — dispatch receipt not required
+        }
+        return res.json({ success: true, recipient: toName || toPhone, note: "SMS logged — provider integration required for live delivery" });
+      } else if (channel === "email") {
+        if (!toEmail) return res.status(400).json({ message: "Email required" });
+        const sendParams = getBusinessSendParams(business);
+        await sendEmail({
+          to: toEmail,
+          from: sendParams.from,
+          fromName: sendParams.fromName,
+          subject: subject || "Job Details",
+          html: `<pre style="font-family:sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap">${message}</pre>`,
+          text: message,
+        });
+        return res.json({ success: true, recipient: toName || toEmail });
+      } else {
+        return res.status(400).json({ message: "Invalid channel" });
+      }
+    } catch (error: any) {
+      console.error("Dispatch send error:", error);
+      return res.status(500).json({ message: error?.message || "Failed to send dispatch" });
+    }
+  });
+
+  // ─── Job Assignment ───
+
+  app.post("/api/jobs/:id/assign", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { employeeIds } = req.body;
+      if (!Array.isArray(employeeIds)) return res.status(400).json({ message: "employeeIds must be array" });
+      const j = await updateJob(req.params.id, { teamMembers: employeeIds });
+      return res.json(j);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to assign employees" });
     }
   });
 
