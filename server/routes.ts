@@ -1306,6 +1306,17 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         if (!twilioSid || !twilioToken || !twilioFrom) {
           return res.status(503).json({ message: "SMS is not configured. Add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN to your environment secrets to enable text messaging." });
         }
+        // Normalize to E.164 format (+1XXXXXXXXXX for US numbers)
+        const digitsOnly = toPhone.replace(/\D/g, "");
+        let normalizedPhone = toPhone;
+        if (digitsOnly.length === 10) {
+          normalizedPhone = `+1${digitsOnly}`;
+        } else if (digitsOnly.length === 11 && digitsOnly.startsWith("1")) {
+          normalizedPhone = `+${digitsOnly}`;
+        } else if (!toPhone.startsWith("+")) {
+          normalizedPhone = `+${digitsOnly}`;
+        }
+        console.log(`[Dispatch SMS] Sending to: ${normalizedPhone} from: ${twilioFrom}`);
         const twilioRes = await fetch(
           `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
           {
@@ -1314,15 +1325,17 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
               "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
               "Content-Type": "application/x-www-form-urlencoded",
             },
-            body: new URLSearchParams({ From: twilioFrom, To: toPhone, Body: message }).toString(),
+            body: new URLSearchParams({ From: twilioFrom, To: normalizedPhone, Body: message }).toString(),
           }
         );
+        const twilioBody = await twilioRes.json() as any;
         if (!twilioRes.ok) {
-          const errText = await twilioRes.text();
-          console.error("Dispatch SMS error:", twilioRes.status, errText);
-          return res.status(500).json({ message: "Failed to deliver SMS. Check your Twilio account for details." });
+          console.error("Dispatch SMS error:", twilioRes.status, JSON.stringify(twilioBody));
+          const twilioMsg = twilioBody?.message || twilioBody?.error_message || "Failed to deliver SMS";
+          return res.status(500).json({ message: `SMS failed: ${twilioMsg}` });
         }
-        return res.json({ success: true, recipient: toName || toPhone });
+        console.log(`[Dispatch SMS] Success — SID: ${twilioBody.sid}, Status: ${twilioBody.status}`);
+        return res.json({ success: true, recipient: toName || normalizedPhone });
       } else if (channel === "email") {
         if (!toEmail) return res.status(400).json({ message: "Email required" });
         const sendParams = getBusinessSendParams(business);
