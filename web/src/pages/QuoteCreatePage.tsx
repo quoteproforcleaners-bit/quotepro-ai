@@ -388,7 +388,7 @@ export default function QuoteCreatePage() {
           firstCleanPrice: quote.better.firstCleanPrice ?? undefined,
           name: "Better",
           serviceTypeName: quote.better.name || "Standard Clean",
-          serviceTypeId: quote.better.serviceTypeId || "regular",
+          serviceTypeId: quote.better.serviceTypeId || "standard",
           scope: aiScopes?.better || quote.better.scope || "",
           addOnsIncluded: addOnOptions.filter(o => services.addOns[o.key]).map(o => o.label),
         },

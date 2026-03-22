@@ -376,6 +376,15 @@ export function computeResidentialQuote(
   if (best.price <= better.price) {
     best = { ...best, price: roundToNearest5(better.price + TIER_DELTA) };
   }
+  // Also enforce gap on firstCleanPrice (displayed separately on recurring quotes)
+  if (better.firstCleanPrice !== null && good.firstCleanPrice !== null
+      && better.firstCleanPrice <= good.firstCleanPrice) {
+    better = { ...better, firstCleanPrice: roundToNearest5(good.firstCleanPrice + TIER_DELTA) };
+  }
+  if (best.firstCleanPrice !== null && better.firstCleanPrice !== null
+      && best.firstCleanPrice <= better.firstCleanPrice) {
+    best = { ...best, firstCleanPrice: roundToNearest5(better.firstCleanPrice + TIER_DELTA) };
+  }
 
   // Summary add-on totals for the parent result
   const addOnPricesMap = { ...DEFAULT_ADD_ON_PRICES, ...(p.addOnPrices ?? {}) };
