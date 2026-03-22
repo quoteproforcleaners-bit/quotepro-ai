@@ -306,6 +306,8 @@ function NumInput({ label, value, onChange, placeholder, prefix, suffix, min }: 
 interface FacilityInfo {
   facilityName: string;
   contactName: string;
+  contactEmail: string;
+  contactPhone: string;
   siteAddress: string;
   facilityType: FacilityType;
   totalSqFt: number;
@@ -317,6 +319,7 @@ function FacilityStep({ data, onChange, onNext }: {
 }) {
   const set = <K extends keyof FacilityInfo>(k: K, v: FacilityInfo[K]) => onChange({ ...data, [k]: v });
   const canProceed = data.facilityName.trim() && data.facilityType && data.totalSqFt > 0;
+  const missingContact = !data.contactEmail.trim() || !data.contactPhone.trim();
 
   return (
     <Card>
@@ -338,12 +341,40 @@ function FacilityStep({ data, onChange, onNext }: {
             options={FACILITY_TYPES.map((t) => ({ value: t.value, label: t.label }))}
           />
         </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Contact Email</label>
+          <Input
+            type="email"
+            value={data.contactEmail}
+            onChange={(e) => set("contactEmail", e.target.value)}
+            placeholder="contact@company.com"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Contact Phone</label>
+          <Input
+            type="tel"
+            value={data.contactPhone}
+            onChange={(e) => set("contactPhone", e.target.value)}
+            placeholder="(555) 000-0000"
+          />
+        </div>
         <div className="sm:col-span-2">
           <label className="block text-xs font-medium text-slate-600 mb-1">Site Address</label>
           <Input value={data.siteAddress} onChange={(e) => set("siteAddress", e.target.value)} placeholder="123 Business Blvd, City, State" />
         </div>
         <NumInput label="Total Square Footage *" value={data.totalSqFt} onChange={(v) => set("totalSqFt", v)} placeholder="e.g. 5000" />
         <NumInput label="Number of Floors" value={data.floors} onChange={(v) => set("floors", v)} placeholder="1" min={1} />
+
+        {missingContact && (
+          <div className="sm:col-span-2 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700">
+              <span className="font-semibold">You'll need an email and phone to send this quote.</span> You can skip them now and add later, but the quote won't be sendable until a contact has both.
+            </p>
+          </div>
+        )}
+
         <div className="sm:col-span-2 p-3 rounded-xl bg-blue-50 border border-blue-100 flex items-start gap-2.5">
           <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
           <p className="text-xs text-blue-700">
@@ -787,6 +818,30 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
     setSaving(true);
     setError("");
     try {
+      // Auto-create customer from facility contact info if any contact data exists
+      let customerId: string | undefined;
+      const hasContactInfo = facility.contactName.trim() || facility.contactEmail.trim() || facility.contactPhone.trim();
+      if (hasContactInfo) {
+        try {
+          const nameParts = facility.contactName.trim().split(" ");
+          const firstName = nameParts[0] || facility.facilityName;
+          const lastName = nameParts.slice(1).join(" ") || "";
+          const custRes = await apiRequest("POST", "/api/customers", {
+            firstName,
+            lastName,
+            email: facility.contactEmail.trim() || undefined,
+            phone: facility.contactPhone.trim() || undefined,
+            address: facility.siteAddress.trim() || undefined,
+            company: facility.facilityName.trim() || undefined,
+            type: "commercial",
+          });
+          const custData = await custRes.json();
+          if (custData.id) customerId = custData.id;
+        } catch {
+          // Non-fatal: proceed without customer link
+        }
+      }
+
       const notes = [
         facility.siteAddress && `Address: ${facility.siteAddress}`,
         `Square Footage: ${facility.totalSqFt.toLocaleString()} sq ft`,
@@ -809,6 +864,7 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
 
       const res = await apiRequest("POST", "/api/quotes", {
         // Required base fields (commercial quotes store data in propertyDetails)
+        customerId: customerId || undefined,
         propertyBeds: 0,
         propertyBaths: 0,
         propertySqft: facility.totalSqFt,
@@ -825,6 +881,8 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
           quoteType: "commercial",
           facilityName: facility.facilityName,
           contactName: facility.contactName,
+          contactEmail: facility.contactEmail,
+          contactPhone: facility.contactPhone,
           siteAddress: facility.siteAddress,
           facilityType: facility.facilityType,
           facilityTypeLabel: FACILITY_TYPES.find((t) => t.value === facility.facilityType)?.label || facility.facilityType,
@@ -1073,7 +1131,7 @@ function CommercialQuoteContent() {
 
   const [step, setStep] = useState<Step>("facility");
   const [facility, setFacility] = useState<FacilityInfo>({
-    facilityName: "", contactName: "", siteAddress: "",
+    facilityName: "", contactName: "", contactEmail: "", contactPhone: "", siteAddress: "",
     facilityType: "Office", totalSqFt: 0, floors: 1,
   });
   const [walkthrough, setWalkthrough] = useState<Walkthrough>({ ...DEFAULT_WALKTHROUGH });
