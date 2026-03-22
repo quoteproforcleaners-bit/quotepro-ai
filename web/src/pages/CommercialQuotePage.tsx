@@ -21,6 +21,8 @@ import {
   AlertTriangle,
   Info,
   Settings,
+  Star,
+  Pencil,
 } from "lucide-react";
 import {
   PageHeader,
@@ -756,11 +758,30 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [selectedTier, setSelectedTier] = useState(1);
+  const [recommendedTier, setRecommendedTier] = useState(1);
+  const [priceOverrides, setPriceOverrides] = useState<{ monthly: string; perVisit: string }[]>([
+    { monthly: "", perVisit: "" },
+    { monthly: "", perVisit: "" },
+    { monthly: "", perVisit: "" },
+  ]);
+  const [editingPrice, setEditingPrice] = useState<number | null>(null);
 
   const calc = useMemo(() => calculatePricing(laborEst, pricingConfig, walkthrough.frequency), [laborEst, pricingConfig, walkthrough.frequency]);
   const tiers = useMemo(() => generateTiers(facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule), [facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule]);
   const freq = FREQUENCY_OPTIONS.find((f) => f.value === walkthrough.frequency);
-  const tier = tiers[selectedTier];
+
+  // Effective prices: use overrides if set, else computed
+  const effectiveTiers = useMemo(() => tiers.map((t, i) => {
+    const mo = parseFloat(priceOverrides[i]?.monthly);
+    const pv = parseFloat(priceOverrides[i]?.perVisit);
+    return {
+      ...t,
+      monthlyPrice: !isNaN(mo) && mo > 0 ? mo : t.monthlyPrice,
+      pricePerVisit: !isNaN(pv) && pv > 0 ? pv : t.pricePerVisit,
+    };
+  }), [tiers, priceOverrides]);
+
+  const tier = effectiveTiers[selectedTier];
 
   const handleSave = async () => {
     setSaving(true);
@@ -819,7 +840,8 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
           pricingConfig,
           selectedTierIndex: selectedTier,
           selectedTierName: tier.name,
-          tiers: tiers.map((t) => ({ name: t.name, pricePerVisit: t.pricePerVisit, monthlyPrice: t.monthlyPrice })),
+          recommendedTierIndex: recommendedTier,
+          tiers: effectiveTiers.map((t) => ({ name: t.name, pricePerVisit: t.pricePerVisit, monthlyPrice: t.monthlyPrice })),
           frequency: walkthrough.frequency,
           frequencyLabel: freq?.label || walkthrough.frequency,
           notes,
@@ -849,41 +871,102 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
       <Card>
         <CardHeader title="Service Tiers — Select One to Save" icon={FileText} />
         <div className="px-5 pb-5 space-y-3">
-          {tiers.map((t, i) => {
+          {effectiveTiers.map((t, i) => {
             const isSelected = selectedTier === i;
+            const isRecommended = recommendedTier === i;
             const tierColors = ["border-slate-200", "border-primary-400", "border-violet-400"];
             const tierBg = ["bg-slate-50", "bg-primary-50", "bg-violet-50"];
             const tierText = ["text-slate-700", "text-primary-700", "text-violet-700"];
-            const tierBadge = ["text-slate-500 bg-white", "text-primary-600 bg-primary-100", "text-violet-600 bg-violet-100"];
+            const ringClass = i === 0 ? "ring-slate-300" : i === 1 ? "ring-primary-400" : "ring-violet-400";
+            const isEditingThis = editingPrice === i;
             return (
-              <button
-                key={t.name}
-                onClick={() => setSelectedTier(i)}
-                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${isSelected ? tierColors[i] + " ring-2 ring-offset-1 " + (i === 0 ? "ring-slate-300" : i === 1 ? "ring-primary-400" : "ring-violet-400") : "border-slate-200 hover:border-slate-300"} ${isSelected ? tierBg[i] : "bg-white"}`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {isSelected && <CheckCircle className={`w-4 h-4 ${tierText[i]}`} />}
-                    <span className={`font-bold text-sm ${isSelected ? tierText[i] : "text-slate-800"}`}>{t.name}</span>
-                    {i === 1 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary-100 text-primary-700">Recommended</span>}
-                  </div>
-                  <div className="text-right">
-                    <div className={`font-extrabold text-base ${isSelected ? tierText[i] : "text-slate-900"}`}>
-                      ${t.monthlyPrice.toLocaleString()}<span className="text-xs font-normal text-slate-500">/mo</span>
+              <div key={t.name} className={`rounded-xl border-2 transition-all ${isSelected ? tierColors[i] + " ring-2 ring-offset-1 " + ringClass : "border-slate-200"} ${isSelected ? tierBg[i] : "bg-white"}`}>
+                <button
+                  onClick={() => setSelectedTier(i)}
+                  className="w-full text-left p-4"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {isSelected && <CheckCircle className={`w-4 h-4 ${tierText[i]}`} />}
+                      <span className={`font-bold text-sm ${isSelected ? tierText[i] : "text-slate-800"}`}>{t.name}</span>
+                      {isRecommended && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary-100 text-primary-700 flex items-center gap-1">
+                          <Star className="w-2.5 h-2.5" />Recommended
+                        </span>
+                      )}
                     </div>
-                    <div className="text-xs text-slate-400">${t.pricePerVisit.toLocaleString()}/visit</div>
-                  </div>
-                </div>
-                <p className="text-xs text-slate-500 mb-2">{t.scopeText}</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                  {t.includedBullets.slice(0, 3).map((b) => (
-                    <div key={b} className="flex items-start gap-1.5">
-                      <CheckCircle className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
-                      <span className="text-xs text-slate-600">{b}</span>
+                    <div className="text-right">
+                      <div className={`font-extrabold text-base ${isSelected ? tierText[i] : "text-slate-900"}`}>
+                        ${t.monthlyPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="text-xs font-normal text-slate-500">/mo</span>
+                      </div>
+                      <div className="text-xs text-slate-400">${t.pricePerVisit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/visit</div>
                     </div>
-                  ))}
+                  </div>
+                  <p className="text-xs text-slate-500 mb-2">{t.scopeText}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                    {t.includedBullets.slice(0, 3).map((b) => (
+                      <div key={b} className="flex items-start gap-1.5">
+                        <CheckCircle className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
+                        <span className="text-xs text-slate-600">{b}</span>
+                      </div>
+                    ))}
+                  </div>
+                </button>
+
+                {/* Per-tier controls: recommend + price edit */}
+                <div className="border-t border-slate-100 px-4 py-2.5 flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setRecommendedTier(i); }}
+                    className={`text-xs flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${isRecommended ? "bg-primary-50 border-primary-300 text-primary-700 font-semibold" : "border-slate-200 text-slate-500 hover:border-primary-300 hover:text-primary-600"}`}
+                  >
+                    <Star className={`w-3 h-3 ${isRecommended ? "fill-primary-500 text-primary-500" : ""}`} />
+                    {isRecommended ? "Recommended" : "Set as Recommended"}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setEditingPrice(isEditingThis ? null : i); }}
+                    className="text-xs flex items-center gap-1 px-2.5 py-1 rounded-full border border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
+                  >
+                    <Pencil className="w-3 h-3" />Edit Price
+                  </button>
                 </div>
-              </button>
+
+                {isEditingThis && (
+                  <div className="border-t border-slate-100 px-4 pb-4 pt-3 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block mb-1">Monthly Price ($)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={tiers[i].monthlyPrice.toFixed(2)}
+                        value={priceOverrides[i].monthly}
+                        onChange={(e) => setPriceOverrides((prev) => prev.map((p, idx) => idx === i ? { ...p, monthly: e.target.value } : p))}
+                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block mb-1">Per-Visit Price ($)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={tiers[i].pricePerVisit.toFixed(2)}
+                        value={priceOverrides[i].perVisit}
+                        onChange={(e) => setPriceOverrides((prev) => prev.map((p, idx) => idx === i ? { ...p, perVisit: e.target.value } : p))}
+                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setPriceOverrides((prev) => prev.map((p, idx) => idx === i ? { monthly: "", perVisit: "" } : p)); setEditingPrice(null); }}
+                      className="text-xs text-slate-400 hover:text-slate-600 col-span-2 text-left"
+                    >
+                      Reset to calculated price
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

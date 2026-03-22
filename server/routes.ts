@@ -10102,14 +10102,25 @@ loadMonth(nextMo);
 
   app.post("/api/quotes/:id/invoice-packet", requireAuth, async (req: any, res) => {
     try {
-      const quote = await getQuoteById(req.params.id);
-      if (!quote || quote.businessId !== req.businessId) return res.status(404).json({ error: "Quote not found" });
-
       const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      const quote = await getQuoteById(req.params.id);
+      if (!quote || quote.businessId !== business.id) return res.status(404).json({ error: "Quote not found" });
+
       const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
       const lineItems = await getLineItemsByQuote(quote.id);
-      const options = (quote as any).options as any[] || [];
-      const selectedOpt = options.find((o: any) => o.id === (quote as any).selectedOption) || options[0];
+      // options can be an array or a keyed object {good,better,best}
+      const rawOptions = (quote as any).options;
+      const optionsArr: any[] = Array.isArray(rawOptions)
+        ? rawOptions
+        : rawOptions && typeof rawOptions === "object"
+          ? Object.values(rawOptions)
+          : [];
+      const selectedKey = (quote as any).selectedOption;
+      const selectedOpt = optionsArr.find((o: any) => o.id === selectedKey || o.name?.toLowerCase() === selectedKey)
+        || (rawOptions && typeof rawOptions === "object" && rawOptions[selectedKey])
+        || optionsArr[1]
+        || optionsArr[0];
 
       const customerInfo = {
         displayName: customer ? `${customer.firstName || ""} ${customer.lastName || ""}`.trim() : "Walk-in Customer",
@@ -10190,7 +10201,7 @@ loadMonth(nextMo);
 
       const packet = await createInvoicePacket({
         quoteId: quote.id,
-        businessId: req.businessId,
+        businessId: business.id,
         userId: req.session.userId!,
         status: "generated",
         lineItemsJson: items,
@@ -10202,7 +10213,7 @@ loadMonth(nextMo);
         plainText: plainLines,
       });
 
-      await dispatchWebhook(req.businessId, req.session.userId!, "invoice_packet.created", { invoicePacketId: packet.id, quoteId: quote.id, invoiceNumber });
+      await dispatchWebhook(business.id, req.session.userId!, "invoice_packet.created", { invoicePacketId: packet.id, quoteId: quote.id, invoiceNumber });
 
       res.json({ success: true, packet });
     } catch (e: any) {
