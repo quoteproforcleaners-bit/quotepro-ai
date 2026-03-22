@@ -9,6 +9,7 @@ import {
   User,
   Globe,
   Check,
+  Sliders,
 } from "lucide-react";
 import {
   PageHeader,
@@ -17,6 +18,7 @@ import {
   Button,
   Badge,
   ConfirmModal,
+  Toggle,
 } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
@@ -39,6 +41,9 @@ export default function AccountSettingsPage() {
   const [langSaved, setLangSaved] = useState(false);
   const [pendingAppLang, setPendingAppLang] = useState<LangCode>(appLanguage);
   const [pendingOutboundLang, setPendingOutboundLang] = useState<LangCode>(outboundLanguage);
+  const [navTooltips, setNavTooltips] = useState(() => {
+    try { return localStorage.getItem("qp_nav_tooltips") !== "false"; } catch { return true; }
+  });
 
   const handleManageSubscription = async () => {
     setPortalError(null);
@@ -370,6 +375,31 @@ export default function AccountSettingsPage() {
                 </>
               )}
             </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Interface Preferences */}
+      <Card>
+        <CardHeader title="Interface Preferences" icon={Sliders} />
+        <div className="space-y-1">
+          <div className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-zinc-800">
+            <div>
+              <p className="text-sm font-medium text-slate-900 dark:text-white">Navigation tooltips</p>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Show a description of each menu item after hovering for 2 seconds.
+              </p>
+            </div>
+            <Toggle
+              checked={navTooltips}
+              onChange={(v) => {
+                setNavTooltips(v);
+                try {
+                  localStorage.setItem("qp_nav_tooltips", v ? "true" : "false");
+                  window.dispatchEvent(new Event("qp-nav-tooltip-change"));
+                } catch {}
+              }}
+            />
           </div>
         </div>
       </Card>

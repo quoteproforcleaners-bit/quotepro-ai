@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -27,6 +28,7 @@ interface NavItem {
   pro?: boolean;
   beta?: boolean;
   shortcut?: string;
+  description?: string;
 }
 
 interface NavSection {
@@ -41,64 +43,64 @@ const navSections: NavSection[] = [
   {
     label: null,
     items: [
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, shortcut: "G H" },
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — revenue at a glance, pipeline health, recent quotes, and team activity." },
     ],
   },
   {
     label: "Operations",
     items: [
-      { to: "/quotes", label: "Quotes", icon: FileText, shortcut: "G Q" },
-      { to: "/customers", label: "Customers", icon: Users, pro: true },
-      { to: "/jobs", label: "Jobs", icon: Briefcase, pro: true },
-      { to: "/employees", label: "Team Members", icon: UserCog },
-      { to: "/calendar", label: "Schedule", icon: CalendarDays, pro: true },
-      { to: "/commercial-quote", label: "Commercial Quote", icon: Building2, pro: true },
-      { to: "/intake-requests", label: "Quote Requests", icon: Inbox },
+      { to: "/quotes", label: "Quotes", icon: FileText, shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
+      { to: "/customers", label: "Customers", icon: Users, pro: true, description: "Full contact history, quote history, job records, and notes for every client in one place." },
+      { to: "/jobs", label: "Jobs", icon: Briefcase, pro: true, description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
+      { to: "/employees", label: "Team Members", icon: UserCog, description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
+      { to: "/calendar", label: "Schedule", icon: CalendarDays, pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
+      { to: "/commercial-quote", label: "Commercial Quote", icon: Building2, pro: true, description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
+      { to: "/intake-requests", label: "Quote Requests", icon: Inbox, description: "Leads submitted through your website intake form — review, respond, or convert them to quotes." },
     ],
   },
   {
     label: "Intelligence",
     items: [
-      { to: "/pricing-logic", label: "Pricing Engine", icon: Brain },
-      { to: "/quote-preferences", label: "Quote Settings", icon: Sliders },
-      { to: "/settings", label: "Price Settings", icon: Settings },
-      { to: "/closing-assistant", label: "Objection Assistant", icon: Zap, pro: true },
-      { to: "/sales-strategy", label: "Sales Strategy", icon: Layers, pro: true },
-      { to: "/walkthrough-ai", label: "Quote from Notes", icon: Wand2 },
-      { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true },
+      { to: "/pricing-logic", label: "Pricing Engine", icon: Brain, description: "AI-powered pricing logic based on your market, home size, and service type. Set your rates here." },
+      { to: "/quote-preferences", label: "Quote Settings", icon: Sliders, description: "Control what appears on your quotes — service lines, terms, branding, and layout preferences." },
+      { to: "/settings", label: "Price Settings", icon: Settings, description: "Set your base rates, add-on prices, discounts, and tax rules for all your cleaning services." },
+      { to: "/closing-assistant", label: "Objection Assistant", icon: Zap, pro: true, description: "AI coach that gives you word-for-word responses to price pushback and sales objections." },
+      { to: "/sales-strategy", label: "Sales Strategy", icon: Layers, pro: true, description: "Personalized playbooks and talking points to help you close more jobs at higher prices." },
+      { to: "/walkthrough-ai", label: "Quote from Notes", icon: Wand2, description: "Paste your walkthrough notes and let AI generate a complete, ready-to-send quote instantly." },
+      { to: "/ai-assistant", label: "Sales Assistant", icon: Bot, pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
     ],
   },
   {
     label: "Growth",
     items: [
-      { to: "/revenue", label: "Revenue", icon: DollarSign, pro: true },
-      { to: "/growth", label: "Growth Hub", icon: TrendingUp, pro: true },
-      { to: "/follow-ups", label: "Follow-ups", icon: Bell },
-      { to: "/opportunities", label: "Opportunities", icon: Target, pro: true },
-      { to: "/lead-finder", label: "Lead Radar", icon: Radio, pro: true, beta: true },
-      { to: "/lead-capture", label: "Lead Capture", icon: Link2, pro: true },
-      { to: "/reactivation", label: "Reactivation", icon: RefreshCw, pro: true },
-      { to: "/email-sequences", label: "Email Sequences", icon: MailOpen },
-      { to: "/reviews-referrals", label: "Reviews & Referrals", icon: Star, pro: true },
-      { to: "/weekly-recap", label: "Weekly Recap", icon: BarChart2, pro: true },
-      { to: "/tasks-queue", label: "Tasks Queue", icon: CheckSquare, pro: true },
+      { to: "/revenue", label: "Revenue", icon: DollarSign, pro: true, description: "Track total revenue, average job value, and month-over-month growth across your entire business." },
+      { to: "/growth", label: "Growth Hub", icon: TrendingUp, pro: true, description: "Identify your biggest opportunities and get a clear, prioritized action plan for scaling revenue." },
+      { to: "/follow-ups", label: "Follow-ups", icon: Bell, description: "Automated and manual follow-ups for quotes that haven't been answered yet. Never let a lead go cold." },
+      { to: "/opportunities", label: "Opportunities", icon: Target, pro: true, description: "AI-identified upsell and cross-sell opportunities hidden inside your existing customer base." },
+      { to: "/lead-finder", label: "Lead Radar", icon: Radio, pro: true, beta: true, description: "Discover new cleaning leads in your area based on your ideal customer profile and target criteria." },
+      { to: "/lead-capture", label: "Lead Capture", icon: Link2, pro: true, description: "Embed a smart intake form on your website to capture and qualify new leads automatically." },
+      { to: "/reactivation", label: "Reactivation", icon: RefreshCw, pro: true, description: "Re-engage past customers who haven't booked in a while with targeted, personalized outreach." },
+      { to: "/email-sequences", label: "Email Sequences", icon: MailOpen, description: "Set up automated email campaigns for new leads, quote follow-ups, and win-back campaigns." },
+      { to: "/reviews-referrals", label: "Reviews & Referrals", icon: Star, pro: true, description: "Request reviews, track your ratings, and manage your referral program all from one place." },
+      { to: "/weekly-recap", label: "Weekly Recap", icon: BarChart2, pro: true, description: "AI-generated summary of your week — revenue, jobs completed, quotes sent, and what to improve next." },
+      { to: "/tasks-queue", label: "Tasks Queue", icon: CheckSquare, pro: true, description: "Your prioritized business to-do list — AI-powered and always focused on what moves the needle most." },
     ],
   },
   {
     label: "Workspace",
     items: [
-      { to: "/automations", label: "Automations", icon: Cpu, pro: true },
-      { to: "/file-library", label: "File Library", icon: FolderOpen },
-      { to: "/toolkit", label: "Toolkit", icon: Wrench },
-      { to: "/pro-setup", label: "Setup Checklist", icon: Clipboard },
+      { to: "/automations", label: "Automations", icon: Cpu, pro: true, description: "Set up rules that trigger emails, follow-ups, or notifications automatically based on events." },
+      { to: "/file-library", label: "File Library", icon: FolderOpen, description: "Store and organize contracts, photos, invoices, and business documents in one secure place." },
+      { to: "/toolkit", label: "Toolkit", icon: Wrench, description: "Calculators, templates, and tools to help you run your cleaning business more efficiently." },
+      { to: "/pro-setup", label: "Setup Checklist", icon: Clipboard, description: "A step-by-step guide to getting your QuotePro account fully configured, branded, and live." },
     ],
   },
   {
     label: "Integrations",
     beta: true,
     items: [
-      { to: "/qbo-settings", label: "QuickBooks Online", icon: BookOpen, pro: true },
-      { to: "/jobber", label: "Jobber", icon: PlugZap, pro: true },
+      { to: "/qbo-settings", label: "QuickBooks Online", icon: BookOpen, pro: true, description: "Sync invoices, payments, and customer data between QuotePro and your QuickBooks account." },
+      { to: "/jobber", label: "Jobber", icon: PlugZap, pro: true, description: "Import jobs and customer records from your Jobber account directly into QuotePro." },
     ],
   },
 ];
@@ -147,6 +149,96 @@ const SECTION_LABEL_KEYS: Record<string, string> = {
   Workspace: "nav.sections.workspace",
   Integrations: "nav.sections.integrations",
 };
+
+/* ─── Nav Tooltip ────────────────────────────────────────────────────────── */
+
+const NAV_TOOLTIPS_KEY = "qp_nav_tooltips";
+
+function NavItemWithTooltip({
+  item, enabled, intakeNewCount, isPro, setSidebarOpen, t,
+}: {
+  item: NavItem; enabled: boolean; intakeNewCount: number;
+  isPro: boolean; setSidebarOpen: (v: boolean) => void; t: (k: string) => string;
+}) {
+  const [tooltipTop, setTooltipTop] = useState<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const clear = () => { if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; } };
+
+  const handleMouseEnter = () => {
+    if (!enabled || !item.description) return;
+    clear();
+    timerRef.current = setTimeout(() => {
+      if (wrapperRef.current) {
+        const r = wrapperRef.current.getBoundingClientRect();
+        setTooltipTop(r.top + r.height / 2);
+      }
+    }, 2000);
+  };
+
+  const handleMouseLeave = () => { clear(); setTooltipTop(null); };
+
+  useEffect(() => () => clear(), []);
+
+  const isDark = document.documentElement.classList.contains("dark");
+  const bg = isDark ? "#27272a" : "#ffffff";
+  const border = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
+
+  return (
+    <div ref={wrapperRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+      <NavLink
+        to={item.to}
+        onClick={() => setSidebarOpen(false)}
+        className={({ isActive }) => `nav-item w-full ${isActive ? "nav-item-active" : ""}`}
+      >
+        <item.icon className="shrink-0" style={{ width: "15px", height: "15px", opacity: 0.85 }} />
+        <span className="flex-1 text-[13px]">{t(NAV_LABEL_KEYS[item.to] || item.label)}</span>
+        {item.to === "/intake-requests" && intakeNewCount > 0 ? (
+          <span className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
+            style={{ minWidth: "18px", height: "18px", fontSize: "10px", padding: "0 4px" }}>
+            {intakeNewCount > 99 ? "99+" : intakeNewCount}
+          </span>
+        ) : null}
+        {item.beta ? (
+          <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500 text-white uppercase tracking-wider leading-none">Beta</span>
+        ) : null}
+        {item.pro && !isPro ? (
+          <Lock className="shrink-0" style={{ width: "12px", height: "12px", color: "#d4d4d8" }} />
+        ) : null}
+      </NavLink>
+
+      {tooltipTop !== null && createPortal(
+        <div
+          onMouseEnter={clear}
+          onMouseLeave={handleMouseLeave}
+          style={{
+            position: "fixed", left: 262, top: tooltipTop,
+            transform: "translateY(-50%)", zIndex: 9999, width: 228,
+            background: bg, border: `1px solid ${border}`,
+            borderRadius: 12, padding: "10px 14px",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08)",
+            animation: "navTooltipIn 0.15s ease-out",
+          }}
+        >
+          <div style={{
+            position: "absolute", left: -6, top: "50%", transform: "translateY(-50%)",
+            width: 0, height: 0,
+            borderTop: "5px solid transparent", borderBottom: "5px solid transparent",
+            borderRight: `6px solid ${bg}`,
+          }} />
+          <p style={{ fontSize: "12px", fontWeight: 700, color: isDark ? "#fff" : "#18181b", marginBottom: "4px" }}>
+            {item.label}
+          </p>
+          <p style={{ fontSize: "11.5px", color: isDark ? "#a1a1aa" : "#71717a", lineHeight: "1.55" }}>
+            {item.description}
+          </p>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
 
 /* ─── Command Palette ─────────────────────────────────────────────────────── */
 
@@ -318,6 +410,9 @@ export function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [navTooltipsEnabled, setNavTooltipsEnabled] = useState(() => {
+    try { return localStorage.getItem(NAV_TOOLTIPS_KEY) !== "false"; } catch { return true; }
+  });
   const mainRef = useRef<HTMLElement>(null);
 
   const { data: intakeCount } = useQuery<{ count: number; newCount: number; reviewCount: number }>({
@@ -329,6 +424,14 @@ export function Layout() {
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handler = () => {
+      try { setNavTooltipsEnabled(localStorage.getItem(NAV_TOOLTIPS_KEY) !== "false"); } catch {}
+    };
+    window.addEventListener("qp-nav-tooltip-change", handler);
+    return () => window.removeEventListener("qp-nav-tooltip-change", handler);
+  }, []);
 
   useEffect(() => {
     if (!isCompleted && !isDismissed && location.pathname === "/dashboard") {
@@ -444,34 +547,15 @@ export function Layout() {
               ) : null}
               <div className="space-y-0.5">
                 {section.items.map((item) => (
-                  <NavLink
+                  <NavItemWithTooltip
                     key={item.to}
-                    to={item.to}
-                    onClick={() => setSidebarOpen(false)}
-                    className={({ isActive }) =>
-                      `nav-item w-full ${isActive ? "nav-item-active" : ""}`
-                    }
-                  >
-                    <item.icon
-                      className="shrink-0"
-                      style={{ width: "15px", height: "15px", opacity: 0.85 }}
-                    />
-                    <span className="flex-1 text-[13px]">{t(NAV_LABEL_KEYS[item.to] || item.label)}</span>
-                    {item.to === "/intake-requests" && intakeNewCount > 0 ? (
-                      <span
-                        className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
-                        style={{ minWidth: "18px", height: "18px", fontSize: "10px", padding: "0 4px" }}
-                      >
-                        {intakeNewCount > 99 ? "99+" : intakeNewCount}
-                      </span>
-                    ) : null}
-                    {item.beta ? (
-                      <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500 text-white uppercase tracking-wider leading-none">Beta</span>
-                    ) : null}
-                    {item.pro && !isPro ? (
-                      <Lock className="shrink-0" style={{ width: "12px", height: "12px", color: "#d4d4d8" }} />
-                    ) : null}
-                  </NavLink>
+                    item={item}
+                    enabled={navTooltipsEnabled}
+                    intakeNewCount={intakeNewCount}
+                    isPro={isPro}
+                    setSidebarOpen={setSidebarOpen}
+                    t={t}
+                  />
                 ))}
               </div>
             </div>

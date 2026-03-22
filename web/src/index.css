@@ -137,6 +137,11 @@ input[type="range"]::-moz-range-thumb {
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+@keyframes navTooltipIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(-6px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+
 .animate-fade-in { animation: fadeIn 0.18s ease-out; }
 .animate-slide-up { animation: slideUp 0.25s ease-out; }
 .animate-slide-in { animation: slideIn 0.25s ease-out; }
