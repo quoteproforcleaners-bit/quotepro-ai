@@ -84,115 +84,173 @@ function CommandHeader({
   navigate: (path: string) => void;
 }) {
   const hasRisk = followUpQueueCount > 0;
+  const closeRateColor = closeRate >= 50 ? "#10b981" : closeRate >= 35 ? "#f59e0b" : closeRate > 0 ? "#ef4444" : "#94a3b8";
 
   return (
-    <div className="rounded-2xl overflow-hidden mb-6 shadow-lg">
-      {/* Main header area */}
+    <div className="mb-6">
+      {/* ── Hero ── */}
       <div
-        className="relative px-6 py-6"
+        className="rounded-2xl overflow-hidden relative"
         style={{
-          background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #1d4ed8 100%)",
+          background: "linear-gradient(145deg, #06070d 0%, #0d1225 45%, #0f1e3d 100%)",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.12)",
         }}
       >
-        {/* Decorative radial glow */}
+        {/* Grid overlay */}
         <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ background: "radial-gradient(ellipse at 70% -20%, rgba(99,102,241,0.3) 0%, transparent 60%)" }}
+          className="absolute inset-0 pointer-events-none hero-grid-overlay"
+        />
+        {/* Blue glow */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            top: "-60px", right: "-40px", width: "360px", height: "360px",
+            background: "radial-gradient(circle, rgba(37,99,235,0.18) 0%, transparent 65%)",
+          }}
         />
         <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ background: "radial-gradient(ellipse at 100% 100%, rgba(37,99,235,0.2) 0%, transparent 50%)" }}
+          className="absolute pointer-events-none"
+          style={{
+            bottom: "-40px", left: "30%", width: "280px", height: "200px",
+            background: "radial-gradient(ellipse, rgba(99,102,241,0.1) 0%, transparent 70%)",
+          }}
         />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center gap-5">
-          {/* Left: greeting */}
-          <div className="flex-1 min-w-0">
-            <p className="text-blue-300 text-xs font-bold uppercase tracking-widest mb-1">{todayLabel()}</p>
-            <h1 className="text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight">
-              {greeting()}{business?.companyName ? `, ${business.companyName}` : ""}
-            </h1>
-            <p className="text-blue-200 text-sm mt-1">
-              {monthRevenue > 0
-                ? `${fmt(monthRevenue)} won this month · keep the momentum`
-                : "Your cleaning business command center"}
-            </p>
-          </div>
-
-          {/* Right: CTA */}
-          <div className="flex items-center gap-3 shrink-0">
-            {isInFreeTrial ? (
-              <button
-                onClick={() => navigate("/pricing")}
-                className="text-xs font-semibold text-amber-300 border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 rounded-lg hover:bg-amber-400/20 transition-colors whitespace-nowrap"
+        {/* Content */}
+        <div className="relative z-10 px-6 pt-6 pb-5">
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div>
+              <p
+                className="text-[11px] font-semibold uppercase tracking-widest mb-2"
+                style={{ color: "rgba(147,197,253,0.6)", letterSpacing: "0.1em" }}
               >
-                Trial: {freeTrialDaysLeft}d left
-              </button>
-            ) : null}
-            <button
-              onClick={() => navigate("/quotes/new")}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-primary-700 font-bold text-sm shadow-md hover:bg-blue-50 transition-all hover:shadow-lg active:scale-[0.98]"
-            >
-              <Plus className="w-4 h-4" />
-              New Quote
-            </button>
-          </div>
-        </div>
-
-        {/* Stat pills row */}
-        <div className="relative z-10 flex flex-wrap gap-3 mt-5">
-          <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
-            <DollarSign className="w-4 h-4 text-emerald-300 shrink-0" />
-            <div>
-              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider">Month Revenue</p>
-              <p className="text-base font-black text-white leading-tight">{fmt(monthRevenue)}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
-            <Briefcase className="w-4 h-4 text-blue-300 shrink-0" />
-            <div>
-              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider">Jobs This Week</p>
-              <p className="text-base font-black text-white leading-tight">{weekJobs}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl px-4 py-2.5">
-            <Target className="w-4 h-4 text-violet-300 shrink-0" />
-            <div>
-              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider">Close Rate</p>
-              <p className={`text-base font-black leading-tight ${closeRate >= 50 ? "text-emerald-300" : closeRate >= 35 ? "text-amber-300" : "text-red-300"}`}>
-                {closeRate > 0 ? `${Math.round(closeRate)}%` : "—"}
+                {todayLabel()}
+              </p>
+              <h1
+                className="text-[26px] lg:text-[30px] font-bold leading-tight tracking-tight text-white"
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                {greeting()}
+                {business?.companyName ? (
+                  <span style={{ color: "rgba(255,255,255,0.65)", fontWeight: 400 }}>,&nbsp;{business.companyName}</span>
+                ) : null}
+              </h1>
+              <p className="text-[13px] mt-1.5" style={{ color: "rgba(147,197,253,0.7)" }}>
+                {monthRevenue > 0
+                  ? `${fmt(monthRevenue)} recognized this month — keep pushing`
+                  : "Your revenue operations command center"}
               </p>
             </div>
-          </div>
-          {followUpQueueCount > 0 ? (
-            <div className="flex items-center gap-2.5 bg-amber-400/15 backdrop-blur-sm border border-amber-400/30 rounded-xl px-4 py-2.5">
-              <PhoneMissed className="w-4 h-4 text-amber-300 shrink-0" />
-              <div>
-                <p className="text-[10px] font-bold text-amber-200 uppercase tracking-wider">At Risk</p>
-                <p className="text-base font-black text-amber-300 leading-tight">{fmt(amountAtRisk)}</p>
-              </div>
+            <div className="flex items-center gap-2 shrink-0 mt-0.5">
+              {isInFreeTrial ? (
+                <button
+                  onClick={() => navigate("/pricing")}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                  style={{ color: "#fbbf24", border: "1px solid rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.08)" }}
+                >
+                  Trial: {freeTrialDaysLeft}d left
+                </button>
+              ) : null}
+              <button
+                onClick={() => navigate("/quotes/new")}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-[13px] transition-all active:scale-[0.97]"
+                style={{ background: "rgba(255,255,255,0.95)", color: "#1d4ed8" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "white"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.95)"; }}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                New Quote
+              </button>
             </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Alert ribbon */}
-      {hasRisk ? (
-        <button
-          onClick={() => navigate("/follow-ups")}
-          className="w-full flex items-center gap-3 px-6 py-3 bg-amber-500 hover:bg-amber-600 transition-colors text-left group"
-        >
-          <AlertTriangle className="w-4 h-4 text-amber-900 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <span className="text-sm font-bold text-amber-900">
-              {followUpQueueCount} quote{followUpQueueCount > 1 ? "s" : ""} need follow-up
-            </span>
-            <span className="text-amber-800 text-sm"> · {fmt(amountAtRisk)} at risk · Oldest: {oldestQuoteDays} day{oldestQuoteDays !== 1 ? "s" : ""} out</span>
           </div>
-          <span className="flex items-center gap-1 text-xs font-bold text-amber-900 whitespace-nowrap group-hover:gap-2 transition-all">
-            Act now <ArrowRight className="w-3.5 h-3.5" />
-          </span>
-        </button>
-      ) : null}
+
+          {/* Metric strip */}
+          <div
+            className="grid grid-cols-2 sm:grid-cols-4 gap-0 rounded-xl overflow-hidden"
+            style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.04)" }}
+          >
+            {[
+              {
+                icon: DollarSign,
+                label: "Month Revenue",
+                value: fmt(monthRevenue),
+                valueColor: "#34d399",
+                iconColor: "#34d399",
+              },
+              {
+                icon: Briefcase,
+                label: "Jobs This Week",
+                value: String(weekJobs),
+                valueColor: "white",
+                iconColor: "#93c5fd",
+              },
+              {
+                icon: Target,
+                label: "Close Rate",
+                value: closeRate > 0 ? `${Math.round(closeRate)}%` : "—",
+                valueColor: closeRateColor,
+                iconColor: "#c4b5fd",
+              },
+              {
+                icon: followUpQueueCount > 0 ? PhoneMissed : CheckCircle,
+                label: followUpQueueCount > 0 ? "At Risk" : "Follow-ups",
+                value: followUpQueueCount > 0 ? fmt(amountAtRisk) : "Clear",
+                valueColor: followUpQueueCount > 0 ? "#fbbf24" : "#34d399",
+                iconColor: followUpQueueCount > 0 ? "#fbbf24" : "#34d399",
+                clickable: followUpQueueCount > 0,
+              },
+            ].map((stat, i) => (
+              <div
+                key={i}
+                onClick={stat.clickable ? () => navigate("/follow-ups") : undefined}
+                className={`px-5 py-4 flex items-start gap-3 ${i > 0 ? "border-l" : ""} ${stat.clickable ? "cursor-pointer hover:bg-white/5 transition-colors" : ""}`}
+                style={{ borderLeftColor: "rgba(255,255,255,0.07)" }}
+              >
+                <stat.icon
+                  className="shrink-0 mt-0.5"
+                  style={{ width: "14px", height: "14px", color: stat.iconColor, opacity: 0.85 }}
+                />
+                <div className="min-w-0">
+                  <p
+                    className="text-[10px] uppercase tracking-wider mb-1 font-medium"
+                    style={{ color: "rgba(147,197,253,0.5)", letterSpacing: "0.07em" }}
+                  >
+                    {stat.label}
+                  </p>
+                  <p
+                    className="text-[18px] font-bold leading-none stat-number"
+                    style={{ color: stat.valueColor }}
+                  >
+                    {stat.value}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Alert ribbon */}
+        {hasRisk ? (
+          <button
+            onClick={() => navigate("/follow-ups")}
+            className="w-full flex items-center gap-3 px-6 py-2.5 text-left group transition-colors"
+            style={{ background: "rgba(245,158,11,0.15)", borderTop: "1px solid rgba(245,158,11,0.2)" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(245,158,11,0.22)"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(245,158,11,0.15)"; }}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" style={{ color: "#fbbf24" }} />
+            <span className="text-[12.5px] font-semibold flex-1" style={{ color: "#fcd34d" }}>
+              {followUpQueueCount} quote{followUpQueueCount > 1 ? "s" : ""} need follow-up
+              <span style={{ color: "rgba(252,211,77,0.65)", fontWeight: 400 }}>
+                {" "}· {fmt(amountAtRisk)} at risk · Oldest {oldestQuoteDays}d
+              </span>
+            </span>
+            <span className="flex items-center gap-1 text-[11px] font-semibold whitespace-nowrap" style={{ color: "#fcd34d" }}>
+              Act now <ArrowRight className="w-3 h-3" />
+            </span>
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -210,76 +268,68 @@ interface KPICardProps {
   onClick?: () => void;
 }
 
-const KPI_COLORS = {
-  emerald: {
-    bg: "bg-gradient-to-br from-emerald-50 to-emerald-50/30",
-    border: "border-emerald-200",
-    icon: "bg-emerald-100 text-emerald-600",
-    value: "text-emerald-700",
-    label: "text-emerald-600",
-    sub: "text-emerald-500",
-  },
-  blue: {
-    bg: "bg-gradient-to-br from-blue-50 to-blue-50/30",
-    border: "border-blue-200",
-    icon: "bg-blue-100 text-blue-600",
-    value: "text-blue-700",
-    label: "text-blue-600",
-    sub: "text-blue-400",
-  },
-  amber: {
-    bg: "bg-gradient-to-br from-amber-50 to-amber-50/30",
-    border: "border-amber-200",
-    icon: "bg-amber-100 text-amber-600",
-    value: "text-amber-700",
-    label: "text-amber-600",
-    sub: "text-amber-400",
-  },
-  violet: {
-    bg: "bg-gradient-to-br from-violet-50 to-violet-50/30",
-    border: "border-violet-200",
-    icon: "bg-violet-100 text-violet-600",
-    value: "text-violet-700",
-    label: "text-violet-600",
-    sub: "text-violet-400",
-  },
-  red: {
-    bg: "bg-gradient-to-br from-red-50 to-red-50/30",
-    border: "border-red-200",
-    icon: "bg-red-100 text-red-600",
-    value: "text-red-700",
-    label: "text-red-600",
-    sub: "text-red-400",
-  },
+const KPI_ACCENT: Record<string, { icon: string; value: string; dot: string }> = {
+  emerald: { icon: "#059669", value: "#065f46", dot: "#10b981" },
+  blue:    { icon: "#2563eb", value: "#1e40af", dot: "#3b82f6" },
+  amber:   { icon: "#d97706", value: "#92400e", dot: "#f59e0b" },
+  violet:  { icon: "#7c3aed", value: "#4c1d95", dot: "#8b5cf6" },
+  red:     { icon: "#dc2626", value: "#7f1d1d", dot: "#ef4444" },
 };
 
 function KPICard({ label, value, subtitle, icon: Icon, color, badge, badgePositive, onClick }: KPICardProps) {
-  const c = KPI_COLORS[color];
+  const accent = KPI_ACCENT[color];
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl border p-5 ${c.bg} ${c.border} ${onClick ? "cursor-pointer hover:shadow-md active:scale-[0.99]" : ""} transition-all duration-200`}
+      className={`rounded-xl bg-white p-5 ${onClick ? "cursor-pointer active:scale-[0.99]" : ""} transition-all duration-150`}
+      style={{
+        border: "1px solid rgba(0,0,0,0.07)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}
+      onMouseEnter={onClick ? (e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)";
+        (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+      } : undefined}
+      onMouseLeave={onClick ? (e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
+        (e.currentTarget as HTMLElement).style.transform = "";
+      } : undefined}
     >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${c.icon}`}>
-          <Icon className="w-5 h-5" />
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: `${accent.dot}14`, color: accent.icon }}
+        >
+          <Icon className="w-4.5 h-4.5" style={{ width: "18px", height: "18px" }} />
         </div>
         {badge ? (
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-            badgePositive
-              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-              : "bg-amber-50 text-amber-700 border-amber-200"
-          }`}>
+          <span
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+            style={badgePositive
+              ? { background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" }
+              : { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }
+            }
+          >
             {badge}
           </span>
         ) : null}
       </div>
-      <p className={`text-2xl lg:text-3xl font-black tracking-tight leading-none ${c.value}`}>
+      <p
+        className="text-2xl lg:text-[28px] font-bold tracking-tight leading-none stat-number"
+        style={{ color: "#09090b", letterSpacing: "-0.025em" }}
+      >
         {value}
       </p>
-      <p className={`text-xs font-bold uppercase tracking-wider mt-2 ${c.label}`}>{label}</p>
+      <p
+        className="text-[11px] font-medium uppercase tracking-wider mt-2"
+        style={{ color: "#a1a1aa", letterSpacing: "0.06em" }}
+      >
+        {label}
+      </p>
       {subtitle ? (
-        <p className={`text-xs mt-1 ${c.sub}`}>{subtitle}</p>
+        <p className="text-[11.5px] mt-1" style={{ color: accent.icon }}>
+          {subtitle}
+        </p>
       ) : null}
     </div>
   );

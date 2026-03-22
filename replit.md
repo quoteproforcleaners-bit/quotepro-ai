@@ -46,11 +46,19 @@ When a quote is sent, the system automatically schedules a follow-up message to 
 UI: "Follow-Up Automation" section in `QuoteDetailScreen.tsx` (mobile) and `QuoteDetailPage.tsx` (web), visible only for `sent` quotes.
 API routes: `GET /api/quotes/:id/scheduled-followups`, `POST /api/communications/:id/send-now`, `PUT /api/communications/:id`, `DELETE /api/communications/:id`, `POST /api/quotes/:id/followup-preview`.
 
+### Web Design System (v2 — Warm Minimal)
+The web app (`web/src/`) underwent a full visual overhaul targeting a premium, editorial aesthetic:
+- **Background**: Warm off-white `#F5F4F1` (not cold slate). Dark mode: `#0A0A0F` (deep zinc).
+- **Sidebar** (`web/src/components/Layout.tsx`): 248px left sidebar with QuotePro brand, ⌘K search trigger, organized nav sections (Operations / Intelligence / Growth / Workspace / Integrations). Active state uses a left blue border indicator (`.nav-item-active` class). No bottom tab bar on desktop.
+- **Command Palette** (`Layout.tsx`): Triggered by ⌘K or clicking the search bar. Fuzzy-search navigation with keyboard arrow navigation, grouped results (Actions / Navigate), and Esc to close.
+- **Header**: Compact 56px top bar with page title, ⌘K search trigger, "New Quote" primary button, and notification bell.
+- **CSS** (`web/src/index.css`): Tailwind v4 with `.nav-item` / `.nav-item-active` utility classes, `.cmd-palette` overlay, premium card shadows, hero grid overlay, zinc-based dark palette, `@custom-variant dark`.
+
 ### Web Dashboard (DashboardPage.tsx)
 The web dashboard (`web/src/pages/DashboardPage.tsx`) was fully redesigned as a premium "Revenue Command Center". Sections top to bottom:
-1. **CommandHeader** — dark gradient hero (slate-900 → primary-800) with business greeting, glass stat pills (Month Revenue, Jobs This Week, Close Rate, At Risk), and a white "New Quote" CTA. Shows an amber alert ribbon when follow-ups are at risk.
+1. **DashboardHero** — architectural near-black card (`#111118`) with faint dot-grid overlay and a subtle blue radial glow. Shows time-of-day greeting, business name, and a single 4-metric strip (Month Revenue, Jobs This Week, Close Rate, At Risk). Metrics use tabular numerals in large type. No colorful gradients.
 2. **StartHereChecklist** — shown for new/low-setup users only (steps: set rates, create quote, add client, activate follow-ups).
-3. **KPI Row** — 4 tinted gradient cards: "Revenue Won" (emerald), "Active Jobs" (blue), "Close Rate" (dynamic color), "Pipeline Value" (amber/violet).
+3. **KPI Row** — 4 clean white cards with soft shadows, subtle colored icon accent (not full gradient backgrounds), and large tabular-numerals metric values.
 4. **TodayOperations** — 4-cell strip: Cleans Today, Revenue Today, Next Clean, Needs Scheduling.
 5. **TodaysRevenueMoves** — up to 3 dynamic action cards based on current business state.
 6. **Pipeline + Attention** — 5-col grid: `PipelineCard` (3 cols) with funnel bars + close rate/avg value stats, `AttentionPanel` (2 cols) with severity-coded action items.
