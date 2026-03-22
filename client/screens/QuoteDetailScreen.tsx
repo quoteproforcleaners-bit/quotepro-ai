@@ -1110,15 +1110,17 @@ export default function QuoteDetailScreen() {
               >
                 <View style={styles.optionHeader}>
                   <ThemedText type="body" style={{ fontWeight: "600" }}>
-                    {opt.serviceTypeName || opt.name || key}
+                    {opt.name || (key.charAt(0).toUpperCase() + key.slice(1))}
                   </ThemedText>
                   {isSelected ? (
                     <Feather name="check-circle" size={18} color={theme.primary} />
                   ) : null}
                 </View>
-                <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                  {opt.serviceTypeName || opt.name || key}
-                </ThemedText>
+                {(opt.serviceTypeName || opt.scope) ? (
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                    {opt.serviceTypeName || opt.scope}
+                  </ThemedText>
+                ) : null}
                 <ThemedText type="h3" style={{ color: theme.primary, marginTop: Spacing.sm }}>
                   ${opt.price?.toFixed(0) || "0"}
                 </ThemedText>

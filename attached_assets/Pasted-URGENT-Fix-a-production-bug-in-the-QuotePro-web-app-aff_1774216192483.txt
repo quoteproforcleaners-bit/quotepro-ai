@@ -1,0 +1,254 @@
+URGENT: Fix a production bug in the QuotePro web app affecting customer-facing quote packages.
+
+Current bug:
+When quotes are sent to customers, the package options (for example Good / Better / Best) are rendering incorrectly.
+
+Observed issues:
+1. all package prices are the same, even though each package should have different pricing
+2. package labels/descriptions are showing as “undefined”
+3. customer-facing quote output is not correctly reflecting package differences
+4. this is breaking trust in the quote experience and must be fixed ASAP
+
+Treat this as a production-critical bug involving:
+- pricing integrity
+- quote rendering
+- package mapping
+- customer-facing output correctness
+
+GOAL
+
+Fix the quote generation and rendering flow so that:
+- each package displays the correct package name/title
+- each package displays the correct subtitle/description if applicable
+- each package displays the correct package-specific price
+- customer-facing quote pages/emails accurately reflect package differences
+- no package ever shows “undefined”
+- package pricing and labels are deterministic and validated before send/publish
+
+LIKELY ROOT CAUSE AREAS TO AUDIT
+
+Audit the entire quote package pipeline, especially:
+1. package tier data model
+2. package creation logic
+3. package pricing calculation logic
+4. package serialization / API response shaping
+5. customer-facing quote renderer
+6. fallback/default value behavior
+7. mapping between package objects and UI components
+8. package-specific adjustments, multipliers, add-ons, or inclusions
+9. template rendering for quote email/page
+10. data transformation between backend and frontend
+
+I suspect one or more of these is happening:
+- all packages are inheriting the same base total without package-specific deltas
+- package-level pricing overrides are not being applied
+- package metadata fields are null/undefined and not mapped correctly
+- the frontend is reading the wrong field names
+- the quote renderer is using fallback values for every package
+- package description/title fields changed in schema but not in rendering
+- package calculation objects are being cloned incorrectly or overwritten
+- package tiers are generated but not independently recalculated
+
+WHAT TO DO FIRST
+
+Start by tracing one quote end-to-end:
+
+1. inspect how Good / Better / Best packages are created in code
+2. inspect the raw package data produced before rendering
+3. inspect the API payload sent to the customer-facing quote page/email
+4. inspect the frontend component that renders package title, description, and price
+5. identify exactly where:
+   - title/description becomes undefined
+   - pricing collapses to the same number across packages
+
+Then fix the root cause, not just the symptom.
+
+REQUIRED FIXES
+
+1. PACKAGE TITLE / LABEL FIX
+Ensure each package has a valid title/label.
+Examples:
+- Good
+- Better
+- Best
+or whatever the app’s configured package names are
+
+If there is also a subtitle/description, ensure it resolves correctly and never renders as undefined.
+
+Implement safe fallbacks such as:
+- if subtitle is missing, omit subtitle entirely
+- never render literal “undefined” or “null” to customers
+
+2. PACKAGE PRICE DIFFERENTIATION FIX
+Ensure package-specific pricing is actually applied.
+
+Each package should have its own computed amount based on:
+- included services
+- excluded services
+- tier-specific add-ons
+- package multipliers
+- pricing rules
+- manual adjustments
+- upsell differences
+
+If the intended behavior is:
+- Good = base package
+- Better = some added value/add-ons
+- Best = premium package with more included work
+
+then each should calculate independently and produce different totals when configured differently.
+
+Do not allow all packages to silently reuse the same total unless they are truly identical by design.
+
+3. CUSTOMER-FACING RENDERING FIX
+Fix the quote page / email renderer so it correctly displays:
+- package title
+- package subtitle/description if present
+- package amount
+- package CTA button text
+
+Examples:
+- Accept Good
+- Accept Better
+- Accept Best
+
+Do not render:
+- “Good - undefined”
+- “Accept Better - undefined”
+
+If no secondary label exists, render only the package name cleanly.
+
+4. VALIDATION BEFORE SEND
+Before a quote is sent to a customer, validate package integrity.
+
+Add validation rules such as:
+- package title must exist
+- package price must be numeric
+- package list must not contain invalid undefined metadata
+- package amounts should not all be identical if package contents differ
+- if package generation fails, prevent sending and surface an admin error
+
+This is very important.
+Do not allow broken quote packages to be sent silently.
+
+5. DEBUGGING / LOGGING
+Add useful logging or dev diagnostics around package generation and rendering, including:
+- generated package data
+- computed totals per package
+- missing title/description fields
+- quote payload validation failures
+
+Make this easy to inspect in development.
+
+EXPECTED DATA MODEL BEHAVIOR
+
+Audit and normalize package objects so each package consistently contains fields like:
+- id
+- tier_key
+- title
+- subtitle or description
+- total
+- line_items
+- included_features
+- excluded_features
+- applied_rules
+- CTA label if needed
+- sort_order
+- recommended flag
+
+Use a consistent contract between backend and frontend.
+If field names differ today, standardize or map them correctly.
+
+FRONTEND / UI REQUIREMENTS
+
+Fix the customer-facing quote cards so they render cleanly and safely.
+
+Requirements:
+- never display undefined/null strings
+- show distinct pricing for each package
+- show recommended package styling if configured
+- show correct button labels
+- preserve good visual hierarchy
+- do not patch with hardcoded text unless absolutely necessary as a fallback
+
+If the subtitle/description is optional:
+- hide the line if missing
+- do not append “- undefined”
+
+BACKEND / LOGIC REQUIREMENTS
+
+Audit the pricing logic for package tiers.
+
+Potential issues to inspect:
+- package objects mutating the same reference
+- total copied from the same source for all packages
+- pricing function called once instead of once per package
+- package-specific add-ons not merged correctly
+- tier config not loaded
+- upsell config not passed into calculation
+- package loop overwriting values
+- quote serializer flattening package totals incorrectly
+
+Fix the underlying logic so each tier is independently computed.
+
+TESTING REQUIREMENTS
+
+Add tests immediately for:
+1. package title rendering
+2. no undefined text in customer-facing quote output
+3. different package totals when package contents differ
+4. same totals only when packages are actually configured identically
+5. package serialization integrity
+6. quote send validation catches broken packages
+7. frontend quote card rendering with missing optional subtitle
+8. CTA labels render correctly
+
+Create regression tests so this bug does not come back.
+
+SEED / DEMO CASES
+
+Create or update demo data to include:
+- Good / Better / Best quote packages with clearly different contents
+- distinct prices for each package
+- one package with missing optional subtitle to verify clean fallback behavior
+- one recommended package state
+
+Use these to verify the customer-facing quote page looks correct.
+
+ADMIN / INTERNAL SAFETY IMPROVEMENT
+
+If possible, update the internal quote preview screen so users can review package output before sending, including:
+- package title
+- subtitle/description
+- package price
+- rendered button text
+- warning if any field is invalid
+
+This should catch broken quotes before they reach customers.
+
+DELIVERABLES
+
+I want:
+1. root cause identified
+2. package pricing bug fixed
+3. undefined text bug fixed
+4. customer-facing quote rendering fixed
+5. validation before quote send
+6. regression tests
+7. demo data updated
+8. brief README/dev note on the package object contract if useful
+
+IMPORTANT
+
+Do not just patch the UI to hide the symptom.
+Trace the bug from quote generation through rendering and fix the real issue.
+
+START BY
+
+1. tracing one broken quote from package generation to rendered output
+2. logging the raw package objects
+3. identifying where title/subtitle becomes undefined
+4. identifying where package totals collapse to the same amount
+5. fixing backend/package generation logic first
+6. then fixing frontend rendering/fallback behavior
+7. then adding validation and tests

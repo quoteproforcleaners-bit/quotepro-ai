@@ -249,17 +249,27 @@ function calculateQuote(
   };
 
   // Good: no add-ons (base service only)
-  const good = calcTier(goodTypeId, false);
-  // Better: user-selected add-ons included (fixed: was incorrectly false)
-  const better = calcTier(betterTypeId, true);
+  let good = calcTier(goodTypeId, false);
+  // Better: user-selected add-ons included
+  let better = calcTier(betterTypeId, true);
   // Best: deep-clean default add-ons — oven, cabinets, windows, baseboards, blinds (no fridge)
-  const best = calcTier(bestTypeId, false, {
+  let best = calcTier(bestTypeId, false, {
     insideOven: true,
     insideCabinets: true,
     interiorWindows: true,
     baseboardsDetail: true,
     blindsDetail: true,
   });
+
+  // Enforce tier price differentiation: minimum ticket can collapse Good and Better to the
+  // same floor. Ensure each tier is at least $20 more than the one below it.
+  const TIER_DELTA = 20;
+  if (better.price <= good.price) {
+    better = { ...better, price: roundToNearest5(good.price + TIER_DELTA) };
+  }
+  if (best.price <= better.price) {
+    best = { ...best, price: roundToNearest5(better.price + TIER_DELTA) };
+  }
 
   return {
     good,
@@ -570,20 +580,29 @@ export default function QuoteCreatePage() {
         good: {
           price: goodPrice,
           firstCleanPrice: quote.good.firstCleanPrice ?? undefined,
-          name: `Good - ${quote.good.name}`,
-          scope: aiScopes?.good || quote.good.scope,
+          name: "Good",
+          serviceTypeName: quote.good.name || "Touch Up",
+          serviceTypeId: quote.good.serviceTypeId || "touch-up",
+          scope: aiScopes?.good || quote.good.scope || "",
+          addOnsIncluded: [],
         },
         better: {
           price: betterPrice,
           firstCleanPrice: quote.better.firstCleanPrice ?? undefined,
-          name: `Better - ${quote.better.name}`,
-          scope: aiScopes?.better || quote.better.scope,
+          name: "Better",
+          serviceTypeName: quote.better.name || "Standard Clean",
+          serviceTypeId: quote.better.serviceTypeId || "regular",
+          scope: aiScopes?.better || quote.better.scope || "",
+          addOnsIncluded: addOnOptions.filter(o => services.addOns[o.key]).map(o => o.label),
         },
         best: {
           price: bestPrice,
           firstCleanPrice: quote.best.firstCleanPrice ?? undefined,
-          name: `Best - ${quote.best.name}`,
-          scope: aiScopes?.best || quote.best.scope,
+          name: "Best",
+          serviceTypeName: quote.best.name || "Deep Clean",
+          serviceTypeId: quote.best.serviceTypeId || "deep-clean",
+          scope: aiScopes?.best || quote.best.scope || "",
+          addOnsIncluded: ["Inside Oven", "Inside Cabinets", "Interior Windows", "Baseboards Detail", "Blinds Detail"],
         },
       },
       addOns: Object.fromEntries(

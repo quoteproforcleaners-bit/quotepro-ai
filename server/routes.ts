@@ -2358,6 +2358,34 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       const quote = await getQuoteById(req.params.id);
       if (!quote) return res.status(404).json({ message: "Quote not found" });
 
+      // ── Package integrity validation ──────────────────────────────────────
+      const opts = (quote.options || {}) as Record<string, any>;
+      const tierKeys = ["good", "better", "best"].filter(k => opts[k] !== undefined);
+      const validationErrors: string[] = [];
+      const tierPrices: number[] = [];
+      for (const key of tierKeys) {
+        const opt = opts[key];
+        if (!opt || typeof opt !== "object") { validationErrors.push(`Package "${key}" is missing or invalid`); continue; }
+        const price = Number(opt.price);
+        if (!isFinite(price) || price <= 0) validationErrors.push(`Package "${key}" has invalid price: ${opt.price}`);
+        const name = opt.name || opt.serviceTypeName;
+        if (!name || String(name).toLowerCase().includes("undefined")) validationErrors.push(`Package "${key}" has invalid name: ${opt.name}`);
+        tierPrices.push(price);
+      }
+      if (tierPrices.length > 1) {
+        const uniquePrices = new Set(tierPrices);
+        if (uniquePrices.size === 1) {
+          validationErrors.push(`All packages have identical prices ($${tierPrices[0]}). Review your pricing before sending.`);
+        } else if (tierPrices.length >= 2 && tierPrices[0] === tierPrices[1]) {
+          validationErrors.push(`Good and Better packages have the same price ($${tierPrices[0]}). Customers will not be able to distinguish them.`);
+        }
+      }
+      if (validationErrors.length > 0) {
+        console.warn(`[quote-send] Validation failed for quote ${quote.id}:`, validationErrors);
+        return res.status(422).json({ message: "Quote packages have issues that must be fixed before sending", errors: validationErrors });
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       const q = await updateQuote(req.params.id, {
         status: "sent",
         sentVia: channel,
@@ -4344,6 +4372,29 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       if (!to) {
         return res.status(400).json({ message: "to (recipient email) is required" });
       }
+
+      // ── Package integrity validation ──────────────────────────────────────
+      const sendOpts = (quote.options || {}) as Record<string, any>;
+      const sendTierKeys = ["good", "better", "best"].filter(k => sendOpts[k] !== undefined);
+      const sendErrors: string[] = [];
+      const sendPrices: number[] = [];
+      for (const key of sendTierKeys) {
+        const opt = sendOpts[key];
+        if (!opt || typeof opt !== "object") { sendErrors.push(`Package "${key}" is missing or invalid`); continue; }
+        const price = Number(opt.price);
+        if (!isFinite(price) || price <= 0) sendErrors.push(`Package "${key}" has invalid price: ${opt.price}`);
+        const name = opt.name || opt.serviceTypeName;
+        if (!name || String(name).toLowerCase().includes("undefined")) sendErrors.push(`Package "${key}" has invalid name`);
+        sendPrices.push(price);
+      }
+      if (sendPrices.length > 1 && new Set(sendPrices).size === 1) {
+        sendErrors.push(`All packages have identical prices ($${sendPrices[0]}). Review before sending.`);
+      }
+      if (sendErrors.length > 0) {
+        console.warn(`[quote-send-pdf] Validation failed for quote ${quote.id}:`, sendErrors);
+        return res.status(422).json({ message: "Quote packages have issues that must be fixed before sending", errors: sendErrors });
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       const { fromName, replyTo: replyToEmail } = getBusinessSendParams(business);
 
