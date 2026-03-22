@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import AppStoreQR from "./AppStoreQR";
 import { useAuth } from "../lib/auth";
@@ -50,6 +51,7 @@ const navSections: NavSection[] = [
       { to: "/employees", label: "Team Members", icon: UserCog },
       { to: "/calendar", label: "Schedule", icon: CalendarDays, pro: true },
       { to: "/commercial-quote", label: "Commercial Quote", icon: Building2, pro: true },
+      { to: "/intake-requests", label: "Quote Requests", icon: Inbox },
     ],
   },
   {
@@ -84,7 +86,6 @@ const navSections: NavSection[] = [
     label: "Workspace",
     items: [
       { to: "/automations", label: "Automations", icon: Cpu, pro: true },
-      { to: "/intake-requests", label: "Quote Requests", icon: Inbox },
       { to: "/file-library", label: "File Library", icon: FolderOpen },
       { to: "/toolkit", label: "Toolkit", icon: Wrench },
       { to: "/pro-setup", label: "Setup Checklist", icon: Clipboard },
@@ -271,6 +272,12 @@ export function Layout() {
   const [cmdOpen, setCmdOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
+  const { data: intakeCount } = useQuery<{ count: number; newCount: number; reviewCount: number }>({
+    queryKey: ["/api/intake-requests/count"],
+    refetchInterval: 60_000,
+  });
+  const intakeNewCount = intakeCount?.newCount ?? 0;
+
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [location.pathname]);
@@ -402,6 +409,14 @@ export function Layout() {
                       style={{ width: "15px", height: "15px", opacity: 0.85 }}
                     />
                     <span className="flex-1 text-[13px]">{item.label}</span>
+                    {item.to === "/intake-requests" && intakeNewCount > 0 ? (
+                      <span
+                        className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
+                        style={{ minWidth: "18px", height: "18px", fontSize: "10px", padding: "0 4px" }}
+                      >
+                        {intakeNewCount > 99 ? "99+" : intakeNewCount}
+                      </span>
+                    ) : null}
                     {item.beta ? (
                       <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500 text-white uppercase tracking-wider leading-none">Beta</span>
                     ) : null}

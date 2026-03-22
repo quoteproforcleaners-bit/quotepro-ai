@@ -33,6 +33,7 @@ import {
   RefreshCw,
   TrendingDown,
   Clock,
+  Inbox,
   AlertCircle,
 } from "lucide-react";
 import { Button, Badge, Card, CardHeader, ProgressBar, MetricRing, FunnelBar } from "../components/ui";
@@ -865,6 +866,10 @@ export default function DashboardPage() {
     distribution: Record<number, number>;
   }>({ queryKey: ["/api/ratings/summary"] });
   const { data: pricing } = useQuery<any>({ queryKey: ["/api/pricing"] });
+  const { data: intakeCountData } = useQuery<{ count: number; newCount: number; reviewCount: number }>({
+    queryKey: ["/api/intake-requests/count"],
+    refetchInterval: 60_000,
+  });
 
   // ── Derived state ──────────────────────────────────────────────────────────
   const sentQuotes = quotes.filter((q: any) => q.status === "sent");
@@ -1190,6 +1195,37 @@ export default function DashboardPage() {
           onClick={() => navigate("/quotes?filter=accepted")}
         />
       </div>
+
+      {/* 4a. Quote Requests Banner */}
+      {(intakeCountData?.newCount ?? 0) > 0 ? (
+        <button
+          onClick={() => navigate("/intake-requests")}
+          className="w-full mb-4 rounded-2xl border border-red-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-red-300 transition-all text-left group"
+        >
+          <div className="px-5 py-4 flex items-center gap-4">
+            <div className="relative shrink-0">
+              <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center">
+                <Inbox className="w-5 h-5 text-red-600" />
+              </div>
+              <span
+                className="absolute -top-1.5 -right-1.5 flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
+                style={{ minWidth: "20px", height: "20px", fontSize: "11px", padding: "0 4px" }}
+              >
+                {(intakeCountData?.newCount ?? 0) > 99 ? "99+" : intakeCountData?.newCount}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-slate-800 text-sm">
+                {intakeCountData?.newCount === 1 ? "1 New Quote Request" : `${intakeCountData?.newCount} New Quote Requests`}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {intakeCountData?.newCount === 1 ? "A lead is waiting for your response" : "Leads are waiting for your response — review and build quotes"}
+              </p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-red-500 transition-colors shrink-0" />
+          </div>
+        </button>
+      ) : null}
 
       {/* 4. Today Operations */}
       <TodayOperations

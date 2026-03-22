@@ -147,17 +147,17 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
         {/* Header */}
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-            <span className="text-blue-700 font-semibold text-sm">{req.customerName.charAt(0).toUpperCase()}</span>
+            <span className="text-blue-700 font-semibold text-sm">{(req.customerName || "?").charAt(0).toUpperCase()}</span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-0.5">
               <span className="font-semibold text-slate-900 text-sm">{req.customerName}</span>
               {!isDone ? <ConfidenceBadge level={req.confidence || "low"} /> : null}
               {f.frequency && f.frequency !== "one-time" && (
-                <Badge variant="success">{FREQ_LABELS[f.frequency]}</Badge>
+                <Badge status="success" label={FREQ_LABELS[f.frequency] || f.frequency} />
               )}
-              {req.status === "converted" && <Badge variant="success">Converted</Badge>}
-              {req.status === "dismissed" && <Badge variant="default">Dismissed</Badge>}
+              {req.status === "converted" && <Badge status="success" label="Converted" />}
+              {req.status === "dismissed" && <Badge status="draft" label="Dismissed" />}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               {req.customerPhone && (

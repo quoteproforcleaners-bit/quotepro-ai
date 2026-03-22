@@ -173,7 +173,7 @@ export function Badge({
   size?: "sm" | "md";
 }) {
   const style = badgeStyles[status] || badgeStyles.draft;
-  const text = label || status.replace(/[-_]/g, " ");
+  const text = label || (status ? status.replace(/[-_]/g, " ") : "");
   const sizeClass = size === "sm" ? "px-2 py-px text-[10px]" : "px-2.5 py-0.5 text-xs";
   return (
     <span
