@@ -1,0 +1,325 @@
+URGENT: Fix the QuotePro web app Live Quote Preview and pricing settings system.
+
+This is a production-critical pricing integrity issue.
+The live quote preview is currently wrong because the price does not update properly when the user changes:
+- square footage
+- bedrooms
+- bathrooms
+
+This must be fixed correctly the first time.
+Pricing is the most critical part of the app.
+
+CURRENT BUG
+
+In the New Quote flow / Live Quote Preview:
+- adding bedrooms does not correctly change the price
+- adding bathrooms does not correctly change the price
+- increasing square footage does not correctly change the price
+- the live price preview is not reliably recalculating from the quote inputs
+- the pricing engine and/or settings mapping is likely broken
+
+GOAL
+
+Fix the pricing engine and live preview so that:
+1. the quote price updates instantly when quote inputs change
+2. the preview always reflects the correct calculation
+3. the price uses configurable pricing settings, not hardcoded values
+4. the software user can edit quote prices manually
+5. the pricing settings for these base inputs exist in settings and work correctly
+6. the final saved quote matches the live preview exactly
+
+REQUIRED BASE PRICING LOGIC
+
+For residential quote base pricing, use these defaults unless overridden in pricing settings:
+
+- every 1000 square feet = $85 base price
+- every bedroom = $15
+- every bathroom = $18
+
+Interpretation for MVP/default behavior:
+- square footage contributes price in 1000 sq ft units
+- bedrooms add $15 each
+- bathrooms add $18 each
+
+Implement square footage logic clearly and consistently.
+Example default behavior:
+- 1000 sq ft = $85
+- 2000 sq ft = $170
+- 2300 sq ft = 2.3 x $85 if using proportional pricing
+OR a clearly documented rounding strategy if the app uses rounded increments
+
+Pick one consistent method and document it.
+Recommended: use proportional calculation unless the existing product already has an intentional rounding rule.
+
+IMPORTANT:
+These values are defaults only.
+They must be editable in Pricing Settings by the software user.
+
+SETTINGS REQUIREMENT
+
+Audit the current pricing settings system.
+
+If editable fields for these inputs do not already exist, create them in pricing settings for the software user:
+
+Residential Base Pricing Settings:
+- price_per_1000_sqft
+- price_per_bedroom
+- price_per_bathroom
+
+Optional if architecture already supports it:
+- minimum job price
+- price per half bath
+- pet surcharge
+- cleanliness multiplier or surcharge
+- service type multipliers
+
+But at minimum, the first three fields above must exist and work.
+
+The live quote preview must read from these settings, not from random hardcoded values in the UI.
+
+ROOT CAUSE INVESTIGATION
+
+Start by auditing the full pricing flow:
+1. quote builder form state
+2. live preview calculation logic
+3. pricing settings retrieval
+4. mapping between settings and calculator
+5. backend pricing engine
+6. save quote logic
+7. edit quote logic
+8. manual adjustment logic
+
+Likely causes to inspect:
+- live preview is not subscribed to field changes
+- recalculation is memoized incorrectly
+- pricing settings are not being loaded
+- calculator uses stale values
+- bedrooms/bathrooms/sqft are not mapped correctly into the pricing engine
+- same base amount is reused instead of recalculated
+- preview logic differs from final save logic
+- settings keys do not match calculation keys
+- form state updates but pricing engine is not re-run
+
+Fix the root cause, not just the UI symptom.
+
+LIVE QUOTE PREVIEW REQUIREMENTS
+
+Fix the Live Quote Preview so that:
+- the amount recalculates immediately when square footage changes
+- the amount recalculates immediately when bedroom count changes
+- the amount recalculates immediately when bathroom count changes
+- breakdown rows update too
+- triggered rules update too
+- warnings/minimum ticket messaging updates correctly
+- the total shown is always the current correct value
+
+The preview must feel live and trustworthy.
+
+SHARED PRICING ENGINE REQUIREMENT
+
+This is critical:
+There must be ONE pricing engine / source of truth.
+
+Do NOT keep:
+- one calculation for the live preview
+- and a different calculation for final quote save
+
+Instead:
+- use one shared pricing calculation service/module
+- use it in live preview
+- use it when saving quote
+- use it when editing quote
+- use it in customer-facing quote rendering if relevant
+
+The final quote total must always match the live preview.
+
+BASE PRICE BREAKDOWN REQUIREMENTS
+
+The live quote preview should clearly show the breakdown using the configured settings.
+
+Example:
+- Base square footage (2.3 x $85): $195.50
+- Bedrooms (3 x $15): $45
+- Bathrooms (2 x $18): $36
+- Subtotal: $276.50
+- Minimum price applied if relevant
+- Final total
+
+If your existing UI structure already supports a different but sensible breakdown format, keep it clean and readable.
+
+MINIMUM JOB PRICE BEHAVIOR
+
+If minimum job price logic already exists, keep it working correctly.
+However:
+- it must apply after the real base calculation
+- it must not mask broken calculation behavior
+- the UI should clearly show when minimum price is applied
+
+Example:
+- calculated price = $128
+- minimum job price = $155
+- final total = $155
+- message: minimum applied
+
+But if the calculated price should be above minimum, the minimum should not incorrectly override it.
+
+QUOTE PRICES MUST BE EDITABLE
+
+This is required.
+
+The software user must be able to manually edit/override quote prices.
+
+Implement or fix a manual price edit capability such as:
+- manual adjustment amount
+- direct total override if the app supports this pattern
+- editable line items if architecture already supports it
+
+At minimum, support:
+1. calculated price from engine
+2. manual adjustment by the software user
+3. clear indication of adjusted total
+4. preserved adjustment reason if possible
+5. edited price saved with the quote
+
+Make sure manual edits do not break the pricing engine.
+The system should preserve:
+- calculated base total
+- manual adjustment amount or override
+- final displayed total
+
+EDIT QUOTE SUPPORT
+
+When editing an existing quote:
+- the same pricing engine must run
+- the same settings must apply
+- any saved manual edits must remain visible/editable
+- the live preview must still work
+
+PRICING SETTINGS UI REQUIREMENTS
+
+Create or fix a clean pricing settings section for software users.
+
+At minimum include:
+Residential Base Pricing
+- Price per 1000 sq ft
+- Price per bedroom
+- Price per bathroom
+
+Optional helpful text:
+- “These values are used by Live Quote Preview and residential quote calculations.”
+- “Changes here affect future quotes.”
+
+Use proper validation:
+- numeric only
+- no negative values unless product explicitly supports discounts here
+- save confirmation
+- persistence in database
+
+DATA MODEL / BACKEND REQUIREMENTS
+
+Audit or extend the pricing settings model to support:
+- business/workspace-level pricing settings
+- price_per_1000_sqft
+- price_per_bedroom
+- price_per_bathroom
+- minimum_job_price if present
+- timestamps
+- created_by/updated_by if appropriate
+
+Ensure these values are loaded correctly into the quote builder.
+
+FRONTEND REQUIREMENTS
+
+Fix the quote builder UI so that:
+- changing square footage triggers recalculation
+- bedroom plus/minus triggers recalculation
+- bathroom plus/minus triggers recalculation
+- live preview rerenders correctly
+- no stale total remains on screen
+- manual price adjustments/edits are possible
+- the preview remains fast and smooth
+
+If needed, refactor the form state and live preview data flow.
+
+VALIDATION / TESTING REQUIREMENTS
+
+Add regression tests for:
+1. square footage recalculation
+2. bedroom recalculation
+3. bathroom recalculation
+4. pricing settings values are used instead of defaults when changed
+5. live preview matches final saved quote
+6. minimum job price applies correctly
+7. manual adjustment updates final total
+8. edit quote preserves pricing behavior
+9. breakdown values are correct
+10. settings persistence works
+
+Use specific test cases such as:
+- 1000 sq ft, 1 bed, 1 bath
+- 2300 sq ft, 3 bed, 2 bath
+- settings changed to custom values
+- quote with manual price adjustment
+- quote above minimum and below minimum
+
+EXAMPLE DEFAULT CALCULATION TO VERIFY
+
+With defaults:
+- 2300 sq ft
+- 3 bedrooms
+- 2 bathrooms
+
+Expected base calculation should reflect:
+- sqft: 2.3 x 85 = 195.50
+- bedrooms: 3 x 15 = 45
+- bathrooms: 2 x 18 = 36
+- subtotal: 276.50
+
+Then apply any valid minimum rules only if needed.
+
+If the app intentionally rounds currency/inputs, document and apply that consistently.
+
+SEED / DEMO DATA
+
+Seed/update demo data so the pricing system can be verified immediately:
+- residential pricing settings with the default values above
+- sample residential quote scenarios
+- at least one quote with manual adjustment
+- at least one quote below minimum price
+- at least one quote above minimum price
+
+DELIVERABLES
+
+I want:
+1. root cause identified
+2. live quote preview recalculation fixed
+3. square footage pricing fixed
+4. bedroom pricing fixed
+5. bathroom pricing fixed
+6. pricing settings created/fixed for these base values
+7. manual quote price editing implemented/fixed
+8. shared pricing engine used by preview + save + edit
+9. regression tests
+10. demo data
+11. brief dev note / README update about the pricing calculation contract
+
+IMPORTANT
+
+Do not hardcode the new values only in the preview UI.
+The proper fix is:
+- settings-backed pricing fields
+- shared pricing engine
+- trustworthy recalculation
+- editable quote pricing
+- exact match between preview and saved quote
+
+START BY
+
+1. auditing the quote builder field state and live preview calculation flow
+2. auditing pricing settings retrieval and mapping
+3. implementing/fixing the shared residential pricing engine
+4. wiring live preview to recalculate on every relevant input change
+5. adding/fixing pricing settings UI fields
+6. implementing manual quote price edit capability
+7. verifying preview and final saved quote parity
+8. adding regression tests

@@ -1145,7 +1145,18 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       }
 
       const pricing = await getPricingByBusiness(business.id);
-      return res.json(pricing?.settings || null);
+      const stored: any = pricing?.settings || {};
+      // Always merge flat-rate defaults so every client gets these fields
+      const merged = {
+        pricePerSqft:     stored.pricePerSqft    ?? 85,
+        pricePerBedroom:  stored.pricePerBedroom  ?? 15,
+        pricePerBathroom: stored.pricePerBathroom ?? 18,
+        hourlyRate:       stored.hourlyRate       ?? 45,
+        minimumTicket:    stored.minimumTicket    ?? 100,
+        taxRate:          stored.taxRate          ?? 0,
+        ...stored,
+      };
+      return res.json(merged);
     } catch (error: any) {
       console.error("Get pricing error:", error);
       return res.status(500).json({ message: "Failed to get pricing" });

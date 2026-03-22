@@ -20,7 +20,14 @@ export interface ResidentialProperty {
 }
 
 export interface PricingSettings {
-  hourlyRate: number;
+  // ── Flat-rate residential base pricing ──────────────────────────────────
+  // These three values drive the live preview and all residential quotes.
+  // Defaults: $85/1000sqft · $15/bedroom · $18/bathroom
+  pricePerSqft: number;        // dollars per 1,000 sq ft (default 85)
+  pricePerBedroom: number;     // dollars per bedroom (default 15)
+  pricePerBathroom: number;    // dollars per full bathroom (default 18)
+  // ── Other pricing config ─────────────────────────────────────────────────
+  hourlyRate: number;          // used for pet surcharge & labor-hour estimate display
   minimumTicket: number;
   serviceTypes: Array<{ id: string; name: string; multiplier: number; scope: string }>;
   goodOptionId: string;
@@ -92,8 +99,6 @@ export const DEFAULT_ADD_ON_PRICES: Record<string, number> = {
 
 // ─── Pure helper functions ────────────────────────────────────────────────────
 
-function getSqftBaseHours(sqft: number): number { return (sqft / 1000) * (40 / 60); }
-
 function getConditionMultiplier(score: number): number {
   if (score >= 9) return 0.9;
   if (score >= 7) return 1.0;
@@ -126,8 +131,43 @@ function getFreqDiscount(freq: string, discounts: { weekly: number; biweekly: nu
   return 0;
 }
 
-// ─── Main residential calculator ─────────────────────────────────────────────
+// ─── Defaults ─────────────────────────────────────────────────────────────────
 
+export const DEFAULT_PRICING: PricingSettings = {
+  pricePerSqft: 85,
+  pricePerBedroom: 15,
+  pricePerBathroom: 18,
+  hourlyRate: 45,
+  minimumTicket: 100,
+  serviceTypes: [
+    { id: "touch-up",   name: "Touch Up",       multiplier: 0.75, scope: "Quick surface cleaning" },
+    { id: "standard",   name: "Standard Clean",  multiplier: 1.0,  scope: "Full cleaning of all rooms" },
+    { id: "deep-clean", name: "Deep Clean",      multiplier: 1.5,  scope: "Thorough deep cleaning" },
+  ],
+  goodOptionId: "touch-up",
+  betterOptionId: "standard",
+  bestOptionId: "deep-clean",
+  addOnPrices: DEFAULT_ADD_ON_PRICES,
+  frequencyDiscounts: { weekly: 25, biweekly: 15, monthly: 10 },
+};
+
+// ─── Main residential calculator ─────────────────────────────────────────────
+//
+// Pricing contract (residential):
+//   basePrice  = (sqft / 1000) × pricePerSqft
+//              + beds          × pricePerBedroom
+//              + baths         × pricePerBathroom
+//              + halfBaths     × (pricePerBathroom / 2)
+//   adjusted   = basePrice × conditionMultiplier × peopleMultiplier + petSurcharge
+//   tierPrice  = adjusted  × serviceTypeMultiplier
+//   addOns     = flat add-on catalog prices
+//   firstClean = max(tierPrice + addOns, minimumTicket), rounded to nearest $5
+//   recurring  = max(tierPrice, minimumTicket) × (1 − freqDiscount), rounded to $5
+//   price      = firstClean  (one-time)  |  recurring  (subscription)
+//
+// pricePerSqft / pricePerBedroom / pricePerBathroom are stored in pricing settings
+// and editable by the software user in Settings → Pricing.
+//
 function calcTier(
   typeId: string,
   includeUserAddOns: boolean,
@@ -137,88 +177,107 @@ function calcTier(
   pricing: PricingSettings,
   extraAddOns?: Record<string, boolean>
 ): ResidentialTierResult {
-  const hourlyRate = pricing.hourlyRate || 45;
-  const minimumTicket = pricing.minimumTicket || 100;
-  const serviceTypes = pricing.serviceTypes || [];
-  const addOnPrices = { ...DEFAULT_ADD_ON_PRICES, ...(pricing.addOnPrices || {}) };
-  const freqDiscounts = pricing.frequencyDiscounts || { weekly: 25, biweekly: 15, monthly: 10 };
+  // ── Config ────────────────────────────────────────────────────────────────
+  const pricePerSqft    = pricing.pricePerSqft    ?? 85;
+  const pricePerBedroom = pricing.pricePerBedroom  ?? 15;
+  const pricePerBathroom = pricing.pricePerBathroom ?? 18;
+  const hourlyRate      = pricing.hourlyRate       ?? 45;
+  const minimumTicket   = pricing.minimumTicket    ?? 100;
+  const serviceTypes    = pricing.serviceTypes     ?? [];
+  const addOnPrices     = { ...DEFAULT_ADD_ON_PRICES, ...(pricing.addOnPrices ?? {}) };
+  const freqDiscounts   = pricing.frequencyDiscounts ?? { weekly: 25, biweekly: 15, monthly: 10 };
 
-  const st = serviceTypes.find((s) => s.id === typeId) || { id: typeId, name: typeId, multiplier: 1, scope: "" };
-  const tierAddOns = includeUserAddOns ? addOns : (extraAddOns || {});
+  const st = serviceTypes.find(s => s.id === typeId)
+    ?? { id: typeId, name: typeId, multiplier: 1.0, scope: "" };
+  const tierAddOns = includeUserAddOns ? addOns : (extraAddOns ?? {});
 
-  const sqftHours = getSqftBaseHours(property.sqft);
-  const bathHours = Math.max(0, property.baths - 1) * 0.5 + property.halfBaths * 0.25;
-  const bedHours = Math.max(0, property.beds - 2) * 0.25;
-  const condMult = getConditionMultiplier(property.conditionScore);
+  // ── Flat-rate base ────────────────────────────────────────────────────────
+  const sqftRaw  = (property.sqft / 1000) * pricePerSqft;
+  const bedRaw   = property.beds * pricePerBedroom;
+  const bathRaw  = property.baths * pricePerBathroom
+                 + property.halfBaths * (pricePerBathroom / 2);
+
+  const condMult   = getConditionMultiplier(property.conditionScore);
   const peopleMult = getPeopleMultiplier(property.peopleCount);
-  const petHrs = getPetHours(property.petType, property.petShedding);
+  const petHrs     = getPetHours(property.petType, property.petShedding);
+  const petSurcharge = petHrs * hourlyRate; // pet time billed at hourly rate
 
-  const baseHours = (sqftHours + bathHours + bedHours + petHrs) * condMult * peopleMult;
+  // adjusted base before service-tier multiplier
+  const adjustedBase = (sqftRaw + bedRaw + bathRaw) * condMult * peopleMult + petSurcharge;
 
-  let tierAddOnHours = 0;
+  // ── Add-ons ───────────────────────────────────────────────────────────────
   let tierAddOnPrice = 0;
   for (const opt of ADD_ON_OPTIONS) {
     if ((tierAddOns as any)[opt.key]) {
-      tierAddOnHours += opt.hours;
-      tierAddOnPrice += addOnPrices[opt.key] || 0;
+      tierAddOnPrice += addOnPrices[opt.key] ?? 0;
     }
   }
 
-  const canDiscount = st.id !== "move-in-out" && st.id !== "post-construction";
-  const disc = canDiscount ? getFreqDiscount(frequency, freqDiscounts) : 0;
-  const isOneTime = frequency === "one-time";
+  const canDiscount  = st.id !== "move-in-out" && st.id !== "post-construction";
+  const discFraction = canDiscount ? getFreqDiscount(frequency, freqDiscounts) : 0;
+  const isOneTime    = frequency === "one-time";
 
-  const serviceHours = roundHours(baseHours * st.multiplier);
-  const totalHoursWithAddOns = roundHours(baseHours * st.multiplier + tierAddOnHours);
+  // ── Price computation ─────────────────────────────────────────────────────
+  const tierBase = adjustedBase * st.multiplier;
 
-  let firstCleanPrice = totalHoursWithAddOns * hourlyRate + tierAddOnPrice;
-  const minimumApplied = firstCleanPrice < minimumTicket;
-  firstCleanPrice = Math.max(firstCleanPrice, minimumTicket);
-  firstCleanPrice = roundToNearest5(firstCleanPrice);
+  // First clean = full tier base + add-ons, no frequency discount
+  const firstCleanCalc    = tierBase + tierAddOnPrice;
+  const firstCleanBelowMin = firstCleanCalc < minimumTicket;
+  const firstCleanPrice   = roundToNearest5(Math.max(firstCleanCalc, minimumTicket));
 
-  let recurringPrice = serviceHours * hourlyRate;
-  const recurringMinimumApplied = recurringPrice < minimumTicket;
-  recurringPrice = Math.max(recurringPrice, minimumTicket);
-  let discountAmount = 0;
-  if (disc > 0) {
-    discountAmount = recurringPrice * disc;
-    recurringPrice = recurringPrice * (1 - disc);
+  // Recurring = tier base only, with frequency discount (no first-clean add-ons)
+  const recurringBase      = Math.max(tierBase, minimumTicket);
+  const recurringBelowMin  = tierBase < minimumTicket;
+  let discountAmount        = 0;
+  let recurringCalc         = recurringBase;
+  if (discFraction > 0) {
+    discountAmount = recurringBase * discFraction;
+    recurringCalc  = recurringBase * (1 - discFraction);
   }
-  recurringPrice = roundToNearest5(recurringPrice);
+  const recurringPrice = roundToNearest5(recurringCalc);
 
-  const price = isOneTime ? firstCleanPrice : recurringPrice;
-  const totalHours = isOneTime ? totalHoursWithAddOns : serviceHours;
+  const price      = isOneTime ? firstCleanPrice : recurringPrice;
+  // Estimated hours for display (approximate: tierBase ÷ hourlyRate)
+  const totalHours = roundHours(tierBase / Math.max(hourlyRate, 1));
 
-  // ── Build line items ──
-  const lineItems: LineItem[] = [];
+  // ── Line items (amounts shown after tier multiplier — sum ≈ pre-minimum total) ─
+  const lineItems: LineItem[]     = [];
   const appliedRules: AppliedRule[] = [];
-  const warnings: Warning[] = [];
+  const warnings: Warning[]       = [];
 
-  // Base labor from sqft
-  const sqftContrib = sqftHours * st.multiplier * condMult * peopleMult * hourlyRate;
+  // Square footage
   if (property.sqft > 0) {
-    lineItems.push({ label: `Base labor (${property.sqft.toLocaleString()} sqft)`, amount: sqftContrib, type: "base" });
+    lineItems.push({
+      label:  `Square footage (${property.sqft.toLocaleString()} sqft × $${pricePerSqft}/1k)`,
+      amount: sqftRaw * condMult * peopleMult * st.multiplier,
+      type:   "base",
+    });
   } else {
     warnings.push({ type: "missing_sqft", message: "Enter square footage for accurate pricing." });
   }
 
-  // Extra bathrooms
-  if (bathHours > 0) {
-    const bathContrib = bathHours * st.multiplier * condMult * peopleMult * hourlyRate;
-    lineItems.push({ label: `Extra bathrooms (+${property.baths - 1} full, ${property.halfBaths} half)`, amount: bathContrib, type: "room" });
+  // Bedrooms
+  if (bedRaw > 0) {
+    lineItems.push({
+      label:  `Bedrooms (${property.beds} × $${pricePerBedroom})`,
+      amount: bedRaw * condMult * peopleMult * st.multiplier,
+      type:   "room",
+    });
   }
 
-  // Extra bedrooms (3+)
-  if (bedHours > 0) {
-    const bedContrib = bedHours * st.multiplier * condMult * peopleMult * hourlyRate;
-    lineItems.push({ label: `Extra bedrooms (${property.beds - 2} above 2)`, amount: bedContrib, type: "room" });
+  // Bathrooms
+  if (bathRaw > 0) {
+    const bathLabel = property.halfBaths > 0
+      ? `Bathrooms (${property.baths} full, ${property.halfBaths} half × $${pricePerBathroom})`
+      : `Bathrooms (${property.baths} × $${pricePerBathroom})`;
+    lineItems.push({ label: bathLabel, amount: bathRaw * condMult * peopleMult * st.multiplier, type: "room" });
   }
 
-  // Condition surcharge / discount
+  // Condition surcharge / credit
   if (condMult !== 1.0) {
-    const base = sqftHours * st.multiplier * hourlyRate;
-    const condDelta = base * condMult - base;
-    const condLabel = condMult > 1.0
+    const baseAt1x   = (sqftRaw + bedRaw + bathRaw) * peopleMult * st.multiplier;
+    const condDelta  = baseAt1x * condMult - baseAt1x;
+    const condLabel  = condMult > 1.0
       ? `Condition surcharge (score ${property.conditionScore}/10)`
       : `Cleanliness credit (score ${property.conditionScore}/10)`;
     lineItems.push({ label: condLabel, amount: condDelta, type: condDelta > 0 ? "surcharge" : "discount" });
@@ -227,46 +286,48 @@ function calcTier(
     }
   }
 
-  // People multiplier
+  // People surcharge
   if (peopleMult > 1.0) {
-    const base = sqftHours * st.multiplier * condMult * hourlyRate;
-    const peopleDelta = base * peopleMult - base;
+    const baseAt1person = (sqftRaw + bedRaw + bathRaw) * condMult * st.multiplier;
+    const peopleDelta   = baseAt1person * peopleMult - baseAt1person;
     lineItems.push({ label: `Occupancy surcharge (${property.peopleCount} residents)`, amount: peopleDelta, type: "surcharge" });
   }
 
   // Pet surcharge
-  if (petHrs > 0) {
-    const petContrib = petHrs * st.multiplier * condMult * peopleMult * hourlyRate;
-    lineItems.push({ label: `Pet surcharge (${property.petType}${property.petShedding ? ", shedding" : ""})`, amount: petContrib, type: "surcharge" });
-    appliedRules.push({ label: `Pet surcharge applied (+${property.petType}${property.petShedding ? ", heavy shedding" : ""})`, impact: petContrib });
+  if (petSurcharge > 0) {
+    lineItems.push({
+      label:  `Pet surcharge (${property.petType}${property.petShedding ? ", shedding" : ""})`,
+      amount: petSurcharge,
+      type:   "surcharge",
+    });
+    appliedRules.push({ label: `Pet surcharge applied (${property.petType})`, impact: petSurcharge });
   }
 
-  // Service type multiplier (above 1.0 standard)
+  // Service tier multiplier (informational in applied rules)
   if (st.multiplier !== 1.0) {
-    const baseWithoutMult = (sqftHours + bathHours + bedHours + petHrs) * condMult * peopleMult * hourlyRate;
-    const multDelta = baseWithoutMult * st.multiplier - baseWithoutMult;
-    appliedRules.push({ label: `${st.name} multiplier (×${st.multiplier})`, impact: multDelta });
+    const baseAt1x = adjustedBase - petSurcharge; // ex-pet base
+    const multDelta = baseAt1x * (st.multiplier - 1.0);
+    appliedRules.push({ label: `${st.name} level (×${st.multiplier})`, impact: multDelta });
   }
 
   // Add-on items
   for (const opt of ADD_ON_OPTIONS) {
     if ((tierAddOns as any)[opt.key]) {
-      lineItems.push({ label: opt.label, amount: addOnPrices[opt.key] || 0, type: "addon" });
+      lineItems.push({ label: opt.label, amount: addOnPrices[opt.key] ?? 0, type: "addon" });
     }
   }
 
   // Frequency discount
   if (discountAmount > 0) {
-    const freqLabel =
-      frequency === "weekly" ? `Weekly discount (${freqDiscounts.weekly}%)`
+    const freqLabel = frequency === "weekly"   ? `Weekly discount (${freqDiscounts.weekly}%)`
       : frequency === "biweekly" ? `Biweekly discount (${freqDiscounts.biweekly}%)`
-      : `Monthly discount (${freqDiscounts.monthly}%)`;
+      :                            `Monthly discount (${freqDiscounts.monthly}%)`;
     lineItems.push({ label: freqLabel, amount: -discountAmount, type: "discount" });
     appliedRules.push({ label: freqLabel, impact: -discountAmount });
   }
 
-  // Minimum price
-  if (minimumApplied || recurringMinimumApplied) {
+  // Minimum ticket
+  if (firstCleanBelowMin || recurringBelowMin) {
     appliedRules.push({ label: `Minimum job price applied ($${minimumTicket})`, impact: 0 });
     warnings.push({ type: "below_minimum", message: `Quote was below minimum ticket ($${minimumTicket}) — minimum applied.` });
   }
@@ -277,7 +338,8 @@ function calcTier(
   }
 
   return {
-    price, firstCleanPrice: isOneTime ? null : firstCleanPrice,
+    price,
+    firstCleanPrice: isOneTime ? null : firstCleanPrice,
     name: st.name, scope: st.scope, serviceTypeId: st.id,
     totalHours, lineItems, appliedRules, warnings,
   };
@@ -289,39 +351,43 @@ export function computeResidentialQuote(
   frequency: string,
   pricing: PricingSettings | null
 ): ResidentialQuoteResult {
-  const p: PricingSettings = pricing || {
-    hourlyRate: 45, minimumTicket: 100,
-    serviceTypes: [
-      { id: "touch-up", name: "Touch Up", multiplier: 0.75, scope: "Quick surface cleaning" },
-      { id: "standard", name: "Standard Clean", multiplier: 1.0, scope: "Full cleaning of all rooms" },
-      { id: "deep-clean", name: "Deep Clean", multiplier: 1.5, scope: "Thorough deep cleaning" },
-    ],
-    goodOptionId: "touch-up", betterOptionId: "standard", bestOptionId: "deep-clean",
-    addOnPrices: DEFAULT_ADD_ON_PRICES,
-    frequencyDiscounts: { weekly: 25, biweekly: 15, monthly: 10 },
+  // Merge caller settings with defaults so missing fields always have values
+  const p: PricingSettings = {
+    ...DEFAULT_PRICING,
+    ...(pricing ?? {}),
+    // Ensure per-unit rates fall back to defaults if not set
+    pricePerSqft:    (pricing as any)?.pricePerSqft    ?? DEFAULT_PRICING.pricePerSqft,
+    pricePerBedroom: (pricing as any)?.pricePerBedroom  ?? DEFAULT_PRICING.pricePerBedroom,
+    pricePerBathroom:(pricing as any)?.pricePerBathroom ?? DEFAULT_PRICING.pricePerBathroom,
   };
 
-  const good = calcTier(p.goodOptionId, false, property, addOns, frequency, p);
-  const better = calcTier(p.betterOptionId, true, property, addOns, frequency, p);
-  const best = calcTier(p.bestOptionId, false, property, addOns, frequency, p, {
-    insideOven: true, insideCabinets: true, interiorWindows: true, baseboardsDetail: true, blindsDetail: true,
+  let good   = calcTier(p.goodOptionId,   false, property, addOns, frequency, p);
+  let better = calcTier(p.betterOptionId,  true,  property, addOns, frequency, p);
+  let best   = calcTier(p.bestOptionId,   false, property, addOns, frequency, p, {
+    insideOven: true, insideCabinets: true, interiorWindows: true,
+    baseboardsDetail: true, blindsDetail: true,
   });
 
-  const addOnPrices = { ...DEFAULT_ADD_ON_PRICES, ...(p.addOnPrices || {}) };
-  const sqftHours = getSqftBaseHours(property.sqft);
-  const bathHours = Math.max(0, property.baths - 1) * 0.5 + property.halfBaths * 0.25;
-  const bedHours = Math.max(0, property.beds - 2) * 0.25;
-  const condMult = getConditionMultiplier(property.conditionScore);
-  const peopleMult = getPeopleMultiplier(property.peopleCount);
-  const petHrs = getPetHours(property.petType, property.petShedding);
-  const baseHours = (sqftHours + bathHours + bedHours + petHrs) * condMult * peopleMult;
-
-  let addOnHours = 0; let addOnPrice = 0;
-  for (const opt of ADD_ON_OPTIONS) {
-    if (addOns[opt.key]) { addOnHours += opt.hours; addOnPrice += addOnPrices[opt.key] || 0; }
+  // ── Enforce $20 minimum gap between tiers so minimum ticket never collapses them ──
+  const TIER_DELTA = 20;
+  if (better.price <= good.price) {
+    better = { ...better, price: roundToNearest5(good.price + TIER_DELTA) };
+  }
+  if (best.price <= better.price) {
+    best = { ...best, price: roundToNearest5(better.price + TIER_DELTA) };
   }
 
-  return { good, better, best, baseHours: roundHours(baseHours), addOnHours, addOnPrice, hourlyRate: p.hourlyRate || 45 };
+  // Summary add-on totals for the parent result
+  const addOnPricesMap = { ...DEFAULT_ADD_ON_PRICES, ...(p.addOnPrices ?? {}) };
+  let addOnHours = 0; let addOnPrice = 0;
+  for (const opt of ADD_ON_OPTIONS) {
+    if (addOns[opt.key]) {
+      addOnHours += opt.hours;
+      addOnPrice += addOnPricesMap[opt.key] ?? 0;
+    }
+  }
+
+  return { good, better, best, baseHours: 0, addOnHours, addOnPrice, hourlyRate: p.hourlyRate ?? 45 };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

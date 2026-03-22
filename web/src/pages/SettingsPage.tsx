@@ -303,6 +303,9 @@ export default function SettingsPage() {
   });
 
   const [pricingForm, setPricingForm] = useState({
+    pricePerSqft: 85,
+    pricePerBedroom: 15,
+    pricePerBathroom: 18,
     hourlyRate: 45,
     minimumTicket: 100,
     taxRate: 0,
@@ -461,9 +464,12 @@ export default function SettingsPage() {
   useEffect(() => {
     if (pricing) {
       setPricingForm({
-        hourlyRate: pricing.hourlyRate || 45,
-        minimumTicket: pricing.minimumTicket || 100,
-        taxRate: pricing.taxRate || 0,
+        pricePerSqft:    pricing.pricePerSqft    ?? 85,
+        pricePerBedroom: pricing.pricePerBedroom  ?? 15,
+        pricePerBathroom:pricing.pricePerBathroom ?? 18,
+        hourlyRate:      pricing.hourlyRate       ?? 45,
+        minimumTicket:   pricing.minimumTicket    ?? 100,
+        taxRate:         pricing.taxRate          ?? 0,
       });
       setAddOnPrices(pricing.addOnPrices || {});
     }
@@ -697,41 +703,65 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader title="Pricing Configuration" icon={DollarSign} />
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Input
-                  label="Hourly Rate ($)"
-                  type="number"
-                  value={pricingForm.hourlyRate}
-                  onChange={(e) =>
-                    setPricingForm((p) => ({
-                      ...p,
-                      hourlyRate: +e.target.value,
-                    }))
-                  }
-                />
-                <Input
-                  label="Minimum Ticket ($)"
-                  type="number"
-                  value={pricingForm.minimumTicket}
-                  onChange={(e) =>
-                    setPricingForm((p) => ({
-                      ...p,
-                      minimumTicket: +e.target.value,
-                    }))
-                  }
-                />
-                <Input
-                  label="Tax Rate (%)"
-                  type="number"
-                  value={pricingForm.taxRate}
-                  onChange={(e) =>
-                    setPricingForm((p) => ({
-                      ...p,
-                      taxRate: +e.target.value,
-                    }))
-                  }
-                />
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Residential Base Pricing</p>
+                <p className="text-xs text-slate-500 mb-3">These values are used by Live Quote Preview and all residential quote calculations. Changes affect future quotes.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Input
+                    label="Price per 1,000 sq ft ($)"
+                    type="number"
+                    value={pricingForm.pricePerSqft}
+                    onChange={(e) =>
+                      setPricingForm((p) => ({ ...p, pricePerSqft: +e.target.value }))
+                    }
+                  />
+                  <Input
+                    label="Price per Bedroom ($)"
+                    type="number"
+                    value={pricingForm.pricePerBedroom}
+                    onChange={(e) =>
+                      setPricingForm((p) => ({ ...p, pricePerBedroom: +e.target.value }))
+                    }
+                  />
+                  <Input
+                    label="Price per Bathroom ($)"
+                    type="number"
+                    value={pricingForm.pricePerBathroom}
+                    onChange={(e) =>
+                      setPricingForm((p) => ({ ...p, pricePerBathroom: +e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Other Pricing</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Input
+                    label="Hourly Rate — Pets & Estimates ($)"
+                    type="number"
+                    value={pricingForm.hourlyRate}
+                    onChange={(e) =>
+                      setPricingForm((p) => ({ ...p, hourlyRate: +e.target.value }))
+                    }
+                  />
+                  <Input
+                    label="Minimum Job Price ($)"
+                    type="number"
+                    value={pricingForm.minimumTicket}
+                    onChange={(e) =>
+                      setPricingForm((p) => ({ ...p, minimumTicket: +e.target.value }))
+                    }
+                  />
+                  <Input
+                    label="Tax Rate (%)"
+                    type="number"
+                    value={pricingForm.taxRate}
+                    onChange={(e) =>
+                      setPricingForm((p) => ({ ...p, taxRate: +e.target.value }))
+                    }
+                  />
+                </div>
               </div>
               <Button
                 icon={Save}
