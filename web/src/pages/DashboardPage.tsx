@@ -682,34 +682,34 @@ function StartHereChecklist({
   const pct = Math.round((completedCount / steps.length) * 100);
 
   return (
-    <div className="rounded-2xl border border-primary-200 bg-primary-50/40 overflow-hidden mb-6">
-      <div className="px-5 py-4 border-b border-primary-100 flex items-center justify-between">
+    <div className="rounded-2xl border border-primary-200 dark:border-primary-800/50 bg-primary-50/40 dark:bg-primary-900/20 overflow-hidden mb-6">
+      <div className="px-5 py-4 border-b border-primary-100 dark:border-primary-800/40 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-primary-100 flex items-center justify-center">
-            <Target className="w-4 h-4 text-primary-600" />
+          <div className="w-8 h-8 rounded-xl bg-primary-100 dark:bg-primary-800/50 flex items-center justify-center">
+            <Target className="w-4 h-4 text-primary-600 dark:text-primary-400" />
           </div>
           <div>
-            <h2 className="font-bold text-primary-900 text-sm">Get QuotePro Running</h2>
-            <p className="text-xs text-primary-600 mt-0.5">{completedCount} of {steps.length} steps complete</p>
+            <h2 className="font-bold text-primary-900 dark:text-white text-sm">Get QuotePro Running</h2>
+            <p className="text-xs text-primary-600 dark:text-slate-400 mt-0.5">{completedCount} of {steps.length} steps complete</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-28 h-1.5 rounded-full bg-primary-100 overflow-hidden">
+          <div className="w-28 h-1.5 rounded-full bg-primary-100 dark:bg-primary-800/50 overflow-hidden">
             <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
           </div>
-          <span className="text-xs font-bold text-primary-600">{pct}%</span>
+          <span className="text-xs font-bold text-primary-600 dark:text-slate-400">{pct}%</span>
         </div>
       </div>
-      <div className="divide-y divide-primary-100">
+      <div className="divide-y divide-primary-100 dark:divide-primary-800/40">
         {steps.filter((s) => !s.done).slice(0, 3).map((step) => (
           <div key={step.id} className="flex items-center gap-4 px-5 py-3.5">
-            <div className="w-8 h-8 rounded-full border-2 border-primary-200 flex items-center justify-center shrink-0">
-              <step.icon className="w-3.5 h-3.5 text-primary-400" />
+            <div className="w-8 h-8 rounded-full border-2 border-primary-200 dark:border-primary-700/60 flex items-center justify-center shrink-0">
+              <step.icon className="w-3.5 h-3.5 text-primary-400 dark:text-primary-500" />
             </div>
-            <p className="text-sm font-semibold text-slate-800 flex-1">{step.label}</p>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex-1">{step.label}</p>
             <button
               onClick={() => navigate(step.path)}
-              className="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center gap-1 shrink-0"
+              className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1 shrink-0"
             >
               {step.cta} <ChevronRight className="w-3 h-3" />
             </button>
