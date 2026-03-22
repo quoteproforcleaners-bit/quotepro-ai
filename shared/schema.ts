@@ -96,6 +96,7 @@ export const customers = pgTable("customers", {
   status: text("status").notNull().default("lead"),
   smsOptOut: boolean("sms_opt_out").notNull().default(false),
   isVip: boolean("is_vip").notNull().default(false),
+  preferredLanguage: varchar("preferred_language", { length: 10 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

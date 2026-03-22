@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import AppStoreQR from "./AppStoreQR";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
@@ -100,6 +101,51 @@ const navSections: NavSection[] = [
     ],
   },
 ];
+
+/* ─── Nav Translation Keys ────────────────────────────────────────────────── */
+
+const NAV_LABEL_KEYS: Record<string, string> = {
+  "/dashboard": "nav.dashboard",
+  "/quotes": "nav.quotes",
+  "/customers": "nav.customers",
+  "/jobs": "nav.jobs",
+  "/employees": "nav.team",
+  "/calendar": "nav.schedule",
+  "/commercial-quote": "nav.commercial",
+  "/intake-requests": "nav.quoteRequests",
+  "/pricing-logic": "nav.pricingEngine",
+  "/quote-preferences": "nav.quoteSettings",
+  "/settings": "nav.priceSettings",
+  "/closing-assistant": "nav.objectionAssistant",
+  "/sales-strategy": "nav.salesStrategy",
+  "/walkthrough-ai": "nav.quoteFromNotes",
+  "/ai-assistant": "nav.salesAssistant",
+  "/revenue": "nav.revenue",
+  "/growth": "nav.growthHub",
+  "/follow-ups": "nav.followUps",
+  "/opportunities": "nav.opportunities",
+  "/lead-finder": "nav.leadRadar",
+  "/lead-capture": "nav.leadCapture",
+  "/reactivation": "nav.reactivation",
+  "/email-sequences": "nav.emailSequences",
+  "/reviews-referrals": "nav.reviewsReferrals",
+  "/weekly-recap": "nav.weeklyRecap",
+  "/tasks-queue": "nav.tasksQueue",
+  "/automations": "nav.automations",
+  "/file-library": "nav.fileLibrary",
+  "/toolkit": "nav.toolkit",
+  "/pro-setup": "nav.setupChecklist",
+  "/qbo-settings": "nav.quickbooks",
+  "/jobber": "nav.jobber",
+};
+
+const SECTION_LABEL_KEYS: Record<string, string> = {
+  Operations: "nav.sections.operations",
+  Intelligence: "nav.sections.intelligence",
+  Growth: "nav.sections.growth",
+  Workspace: "nav.sections.workspace",
+  Integrations: "nav.sections.integrations",
+};
 
 /* ─── Command Palette ─────────────────────────────────────────────────────── */
 
@@ -266,6 +312,7 @@ export function Layout() {
   const { isPro } = useSubscription();
   const { theme, toggleTheme } = useTheme();
   const { isCompleted, isDismissed, startTour, resetTour } = useWalkthrough();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -371,7 +418,7 @@ export function Layout() {
             style={{ background: "#F4F4F5", border: "1px solid rgba(0,0,0,0.06)" }}
           >
             <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "#a1a1aa" }} />
-            <span className="flex-1 text-[12.5px]" style={{ color: "#a1a1aa" }}>Search or jump to...</span>
+            <span className="flex-1 text-[12.5px]" style={{ color: "#a1a1aa" }}>{t("common.searchOrJump")}</span>
             <div className="flex items-center gap-0.5">
               <kbd className="cmd-kbd">⌘</kbd>
               <kbd className="cmd-kbd">K</kbd>
@@ -388,7 +435,7 @@ export function Layout() {
                   className="px-3 mb-1 flex items-center gap-1.5"
                   style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", color: "#a1a1aa" }}
                 >
-                  {section.label}
+                  {t(SECTION_LABEL_KEYS[section.label] || section.label)}
                   {section.beta ? (
                     <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500 text-white uppercase tracking-wider leading-none">Beta</span>
                   ) : null}
@@ -408,7 +455,7 @@ export function Layout() {
                       className="shrink-0"
                       style={{ width: "15px", height: "15px", opacity: 0.85 }}
                     />
-                    <span className="flex-1 text-[13px]">{item.label}</span>
+                    <span className="flex-1 text-[13px]">{t(NAV_LABEL_KEYS[item.to] || item.label)}</span>
                     {item.to === "/intake-requests" && intakeNewCount > 0 ? (
                       <span
                         className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
@@ -438,7 +485,7 @@ export function Layout() {
             style={{ color: "#a1a1aa" }}
           >
             <BookOpen style={{ width: "14px", height: "14px" }} />
-            <span style={{ fontSize: "12.5px" }}>Product Tour</span>
+            <span style={{ fontSize: "12.5px" }}>{t("nav.productTour")}</span>
           </button>
         </div>
 

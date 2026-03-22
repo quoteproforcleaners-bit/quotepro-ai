@@ -63,6 +63,15 @@ The system uses session-based authentication supporting email/password, Apple, a
 - **QuickBooks Online**: OAuth2 integration for customer and invoice management.
 - **Jobber**: OAuth2 integration for client and job creation.
 
+### Multilingual System
+- **App Language**: Each business can set their interface language (`businesses.app_language` column). Options: en/es/pt/ru. Synced to `i18next` on login/change via App.tsx effect. Translation files in `web/src/locales/{en,es,pt,ru}.json`. Library: `react-i18next`.
+- **Outbound Communication Language**: Each business sets a default language for customer-facing communications (`businesses.comm_language`). Used in AI-generated follow-ups, quotes, reminders, etc. via `getLangInstruction()` in routes.ts.
+- **Customer Language Override**: Each customer can have a `preferred_language` column override. The `getEffectiveLang(customerId, businessCommLanguage)` helper in routes.ts checks this first. Follow-up messages and quote messages now use this resolver.
+- **Language Settings UI**: `AccountSettingsPage.tsx` has a "Language Settings" card with independent selectors for App Language (blue selection) and Outbound Language (green selection). API: `PUT /api/settings/language`.
+- **Translated Nav**: `Layout.tsx` uses `useTranslation` with `NAV_LABEL_KEYS` and `SECTION_LABEL_KEYS` lookup maps to translate all sidebar labels and section headers dynamically.
+- **Customer Detail**: `CustomerDetailPage.tsx` includes a "Preferred Language" chip selector in the edit form.
+- **Hook**: `web/src/lib/useLanguage.ts` provides `{ t, appLanguage, outboundLanguage, setAppLanguage, setOutboundLanguage }`.
+
 ### Integrations Lite
 - **Invoice Packets**: Generation of QuickBooks-compatible invoice packets.
 - **Calendar Integration**: Creation of calendar event stubs with ICS download and Google Calendar deep links.

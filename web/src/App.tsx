@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./lib/auth";
+import i18n from "./lib/i18n";
 import { SubscriptionProvider } from "./lib/subscription";
 import { ThemeProvider } from "./lib/theme";
 import { WalkthroughProvider } from "./lib/walkthrough";
@@ -55,7 +57,14 @@ import PricingLogicPage from "./pages/PricingLogicPage";
 import EmployeesPage from "./pages/EmployeesPage";
 
 export default function App() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, business } = useAuth();
+
+  useEffect(() => {
+    const lang = (business as any)?.appLanguage || "en";
+    if (i18n.language !== lang) {
+      i18n.changeLanguage(lang);
+    }
+  }, [business]);
 
   if (isLoading) {
     return (

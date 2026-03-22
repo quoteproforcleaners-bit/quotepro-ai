@@ -7,6 +7,7 @@ import { queryClient } from "./lib/queryClient";
 import { WebErrorBoundary } from "./components/WebErrorBoundary";
 import App from "./App";
 import "./index.css";
+import "./lib/i18n";
 
 // Intake links live at /intake/:id (outside the /app prefix).
 // Use basename "/" for those paths so React Router can match them.

@@ -52,6 +52,17 @@ function getLangInstruction(langCode: string | null | undefined): string {
     default:   return " Write the entire response in English.";
   }
 }
+
+/** Returns the effective outbound language for a specific customer, falling back to business default. */
+async function getEffectiveLang(customerId: string | null | undefined, businessCommLanguage: string | null | undefined): Promise<string> {
+  if (customerId) {
+    try {
+      const c = await getCustomerById(customerId);
+      if (c && (c as any).preferredLanguage) return (c as any).preferredLanguage;
+    } catch (_) {}
+  }
+  return businessCommLanguage || "en";
+}
 import {
   getUserById,
   getUserByEmail,
@@ -1065,6 +1076,23 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     } catch (error: any) {
       console.error("Update business error:", error);
       return res.status(500).json({ message: "Failed to update business" });
+    }
+  });
+
+  // ─── Language Settings ───
+  app.put("/api/settings/language", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { appLanguage, commLanguage } = req.body as { appLanguage?: string; commLanguage?: string };
+      const validCodes = ["en", "es", "pt", "ru"];
+      const safeApp = validCodes.includes(appLanguage || "") ? appLanguage! : (business as any).appLanguage || "en";
+      const safeComm = validCodes.includes(commLanguage || "") ? commLanguage! : (business as any).commLanguage || "en";
+      const updated = await updateBusiness(business.id, { appLanguage: safeApp, commLanguage: safeComm } as any);
+      return res.json({ appLanguage: (updated as any).appLanguage, commLanguage: (updated as any).commLanguage });
+    } catch (error) {
+      console.error("Language settings error:", error);
+      return res.status(500).json({ message: "Failed to update language settings" });
     }
   });
 
@@ -3997,7 +4025,8 @@ The email should:
     const msgType = channel === "email" ? "email" : "SMS";
     const maxLen = channel === "email" ? 200 : 160;
     const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
-    const followUpLangInstruction = getLangInstruction(business?.commLanguage);
+    const effectiveLang = await getEffectiveLang(customer?.id, business?.commLanguage);
+    const followUpLangInstruction = getLangInstruction(effectiveLang);
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -4676,7 +4705,8 @@ The email should:
 
       const msgType = channel === "email" ? "email" : "SMS";
       const maxLen = channel === "email" ? 200 : 160;
-      const langInstruction = getLangInstruction(commLang || (business as any)?.commLanguage);
+      const effectiveLang = commLang || await getEffectiveLang(customer?.id, (business as any)?.commLanguage);
+      const langInstruction = getLangInstruction(effectiveLang);
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -13699,6 +13729,8 @@ function formatBusiness(b: any) {
     paymentOptions: b.paymentOptions || null,
     paymentNotes: b.paymentNotes || null,
     avatarConfig: b.avatarConfig || null,
+    appLanguage: b.appLanguage || "en",
+    commLanguage: b.commLanguage || "en",
   };
 }
 

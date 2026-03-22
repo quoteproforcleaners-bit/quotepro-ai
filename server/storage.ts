@@ -299,6 +299,7 @@ export async function updateCustomer(
     status: string;
     smsOptOut: boolean;
     isVip: boolean;
+    preferredLanguage: string | null;
   }>
 ): Promise<Customer> {
   const [c] = await db

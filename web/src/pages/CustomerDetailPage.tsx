@@ -1,7 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { apiPut, apiDelete, apiPost } from "../lib/api";
 import { buildAddress, parseAddress } from "../lib/address";
+import { SUPPORTED_LANGUAGES } from "../lib/i18n";
 import { queryClient } from "../lib/queryClient";
 import {
   Save,
@@ -34,6 +36,7 @@ import {
 export default function CustomerDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
@@ -59,6 +62,7 @@ export default function CustomerDetailPage() {
     state: "",
     zip: "",
     country: "",
+    preferredLanguage: "" as string,
   });
 
   useEffect(() => {
@@ -74,6 +78,7 @@ export default function CustomerDetailPage() {
         state: addr.state,
         zip: addr.zip,
         country: addr.country,
+        preferredLanguage: customer.preferredLanguage || "",
       });
     }
   }, [customer]);
@@ -262,7 +267,46 @@ export default function CustomerDetailPage() {
                 placeholder="US"
               />
             </div>
-            <div className="flex items-center gap-3 mt-5 pt-4 border-t border-slate-100">
+            {/* Preferred Language */}
+            <div className="sm:col-span-2 mt-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                {t("language.customerLanguage")}
+                <span className="text-slate-400 font-normal ml-1">({t("language.customerLanguageDesc")})</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, preferredLanguage: "" }))}
+                  className="px-3 py-1.5 rounded-lg border text-xs transition-all"
+                  style={{
+                    borderColor: form.preferredLanguage === "" ? "#2563eb" : "rgba(0,0,0,0.1)",
+                    background: form.preferredLanguage === "" ? "#eff6ff" : "transparent",
+                    color: form.preferredLanguage === "" ? "#1d4ed8" : "#6b7280",
+                    fontWeight: form.preferredLanguage === "" ? 600 : 400,
+                  }}
+                >
+                  {t("language.noOverride")}
+                </button>
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, preferredLanguage: lang.code }))}
+                    className="px-3 py-1.5 rounded-lg border text-xs transition-all"
+                    style={{
+                      borderColor: form.preferredLanguage === lang.code ? "#2563eb" : "rgba(0,0,0,0.1)",
+                      background: form.preferredLanguage === lang.code ? "#eff6ff" : "transparent",
+                      color: form.preferredLanguage === lang.code ? "#1d4ed8" : "#6b7280",
+                      fontWeight: form.preferredLanguage === lang.code ? 600 : 400,
+                    }}
+                  >
+                    {lang.nativeLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-5 pt-4 border-t border-slate-100 sm:col-span-2">
               <Button
                 icon={Save}
                 onClick={() => {
@@ -270,6 +314,7 @@ export default function CustomerDetailPage() {
                   updateMutation.mutate({
                     ...rest,
                     address: buildAddress({ street, city, state, zip, country }),
+                    preferredLanguage: rest.preferredLanguage || null,
                   });
                 }}
                 loading={updateMutation.isPending}

@@ -7,6 +7,8 @@ import {
   Trash2,
   ExternalLink,
   User,
+  Globe,
+  Check,
 } from "lucide-react";
 import {
   PageHeader,
@@ -19,6 +21,8 @@ import {
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
 import { useWebAIConsent } from "../lib/webAIConsent";
+import { useLanguage } from "../lib/useLanguage";
+import { SUPPORTED_LANGUAGES, type LangCode } from "../lib/i18n";
 import { apiPost } from "../lib/api";
 
 export default function AccountSettingsPage() {
@@ -26,10 +30,15 @@ export default function AccountSettingsPage() {
   const { user, logout } = useAuth();
   const { isPro, isGrowth, isStarter, tier, openPortal } = useSubscription();
   const { hasAIConsent, consentData, revokeAIConsent, requestAIConsent } = useWebAIConsent();
+  const { t, appLanguage, outboundLanguage, setAppLanguage, setOutboundLanguage } = useLanguage();
 
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [langSaving, setLangSaving] = useState(false);
+  const [langSaved, setLangSaved] = useState(false);
+  const [pendingAppLang, setPendingAppLang] = useState<LangCode>(appLanguage);
+  const [pendingOutboundLang, setPendingOutboundLang] = useState<LangCode>(outboundLanguage);
 
   const handleManageSubscription = async () => {
     setPortalError(null);
@@ -64,23 +73,38 @@ export default function AccountSettingsPage() {
     } catch {}
   };
 
+  const handleSaveLanguage = async () => {
+    setLangSaving(true);
+    setLangSaved(false);
+    try {
+      if (pendingAppLang !== appLanguage) await setAppLanguage(pendingAppLang);
+      if (pendingOutboundLang !== outboundLanguage) await setOutboundLanguage(pendingOutboundLang);
+      setLangSaved(true);
+      setTimeout(() => setLangSaved(false), 3000);
+    } finally {
+      setLangSaving(false);
+    }
+  };
+
+  const isDirty = pendingAppLang !== appLanguage || pendingOutboundLang !== outboundLanguage;
+
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader
-        title="Account"
-        subtitle="Manage your account details, subscription, and privacy settings"
+        title={t("settings.account")}
+        subtitle={t("settings.subtitle")}
       />
 
       {/* Account Details */}
       <Card>
-        <CardHeader title="Account Details" icon={User} />
+        <CardHeader title={t("settings.accountDetails")} icon={User} />
         <div className="space-y-3 text-sm">
           <div className="flex justify-between py-2.5 border-b border-slate-100">
-            <span className="text-slate-500">Email</span>
+            <span className="text-slate-500">{t("settings.email")}</span>
             <span className="text-slate-900 font-medium">{user?.email}</span>
           </div>
           <div className="flex justify-between py-2.5">
-            <span className="text-slate-500">Name</span>
+            <span className="text-slate-500">{t("settings.name")}</span>
             <span className="text-slate-900 font-medium">
               {user?.firstName} {user?.lastName}
             </span>
@@ -90,7 +114,7 @@ export default function AccountSettingsPage() {
 
       {/* Subscription */}
       <Card>
-        <CardHeader title="Subscription" icon={Zap} />
+        <CardHeader title={t("settings.subscription")} icon={Zap} />
         {isGrowth ? (
           <div className="p-4 bg-gradient-to-br from-primary-50 to-violet-50 rounded-xl border border-primary-100">
             <div className="flex items-center gap-2 mb-2">
@@ -113,7 +137,7 @@ export default function AccountSettingsPage() {
               onClick={handleManageSubscription}
               loading={portalLoading}
             >
-              Manage Subscription
+              {t("settings.manageSubscription")}
             </Button>
             {portalError ? (
               <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
@@ -177,15 +201,105 @@ export default function AccountSettingsPage() {
               onClick={() => navigate("/pricing")}
               className="bg-gradient-to-r from-primary-600 to-primary-700"
             >
-              View plans
+              {t("settings.upgradePlan")}
             </Button>
           </div>
         )}
       </Card>
 
+      {/* Language Settings */}
+      <Card>
+        <CardHeader title={t("language.title")} icon={Globe} />
+        <div className="space-y-6">
+          {/* Explainer */}
+          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2.5 leading-relaxed">
+            {t("language.separation")}
+          </p>
+
+          {/* App Language */}
+          <div>
+            <div className="mb-2">
+              <span className="text-sm font-medium text-slate-800">{t("language.appLanguage")}</span>
+              <p className="text-xs text-slate-500 mt-0.5">{t("language.appLanguageDesc")}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => setPendingAppLang(lang.code as LangCode)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all"
+                  style={{
+                    borderColor: pendingAppLang === lang.code ? "#2563eb" : "rgba(0,0,0,0.09)",
+                    background: pendingAppLang === lang.code ? "#eff6ff" : "transparent",
+                    color: pendingAppLang === lang.code ? "#1d4ed8" : "#374151",
+                  }}
+                >
+                  <span className="flex-1">
+                    <span className="font-medium block leading-tight">{lang.nativeLabel}</span>
+                    <span className="text-xs opacity-60">{lang.label}</span>
+                  </span>
+                  {pendingAppLang === lang.code ? (
+                    <Check className="w-4 h-4 shrink-0" style={{ color: "#2563eb" }} />
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Outbound Language */}
+          <div>
+            <div className="mb-2">
+              <span className="text-sm font-medium text-slate-800">{t("language.outboundLanguage")}</span>
+              <p className="text-xs text-slate-500 mt-0.5">{t("language.outboundLanguageDesc")}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => setPendingOutboundLang(lang.code as LangCode)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-sm text-left transition-all"
+                  style={{
+                    borderColor: pendingOutboundLang === lang.code ? "#059669" : "rgba(0,0,0,0.09)",
+                    background: pendingOutboundLang === lang.code ? "#f0fdf4" : "transparent",
+                    color: pendingOutboundLang === lang.code ? "#065f46" : "#374151",
+                  }}
+                >
+                  <span className="flex-1">
+                    <span className="font-medium block leading-tight">{lang.nativeLabel}</span>
+                    <span className="text-xs opacity-60">{lang.label}</span>
+                  </span>
+                  {pendingOutboundLang === lang.code ? (
+                    <Check className="w-4 h-4 shrink-0" style={{ color: "#059669" }} />
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveLanguage}
+              loading={langSaving}
+              disabled={!isDirty && !langSaved}
+            >
+              {langSaved ? t("common.saved") : t("common.save")}
+            </Button>
+            {langSaved ? (
+              <span className="text-xs text-emerald-600 flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" />
+                {t("language.saved")}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </Card>
+
       {/* Privacy & Legal */}
       <Card>
-        <CardHeader title="Privacy &amp; Legal" icon={Shield} />
+        <CardHeader title={t("settings.privacyLegal")} icon={Shield} />
         <div className="space-y-4 text-sm">
           <div className="flex items-center justify-between py-2 border-b border-slate-100">
             <span className="text-slate-500">Privacy Policy</span>
@@ -262,7 +376,7 @@ export default function AccountSettingsPage() {
 
       {/* Danger Zone */}
       <Card>
-        <CardHeader title="Danger Zone" />
+        <CardHeader title={t("settings.dangerZone")} />
         <div className="space-y-3">
           <Button
             variant="secondary"
@@ -271,7 +385,7 @@ export default function AccountSettingsPage() {
             size="sm"
             className="w-full sm:w-auto justify-start"
           >
-            Sign out
+            {t("settings.signOut")}
           </Button>
           <Button
             variant="ghost"
@@ -280,7 +394,7 @@ export default function AccountSettingsPage() {
             size="sm"
             className="w-full sm:w-auto justify-start text-red-600 hover:bg-red-50"
           >
-            Delete account
+            {t("settings.deleteAccount")}
           </Button>
         </div>
       </Card>
