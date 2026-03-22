@@ -1,0 +1,422 @@
+Build a production-quality “Live Quote Preview” feature for the QuotePro web app.
+
+This feature should show the quote amount updating in real time while the software user is building a quote.
+
+Important:
+- This is for the web app
+- It must support both residential and commercial quotes
+- The displayed amount must increase/decrease instantly as inputs change
+- The live amount must use the same pricing engine as the final saved quote
+- This should feel premium, fast, and trustworthy
+
+PRODUCT GOAL
+
+As the user creates a quote, they should always be able to see a live pricing panel that updates in real time based on the quote inputs.
+
+Examples:
+- changing square footage updates the amount immediately
+- adding bathrooms increases the amount
+- changing frequency changes the amount
+- adding a deep clean multiplier changes the amount
+- adding commercial restrooms, floor care, or after-hours requirements changes the amount
+- manual adjustments change the total immediately
+
+This should feel like a serious quoting engine, not a simple calculator.
+
+CORE FEATURE NAME
+
+Live Quote Preview
+
+HIGH-LEVEL UX
+
+Build the quote creation experience so that:
+
+1. The quote builder form is on the left/main area
+2. A sticky “Live Quote Preview” panel appears on the right on desktop
+3. As fields are changed, the quote amount updates immediately
+4. The preview panel shows:
+   - current total
+   - breakdown of price components
+   - triggered pricing rules
+   - discounts/surcharges
+   - estimated hours if available
+   - warnings if pricing is below minimum or outside expected range
+5. The amount shown in the preview should match the final quote amount when the quote is saved
+
+For smaller screens, translate this into a mobile-friendly layout if needed, but prioritize web app desktop UX first.
+
+REQUIRED SUPPORT
+
+The feature must support both:
+- residential quoting
+- commercial quoting
+
+These should share a common pricing engine architecture but support different rule/input models.
+
+RESIDENTIAL INPUTS TO SUPPORT
+
+Support live pricing updates for fields like:
+- service type
+  - standard clean
+  - deep clean
+  - move-in / move-out
+  - recurring clean
+- square footage
+- bedrooms
+- bathrooms
+- half baths
+- frequency
+  - one-time
+  - weekly
+  - biweekly
+  - monthly
+- condition level
+- pets
+- add-ons
+  - fridge
+  - oven
+  - interior windows
+  - laundry
+  - dishes
+  - etc.
+- first-time clean multiplier
+- zip code / travel surcharge if supported
+- custom adjustments
+- minimum price enforcement
+
+COMMERCIAL INPUTS TO SUPPORT
+
+Support live pricing updates for fields like:
+- building type
+- square footage
+- cleaning frequency
+- service days per week
+- number of restrooms
+- kitchen / breakroom
+- floor type / floor care
+- trash volume
+- occupancy / traffic level
+- after-hours requirement
+- scope complexity
+- special service areas
+- custom labor assumptions
+- per-visit pricing
+- monthly estimate
+- annualized estimate if feasible
+- custom adjustments
+- minimum price guardrails
+
+PRICING ENGINE REQUIREMENTS
+
+This is critical:
+The live preview must use the same deterministic pricing engine as final quote creation.
+
+Do NOT build:
+- one set of logic for the UI preview
+- and another set of logic for final quote save
+
+There should be one shared source of truth.
+
+Implement a pricing engine that:
+- accepts quote input data
+- evaluates pricing rules
+- calculates total
+- calculates line-item breakdown
+- returns triggered rules
+- supports residential and commercial pricing logic
+- supports draft vs published pricing profiles if relevant
+- supports manual adjustments
+- is deterministic and testable
+
+FEATURE BEHAVIOR
+
+As the user changes quote inputs, the UI should update:
+- instantly or near-instantly
+- without requiring page refresh
+- without requiring user to click “calculate”
+
+Use debounced/reasonable recalculation if needed, but the UX should feel immediate.
+
+LIVE QUOTE PREVIEW PANEL REQUIREMENTS
+
+The preview panel should include:
+
+1. Current Total
+- large, prominent dollar amount
+- animated subtly when changed
+- visually obvious and trustworthy
+
+2. Price Breakdown
+Show major components such as:
+- base price
+- square footage contribution
+- room/bath adjustments
+- service-type multiplier
+- frequency discount
+- condition surcharge
+- pet surcharge
+- add-ons
+- travel surcharge
+- custom adjustments
+- commercial-specific charges
+
+3. Triggered Pricing Rules
+Show which rules affected the quote, for example:
+- minimum job price applied
+- deep clean multiplier applied
+- monthly discount applied
+- restroom count adjustment applied
+- after-hours surcharge applied
+
+4. Hours / Effort Estimate
+If the pricing engine supports it, show:
+- estimated labor hours
+- crew assumptions
+- per-visit estimate
+- monthly equivalent for recurring or commercial where relevant
+
+5. Warnings / Guardrails
+Examples:
+- below minimum recommended price
+- quote outside normal range
+- missing required inputs
+- very low commercial estimate
+- unusually high discount applied
+
+6. Manual Adjustments
+Allow the user to add:
+- fixed-dollar adjustment
+- percentage adjustment if supported
+- reason/note
+These should instantly update the live total.
+
+UX REQUIREMENTS
+
+Make the UI feel premium and operationally strong.
+
+Use:
+- sticky preview panel on desktop
+- strong visual hierarchy
+- elegant cards/sections
+- subtle animations on value change
+- clear plus/minus indicators
+- readable breakdown rows
+- warning states that are informative, not scary
+- polished loading/empty/error states if needed
+
+Avoid:
+- clunky calculator vibes
+- laggy price changes
+- mysterious black-box totals
+- too much hidden logic
+- mismatch between preview and final saved quote
+
+TRUST / EXPLAINABILITY
+
+The user should understand why the quote is what it is.
+
+For each major price change, the system should make the logic transparent:
+- what changed
+- how much it changed the quote
+- which rule caused it if relevant
+
+Examples:
+- +$45 for deep clean
+- -10% biweekly discount
+- +$25 pet surcharge
+- +$80 due to 2 extra restrooms
+- Minimum job price applied
+
+If possible, include a short “Why this total?” collapsible explanation section.
+
+COMMERCIAL-SPECIFIC DISPLAY
+
+For commercial quotes, the preview should support showing:
+- per visit amount
+- weekly amount if applicable
+- monthly estimate
+- annualized value if relevant
+
+This is very important for commercial users.
+
+Example:
+- Per Visit: $185
+- Weekly Total: $925
+- Monthly Estimate: $4,005
+- Estimated Annual Value: $48,060
+
+RESIDENTIAL-SPECIFIC DISPLAY
+
+For residential quotes, the preview should support showing:
+- one-time total
+- recurring adjusted total if frequency changes
+- first clean vs recurring pricing where appropriate
+
+Example:
+- First Clean: $290
+- Ongoing Biweekly: $210
+
+SCENARIO TESTING ENHANCEMENT
+
+If feasible, support lightweight scenario testing in the preview panel, such as:
+- standard clean vs deep clean
+- one-time vs biweekly vs monthly
+- with add-ons vs without add-ons
+
+But this is secondary to getting the core live preview correct.
+
+DATA MODEL / ARCHITECTURE
+
+Use the existing QuotePro quote/pricing architecture if present.
+Refactor if needed to ensure:
+- one shared pricing engine
+- reusable rule evaluation
+- clean interfaces for both residential and commercial quotes
+
+Potential modules:
+- pricing engine
+- residential pricing evaluator
+- commercial pricing evaluator
+- quote preview service
+- rule breakdown formatter
+- quote preview UI components
+
+Suggested outputs from the pricing engine:
+- total
+- subtotal
+- line_items
+- applied_rules
+- warnings
+- estimated_hours
+- monthly_estimate
+- annual_estimate
+- adjusted_total
+
+INTEGRATION REQUIREMENTS
+
+Integrate the feature into the quote builder workflow so that:
+- building a quote always updates the preview
+- saving the quote uses the same computed result
+- editing a quote also shows the live preview
+- changes to pricing profile/rules are reflected in preview calculations
+
+If QuotePro already has a Pricing Logic Engine or pricing profiles, the preview must honor those rules.
+
+PERFORMANCE REQUIREMENTS
+
+The live preview must feel fast.
+Optimize for:
+- efficient recalculation
+- minimal UI jank
+- memoized computations where appropriate
+- backend calls only when necessary
+- local/shared calculation when feasible for responsiveness
+
+If server-side calculation is required for correctness, implement it carefully so the UX still feels immediate.
+
+VALIDATION / ERROR STATES
+
+Handle incomplete or invalid quote inputs gracefully.
+Examples:
+- missing square footage
+- missing service frequency
+- missing commercial scope fields
+- invalid numeric input
+
+In these cases:
+- show partial preview if possible
+- clearly show what inputs are still needed
+- avoid crashing the preview panel
+
+MANUAL OVERRIDE / ADJUSTMENT REQUIREMENTS
+
+Allow software users to apply manual overrides/adjustments while quote building, such as:
+- +$25 manual adjustment
+- -$30 goodwill discount
+- custom adjustment reason
+
+These must:
+- be reflected live
+- appear in the breakdown
+- be saved with the quote
+- remain distinct from system-generated rules
+
+TESTING REQUIREMENTS
+
+Add tests for:
+- residential price recalculation
+- commercial price recalculation
+- line-item breakdown accuracy
+- pricing rule application
+- minimum price enforcement
+- frequency discount behavior
+- add-on behavior
+- manual adjustments
+- preview matches final saved quote
+- warnings/guardrails
+- commercial monthly/annual estimates
+
+SEED / DEMO DATA
+
+Seed the app with realistic demo data for:
+- residential quote scenarios
+- commercial quote scenarios
+- pricing profiles/rules
+- add-ons
+- sample customers
+- sample quote drafts
+
+This should make the feature look alive immediately.
+
+UI SCREENS / COMPONENTS TO BUILD OR UPDATE
+
+Build or update:
+1. residential quote builder with live preview
+2. commercial quote builder with live preview
+3. sticky preview panel
+4. breakdown display
+5. applied rules display
+6. warnings/guardrails display
+7. manual adjustment UI
+8. saved quote flow that matches preview
+9. edit quote flow that also uses live preview
+
+QUALITY BAR
+
+This should feel like a premium quoting experience.
+The live quote preview should be one of the most impressive and trust-building parts of QuotePro.
+
+It should make users feel:
+- faster
+- more confident
+- more in control
+- more precise in their pricing
+
+DELIVERABLES
+
+I want:
+1. full web-app implementation
+2. shared pricing engine architecture
+3. residential live quote preview
+4. commercial live quote preview
+5. sticky preview panel
+6. line-item breakdown
+7. applied rule visibility
+8. guardrails/warnings
+9. manual adjustments
+10. tests
+11. demo data
+12. updated README
+
+START BY
+
+1. auditing the current quote builder and pricing logic architecture
+2. unifying preview + final quote calculation into one shared pricing engine
+3. implementing the pricing engine outputs needed for live preview
+4. building the sticky Live Quote Preview panel
+5. wiring residential inputs
+6. wiring commercial inputs
+7. adding manual adjustments
+8. adding warnings and breakdowns
+9. testing parity between preview and final saved quote
+10. documenting the feature

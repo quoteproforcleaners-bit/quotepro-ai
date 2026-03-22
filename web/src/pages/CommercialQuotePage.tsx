@@ -1,6 +1,9 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { computeCommercialQuote, computeCommercialLaborEstimate } from "../lib/pricingEngine";
+import { CommercialLivePreview, LivePreviewPanel } from "../components/LiveQuotePreview";
+import type { ManualAdjustment } from "../components/LiveQuotePreview";
 import {
   Building2,
   ChevronRight,
@@ -1002,6 +1005,7 @@ function CommercialQuoteContent() {
     suppliesSurchargeType: "fixed",
     roundingRule: "none",
   });
+  const [adjustment, setAdjustment] = useState<ManualAdjustment>({ amount: 0, note: "" });
 
   // Keep walkthrough.facilityType in sync with facility.facilityType
   const handleFacilityChange = (f: FacilityInfo) => {
@@ -1009,8 +1013,19 @@ function CommercialQuoteContent() {
     setWalkthrough((w) => ({ ...w, facilityType: f.facilityType, totalSqFt: f.totalSqFt, floors: f.floors }));
   };
 
+  // Live quote computation for the preview panel
+  const liveQuote = useMemo(() => {
+    if (laborEst.rawHours === 0 && laborEst.overrideHours === null && facility.totalSqFt === 0) return null;
+    const est = laborEst.rawHours > 0
+      ? laborEst
+      : { ...computeCommercialLaborEstimate(walkthrough), overrideHours: null };
+    return computeCommercialQuote(est, pricingConfig, walkthrough.frequency, walkthrough);
+  }, [laborEst, pricingConfig, walkthrough, facility.totalSqFt]);
+
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="flex gap-6 items-start">
+      {/* ─── Left: form steps ──────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0">
       <StepIndicator current={step} />
       {step === "facility" && (
         <FacilityStep data={facility} onChange={handleFacilityChange} onNext={() => setStep("walkthrough")} />
@@ -1051,6 +1066,21 @@ function CommercialQuoteContent() {
           onBack={() => setStep("pricing")}
         />
       )}
+      </div>
+
+      {/* ─── Right: live preview (xl+ screens only) ──────────────────── */}
+      <div className="hidden xl:block shrink-0">
+        <LivePreviewPanel isEmpty={!liveQuote}>
+          {liveQuote ? (
+            <CommercialLivePreview
+              result={liveQuote}
+              facilityName={facility.facilityName || undefined}
+              adjustment={adjustment}
+              onAdjustmentChange={setAdjustment}
+            />
+          ) : null}
+        </LivePreviewPanel>
+      </div>
     </div>
   );
 }

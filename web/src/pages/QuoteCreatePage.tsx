@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { buildAddress } from "../lib/address";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -17,6 +17,9 @@ import {
   Pencil,
 } from "lucide-react";
 import { PageHeader, Card, CardHeader, Button, Badge, Alert } from "../components/ui";
+import { computeResidentialQuote } from "../lib/pricingEngine";
+import { ResidentialLivePreview, LivePreviewPanel } from "../components/LiveQuotePreview";
+import type { ManualAdjustment } from "../components/LiveQuotePreview";
 
 const steps = ["Customer", "Property", "Services", "Review"];
 
@@ -362,6 +365,7 @@ export default function QuoteCreatePage() {
   const [editingTier, setEditingTier] = useState<"good" | "better" | "best" | null>(null);
   const [editingValue, setEditingValue] = useState<string>("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [adjustment, setAdjustment] = useState<ManualAdjustment>({ amount: 0, note: "" });
 
   // Pre-fill from intake request URL params
   useEffect(() => {
@@ -440,11 +444,9 @@ export default function QuoteCreatePage() {
     },
   });
 
-  const quote = calculateQuote(
-    property,
-    services.addOns,
-    services.frequency,
-    pricing
+  const quote = useMemo(
+    () => computeResidentialQuote(property, services.addOns, services.frequency, pricing ?? null),
+    [property, services.addOns, services.frequency, pricing]
   );
 
   const commitPriceEdit = (tier: "good" | "better" | "best") => {
@@ -616,7 +618,9 @@ export default function QuoteCreatePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="flex gap-6 items-start">
+      {/* ─── Left: form ─────────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0">
       <PageHeader title="New Quote" backTo="/quotes" />
 
       <div className="flex items-center gap-0 mb-8">
@@ -1528,6 +1532,21 @@ export default function QuoteCreatePage() {
             Create Quote
           </Button>
         )}
+      </div>
+      </div>
+
+      {/* ─── Right: live preview (xl+ screens only) ─────────────────── */}
+      <div className="hidden xl:block shrink-0">
+        <LivePreviewPanel isEmpty={property.sqft === 0 && step < 1}>
+          <ResidentialLivePreview
+            result={quote}
+            selectedTier={selectedOption}
+            priceOverride={aiPriceOverrides?.[selectedOption] ?? undefined}
+            adjustment={adjustment}
+            onAdjustmentChange={setAdjustment}
+            frequency={services.frequency}
+          />
+        </LivePreviewPanel>
       </div>
     </div>
   );
