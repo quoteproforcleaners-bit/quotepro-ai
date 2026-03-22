@@ -498,20 +498,32 @@ export function Layout() {
           >
             AI
           </span>
-          {isPro ? (
-            <span
-              className="ml-auto text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-              style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white" }}
+          <div className="flex items-center gap-1.5 ml-auto">
+            {isPro ? (
+              <span
+                className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white" }}
+              >
+                Pro
+              </span>
+            ) : null}
+            <button
+              onClick={toggleTheme}
+              className="p-1.5 rounded-md transition-colors"
+              style={{ color: "#a1a1aa" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#52525b"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#a1a1aa"; }}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
-              Pro
-            </span>
-          ) : null}
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden ml-auto p-1 rounded-md text-zinc-400 hover:text-zinc-600 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+              {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-1 rounded-md text-zinc-400 hover:text-zinc-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Command palette trigger */}
@@ -630,16 +642,6 @@ export function Layout() {
                 {business?.companyName || ""}
               </p>
             </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleTheme(); }}
-              className="p-1.5 rounded-md transition-colors shrink-0"
-              style={{ color: "#a1a1aa" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#52525b"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#a1a1aa"; }}
-              title={theme === "dark" ? "Light mode" : "Dark mode"}
-            >
-              {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            </button>
           </button>
         </div>
       </aside>
