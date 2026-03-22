@@ -385,7 +385,7 @@ export function Layout() {
           >
             <Zap className="w-3.5 h-3.5 text-white" />
           </div>
-          <span className="font-bold text-[15px] tracking-tight" style={{ color: "#09090b" }}>
+          <span className="font-bold text-[15px] tracking-tight text-zinc-900 dark:text-white">
             QuotePro
           </span>
           <span
