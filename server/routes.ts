@@ -9467,7 +9467,7 @@ loadMonth(nextMo);
       let oneTimeAddOnTotal = 0;
       let pricingSettings: any = null;
       try { pricingSettings = await getPricingByBusiness(q.businessId); } catch (_e) {}
-      const addOnPrices = pricingSettings?.addOnPrices || {};
+      const addOnPrices = (pricingSettings?.settings as any)?.addOnPrices || {};
       if (isRecurring && hasOneTimeAddOns) {
         for (const k of oneTimeAddOnKeys) {
           const v = addOns[k];
@@ -9521,25 +9521,63 @@ loadMonth(nextMo);
         </div>`;
       }
 
-      const addonDataItems: { key: string; name: string; price: number; selected: boolean }[] = [];
+      // Build label<->key mappings for add-ons
+      const addonKeyToLabel: Record<string, string> = {};
+      const addonLabelToKey: Record<string, string> = {};
+      for (const key of Object.keys(addOns)) {
+        const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (s: string) => s.toUpperCase()).replace(/_/g, " ");
+        addonKeyToLabel[key] = label;
+        addonLabelToKey[label.toLowerCase()] = key;
+      }
+
+      // Build per-tier addOnsIncluded sets (as keys, not human labels)
+      const optionAddOnsIncludedByTier: Record<string, string[]> = {};
+      for (const tKey of ["good", "better", "best"]) {
+        const optVal = opts[tKey];
+        if (!optVal || typeof optVal !== "object") continue;
+        const includedLabels: string[] = optVal.addOnsIncluded || [];
+        optionAddOnsIncludedByTier[tKey] = includedLabels
+          .map((lbl: string) => addonLabelToKey[lbl.toLowerCase()] || "")
+          .filter(Boolean);
+      }
+
+      // Determine which add-ons are included in the currently selected tier
+      const selectedTierAddOnsIncluded: string[] = optionAddOnsIncludedByTier[preselectedOption] || [];
+
+      const addonDataItems: { key: string; name: string; price: number; selected: boolean; includedInTier: boolean }[] = [];
       let addOnsHtml = "";
       const allAddonKeys = Object.keys(addOns);
       if (allAddonKeys.length > 0) {
         for (const key of allAddonKeys) {
           const v = addOns[key];
-          if (!v) continue;
-          const isEnabled = typeof v === "object" ? v.selected : v;
+          const label = escHtml(addonKeyToLabel[key] || key);
           const price = typeof v === "object" && v.price ? Number(v.price) : (addOnPrices[key] ? Number(addOnPrices[key]) : 0);
-          const label = escHtml(key.replace(/([A-Z])/g, " $1").replace(/^./, (s: string) => s.toUpperCase()).replace(/_/g, " "));
-          addonDataItems.push({ key, name: label, price, selected: !!isEnabled });
-          const checkedClass = isEnabled ? " checked" : "";
-          addOnsHtml += `<div class="addon-row" onclick="toggleAddon(this,'${key}')">
-            <div class="addon-left">
-              <div class="addon-check${checkedClass}"><svg viewBox="0 0 12 12"><path d="M10 3L4.5 8.5 2 6"/></svg></div>
-              <span class="addon-name">${label}</span>
-            </div>
-            ${price > 0 ? `<span class="addon-price">+$${price.toFixed(2)}</span>` : `<span class="addon-included">Included</span>`}
-          </div>`;
+          const isIncludedInSelectedTier = selectedTierAddOnsIncluded.includes(key);
+          const isInAnyTier = Object.values(optionAddOnsIncludedByTier).some((arr) => arr.includes(key));
+
+          // Only show add-ons that either have a price (optional) or are included in some tier
+          if (price === 0 && !isInAnyTier) continue;
+
+          const isSelected = !isIncludedInSelectedTier && (typeof v === "object" ? !!v.selected : !!v);
+          addonDataItems.push({ key, name: label, price, selected: isSelected, includedInTier: isIncludedInSelectedTier });
+
+          if (isIncludedInSelectedTier) {
+            addOnsHtml += `<div class="addon-row addon-row-static" data-addon-key="${key}">
+              <div class="addon-left">
+                <span class="addon-name">${label}</span>
+              </div>
+              <span class="addon-included">Included</span>
+            </div>`;
+          } else {
+            const checkedClass = isSelected ? " checked" : "";
+            addOnsHtml += `<div class="addon-row addon-row-optional" data-addon-key="${key}" data-addon-price="${price}" onclick="toggleAddon(this,'${key}')">
+              <div class="addon-left">
+                <div class="addon-check${checkedClass}"><svg viewBox="0 0 12 12"><path d="M10 3L4.5 8.5 2 6"/></svg></div>
+                <span class="addon-name">${label}</span>
+              </div>
+              ${price > 0 ? `<span class="addon-price">+$${price.toFixed(2)}</span>` : ""}
+            </div>`;
+          }
         }
       }
 
@@ -9636,6 +9674,7 @@ loadMonth(nextMo);
         "{{preselectedOption}}": preselectedOption,
         "{{optionDataJson}}": JSON.stringify(optionDataItems),
         "{{addonDataJson}}": JSON.stringify(addonDataItems),
+        "{{optionAddOnsIncludedJson}}": JSON.stringify(optionAddOnsIncludedByTier),
         "{{optionsHtml}}": optionsHtml,
         "{{addOnsHtml}}": addOnsHtml,
         "{{lineItemsHtml}}": lineItemsHtml,

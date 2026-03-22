@@ -396,11 +396,39 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-
 var selectedOption="{{preselectedOption}}";
 var optionData={{optionDataJson}};
 var addonData={{addonDataJson}};
+var optionAddOnsIncluded={{optionAddOnsIncludedJson}};
 var token="{{publicToken}}";
 var storedTotal={{storedTotal}};
 var expiresAt={{expiresAtMs}};
 var depositRequired={{depositRequired}};
 var depositAmount={{depositAmountNum}};
+
+function updateAddonsForTier(tierKey){
+  var included=optionAddOnsIncluded[tierKey]||[];
+  document.querySelectorAll(".addon-row[data-addon-key]").forEach(function(row){
+    var addonKey=row.getAttribute("data-addon-key");
+    var priceAttr=parseFloat(row.getAttribute("data-addon-price")||"0");
+    var addon=addonData.find(function(a){return a.key===addonKey});
+    if(!addon)return;
+    var isNowIncluded=included.includes(addonKey);
+    if(isNowIncluded===addon.includedInTier)return;
+    addon.includedInTier=isNowIncluded;
+    if(isNowIncluded){
+      addon.selected=false;
+      row.className="addon-row addon-row-static";
+      row.removeAttribute("onclick");
+      row.innerHTML='<div class="addon-left"><span class="addon-name">'+addon.name+'</span></div><span class="addon-included">Included</span>';
+    }else{
+      row.className="addon-row addon-row-optional";
+      row.setAttribute("data-addon-price",String(priceAttr));
+      var addonKeyCopy=addonKey;
+      row.onclick=function(){toggleAddon(row,addonKeyCopy)};
+      var priceHtml=priceAttr>0?'<span class="addon-price">+$'+priceAttr.toFixed(2)+'</span>':"";
+      row.innerHTML='<div class="addon-left"><div class="addon-check"><svg viewBox="0 0 12 12"><path d="M10 3L4.5 8.5 2 6"/></svg></div><span class="addon-name">'+addon.name+'</span></div>'+priceHtml;
+    }
+  });
+  updateTotals();
+}
 
 function selectOption(key){
   selectedOption=key;
@@ -409,31 +437,31 @@ function selectOption(key){
     if(k===key){c.classList.add("selected")}
     else{c.classList.remove("selected")}
   });
+  updateAddonsForTier(key);
   updateTotals();
   trackEvent("quote_option_selected",{option:key});
 }
 
 function toggleAddon(el,key){
   var addon=addonData.find(function(a){return a.key===key});
-  if(!addon)return;
+  if(!addon||addon.includedInTier)return;
   addon.selected=!addon.selected;
   var check=el.querySelector(".addon-check");
-  if(addon.selected){check.classList.add("checked")}
-  else{check.classList.remove("checked")}
+  if(check){if(addon.selected){check.classList.add("checked")}else{check.classList.remove("checked")}}
   updateTotals();
   trackEvent("addon_toggled",{addon:key,selected:addon.selected});
 }
 
 function getSelectedAddonsTotal(){
   var total=0;
-  addonData.forEach(function(a){if(a.selected&&a.price)total+=a.price});
+  addonData.forEach(function(a){if(a.selected&&!a.includedInTier&&a.price)total+=a.price});
   return total;
 }
 
 function getSelectedAddons(){
   var result={};
   addonData.forEach(function(a){
-    result[a.key]={selected:a.selected,price:a.price,name:a.name};
+    result[a.key]={selected:a.includedInTier?true:a.selected,price:a.includedInTier?0:a.price,name:a.name,includedInTier:!!a.includedInTier};
   });
   return result;
 }
