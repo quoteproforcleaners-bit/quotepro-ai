@@ -381,4 +381,66 @@ const router = Router();
     }
   });
 
+  // ── GET /api/admin/security ───────────────────────────────────────────────
+  router.get("/api/admin/security", async (req: Request, res: Response) => {
+    const adminKey = req.headers["x-admin-key"] as string;
+    if (!adminKey || adminKey !== ADMIN_KEY) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+      const [
+        injectionRes,
+        webhookFailRes,
+        fraudRes,
+        loginFailRes,
+        keysIssuedRes,
+        keysRevokedRes,
+      ] = await Promise.all([
+        pool.query(
+          `SELECT COUNT(*) AS c FROM analytics_events
+           WHERE event_name = 'PROMPT_INJECTION_DETECTED' AND created_at >= $1`,
+          [since30]
+        ),
+        pool.query(
+          `SELECT COUNT(*) AS c FROM analytics_events
+           WHERE event_name = 'WEBHOOK_SIGNATURE_FAILED' AND created_at >= $1`,
+          [since30]
+        ),
+        pool.query(
+          `SELECT COUNT(*) AS c FROM analytics_events
+           WHERE event_name = 'REFERRAL_FRAUD_SUSPECTED' AND created_at >= $1`,
+          [since30]
+        ),
+        pool.query(
+          `SELECT COUNT(*) AS c FROM analytics_events
+           WHERE event_name = 'LOGIN_FAILED' AND created_at >= $1`,
+          [since30]
+        ),
+        pool.query(
+          `SELECT COUNT(*) AS c FROM api_keys WHERE created_at >= $1`,
+          [since30]
+        ),
+        pool.query(
+          `SELECT COUNT(*) AS c FROM api_keys WHERE is_active = false AND updated_at >= $1`,
+          [since30]
+        ),
+      ]);
+
+      return res.json({
+        windowDays: 30,
+        promptInjectionAttempts: parseInt(injectionRes.rows[0]?.c ?? "0", 10),
+        failedWebhookSignatures: parseInt(webhookFailRes.rows[0]?.c ?? "0", 10),
+        suspectedReferralFraud: parseInt(fraudRes.rows[0]?.c ?? "0", 10),
+        failedLoginAttempts: parseInt(loginFailRes.rows[0]?.c ?? "0", 10),
+        apiKeysIssued: parseInt(keysIssuedRes.rows[0]?.c ?? "0", 10),
+        apiKeysRevoked: parseInt(keysRevokedRes.rows[0]?.c ?? "0", 10),
+      });
+    } catch (err: any) {
+      console.error("GET /api/admin/security error:", err.message);
+      return res.status(500).json({ message: "Failed to fetch security data" });
+    }
+  });
+
 export default router;

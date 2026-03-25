@@ -39,6 +39,8 @@ export const users = pgTable("users", {
   referralCode: text("referral_code").unique(),
   referredBy: text("referred_by"),
   referralCreditsMonths: integer("referral_credits_months").default(0),
+  referralFraudFlagged: boolean("referral_fraud_flagged").default(false),
+  signupIp: text("signup_ip"),
   aiFollowUpsUsedThisMonth: integer("ai_follow_ups_used_this_month").default(0),
   trialDripEnrolledAt: timestamp("trial_drip_enrolled_at"),
   trialDripLastSentDay: integer("trial_drip_last_sent_day").default(0),

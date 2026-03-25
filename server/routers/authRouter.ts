@@ -126,6 +126,10 @@ const router = Router();
       }
 
       const passwordHash = await bcrypt.hash(password, 12);
+      const signupIp =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        req.socket.remoteAddress ||
+        null;
       const user = await createUser({
         email,
         name: name || null,
@@ -134,7 +138,8 @@ const router = Router();
         referralCode,
         referredBy,
         trialStartedAt: new Date(),
-      });
+        signupIp,
+      } as any);
 
       const business = await createBusiness(user.id);
       enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));

@@ -9,6 +9,7 @@ import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, lo
 import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import { callAI, AIError } from "../aiClient";
 import { trackEvent } from "../analytics";
+import { sanitizeAndLog } from "../promptSanitizer";
 import { AnalyticsEvents } from "../../shared/analytics-events";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
@@ -367,7 +368,8 @@ ${contextStr}`;
 
   router.post("/api/ai/agent-chat", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { message, mode = "coach", conversationHistory = [] } = req.body;
+      const { mode = "coach", conversationHistory = [] } = req.body;
+      const message = sanitizeAndLog(req.body.message || "", req.session.userId!, "agent-chat");
       if (!message) return res.status(400).json({ message: "message is required" });
       if (!["business", "coach", "teach"].includes(mode)) return res.status(400).json({ message: "invalid mode" });
       trackEvent(req.session.userId!, AnalyticsEvents.AI_AGENT_OPENED, { mode }).catch(() => {});
@@ -995,8 +997,12 @@ ${historyContext}`;
 
   router.post("/api/ai/walkthrough-extract", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
-      const raw = req.body.description || req.body.notes || "";
-      const description = typeof raw === "string" ? raw.trim() : "";
+      const rawInput = req.body.description || req.body.notes || "";
+      const description = sanitizeAndLog(
+        typeof rawInput === "string" ? rawInput.trim() : "",
+        req.session.userId!,
+        "walkthrough-extract"
+      );
       if (!description) {
         return res.status(400).json({ message: "A job description is required" });
       }
@@ -1289,7 +1295,11 @@ Return exactly this JSON structure:
 
   router.post("/api/ai/communication-draft", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
-      const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;
+      const { type, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;
+      const purpose = sanitizeAndLog(req.body.purpose || "", req.session.userId!, "communication-draft-purpose");
+      const customerName = sanitizeAndLog(req.body.customerName || "", req.session.userId!, "communication-draft-customer");
+      const companyName = sanitizeAndLog(req.body.companyName || "", req.session.userId!, "communication-draft-company");
+      const senderName = sanitizeAndLog(req.body.senderName || "", req.session.userId!, "communication-draft-sender");
 
       if (!type || !purpose) {
         return res.status(400).json({ message: "type and purpose are required" });
@@ -1504,7 +1514,11 @@ Return exactly this JSON structure:
 
   router.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { purpose, channel, customerName, companyName, senderName, total, status, quoteLink, bookingLink, paymentMethodsText, language: commLang } = req.body;
+      const { channel, total, status, quoteLink, bookingLink, paymentMethodsText, language: commLang } = req.body;
+      const purpose = sanitizeAndLog(req.body.purpose || "", req.session.userId!, "generate-message-purpose");
+      const customerName = sanitizeAndLog(req.body.customerName || "", req.session.userId!, "generate-message-customer");
+      const companyName = sanitizeAndLog(req.body.companyName || "", req.session.userId!, "generate-message-company");
+      const senderName = sanitizeAndLog(req.body.senderName || "", req.session.userId!, "generate-message-sender");
       const msgType = (channel || "sms") as string;
       const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
 

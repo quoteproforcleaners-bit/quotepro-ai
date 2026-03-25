@@ -351,10 +351,12 @@ const router = Router();
       const result = await sendFollowUpNow(req.params.id, req);
       if (!result.success) return res.status(400).json({ message: result.message });
 
-      // Increment for Starter users
+      // Atomic increment for Starter users — avoids race condition
       if (user && user.subscriptionTier === "starter") {
-        const used = (user as any).aiFollowUpsUsedThisMonth ?? 0;
-        await updateUser(user.id, { aiFollowUpsUsedThisMonth: used + 1 } as any);
+        await pool.query(
+          "UPDATE users SET ai_follow_ups_used_this_month = ai_follow_ups_used_this_month + 1 WHERE id = $1",
+          [user.id]
+        );
       }
 
       return res.json({ success: true, message: result.message });
@@ -701,6 +703,7 @@ const router = Router();
         event = (await getStripe())!.webhooks.constructEvent(req.rawBody as Buffer, sig as string, webhookSecret);
       } catch (err: any) {
         console.error("Webhook signature verification failed:", err.message);
+        trackEvent("system", "WEBHOOK_SIGNATURE_FAILED", { error: err.message }).catch(() => {});
         return res.status(400).send(`Webhook Error: ${err.message}`);
       }
 
@@ -748,22 +751,75 @@ const router = Router();
             }
 
             // Referral credit: give referrer 1 free month when referred user upgrades
+            // Includes fraud protection: 30-day check, same-IP, 6-month cap, email domain flag
             try {
               const newUser = await getUserById(userId);
               const referredBy = (newUser as any)?.referredBy as string | null;
               if (referredBy) {
                 const referrerResult = await pool.query(
-                  "SELECT id, referral_credits_months FROM users WHERE referral_code = $1 LIMIT 1",
+                  `SELECT id, referral_credits_months, email, signup_ip
+                   FROM users WHERE referral_code = $1 LIMIT 1`,
                   [referredBy]
                 );
                 if (referrerResult.rows.length > 0) {
                   const referrer = referrerResult.rows[0];
-                  const currentCredits = referrer.referral_credits_months ?? 0;
-                  await pool.query(
-                    "UPDATE users SET referral_credits_months = $1, updated_at = NOW() WHERE id = $2",
-                    [currentCredits + 1, referrer.id]
-                  );
-                  console.log(`Referral credit applied to user ${referrer.id} (now ${currentCredits + 1} months)`);
+
+                  // ① 30-day paid subscription required before crediting
+                  const subStart: Date | null = (newUser as any)?.subscriptionStartedAt
+                    ? new Date((newUser as any).subscriptionStartedAt)
+                    : null;
+                  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                  if (!subStart || subStart > thirtyDaysAgo) {
+                    console.log(`Referral credit deferred: referred user ${userId} has not been paid for 30 days yet`);
+                    // Leave for a future cron to re-evaluate — do not credit now
+                  } else {
+                    // ② Same-IP fraud detection
+                    const referredIp: string | null = (newUser as any)?.signupIp || null;
+                    const referrerIp: string | null = referrer.signup_ip || null;
+                    if (referredIp && referrerIp && referredIp === referrerIp) {
+                      await pool.query(
+                        "UPDATE users SET referral_fraud_flagged = true WHERE id = $1",
+                        [userId]
+                      );
+                      trackEvent(userId, "REFERRAL_FRAUD_SUSPECTED", {
+                        reason: "same_ip",
+                        referrerId: referrer.id,
+                        ip: referredIp,
+                      }).catch(() => {});
+                      console.warn(`Referral fraud suspected (same IP): referrer=${referrer.id}, referred=${userId}`);
+                    } else {
+                      // ③ Email domain flag (same domain, not gmail/yahoo/hotmail etc.)
+                      const GENERIC_DOMAINS = new Set(["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com"]);
+                      const referredDomain = ((newUser as any)?.email || "").split("@")[1]?.toLowerCase();
+                      const referrerDomain = (referrer.email || "").split("@")[1]?.toLowerCase();
+                      if (
+                        referredDomain &&
+                        referrerDomain &&
+                        referredDomain === referrerDomain &&
+                        !GENERIC_DOMAINS.has(referredDomain)
+                      ) {
+                        trackEvent(userId, "REFERRAL_DOMAIN_MATCH_FLAGGED", {
+                          domain: referredDomain,
+                          referrerId: referrer.id,
+                        }).catch(() => {});
+                        console.warn(`Referral domain match flagged: both @${referredDomain}`);
+                        // Flag but do NOT block — allow credit to proceed
+                      }
+
+                      // ④ Cap at 6 credits
+                      const currentCredits = referrer.referral_credits_months ?? 0;
+                      if (currentCredits >= 6) {
+                        trackEvent(referrer.id, "REFERRAL_CAP_REACHED", { totalCredits: currentCredits }).catch(() => {});
+                        console.log(`Referral cap reached for user ${referrer.id} (${currentCredits} months already)`);
+                      } else {
+                        await pool.query(
+                          "UPDATE users SET referral_credits_months = referral_credits_months + 1, updated_at = NOW() WHERE id = $1",
+                          [referrer.id]
+                        );
+                        console.log(`Referral credit applied to user ${referrer.id} (now ${currentCredits + 1} months)`);
+                      }
+                    }
+                  }
                 }
               }
             } catch (refErr: any) {
