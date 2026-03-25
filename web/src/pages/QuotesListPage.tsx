@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, FileText, ArrowUpDown } from "lucide-react";
+import { Plus, FileText, ArrowUpDown, Sparkles, X } from "lucide-react";
 import {
   PageHeader,
   Card,
@@ -14,6 +14,49 @@ import {
 } from "../components/ui";
 
 const tabs = ["all", "draft", "sent", "viewed", "accepted", "declined", "expired"];
+
+function AIQuotesNudge({ quotesCount }: { quotesCount: number }) {
+  const navigate = useNavigate();
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem("qp_ai_nudge_quotes") === "1"; } catch { return false; }
+  });
+  if (dismissed) return null;
+
+  const prompt = quotesCount > 0
+    ? "How do I follow up on quotes without being pushy?"
+    : "What should I charge for a 3-bedroom house clean?";
+
+  const handleClick = () => {
+    sessionStorage.setItem("ai_preload_question", prompt);
+    sessionStorage.setItem("ai_preload_mode", quotesCount > 0 ? "coach" : "teach");
+    navigate("/ai-assistant");
+  };
+
+  const dismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    localStorage.setItem("qp_ai_nudge_quotes", "1");
+    setDismissed(true);
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      className="flex items-center gap-3 rounded-xl px-4 py-3 mb-4 cursor-pointer group"
+      style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.06), rgba(59,130,246,0.06))", border: "1px solid rgba(99,102,241,0.15)" }}
+    >
+      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(99,102,241,0.15)" }}>
+        <Sparkles className="w-3.5 h-3.5" style={{ color: "#818cf8" }} />
+      </div>
+      <p className="text-sm flex-1" style={{ color: "#64748b" }}>
+        <span className="font-medium" style={{ color: "#4f46e5" }}>Ask AI: </span>
+        <span className="group-hover:underline">{prompt}</span>
+      </p>
+      <button onClick={dismiss} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <X className="w-3.5 h-3.5" style={{ color: "#94a3b8" }} />
+      </button>
+    </div>
+  );
+}
 
 export default function QuotesListPage() {
   const navigate = useNavigate();
@@ -80,6 +123,8 @@ export default function QuotesListPage() {
           </Button>
         }
       />
+
+      <AIQuotesNudge quotesCount={quotes.length} />
 
       <Card padding={false}>
         <div className="p-4 lg:p-5 border-b border-slate-100 space-y-3">

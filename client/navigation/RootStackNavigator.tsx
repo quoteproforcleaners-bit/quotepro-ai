@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -38,6 +39,7 @@ import LeadFinderScreen from "@/screens/LeadFinderScreen";
 import LeadFinderDetailScreen from "@/screens/LeadFinderDetailScreen";
 import LeadFinderSettingsScreen from "@/screens/LeadFinderSettingsScreen";
 import LeadCaptureSettingsScreen from "@/screens/LeadCaptureSettingsScreen";
+import AIAgentIntroScreen from "@/screens/AIAgentIntroScreen";
 
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
@@ -87,6 +89,7 @@ export type RootStackParamList = {
   LeadFinderDetail: { leadId: string };
   LeadFinderSettings: undefined;
   LeadCaptureSettings: undefined;
+  AIAgentIntro: undefined;
 
 };
 
@@ -107,6 +110,28 @@ function PostOnboardingPaywallTrigger() {
       }, 500);
       return () => clearTimeout(timer);
     }
+  }, [navigation]);
+
+  return null;
+}
+
+function PostOnboardingAIIntroTrigger() {
+  const navigation = useNavigation<any>();
+  const triggered = useRef(false);
+
+  useEffect(() => {
+    if (triggered.current) return;
+    AsyncStorage.getItem("ai_intro_shown").then((val) => {
+      if (!val && !triggered.current) {
+        triggered.current = true;
+        const timer = setTimeout(() => {
+          try {
+            navigation.navigate("AIAgentIntro");
+          } catch {}
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    });
   }, [navigation]);
 
   return null;
@@ -169,6 +194,7 @@ export default function RootStackNavigator() {
             {() => (
               <>
                 <PostOnboardingPaywallTrigger />
+                <PostOnboardingAIIntroTrigger />
                 <MainTabNavigator />
               </>
             )}
@@ -417,6 +443,23 @@ export default function RootStackNavigator() {
               headerTitle: "Lead Capture Link",
             }}
           />
+          <Stack.Screen
+            name="AIAgentIntro"
+            options={{
+              presentation: "fullScreenModal",
+              animation: "slide_from_bottom",
+              headerShown: false,
+            }}
+          >
+            {({ navigation }) => (
+              <AIAgentIntroScreen
+                onDone={() => {
+                  AsyncStorage.setItem("ai_intro_shown", "true").catch(() => {});
+                  navigation.goBack();
+                }}
+              />
+            )}
+          </Stack.Screen>
         </>
       )}
     </Stack.Navigator>

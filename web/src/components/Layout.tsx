@@ -471,6 +471,13 @@ export function Layout() {
   });
   const intakeNewCount = intakeCount?.newCount ?? 0;
 
+  const { data: quoteCountData } = useQuery<{ count: number }>({
+    queryKey: ["/api/quotes/count"],
+    refetchInterval: 120_000,
+  });
+  const quoteCount = quoteCountData?.count ?? 0;
+  const featureUnlocked = quoteCount >= 5;
+
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [location.pathname]);
@@ -624,6 +631,38 @@ export function Layout() {
             </div>
           ))}
         </nav>
+
+        {/* Progressive feature disclosure */}
+        {!featureUnlocked && (
+          <div className="px-3 pb-2 shrink-0">
+            <div
+              className="rounded-xl p-3"
+              style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.08))", border: "1px solid rgba(99,102,241,0.2)" }}
+            >
+              <div className="flex items-center gap-2 mb-1.5">
+                <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#6366f1", flexShrink: 0 }} />
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#a5b4fc" }}>More features unlock soon</span>
+              </div>
+              <div className="flex gap-1 mb-1.5">
+                {[...Array(5)].map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      flex: 1, height: "3px", borderRadius: "2px",
+                      background: i < quoteCount ? "#6366f1" : "rgba(99,102,241,0.15)",
+                      transition: "background 0.3s",
+                    }}
+                  />
+                ))}
+              </div>
+              <p style={{ fontSize: "10.5px", color: "#94a3b8", lineHeight: 1.5 }}>
+                {quoteCount === 0
+                  ? "Send your first quote to get started"
+                  : `${5 - quoteCount} more quote${5 - quoteCount !== 1 ? "s" : ""} to unlock Growth, Automations & AI`}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Product Tour */}
         <div className="px-3 pb-1 shrink-0">

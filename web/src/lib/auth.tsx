@@ -34,10 +34,12 @@ interface AuthContextType {
   business: Business | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  needsOnboarding: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  setBusiness: (b: Business | null) => void;
 }
 
 interface RegisterData {
@@ -100,10 +102,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         business,
         isLoading,
         isAuthenticated: !!user,
+        needsOnboarding: !!user && !business?.onboardingComplete,
         login,
         register,
         logout,
         refresh,
+        setBusiness,
       }}
     >
       {children}

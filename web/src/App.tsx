@@ -59,9 +59,10 @@ import PricingLogicPage from "./pages/PricingLogicPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import SchedulePublishPage from "./pages/SchedulePublishPage";
 import ScheduleAckPage from "./pages/ScheduleAckPage";
+import OnboardingWizardPage from "./pages/OnboardingWizardPage";
 
 export default function App() {
-  const { isAuthenticated, isLoading, business } = useAuth();
+  const { isAuthenticated, isLoading, business, needsOnboarding } = useAuth();
 
   useEffect(() => {
     const lang = (business as any)?.appLanguage || "en";
@@ -117,6 +118,18 @@ export default function App() {
           isAuthenticated ? <PaywallPage /> : <Navigate to="/login" replace />
         } />
 
+        {/* Onboarding wizard — full-screen, outside Layout */}
+        <Route
+          path="/onboarding"
+          element={
+            isAuthenticated ? (
+              !needsOnboarding ? <Navigate to="/dashboard" replace /> : <OnboardingWizardPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
         <Route
           element={
             <ProtectedRoute>
@@ -124,7 +137,10 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route
+            path="/dashboard"
+            element={needsOnboarding ? <Navigate to="/onboarding" replace /> : <DashboardPage />}
+          />
           <Route path="/quotes" element={<QuotesListPage />} />
           <Route path="/quotes/new" element={<QuoteCreatePage />} />
           <Route path="/quotes/:id" element={<QuoteDetailPage />} />
