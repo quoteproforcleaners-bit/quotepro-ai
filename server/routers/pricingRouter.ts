@@ -26,7 +26,7 @@ import {
 import {
   getUserById, getUserByEmail, getUserByProviderId, createUser, updateUser,
   getBusinessByOwner, createBusiness, updateBusiness,
-  getPricingByBusiness, upsertPricingSettings,
+  getPricingByBusiness, getPricingByBusinessRaw, upsertPricingSettings,
   getCustomersByBusiness, getCustomerById, createCustomer, updateCustomer, deleteCustomer,
   getQuotesByBusiness, getQuoteById, getQuoteByToken, createQuote, updateQuote,
   deleteQuote as deleteQuoteRow,
@@ -84,7 +84,8 @@ import { runPricingEngine } from "../pricingEngine";
         return res.status(404).json({ message: "Business not found" });
       }
 
-      const pricing = await getPricingByBusiness(business.id);
+      // Use raw fetch so a corrupt record returns defaults instead of 500
+      const pricing = await getPricingByBusinessRaw(business.id);
       const stored: any = pricing?.settings || {};
       // Always merge flat-rate defaults so every client gets these fields
       const merged = {

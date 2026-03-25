@@ -227,11 +227,23 @@ export async function getPricingByBusiness(
   return row;
 }
 
+/** Like getPricingByBusiness but returns the raw row even when settings are corrupt. */
+export async function getPricingByBusinessRaw(
+  businessId: string
+): Promise<PricingSettingsRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(pricingSettings)
+    .where(eq(pricingSettings.businessId, businessId));
+  return row;
+}
+
 export async function upsertPricingSettings(
   businessId: string,
   settings: unknown
 ): Promise<PricingSettingsRow> {
-  const existing = await getPricingByBusiness(businessId);
+  // Use raw fetch so a pre-existing corrupt record doesn't block the update
+  const existing = await getPricingByBusinessRaw(businessId);
   if (existing) {
     const [row] = await db
       .update(pricingSettings)
