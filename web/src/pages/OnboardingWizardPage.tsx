@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { apiPost, apiPut } from "../lib/api";
+import { apiPost, apiPut, apiPatch } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import { Building2, DollarSign, ArrowRight, ArrowLeft, Upload, Check, Sparkles } from "lucide-react";
 import AIAgentIntro from "../components/AIAgentIntro";
@@ -51,7 +51,7 @@ export default function OnboardingWizardPage() {
       if (logoUri && logoUri.startsWith("data:")) {
         payload.logoUri = logoUri;
       }
-      await apiPost("/api/business", payload).catch(() => {});
+      await apiPatch("/api/business", payload).catch(() => {});
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     } finally {
       setSaving(false);
@@ -73,7 +73,7 @@ export default function OnboardingWizardPage() {
   const handleStep3Go = async () => {
     setSaving(true);
     try {
-      await apiPost("/api/business", { onboardingComplete: true }).catch(() => {});
+      await apiPatch("/api/business", { onboardingComplete: true });
       await refresh();
       setShowAIIntro(true);
     } finally {
@@ -82,13 +82,13 @@ export default function OnboardingWizardPage() {
   };
 
   const handleAIIntroComplete = async () => {
-    // Ensure onboarding is saved before navigating — retry the flag write
-    // in case the original call in handleStep3Go failed silently.
-    await apiPost("/api/business", { onboardingComplete: true }).catch(() => {});
-    // Force-update local auth state so needsOnboarding is definitely false,
-    // even if the API call above failed or refresh returns stale data.
+    // Retry saving in case the step-3 call above failed.
+    await apiPatch("/api/business", { onboardingComplete: true }).catch(() => {});
+    // Immediately mark complete in local auth state so the route guard
+    // sees needsOnboarding=false before navigation happens.
     setBusiness(business ? { ...business, onboardingComplete: true } : business);
-    await refresh();
+    // Do NOT call refresh() here — it would overwrite setBusiness with
+    // stale server data if the DB write above hasn't propagated yet.
     navigate("/dashboard", { replace: true });
   };
 
