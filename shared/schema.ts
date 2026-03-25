@@ -45,6 +45,15 @@ export const users = pgTable("users", {
   trialDripCompleted: boolean("trial_drip_completed").default(false),
   trialDripUnsubscribed: boolean("trial_drip_unsubscribed").default(false),
   lastLoginAt: timestamp("last_login_at"),
+  // Churn detection + NPS
+  lastActiveAt: timestamp("last_active_at"),
+  lastQuoteSentAt: timestamp("last_quote_sent_at"),
+  churnRiskScore: integer("churn_risk_score").default(0),
+  churnInterventionSentAt: timestamp("churn_intervention_sent_at"),
+  npsScore: integer("nps_score"),
+  npsSurveyedAt: timestamp("nps_surveyed_at"),
+  npsResponse: text("nps_response"),
+  subscriptionStartedAt: timestamp("subscription_started_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

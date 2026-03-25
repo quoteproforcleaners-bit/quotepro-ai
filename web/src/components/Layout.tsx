@@ -11,6 +11,7 @@ import { useTheme } from "../lib/theme";
 import { useWalkthrough } from "../lib/walkthrough";
 import { WalkthroughOverlay } from "./WalkthroughOverlay";
 import AIChatBubble from "./AIChatBubble";
+import NPSSurvey from "./NPSSurvey";
 import {
   LayoutDashboard, FileText, Users, Briefcase, CalendarDays, Settings,
   Menu, X, Zap, Bell, Bot, TrendingUp, Target, Wand2, Crown, Lock,
@@ -823,6 +824,7 @@ export function Layout() {
 
       {/* AI chat bubble — hidden on the full AI assistant page */}
       {location.pathname !== "/ai-assistant" && <AIChatBubble />}
+      <NPSSurvey />
     </div>
     </AIToastProvider>
   );

@@ -379,3 +379,189 @@ export async function processChurnSignals(): Promise<void> {
   }
   console.log("[analytics] Churn signal check complete.");
 }
+
+/* ─── Churn Risk Scoring (daily 6am cron) ───────────────────────────────────── */
+
+const TIER_MRR: Record<string, number> = { starter: 19, growth: 49, pro: 99 };
+
+export async function computeAndUpdateChurnScores(): Promise<void> {
+  console.log("[churn] Starting churn risk scoring...");
+  try {
+    // All paid users
+    const usersResult = await pool.query(`
+      SELECT u.id, u.email, u.name, u.subscription_tier,
+             u.last_active_at, u.created_at, u.trial_started_at,
+             u.churn_intervention_sent_at,
+             EXTRACT(EPOCH FROM (NOW() - u.last_active_at)) / 86400 AS days_since_active
+      FROM users u
+      WHERE u.subscription_tier IN ('starter','growth','pro')
+         OR (u.subscription_tier = 'free' AND u.created_at > NOW() - INTERVAL '21 days')
+      ORDER BY u.id
+    `);
+
+    for (const user of usersResult.rows) {
+      let score = 0;
+      const isPaid = user.subscription_tier !== "free";
+      const daysSinceActive = parseFloat(user.days_since_active) || 999;
+
+      // ── Risk signals (add points) ───────────────────────────────
+      if (isPaid && daysSinceActive > 7) score += 30;
+      if (daysSinceActive > 3 && !isPaid) score += 10;
+
+      // No quote sent in 14 days
+      const quoteSentRow = await pool.query(
+        `SELECT last_quote_sent_at FROM users WHERE id = $1`,
+        [user.id]
+      );
+      const lastQuoteSent = quoteSentRow.rows[0]?.last_quote_sent_at;
+      const daysSinceQuote = lastQuoteSent
+        ? (Date.now() - new Date(lastQuoteSent).getTime()) / 86_400_000
+        : 999;
+      if (daysSinceQuote > 14) score += 20;
+
+      // Quota hit but didn't upgrade within 48h
+      const quotaHit = await pool.query(
+        `SELECT COUNT(*) AS cnt FROM analytics_events
+         WHERE business_id IN (SELECT id FROM businesses WHERE owner_user_id = $1)
+           AND event_name = 'quote_limit_reached'
+           AND created_at > NOW() - INTERVAL '48 hours'`,
+        [user.id]
+      );
+      if (parseInt(quotaHit.rows[0]?.cnt) > 0 && !isPaid) score += 15;
+
+      // Opened cancel flow
+      const cancelInitiated = await pool.query(
+        `SELECT COUNT(*) AS cnt FROM analytics_events
+         WHERE business_id IN (SELECT id FROM businesses WHERE owner_user_id = $1)
+           AND event_name = 'cancel_initiated'
+           AND created_at > NOW() - INTERVAL '14 days'`,
+        [user.id]
+      );
+      if (parseInt(cancelInitiated.rows[0]?.cnt) > 0) score += 15;
+
+      // Trial with 2 days left, not upgraded
+      const trialRef = user.trial_started_at || user.created_at;
+      const trialAgeDays = (Date.now() - new Date(trialRef).getTime()) / 86_400_000;
+      if (!isPaid && trialAgeDays > 12 && trialAgeDays < 14) score += 10;
+
+      // Zero jobs scheduled
+      const jobCount = await pool.query(
+        `SELECT COUNT(*) AS cnt FROM jobs
+         WHERE business_id IN (SELECT id FROM businesses WHERE owner_user_id = $1)`,
+        [user.id]
+      );
+      if (parseInt(jobCount.rows[0]?.cnt) === 0) score += 5;
+
+      // ── Health signals (subtract points) ───────────────────────
+      // Quote accepted in last 7 days
+      const recentAccepted = await pool.query(
+        `SELECT COUNT(*) AS cnt FROM quotes
+         WHERE business_id IN (SELECT id FROM businesses WHERE owner_user_id = $1)
+           AND status = 'accepted'
+           AND updated_at > NOW() - INTERVAL '7 days'`,
+        [user.id]
+      );
+      if (parseInt(recentAccepted.rows[0]?.cnt) > 0) score -= 20;
+
+      // Job completed in last 7 days
+      const recentJob = await pool.query(
+        `SELECT COUNT(*) AS cnt FROM jobs
+         WHERE business_id IN (SELECT id FROM businesses WHERE owner_user_id = $1)
+           AND status = 'completed'
+           AND updated_at > NOW() - INTERVAL '7 days'`,
+        [user.id]
+      );
+      if (parseInt(recentJob.rows[0]?.cnt) > 0) score -= 15;
+
+      // AI agent used in last 3 days
+      const recentAI = await pool.query(
+        `SELECT COUNT(*) AS cnt FROM analytics_events
+         WHERE business_id IN (SELECT id FROM businesses WHERE owner_user_id = $1)
+           AND event_name ILIKE 'ai_%'
+           AND created_at > NOW() - INTERVAL '3 days'`,
+        [user.id]
+      );
+      if (parseInt(recentAI.rows[0]?.cnt) > 0) score -= 10;
+
+      // Logged in today
+      if (daysSinceActive < 1) score -= 10;
+
+      // Clamp
+      score = Math.max(0, Math.min(100, score));
+
+      // Update score
+      await pool.query(
+        "UPDATE users SET churn_risk_score = $1 WHERE id = $2",
+        [score, user.id]
+      );
+
+      // ── Interventions ───────────────────────────────────────────
+      if (!isPaid) continue; // only intervene on paid users
+
+      const lastIntervention = user.churn_intervention_sent_at
+        ? (Date.now() - new Date(user.churn_intervention_sent_at).getTime()) / 86_400_000
+        : 999;
+
+      const mrr = TIER_MRR[user.subscription_tier] || 0;
+
+      if (score >= 70 && lastIntervention > 7) {
+        // HIGH RISK
+        await sendEmail({
+          to: user.email,
+          subject: `Everything ok, ${user.name?.split(" ")[0] || "there"}?`,
+          html: `<div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;color:#1a1a1a;line-height:1.7">
+<p>Hey ${user.name?.split(" ")[0] || "there"},</p>
+<p>I noticed you haven't logged into QuotePro in a while. I wanted to reach out personally.</p>
+<p>Is there something we could be doing better? Are you running into any roadblocks?</p>
+<p>Hit reply — I personally read every response and usually get back within a few hours.</p>
+<p>— Mike<br><span style="color:#6b7280;font-size:0.875rem">Founder, QuotePro AI</span></p>
+</div>`,
+        });
+        await pool.query(
+          "UPDATE users SET churn_intervention_sent_at = NOW() WHERE id = $1",
+          [user.id]
+        );
+        // Flag high-value accounts for manual outreach
+        if (mrr >= 49) {
+          console.log(`[churn] HIGH-RISK account flagged for manual outreach: ${user.email} ($${mrr}/mo, score=${score})`);
+        }
+        console.log(`[churn] High-risk intervention sent to ${user.email} (score=${score})`);
+      } else if (score >= 40 && score < 70 && lastIntervention > 14) {
+        // MEDIUM RISK — feature nudge
+        const hasNeverUsedAI = parseInt((await pool.query(
+          `SELECT COUNT(*) AS cnt FROM analytics_events
+           WHERE business_id IN (SELECT id FROM businesses WHERE owner_user_id = $1)
+             AND event_name ILIKE 'ai_%'`,
+          [user.id]
+        )).rows[0]?.cnt) === 0;
+
+        const subject = hasNeverUsedAI
+          ? "Your quotes are going cold — here's the 60-second fix"
+          : `A QuotePro feature you haven't tried yet`;
+        const body = hasNeverUsedAI
+          ? `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;line-height:1.6">
+<p>Hey ${user.name?.split(" ")[0] || "there"},</p>
+<p>Did you know QuotePro can automatically follow up with customers whose quotes you haven't heard back on?</p>
+<p>Most cleaning businesses lose 30% of potential jobs just from slow follow-up. Our AI sends a personalized nudge in your voice — while you're on a job.</p>
+<p><a href="${process.env.EXPO_PUBLIC_DOMAIN || "https://quotepro.ai"}/app/follow-ups" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">Try AI Follow-Ups</a></p>
+<p style="color:#6b7280;font-size:0.875rem">Takes 60 seconds to set up. No extra charge on your Growth plan.</p>
+</div>`
+          : `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;line-height:1.6">
+<p>Hey ${user.name?.split(" ")[0] || "there"},</p>
+<p>Just wanted to make sure you're getting the most out of QuotePro. A lot of cleaning businesses on your plan are using the AI Coach to map out their next $10k in revenue.</p>
+<p><a href="${process.env.EXPO_PUBLIC_DOMAIN || "https://quotepro.ai"}/app/ai-assistant" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">Try the AI Coach</a></p>
+</div>`;
+
+        await sendEmail({ to: user.email, subject, html: body });
+        await pool.query(
+          "UPDATE users SET churn_intervention_sent_at = NOW() WHERE id = $1",
+          [user.id]
+        );
+        console.log(`[churn] Medium-risk intervention sent to ${user.email} (score=${score})`);
+      }
+    }
+  } catch (err: any) {
+    console.error("[churn] Scoring cron failed:", err.message);
+  }
+  console.log("[churn] Churn risk scoring complete.");
+}

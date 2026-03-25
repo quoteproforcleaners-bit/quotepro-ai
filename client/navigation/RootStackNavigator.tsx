@@ -40,6 +40,7 @@ import LeadFinderDetailScreen from "@/screens/LeadFinderDetailScreen";
 import LeadFinderSettingsScreen from "@/screens/LeadFinderSettingsScreen";
 import LeadCaptureSettingsScreen from "@/screens/LeadCaptureSettingsScreen";
 import AIAgentIntroScreen from "@/screens/AIAgentIntroScreen";
+import NPSSurveyModal from "@/screens/NPSSurveyModal";
 
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
@@ -113,6 +114,34 @@ function PostOnboardingPaywallTrigger() {
   }, [navigation]);
 
   return null;
+}
+
+function NPSSurveyTrigger() {
+  const { user } = useAuth();
+  const [showNPS, setShowNPS] = useState(false);
+  const checkedRef = useRef(false);
+
+  useEffect(() => {
+    if (!user || checkedRef.current) return;
+    checkedRef.current = true;
+    // Wait 5s after mount to avoid jarring the user
+    const timer = setTimeout(async () => {
+      try {
+        const { apiRequest } = await import("@/lib/query-client");
+        const data: any = await apiRequest("GET", "/api/nps/status");
+        if (data?.shouldShow) {
+          setShowNPS(true);
+        }
+      } catch {
+        // Non-fatal
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [user]);
+
+  return (
+    <NPSSurveyModal visible={showNPS} onClose={() => setShowNPS(false)} />
+  );
 }
 
 function PostOnboardingAIIntroTrigger() {
@@ -195,6 +224,7 @@ export default function RootStackNavigator() {
               <>
                 <PostOnboardingPaywallTrigger />
                 <PostOnboardingAIIntroTrigger />
+                <NPSSurveyTrigger />
                 <MainTabNavigator />
               </>
             )}

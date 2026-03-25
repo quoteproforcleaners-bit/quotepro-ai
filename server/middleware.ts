@@ -12,6 +12,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
+import { pool } from "./db";
 import { getUserById } from "./storage";
 
 // ─── Tier helpers ─────────────────────────────────────────────────────────────
@@ -36,6 +37,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     res.status(401).json({ message: "Not authenticated" });
     return;
   }
+  // Fire-and-forget: never awaited, adds zero latency
+  pool.query("UPDATE users SET last_active_at = NOW() WHERE id = $1", [req.session.userId]).catch(() => {});
   next();
 }
 

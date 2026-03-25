@@ -6,7 +6,7 @@ import * as path from "path";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
 import { processDripQueue } from "./dripEmails";
-import { processChurnSignals } from "./analytics";
+import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
 
 const app = express();
 const log = console.log;
@@ -469,6 +469,22 @@ async function seedDemoUser() {
     }, msUntil8am);
   }
   scheduleChurnCron();
+
+  // ─── Churn RISK SCORING cron: fires daily at 6am ─────────────────────────
+  function scheduleChurnScoringCron() {
+    const now = new Date();
+    const next6am = new Date(now);
+    next6am.setHours(6, 0, 0, 0);
+    if (next6am <= now) next6am.setDate(next6am.getDate() + 1);
+    const msUntil6am = next6am.getTime() - now.getTime();
+    setTimeout(() => {
+      computeAndUpdateChurnScores().catch((e: any) => console.error("[churn-score] Cron error:", e));
+      setInterval(() => {
+        computeAndUpdateChurnScores().catch((e: any) => console.error("[churn-score] Cron error:", e));
+      }, 24 * 60 * 60 * 1000);
+    }, msUntil6am);
+  }
+  scheduleChurnScoringCron();
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

@@ -311,6 +311,12 @@ const router = Router();
         sentAt: new Date(),
       });
 
+      // Fire-and-forget: track last quote sent time for churn scoring
+      pool.query(
+        "UPDATE users SET last_quote_sent_at = NOW() WHERE id = $1",
+        [req.session.userId]
+      ).catch(() => {});
+
       await createCommunication({
         businessId: business.id,
         customerId: quote.customerId || undefined,

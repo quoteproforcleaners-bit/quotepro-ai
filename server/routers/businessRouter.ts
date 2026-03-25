@@ -721,6 +721,11 @@ const router = Router();
             updateData.subscriptionPlatform = "stripe";
             updateData.subscriptionSyncedAt = new Date();
             if (session.subscription) updateData.stripeSubscriptionStatus = "active";
+            // Set subscription_started_at only on first purchase
+            await pool.query(
+              "UPDATE users SET subscription_started_at = NOW() WHERE id = $1 AND subscription_started_at IS NULL",
+              [userId]
+            );
             await updateUser(userId, updateData as any);
             trackEvent(userId, AnalyticsEvents.UPGRADE_COMPLETED, { plan: planMeta, interval: intervalMeta }).catch(() => {});
             console.log(`Subscription activated for user ${userId} on plan ${planMeta}`);

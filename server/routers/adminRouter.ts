@@ -296,4 +296,89 @@ const router = Router();
     }
   });
 
+  // ── GET /api/admin/churn ─────────────────────────────────────────────────
+  router.get("/api/admin/churn", async (req: Request, res: Response) => {
+    if (!checkAdminKey(req, res)) return;
+    try {
+      const sortBy = (req.query.sortBy as string) || "score";
+
+      const TIER_MRR: Record<string, number> = { starter: 19, growth: 49, pro: 99 };
+
+      // High-risk accounts (score 70-100)
+      const highRiskResult = await pool.query(`
+        SELECT u.id AS "userId", u.email, u.subscription_tier AS tier,
+               u.churn_risk_score AS "churnRiskScore",
+               u.last_active_at AS "lastActiveAt",
+               u.nps_score AS "npsScore"
+        FROM users u
+        WHERE u.subscription_tier IN ('starter','growth','pro')
+          AND u.churn_risk_score >= 70
+        ORDER BY ${sortBy === "mrr" ? "u.subscription_tier DESC, u.churn_risk_score DESC" : "u.churn_risk_score DESC"}
+        LIMIT 50
+      `);
+
+      // Medium-risk accounts (score 40-69)
+      const mediumRiskResult = await pool.query(`
+        SELECT u.id AS "userId", u.email, u.subscription_tier AS tier,
+               u.churn_risk_score AS "churnRiskScore",
+               u.last_active_at AS "lastActiveAt",
+               u.nps_score AS "npsScore"
+        FROM users u
+        WHERE u.subscription_tier IN ('starter','growth','pro')
+          AND u.churn_risk_score >= 40 AND u.churn_risk_score < 70
+        ORDER BY ${sortBy === "mrr" ? "u.subscription_tier DESC, u.churn_risk_score DESC" : "u.churn_risk_score DESC"}
+        LIMIT 50
+      `);
+
+      // Add MRR to each row
+      const addMrr = (rows: any[]) => rows.map(r => ({
+        ...r,
+        mrr: TIER_MRR[r.tier] || 0,
+      }));
+
+      // Weekly churn rate: paid users who downgraded to free in last 7 days vs total paid last week
+      const churnRateResult = await pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE subscription_tier = 'free' AND updated_at > NOW() - INTERVAL '7 days'
+                           AND subscription_expires_at IS NOT NULL) AS churned,
+          COUNT(*) FILTER (WHERE subscription_tier IN ('starter','growth','pro')
+                           OR (subscription_tier = 'free' AND updated_at > NOW() - INTERVAL '7 days')) AS total
+        FROM users
+      `);
+      const churned = parseInt(churnRateResult.rows[0]?.churned) || 0;
+      const total = parseInt(churnRateResult.rows[0]?.total) || 1;
+      const weeklyChurnRate = `${Math.round((churned / total) * 100)}%`;
+
+      // NPS breakdown
+      const npsResult = await pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE nps_score >= 9) AS promoters,
+          COUNT(*) FILTER (WHERE nps_score >= 7 AND nps_score <= 8) AS passives,
+          COUNT(*) FILTER (WHERE nps_score <= 6 AND nps_score IS NOT NULL) AS detractors,
+          AVG(nps_score) AS avg_score
+        FROM users WHERE nps_surveyed_at IS NOT NULL
+      `);
+      const npsRow = npsResult.rows[0];
+      const promoters = parseInt(npsRow?.promoters) || 0;
+      const passives = parseInt(npsRow?.passives) || 0;
+      const detractors = parseInt(npsRow?.detractors) || 0;
+      const totalNps = promoters + passives + detractors;
+      const netPromoterScore = totalNps > 0
+        ? Math.round(((promoters - detractors) / totalNps) * 100)
+        : 0;
+
+      return res.json({
+        highRiskAccounts: addMrr(highRiskResult.rows),
+        mediumRiskAccounts: addMrr(mediumRiskResult.rows),
+        weeklyChurnRate,
+        avgNpsScore: npsRow?.avg_score ? Math.round(parseFloat(npsRow.avg_score) * 10) / 10 : null,
+        npsBreakdown: { promoters, passives, detractors },
+        netPromoterScore,
+      });
+    } catch (err: any) {
+      console.error("GET /api/admin/churn error:", err.message);
+      return res.status(500).json({ message: "Failed to fetch churn data" });
+    }
+  });
+
 export default router;
