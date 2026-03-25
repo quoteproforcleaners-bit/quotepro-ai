@@ -144,6 +144,7 @@ export default function SettingsScreen() {
     maxFollowUpsPerDay: number;
     weeklyGoal: string | null;
     weeklyGoalTarget: number | null;
+    pushPrefs?: { quotes: boolean; jobs: boolean; growth: boolean };
   }>({ queryKey: ["/api/preferences"] });
 
   const currentPrefs = prefs || {
@@ -158,6 +159,7 @@ export default function SettingsScreen() {
     maxFollowUpsPerDay: 1,
     weeklyGoal: null,
     weeklyGoalTarget: null,
+    pushPrefs: { quotes: true, jobs: true, growth: true },
   };
 
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -166,8 +168,8 @@ export default function SettingsScreen() {
 
   const updatePref = useCallback(async (updates: Record<string, any>) => {
     try {
-      const { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget } = { ...currentPrefs, ...updates };
-      await apiRequest("PUT", "/api/preferences", { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget });
+      const { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget, pushPrefs } = { ...currentPrefs, ...updates };
+      await apiRequest("PUT", "/api/preferences", { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget, pushPrefs });
       queryClient.invalidateQueries({ queryKey: ["/api/preferences"] });
       Haptics.selectionAsync();
       const merged = { ...currentPrefs, ...updates };
@@ -1287,6 +1289,67 @@ export default function SettingsScreen() {
             ))}
           </View>
         ) : null}
+
+        <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
+
+        {/* Push notification channel preferences */}
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Quote activity</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              When quotes are viewed or accepted by customers
+            </ThemedText>
+          </View>
+          <Switch
+            value={currentPrefs.pushPrefs?.quotes !== false}
+            onValueChange={(val) =>
+              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs ?? { quotes: true, jobs: true, growth: true }), quotes: val } })
+            }
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-push-quotes"
+          />
+        </View>
+
+        <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
+
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Job reminders</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              Alerts 1 hour before a job starts
+            </ThemedText>
+          </View>
+          <Switch
+            value={currentPrefs.pushPrefs?.jobs !== false}
+            onValueChange={(val) =>
+              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs ?? { quotes: true, jobs: true, growth: true }), jobs: val } })
+            }
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-push-jobs"
+          />
+        </View>
+
+        <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
+
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Growth tips & weekly recap</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              Sunday evening revenue summary (silent)
+            </ThemedText>
+          </View>
+          <Switch
+            value={currentPrefs.pushPrefs?.growth !== false}
+            onValueChange={(val) =>
+              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs ?? { quotes: true, jobs: true, growth: true }), growth: val } })
+            }
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-push-growth"
+          />
+        </View>
 
         <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
 

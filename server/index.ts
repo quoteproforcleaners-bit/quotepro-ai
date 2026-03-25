@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { pool } from "./db";
 import { processDripQueue } from "./dripEmails";
 import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
+import { sendPush } from "./pushNotifications";
 
 const app = express();
 const log = console.log;
@@ -485,6 +486,123 @@ async function seedDemoUser() {
     }, msUntil6am);
   }
   scheduleChurnScoringCron();
+
+  // ─── Follow-up queue push: daily 8:30am, once per day if queue > 0 ────────
+  function scheduleFollowUpQueuePushCron() {
+    setInterval(async () => {
+      try {
+        const d = new Date();
+        if (d.getHours() !== 8 || d.getMinutes() > 30) return;
+        // Get each business with pending follow-up communications
+        const result = await pool.query(
+          `SELECT b.owner_user_id, b.id as business_id,
+                  COUNT(c.id) as queue_count
+           FROM businesses b
+           JOIN push_tokens pt ON pt.user_id = b.owner_user_id
+           JOIN communications c ON c.business_id = b.id
+             AND c.status = 'scheduled'
+             AND c.scheduled_for <= NOW() + INTERVAL '24 hours'
+             AND c.quote_id IS NOT NULL
+           GROUP BY b.owner_user_id, b.id
+           HAVING COUNT(c.id) > 0`
+        );
+        for (const row of result.rows) {
+          const n = Number(row.queue_count);
+          sendPush(row.owner_user_id, {
+            title: `${n} quote${n !== 1 ? "s" : ""} need follow-up today`,
+            body: "Your AI is ready to send follow-ups. Tap to review and send.",
+            data: { screen: "FollowUpQueue" },
+            channel: "quotes",
+          }).catch(() => {});
+        }
+      } catch (e: any) {
+        console.error("[followup-push] Error:", e.message);
+      }
+    }, 60 * 60 * 1000);
+  }
+  scheduleFollowUpQueuePushCron();
+
+  // ─── Job starting soon: checks every 30 min, pushes 1h before job ────────
+  function scheduleJobStartingSoonCron() {
+    setInterval(async () => {
+      try {
+        const now = new Date();
+        const in60 = new Date(now.getTime() + 60 * 60 * 1000);
+        const in75 = new Date(now.getTime() + 75 * 60 * 1000);
+        const result = await pool.query(
+          `SELECT j.id, j.scheduled_date, j.scheduled_time, j.address,
+                  b.owner_user_id,
+                  c.first_name, c.last_name,
+                  j.push_notified_starting_soon
+           FROM jobs j
+           JOIN businesses b ON b.id = j.business_id
+           LEFT JOIN customers c ON c.id = j.customer_id
+           WHERE j.status IN ('scheduled','confirmed')
+             AND j.scheduled_date IS NOT NULL
+             AND CONCAT(j.scheduled_date::text, ' ', COALESCE(j.scheduled_time, '09:00'))::timestamp BETWEEN $1 AND $2
+             AND (j.push_notified_starting_soon IS NULL OR j.push_notified_starting_soon = false)`,
+          [in60, in75]
+        ).catch(() => ({ rows: [] }));
+        for (const row of result.rows) {
+          const customerName = [row.first_name, row.last_name].filter(Boolean).join(" ") || "Your customer";
+          const addressShort = (row.address || "").split(",")[0] || "the job site";
+          sendPush(row.owner_user_id, {
+            title: "Job starting in 1 hour",
+            body: `${customerName} at ${addressShort}. Tap to see the checklist.`,
+            data: { screen: "JobDetail", jobId: row.id },
+            channel: "jobs",
+          }).catch(() => {});
+          await pool.query(
+            `UPDATE jobs SET push_notified_starting_soon = true WHERE id = $1`,
+            [row.id]
+          ).catch(() => {});
+        }
+      } catch (e: any) {
+        console.error("[job-push] Error:", e.message);
+      }
+    }, 30 * 60 * 1000);
+  }
+  scheduleJobStartingSoonCron();
+
+  // ─── Weekly revenue recap PUSH: Sunday 6pm ────────────────────────────────
+  function scheduleWeeklyRecapPushCron() {
+    setInterval(async () => {
+      try {
+        const d = new Date();
+        if (d.getDay() !== 0) return;       // Sunday only
+        if (d.getHours() !== 18) return;    // 6pm only
+        if (d.getMinutes() > 30) return;    // within first 30 min of the hour
+
+        const result = await pool.query(
+          `SELECT DISTINCT b.owner_user_id, b.id as business_id, b.company_name,
+                  up.weekly_recap_enabled,
+                  (SELECT COUNT(*) FROM quotes q WHERE q.business_id = b.id
+                   AND q.created_at > NOW() - INTERVAL '7 days') as quotes_sent,
+                  (SELECT COALESCE(SUM(q.total),0) FROM quotes q WHERE q.business_id = b.id
+                   AND q.status = 'accepted' AND q.updated_at > NOW() - INTERVAL '7 days') as revenue_won
+           FROM businesses b
+           JOIN push_tokens pt ON pt.user_id = b.owner_user_id
+           LEFT JOIN user_preferences up ON up.business_id = b.id
+           WHERE (up.weekly_recap_enabled IS NULL OR up.weekly_recap_enabled = true)`
+        );
+        for (const row of result.rows) {
+          const quotesSent = Number(row.quotes_sent) || 0;
+          const revenueWon = Number(row.revenue_won) || 0;
+          sendPush(row.owner_user_id, {
+            title: "Your week in review",
+            body: quotesSent > 0
+              ? `You sent ${quotesSent} quote${quotesSent !== 1 ? "s" : ""} and earned $${revenueWon.toFixed(0)} this week.`
+              : "Ready to review your week and plan the next one?",
+            data: { screen: "Dashboard" },
+            channel: "growth",
+          }).catch(() => {});
+        }
+      } catch (e: any) {
+        console.error("[weekly-push] Error:", e.message);
+      }
+    }, 60 * 60 * 1000);
+  }
+  scheduleWeeklyRecapPushCron();
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

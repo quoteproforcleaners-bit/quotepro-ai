@@ -81,6 +81,7 @@ import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage
 import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "../calculator-engine";
 import { sendEmail, getBusinessSendParams } from "../mail";
 import { syncQuoteToJobber } from "../jobber-client";
+import { sendPush } from "../pushNotifications";
 
 const router = Router();
 const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -932,6 +933,25 @@ init();
       try {
         if (!q.viewedAt) {
           await updateQuote(q.id, { viewedAt: new Date() } as any);
+
+          // Push: notify business owner that their quote was just viewed
+          try {
+            const bizOwner = await pool.query(
+              "SELECT owner_user_id FROM businesses WHERE id = $1 LIMIT 1",
+              [q.businessId]
+            );
+            if (bizOwner.rows.length > 0) {
+              const cust = q.customerId ? await getCustomerById(q.customerId) : null;
+              const custName = cust ? `${cust.firstName} ${cust.lastName}`.trim() : "Your customer";
+              sendPush(bizOwner.rows[0].owner_user_id, {
+                title: "Your quote was just viewed!",
+                body: `${custName} opened your quote. Follow up now while it's fresh.`,
+                data: { screen: "QuoteDetail", quoteId: q.id },
+                channel: "quotes",
+              }).catch(() => {});
+            }
+          } catch {}
+
           const existingFollowUps = await getFollowUpsByQuote(q.id);
           const hasPendingFollowUp = existingFollowUps.some((f: any) => f.status === "scheduled");
           if (!hasPendingFollowUp && q.status !== "accepted" && q.status !== "declined") {
@@ -1708,31 +1728,18 @@ loadMonth(nextMo);
         } catch (_e) {}
       }
 
-      // Send push notification to business owner
+      // Push: notify business owner that quote was accepted
       try {
         const business = await db_getBusinessById(q.businessId);
         if (business?.userId) {
-          const tokens = await getPushTokensByUser(business.userId);
           const customer = q.customerId ? await getCustomerById(q.customerId) : null;
           const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : acceptedName.trim();
-          const total = updateData.total || q.total;
-          
-          for (const tokenRow of tokens) {
-            try {
-              await fetch("https://exp.host/--/api/v2/push/send", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  to: tokenRow.token,
-                  title: "Quote Accepted!",
-                  body: `${customerName} accepted your quote for $${Number(total).toFixed(2)}`,
-                  data: { type: "quote_accepted", quoteId: q.id },
-                  sound: "default",
-                  badge: 1,
-                }),
-              });
-            } catch (_pushErr) {}
-          }
+          sendPush(business.userId, {
+            title: "New job confirmed!",
+            body: `${customerName} accepted your quote. Tap to schedule the job.`,
+            data: { screen: "QuoteDetail", quoteId: q.id },
+            channel: "quotes",
+          }).catch(() => {});
         }
       } catch (_notifErr) {}
 

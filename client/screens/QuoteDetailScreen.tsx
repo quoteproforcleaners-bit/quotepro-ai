@@ -6,6 +6,8 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navig
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as StoreReview from "expo-store-review";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
@@ -324,6 +326,22 @@ export default function QuoteDetailScreen() {
       onSuccess: () => {
         if (newStatus === "accepted" && !linkedJob) {
           setTimeout(() => setShowScheduleJobModal(true), 500);
+        }
+        if (newStatus === "accepted") {
+          // App Store review: request once after first quote accepted
+          AsyncStorage.getItem("review_requested").then((val) => {
+            if (!val && Platform.OS !== "web") {
+              setTimeout(async () => {
+                try {
+                  const isAvailable = await StoreReview.isAvailableAsync();
+                  if (isAvailable) {
+                    await StoreReview.requestReview();
+                    await AsyncStorage.setItem("review_requested", "true");
+                  }
+                } catch {}
+              }, 2000);
+            }
+          }).catch(() => {});
         }
       },
     });

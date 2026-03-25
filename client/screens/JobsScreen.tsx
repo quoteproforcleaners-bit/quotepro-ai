@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
+import * as StoreReview from "expo-store-review";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -248,6 +250,28 @@ export default function JobsScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
       if (data.nextJob) {
         Alert.alert("Job Completed", data.message);
+      }
+      // App Store review: request once after 5th completed job
+      if (Platform.OS !== "web") {
+        AsyncStorage.getItem("review_requested").then((val) => {
+          if (!val) {
+            AsyncStorage.getItem("completed_jobs_count").then(async (countStr) => {
+              const count = parseInt(countStr || "0", 10) + 1;
+              await AsyncStorage.setItem("completed_jobs_count", String(count));
+              if (count >= 5) {
+                try {
+                  const isAvailable = await StoreReview.isAvailableAsync();
+                  if (isAvailable) {
+                    setTimeout(async () => {
+                      await StoreReview.requestReview();
+                      await AsyncStorage.setItem("review_requested", "true");
+                    }, 2000);
+                  }
+                } catch {}
+              }
+            }).catch(() => {});
+          }
+        }).catch(() => {});
       }
     },
   });

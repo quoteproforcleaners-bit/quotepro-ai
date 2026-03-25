@@ -292,13 +292,17 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (Platform.OS !== "ios") {
+      // Only iOS and Android support native RevenueCat SDK
+      if (Platform.OS !== "ios" && Platform.OS !== "android") {
         setTier(dbTier);
         setIsLoading(false);
         return;
       }
 
-      const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || RC_IOS_PUBLIC_KEY;
+      const apiKey =
+        Platform.OS === "android"
+          ? process.env.EXPO_PUBLIC_RC_ANDROID_KEY || ""
+          : (process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || RC_IOS_PUBLIC_KEY);
       if (!apiKey) {
         console.warn("[RC] No RevenueCat API key available");
         setTier(dbTier);

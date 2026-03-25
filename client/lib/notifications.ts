@@ -21,6 +21,45 @@ export function setupNotificationHandler() {
   }
 }
 
+/**
+ * Register Android notification channels.
+ * Must be called once on app launch before any notifications are scheduled.
+ * No-op on iOS and web.
+ */
+export async function setupAndroidNotificationChannels(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  try {
+    await Notifications.setNotificationChannelAsync("quotes", {
+      name: "Quote Updates",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      sound: "default",
+      description: "Alerts when quotes are viewed or accepted by customers",
+      enableVibrate: true,
+      showBadge: true,
+    });
+    await Notifications.setNotificationChannelAsync("jobs", {
+      name: "Job Alerts",
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: "default",
+      description: "Reminders for upcoming jobs and schedule changes",
+      enableVibrate: true,
+      showBadge: true,
+    });
+    await Notifications.setNotificationChannelAsync("growth", {
+      name: "Growth & Tips",
+      importance: Notifications.AndroidImportance.DEFAULT,
+      sound: null,
+      description: "Weekly recaps and growth coaching tips (silent)",
+      enableVibrate: false,
+      showBadge: false,
+    });
+    console.log("[notifications] Android channels registered");
+  } catch (e) {
+    console.warn("[notifications] Failed to setup Android channels:", e);
+  }
+}
+
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   try {
     if (Platform.OS === "web") return null;

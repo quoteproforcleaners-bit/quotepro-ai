@@ -952,8 +952,28 @@ const router = Router();
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget } = req.body;
-      const prefs = await upsertPreferences(business.id, { dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay, quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays, maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget });
+      const {
+        dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay,
+        quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays,
+        maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget,
+        pushPrefs,
+      } = req.body;
+
+      const prefs = await upsertPreferences(business.id, {
+        dailyPulseEnabled, dailyPulseTime, weeklyRecapEnabled, weeklyRecapDay,
+        quietHoursEnabled, quietHoursStart, quietHoursEnd, dormantThresholdDays,
+        maxFollowUpsPerDay, weeklyGoal, weeklyGoalTarget,
+        ...(pushPrefs !== undefined ? { pushPrefs } : {}),
+      });
+
+      // Also persist push_prefs via raw SQL so it's available to pushNotifications.ts
+      if (pushPrefs !== undefined) {
+        await pool.query(
+          `UPDATE user_preferences SET push_prefs = $1 WHERE business_id = $2`,
+          [JSON.stringify(pushPrefs), business.id]
+        );
+      }
+
       return res.json(prefs);
     } catch (error: any) {
       console.error("Update preferences error:", error);

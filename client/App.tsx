@@ -17,7 +17,7 @@ import { TutorialProvider } from "@/context/TutorialContext";
 import { TourOverlay } from "@/components/TourOverlay";
 import RootStackNavigator from "@/navigation/RootStackNavigator";
 import { ErrorBoundary, sendCrashReport } from "@/components/ErrorBoundary";
-import { setupNotificationHandler, registerForPushNotificationsAsync, savePushTokenToServer } from "@/lib/notifications";
+import { setupNotificationHandler, registerForPushNotificationsAsync, savePushTokenToServer, setupAndroidNotificationChannels } from "@/lib/notifications";
 import { useTheme } from "@/hooks/useTheme";
 
 function SafeKeyboardProvider({ children }: { children: React.ReactNode }) {
@@ -67,6 +67,9 @@ try {
 } catch (e) {
   console.warn("Notification handler setup failed:", e);
 }
+
+// Register Android notification channels (no-op on iOS/web)
+setupAndroidNotificationChannels().catch(() => {});
 
 function ThemedNavigation() {
   const { theme, isDark } = useTheme();

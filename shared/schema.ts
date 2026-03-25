@@ -628,6 +628,8 @@ export const userPreferences = pgTable("user_preferences", {
   weeklyGoalTarget: integer("weekly_goal_target"),
   celebratedMilestones: jsonb("celebrated_milestones").notNull().default(sql`'[]'::jsonb`),
   lastWeeklyDigestAt: timestamp("last_weekly_digest_at"),
+  // Push notification preferences per channel
+  pushPrefs: jsonb("push_prefs").default(sql`'{"quotes":true,"jobs":true,"growth":true}'::jsonb`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

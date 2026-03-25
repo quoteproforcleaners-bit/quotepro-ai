@@ -1,0 +1,37 @@
+{
+  "_comment": "PLACEHOLDER — Replace this file with your real google-services.json from the Firebase Console.",
+  "_instructions": [
+    "1. Go to https://console.firebase.google.com",
+    "2. Create a project (or select existing QuotePro project)",
+    "3. Add an Android app with package name: ai.getquotepro.app",
+    "4. Download google-services.json and replace this file",
+    "5. Run 'eas build --platform android' to build with FCM support"
+  ],
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "quotepro-placeholder",
+    "storage_bucket": "quotepro-placeholder.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+        "android_client_info": {
+          "package_name": "ai.getquotepro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "REPLACE_WITH_REAL_FIREBASE_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
