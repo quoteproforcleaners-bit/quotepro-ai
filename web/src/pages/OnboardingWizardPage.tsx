@@ -81,8 +81,14 @@ export default function OnboardingWizardPage() {
     }
   };
 
-  const handleAIIntroComplete = () => {
-    setShowAIIntro(false);
+  const handleAIIntroComplete = async () => {
+    // Ensure onboarding is saved before navigating — retry the flag write
+    // in case the original call in handleStep3Go failed silently.
+    await apiPost("/api/business", { onboardingComplete: true }).catch(() => {});
+    // Force-update local auth state so needsOnboarding is definitely false,
+    // even if the API call above failed or refresh returns stale data.
+    setBusiness(business ? { ...business, onboardingComplete: true } : business);
+    await refresh();
     navigate("/dashboard", { replace: true });
   };
 
