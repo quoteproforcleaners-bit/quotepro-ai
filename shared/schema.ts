@@ -8,6 +8,7 @@ import {
   jsonb,
   integer,
   real,
+  serial,
   index,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -1298,6 +1299,21 @@ export const cleanerScheduleNotifications = pgTable("cleaner_schedule_notificati
 });
 
 export type CleanerScheduleNotification = typeof cleanerScheduleNotifications.$inferSelect;
+
+// ─── AI Usage Logs ────────────────────────────────────────────────────────────
+
+export const aiUsageLogs = pgTable("ai_usage_logs", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id"),
+  route: text("route"),
+  tokensUsed: integer("tokens_used").notNull().default(0),
+  responseTimeMs: integer("response_time_ms").notNull().default(0),
+  success: boolean("success").notNull().default(true),
+  errorCode: text("error_code"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type AIUsageLog = typeof aiUsageLogs.$inferSelect;
 
 // ─── Backward-compatibility aliases (used by auto-generated router imports) ───
 export const photos = jobPhotos;

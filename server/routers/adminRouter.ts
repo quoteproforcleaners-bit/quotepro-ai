@@ -170,4 +170,63 @@ const router = Router();
     }
   });
 
+  router.get("/api/admin/ai-usage", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const [totals, daily, byRoute, errors] = await Promise.all([
+        pool.query(`
+          SELECT
+            COUNT(*) AS total_calls,
+            COUNT(*) FILTER (WHERE success = TRUE)  AS successful_calls,
+            COUNT(*) FILTER (WHERE success = FALSE) AS failed_calls,
+            ROUND(AVG(response_time_ms)) AS avg_latency_ms,
+            ROUND(AVG(response_time_ms) FILTER (WHERE success = TRUE)) AS avg_latency_success_ms,
+            SUM(tokens_used) AS total_tokens,
+            ROUND(100.0 * COUNT(*) FILTER (WHERE success = FALSE) / NULLIF(COUNT(*), 0), 1) AS error_rate_pct
+          FROM ai_usage_logs
+          WHERE created_at >= NOW() - INTERVAL '30 days'
+        `),
+        pool.query(`
+          SELECT
+            DATE(created_at) AS day,
+            COUNT(*) AS calls,
+            COUNT(*) FILTER (WHERE success = FALSE) AS errors,
+            SUM(tokens_used) AS tokens
+          FROM ai_usage_logs
+          WHERE created_at >= NOW() - INTERVAL '14 days'
+          GROUP BY DATE(created_at)
+          ORDER BY day DESC
+        `),
+        pool.query(`
+          SELECT
+            route,
+            COUNT(*) AS calls,
+            COUNT(*) FILTER (WHERE success = FALSE) AS errors,
+            ROUND(AVG(response_time_ms)) AS avg_latency_ms,
+            SUM(tokens_used) AS tokens
+          FROM ai_usage_logs
+          WHERE created_at >= NOW() - INTERVAL '30 days'
+          GROUP BY route
+          ORDER BY calls DESC
+        `),
+        pool.query(`
+          SELECT error_code, COUNT(*) AS count
+          FROM ai_usage_logs
+          WHERE success = FALSE AND created_at >= NOW() - INTERVAL '30 days'
+          GROUP BY error_code
+          ORDER BY count DESC
+        `),
+      ]);
+
+      return res.json({
+        totals: totals.rows[0],
+        daily: daily.rows,
+        byRoute: byRoute.rows,
+        topErrors: errors.rows,
+      });
+    } catch (err: any) {
+      console.error("GET /api/admin/ai-usage error:", err.message);
+      return res.status(500).json({ message: "Failed to fetch AI usage metrics" });
+    }
+  });
+
 export default router;

@@ -7,6 +7,7 @@ import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { callAI, AIError } from "../aiClient";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -644,13 +645,18 @@ SALES & MARKETING:
       }
       chatMessages.push({ role: "user", content: message });
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: chatMessages,
-        max_completion_tokens: 900,
-      });
-
-      const reply = completion.choices[0]?.message?.content?.trim() || "I'm having trouble generating a response right now. Please try again.";
+      let reply: string;
+      try {
+        const { content } = await callAI(chatMessages, {
+          maxTokens: 900,
+          userId: req.session.userId,
+          route: "agent-chat",
+        });
+        reply = content || "I'm having trouble generating a response right now. Please try again.";
+      } catch (aiErr: any) {
+        console.error("AI agent chat error:", aiErr?.message || aiErr);
+        reply = "I'm temporarily unavailable. Please try again in a moment.";
+      }
       return res.json({ reply, mode });
 
     } catch (error: any) {
@@ -1059,22 +1065,26 @@ Field rules:
 - confidence: high = most key fields filled, medium = some gaps, low = very sparse.
 - NEVER include prices, costs, rates, or dollar amounts.`;
 
-      let completion;
+      let aiContent: string;
       try {
-        completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
+        const { content: raw } = await callAI(
+          [
             { role: "system", content: systemPrompt },
             { role: "user", content: description },
           ],
-          response_format: { type: "json_object" },
-        });
+          {
+            responseFormat: "json_object",
+            userId: req.session.userId,
+            route: "walkthrough-extract",
+          }
+        );
+        aiContent = raw;
       } catch (aiError: any) {
         console.error("Walkthrough AI call failed:", aiError?.message || aiError);
-        return res.status(500).json({ message: "AI service is temporarily unavailable. Please try again in a moment." });
+        return res.status(503).json({ message: "AI service is temporarily unavailable. Please try again in a moment." });
       }
 
-      const content = completion.choices[0]?.message?.content;
+      const content = aiContent;
       if (!content) {
         console.error("Walkthrough AI empty response");
         return res.status(500).json({ message: "AI returned an empty response. Please try again." });
@@ -1381,16 +1391,20 @@ Return exactly this JSON structure:
       const campaignLangInstruction = getLangInstruction((business as any).commLanguage);
       const systemPrompt = `Write a short marketing email for "${businessName}" (${ownerName}) to ${targetDesc}. Theme: "${campaignName}".${customInstruction} Rules: first line "Subject: ..." then blank line then body under 60 words in 3 short paragraphs. Use [Customer] as name. Sign off as ${signOff}. No links, no emojis. End with "Reply to book".${campaignLangInstruction}`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: "Write the email." },
-        ],
-      });
+      let raw = "";
+      try {
+        const { content: aiRaw } = await callAI(
+          [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: "Write the email." },
+          ],
+          { userId: req.session.userId, route: "generate-campaign-content" }
+        );
+        raw = aiRaw;
+      } catch (aiErr: any) {
+        console.error("AI campaign content error:", aiErr?.message || aiErr);
+      }
 
-      const raw = completion.choices[0]?.message?.content?.trim() || "";
-      
       if (!raw) {
         const fallback = instantTemplates[campaignName] || { content: `Hi [Customer],\n\nWe wanted to reach out from ${businessName} about our ${campaignName} offer.\n\nWe'd love to serve you${segment === "dormant" ? " again" : ""}. Reply to schedule your next cleaning.\n\nBest regards,\n${signOff}`, subject: campaignName };
         return res.json({ content: fallback.content, subject: fallback.subject, channel: "email" });
@@ -1429,16 +1443,21 @@ Return exactly this JSON structure:
       const reviewLangInstruction = getLangInstruction((business as any).commLanguage);
       const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. ${linkInstruction} No emojis. Keep it personal and genuine.${reviewLangInstruction}`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: "Generate a review request email." },
-        ],
-        max_completion_tokens: 250,
-      });
+      let rawReview = "";
+      try {
+        const { content: aiRaw } = await callAI(
+          [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: "Generate a review request email." },
+          ],
+          { maxTokens: 250, userId: req.session.userId, route: "generate-review-email" }
+        );
+        rawReview = aiRaw;
+      } catch (aiErr: any) {
+        console.error("AI generate review email error:", aiErr?.message || aiErr);
+      }
 
-      const raw = completion.choices[0]?.message?.content?.trim() || "";
+      const raw = rawReview;
       let subject = "";
       let content = raw;
       if (raw.startsWith("Subject:")) {
@@ -1499,16 +1518,25 @@ Return exactly this JSON structure:
         userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
       }
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_completion_tokens: msgType === "sms" ? 100 : 250,
-      });
+      let draft = "";
+      try {
+        const { content: aiDraft } = await callAI(
+          [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          {
+            maxTokens: msgType === "sms" ? 100 : 250,
+            userId: req.session.userId,
+            route: "generate-message",
+          }
+        );
+        draft = aiDraft;
+      } catch (aiErr: any) {
+        console.error("AI generate message error:", aiErr?.message || aiErr);
+        return res.status(503).json({ message: "AI is temporarily unavailable. Please try again." });
+      }
 
-      let draft = completion.choices[0]?.message?.content?.trim() || "";
       if (draft.startsWith('"') && draft.endsWith('"')) draft = draft.slice(1, -1);
       if (draft.startsWith('{')) { try { const p = JSON.parse(draft); draft = p.draft || p.message || draft; } catch {} }
       draft = draft.replace(/\\n/g, '\n');
@@ -1517,6 +1545,57 @@ Return exactly this JSON structure:
     } catch (error: any) {
       console.error("AI generate message error:", error);
       return res.status(500).json({ message: "Failed to generate message" });
+    }
+  });
+
+  router.post("/api/lead-finder/leads/:id/generate-replies", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const leadRows = await pool.query("SELECT * FROM social_leads WHERE id = $1 AND business_id = $2 LIMIT 1", [id, business.id]);
+      const lead = leadRows.rows[0];
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+      const businessName = business.companyName || "our cleaning company";
+      const ownerName = business.senderName || businessName;
+      const platform = lead.platform || "social media";
+      const postText = lead.post_text || lead.postText || "";
+      const leadName = lead.name || "the potential client";
+
+      const systemPrompt = `You are a sales assistant for "${businessName}", a residential cleaning company. Generate 3 concise reply messages to a potential client on ${platform}. The replies should be friendly, professional, and designed to convert a lead into a booked cleaning appointment. Each reply must be under 60 words. Vary the tone: one direct/confident, one warm/conversational, one question-focused. Return a JSON object: { "replies": ["reply1", "reply2", "reply3"] }. No emojis.`;
+      const userPrompt = `Lead name: ${leadName}. Their post/comment: "${postText || "Inquiry about cleaning services"}". Generate 3 reply options as JSON.`;
+
+      let replies: string[] = [];
+      try {
+        const { content } = await callAI(
+          [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          { responseFormat: "json_object", maxTokens: 400, userId: req.session.userId, route: "generate-replies" }
+        );
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed.replies)) {
+          replies = parsed.replies.filter((r: any) => typeof r === "string").slice(0, 3);
+        }
+      } catch (aiErr: any) {
+        console.error("AI generate replies error:", aiErr?.message || aiErr);
+      }
+
+      if (replies.length === 0) {
+        replies = [
+          `Hi ${leadName}, thanks for reaching out! We'd love to help with your cleaning needs. When would be a good time for a quick chat about what you're looking for?`,
+          `Hello! ${businessName} here. We specialize in residential cleaning and would be happy to give you a quote. What area are you located in?`,
+          `Thanks for your interest! We're currently taking new clients. Could you tell me a bit more about the space you need cleaned so we can get you the best rate?`,
+        ];
+      }
+
+      return res.json({ replies });
+    } catch (error: any) {
+      console.error("Generate replies error:", error?.message || error);
+      return res.status(500).json({ message: "Failed to generate replies" });
     }
   });
 

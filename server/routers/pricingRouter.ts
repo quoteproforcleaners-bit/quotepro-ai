@@ -7,6 +7,7 @@ import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { callAI } from "../aiClient";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -312,16 +313,18 @@ Focus on real patterns in the data. Flag jobs that appear underpriced relative t
       let parsedOutput: any = {};
 
       try {
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
+        const { content: aiContent } = await callAI(
+          [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          response_format: { type: "json_object" },
-          temperature: 0.3,
-        });
-        rawOutput = completion.choices[0]?.message?.content || "{}";
+          {
+            responseFormat: "json_object",
+            userId: (req as any).session?.userId,
+            route: "pricing-analyze",
+          }
+        );
+        rawOutput = aiContent || "{}";
         parsedOutput = JSON.parse(rawOutput);
       } catch (aiErr: any) {
         console.error("AI analysis error:", aiErr.message);

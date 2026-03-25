@@ -7,6 +7,7 @@ import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { callAI } from "../aiClient";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -420,15 +421,21 @@ Rules:
 - Total MUST be between $${computedMin} and $${computedMax} — do NOT go outside this range
 - Never output markdown, only pure JSON`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-      });
-
       let aiData: any = {};
-      try { aiData = JSON.parse(completion.choices[0].message.content || "{}"); } catch {}
+      try {
+        const { content: aiContent } = await callAI(
+          [{ role: "user", content: prompt }],
+          {
+            responseFormat: "json_object",
+            userId: req.session.userId,
+            route: "ai-quote",
+          }
+        );
+        aiData = JSON.parse(aiContent || "{}");
+      } catch (aiErr: any) {
+        console.error("[ai-quote] AI call failed:", aiErr?.message || aiErr);
+        return res.status(503).json({ message: "AI service is temporarily unavailable. Please try again." });
+      }
 
       const lineItems = Array.isArray(aiData.lineItems) ? aiData.lineItems : [];
       const lineItemsTotal = lineItems.reduce((s: number, li: any) => s + (Number(li.subtotal) || Number(li.unitPrice) || 0), 0);

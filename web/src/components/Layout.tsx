@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { AIToastProvider } from "../lib/aiToast";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -507,6 +508,7 @@ export function Layout() {
     (location.pathname.startsWith("/quotes/") ? "Quote" : "QuotePro");
 
   return (
+    <AIToastProvider>
     <div className="min-h-screen flex bg-[#F5F4F1] dark:bg-[#0A0A0F]">
       {/* Mobile overlay */}
       {sidebarOpen ? (
@@ -783,5 +785,6 @@ export function Layout() {
       {/* AI chat bubble — hidden on the full AI assistant page */}
       {location.pathname !== "/ai-assistant" && <AIChatBubble />}
     </div>
+    </AIToastProvider>
   );
 }
