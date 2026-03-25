@@ -467,6 +467,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── Soft-Delete Recovery Endpoints ──────────────────────────────────────────
+
+  // GET /api/admin/deleted-records — lists soft-deleted customers and quotes
+  // owned by the authenticated user's business, from the last 30 days.
+  app.get("/api/admin/deleted-records", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const since = new Date();
+      since.setDate(since.getDate() - 30);
+
+      const [deletedCustomers, deletedQuotes] = await Promise.all([
+        pool.query(
+          `SELECT id, first_name, last_name, email, phone, deleted_at, created_at
+           FROM customers
+           WHERE business_id = $1
+             AND deleted_at IS NOT NULL
+             AND deleted_at >= $2
+           ORDER BY deleted_at DESC`,
+          [business.id, since]
+        ),
+        pool.query(
+          `SELECT id, total, status, deleted_at, created_at, customer_id, public_token
+           FROM quotes
+           WHERE business_id = $1
+             AND deleted_at IS NOT NULL
+             AND deleted_at >= $2
+           ORDER BY deleted_at DESC`,
+          [business.id, since]
+        ),
+      ]);
+
+      return res.json({
+        customers: deletedCustomers.rows,
+        quotes: deletedQuotes.rows,
+      });
+    } catch (err: any) {
+      console.error("GET /api/admin/deleted-records error:", err.message);
+      return res.status(500).json({ message: "Failed to retrieve deleted records" });
+    }
+  });
+
+  // POST /api/admin/restore/:type/:id — restores a soft-deleted record by
+  // setting deleted_at back to NULL.  type must be "customer" or "quote".
+  app.post("/api/admin/restore/:type/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { type, id } = req.params;
+      if (type !== "customer" && type !== "quote") {
+        return res.status(400).json({ message: "type must be 'customer' or 'quote'" });
+      }
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const table = type === "customer" ? "customers" : "quotes";
+      const result = await pool.query(
+        `UPDATE ${table}
+         SET deleted_at = NULL
+         WHERE id = $1
+           AND business_id = $2
+           AND deleted_at IS NOT NULL
+         RETURNING id`,
+        [id, business.id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: `${type} not found, already restored, or not owned by your business`,
+        });
+      }
+
+      return res.json({ restored: true, id: result.rows[0].id, type });
+    } catch (err: any) {
+      console.error("POST /api/admin/restore error:", err.message);
+      return res.status(500).json({ message: "Failed to restore record" });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+
   app.post("/api/auth/register", authLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password, name } = req.body;

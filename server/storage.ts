@@ -1,4 +1,5 @@
 import { eq, and, desc, asc, gte, lte, ilike, or, sql, isNotNull, isNull, lt, inArray } from "drizzle-orm";
+import { QuoteOptionsSchema, QuoteAddOnsSchema, PricingSettingsSchema, parseJsonbField, AppError } from "./schemas";
 import { db, pool } from "./db";
 import {
   users,
@@ -197,6 +198,9 @@ export async function getPricingByBusiness(
     .select()
     .from(pricingSettings)
     .where(eq(pricingSettings.businessId, businessId));
+  if (row) {
+    parseJsonbField(PricingSettingsSchema, row.settings, "settings", row.id);
+  }
   return row;
 }
 
@@ -226,10 +230,11 @@ export async function getCustomersByBusiness(
   businessId: string,
   opts?: { search?: string; status?: string }
 ): Promise<Customer[]> {
-  let query = db.select().from(customers).where(eq(customers.businessId, businessId));
+  const baseWhere = and(eq(customers.businessId, businessId), isNull(customers.deletedAt));
+  let query = db.select().from(customers).where(baseWhere);
 
   if (opts?.status) {
-    query = query.where(and(eq(customers.businessId, businessId), eq(customers.status, opts.status))) as any;
+    query = query.where(and(eq(customers.businessId, businessId), isNull(customers.deletedAt), eq(customers.status, opts.status))) as any;
   }
 
   if (opts?.search) {
@@ -237,6 +242,7 @@ export async function getCustomersByBusiness(
     query = db.select().from(customers).where(
       and(
         eq(customers.businessId, businessId),
+        isNull(customers.deletedAt),
         or(
           ilike(customers.firstName, s),
           ilike(customers.lastName, s),
@@ -251,9 +257,8 @@ export async function getCustomersByBusiness(
 }
 
 export async function getCustomerById(id: string): Promise<Customer | undefined> {
-  const [c] = await db.select().from(customers).where(eq(customers.id, id));
-  return c;
-}
+  const [c] = await db.select().from(customers).where(and(eq(customers.id, id), isNull(customers.deletedAt)));
+  return c;}
 
 export async function createCustomer(data: {
   businessId: string;
@@ -311,22 +316,13 @@ export async function updateCustomer(
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
-  const customerQuotes = await db.select({ id: quotes.id }).from(quotes).where(eq(quotes.customerId, id));
-  for (const q of customerQuotes) {
-    await db.delete(quoteLineItems).where(eq(quoteLineItems.quoteId, q.id));
-  }
-  await db.delete(quotes).where(eq(quotes.customerId, id));
-
-  const customerJobs = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.customerId, id));
-  for (const j of customerJobs) {
-    await db.delete(jobChecklistItems).where(eq(jobChecklistItems.jobId, j.id));
-    await db.delete(jobPhotos).where(eq(jobPhotos.jobId, j.id));
-  }
-  await db.delete(jobs).where(eq(jobs.customerId, id));
-
-  await db.delete(communications).where(eq(communications.customerId, id));
-  await db.delete(tasks).where(eq(tasks.customerId, id));
-  await db.delete(customers).where(eq(customers.id, id));
+  const now = new Date();
+  // Soft-delete the customer's quotes so they disappear from all lists
+  await db.update(quotes).set({ deletedAt: now }).where(
+    and(eq(quotes.customerId, id), isNull(quotes.deletedAt))
+  );
+  // Soft-delete the customer record
+  await db.update(customers).set({ deletedAt: now }).where(eq(customers.id, id));
 }
 
 // ─── Quotes ───
@@ -335,7 +331,7 @@ export async function getQuotesByBusiness(
   businessId: string,
   opts?: { status?: string; customerId?: string }
 ): Promise<QuoteRow[]> {
-  const conditions = [eq(quotes.businessId, businessId)];
+  const conditions = [eq(quotes.businessId, businessId), isNull(quotes.deletedAt)];
   if (opts?.status) conditions.push(eq(quotes.status, opts.status));
   if (opts?.customerId) conditions.push(eq(quotes.customerId, opts.customerId));
 
@@ -347,12 +343,20 @@ export async function getQuotesByBusiness(
 }
 
 export async function getQuoteById(id: string): Promise<QuoteRow | undefined> {
-  const [q] = await db.select().from(quotes).where(eq(quotes.id, id));
+  const [q] = await db.select().from(quotes).where(and(eq(quotes.id, id), isNull(quotes.deletedAt)));
+  if (!q) return undefined;
+  parseJsonbField(QuoteOptionsSchema, q.options, "options", q.id);
+  parseJsonbField(QuoteAddOnsSchema, q.addOns, "addOns", q.id);
   return q;
 }
 
 export async function getQuoteByToken(token: string): Promise<QuoteRow | undefined> {
+  // Token-based lookup is used by the customer-facing quote page — allow access even if soft-deleted
+  // (so customers can still view a quote they received, but it won't appear in business lists)
   const [q] = await db.select().from(quotes).where(eq(quotes.publicToken, token));
+  if (!q) return undefined;
+  parseJsonbField(QuoteOptionsSchema, q.options, "options", q.id);
+  parseJsonbField(QuoteAddOnsSchema, q.addOns, "addOns", q.id);
   return q;
 }
 
@@ -449,7 +453,7 @@ export async function updateQuote(
 }
 
 export async function deleteQuote(id: string): Promise<void> {
-  await db.delete(quotes).where(eq(quotes.id, id));
+  await db.update(quotes).set({ deletedAt: new Date() }).where(eq(quotes.id, id));
 }
 
 // ─── Quote Line Items ───
@@ -1148,7 +1152,7 @@ export async function getQuoteStats(businessId: string): Promise<{
   const allQuotes = await db
     .select()
     .from(quotes)
-    .where(eq(quotes.businessId, businessId));
+    .where(and(eq(quotes.businessId, businessId), isNull(quotes.deletedAt)));
 
   const sent = allQuotes.filter((q) => q.status === "sent").length;
   const accepted = allQuotes.filter((q) => q.status === "accepted").length;
@@ -1188,6 +1192,7 @@ export async function getRevenueByPeriod(
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         eq(quotes.status, "accepted"),
         gte(quotes.acceptedAt, since)
       )
@@ -1260,6 +1265,7 @@ export async function getUnfollowedQuotes(businessId: string): Promise<QuoteRow[
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         eq(quotes.status, "sent")
       )
     )
@@ -1539,6 +1545,7 @@ export async function getFollowUpQueueQuotes(businessId: string): Promise<any[]>
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         eq(quotes.status, "sent"),
         lte(quotes.sentAt, twentyFourHoursAgo)
       )
@@ -1612,6 +1619,7 @@ export async function getWeeklyRecapStats(
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         gte(quotes.createdAt, weekStart),
         lte(quotes.createdAt, weekEnd)
       )
@@ -1625,6 +1633,7 @@ export async function getWeeklyRecapStats(
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         eq(quotes.status, "accepted"),
         gte(quotes.acceptedAt, weekStart),
         lte(quotes.acceptedAt, weekEnd)
@@ -1637,6 +1646,7 @@ export async function getWeeklyRecapStats(
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         eq(quotes.status, "declined"),
         gte(quotes.declinedAt, weekStart),
         lte(quotes.declinedAt, weekEnd)
@@ -1649,6 +1659,7 @@ export async function getWeeklyRecapStats(
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         eq(quotes.status, "expired"),
         gte(quotes.updatedAt, weekStart),
         lte(quotes.updatedAt, weekEnd)
@@ -1670,6 +1681,7 @@ export async function getWeeklyRecapStats(
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         eq(quotes.status, "sent")
       )
     )
@@ -1702,7 +1714,7 @@ export async function getDormantCustomers(
   const allCustomers = await db
     .select()
     .from(customers)
-    .where(eq(customers.businessId, businessId));
+    .where(and(eq(customers.businessId, businessId), isNull(customers.deletedAt)));
 
   const results: any[] = [];
 
@@ -1765,6 +1777,7 @@ export async function getLostQuotes(
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         or(
           eq(quotes.status, "expired"),
           eq(quotes.status, "declined")
@@ -2183,7 +2196,7 @@ export async function getUpsellOpportunities(businessId: string): Promise<any[]>
   const allCustomers = await db
     .select()
     .from(customers)
-    .where(eq(customers.businessId, businessId));
+    .where(and(eq(customers.businessId, businessId), isNull(customers.deletedAt)));
 
   const results: any[] = [];
 
@@ -2236,7 +2249,7 @@ export async function getAutoRebookCandidates(
   const allCustomers = await db
     .select()
     .from(customers)
-    .where(eq(customers.businessId, businessId));
+    .where(and(eq(customers.businessId, businessId), isNull(customers.deletedAt)));
 
   const results: any[] = [];
 
@@ -2299,6 +2312,7 @@ export async function getForecastData(businessId: string): Promise<{
     .where(
       and(
         eq(quotes.businessId, businessId),
+        isNull(quotes.deletedAt),
         eq(quotes.status, "sent")
       )
     );
@@ -2308,7 +2322,7 @@ export async function getForecastData(businessId: string): Promise<{
   const allQuotes = await db
     .select()
     .from(quotes)
-    .where(eq(quotes.businessId, businessId));
+    .where(and(eq(quotes.businessId, businessId), isNull(quotes.deletedAt)));
 
   const accepted = allQuotes.filter(q => q.status === "accepted").length;
   const closeRate = allQuotes.length > 0 ? (accepted / allQuotes.length) * 100 : 0;
@@ -2519,6 +2533,7 @@ export async function getStaleQuotesForNudge(hoursOld: number = 48): Promise<any
     .where(
       and(
         eq(quotes.status, "sent"),
+        isNull(quotes.deletedAt),
         lt(quotes.sentAt, cutoff),
         isNull(quotes.nudgeSentAt)
       )
@@ -2563,7 +2578,7 @@ export async function getWeeklyQuoteStats(businessId: string): Promise<{
   const allQuotes = await db
     .select()
     .from(quotes)
-    .where(and(eq(quotes.businessId, businessId), gte(quotes.createdAt, since)));
+    .where(and(eq(quotes.businessId, businessId), isNull(quotes.deletedAt), gte(quotes.createdAt, since)));
 
   const sentCount = allQuotes.filter((q) => ["sent", "accepted", "declined"].includes(q.status)).length;
   const acceptedCount = allQuotes.filter((q) => q.status === "accepted").length;
@@ -2572,7 +2587,7 @@ export async function getWeeklyQuoteStats(businessId: string): Promise<{
   const pendingAll = await db
     .select()
     .from(quotes)
-    .where(and(eq(quotes.businessId, businessId), eq(quotes.status, "sent")))
+    .where(and(eq(quotes.businessId, businessId), isNull(quotes.deletedAt), eq(quotes.status, "sent")))
     .orderBy(asc(quotes.sentAt))
     .limit(5);
 

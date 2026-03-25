@@ -385,6 +385,36 @@ async function seedDemoUser() {
 
   await seedDemoUser();
 
+  // ─── Nightly auto-purge: hard-delete records soft-deleted more than 30 days ago ──
+  async function purgeSoftDeleted() {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    try {
+      const [custResult, quoteResult] = await Promise.all([
+        pool.query(
+          `DELETE FROM customers WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+          [cutoff]
+        ),
+        pool.query(
+          `DELETE FROM quotes WHERE deleted_at IS NOT NULL AND deleted_at < $1`,
+          [cutoff]
+        ),
+      ]);
+      const customersPurged = custResult.rowCount ?? 0;
+      const quotesPurged = quoteResult.rowCount ?? 0;
+      if (customersPurged > 0 || quotesPurged > 0) {
+        log(`[purge] Nightly purge: ${customersPurged} customers, ${quotesPurged} quotes permanently deleted`);
+      }
+    } catch (e: any) {
+      console.error("[purge] Nightly purge failed:", e.message);
+    }
+  }
+
+  // Run once at startup (catches any overdue records), then every 24 hours
+  purgeSoftDeleted();
+  setInterval(purgeSoftDeleted, 24 * 60 * 60 * 1000);
+  // ─────────────────────────────────────────────────────────────────────────────
+
   const port = parseInt(process.env.PORT || "5000", 10);
   server.listen(
     {
