@@ -26,6 +26,7 @@ export const users = pgTable("users", {
   subscriptionInterval: text("subscription_interval").default("monthly"),
   subscriptionExpiresAt: timestamp("subscription_expires_at"),
   stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
   quotesThisMonth: integer("quotes_this_month").default(0),
   quotesMonthResetAt: timestamp("quotes_month_reset_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

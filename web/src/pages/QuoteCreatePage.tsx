@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../lib/auth";
+import { useSubscription } from "../lib/subscription";
 import { buildAddress } from "../lib/address";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiPost, apiRequest } from "../lib/api";
@@ -125,7 +127,10 @@ function StepperButton({
 export default function QuoteCreatePage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const { quotesPerMonth, startCheckout } = useSubscription();
   const [step, setStep] = useState(0);
+  const [dismissedNudge, setDismissedNudge] = useState(false);
   const [intakeId, setIntakeId] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState("");
   const [newCustomer, setNewCustomer] = useState(false);
@@ -433,11 +438,51 @@ export default function QuoteCreatePage() {
     createQuoteMutation.mutate(quoteData);
   };
 
+  const quotaUsed = (user as any)?.quotesThisMonth ?? 0;
+  const isQuotaCapped = quotesPerMonth !== Infinity;
+  const quotaPct = isQuotaCapped ? quotaUsed / quotesPerMonth : 0;
+  const showQuotaNudge = !dismissedNudge && isQuotaCapped && quotaPct >= 0.8;
+
   return (
     <div className="flex gap-6 items-start">
       {/* ─── Left: form ─────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0">
       <PageHeader title="New Quote" backTo="/quotes" />
+
+      {showQuotaNudge && (
+        <div className="mb-5 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <div className="w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-900">
+              {quotaUsed >= quotesPerMonth
+                ? `You've used all ${quotesPerMonth} quotes this month`
+                : `${quotaUsed} of ${quotesPerMonth} quotes used this month`}
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Upgrade to Growth for unlimited quotes and AI tools.{" "}
+              <button
+                onClick={() => startCheckout("growth", "monthly")}
+                className="underline font-semibold hover:text-amber-900"
+              >
+                Upgrade now
+              </button>
+            </p>
+          </div>
+          <button
+            onClick={() => setDismissedNudge(true)}
+            className="text-amber-400 hover:text-amber-600 shrink-0 ml-1"
+            aria-label="Dismiss"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-0 mb-8">
         {steps.map((s, i) => (

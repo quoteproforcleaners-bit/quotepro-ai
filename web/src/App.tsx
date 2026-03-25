@@ -14,6 +14,8 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import PaywallPage from "./pages/PaywallPage";
 import PricingPage from "./pages/PricingPage";
+import PricingSuccessPage from "./pages/PricingSuccessPage";
+import PricingCancelPage from "./pages/PricingCancelPage";
 import DashboardPage from "./pages/DashboardPage";
 import QuotesListPage from "./pages/QuotesListPage";
 import QuoteDetailPage from "./pages/QuoteDetailPage";
@@ -107,6 +109,10 @@ export default function App() {
         />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/upgrade" element={<Navigate to="/pricing" replace />} />
+        <Route path="/pricing/success" element={
+          isAuthenticated ? <PricingSuccessPage /> : <Navigate to="/login" replace />
+        } />
+        <Route path="/pricing/cancel" element={<PricingCancelPage />} />
         <Route path="/subscription/success" element={
           isAuthenticated ? <PaywallPage /> : <Navigate to="/login" replace />
         } />

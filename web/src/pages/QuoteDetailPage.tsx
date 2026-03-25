@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "../lib/queryClient";
 import { apiPut, apiDelete, apiPost, apiGet } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useSubscription } from "../lib/subscription";
 import SendQuoteModal from "../components/SendQuoteModal";
 import EditQuoteModal from "../components/EditQuoteModal";
 import DispatchCard from "../components/DispatchCard";
@@ -68,6 +69,7 @@ export default function QuoteDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { business } = useAuth();
+  const { isFree, isStarter, startCheckout } = useSubscription();
   const [copied, setCopied] = useState(false);
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -1609,6 +1611,23 @@ export default function QuoteDetailPage() {
               {quoteUrl}
             </p>
           </Card>
+
+          {quote.status === "accepted" && (isFree || isStarter) ? (
+            <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+              <p className="text-sm font-semibold text-blue-900 mb-1">
+                Quote accepted — keep the momentum
+              </p>
+              <p className="text-xs text-blue-700 mb-3 leading-relaxed">
+                Upgrade to Growth for automated follow-ups, unlimited quotes, and AI tools that turn wins into repeat business.
+              </p>
+              <button
+                onClick={() => startCheckout("growth", "monthly")}
+                className="w-full h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors"
+              >
+                Upgrade to Growth
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 

@@ -537,22 +537,34 @@ const router = Router();
       const host = req.get("host")!;
       const protocol = host.includes("localhost") ? "http" : "https";
 
+      // Support pre-configured Stripe Price IDs via env vars
+      const PRICE_ID_MAP: Record<string, Record<string, string | undefined>> = {
+        starter: { monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY, annual: process.env.STRIPE_PRICE_STARTER_ANNUAL },
+        growth: { monthly: process.env.STRIPE_PRICE_GROWTH_MONTHLY, annual: process.env.STRIPE_PRICE_GROWTH_ANNUAL },
+        pro: { monthly: process.env.STRIPE_PRICE_PRO_MONTHLY, annual: process.env.STRIPE_PRICE_PRO_ANNUAL },
+      };
+      const priceId = PRICE_ID_MAP[plan]?.[interval];
+
+      const lineItems: Stripe.Checkout.SessionCreateParams["line_items"] = priceId
+        ? [{ price: priceId, quantity: 1 }]
+        : [
+            {
+              price_data: {
+                currency: "usd",
+                product_data: { name: config.name, description: config.desc },
+                recurring: { interval: recurringInterval },
+                unit_amount: unitAmount,
+              },
+              quantity: 1,
+            },
+          ];
+
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         customer: stripeCustomerId,
         mode: "subscription",
-        line_items: [
-          {
-            price_data: {
-              currency: "usd",
-              product_data: { name: config.name, description: config.desc },
-              recurring: { interval: recurringInterval },
-              unit_amount: unitAmount,
-            },
-            quantity: 1,
-          },
-        ],
-        success_url: `${protocol}://${host}/app/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${protocol}://${host}/app/pricing`,
+        line_items: lineItems,
+        success_url: `${protocol}://${host}/app/pricing/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${protocol}://${host}/app/pricing/cancel`,
         subscription_data: {
           metadata: { userId: String(user.id), plan, interval },
           ...(config.trialDays > 0 ? { trial_period_days: config.trialDays } : {}),
@@ -635,7 +647,14 @@ const router = Router();
           if (userId && session.mode === "subscription") {
             const planMeta = session.subscription_data?.metadata?.plan || session.metadata?.plan || "growth";
             const intervalMeta = session.subscription_data?.metadata?.interval || session.metadata?.interval || "monthly";
-            await updateUser(userId, { subscriptionTier: planMeta, subscriptionInterval: intervalMeta, subscriptionExpiresAt: null } as any);
+            const updateData: Record<string, any> = {
+              subscriptionTier: planMeta,
+              subscriptionInterval: intervalMeta,
+              subscriptionExpiresAt: null,
+            };
+            if (session.customer) updateData.stripeCustomerId = session.customer as string;
+            if (session.subscription) updateData.stripeSubscriptionId = session.subscription as string;
+            await updateUser(userId, updateData as any);
             console.log(`Subscription activated for user ${userId} on plan ${planMeta}`);
           }
           break;
@@ -650,8 +669,44 @@ const router = Router();
             await updateUser(userId, {
               subscriptionTier: isActive ? planFromMeta : "free",
               subscriptionExpiresAt: isActive ? null : new Date(),
-            });
+              stripeSubscriptionId: subscription.id,
+            } as any);
             console.log(`Subscription ${isActive ? "active (" + planFromMeta + ")" : "cancelled"} for user ${userId}`);
+          }
+          break;
+        }
+        case "invoice.payment_failed": {
+          const invoice = event.data.object as any;
+          const stripeCustomerId = invoice.customer as string;
+          if (stripeCustomerId) {
+            try {
+              const userResult = await pool.query(
+                "SELECT id, email, name FROM users WHERE stripe_customer_id = $1 LIMIT 1",
+                [stripeCustomerId]
+              );
+              if (userResult.rows.length > 0) {
+                const failedUser = userResult.rows[0];
+                const { sendEmail, getBusinessSendParams } = await import("../mail");
+                const business = await getBusinessByOwner(failedUser.id);
+                const sendParams = business ? getBusinessSendParams(business) : null;
+                await sendEmail({
+                  to: failedUser.email,
+                  from: sendParams?.from,
+                  subject: "Action needed: Payment issue with your QuotePro subscription",
+                  html: `<div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+<h2 style="color:#0f172a">Payment failed</h2>
+<p>Hi ${failedUser.name || "there"},</p>
+<p>We had trouble processing your most recent QuotePro payment. To keep your account active, please update your payment method.</p>
+<p><a href="${process.env.EXPO_PUBLIC_DOMAIN || "https://quotepro.ai"}/app/settings" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">Update payment method</a></p>
+<p style="color:#64748b;font-size:0.875rem">If you believe this is an error, reply to this email and we'll help you right away.</p>
+</div>`,
+                  text: `Hi ${failedUser.name || "there"}, your recent QuotePro payment failed. Please update your payment method at: ${process.env.EXPO_PUBLIC_DOMAIN || "https://quotepro.ai"}/app/settings`,
+                });
+                console.log(`Payment failed email sent to user ${failedUser.id}`);
+              }
+            } catch (emailErr: any) {
+              console.error("Failed to send payment_failed email:", emailErr.message);
+            }
           }
           break;
         }

@@ -57,6 +57,7 @@ The system uses session-based authentication supporting email/password, Apple, a
 - **SendGrid**: Email integration.
 - **Google Calendar**: OAuth2-based calendar synchronization.
 - **Stripe Connect**: Online payments (Stripe Express and Stripe Checkout).
+- **Stripe Billing**: Subscription management via `POST /api/subscription/create-checkout`, `POST /api/subscription/create-portal`, `POST /api/subscription/webhook`. Webhook handles `checkout.session.completed` (activate tier + store stripeSubscriptionId), `customer.subscription.updated/deleted` (sync tier), `invoice.payment_failed` (send email alert). Optional env vars `STRIPE_PRICE_*` map plan+interval to pre-configured Stripe Price IDs; falls back to inline `price_data`. Success redirect: `/app/pricing/success?session_id=`, cancel redirect: `/app/pricing/cancel`. `users.stripe_subscription_id` column stores active subscription ID.
 - **RevenueCat**: In-app subscription management (iOS only).
 - **Expo-notifications**: Push notification support.
 - **Expo-print**, **expo-sharing**: For quote PDF export.
