@@ -12,3 +12,9 @@ id = "tvENfrP72dS_tR3PAZLCC"
 uri = "file://AUDIT.md"
 type = "text"
 title = "QuotePro AI — Full Product Audit Brief"
+
+[[outputs]]
+id = "LzTRjSzrjX_PPWH-ndBky"
+uri = "file://quotepro-audit.md"
+type = "text"
+title = "QuotePro AI — Full Product Audit Document"
