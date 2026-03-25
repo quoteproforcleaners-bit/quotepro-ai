@@ -74,6 +74,7 @@ import {
 import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
 import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "../mail";
 import { trackEvent } from "../analytics";
+import { maybeAwardBadge } from "../badgeRewards";
 import { AnalyticsEvents } from "../../shared/analytics-events";
 
 const router = Router();
@@ -743,6 +744,10 @@ const router = Router();
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const series = await createRecurringSeries({ ...req.body, businessId: business.id });
+
+      // ── Badge: first_recurring_job ────────────────────────────────────────
+      maybeAwardBadge(business.id, req.session.userId!, "first_recurring_job").catch(() => {});
+
       return res.json(series);
     } catch (error: any) {
       console.error("Create recurring series error:", error);
@@ -1142,6 +1147,20 @@ const router = Router();
       }
 
       trackEvent(req.session.userId!, AnalyticsEvents.FIRST_JOB_COMPLETED, { jobId: job.id }).catch(() => {});
+
+      // ── Badge: five_jobs_completed ────────────────────────────────────────
+      if (job.businessId && req.session.userId) {
+        pool.query(
+          `SELECT COUNT(*) AS c FROM jobs WHERE business_id = $1 AND status = 'completed'`,
+          [job.businessId]
+        ).then(async (r) => {
+          const count = parseInt(r.rows[0]?.c ?? "0", 10);
+          if (count >= 5) {
+            await maybeAwardBadge(job.businessId, req.session.userId!, "five_jobs_completed").catch(() => {});
+          }
+        }).catch(() => {});
+      }
+
       return res.json({
         completedJob: updatedJob,
         nextJob,

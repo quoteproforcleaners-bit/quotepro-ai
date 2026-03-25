@@ -24,6 +24,7 @@ import {
 } from "../helpers";
 import { logSync } from "../qbo-client";
 import { trackEvent } from "../analytics";
+import { maybeAwardBadge } from "../badgeRewards";
 import { AnalyticsEvents } from "../../shared/analytics-events";
 import {
   getUserById, getUserByEmail, getUserByProviderId, createUser, updateUser,
@@ -257,6 +258,38 @@ const router = Router();
               syncQuoteToJobber(req.session.userId!, q.id, "automatic").catch((err) => {
                 console.error("Auto Jobber sync failed:", err.message);
               });
+            }
+          }).catch(() => {});
+
+          // ── Badge: first_quote_accepted ─────────────────────────────────
+          if (q.businessId && req.session.userId) {
+            maybeAwardBadge(q.businessId, req.session.userId, "first_quote_accepted").catch(() => {});
+
+            // ── Badge: revenue_milestone_1k / _10k ─────────────────────
+            pool.query(
+              `SELECT COALESCE(SUM(total::numeric), 0) AS lifetime
+               FROM quotes WHERE business_id = $1 AND status = 'accepted' AND deleted_at IS NULL`,
+              [q.businessId]
+            ).then(async (r) => {
+              const lifetime = parseFloat(r.rows[0]?.lifetime ?? "0");
+              if (lifetime >= 10000) {
+                await maybeAwardBadge(q.businessId!, req.session.userId!, "revenue_milestone_10k").catch(() => {});
+              } else if (lifetime >= 1000) {
+                await maybeAwardBadge(q.businessId!, req.session.userId!, "revenue_milestone_1k").catch(() => {});
+              }
+            }).catch(() => {});
+          }
+        }
+
+        // ── Badge: ten_quotes_sent ────────────────────────────────────────
+        if (data.status === "sent" && q.businessId && req.session.userId) {
+          pool.query(
+            `SELECT COUNT(*) AS c FROM quotes WHERE business_id = $1 AND status IN ('sent','viewed','accepted','declined') AND deleted_at IS NULL`,
+            [q.businessId]
+          ).then(async (r) => {
+            const total = parseInt(r.rows[0]?.c ?? "0", 10);
+            if (total >= 10) {
+              await maybeAwardBadge(q.businessId!, req.session.userId!, "ten_quotes_sent").catch(() => {});
             }
           }).catch(() => {});
         }

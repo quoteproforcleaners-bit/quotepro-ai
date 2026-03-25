@@ -83,6 +83,7 @@ import {
   getSocialOptOutsByBusiness, getSocialStats,
 } from "../social-storage";
 import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "../mail";
+import { GROWTH_TASK_LIBRARY, getBusinessStage } from "../data/growth-tasks-library";
 
 const router = Router();
 
@@ -556,6 +557,123 @@ Respond with JSON: {"reply": string}`
   });
 
   router.get("/api/growth-tasks", requireAuth, async (req: Request, res: Response) => {
+    // mode=curated → personalized task library (1 AI + 2 library, max 3)
+    if (req.query.mode === "curated") {
+      try {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (!business) return res.status(404).json({ message: "Business not found" });
+        const user = await getUserById(req.session.userId!);
+        const tier = user?.subscriptionTier || "free";
+
+        // 1. Determine stage from total sent/viewed/accepted/declined quote count
+        const countResult = await pool.query(
+          `SELECT COUNT(*) AS c FROM quotes WHERE business_id = $1 AND deleted_at IS NULL`,
+          [business.id]
+        );
+        const totalQuotes = parseInt(countResult.rows[0]?.c ?? "0", 10);
+        const stage = getBusinessStage(totalQuotes);
+
+        // 2. Get library task IDs already dismissed/completed for this business
+        const doneResult = await pool.query(
+          `SELECT metadata->>'libraryId' AS library_id FROM growth_tasks
+           WHERE business_id = $1
+             AND metadata->>'libraryId' IS NOT NULL
+             AND status IN ('completed', 'dismissed')`,
+          [business.id]
+        );
+        const doneIds = new Set<string>(doneResult.rows.map((r: any) => r.library_id));
+
+        // 3. Filter library tasks: right stage, not done, tier-appropriate
+        const TIER_RANK: Record<string, number> = { free: 0, starter: 1, growth: 2, pro: 3 };
+        const REQUIRED_RANK: Record<string, number> = { starter: 1, growth: 2, pro: 3 };
+        const userRank = TIER_RANK[tier] ?? 0;
+        const stageTasks = GROWTH_TASK_LIBRARY.filter((t) => {
+          if (t.stage !== stage) return false;
+          if (doneIds.has(t.id)) return false;
+          if (t.requiresTier) {
+            const required = REQUIRED_RANK[t.requiresTier] ?? 0;
+            if (userRank < required) return false;
+          }
+          return true;
+        });
+
+        // Pick 2 library tasks (rotate by week number so they change weekly)
+        const weekNumber = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+        const offset = weekNumber % Math.max(stageTasks.length, 1);
+        const libraryPick = [
+          stageTasks[offset % stageTasks.length],
+          stageTasks[(offset + 1) % stageTasks.length],
+        ].filter(Boolean).filter((t, i, arr) => arr.indexOf(t) === i);
+
+        // 4. AI-personalized task (1) — with template fallback
+        let aiTask: { id: string; title: string; description: string; actionUrl: string; estimatedTime: string; impact: string; stage: string; category: string; isAiGenerated: boolean } | null = null;
+        try {
+          const [quotesResult, openQuotesResult] = await Promise.all([
+            pool.query(
+              `SELECT COUNT(*) AS c FROM quotes WHERE business_id = $1 AND status IN ('sent','viewed') AND deleted_at IS NULL`,
+              [business.id]
+            ),
+            pool.query(
+              `SELECT COALESCE(SUM(total::numeric),0) AS val FROM quotes WHERE business_id = $1 AND status IN ('sent','viewed') AND deleted_at IS NULL`,
+              [business.id]
+            ),
+          ]);
+          const openCount = parseInt(quotesResult.rows[0]?.c ?? "0", 10);
+          const openValue = parseFloat(openQuotesResult.rows[0]?.val ?? "0");
+          const companyName = business.companyName || "your business";
+
+          const systemPrompt = `You are a business growth coach for cleaning companies. Generate ONE specific, actionable growth task for this business. Return a JSON object with exactly these fields: title (string, max 80 chars), description (string, 1-2 sentences with specific numbers), actionUrl (string, must start with /app/), estimatedTime (string like "5 minutes"), category (one of: revenue, operations, growth). No markdown, no explanation — just the JSON object.`;
+          const userPrompt = `Business: ${companyName}. Stage: ${stage}. Total quotes: ${totalQuotes}. Open/unanswered quotes: ${openCount} worth $${openValue.toFixed(0)}. Subscription: ${tier}. Create a highly personalized task based on their specific situation.`;
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+            max_completion_tokens: 200,
+            response_format: { type: "json_object" },
+          });
+          const raw = JSON.parse(completion.choices[0]?.message?.content || "{}");
+          if (raw.title && raw.description) {
+            aiTask = { id: "ai-personalized", ...raw, stage, isAiGenerated: true };
+          }
+        } catch (_aiErr) {
+          // Fallback AI task based on open quotes
+          const openCount = 0;
+          aiTask = {
+            id: "ai-personalized-fallback",
+            title: openCount > 0
+              ? `You have ${openCount} unanswered quotes — follow up today`
+              : "Send a follow-up on your most recent open quote",
+            description: openCount > 0
+              ? `Following up on open quotes within 48 hours increases acceptance by up to 40%. Reach out to ${openCount} quote${openCount !== 1 ? "s" : ""} now.`
+              : "Customers who receive a follow-up are 2x more likely to accept. Send a quick check-in today.",
+            actionUrl: "/app/quotes?status=sent",
+            estimatedTime: "5 minutes",
+            impact: "high",
+            stage,
+            category: "revenue",
+            isAiGenerated: true,
+          };
+        }
+
+        // 5. Return max 3: 1 AI + 2 library
+        const tasks = [
+          ...(aiTask ? [aiTask] : []),
+          ...libraryPick.map((t) => ({ ...t, isAiGenerated: false })),
+        ].slice(0, 3);
+
+        return res.json({
+          tasks,
+          stage,
+          totalQuotes,
+          refreshedAt: new Date().toISOString(),
+        });
+      } catch (error: any) {
+        console.error("Get curated growth tasks error:", error);
+        return res.status(500).json({ message: "Failed to get curated tasks" });
+      }
+    }
+
+    // Default mode: return DB queue tasks (existing behavior)
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });

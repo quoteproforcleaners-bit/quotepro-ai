@@ -41,6 +41,11 @@ export const users = pgTable("users", {
   referralCreditsMonths: integer("referral_credits_months").default(0),
   referralFraudFlagged: boolean("referral_fraud_flagged").default(false),
   signupIp: text("signup_ip"),
+  // Badge rewards
+  proposalTemplatesUnlocked: boolean("proposal_templates_unlocked").default(false),
+  growthPreviewUntil: timestamp("growth_preview_until"),
+  loyaltyDiscountPct: integer("loyalty_discount_pct").default(0),
+  mrrDashboardUnlocked: boolean("mrr_dashboard_unlocked").default(false),
   aiFollowUpsUsedThisMonth: integer("ai_follow_ups_used_this_month").default(0),
   trialDripEnrolledAt: timestamp("trial_drip_enrolled_at"),
   trialDripLastSentDay: integer("trial_drip_last_sent_day").default(0),

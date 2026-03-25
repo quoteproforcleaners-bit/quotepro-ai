@@ -588,11 +588,50 @@ async function seedDemoUser() {
         for (const row of result.rows) {
           const quotesSent = Number(row.quotes_sent) || 0;
           const revenueWon = Number(row.revenue_won) || 0;
+
+          // Try AI-personalized insight, fall back to template
+          let recapBody: string;
+          try {
+            const { openai } = await import("./clients");
+            const [jobsRes, followUpsRes] = await Promise.all([
+              pool.query(
+                `SELECT COUNT(*) AS c FROM jobs WHERE business_id = $1 AND status = 'completed' AND updated_at > NOW() - INTERVAL '7 days'`,
+                [row.business_id]
+              ),
+              pool.query(
+                `SELECT COUNT(*) AS c FROM communications WHERE business_id = $1 AND status = 'sent' AND created_at > NOW() - INTERVAL '7 days'`,
+                [row.business_id]
+              ),
+            ]);
+            const jobsCompleted = Number(jobsRes.rows[0]?.c) || 0;
+            const followUpsSent = Number(followUpsRes.rows[0]?.c) || 0;
+
+            const completion = await openai.chat.completions.create({
+              model: "gpt-4o-mini",
+              messages: [{
+                role: "user",
+                content: `Write a 1-sentence motivational weekly recap for a cleaning business. Stats: ${quotesSent} quotes sent, $${revenueWon.toFixed(0)} revenue won, ${jobsCompleted} jobs completed, ${followUpsSent} follow-ups sent. Be specific to the numbers. Max 120 chars.`,
+              }],
+              max_completion_tokens: 60,
+            });
+            recapBody = completion.choices[0]?.message?.content?.trim() ||
+              (quotesSent > 0
+                ? `You sent ${quotesSent} quote${quotesSent !== 1 ? "s" : ""} and earned $${revenueWon.toFixed(0)} this week.`
+                : "Ready to review your week and plan the next one?");
+          } catch {
+            // Template fallback
+            if (quotesSent > 0 && revenueWon > 0) {
+              recapBody = `${quotesSent} quote${quotesSent !== 1 ? "s" : ""} sent, $${revenueWon.toFixed(0)} won — great week!`;
+            } else if (quotesSent > 0) {
+              recapBody = `${quotesSent} quote${quotesSent !== 1 ? "s" : ""} out this week. Follow up on open ones to close more.`;
+            } else {
+              recapBody = "Send a follow-up on your open quotes to close more jobs this week.";
+            }
+          }
+
           sendPush(row.owner_user_id, {
             title: "Your week in review",
-            body: quotesSent > 0
-              ? `You sent ${quotesSent} quote${quotesSent !== 1 ? "s" : ""} and earned $${revenueWon.toFixed(0)} this week.`
-              : "Ready to review your week and plan the next one?",
+            body: recapBody,
             data: { screen: "Dashboard" },
             channel: "growth",
           }).catch(() => {});
