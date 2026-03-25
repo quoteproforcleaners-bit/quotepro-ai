@@ -5,6 +5,8 @@
 import bcrypt from "bcryptjs";
 import { Router, type Request, type Response } from "express";
 import { verifyUnsubscribeToken } from "../dripEmails";
+import { trackEvent } from "../analytics";
+import { AnalyticsEvents } from "../../shared/analytics-events";
 import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter, isGrowthOrAbove } from "../middleware";
@@ -98,6 +100,7 @@ const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>(
       const lineItems = await getLineItemsByQuote(q.id);
       const qpPreview = (business as any)?.quotePreferences;
 
+      if (business?.ownerUserId) trackEvent(business.ownerUserId, AnalyticsEvents.FIRST_QUOTE_VIEWED_BY_CUSTOMER, { quoteId: q.id }).catch(() => {});
       return res.json({
         quote: {
           id: q.id,
@@ -151,6 +154,10 @@ const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>(
         await cancelPendingCommunicationsForQuote(q.id);
         if (q.customerId) {
           await updateCustomer(q.customerId, { status: "active" });
+        }
+        {
+          const biz = await db_getBusinessById(q.businessId);
+          if (biz?.ownerUserId) trackEvent(biz.ownerUserId, AnalyticsEvents.FIRST_QUOTE_ACCEPTED, { quoteId: q.id }).catch(() => {});
         }
       } else if (action === "decline") {
         await updateQuote(q.id, { status: "declined", declinedAt: new Date() });

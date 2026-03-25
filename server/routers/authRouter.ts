@@ -25,6 +25,8 @@ import {
   syncJobToGoogleCalendar,
 } from "../helpers";
 import { enrollUserInDrip } from "../dripEmails";
+import { trackEvent } from "../analytics";
+import { AnalyticsEvents } from "../../shared/analytics-events";
 import {
   getUserById, getUserByEmail, getUserByProviderId, createUser, updateUser,
   getBusinessByOwner, createBusiness, updateBusiness,
@@ -136,11 +138,14 @@ const router = Router();
 
       const business = await createBusiness(user.id);
       enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
+      trackEvent(user.id, AnalyticsEvents.ACCOUNT_CREATED, { authProvider: "email" }).catch(() => {});
+      trackEvent(user.id, AnalyticsEvents.TRIAL_STARTED, { plan: "free" }).catch(() => {});
 
       await new Promise<void>((resolve, reject) => {
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
       req.session.userId = user.id;
+      await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
 
       return res.json({
         user: formatUser(user),
@@ -188,6 +193,7 @@ const router = Router();
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
       req.session.userId = user.id;
+      pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
 
       return res.json({
         user: formatUser(user),
@@ -295,6 +301,7 @@ const router = Router();
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
       req.session.userId = user.id;
+      pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
       return new Promise<void>((resolve) => {
         req.session.save(() => {
           res.redirect("/app/dashboard");
@@ -364,6 +371,7 @@ const router = Router();
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
         req.session.userId = user.id;
+        pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
 
         return res.json({
           user: formatUser(user),
@@ -377,6 +385,7 @@ const router = Router();
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
       req.session.userId = user.id;
+      pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
 
       return res.json({
         user: formatUser(user),
@@ -442,6 +451,7 @@ const router = Router();
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
         req.session.userId = user.id;
+        pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
 
         return res.json({
           user: formatUser(user),
@@ -455,6 +465,7 @@ const router = Router();
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
       req.session.userId = user.id;
+      pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
 
       return res.json({
         user: formatUser(user),
@@ -545,6 +556,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
         req.session.userId = user.id;
+        pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
         return new Promise<void>((resolve) => {
           req.session.save(() => {
             res.redirect("/app/dashboard");
@@ -586,6 +598,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
       req.session.userId = user.id;
+      pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
       req.session.save(() => {
         return res.json({
           user: { id: user.id, email: user.email, name: user.name, subscriptionTier: user.subscriptionTier || "free" },

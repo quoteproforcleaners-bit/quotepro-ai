@@ -74,6 +74,8 @@ import {
 } from "../storage";
 import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
 import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "../mail";
+import { trackEvent } from "../analytics";
+import { AnalyticsEvents } from "../../shared/analytics-events";
 
 const router = Router();
 
@@ -717,6 +719,7 @@ const router = Router();
             if (session.customer) updateData.stripeCustomerId = session.customer as string;
             if (session.subscription) updateData.stripeSubscriptionId = session.subscription as string;
             await updateUser(userId, updateData as any);
+            trackEvent(userId, AnalyticsEvents.UPGRADE_COMPLETED, { plan: planMeta, interval: intervalMeta }).catch(() => {});
             console.log(`Subscription activated for user ${userId} on plan ${planMeta}`);
 
             // Referral credit: give referrer 1 free month when referred user upgrades
@@ -820,6 +823,7 @@ const router = Router();
         return_url: `${protocol}://${host}/app/settings`,
       });
 
+      trackEvent(req.session.userId!, AnalyticsEvents.CANCEL_INITIATED, { tier: (user as any).subscriptionTier }).catch(() => {});
       return res.json({ url: portalSession.url });
     } catch (error: any) {
       console.error("Portal session error:", error);

@@ -73,6 +73,8 @@ import {
 } from "../storage";
 import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
 import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "../mail";
+import { trackEvent } from "../analytics";
+import { AnalyticsEvents } from "../../shared/analytics-events";
 
 const router = Router();
 
@@ -1139,6 +1141,7 @@ const router = Router();
         ratingUrl = `${getPublicBaseUrl(req)}/rate/${updatedJob.ratingToken}`;
       }
 
+      trackEvent(req.session.userId!, AnalyticsEvents.FIRST_JOB_COMPLETED, { jobId: job.id }).catch(() => {});
       return res.json({
         completedJob: updatedJob,
         nextJob,

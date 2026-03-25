@@ -39,6 +39,7 @@ export const users = pgTable("users", {
   trialDripLastSentDay: integer("trial_drip_last_sent_day").default(0),
   trialDripCompleted: boolean("trial_drip_completed").default(false),
   trialDripUnsubscribed: boolean("trial_drip_unsubscribed").default(false),
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -23,6 +23,8 @@ import {
   syncJobToGoogleCalendar,
 } from "../helpers";
 import { logSync } from "../qbo-client";
+import { trackEvent } from "../analytics";
+import { AnalyticsEvents } from "../../shared/analytics-events";
 import {
   getUserById, getUserByEmail, getUserByProviderId, createUser, updateUser,
   getBusinessByOwner, createBusiness, updateBusiness,
@@ -168,6 +170,7 @@ const router = Router();
         const isInFreeTrial = user.subscriptionTier === "free" && userAgeDays < FREE_TRIAL_DAYS;
         const quoteCap = user.subscriptionTier === "starter" ? 20 : (isInFreeTrial ? 20 : 3);
         if (existingQuotes.length >= quoteCap) {
+          trackEvent(req.session.userId!, AnalyticsEvents.QUOTE_QUOTA_HIT, { quoteCap, tier: user.subscriptionTier }).catch(() => {});
           return res.status(403).json({
             message: user.subscriptionTier === "starter"
               ? `You've reached your ${quoteCap} quote monthly limit. Upgrade to Growth for unlimited quotes.`
@@ -197,6 +200,7 @@ const router = Router();
       }
 
       dispatchWebhook(business.id, req.session.userId!, "quote.created", { quoteId: q.id, total: q.total, status: q.status }).catch(() => {});
+      trackEvent(req.session.userId!, AnalyticsEvents.FIRST_QUOTE_CREATED, { quoteId: q.id, total: q.total }).catch(() => {});
 
       return res.json(q);
     } catch (error: any) {
@@ -337,6 +341,7 @@ const router = Router();
         }
       }
 
+      trackEvent(req.session.userId!, AnalyticsEvents.FIRST_QUOTE_SENT, { quoteId: q.id, channel }).catch(() => {});
       return res.json(q);
     } catch (error: any) {
       console.error("Send quote error:", error);

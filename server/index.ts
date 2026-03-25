@@ -6,6 +6,7 @@ import * as path from "path";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
 import { processDripQueue } from "./dripEmails";
+import { processChurnSignals } from "./analytics";
 
 const app = express();
 const log = console.log;
@@ -452,6 +453,22 @@ async function seedDemoUser() {
     }, 60 * 60 * 1000); // check every hour
   }
   scheduleDripCron();
+
+  // ─── Churn signal cron: fires daily at 8am ───────────────────────────────
+  function scheduleChurnCron() {
+    const now = new Date();
+    const next8am = new Date(now);
+    next8am.setHours(8, 0, 0, 0);
+    if (next8am <= now) next8am.setDate(next8am.getDate() + 1);
+    const msUntil8am = next8am.getTime() - now.getTime();
+    setTimeout(() => {
+      processChurnSignals().catch((e: any) => console.error("Churn cron error:", e));
+      setInterval(() => {
+        processChurnSignals().catch((e: any) => console.error("Churn cron error:", e));
+      }, 24 * 60 * 60 * 1000);
+    }, msUntil8am);
+  }
+  scheduleChurnCron();
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

@@ -8,6 +8,8 @@ import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql }
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import { callAI, AIError } from "../aiClient";
+import { trackEvent } from "../analytics";
+import { AnalyticsEvents } from "../../shared/analytics-events";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -209,6 +211,7 @@ const router = Router();
       });
 
       const draft = completion.choices[0]?.message?.content?.trim() || "";
+      trackEvent(req.session.userId!, AnalyticsEvents.AI_FOLLOWUP_SENT, { quoteId, channel }).catch(() => {});
       return res.json({ draft });
     } catch (error: any) {
       console.error("AI generate followup error:", error);
@@ -367,6 +370,9 @@ ${contextStr}`;
       const { message, mode = "coach", conversationHistory = [] } = req.body;
       if (!message) return res.status(400).json({ message: "message is required" });
       if (!["business", "coach", "teach"].includes(mode)) return res.status(400).json({ message: "invalid mode" });
+      trackEvent(req.session.userId!, AnalyticsEvents.AI_AGENT_OPENED, { mode }).catch(() => {});
+      if (mode === "business") trackEvent(req.session.userId!, AnalyticsEvents.AI_AGENT_MY_BUSINESS_USED, {}).catch(() => {});
+      else if (mode === "coach") trackEvent(req.session.userId!, AnalyticsEvents.AI_AGENT_COACH_USED, {}).catch(() => {});
 
       const business = await getBusinessByOwner(req.session.userId!);
       const businessName = business?.companyName || "your cleaning business";

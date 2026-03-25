@@ -1,4 +1,7 @@
 import { apiRequest } from "@/lib/query-client";
+import { AnalyticsEvents } from "../../shared/analytics-events";
+
+export { AnalyticsEvents };
 
 type EventName =
   | "app_open"
@@ -91,7 +94,29 @@ type EventName =
   | "jobber_sync_failed"
   | "jobber_import_started"
   | "jobber_import_completed"
-  | "jobber_connect_cta_clicked";
+  | "jobber_connect_cta_clicked"
+  // Funnel events
+  | "account_created"
+  | "trial_started"
+  | "first_quote_created"
+  | "first_quote_sent"
+  | "first_quote_viewed"
+  | "first_quote_accepted"
+  | "first_job_completed"
+  | "ai_agent_opened"
+  | "ai_agent_my_business"
+  | "ai_agent_coach"
+  | "ai_followup_sent"
+  | "ai_followup_converted"
+  | "calculator_used"
+  | "upgrade_clicked"
+  | "upgrade_completed"
+  | "plan_changed"
+  | "day_7_active"
+  | "day_14_active"
+  | "day_30_active"
+  | "cancel_initiated"
+  | "quote_quota_hit";
 
 export async function trackEvent(
   name: EventName,

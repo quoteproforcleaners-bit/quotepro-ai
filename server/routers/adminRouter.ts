@@ -229,4 +229,71 @@ const router = Router();
     }
   });
 
+  const ADMIN_KEY = process.env.ADMIN_API_KEY || "";
+
+  function checkAdminKey(req: Request, res: Response): boolean {
+    const key = req.headers["x-admin-key"];
+    if (!ADMIN_KEY || key !== ADMIN_KEY) {
+      res.status(401).json({ message: "Unauthorized" });
+      return false;
+    }
+    return true;
+  }
+
+  router.get("/api/admin/funnel", async (req: Request, res: Response) => {
+    if (!checkAdminKey(req, res)) return;
+    try {
+      const result = await pool.query(`
+        SELECT
+          event_name,
+          COUNT(DISTINCT business_id) AS businesses,
+          COUNT(*) AS total_occurrences,
+          MIN(created_at) AS first_seen,
+          MAX(created_at) AS last_seen
+        FROM analytics_events
+        GROUP BY event_name
+        ORDER BY businesses DESC
+      `);
+      return res.json({ funnel: result.rows });
+    } catch (err: any) {
+      console.error("GET /api/admin/funnel error:", err.message);
+      return res.status(500).json({ message: "Failed to fetch funnel data" });
+    }
+  });
+
+  router.get("/api/admin/drop-off", async (req: Request, res: Response) => {
+    if (!checkAdminKey(req, res)) return;
+    try {
+      const steps = [
+        "account_created",
+        "trial_started",
+        "first_quote_created",
+        "first_quote_sent",
+        "first_quote_viewed_by_customer",
+        "first_quote_accepted",
+        "first_job_completed",
+        "upgrade_completed",
+      ];
+      const rows: Record<string, number> = {};
+      for (const step of steps) {
+        const r = await pool.query(
+          `SELECT COUNT(DISTINCT business_id) AS cnt FROM analytics_events WHERE event_name = $1`,
+          [step]
+        );
+        rows[step] = parseInt(r.rows[0]?.cnt ?? "0", 10);
+      }
+      const dropOff = steps.map((step, i) => ({
+        step,
+        businesses: rows[step],
+        dropRate: i === 0 ? 0 : rows[steps[0]] > 0
+          ? Math.round(((rows[steps[0]] - rows[step]) / rows[steps[0]]) * 100)
+          : 0,
+      }));
+      return res.json({ dropOff });
+    } catch (err: any) {
+      console.error("GET /api/admin/drop-off error:", err.message);
+      return res.status(500).json({ message: "Failed to fetch drop-off data" });
+    }
+  });
+
 export default router;
