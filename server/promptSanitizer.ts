@@ -1,4 +1,4 @@
-import { trackEvent } from "./helpers";
+import { trackEvent } from "./analytics";
 
 const INJECTION_PATTERNS: RegExp[] = [
   /ignore\s+(all\s+)?previous\s+instructions?/gi,
