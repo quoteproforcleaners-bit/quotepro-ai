@@ -11,6 +11,7 @@ import {
   Link2,
   Save,
   CheckCircle,
+  TrendingUp,
   XCircle,
   DollarSign,
   FileText,
@@ -244,6 +245,90 @@ const LANGUAGE_OPTIONS = [
   { value: "pt", label: "Portugues" },
   { value: "ru", label: "Russkij" },
 ];
+
+function ReferralTab() {
+  const { tier, startCheckout } = useSubscription();
+  const [copied, setCopied] = useState(false);
+  const { data, isLoading } = useQuery({ queryKey: ["/api/referrals"] });
+  const referrals = data as any;
+
+  const handleCopy = () => {
+    if (referrals?.referralUrl) {
+      navigator.clipboard.writeText(referrals.referralUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <Card>
+        <CardHeader title="Your Referral Link" icon={Gift} />
+        <p className="text-sm text-slate-500 mb-5">
+          Share your referral link with other cleaning company owners. When they subscribe to any paid plan, you earn one free month of QuotePro.
+        </p>
+
+        {isLoading ? (
+          <div className="h-12 bg-slate-100 rounded-xl animate-pulse" />
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 font-mono truncate">
+              {referrals?.referralUrl || "Generating your link..."}
+            </div>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        )}
+
+        <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
+          Your referral code: <strong>{referrals?.referralCode || "..."}</strong>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Referral Stats" icon={TrendingUp} />
+        <div className="grid grid-cols-3 gap-4">
+          <div className="text-center p-4 bg-slate-50 rounded-xl">
+            <p className="text-2xl font-bold text-slate-900">{referrals?.referredCount ?? 0}</p>
+            <p className="text-xs text-slate-500 mt-1">Signed up</p>
+          </div>
+          <div className="text-center p-4 bg-slate-50 rounded-xl">
+            <p className="text-2xl font-bold text-slate-900">{referrals?.paidReferrals ?? 0}</p>
+            <p className="text-xs text-slate-500 mt-1">Converted to paid</p>
+          </div>
+          <div className="text-center p-4 bg-emerald-50 rounded-xl">
+            <p className="text-2xl font-bold text-emerald-700">{referrals?.creditsEarned ?? 0}</p>
+            <p className="text-xs text-slate-500 mt-1">Free months earned</p>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="How It Works" icon={Star} />
+        <ol className="space-y-3">
+          {[
+            "Copy your unique referral link above",
+            "Share it with other residential cleaning company owners",
+            "They sign up and subscribe to any paid plan",
+            "You automatically earn one free month of QuotePro",
+          ].map((step, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center mt-0.5">
+                {i + 1}
+              </span>
+              <span className="text-sm text-slate-700">{step}</span>
+            </li>
+          ))}
+        </ol>
+      </Card>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { user, business, refresh } = useAuth();
@@ -607,6 +692,7 @@ export default function SettingsPage() {
     "features",
     "booking",
     "integrations",
+    "referrals",
     "developer",
   ];
 
@@ -1714,6 +1800,10 @@ export default function SettingsPage() {
             </div>
           </Card>
         </div>
+      ) : null}
+
+      {tab === "referrals" ? (
+        <ReferralTab />
       ) : null}
 
       {tab === "developer" ? (

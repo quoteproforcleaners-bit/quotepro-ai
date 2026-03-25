@@ -32,6 +32,7 @@ import QuotesScreen from "@/screens/QuotesScreen";
 import CalendarScreen from "@/screens/CalendarScreen";
 import GrowthDashboardScreen from "@/screens/GrowthDashboardScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
+import LeadFinderScreen from "@/screens/LeadFinderScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
@@ -44,6 +45,7 @@ export type MainTabParamList = {
   QuotesTab: undefined;
   JobsTab: undefined;
   GrowthTab: undefined;
+  LeadRadarTab: undefined;
   SettingsTab: undefined;
 };
 
@@ -378,6 +380,18 @@ export default function MainTabNavigator() {
           headerTitle: "Reports",
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="bar-chart-2" color={color} size={size} focused={focused} badgeCount={pendingTaskCount} />
+          ),
+        }}
+        listeners={{ tabPress: handleTabPress }}
+      />
+      <Tab.Screen
+        name="LeadRadarTab"
+        component={LeadFinderScreen}
+        options={{
+          title: "Lead Radar",
+          headerTitle: "Lead Radar",
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="radio" color={color} size={size} focused={focused} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}

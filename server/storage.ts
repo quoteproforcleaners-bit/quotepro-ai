@@ -111,6 +111,9 @@ export async function createUser(data: {
   passwordHash?: string;
   authProvider: string;
   providerId?: string;
+  referralCode?: string | null;
+  referredBy?: string | null;
+  trialStartedAt?: Date | null;
 }): Promise<User> {
   const [user] = await db
     .insert(users)
@@ -120,6 +123,9 @@ export async function createUser(data: {
       passwordHash: data.passwordHash || null,
       authProvider: data.authProvider,
       providerId: data.providerId || null,
+      ...(data.referralCode ? { referralCode: data.referralCode } : {}),
+      ...(data.referredBy ? { referredBy: data.referredBy } : {}),
+      ...(data.trialStartedAt ? { trialStartedAt: data.trialStartedAt } : {}),
     })
     .returning();
   return user;
@@ -128,6 +134,13 @@ export async function createUser(data: {
 export async function updateUser(userId: string, data: Partial<{
   subscriptionTier: string;
   subscriptionExpiresAt: Date | null;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  trialStartedAt: Date | null;
+  referralCode: string | null;
+  referredBy: string | null;
+  referralCreditsMonths: number;
+  aiFollowUpsUsedThisMonth: number;
 }>): Promise<User> {
   const [user] = await db
     .update(users)

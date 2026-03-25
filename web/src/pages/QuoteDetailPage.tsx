@@ -102,6 +102,7 @@ export default function QuoteDetailPage() {
   const [followUpSendingNow, setFollowUpSendingNow] = useState(false);
   const [followUpPreviewLoading, setFollowUpPreviewLoading] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [acceptedUpgradeOpen, setAcceptedUpgradeOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" | "info" } | null>(null);
 
   const showToast = (message: string, variant: "success" | "error" | "info" = "success") => {
@@ -187,7 +188,12 @@ export default function QuoteDetailPage() {
     onSuccess: (_data, status) => {
       queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/quotes"] });
-      if (status === "accepted") setScheduleModalOpen(true);
+      if (status === "accepted") {
+        setScheduleModalOpen(true);
+        if (isFree || isStarter) {
+          setTimeout(() => setAcceptedUpgradeOpen(true), 1200);
+        }
+      }
     },
   });
 
@@ -1750,6 +1756,35 @@ export default function QuoteDetailPage() {
           variant={toast.variant}
           onClose={() => setToast(null)}
         />
+      ) : null}
+
+      {/* Accepted quote upgrade nudge modal */}
+      {acceptedUpgradeOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-scale-in text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-emerald-50 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-emerald-500" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Quote accepted — nice work!</h2>
+            <p className="text-slate-500 text-sm mb-6">
+              You're building momentum. Upgrade to Growth or Pro to unlock unlimited quotes, automated follow-ups, and the full AI coaching suite.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => { setAcceptedUpgradeOpen(false); startCheckout("growth", "monthly"); }}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors"
+              >
+                Upgrade to Growth — $49/mo
+              </button>
+              <button
+                onClick={() => setAcceptedUpgradeOpen(false)}
+                className="w-full py-2 text-slate-500 text-sm hover:text-slate-700 transition-colors"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

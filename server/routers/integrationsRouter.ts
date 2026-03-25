@@ -87,6 +87,16 @@ const router = Router();
       const expiredCount = await expireOldQuotes();
       if (expiredCount > 0) console.log(`Expired ${expiredCount} quotes`);
       const { sent, canceled } = await processPendingFollowUps();
+
+      // Monthly reset: if it's the 1st of the month (UTC), reset monthly counters
+      const now = new Date();
+      if (now.getUTCDate() === 1 && now.getUTCHours() < 1) {
+        await pool.query(
+          "UPDATE users SET ai_follow_ups_used_this_month = 0 WHERE ai_follow_ups_used_this_month > 0"
+        );
+        console.log("Monthly reset: ai_follow_ups_used_this_month cleared");
+      }
+
       return res.json({ expired: expiredCount, followupsSent: sent, followupsCanceled: canceled });
     } catch (error: any) {
       console.error("Cron error:", error);

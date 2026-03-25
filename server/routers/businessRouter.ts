@@ -330,12 +330,74 @@ const router = Router();
 
   router.post("/api/communications/:id/send-now", requireAuth, async (req: Request, res: Response) => {
     try {
+      // Starter AI follow-up quota: 3/month taste
+      const user = await getUserById(req.session.userId!);
+      if (user && user.subscriptionTier === "starter") {
+        const used = (user as any).aiFollowUpsUsedThisMonth ?? 0;
+        if (used >= 3) {
+          return res.status(403).json({
+            error: "limit_reached",
+            message: "You've used your 3 AI follow-ups for this month. Upgrade to Growth for unlimited AI follow-ups.",
+            upgradeUrl: "/pricing",
+            used,
+            limit: 3,
+          });
+        }
+        // Increment counter after success below
+      }
+
       const result = await sendFollowUpNow(req.params.id, req);
       if (!result.success) return res.status(400).json({ message: result.message });
+
+      // Increment for Starter users
+      if (user && user.subscriptionTier === "starter") {
+        const used = (user as any).aiFollowUpsUsedThisMonth ?? 0;
+        await updateUser(user.id, { aiFollowUpsUsedThisMonth: used + 1 } as any);
+      }
+
       return res.json({ success: true, message: result.message });
     } catch (error: any) {
       console.error("Send follow-up now error:", error);
       return res.status(500).json({ message: "Failed to send follow-up" });
+    }
+  });
+
+  router.get("/api/referrals", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = await getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "Not found" });
+
+      let referralCode = (user as any).referralCode as string | null;
+      if (!referralCode) {
+        // Generate one on the fly
+        const { randomBytes } = await import("node:crypto");
+        referralCode = randomBytes(4).toString("hex").toUpperCase();
+        await updateUser(user.id, { referralCode } as any);
+      }
+
+      const host = req.get("host")!;
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const referralUrl = `${protocol}://${host}/app/register?ref=${referralCode}`;
+
+      const referredResult = await pool.query(
+        "SELECT COUNT(*) as count FROM users WHERE referred_by = $1",
+        [referralCode]
+      );
+      const referredCount = parseInt(referredResult.rows[0]?.count || "0");
+
+      const creditsEarned = (user as any).referralCreditsMonths ?? 0;
+
+      // How many referrals resulted in paid conversions?
+      const paidResult = await pool.query(
+        "SELECT COUNT(*) as count FROM users WHERE referred_by = $1 AND subscription_tier != 'free'",
+        [referralCode]
+      );
+      const paidReferrals = parseInt(paidResult.rows[0]?.count || "0");
+
+      return res.json({ referralCode, referralUrl, referredCount, paidReferrals, creditsEarned });
+    } catch (error: any) {
+      console.error("Referrals error:", error);
+      return res.status(500).json({ message: "Failed to get referral info" });
     }
   });
 
@@ -656,6 +718,29 @@ const router = Router();
             if (session.subscription) updateData.stripeSubscriptionId = session.subscription as string;
             await updateUser(userId, updateData as any);
             console.log(`Subscription activated for user ${userId} on plan ${planMeta}`);
+
+            // Referral credit: give referrer 1 free month when referred user upgrades
+            try {
+              const newUser = await getUserById(userId);
+              const referredBy = (newUser as any)?.referredBy as string | null;
+              if (referredBy) {
+                const referrerResult = await pool.query(
+                  "SELECT id, referral_credits_months FROM users WHERE referral_code = $1 LIMIT 1",
+                  [referredBy]
+                );
+                if (referrerResult.rows.length > 0) {
+                  const referrer = referrerResult.rows[0];
+                  const currentCredits = referrer.referral_credits_months ?? 0;
+                  await pool.query(
+                    "UPDATE users SET referral_credits_months = $1, updated_at = NOW() WHERE id = $2",
+                    [currentCredits + 1, referrer.id]
+                  );
+                  console.log(`Referral credit applied to user ${referrer.id} (now ${currentCredits + 1} months)`);
+                }
+              }
+            } catch (refErr: any) {
+              console.error("Referral credit error:", refErr.message);
+            }
           }
           break;
         }

@@ -160,8 +160,10 @@ const router = Router();
       if (user && !isGrowthOrAbove(user.subscriptionTier)) {
         const existingQuotes = await getQuotesByBusiness(business.id);
         const FREE_TRIAL_DAYS = 14;
-        const userAgeDays = user.createdAt
-          ? Math.floor((Date.now() - new Date(user.createdAt).getTime()) / 86_400_000)
+        // Use trialStartedAt if available, fall back to createdAt
+        const trialRef = (user as any).trialStartedAt ?? user.createdAt;
+        const userAgeDays = trialRef
+          ? Math.floor((Date.now() - new Date(trialRef).getTime()) / 86_400_000)
           : 999;
         const isInFreeTrial = user.subscriptionTier === "free" && userAgeDays < FREE_TRIAL_DAYS;
         const quoteCap = user.subscriptionTier === "starter" ? 20 : (isInFreeTrial ? 20 : 3);

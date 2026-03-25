@@ -52,9 +52,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const hasPremium = isPro;
   const quotesPerMonth = PLAN_LIMITS[tier]?.quotesPerMonth ?? 3;
 
-  // 14-day product-level free trial computed from account creation date
-  const userAgeMs = (user as any)?.createdAt
-    ? Date.now() - new Date((user as any).createdAt).getTime()
+  // 14-day product-level free trial, anchored to trialStartedAt (falls back to createdAt)
+  const trialRef = (user as any)?.trialStartedAt ?? (user as any)?.createdAt;
+  const userAgeMs = trialRef
+    ? Date.now() - new Date(trialRef).getTime()
     : Infinity;
   const isInFreeTrial = isFree && userAgeMs < FREE_TRIAL_DAYS * 86_400_000;
   const freeTrialDaysLeft = isInFreeTrial

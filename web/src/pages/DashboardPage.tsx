@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -880,6 +880,23 @@ export default function DashboardPage() {
   const totalRevenue = acceptedQuotes.reduce((sum: number, q: any) => sum + (Number(q.total) || 0), 0);
   const activeJobs = jobs.filter((j: any) => j.status === "scheduled" || j.status === "in_progress");
 
+  // Revenue milestone modal
+  const MILESTONES = [1000, 5000, 10000];
+  const [milestoneModal, setMilestoneModal] = useState<number | null>(null);
+  useEffect(() => {
+    if (totalRevenue <= 0) return;
+    const seenKey = "qp_seen_milestones";
+    let seen: number[] = [];
+    try { seen = JSON.parse(localStorage.getItem(seenKey) || "[]"); } catch {}
+    for (const m of MILESTONES) {
+      if (totalRevenue >= m && !seen.includes(m)) {
+        setMilestoneModal(m);
+        localStorage.setItem(seenKey, JSON.stringify([...seen, m]));
+        break;
+      }
+    }
+  }, [totalRevenue]);
+
   const followUpQueueCount = followUpQueue.length;
   const amountAtRisk = useMemo(() => followUpQueue.reduce((sum: number, q: any) => sum + (Number(q.total) || 0), 0), [followUpQueue]);
 
@@ -1490,6 +1507,37 @@ export default function DashboardPage() {
 
       {/* Bottom spacing */}
       <div className="h-8" />
+
+      {/* Revenue milestone modal */}
+      {milestoneModal !== null ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 animate-scale-in text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-amber-50 flex items-center justify-center">
+              <Award className="w-8 h-8 text-amber-500" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">
+              ${milestoneModal.toLocaleString()} milestone reached!
+            </h2>
+            <p className="text-slate-500 text-sm mb-6">
+              Your cleaning business has now generated ${milestoneModal.toLocaleString()} in tracked revenue through QuotePro. Keep building — the next milestone is waiting.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => { setMilestoneModal(null); navigate("/revenue"); }}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors"
+              >
+                View Revenue Report
+              </button>
+              <button
+                onClick={() => setMilestoneModal(null)}
+                className="w-full py-2 text-slate-500 text-sm hover:text-slate-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

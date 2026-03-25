@@ -400,6 +400,55 @@ const PRO_ROUTES = [
   "/weekly-recap", "/tasks-queue", "/reviews-referrals", "/qbo-settings", "/jobber",
 ];
 
+/* ─── Trial Countdown Banner ─────────────────────────────────────────────── */
+
+function TrialCountdownBanner() {
+  const { isInFreeTrial, freeTrialDaysLeft, startCheckout } = useSubscription();
+  const [dismissed, setDismissed] = useState(false);
+
+  if (!isInFreeTrial || dismissed) return null;
+
+  const isUrgent = freeTrialDaysLeft <= 2;
+  const isWarning = freeTrialDaysLeft <= 7;
+
+  const bg = isUrgent
+    ? "bg-red-50 border-red-200"
+    : isWarning
+      ? "bg-amber-50 border-amber-200"
+      : "bg-blue-50 border-blue-200";
+  const textColor = isUrgent ? "text-red-800" : isWarning ? "text-amber-800" : "text-blue-800";
+  const btnColor = isUrgent ? "bg-red-600 hover:bg-red-700" : isWarning ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700";
+
+  const label = freeTrialDaysLeft === 0
+    ? "Your free trial ends today"
+    : freeTrialDaysLeft === 1
+      ? "1 day left in your free trial"
+      : `${freeTrialDaysLeft} days left in your free trial`;
+
+  return (
+    <div className={`mb-6 px-4 py-3 border rounded-xl flex items-center justify-between gap-4 ${bg}`}>
+      <div className="flex items-center gap-2">
+        <Zap className={`w-4 h-4 flex-shrink-0 ${textColor}`} />
+        <span className={`text-sm font-medium ${textColor}`}>{label}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => startCheckout("growth", "monthly")}
+          className={`text-xs font-semibold text-white px-3 py-1.5 rounded-lg transition-colors ${btnColor}`}
+        >
+          Upgrade now
+        </button>
+        <button
+          onClick={() => setDismissed(true)}
+          className={`${textColor} opacity-60 hover:opacity-100 transition-opacity`}
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Layout() {
   const { user, business } = useAuth();
   const { isPro } = useSubscription();
@@ -719,6 +768,7 @@ export function Layout() {
 
         {/* Content */}
         <main ref={mainRef} className="flex-1 overflow-y-auto" style={{ padding: "28px 24px 40px" }}>
+          <TrialCountdownBanner />
           <div className="max-w-7xl mx-auto animate-fade-in">
             <Outlet />
           </div>

@@ -29,6 +29,11 @@ export const users = pgTable("users", {
   stripeSubscriptionId: text("stripe_subscription_id"),
   quotesThisMonth: integer("quotes_this_month").default(0),
   quotesMonthResetAt: timestamp("quotes_month_reset_at"),
+  trialStartedAt: timestamp("trial_started_at"),
+  referralCode: text("referral_code").unique(),
+  referredBy: text("referred_by"),
+  referralCreditsMonths: integer("referral_credits_months").default(0),
+  aiFollowUpsUsedThisMonth: integer("ai_follow_ups_used_this_month").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -97,7 +97,7 @@ const router = Router();
 
   router.post("/api/auth/register", authLimiter, async (req: Request, res: Response) => {
     try {
-      const { email, password, name } = req.body;
+      const { email, password, name, ref } = req.body;
 
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
@@ -108,12 +108,29 @@ const router = Router();
         return res.status(409).json({ message: "An account with this email already exists" });
       }
 
+      // Generate unique referral code for this new user
+      const referralCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+
+      // Validate ref param (someone referred this user)
+      let referredBy: string | null = null;
+      const refCode = ref || req.query.ref;
+      if (refCode && typeof refCode === "string") {
+        const referrer = await pool.query(
+          "SELECT id FROM users WHERE referral_code = $1 LIMIT 1",
+          [refCode.toUpperCase()]
+        );
+        if (referrer.rows.length > 0) referredBy = refCode.toUpperCase();
+      }
+
       const passwordHash = await bcrypt.hash(password, 12);
       const user = await createUser({
         email,
         name: name || null,
         passwordHash,
         authProvider: "email",
+        referralCode,
+        referredBy,
+        trialStartedAt: new Date(),
       });
 
       const business = await createBusiness(user.id);
@@ -150,6 +167,17 @@ const router = Router();
       const valid = await bcrypt.compare(password, user.passwordHash);
       if (!valid) {
         return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Backfill trialStartedAt and referralCode for older accounts
+      const backfillData: Record<string, any> = {};
+      if (!(user as any).trialStartedAt) backfillData.trialStartedAt = new Date();
+      if (!(user as any).referralCode) {
+        backfillData.referralCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+      }
+      if (Object.keys(backfillData).length > 0) {
+        await updateUser(user.id, backfillData as any);
+        Object.assign(user, backfillData);
       }
 
       const business = await getBusinessByOwner(user.id);
