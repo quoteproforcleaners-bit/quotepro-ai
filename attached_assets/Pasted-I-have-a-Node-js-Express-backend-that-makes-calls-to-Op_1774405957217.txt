@@ -1,0 +1,58 @@
+I have a Node.js + Express backend that makes calls to 
+OpenAI gpt-4o-mini across 7 different routes. Currently 
+there is no retry logic, timeout handling, or graceful 
+fallback when the AI fails.
+
+1. CREATE A CENTRALIZED AI CLIENT (server/aiClient.ts)
+   - Wrap every OpenAI call in a function: callAI(prompt, options)
+   - Implement: 
+     - 15 second timeout on every request
+     - Automatic retry: up to 2 retries with 1s, 2s exponential backoff
+     - Retry only on: 429 (rate limit), 500, 502, 503 errors
+     - Do NOT retry on: 400 (bad request), 401 (auth error)
+   - On final failure after retries, throw a typed AIError 
+     with { code, message, retryable }
+   - Log every failure with: route, attempt number, error code, 
+     response time
+
+2. UPDATE ALL AI ROUTES
+   Replace direct OpenAI calls in these routes with callAI():
+   - POST /api/ai/agent-chat
+   - POST /api/ai/walkthrough-extract
+   - POST /api/ai/generate-campaign-content
+   - POST /api/ai/generate-review-email
+   - POST /api/ai/generate-message
+   - POST /api/intake-requests/:id/ai-quote
+   - POST /api/lead-finder/leads/:id/generate-replies
+   - POST /api/pricing/analyze
+
+3. GRACEFUL FALLBACKS
+   For each AI route, define what happens when AI is unavailable:
+   - agent-chat → return: "AI assistant is temporarily unavailable. 
+     Try again in a moment."
+   - walkthrough-extract → return empty extractedFields with 
+     missingFields listing all fields, confidence: 0
+   - generate-message → return 3 pre-written template messages 
+     (friendly, professional, urgent) stored as fallback constants
+   - generate-campaign-content → return a generic template
+   - All others → return { error: 'ai_unavailable', 
+     message: 'Try again in a moment' } with HTTP 503
+
+4. FRONTEND ERROR HANDLING
+   In the web app, wherever AI features are called:
+   - Show a toast notification on AI failure: 
+     "AI is taking a moment. Please try again."
+   - Do not show a blank screen or crash
+   - Add a "Try again" button that retries the same call
+
+5. AI USAGE MONITORING
+   - Create a table: ai_usage_log 
+     (id, userId, route, tokensUsed, responseTimeMs, 
+      success, errorCode, createdAt)
+   - Log every AI call result to this table via callAI()
+   - Add GET /api/admin/ai-usage — returns daily totals: 
+     calls, failures, avg response time, total tokens
+     (requireAuth + admin check only)
+
+Show the complete server/aiClient.ts file and every 
+route file modified.

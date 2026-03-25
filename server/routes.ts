@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
 import crypto from "node:crypto";
+import rateLimit from "express-rate-limit";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
@@ -396,6 +397,29 @@ async function generateRevenuePlaybook(quote: any, business: any, customer: any)
   }
 }
 
+// ─── Security: Rate Limiters ─────────────────────────────────────────────────
+// General auth limiter: 10 requests per minute per IP
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many attempts. Try again later." },
+});
+
+// Strict login limiter: 5 failed attempts per 15 minutes per IP
+// skipSuccessfulRequests ensures only failures count against the limit
+const loginFailureLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { message: "Too many attempts. Try again later." },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function registerRoutes(app: Express): Promise<Server> {
   setupSession(app);
 
@@ -443,7 +467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/register", async (req: Request, res: Response) => {
+  app.post("/api/auth/register", authLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password, name } = req.body;
 
@@ -466,6 +490,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const business = await createBusiness(user.id);
 
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
 
       return res.json({
@@ -479,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  app.post("/api/auth/login", authLimiter, loginFailureLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
 
@@ -499,6 +526,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const business = await getBusinessByOwner(user.id);
 
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
 
       return res.json({
@@ -537,7 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/apple/callback", async (req: Request, res: Response) => {
+  app.post("/api/auth/apple/callback", authLimiter, async (req: Request, res: Response) => {
     try {
       const { id_token, user: userJson, state } = req.body;
 
@@ -602,6 +632,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await createBusiness(user.id);
       }
 
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
       return new Promise<void>((resolve) => {
         req.session.save(() => {
@@ -615,7 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/apple", async (req: Request, res: Response) => {
+  app.post("/api/auth/apple", authLimiter, async (req: Request, res: Response) => {
     try {
       const { identityToken, user: appleUser, fullName, email: appleEmail } = req.body;
 
@@ -667,6 +700,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         const business = await createBusiness(user.id);
+        await new Promise<void>((resolve, reject) => {
+          req.session.regenerate((err) => (err ? reject(err) : resolve()));
+        });
         req.session.userId = user.id;
 
         return res.json({
@@ -677,6 +713,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const business = await getBusinessByOwner(user.id);
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
 
       return res.json({
@@ -690,7 +729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/google", async (req: Request, res: Response) => {
+  app.post("/api/auth/google", authLimiter, async (req: Request, res: Response) => {
     try {
       const { idToken } = req.body;
 
@@ -738,6 +777,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         const business = await createBusiness(user.id);
+        await new Promise<void>((resolve, reject) => {
+          req.session.regenerate((err) => (err ? reject(err) : resolve()));
+        });
         req.session.userId = user.id;
 
         return res.json({
@@ -748,6 +790,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const business = await getBusinessByOwner(user.id);
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
 
       return res.json({
@@ -834,6 +879,9 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       }
 
       if (isWeb) {
+        await new Promise<void>((resolve, reject) => {
+          req.session.regenerate((err) => (err ? reject(err) : resolve()));
+        });
         req.session.userId = user.id;
         return new Promise<void>((resolve) => {
           req.session.save(() => {
@@ -872,6 +920,9 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
       pendingAuthTokens.delete(token);
       const user = await getUserById(pending.userId);
       if (!user) return res.status(404).json({ message: "User not found" });
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => (err ? reject(err) : resolve()));
+      });
       req.session.userId = user.id;
       req.session.save(() => {
         return res.json({
@@ -5247,14 +5298,56 @@ The email should:
 
   app.post("/api/subscription/sync", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { tier } = req.body;
+      const { tier, appUserId } = req.body;
       const validTiers = ["free", "starter", "growth", "pro"];
       if (!tier || !validTiers.includes(tier)) {
         return res.status(400).json({ message: "Invalid tier" });
       }
-      const user = await updateUser(req.session.userId!, {
-        subscriptionTier: tier,
-      });
+
+      // Server-side verification with RevenueCat
+      // Only runs when REVENUECAT_SECRET_KEY is configured and appUserId is provided
+      const rcSecretKey = process.env.REVENUECAT_SECRET_KEY;
+      if (rcSecretKey && appUserId) {
+        try {
+          const rcResp = await fetch(
+            `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`,
+            { headers: { Authorization: `Bearer ${rcSecretKey}` } }
+          );
+          if (!rcResp.ok) {
+            console.error("RevenueCat verification failed:", rcResp.status, "for appUserId:", appUserId);
+            return res.status(400).json({ message: "Could not verify subscription with RevenueCat" });
+          }
+          const rcData = await rcResp.json() as any;
+          const entitlements: Record<string, any> = rcData?.subscriber?.entitlements ?? {};
+
+          const isEntitlementActive = (id: string): boolean => {
+            const ent = entitlements[id];
+            if (!ent) return false;
+            if (!ent.expires_date) return true;
+            return new Date(ent.expires_date) > new Date();
+          };
+
+          // Map RC entitlements to the highest active tier
+          let verifiedTier = "free";
+          if (isEntitlementActive("pro")) verifiedTier = "pro";
+          else if (isEntitlementActive("growth")) verifiedTier = "growth";
+          else if (isEntitlementActive("starter")) verifiedTier = "starter";
+
+          // Client-requested tier must not exceed what RevenueCat confirms
+          const tierRank: Record<string, number> = { free: 0, starter: 1, growth: 2, pro: 3 };
+          if ((tierRank[tier] ?? 0) > (tierRank[verifiedTier] ?? 0)) {
+            console.warn(`RC sync tier escalation blocked: requested=${tier}, verified=${verifiedTier}, appUserId=${appUserId}`);
+            return res.status(403).json({ message: "Requested tier not verified by subscription provider" });
+          }
+        } catch (rcErr: any) {
+          console.error("RevenueCat API error during sync:", rcErr.message);
+          return res.status(502).json({ message: "Subscription verification temporarily unavailable" });
+        }
+      } else if (!rcSecretKey) {
+        console.warn("REVENUECAT_SECRET_KEY not set — subscription sync proceeding without server-side verification");
+      }
+
+      const user = await updateUser(req.session.userId!, { subscriptionTier: tier });
       return res.json({ tier: user.subscriptionTier });
     } catch {
       return res.status(500).json({ message: "Sync failed" });
@@ -5394,16 +5487,21 @@ The email should:
       const sig = req.headers["stripe-signature"];
       const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+      if (!sig) {
+        console.error("Stripe webhook: missing stripe-signature header");
+        return res.status(400).send("Missing stripe-signature header");
+      }
+      if (!webhookSecret) {
+        console.error("Stripe webhook: STRIPE_WEBHOOK_SECRET not configured — rejecting request");
+        return res.status(400).send("Webhook secret not configured");
+      }
+
       let event: any;
-      if (sig && webhookSecret) {
-        try {
-          event = stripe.webhooks.constructEvent(req.body, sig as string, webhookSecret);
-        } catch (err: any) {
-          console.error("Webhook signature verification failed:", err.message);
-          return res.status(400).send(`Webhook Error: ${err.message}`);
-        }
-      } else {
-        event = req.body;
+      try {
+        event = stripe.webhooks.constructEvent(req.rawBody as Buffer, sig as string, webhookSecret);
+      } catch (err: any) {
+        console.error("Webhook signature verification failed:", err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
       }
 
       switch (event.type) {
@@ -10442,6 +10540,13 @@ loadMonth(nextMo);
       const keyPrefix = rawKey.slice(-8);
       const label = req.body.label || "API Key";
 
+      const VALID_SCOPES = ["read:quotes", "write:quotes", "read:customers", "write:customers", "read:business"];
+      const requestedScopes: string[] = Array.isArray(req.body.scopes) ? req.body.scopes : ["read:quotes"];
+      const scopes = requestedScopes.filter((s: string) => VALID_SCOPES.includes(s));
+      if (scopes.length === 0) {
+        return res.status(400).json({ error: "At least one valid scope is required", validScopes: VALID_SCOPES });
+      }
+
       const user = await getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ error: "User not found" });
       const business = await getBusinessByOwner(user.id);
@@ -10454,6 +10559,7 @@ loadMonth(nextMo);
         keyPrefix,
         label,
         isActive: true,
+        scopes,
       });
 
       res.json({ success: true, rawKey, apiKey });
@@ -10465,7 +10571,7 @@ loadMonth(nextMo);
   app.get("/api/api-keys", requireAuth, async (req: any, res) => {
     try {
       const keys = await getApiKeysByUserId(req.session.userId!);
-      res.json(keys.map((k: any) => ({ id: k.id, keyPrefix: k.keyPrefix, label: k.label, isActive: k.isActive, createdAt: k.createdAt })));
+      res.json(keys.map((k: any) => ({ id: k.id, keyPrefix: k.keyPrefix, label: k.label, isActive: k.isActive, scopes: k.scopes ?? ["read:quotes"], createdAt: k.createdAt })));
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

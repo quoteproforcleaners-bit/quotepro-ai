@@ -807,6 +807,7 @@ export const apiKeys = pgTable("api_keys", {
   keyPrefix: text("key_prefix").notNull(),
   label: text("label"),
   isActive: boolean("is_active").notNull().default(true),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default(sql`'["read:quotes"]'::jsonb`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   rotatedAt: timestamp("rotated_at"),
 });

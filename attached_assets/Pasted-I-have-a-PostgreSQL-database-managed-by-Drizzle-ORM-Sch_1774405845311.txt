@@ -1,0 +1,49 @@
+I have a PostgreSQL database managed by Drizzle ORM. 
+Schema is in shared/schema.ts. All DB queries go through 
+server/storage.ts. Routes are in server/routes.ts.
+
+Implement soft-delete for customers and quotes:
+
+1. SCHEMA CHANGES
+   - Add deletedAt timestamp column to both the customers 
+     and quotes tables in shared/schema.ts:
+     deletedAt: timestamp('deleted_at')
+   - Generate and run a Drizzle migration for these changes
+
+2. STORAGE LAYER CHANGES (server/storage.ts)
+   - Find every function that queries customers or quotes
+   - Add WHERE deleted_at IS NULL to every SELECT query 
+     so soft-deleted records are invisible to the app
+   - Change deleteCustomer(id) to set deletedAt = NOW() 
+     instead of running a hard DELETE
+   - Change deleteQuote(id) to set deletedAt = NOW() 
+     instead of running a hard DELETE
+
+3. RECOVERY ENDPOINT
+   - Add GET /api/admin/deleted-records — returns all records 
+     where deleted_at IS NOT NULL, created in the last 30 days
+   - Add POST /api/admin/restore/:type/:id — sets deleted_at 
+     back to NULL (restores the record)
+   - Both routes require requireAuth and that the user is 
+     the business owner of the record
+
+4. AUTO-PURGE CRON
+   - In server/index.ts where other crons are defined, add a 
+     new cron that runs nightly
+   - It permanently deletes records where deleted_at < NOW() - 30 days
+   - Log how many records were purged each run
+
+5. ZOD VALIDATION FOR JSONB BLOBS
+   - Install zod if not already installed
+   - Create a file server/schemas.ts with Zod schemas for:
+     - QuoteOptions (good/better/best with price, name, scope, addOnsIncluded)
+     - QuoteAddOns (each key maps to { selected: boolean, price: number })
+     - PricingSettings (all fields from the pricing engine config)
+   - In server/storage.ts, validate these shapes with .parse() 
+     when reading from the DB
+   - If validation fails, log the error with the record ID and 
+     throw a typed AppError so it surfaces clearly
+
+Do not touch auth, routing logic, or any frontend files.
+Show every migration, every storage function changed, and 
+the complete Zod schemas created.
