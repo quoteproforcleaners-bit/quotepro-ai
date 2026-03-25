@@ -6,3 +6,9 @@ id = "cnUJOYn25iiC-dFqSziX1"
 uri = "file://session-transcript.md"
 type = "text"
 title = "quotepro-agent-session-transcript.md"
+
+[[outputs]]
+id = "tvENfrP72dS_tR3PAZLCC"
+uri = "file://AUDIT.md"
+type = "text"
+title = "QuotePro AI — Full Product Audit Brief"
