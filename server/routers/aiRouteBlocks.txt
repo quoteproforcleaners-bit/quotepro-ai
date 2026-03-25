@@ -1,0 +1,1442 @@
+  router.post("/api/ai/job-update-message", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { type, customerName, companyName, senderName, updateLink, language: commLang } = req.body;
+      if (!type) return res.status(400).json({ message: "type is required" });
+
+      const jobMsgBusiness = await getBusinessByOwner(req.session.userId!);
+      const langInstruction = getLangInstruction(commLang || (jobMsgBusiness as any)?.commLanguage);
+      const name = customerName || "there";
+      const sender = senderName || "your cleaning team";
+      const company = companyName || "our company";
+      const linkPart = updateLink ? ` Track it live: ${updateLink}` : "";
+
+      const STATUS_CONTEXT: Record<string, string> = {
+        en_route: `We are on our way and will arrive shortly.${linkPart}`,
+        started: `We have arrived and are getting started on your home.${linkPart}`,
+        in_progress: `We are currently cleaning your home and making great progress.${linkPart}`,
+        completed: `We have finished cleaning your home — everything looks great!${linkPart}`,
+        sms: `Your live service update page is ready.${linkPart}`,
+      };
+
+      const statusDetail = STATUS_CONTEXT[type] || `Your service is in progress.${linkPart}`;
+
+      const isSmsType = type === "sms";
+      const systemPrompt = isSmsType
+        ? `Write a very short SMS (2-3 sentences max) for a cleaning company. No emojis. Be warm but extremely brief. Start with "Hi ${name}, this is ${sender} from ${company}." Then one short sentence about the update. Nothing else.${langInstruction}`
+        : `Write a short, warm text message (3-5 sentences) that a cleaner would send to a customer. No subject line. No emojis. No formal email format. Sign off with just "${sender}". Start with "Hi ${name}," — do NOT use email structure.${langInstruction}`;
+
+      const userPrompt = `Customer update: ${statusDetail} Reply with ONLY the message text, nothing else.`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_completion_tokens: 150,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+      return res.json({ message: content.trim() });
+    } catch (error: any) {
+      console.error("Job update message error:", error);
+      return res.status(500).json({ message: "Failed to generate message" });
+    }
+  });
+
+  router.post("/api/ai/analyze-quote", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { quoteId } = req.body;
+      if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
+
+      const quote = await getQuoteById(quoteId);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+      const comms = await getCommunicationsByBusiness(quote.businessId, { quoteId });
+
+      const ageDays = Math.round(((Date.now() - (quote.sentAt?.getTime() || quote.createdAt.getTime())) / (1000 * 60 * 60 * 24)) * 10) / 10;
+      const lastComm = comms.length > 0 ? comms[0] : null;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are an AI sales assistant for a residential cleaning company. Analyze a quote and provide actionable insights. Respond with JSON: {"closeProbability": number 0-100, "suggestedAction": string, "followUpMessage": string, "notes": string}`
+          },
+          {
+            role: "user",
+            content: `Quote: $${quote.total}, sent ${ageDays} days ago, status: ${quote.status}, ${comms.length} communications sent. Customer: ${customer ? `${customer.firstName} ${customer.lastName}, status: ${customer.status}` : "Unknown"}. Last contact: ${lastComm ? `${lastComm.channel} ${lastComm.createdAt}` : "None"}.`
+          },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      let parsed: any = {};
+      try { parsed = JSON.parse(content || "{}"); } catch {}
+
+      await updateQuote(quoteId, {
+        closeProbability: parsed.closeProbability || null,
+        expectedValue: quote.total * ((parsed.closeProbability || 50) / 100),
+        aiNotes: parsed.notes || null,
+      });
+
+      return res.json({
+        closeProbability: parsed.closeProbability || 50,
+        suggestedAction: parsed.suggestedAction || "Follow up with the customer",
+        followUpMessage: parsed.followUpMessage || "",
+        notes: parsed.notes || "",
+      });
+    } catch (error: any) {
+      console.error("AI analyze quote error:", error);
+      return res.status(500).json({ message: "Failed to analyze quote" });
+    }
+  });
+
+  router.post("/api/ai/generate-followup", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { quoteId, channel, context, language: commLang } = req.body;
+      if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
+
+      const quote = await getQuoteById(quoteId);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+      const business = await db_getBusinessById(quote.businessId);
+      const ageDays = Math.round(((Date.now() - (quote.sentAt?.getTime() || quote.createdAt.getTime())) / (1000 * 60 * 60 * 24)) * 10) / 10;
+
+      const msgType = channel === "email" ? "email" : "SMS";
+      const maxLen = channel === "email" ? 200 : 160;
+      const effectiveLang = commLang || await getEffectiveLang(customer?.id, (business as any)?.commLanguage);
+      const langInstruction = getLangInstruction(effectiveLang);
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Write a ${msgType} follow-up message (under ${maxLen} chars for SMS) for "${business?.companyName || "our company"}". The quote is $${quote.total} sent ${ageDays} days ago. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}".${context ? ` Context: ${context}` : ""}${langInstruction}`
+          },
+          {
+            role: "user",
+            content: `Generate a follow-up ${msgType} for ${customer ? `${customer.firstName}` : "the customer"}. Reply with ONLY the message text.`
+          },
+        ],
+        max_completion_tokens: channel === "email" ? 250 : 100,
+      });
+
+      const draft = completion.choices[0]?.message?.content?.trim() || "";
+      return res.json({ draft });
+    } catch (error: any) {
+      console.error("AI generate followup error:", error);
+      return res.status(500).json({ message: "Failed to generate follow-up" });
+    }
+  });
+
+  router.post("/api/ai/sales-chat", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { message, conversationHistory } = req.body;
+      if (!message) return res.status(400).json({ message: "message is required" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+
+      let contextStr = "No business data yet — give general cleaning sales coaching.";
+      const now = new Date();
+
+      if (business) {
+        // Run all DB queries in parallel for speed
+        const [stats, allQuotes, customers, jobs, comms] = await Promise.all([
+          getQuoteStats(business.id),
+          getQuotesByBusiness(business.id),
+          getCustomersByBusiness(business.id),
+          getJobsByBusiness(business.id),
+          getCommunicationsByBusiness(business.id),
+        ]);
+
+        const sentQuotes = allQuotes.filter(q => q.status === "sent");
+        const acceptedQuotes = allQuotes.filter(q => q.status === "accepted");
+        const declinedQuotes = allQuotes.filter(q => q.status === "declined");
+        const completedJobs = jobs.filter(j => j.status === "completed");
+        const scheduledJobs = jobs.filter(j => j.status === "scheduled");
+        const customerMap = new Map(customers.map(c => [c.id, c]));
+        const pipelineValue = sentQuotes.reduce((s, q) => s + q.total, 0);
+        const avgAcceptedTotal = acceptedQuotes.length > 0
+          ? acceptedQuotes.reduce((s, q) => s + q.total, 0) / acceptedQuotes.length : 0;
+        const recurringCount = acceptedQuotes.filter(q => q.frequencySelected !== "one-time").length;
+
+        const openQuoteDetails = sentQuotes
+          .sort((a, b) => (a.sentAt?.getTime() || a.createdAt.getTime()) - (b.sentAt?.getTime() || b.createdAt.getTime()))
+          .slice(0, 8)
+          .map(q => {
+            const cust = q.customerId ? customerMap.get(q.customerId) : null;
+            const name = cust ? `${cust.firstName} ${cust.lastName}`.trim() : "Unknown";
+            const sentDate = q.sentAt || q.createdAt;
+            const ageDays = Math.round((now.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
+            const quoteComms = comms.filter(c => c.quoteId === q.id);
+            const followUpAge = quoteComms.length > 0
+              ? Math.round((now.getTime() - new Date(quoteComms[0].createdAt).getTime()) / (1000 * 60 * 60 * 24))
+              : null;
+            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected} (${q.selectedOption}), ${ageDays}d old${followUpAge !== null ? `, last follow-up ${followUpAge}d ago` : ", no follow-up sent"}`;
+          });
+
+        const dormantCount = customers.filter(c => {
+          const lastJob = jobs.filter(j => j.customerId === c.id && j.status === "completed")
+            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+          if (!lastJob) return false;
+          return (now.getTime() - new Date(lastJob.updatedAt).getTime()) / (1000 * 60 * 60 * 24) > 45;
+        }).length;
+
+        const recentWins = acceptedQuotes
+          .sort((a, b) => (b.acceptedAt?.getTime() || 0) - (a.acceptedAt?.getTime() || 0))
+          .slice(0, 4)
+          .map(q => {
+            const name = q.customerId ? (() => { const c = customerMap.get(q.customerId!); return c ? `${c.firstName} ${c.lastName}`.trim() : "Unknown"; })() : "Unknown";
+            return `  - ${name}: $${q.total.toFixed(0)} ${q.frequencySelected}`;
+          });
+
+        const contextParts = [
+          `Business: ${business.companyName} | Date: ${now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
+          `Close rate: ${stats.closeRate}% | Pipeline: ${sentQuotes.length} quotes worth $${pipelineValue.toFixed(0)} | Avg quote: $${avgAcceptedTotal.toFixed(0)}`,
+          `Won: ${stats.acceptedQuotes} quotes (${recurringCount} recurring) | Lost: ${declinedQuotes.length} | Scheduled jobs: ${scheduledJobs.length}`,
+          `Customers: ${customers.length} total, ${dormantCount} dormant (45d+), ${customers.filter(c => c.isVip).length} VIP`,
+        ];
+        if (openQuoteDetails.length > 0) contextParts.push(`Open quotes needing follow-up:\n${openQuoteDetails.join("\n")}`);
+        if (recentWins.length > 0) contextParts.push(`Recent wins:\n${recentWins.join("\n")}`);
+        contextStr = contextParts.join("\n");
+      }
+
+      const businessName = business?.companyName || "your cleaning business";
+
+      const systemPrompt = `You are an elite AI sales coach for "${businessName}", a residential cleaning company. Your job is to help the owner close more jobs, handle objections, and grow recurring revenue.
+
+RESPONSE FORMAT — return ONLY valid JSON, no other text:
+{
+  "mode": "follow-up" | "objection" | "script" | "strategy" | "coaching",
+  "quickTakeaway": "1-2 sentences. The single most important thing to do right now.",
+  "approach": "2-4 sentences. The reasoning, framing, and recommended tactic.",
+  "scripts": [
+    { "label": "Text message", "content": "Ready-to-send script — direct and conversational" },
+    { "label": "Email", "content": "Ready-to-send email with subject line on first line" }
+  ],
+  "alternateVersions": [
+    { "label": "More direct", "content": "..." }
+  ],
+  "nextStep": "1-2 sentences. What to do if no response after 48 hours."
+}
+
+RULES:
+- scripts: include 1-3 that are relevant. Omit irrelevant types. Always include a text message if a script is needed.
+- alternateVersions: include 1-2 when useful (softer, more direct, more premium, recurring-focused, phone). Omit if not helpful.
+- All scripts must sound human, not robotic. No placeholders like [Name]. Use real names from data if available.
+- Stay focused on cleaning service sales: one-time, recurring, deep clean, weekly/biweekly/monthly, move-in/out, add-ons.
+- When business data is available, reference real names, dollar amounts, and timelines. Never be generic.
+- Key sales principles: 48hr follow-up sweet spot; recurring = 3-5x value of one-time; price objection = reframe value saved per hour; "thinking about it" = create gentle urgency; deep clean first = sets the standard for recurring.
+- Do NOT write essay-length answers. Be direct, decisive, tactical.
+
+BUSINESS DATA:
+${contextStr}`;
+
+      const chatMessages: any[] = [{ role: "system", content: systemPrompt }];
+
+      if (conversationHistory && Array.isArray(conversationHistory)) {
+        for (const msg of conversationHistory.slice(-4)) {
+          chatMessages.push({ role: msg.role, content: msg.content });
+        }
+      }
+      chatMessages.push({ role: "user", content: message });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: chatMessages,
+        max_completion_tokens: 800,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = completion.choices[0]?.message?.content?.trim() || "";
+      if (!rawContent) {
+        return res.json({ reply: "I'm having trouble generating a response right now. Please try again.", mode: "coaching", quickTakeaway: "", approach: "", scripts: [], alternateVersions: [], nextStep: "" });
+      }
+
+      let structured: any = {};
+      try {
+        structured = JSON.parse(rawContent);
+      } catch {
+        structured = { mode: "coaching", quickTakeaway: rawContent, approach: "", scripts: [], alternateVersions: [], nextStep: "" };
+      }
+
+      return res.json({
+        reply: rawContent,
+        mode: structured.mode || "coaching",
+        quickTakeaway: structured.quickTakeaway || "",
+        approach: structured.approach || "",
+        scripts: Array.isArray(structured.scripts) ? structured.scripts : [],
+        alternateVersions: Array.isArray(structured.alternateVersions) ? structured.alternateVersions : [],
+        nextStep: structured.nextStep || "",
+      });
+    } catch (error: any) {
+      console.error("AI sales chat error:", error?.message || error);
+      return res.status(500).json({ message: "Failed to process your question. Please try again." });
+    }
+  });
+
+  router.post("/api/ai/agent-chat", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { message, mode = "coach", conversationHistory = [] } = req.body;
+      if (!message) return res.status(400).json({ message: "message is required" });
+      if (!["business", "coach", "teach"].includes(mode)) return res.status(400).json({ message: "invalid mode" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      const businessName = business?.companyName || "your cleaning business";
+      const now = new Date();
+
+      let systemPrompt = "";
+
+      if (mode === "business") {
+        // ── BUSINESS MODE: pull rich data ────────────────────────────────────
+        let dataBlock = "No business data available yet — encourage the user to create quotes and customers to unlock full insights.";
+
+        if (business) {
+          const [stats, allQuotes, customers, jobs] = await Promise.all([
+            getQuoteStats(business.id),
+            getQuotesByBusiness(business.id),
+            getCustomersByBusiness(business.id),
+            getJobsByBusiness(business.id),
+          ]);
+
+          const sentQuotes = allQuotes.filter((q: any) => q.status === "sent" || q.status === "viewed");
+          const acceptedQuotes = allQuotes.filter((q: any) => q.status === "accepted");
+          const declinedQuotes = allQuotes.filter((q: any) => q.status === "declined");
+          const draftQuotes = allQuotes.filter((q: any) => q.status === "draft");
+          const customerMap = new Map(customers.map((c: any) => [c.id, c]));
+
+          const totalRevenue = acceptedQuotes.reduce((s: number, q: any) => s + (Number(q.total) || 0), 0);
+          const pipelineValue = sentQuotes.reduce((s: number, q: any) => s + (Number(q.total) || 0), 0);
+          const avgQuote = acceptedQuotes.length > 0 ? totalRevenue / acceptedQuotes.length : 0;
+          const recurringCount = acceptedQuotes.filter((q: any) => q.frequencySelected && q.frequencySelected !== "one-time" && q.frequencySelected !== "One Time").length;
+
+          // Monthly revenue (this month)
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          const monthRevenue = acceptedQuotes.filter((q: any) => new Date(q.createdAt) >= monthStart).reduce((s: number, q: any) => s + (Number(q.total) || 0), 0);
+
+          // Top customers by revenue
+          const revenueByCustomer: Record<string, { name: string; revenue: number; count: number }> = {};
+          for (const q of acceptedQuotes) {
+            if (!q.customerId) continue;
+            const c = customerMap.get(q.customerId);
+            const name = c ? `${c.firstName} ${c.lastName}`.trim() : "Unknown";
+            if (!revenueByCustomer[name]) revenueByCustomer[name] = { name, revenue: 0, count: 0 };
+            revenueByCustomer[name].revenue += Number(q.total) || 0;
+            revenueByCustomer[name].count++;
+          }
+          const topCustomers = Object.values(revenueByCustomer)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5)
+            .map((c) => `  - ${c.name}: $${c.revenue.toFixed(0)} (${c.count} quote${c.count > 1 ? "s" : ""})`);
+
+          // Stale open quotes (sent 5+ days ago with no response)
+          const staleQuotes = sentQuotes
+            .filter((q: any) => {
+              const sent = q.sentAt || q.createdAt;
+              const ageDays = (now.getTime() - new Date(sent).getTime()) / (1000 * 60 * 60 * 24);
+              return ageDays >= 5;
+            })
+            .sort((a: any, b: any) => new Date(a.sentAt || a.createdAt).getTime() - new Date(b.sentAt || b.createdAt).getTime())
+            .slice(0, 6)
+            .map((q: any) => {
+              const c = q.customerId ? customerMap.get(q.customerId) : null;
+              const name = c ? `${c.firstName} ${c.lastName}`.trim() : (q.customerName || "Unknown");
+              const ageDays = Math.round((now.getTime() - new Date(q.sentAt || q.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+              return `  - ${name}: $${Number(q.total || 0).toFixed(0)} (${ageDays}d ago, ${q.frequencySelected || "one-time"})`;
+            });
+
+          // Service type breakdown
+          const serviceTypes: Record<string, { count: number; revenue: number }> = {};
+          for (const q of acceptedQuotes) {
+            const type = (q.propertyDetails as any)?.selectedOption || q.selectedOption || "Standard";
+            if (!serviceTypes[type]) serviceTypes[type] = { count: 0, revenue: 0 };
+            serviceTypes[type].count++;
+            serviceTypes[type].revenue += Number(q.total) || 0;
+          }
+          const serviceBreakdown = Object.entries(serviceTypes)
+            .sort((a, b) => b[1].revenue - a[1].revenue)
+            .slice(0, 5)
+            .map(([type, d]) => `  - ${type}: ${d.count} quotes, $${d.revenue.toFixed(0)} revenue`);
+
+          // Recent quote activity
+          const recentQuotes = [...allQuotes]
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 8)
+            .map((q: any) => {
+              const c = q.customerId ? customerMap.get(q.customerId) : null;
+              const name = c ? `${c.firstName} ${c.lastName}`.trim() : (q.customerName || "Unknown");
+              const ageDays = Math.round((now.getTime() - new Date(q.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+              return `  - ${name}: $${Number(q.total || 0).toFixed(0)} — ${q.status} (${ageDays}d ago, ${q.frequencySelected || "one-time"})`;
+            });
+
+          // Dormant customers (had a completed job, not seen in 60d+)
+          const dormantCustomers = customers.filter((c: any) => {
+            const lastQuote = allQuotes
+              .filter((q: any) => q.customerId === c.id)
+              .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+            if (!lastQuote) return false;
+            const daysSince = (now.getTime() - new Date(lastQuote.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+            return daysSince >= 60;
+          });
+
+          const blocks: string[] = [
+            `BUSINESS: ${businessName} | Date: ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}`,
+            `PIPELINE: ${sentQuotes.length} open quotes worth $${pipelineValue.toFixed(0)} | ${draftQuotes.length} drafts`,
+            `REVENUE: $${monthRevenue.toFixed(0)} this month | $${totalRevenue.toFixed(0)} all-time | Avg quote $${avgQuote.toFixed(0)}`,
+            `QUOTES: ${allQuotes.length} total — ${acceptedQuotes.length} accepted (${recurringCount} recurring), ${declinedQuotes.length} declined, ${sentQuotes.length} open`,
+            `CLOSE RATE: ${stats.closeRate}%`,
+            `CUSTOMERS: ${customers.length} total | ${dormantCustomers.length} dormant (60d+) | ${customers.filter((c: any) => c.isVip).length} VIP`,
+            `JOBS: ${jobs.length} total | ${jobs.filter((j: any) => j.status === "scheduled").length} scheduled | ${jobs.filter((j: any) => j.status === "completed").length} completed`,
+          ];
+          if (topCustomers.length > 0) blocks.push(`TOP CUSTOMERS BY REVENUE:\n${topCustomers.join("\n")}`);
+          if (staleQuotes.length > 0) blocks.push(`STALE OPEN QUOTES (5d+ no response):\n${staleQuotes.join("\n")}`);
+          if (serviceBreakdown.length > 0) blocks.push(`SERVICE TYPE BREAKDOWN:\n${serviceBreakdown.join("\n")}`);
+          if (recentQuotes.length > 0) blocks.push(`RECENT QUOTE ACTIVITY:\n${recentQuotes.join("\n")}`);
+
+          dataBlock = blocks.join("\n\n");
+        }
+
+        systemPrompt = `You are QuotePro's intelligent business data analyst for "${businessName}". You have direct access to their real business data inside QuotePro. Your job is to answer questions about their business clearly, accurately, and actionably.
+
+RULES:
+- Answer directly from the data provided. Never make up numbers.
+- If data is missing for a question, say so clearly and suggest what action to take.
+- Use the user's real names, numbers, and specifics — never be generic.
+- Format responses with clean markdown: use **bold** for key numbers, bullet lists for multiple items, and short paragraph summaries.
+- Keep responses concise but complete. Prioritize insight over raw data dump.
+- Always end with 1 actionable recommendation when relevant.
+- You can answer follow-up questions naturally based on conversation context.
+
+REAL BUSINESS DATA:
+${dataBlock}`;
+
+      } else if (mode === "coach") {
+        // ── COACH MODE: lightweight context, coaching-focused ─────────────────
+        let contextSummary = "New business with no data yet.";
+
+        if (business) {
+          const [stats, allQuotes, customers, jobs] = await Promise.all([
+            getQuoteStats(business.id),
+            getQuotesByBusiness(business.id),
+            getCustomersByBusiness(business.id),
+            getJobsByBusiness(business.id),
+          ]);
+          const sentQuotes = allQuotes.filter((q: any) => q.status === "sent" || q.status === "viewed");
+          const acceptedQuotes = allQuotes.filter((q: any) => q.status === "accepted");
+          const pipelineValue = sentQuotes.reduce((s: number, q: any) => s + (Number(q.total) || 0), 0);
+          const avgQuote = acceptedQuotes.length > 0 ? acceptedQuotes.reduce((s: number, q: any) => s + (Number(q.total) || 0), 0) / acceptedQuotes.length : 0;
+          const recurringPct = acceptedQuotes.length > 0 ? Math.round(acceptedQuotes.filter((q: any) => q.frequencySelected && q.frequencySelected !== "one-time" && q.frequencySelected !== "One Time").length / acceptedQuotes.length * 100) : 0;
+
+          contextSummary = [
+            `Business: ${businessName}`,
+            `Close rate: ${stats.closeRate}% | Pipeline: ${sentQuotes.length} open quotes, $${pipelineValue.toFixed(0)}`,
+            `Avg accepted quote: $${avgQuote.toFixed(0)} | Recurring: ${recurringPct}% of wins`,
+            `Customers: ${customers.length} | Total quotes: ${allQuotes.length}`,
+          ].join(" | ");
+        }
+
+        systemPrompt = `You are an elite sales and operations coach for cleaning businesses. You're working specifically with "${businessName}". Your job is to help them close more jobs, handle every objection confidently, grow recurring revenue, and build a more profitable business.
+
+YOUR COACHING STYLE:
+- Direct, decisive, and tactical — no filler words
+- Give specific scripts, exact words, and actionable frameworks
+- Reference the user's real business context when relevant
+- Sales psychology + cleaning business expertise
+- Always explain the "why" behind the tactic
+- Keep advice grounded in what actually works in home services
+
+FORMAT:
+- Use **bold** for key tactics and scripts
+- Use bullet lists for frameworks and options
+- Put word-for-word scripts in quotes or a separate block
+- Keep responses scannable — not essays
+- End with a clear next action when relevant
+
+KEY EXPERTISE AREAS:
+- Objection handling (price, timing, "I need to think about it")
+- Follow-up sequences (text, email, phone — timing and tone)
+- Recurring service conversion (positioning, scripts, timing)
+- Deep clean → recurring pipeline building
+- Add-on upsells (fridge, oven, windows, laundry)
+- Lead response speed and first-contact best practices
+- Quote presentation and confidence
+- Pipeline prioritization
+- Referral and review generation
+- Team performance and accountability
+
+CLEANING INDUSTRY PRICING NORMS:
+- Standard residential: $100-$200/visit depending on size
+- Deep clean: 35-60% premium over standard
+- Move-out/in: 60-100% premium
+- Recurring discount: 10-15% biweekly, 15-20% weekly
+- Add-ons: $20-$50 each (fridge, oven, windows, laundry)
+- Commercial: price by sqft ($0.05-$0.15/sqft typical)
+
+BUSINESS CONTEXT: ${contextSummary}`;
+
+      } else {
+        // ── TEACH MODE: cleaning industry educator ────────────────────────────
+        const contextNote = business ? `The student runs "${businessName}", a cleaning business using QuotePro.` : "The student runs a cleaning business.";
+
+        systemPrompt = `You are a cleaning industry expert and business educator. Your job is to teach cleaning business owners everything they need to know to run a more profitable, professional, and scalable business.
+
+${contextNote}
+
+YOUR TEACHING STYLE:
+- Clear, patient, and thorough — never condescending
+- Use real-world examples from the cleaning industry
+- Structure learning with definitions, context, and practical application
+- Give actionable takeaways the student can use today
+- Reference industry norms, data, and best practices
+
+TEACHING FORMAT:
+- Start with the core concept clearly explained
+- Use **bold** for key terms and important points
+- Use bullet lists for frameworks, examples, and options
+- Include a "How to apply this" section when relevant
+- Keep it practical — not textbook theory
+
+YOUR EXPERTISE COVERS:
+RESIDENTIAL CLEANING:
+- Service types (standard, deep, move-in/out, post-construction, recurring)
+- Room-by-room task standards
+- Cleaning supply selection and costs
+- Eco-friendly positioning
+- Time estimates and labor planning
+
+COMMERCIAL CLEANING:
+- Office, retail, medical, industrial
+- Bidding by sqft vs by scope
+- Walk-through best practices
+- Service frequency norms
+- Commercial vs residential differences
+
+QUOTING & PRICING:
+- How to price residential cleaning correctly
+- Square footage vs room-count pricing
+- Condition adjustments and risk pricing
+- Frequency discounts that don't hurt margins
+- Add-on pricing and how to present them
+- Common underpricing mistakes
+- Regional pricing differences
+
+OPERATIONS:
+- Scheduling and routing efficiency
+- Team training and quality control
+- Supply costs as % of revenue (target: 5-8%)
+- Job tracking and completion workflows
+- Customer communication standards
+- Checklists and accountability
+
+BUSINESS GROWTH:
+- Customer acquisition channels (referral, Google, door-to-door, Thumbtack)
+- Retention strategies (loyalty, check-ins, seasonal offers)
+- Recurring revenue building
+- Hiring: W2 vs 1099 considerations
+- Profitability benchmarks (target: 15-25% net margin)
+- When and how to raise prices
+- Adding commercial accounts
+
+SALES & MARKETING:
+- Quote-to-close best practices
+- Follow-up sequences that work
+- Review generation and reputation management
+- Google My Business optimization
+- Social media for cleaning companies
+- Referral programs that actually drive bookings`;
+      }
+
+      // ── Build messages and call OpenAI ────────────────────────────────────
+      const chatMessages: any[] = [{ role: "system", content: systemPrompt }];
+
+      if (Array.isArray(conversationHistory)) {
+        for (const msg of conversationHistory.slice(-6)) {
+          if (msg.role && msg.content) {
+            chatMessages.push({ role: msg.role, content: String(msg.content).slice(0, 1000) });
+          }
+        }
+      }
+      chatMessages.push({ role: "user", content: message });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: chatMessages,
+        max_completion_tokens: 900,
+      });
+
+      const reply = completion.choices[0]?.message?.content?.trim() || "I'm having trouble generating a response right now. Please try again.";
+      return res.json({ reply, mode });
+
+    } catch (error: any) {
+      console.error("AI agent chat error:", error?.message || error);
+      return res.status(500).json({ message: "Failed to process your question. Please try again." });
+    }
+  });
+
+  router.post("/api/send/email", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { to, subject, body, customerId, quoteId, includeQuoteLink } = req.body;
+      if (!to || !body) {
+        return res.status(400).json({ message: "to and body are required" });
+      }
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { fromName, replyTo: replyToEmail } = getBusinessSendParams(business);
+
+      let bodyContent = body;
+      let quoteButtonHtml = "";
+
+      // Add quote link button if requested
+      if (includeQuoteLink && quoteId) {
+        const quote = await getQuoteById(quoteId);
+        if (quote && quote.publicToken) {
+          const quoteUrl = `${getPublicBaseUrl(req)}/q/${quote.publicToken}`;
+          const qpEmail = (business as any).quotePreferences;
+          const primaryColor = qpEmail?.brandColor || business.primaryColor || "#2563EB";
+          quoteButtonHtml = `
+<div style="margin-top:24px;text-align:center;">
+  <a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Accept Your Quote</a>
+</div>`;
+        }
+      }
+
+      const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;">
+          <h2 style="color:#ffffff;margin:0;font-size:20px;">${fromName}</h2>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          ${bodyContent.split('\n').map((line: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333333;">${line}</p>`).join('')}
+          ${quoteButtonHtml}
+        </td></tr>
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;">
+          <p style="margin:0;font-size:12px;color:#999999;">Sent via QuotePro</p>
+          <p style="margin:4px 0 0;font-size:11px;color:#bbbbbb;">If you no longer wish to receive these emails, please reply with "unsubscribe".</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+      try {
+        await sendEmail({
+          to,
+          subject: subject || `Message from ${fromName}`,
+          html: htmlBody,
+          text: bodyContent,
+          fromName,
+          replyTo: replyToEmail,
+        });
+      } catch (mailErr: any) {
+        console.error("[mail] Send email error:", mailErr);
+        return res.status(502).json({ message: "Email could not be delivered. Please try again or contact support." });
+      }
+
+      console.log(`[mail] Email sent to ${to}`);
+
+      await createCommunication({
+        businessId: business.id,
+        customerId: customerId || undefined,
+        quoteId: quoteId || undefined,
+        channel: "email",
+        direction: "outbound",
+        content: bodyContent,
+        status: "sent",
+      });
+
+      return res.json({ success: true, message: "Email sent successfully" });
+    } catch (error: any) {
+      console.error("Send email error:", error);
+      return res.status(500).json({ message: "Failed to send email" });
+    }
+  });
+
+  router.post("/api/send/sms", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { to, body, customerId, quoteId } = req.body;
+      if (!to || !body) {
+        return res.status(400).json({ message: "to and body are required" });
+      }
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+      const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+
+      if (!twilioSid || !twilioToken || !twilioFrom) {
+        return res.status(503).json({ message: "SMS service not configured. Please connect Twilio in settings." });
+      }
+
+      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+      const twilioRes = await fetch(twilioUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          To: to,
+          From: twilioFrom,
+          Body: body,
+        }).toString(),
+      });
+
+      if (!twilioRes.ok) {
+        const errText = await twilioRes.text();
+        console.error("Twilio error:", errText);
+        return res.status(502).json({ message: "Failed to send SMS" });
+      }
+
+      const twilioData = await twilioRes.json() as any;
+
+      await createCommunication({
+        businessId: business.id,
+        customerId: customerId || undefined,
+        quoteId: quoteId || undefined,
+        channel: "sms",
+        direction: "outbound",
+        content: body,
+        status: "sent",
+      });
+
+      return res.json({ success: true, message: "SMS sent successfully", sid: twilioData.sid });
+    } catch (error: any) {
+      console.error("Send SMS error:", error);
+      return res.status(500).json({ message: "Failed to send SMS" });
+    }
+  });
+
+  router.post("/api/ai/quote-descriptions", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { homeDetails, serviceTypes, addOns, companyName } = req.body;
+
+      if (!homeDetails || !serviceTypes) {
+        return res.status(400).json({ message: "homeDetails and serviceTypes are required" });
+      }
+
+      const addOnsList: string[] = [];
+      if (addOns) {
+        if (addOns.insideFridge) addOnsList.push("inside fridge cleaning");
+        if (addOns.insideOven) addOnsList.push("inside oven cleaning");
+        if (addOns.insideWindows) addOnsList.push("inside window cleaning");
+        if (addOns.insideCabinets) addOnsList.push("inside cabinet cleaning");
+        if (addOns.laundry) addOnsList.push("laundry");
+        if (addOns.dishes) addOnsList.push("dishes");
+      }
+
+      const propertyDescription = [
+        homeDetails.sqft ? `${homeDetails.sqft} sq ft` : null,
+        homeDetails.beds ? `${homeDetails.beds} bedroom(s)` : null,
+        homeDetails.baths ? `${homeDetails.baths} bathroom(s)` : null,
+        homeDetails.halfBaths ? `${homeDetails.halfBaths} half bath(s)` : null,
+        homeDetails.homeType ? `${homeDetails.homeType}` : null,
+        homeDetails.petType && homeDetails.petType !== "none" ? `has ${homeDetails.petType}` : null,
+        homeDetails.conditionScore ? `condition score ${homeDetails.conditionScore}/5` : null,
+      ].filter(Boolean).join(", ");
+
+      const systemPrompt = `You are a professional cleaning company copywriter for ${companyName || "our company"}. Generate scope-of-work descriptions for three cleaning service tiers (good, better, best). Rules:
+- Write 1-2 sentences per option, professional but warm tone
+- Include specific property details: ${propertyDescription}
+- Differentiate clearly between the three options
+- Never mention hours or time estimates
+- Never mention pricing or costs
+${addOnsList.length > 0 ? `- The best option includes these add-ons: ${addOnsList.join(", ")}` : ""}
+Respond with a JSON object with keys "good", "better", "best", each containing the description string.`;
+
+      const userPrompt = `Property: ${propertyDescription}
+Good tier: ${serviceTypes.good || "Basic Cleaning"}
+Better tier: ${serviceTypes.better || "Standard Cleaning"}
+Best tier: ${serviceTypes.best || "Deep Clean"}
+${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` : ""}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI" });
+      }
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        parsed = {
+          good: content,
+          better: content,
+          best: content,
+        };
+      }
+
+      return res.json({
+        good: parsed.good || "",
+        better: parsed.better || "",
+        best: parsed.best || "",
+      });
+    } catch (error: any) {
+      console.error("AI quote descriptions error:", error);
+      return res.status(500).json({ message: "Failed to generate quote descriptions" });
+    }
+  });
+
+  router.post("/api/ai/pricing-suggestion", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { homeDetails, addOns, frequency, currentPrices, pricingSettings: ps, businessHistory } = req.body;
+      if (!homeDetails || !currentPrices) return res.status(400).json({ message: "homeDetails and currentPrices required" });
+
+      const propertyDesc = [
+        homeDetails.sqft ? `${homeDetails.sqft} sqft` : null,
+        homeDetails.beds ? `${homeDetails.beds} bed` : null,
+        homeDetails.baths ? `${homeDetails.baths} bath` : null,
+        homeDetails.halfBaths ? `${homeDetails.halfBaths} half bath` : null,
+        homeDetails.homeType || null,
+        homeDetails.conditionScore ? `condition ${homeDetails.conditionScore}/10` : null,
+        homeDetails.peopleCount ? `${homeDetails.peopleCount} people` : null,
+        homeDetails.petType && homeDetails.petType !== "none" ? `pet: ${homeDetails.petType}${homeDetails.petShedding ? " (shedding)" : ""}` : null,
+      ].filter(Boolean).join(", ");
+
+      const addOnsList: string[] = [];
+      if (addOns) {
+        Object.entries(addOns).forEach(([k, v]) => { if (v) addOnsList.push(k.replace(/([A-Z])/g, " $1").toLowerCase().trim()); });
+      }
+
+      const historyContext = businessHistory
+        ? `Business stats: ${businessHistory.totalQuotes || 0} quotes sent, ${businessHistory.acceptRate || 0}% acceptance rate, avg quote $${businessHistory.avgQuote || 0}, hourly rate $${ps?.hourlyRate || 55}. ${businessHistory.recentAccepted ? `Recent accepted quotes ranged $${businessHistory.recentAcceptedMin}-$${businessHistory.recentAcceptedMax}.` : ""}`
+        : `Hourly rate: $${ps?.hourlyRate || 55}. No historical data available.`;
+
+      const systemPrompt = `You are a pricing strategist for residential cleaning. The "base prices" shown are the MINIMUM prices calculated by the business owner's own pricing formula — your suggested prices must NEVER be lower than these base prices. You may suggest higher prices when market factors, property difficulty, add-ons, or business history justify it. Round to nearest $5.
+
+CRITICAL RULES:
+1. suggestedPrice must always be >= the base price for that tier. Never suggest a lower price.
+2. If you cannot justify a higher price, match the base price exactly.
+3. Your reasoning must explicitly compare to the base price and explain WHY the price is higher (or why the base is already optimal).
+4. Be specific about what factors drive the price up (pet shedding, condition score, add-ons, market positioning).
+
+Respond with JSON: {"good":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"better":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"best":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"overallAssessment":"1-2 sentences","confidence":"low"|"medium"|"high","keyInsight":"1 sentence"}`;
+
+      const userPrompt = `Property: ${propertyDesc}
+Frequency: ${frequency || "one-time"}
+Add-ons: ${addOnsList.length > 0 ? addOnsList.join(", ") : "none"}
+
+BASE PRICES (your formula minimum — never go below these):
+- Good: $${currentPrices.good}
+- Better: $${currentPrices.better}
+- Best: $${currentPrices.best}
+
+${historyContext}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 400,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      let parsed: any;
+      try { parsed = JSON.parse(content); } catch { return res.status(500).json({ message: "Invalid AI response" }); }
+
+      // Hard floor: AI price must never be below the current formula price
+      const floorPrice = (aiPrice: number | undefined, base: number): number => {
+        const ai = typeof aiPrice === "number" && !isNaN(aiPrice) ? aiPrice : base;
+        return Math.max(Math.round(ai / 5) * 5, base);
+      };
+
+      const goodPrice = floorPrice(parsed.good?.suggestedPrice, currentPrices.good);
+      const betterPrice = floorPrice(parsed.better?.suggestedPrice, currentPrices.better);
+      const bestPrice = floorPrice(parsed.best?.suggestedPrice, currentPrices.best);
+
+      return res.json({
+        good: {
+          suggestedPrice: goodPrice,
+          reasoning: parsed.good?.reasoning || "",
+          flooredToBase: goodPrice === currentPrices.good,
+        },
+        better: {
+          suggestedPrice: betterPrice,
+          reasoning: parsed.better?.reasoning || "",
+          flooredToBase: betterPrice === currentPrices.better,
+        },
+        best: {
+          suggestedPrice: bestPrice,
+          reasoning: parsed.best?.reasoning || "",
+          flooredToBase: bestPrice === currentPrices.best,
+        },
+        overallAssessment: parsed.overallAssessment || "",
+        confidence: parsed.confidence || "medium",
+        keyInsight: parsed.keyInsight || "",
+        baselinePrices: { good: currentPrices.good, better: currentPrices.better, best: currentPrices.best },
+      });
+    } catch (error: any) {
+      console.error("AI pricing suggestion error:", error);
+      return res.status(500).json({ message: "Failed to generate pricing suggestion" });
+    }
+  });
+
+  router.post("/api/ai/walkthrough-extract", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const raw = req.body.description || req.body.notes || "";
+      const description = typeof raw === "string" ? raw.trim() : "";
+      if (!description) {
+        return res.status(400).json({ message: "A job description is required" });
+      }
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (business) {
+        try {
+          await createAnalyticsEvent({
+            businessId: business.id,
+            eventName: "walkthrough_analysis_started",
+            properties: { descriptionLength: description.length },
+          });
+        } catch (_e) {}
+      }
+
+      const systemPrompt = `You are an expert quoting assistant for residential and commercial cleaning businesses. A cleaning company owner will paste rough notes, walkthrough text, a customer message, or a property description. Your job is to extract all useful quoting details and return a structured JSON response.
+
+You understand cleaning-industry terminology:
+- "first-time clean" or "initial clean" → isFirstTimeClean: true, often implies deep clean
+- "maintenance clean" or "recurring" → standard recurring service
+- "deep clean" → isDeepClean: true, serviceCategory: "deep"
+- "move-in" / "move-out" / "vacant" → isMoveInOut: true, serviceCategory: "move-in-out"
+- "biweekly" / "every two weeks" → frequency: "bi-weekly"
+- "very dirty" / "hasn't been cleaned in months" / "heavy buildup" → conditionLevel: "heavy" or "extreme"
+- "light" / "pretty clean" / "just needs a touch-up" → conditionLevel: "light"
+- "inside fridge" / "inside oven" → add to addOns
+- "Airbnb" / "turnover clean" / "short-term rental" → note in serviceNotes, may be recurring one-time
+- "salon" / "office" / "boutique" / "medical" / "restaurant" → isCommercial: true, set propertyType
+
+Return ONLY a valid JSON object with this exact structure:
+{
+  "extractedFields": {
+    "propertyType": "house" | "apartment" | "condo" | "townhouse" | "office" | "retail" | "medical" | "restaurant" | "gym" | "airbnb" | "other" | null,
+    "serviceCategory": "standard" | "deep" | "move-in-out" | "post-construction" | "recurring" | "one-time" | null,
+    "isCommercial": boolean,
+    "bedrooms": number | null,
+    "bathrooms": number | null,
+    "halfBaths": number | null,
+    "sqft": number | null,
+    "occupants": number | null,
+    "frequency": "one-time" | "weekly" | "bi-weekly" | "monthly" | null,
+    "isFirstTimeClean": boolean,
+    "isDeepClean": boolean,
+    "isMoveInOut": boolean,
+    "petCount": number | null,
+    "petType": "dog" | "cat" | "both" | "other" | "none" | null,
+    "petShedding": boolean | null,
+    "addOns": string[],
+    "conditionLevel": "light" | "moderate" | "heavy" | "extreme" | null,
+    "conditionReasoning": string | null,
+    "urgency": "normal" | "rush" | "flexible" | null,
+    "customerName": string | null,
+    "address": string | null,
+    "serviceNotes": string | null
+  },
+  "missingFields": string[],
+  "recommendations": string[],
+  "serviceReasoning": string,
+  "assumptions": string[],
+  "confidence": "high" | "medium" | "low"
+}
+
+Field rules:
+- Use null for any field not mentioned or inferable. Never guess without strong signal.
+- isFirstTimeClean / isDeepClean / isMoveInOut default to false if not mentioned.
+- isCommercial defaults to false.
+- addOns: use plain English strings like "inside oven", "inside fridge", "window cleaning", "laundry", "organizing", "baseboards", "blinds", "carpet cleaning", "wall washing", "garage", "pet hair treatment".
+- missingFields: list what a cleaner would need to finalize a quote but couldn't determine, e.g. ["square footage", "service frequency", "cleaning type"].
+- recommendations: 1-3 short, practical suggestions for the cleaner, e.g. "First-time deep clean recommended given language about dirtiness", "Ask about preferred recurring schedule after initial clean".
+- serviceReasoning: one sentence explaining why you chose the serviceCategory you did.
+- assumptions: list any inferences you made that aren't explicitly stated.
+- confidence: high = most key fields filled, medium = some gaps, low = very sparse.
+- NEVER include prices, costs, rates, or dollar amounts.`;
+
+      let completion;
+      try {
+        completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: description },
+          ],
+          response_format: { type: "json_object" },
+        });
+      } catch (aiError: any) {
+        console.error("Walkthrough AI call failed:", aiError?.message || aiError);
+        return res.status(500).json({ message: "AI service is temporarily unavailable. Please try again in a moment." });
+      }
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        console.error("Walkthrough AI empty response");
+        return res.status(500).json({ message: "AI returned an empty response. Please try again." });
+      }
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        console.error("Walkthrough AI JSON parse failed:", content?.slice(0, 200));
+        return res.status(500).json({ message: "AI response could not be parsed. Please try again." });
+      }
+
+      const extractedFields = parsed.extractedFields || {};
+      const missingFields = Array.isArray(parsed.missingFields) ? parsed.missingFields : [];
+      const recommendations = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
+      const serviceReasoning = typeof parsed.serviceReasoning === "string" ? parsed.serviceReasoning : "";
+      const assumptions = Array.isArray(parsed.assumptions) ? parsed.assumptions : [];
+      const confidence = ["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low";
+
+      if (business) {
+        try {
+          await createAnalyticsEvent({
+            businessId: business.id,
+            eventName: "walkthrough_analysis_completed",
+            properties: {
+              confidence,
+              isCommercial: extractedFields.isCommercial || false,
+              propertyType: extractedFields.propertyType || "unknown",
+              assumptionCount: assumptions.length,
+            },
+          });
+        } catch (_e) {}
+      }
+
+      return res.json({
+        extractedFields,
+        missingFields,
+        recommendations,
+        serviceReasoning,
+        assumptions,
+        confidence,
+      });
+    } catch (error: any) {
+      console.error("AI walkthrough extract error:", error);
+      return res.status(500).json({ message: "Failed to analyze the job description. Please try again." });
+    }
+  });
+
+  router.post("/api/ai/closing-message", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const {
+        objectionText,
+        objectionType: objType,
+        tone,
+        language: msgLanguage,
+        quoteAmount,
+        serviceType,
+        frequency,
+        addOns,
+        customerName,
+        notes,
+        pricingSummary,
+        messageType,
+      } = req.body;
+
+      if (!tone) {
+        return res.status(400).json({ message: "Tone is required" });
+      }
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (business) {
+        try {
+          await createAnalyticsEvent({
+            businessId: business.id,
+            eventName: "objection_assistant_used",
+            properties: { objectionType: objType || messageType || "general", tone, language: msgLanguage || "en" },
+          });
+        } catch (_e) {}
+      }
+
+      const businessName = business?.companyName || "our company";
+      const languageMap: Record<string, string> = { en: "English", es: "Spanish", pt: "Portuguese", ru: "Russian" };
+      const targetLanguage = languageMap[msgLanguage || "en"] || "English";
+
+      const systemPrompt = `You are an elite AI sales assistant for cleaning businesses. Your job is to help the business owner craft the perfect response to a customer objection or hesitation so they can close more jobs.
+
+You will analyze the customer's message and generate a structured JSON response with:
+1. primaryReply — a ready-to-send message that addresses the objection and guides toward booking
+2. alternateReply — a different angle (e.g. softer, more direct, or differently framed)
+3. objectionType — classify the objection in 2-4 words (e.g., "Price objection", "Commitment hesitation", "Recurring resistance", "Deep clean resistance", "One-time preference")
+4. nextMove — a short tactical tip for what the business owner should do after sending the reply
+
+Rules:
+- Write ENTIRELY in ${targetLanguage}
+- Tone: ${tone}
+- Replies must feel human and genuine — never robotic or salesy
+- Keep replies concise and text-message ready (unless the context suggests email)
+- Reference cleaning-specific details: deep clean, recurring service, weekly/biweekly/monthly, quote amount, first-time clean
+- Use the customer's name if provided; otherwise write naturally without one
+- Business: ${businessName}
+- Do NOT use emojis
+- Do NOT use placeholder brackets like [Name]
+- Return ONLY a valid JSON object, no other text
+
+Return exactly this JSON structure:
+{
+  "primaryReply": "...",
+  "alternateReply": "...",
+  "objectionType": "...",
+  "nextMove": "..."
+}`;
+
+      const contextParts: string[] = [];
+      if (objectionText) contextParts.push(`Customer's message: "${objectionText}"`);
+      if (customerName) contextParts.push(`Customer name: ${customerName}`);
+      if (quoteAmount) contextParts.push(`Quote amount: $${Number(quoteAmount).toFixed(2)}`);
+      if (serviceType) contextParts.push(`Service type: ${serviceType}`);
+      if (frequency) contextParts.push(`Cleaning frequency: ${frequency}`);
+      if (addOns && Array.isArray(addOns) && addOns.length > 0) contextParts.push(`Add-ons: ${addOns.join(", ")}`);
+      if (notes) contextParts.push(`Additional context: ${notes}`);
+      if (pricingSummary) contextParts.push(`Pricing summary: ${pricingSummary}`);
+      if (objType || messageType) contextParts.push(`Objection category: ${(objType || messageType || "").replace(/_/g, " ")}`);
+
+      const userMessage = contextParts.length > 0
+        ? `Generate an objection response with a ${tone} tone:\n\n${contextParts.join("\n")}`
+        : `Generate a sample price objection response with a ${tone} tone for a cleaning business. Example objection: "That's more than I expected."`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+        max_completion_tokens: 800,
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) return res.status(500).json({ message: "No response from AI" });
+
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        return res.json({ message: content.trim(), primaryReply: content.trim() });
+      }
+
+      return res.json({
+        message: parsed.primaryReply || content.trim(),
+        primaryReply: parsed.primaryReply || "",
+        alternateReply: parsed.alternateReply || "",
+        objectionType: parsed.objectionType || "",
+        nextMove: parsed.nextMove || "",
+      });
+    } catch (error: any) {
+      console.error("AI objection assistant error:", error);
+      return res.status(500).json({ message: "Failed to generate reply. Please try again." });
+    }
+  });
+
+  router.post("/api/ai/objection-extract", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { imageBase64, mimeType } = req.body;
+      if (!imageBase64) return res.status(400).json({ message: "Image is required" });
+
+      const dataUrl = `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Extract the visible text from this screenshot of a text message or chat conversation. Return ONLY the extracted text, preserving the conversation flow. Focus especially on the customer's most recent message or objection. Do not add any commentary.",
+              },
+              {
+                type: "image_url",
+                image_url: { url: dataUrl },
+              },
+            ] as any,
+          },
+        ],
+        max_completion_tokens: 400,
+      });
+
+      const extractedText = completion.choices[0]?.message?.content?.trim() || "";
+      return res.json({ text: extractedText });
+    } catch (error: any) {
+      console.error("Objection extract error:", error);
+      return res.status(500).json({ message: "Could not extract text from image. Please type the message manually." });
+    }
+  });
+
+  router.post("/api/ai/communication-draft", requireAuth, requirePro as any, async (req: Request, res: Response) => {
+    try {
+      const { type, purpose, customerName, companyName, senderName, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;
+
+      if (!type || !purpose) {
+        return res.status(400).json({ message: "type and purpose are required" });
+      }
+
+      const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
+
+      const quoteContext = quoteDetails
+        ? ` Quote: ${quoteDetails.selectedOption || "Cleaning"} $${quoteDetails.price || ""}. ${quoteDetails.scope || ""}. ${quoteDetails.propertyInfo || ""}.`
+        : "";
+
+      let systemPrompt: string;
+      let userPrompt: string;
+
+      const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
+
+      const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
+
+      if (type === "sms") {
+        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
+        userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
+      } else {
+        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Do NOT include the raw URL in the email body. Instead, write a sentence like "You can view and accept your quote by clicking the link below." A styled button with the link will be automatically added after your email.` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+        userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_completion_tokens: type === "sms" ? 100 : 250,
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ message: "No response from AI" });
+      }
+
+      let draft = content.trim();
+      if (draft.startsWith('"') && draft.endsWith('"')) {
+        draft = draft.slice(1, -1);
+      }
+      if (draft.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(draft);
+          draft = parsed.draft || content;
+        } catch {}
+      }
+      draft = draft.replace(/\\n/g, '\n');
+
+      return res.json({ draft });
+    } catch (error: any) {
+      console.error("AI communication draft error:", error);
+      return res.status(500).json({ message: "Failed to generate communication draft" });
+    }
+  });
+
+  router.post("/api/ai/generate-campaign-content", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { campaignName, segment, customPrompt, useAI } = req.body;
+
+      const businessName = business.companyName || "our cleaning company";
+      const ownerName = business.senderName || business.companyName || "Your cleaning team";
+      const signOff = ownerName;
+
+      const instantTemplates: Record<string, { subject: string; content: string }> = {
+        "Holiday Deep Clean": {
+          subject: `Holiday Deep Clean - ${businessName}`,
+          content: `Hi [Customer],\n\nThe holidays are almost here! Let ${businessName} get your home guest-ready with a thorough deep clean.\n\nWe'll tackle kitchens, bathrooms, and living spaces so every room sparkles for your gatherings.\n\nReply to book and we'll schedule at your convenience.\n\nBest regards,\n${signOff}`,
+        },
+        "Spring Cleaning Special": {
+          subject: `Spring Cleaning Special - ${businessName}`,
+          content: `Hi [Customer],\n\nSpring is here! Time to refresh your home after winter with a deep clean from ${businessName}.\n\nWe'll dust, scrub, and polish every corner so your space feels brand new for the warmer months.\n\nReply to book your spring cleaning today.\n\nBest regards,\n${signOff}`,
+        },
+        "New Year Fresh Start": {
+          subject: `Start the New Year Fresh - ${businessName}`,
+          content: `Hi [Customer],\n\nHappy New Year! Start fresh with a spotless home from ${businessName}.\n\nA clean home sets the tone for a great year ahead. Let us handle the deep clean so you can focus on your goals.\n\nReply to book and kick off the year right.\n\nBest regards,\n${signOff}`,
+        },
+        "Back to School Clean": {
+          subject: `Back to School Clean - ${businessName}`,
+          content: `Hi [Customer],\n\nSchool is starting! Get your home refreshed after a busy summer with ${businessName}.\n\nWe'll deep clean every room so your family can settle into a clean, organized routine.\n\nReply to book your back-to-school cleaning.\n\nBest regards,\n${signOff}`,
+        },
+        "Win Back Lost Leads": {
+          subject: `We'd Love to Hear from You - ${businessName}`,
+          content: `Hi [Customer],\n\nIt's been a while since we connected. We'd love the chance to earn your business at ${businessName}.\n\nWhether your needs have changed or you're ready for a fresh quote, we're here to help.\n\nReply to this email and we'll get you taken care of.\n\nBest regards,\n${signOff}`,
+        },
+        "VIP Customer Appreciation": {
+          subject: `Thank You from ${businessName}`,
+          content: `Hi [Customer],\n\nThank you for being a valued customer of ${businessName}. We truly appreciate your continued trust.\n\nAs a loyal client, we'd love to offer you priority booking for your next cleaning.\n\nReply to book and we'll schedule you at your preferred time.\n\nWarm regards,\n${signOff}`,
+        },
+      };
+
+      if (!useAI && !customPrompt?.trim() && instantTemplates[campaignName]) {
+        const template = instantTemplates[campaignName];
+        return res.json({ content: template.content, subject: template.subject, channel: "email" });
+      }
+
+      const targetDesc = segment === "dormant" ? "past customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired" : "customers";
+      const customInstruction = customPrompt?.trim() ? ` Focus: ${customPrompt.trim()}.` : "";
+      const campaignLangInstruction = getLangInstruction((business as any).commLanguage);
+      const systemPrompt = `Write a short marketing email for "${businessName}" (${ownerName}) to ${targetDesc}. Theme: "${campaignName}".${customInstruction} Rules: first line "Subject: ..." then blank line then body under 60 words in 3 short paragraphs. Use [Customer] as name. Sign off as ${signOff}. No links, no emojis. End with "Reply to book".${campaignLangInstruction}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Write the email." },
+        ],
+      });
+
+      const raw = completion.choices[0]?.message?.content?.trim() || "";
+      
+      if (!raw) {
+        const fallback = instantTemplates[campaignName] || { content: `Hi [Customer],\n\nWe wanted to reach out from ${businessName} about our ${campaignName} offer.\n\nWe'd love to serve you${segment === "dormant" ? " again" : ""}. Reply to schedule your next cleaning.\n\nBest regards,\n${signOff}`, subject: campaignName };
+        return res.json({ content: fallback.content, subject: fallback.subject, channel: "email" });
+      }
+
+      let subject = "";
+      let content = raw;
+      const subjectMatch = raw.match(/^Subject:\s*(.+)/i);
+      if (subjectMatch) {
+        subject = subjectMatch[1].trim();
+        content = raw.substring(raw.indexOf("\n") + 1).trim();
+      }
+
+      return res.json({ content, subject: subject || campaignName, channel: "email" });
+    } catch (error: any) {
+      console.error("AI generate campaign content error:", error?.message || error, error?.code, error?.status);
+      return res.status(500).json({ message: "Failed to generate campaign content" });
+    }
+  });
+
+  router.post("/api/ai/generate-review-email", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const businessName = business.companyName || "our cleaning company";
+      const ownerName = business.senderName || "";
+
+      const growthSettings = await getGrowthAutomationSettings(business.id);
+      const googleReviewLink = growthSettings?.googleReviewLink?.trim() || "";
+
+      const linkInstruction = googleReviewLink
+        ? `Include this Google review link in the email naturally: ${googleReviewLink} — encourage them to click it to leave a review.`
+        : `No links/URLs. Ask them to reply with their feedback or leave a review.`;
+
+      const reviewLangInstruction = getLangInstruction((business as any).commLanguage);
+      const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. ${linkInstruction} No emojis. Keep it personal and genuine.${reviewLangInstruction}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Generate a review request email." },
+        ],
+        max_completion_tokens: 250,
+      });
+
+      const raw = completion.choices[0]?.message?.content?.trim() || "";
+      let subject = "";
+      let content = raw;
+      if (raw.startsWith("Subject:")) {
+        const lines = raw.split("\n");
+        subject = lines[0].replace("Subject:", "").trim();
+        content = lines.slice(1).join("\n").trim();
+      }
+
+      const fallbackLink = googleReviewLink ? `\n\nLeave us a review here: ${googleReviewLink}` : "";
+      if (!content) {
+        return res.json({
+          content: `Dear [Customer],\n\nThank you for choosing ${businessName}. We hope you were happy with our service.\n\nWould you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.${fallbackLink}\n\nWe appreciate your time!\n\nBest regards,\n${ownerName || businessName}`,
+          subject: "We would love your feedback",
+          channel: "email",
+        });
+      }
+
+      return res.json({ content, subject, channel: "email" });
+    } catch (error: any) {
+      console.error("AI generate review email error:", error?.message || error);
+      const business = await getBusinessByOwner(req.session.userId!).catch(() => null);
+      const businessName = business?.companyName || "our cleaning company";
+      const ownerName = business?.senderName || businessName;
+      let fallbackLink = "";
+      try {
+        if (business) {
+          const gs = await getGrowthAutomationSettings(business.id);
+          if (gs?.googleReviewLink?.trim()) fallbackLink = `\n\nLeave us a review here: ${gs.googleReviewLink.trim()}`;
+        }
+      } catch {}
+      return res.json({
+        content: `Dear [Customer],\n\nThank you for choosing ${businessName}. We hope you were happy with our service.\n\nWould you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.${fallbackLink}\n\nWe appreciate your time!\n\nBest regards,\n${ownerName}`,
+        subject: "We would love your feedback",
+        channel: "email",
+      });
+    }
+  });
+
+  router.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { purpose, channel, customerName, companyName, senderName, total, status, quoteLink, bookingLink, paymentMethodsText, language: commLang } = req.body;
+      const msgType = (channel || "sms") as string;
+      const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
+
+      const genMsgBusiness = await getBusinessByOwner(req.session.userId!);
+      const quoteContext = total ? ` Quote total: $${total}.` : "";
+      const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
+      const langInstruction = getLangInstruction(commLang || (genMsgBusiness as any)?.commLanguage);
+
+      let systemPrompt: string;
+      let userPrompt: string;
+
+      if (msgType === "sms") {
+        systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
+        userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
+      } else {
+        systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Do NOT include the raw URL in the email body. Instead, write a sentence like "You can view and accept your quote by clicking the link below." A styled button with the link will be automatically added after your email.` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+        userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_completion_tokens: msgType === "sms" ? 100 : 250,
+      });
+
+      let draft = completion.choices[0]?.message?.content?.trim() || "";
+      if (draft.startsWith('"') && draft.endsWith('"')) draft = draft.slice(1, -1);
+      if (draft.startsWith('{')) { try { const p = JSON.parse(draft); draft = p.draft || p.message || draft; } catch {} }
+      draft = draft.replace(/\\n/g, '\n');
+
+      return res.json({ message: draft, draft });
+    } catch (error: any) {
+      console.error("AI generate message error:", error);
+      return res.status(500).json({ message: "Failed to generate message" });
+    }
+  });

@@ -413,6 +413,28 @@ async function seedDemoUser() {
   // Run once at startup (catches any overdue records), then every 24 hours
   purgeSoftDeleted();
   setInterval(purgeSoftDeleted, 24 * 60 * 60 * 1000);
+
+  // ─── Analytics events TTL cron: delete events older than 90 days ─────────────
+  // Runs every Sunday at 2am (checks every hour, fires on Sunday 2am).
+  function scheduleAnalyticsTTL() {
+    const now = new Date();
+    const msTillNextCheck = 60 * 60 * 1000; // check every hour
+    setInterval(async () => {
+      const d = new Date();
+      if (d.getDay() === 0 && d.getHours() === 2) {
+        try {
+          const result = await pool.query(
+            `DELETE FROM analytics_events WHERE created_at < NOW() - INTERVAL '90 days'`
+          );
+          const deleted = result.rowCount ?? 0;
+          log(`[analytics-ttl] Purged ${deleted} analytics events older than 90 days`);
+        } catch (e: any) {
+          console.error("[analytics-ttl] Purge failed:", e.message);
+        }
+      }
+    }, msTillNextCheck);
+  }
+  scheduleAnalyticsTTL();
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

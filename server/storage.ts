@@ -2987,3 +2987,36 @@ export async function generateBookingSlots(
   return results;
 }
 
+
+// ─── Stub functions for social leads (not fully implemented) ────────────────
+
+export async function createSocialLead(data: any): Promise<any> {
+  const { db } = await import("./db");
+  const { socialLeads } = await import("@shared/schema");
+  const [lead] = await db.insert(socialLeads).values({
+    businessId: data.businessId,
+    firstName: data.firstName || "",
+    lastName: data.lastName || "",
+    email: data.email || "",
+    phone: data.phone || "",
+    source: data.source || "website",
+    status: "new",
+    notes: data.notes || "",
+  }).returning();
+  return lead;
+}
+
+export async function createAttributionEvent(data: any): Promise<void> {
+  // Stub - attribution events are tracked via analytics events
+  try {
+    const { db } = await import("./db");
+    const { analyticsEvents } = await import("@shared/schema");
+    await db.insert(analyticsEvents).values({
+      businessId: data.businessId,
+      eventName: data.eventName || "attribution",
+      properties: data,
+    });
+  } catch {
+    // Non-critical - don't throw
+  }
+}

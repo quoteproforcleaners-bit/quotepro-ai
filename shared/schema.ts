@@ -8,6 +8,7 @@ import {
   jsonb,
   integer,
   real,
+  index,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -100,7 +101,9 @@ export const customers = pgTable("customers", {
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  businessIdIdx: index("customers_business_id_idx").on(table.businessId),
+}));
 
 export const quotes = pgTable("quotes", {
   id: varchar("id")
@@ -155,7 +158,12 @@ export const quotes = pgTable("quotes", {
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  customerIdIdx: index("quotes_customer_id_idx").on(table.customerId),
+  statusIdx:     index("quotes_status_idx").on(table.status),
+  createdAtIdx:  index("quotes_created_at_idx").on(table.createdAt),
+  deletedAtIdx:  index("quotes_deleted_at_idx").on(table.deletedAt),
+}));
 
 export const salesRecommendations = pgTable("sales_recommendations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -188,7 +196,9 @@ export const quoteFollowUps = pgTable("quote_follow_ups", {
   status: text("status").notNull().default("scheduled"),
   sentAt: timestamp("sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  quoteIdIdx: index("quote_follow_ups_quote_id_idx").on(table.quoteId),
+}));
 
 export const quoteLineItems = pgTable("quote_line_items", {
   id: varchar("id")
@@ -267,7 +277,11 @@ export const jobs = pgTable("jobs", {
   cleanerNotes: text("cleaner_notes").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  quoteIdIdx:       index("jobs_quote_id_idx").on(table.quoteId),
+  startDatetimeIdx: index("jobs_start_datetime_idx").on(table.startDatetime),
+  statusIdx:        index("jobs_status_idx").on(table.status),
+}));
 
 export const employees = pgTable("employees", {
   id: varchar("id")
@@ -358,7 +372,9 @@ export const communications = pgTable("communications", {
   sentAt: timestamp("sent_at"),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  customerIdIdx: index("communications_customer_id_idx").on(table.customerId),
+}));
 
 export const automationRules = pgTable("automation_rules", {
   id: varchar("id")
@@ -596,7 +612,9 @@ export const analyticsEvents = pgTable("analytics_events", {
   eventName: text("event_name").notNull(),
   properties: jsonb("properties").notNull().default(sql`'{}'::jsonb`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  createdAtIdx: index("analytics_events_created_at_idx").on(table.createdAt),
+}));
 
 export const badges = pgTable("badges", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1274,3 +1292,14 @@ export const cleanerScheduleNotifications = pgTable("cleaner_schedule_notificati
 });
 
 export type CleanerScheduleNotification = typeof cleanerScheduleNotifications.$inferSelect;
+
+// ─── Backward-compatibility aliases (used by auto-generated router imports) ───
+export const photos = jobPhotos;
+export const preferences = userPreferences;
+export const bookingAvailability = bookingAvailabilitySettings;
+export const checklistItems = jobChecklistItems;
+// Stubs for tables referenced in generated router imports but not yet in schema
+export const employeeShifts = employees;
+export const intakeRequests = customers;
+export const pricingJobs = pricingAnalyses;
+export const leadCapture = socialLeads;

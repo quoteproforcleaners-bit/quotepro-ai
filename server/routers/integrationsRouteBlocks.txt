@@ -1,0 +1,1405 @@
+  router.post("/api/internal/cron", async (_req: Request, res: Response) => {
+    try {
+      const expiredCount = await expireOldQuotes();
+      if (expiredCount > 0) console.log(`Expired ${expiredCount} quotes`);
+      const { sent, canceled } = await processPendingFollowUps();
+      return res.json({ expired: expiredCount, followupsSent: sent, followupsCanceled: canceled });
+    } catch (error: any) {
+      console.error("Cron error:", error);
+      return res.status(500).json({ message: "Cron failed" });
+    }
+  });
+
+  router.get("/api/google-calendar/status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const tokens = await getGoogleCalendarToken(req.session.userId!);
+      if (tokens) {
+        return res.json({ connected: true, calendarId: tokens.calendarId });
+      }
+      return res.json({ connected: false });
+    } catch (error: any) {
+      console.error("Calendar status error:", error);
+      return res.status(500).json({ message: "Failed to check calendar status" });
+    }
+  });
+
+  router.get("/api/google-calendar/connect", requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return res.status(503).json({ message: "Google Calendar is not set up yet. Contact support to enable calendar sync." });
+      }
+      const state = crypto.randomBytes(32).toString("hex");
+      await pool.query(
+        `INSERT INTO oauth_states (state, user_id, provider, created_at)
+         VALUES ($1, $2, 'google_calendar', NOW())`,
+        [state, req.session.userId]
+      );
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        `https://${req.get("host")}/api/google-calendar/callback`
+      );
+      const url = oauth2Client.generateAuthUrl({
+        access_type: "offline",
+        scope: ["https://www.googleapis.com/auth/calendar.events"],
+        prompt: "consent",
+        state,
+      });
+      return res.json({ url });
+    } catch (error: any) {
+      console.error("Calendar connect error:", error);
+      return res.status(500).json({ message: "Failed to generate auth URL" });
+    }
+  });
+
+  router.get("/api/google-calendar/callback", async (req: Request, res: Response) => {
+    try {
+      const { code, state } = req.query as { code: string; state: string };
+      if (!code || !state) {
+        return res.status(400).send("Missing code or state");
+      }
+
+      const stateResult = await pool.query(
+        `DELETE FROM oauth_states WHERE state = $1 AND provider = 'google_calendar'
+         AND created_at > NOW() - INTERVAL '10 minutes' RETURNING user_id`,
+        [state]
+      );
+      if (stateResult.rows.length === 0) {
+        return res.status(403).send("Invalid or expired OAuth state. Please try connecting again.");
+      }
+      const userId = stateResult.rows[0].user_id;
+
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        `https://${req.get("host")}/api/google-calendar/callback`
+      );
+
+      const { tokens } = await oauth2Client.getToken(code);
+
+      await upsertGoogleCalendarToken(userId, {
+        accessToken: tokens.access_token!,
+        refreshToken: tokens.refresh_token!,
+        expiresAt: new Date(tokens.expiry_date!),
+      });
+
+      return res.send(`<!DOCTYPE html>
+<html><head><title>Calendar Connected</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.check{font-size:48px;margin-bottom:16px;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><div class="check">&#10003;</div><h2>Calendar Connected!</h2><p>You can close this window.</p></div></body></html>`);
+    } catch (error: any) {
+      console.error("Calendar callback error:", error);
+      return res.status(500).send("Failed to connect calendar. Please try again.");
+    }
+  });
+
+  router.delete("/api/google-calendar/disconnect", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteGoogleCalendarToken(req.session.userId!);
+      return res.json({ message: "Disconnected" });
+    } catch (error: any) {
+      console.error("Calendar disconnect error:", error);
+      return res.status(500).json({ message: "Failed to disconnect calendar" });
+    }
+  });
+
+  router.post("/api/google-calendar/sync-job", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.body;
+      if (!jobId) return res.status(400).json({ message: "jobId is required" });
+
+      const job = await getJobById(jobId);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      let customerName = "Customer";
+      if (job.customerId) {
+        const customer = await getCustomerById(job.customerId);
+        if (customer) customerName = `${customer.firstName} ${customer.lastName}`.trim();
+      }
+
+      await syncJobToGoogleCalendar(req.session.userId!, job, customerName);
+      return res.json({ message: "Synced to Google Calendar" });
+    } catch (error: any) {
+      console.error("Calendar sync error:", error);
+      return res.status(500).json({ message: "Failed to sync to calendar" });
+    }
+  });
+
+  router.get("/api/stripe/status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      if (business.stripeAccountId && business.stripeOnboardingComplete) {
+        return res.json({ connected: true, accountId: business.stripeAccountId });
+      }
+      return res.json({ connected: false, accountId: business.stripeAccountId || null });
+    } catch (error: any) {
+      console.error("Stripe status error:", error);
+      return res.status(500).json({ message: "Failed to check Stripe status" });
+    }
+  });
+
+  router.post("/api/stripe/connect", requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).json({ message: "Stripe is not configured. Please add your Stripe API keys to enable payments." });
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      let accountId = business.stripeAccountId;
+      if (!accountId) {
+        const account = await stripe.accounts.create({
+          country: "US",
+          email: business.email || undefined,
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+          business_profile: {
+            name: business.companyName || "Cleaning Business",
+          },
+          metadata: { businessId: business.id },
+        });
+        accountId = account.id;
+        await updateBusiness(business.id, { stripeAccountId: accountId });
+      }
+
+      const accountLink = await stripe.accountLinks.create({
+        account: accountId,
+        refresh_url: `https://${req.get("host")}/api/stripe/connect-refresh?userId=${req.session.userId}`,
+        return_url: `https://${req.get("host")}/api/stripe/connect-callback?userId=${req.session.userId}`,
+        type: "account_onboarding",
+      });
+
+      return res.json({ url: accountLink.url });
+    } catch (error: any) {
+      console.error("Stripe connect error:", error?.message || error);
+      const msg = error?.message || "";
+      if (error?.type === "StripeInvalidRequestError" && (msg.includes("signed up for Connect") || msg.includes("platform profile"))) {
+        return res.status(400).json({ message: "Stripe Connect setup is incomplete. Please visit dashboard.stripe.com/connect to finish platform setup, then try again." });
+      }
+      if (error?.type === "StripeInvalidRequestError" && msg.includes("No such account")) {
+        const business = await getBusinessByOwner(req.session.userId!);
+        if (business) {
+          await updateBusiness(business.id, { stripeAccountId: null, stripeOnboardingComplete: false });
+        }
+        return res.status(400).json({ message: "Previous Stripe account was invalid. Please try connecting again." });
+      }
+      return res.status(500).json({ message: "Failed to connect Stripe. Please try again." });
+    }
+  });
+
+  router.get("/api/stripe/connect-callback", async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).send("Stripe not configured");
+      const { userId } = req.query as { userId: string };
+      if (!userId) return res.status(400).send("Missing userId");
+
+      const business = await getBusinessByOwner(userId);
+      if (!business || !business.stripeAccountId) return res.status(400).send("No Stripe account found");
+
+      const account = await stripe.accounts.retrieve(business.stripeAccountId);
+      const isComplete = !!(account.charges_enabled && account.details_submitted);
+
+      if (isComplete) {
+        await updateBusiness(business.id, { stripeOnboardingComplete: true });
+      }
+
+      return res.send(`<!DOCTYPE html>
+<html><head><title>Stripe Connected</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.check{font-size:48px;margin-bottom:16px;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><div class="check">&#10003;</div><h2>${isComplete ? "Stripe Connected!" : "Almost Done"}</h2><p>${isComplete ? "You can now accept payments. Close this window." : "Please complete the remaining steps in Stripe."}</p></div></body></html>`);
+    } catch (error: any) {
+      console.error("Stripe callback error:", error);
+      return res.status(500).send("Failed to verify Stripe connection.");
+    }
+  });
+
+  router.get("/api/stripe/connect-refresh", async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).send("Stripe not configured");
+      const { userId } = req.query as { userId: string };
+      if (!userId) return res.status(400).send("Missing userId");
+
+      const business = await getBusinessByOwner(userId);
+      if (!business || !business.stripeAccountId) return res.status(400).send("No Stripe account");
+
+      const accountLink = await stripe.accountLinks.create({
+        account: business.stripeAccountId,
+        refresh_url: `https://${req.get("host")}/api/stripe/connect-refresh?userId=${userId}`,
+        return_url: `https://${req.get("host")}/api/stripe/connect-callback?userId=${userId}`,
+        type: "account_onboarding",
+      });
+
+      return res.redirect(accountLink.url);
+    } catch (error: any) {
+      console.error("Stripe refresh error:", error);
+      return res.status(500).send("Failed to refresh onboarding");
+    }
+  });
+
+  router.delete("/api/stripe/disconnect", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      await updateBusiness(business.id, { stripeAccountId: null, stripeOnboardingComplete: false });
+      return res.json({ message: "Stripe disconnected" });
+    } catch (error: any) {
+      console.error("Stripe disconnect error:", error);
+      return res.status(500).json({ message: "Failed to disconnect Stripe" });
+    }
+  });
+
+  router.post("/api/stripe/create-payment", requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
+      const { quoteId } = req.body;
+      if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
+
+      const quote = await getQuoteById(quoteId);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+
+      const business = await db_getBusinessById(quote.businessId);
+      if (!business || !business.stripeAccountId || !business.stripeOnboardingComplete) {
+        return res.status(400).json({ message: "Stripe is not connected for this business" });
+      }
+
+      const amount = Math.round(quote.total * 100);
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: [{
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `Cleaning Service Quote`,
+              description: `${quote.frequencySelected} cleaning - ${quote.selectedOption} option`,
+            },
+            unit_amount: amount,
+          },
+          quantity: 1,
+        }],
+        success_url: `https://${req.get("host")}/api/stripe/payment-success?quoteId=${quoteId}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://${req.get("host")}/api/stripe/payment-cancel?quoteId=${quoteId}`,
+        metadata: { quoteId, businessId: business.id },
+      }, {
+        stripeAccount: business.stripeAccountId,
+      });
+
+      return res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Create payment error:", error);
+      return res.status(500).json({ message: "Failed to create payment session" });
+    }
+  });
+
+  router.get("/api/stripe/deposit-success", async (req: Request, res: Response) => {
+    try {
+      const { quoteId, session_id } = req.query as { quoteId: string; session_id: string };
+      if (!quoteId || !session_id || !stripe) {
+        return res.redirect("/");
+      }
+
+      const quote = await getQuoteById(quoteId);
+      if (!quote) return res.redirect("/");
+
+      const business = await db_getBusinessById(quote.businessId);
+      const stripeOpts = business?.stripeAccountId ? { stripeAccount: business.stripeAccountId } : undefined;
+
+      const checkoutSession = await stripe.checkout.sessions.retrieve(session_id as string, stripeOpts);
+      if (!checkoutSession || checkoutSession.payment_status !== "paid") {
+        return res.redirect(`/q/${quote.publicToken}?payment=failed`);
+      }
+
+      if (checkoutSession.metadata?.quoteId !== quoteId || checkoutSession.metadata?.type !== "deposit") {
+        return res.redirect(`/q/${quote.publicToken}?payment=failed`);
+      }
+
+      const expectedAmountCents = Math.round(Number(quote.depositAmount || 0) * 100);
+      if (expectedAmountCents > 0 && checkoutSession.amount_total !== expectedAmountCents) {
+        return res.redirect(`/q/${quote.publicToken}?payment=failed`);
+      }
+
+      await updateQuote(quoteId, {
+        depositPaid: true,
+        status: "accepted",
+        acceptedAt: new Date(),
+        paymentIntentId: checkoutSession.payment_intent as string || undefined,
+        paymentAmount: (checkoutSession.amount_total || 0) / 100,
+      } as any);
+
+      await cancelPendingCommunicationsForQuote(quoteId);
+
+      return res.redirect(`/q/${quote.publicToken}`);
+    } catch (error: any) {
+      console.error("Deposit success error:", error);
+      return res.redirect("/");
+    }
+  });
+
+  router.get("/api/stripe/payment-success", async (req: Request, res: Response) => {
+    try {
+      const { quoteId, session_id } = req.query as { quoteId: string; session_id: string };
+      if (quoteId) {
+        await updateQuote(quoteId, {
+          paymentStatus: "paid",
+          paymentAmount: undefined,
+          paidAt: new Date(),
+          status: "accepted",
+          acceptedAt: new Date(),
+        });
+
+        if (stripe && session_id) {
+          try {
+            const checkoutSession = await stripe.checkout.sessions.retrieve(session_id);
+            if (checkoutSession.payment_intent) {
+              await updateQuote(quoteId, {
+                paymentIntentId: checkoutSession.payment_intent as string,
+                paymentAmount: (checkoutSession.amount_total || 0) / 100,
+              });
+            }
+          } catch (e) {
+            console.error("Error retrieving checkout session:", e);
+          }
+        }
+      }
+
+      return res.send(`<!DOCTYPE html>
+<html><head><title>Payment Successful</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.check{font-size:48px;margin-bottom:16px;color:#22c55e;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><div class="check">&#10003;</div><h2>Payment Successful!</h2><p>Thank you for your payment. You may close this window.</p></div></body></html>`);
+    } catch (error: any) {
+      console.error("Payment success error:", error);
+      return res.status(500).send("An error occurred processing your payment confirmation.");
+    }
+  });
+
+  router.get("/api/stripe/payment-cancel", async (_req: Request, res: Response) => {
+    return res.send(`<!DOCTYPE html>
+<html><head><title>Payment Cancelled</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
+.card{text-align:center;padding:40px;background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.icon{font-size:48px;margin-bottom:16px;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
+</head><body><div class="card"><div class="icon">&#10007;</div><h2>Payment Cancelled</h2><p>No charge was made. You can close this window.</p></div></body></html>`);
+  });
+
+  router.post("/api/api-keys", requireAuth, async (req: any, res) => {
+    try {
+      const rawKey = `qp_${crypto.randomBytes(32).toString("hex")}`;
+      const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
+      const keyPrefix = rawKey.slice(-8);
+      const label = req.body.label || "API Key";
+
+      const VALID_SCOPES = ["read:quotes", "write:quotes", "read:customers", "write:customers", "read:business"];
+      const requestedScopes: string[] = Array.isArray(req.body.scopes) ? req.body.scopes : ["read:quotes"];
+      const scopes = requestedScopes.filter((s: string) => VALID_SCOPES.includes(s));
+      if (scopes.length === 0) {
+        return res.status(400).json({ error: "At least one valid scope is required", validScopes: VALID_SCOPES });
+      }
+
+      const user = await getUserById(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "User not found" });
+      const business = await getBusinessByOwner(user.id);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+
+      const apiKey = await createApiKey({
+        userId: req.session.userId!,
+        businessId: business.id,
+        keyHash,
+        keyPrefix,
+        label,
+        isActive: true,
+        scopes,
+      });
+
+      res.json({ success: true, rawKey, apiKey });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/api-keys", requireAuth, async (req: any, res) => {
+    try {
+      const keys = await getApiKeysByUserId(req.session.userId!);
+      res.json(keys.map((k: any) => ({ id: k.id, keyPrefix: k.keyPrefix, label: k.label, isActive: k.isActive, scopes: k.scopes ?? ["read:quotes"], createdAt: k.createdAt })));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete("/api/api-keys/:id", requireAuth, async (req: any, res) => {
+    try {
+      await deactivateApiKey(req.params.id, req.session.userId!);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post("/api/webhook-endpoints", requireAuth, async (req: any, res) => {
+    try {
+      const { url, enabledEvents = [] } = req.body;
+      if (!url) return res.status(400).json({ error: "url required" });
+      const endpoint = await createWebhookEndpoint({
+        userId: req.session.userId!,
+        businessId: req.businessId,
+        url,
+        isActive: true,
+        enabledEvents,
+      });
+      res.json({ success: true, endpoint });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/webhook-endpoints", requireAuth, async (req: any, res) => {
+    try {
+      const endpoints = await getWebhookEndpointsByUserId(req.session.userId!);
+      res.json(endpoints);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.put("/api/webhook-endpoints/:id", requireAuth, async (req: any, res) => {
+    try {
+      const { url, isActive, enabledEvents } = req.body;
+      const updated = await updateWebhookEndpoint(req.params.id, req.session.userId!, { url, isActive, enabledEvents });
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      res.json({ success: true, endpoint: updated });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete("/api/webhook-endpoints/:id", requireAuth, async (req: any, res) => {
+    try {
+      await deleteWebhookEndpoint(req.params.id, req.session.userId!);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post("/api/webhook-endpoints/:id/test", requireAuth, async (req: any, res) => {
+    try {
+      const endpoints = await getWebhookEndpointsByUserId(req.session.userId!);
+      const ep = endpoints.find((e: any) => e.id === req.params.id);
+      if (!ep) return res.status(404).json({ error: "Not found" });
+
+      const testPayload = {
+        event_type: "test",
+        event_id: crypto.randomUUID(),
+        occurred_at: new Date().toISOString(),
+        account_id: req.businessId,
+        data: { message: "This is a test webhook from QuotePro" },
+      };
+
+      const keys = await getApiKeysByUserId(req.session.userId!);
+      const activeKey = keys[0];
+      const body = JSON.stringify(testPayload);
+      const signature = activeKey
+        ? crypto.createHmac("sha256", activeKey.keyHash).update(body).digest("hex")
+        : "no-api-key";
+
+      try {
+        const response = await fetch(ep.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-QP-Signature": signature },
+          body,
+          signal: AbortSignal.timeout(10000),
+        });
+        res.json({ success: true, statusCode: response.status, statusText: response.statusText });
+      } catch (fetchErr: any) {
+        res.json({ success: false, error: fetchErr.message });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/webhook-events", requireAuth, async (req: any, res) => {
+    try {
+      const events = await getWebhookEventsByUserId(req.session.userId!);
+      const eventsWithStatus = await Promise.all(
+        events.map(async (evt: any) => {
+          const deliveries = await getWebhookDeliveriesByEventId(evt.id);
+          const allDelivered = deliveries.length > 0 && deliveries.every((d: any) => d.deliveredAt);
+          const anyRetrying = deliveries.some((d: any) => d.nextRetryAt && !d.deliveredAt);
+          const status = allDelivered ? "delivered" : anyRetrying ? "retrying" : deliveries.length > 0 ? "failed" : "pending";
+          return { ...evt, deliveryStatus: status, deliveryCount: deliveries.length };
+        })
+      );
+      res.json(eventsWithStatus);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/webhook-events/:id", requireAuth, async (req: any, res) => {
+    try {
+      const evt = await getWebhookEventById(req.params.id);
+      if (!evt || evt.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+      const deliveries = await getWebhookDeliveriesByEventId(evt.id);
+      res.json({ ...evt, deliveries });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/qbo/status", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT status, company_name as "companyName", realm_id as "realmId", environment,
+                last_error as "lastError", auto_create_invoice as "autoCreateInvoice"
+         FROM qbo_connections WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      if (result.rows.length === 0) {
+        return res.json({ status: "not_connected", companyName: null, realmId: null, environment: "production", lastError: null, autoCreateInvoice: false });
+      }
+      res.json(result.rows[0]);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/qbo/connect", requireAuth, async (req: any, res) => {
+    try {
+      const clientId = process.env.INTUIT_CLIENT_ID;
+      if (!clientId) return res.status(500).json({ error: "QuickBooks integration not configured" });
+
+      const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const redirectUri = `${protocol}://${host}/api/integrations/qbo/callback`;
+
+      const state = crypto.randomBytes(32).toString("hex");
+      await pool.query(
+        `INSERT INTO oauth_states (state, user_id, provider, created_at)
+         VALUES ($1, $2, 'qbo', NOW())`,
+        [state, req.session.userId]
+      );
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: "code",
+        scope: "com.intuit.quickbooks.accounting",
+        state,
+      });
+
+      const url = `https://appcenter.intuit.com/connect/oauth2?${params.toString()}`;
+      res.json({ url });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/qbo/callback", async (req: any, res) => {
+    try {
+      const { code, state, realmId } = req.query;
+      if (!code || !state || !realmId) {
+        return res.status(400).send("Missing required OAuth parameters");
+      }
+
+      const stateResult = await pool.query(
+        `DELETE FROM oauth_states WHERE state = $1 AND provider = 'qbo'
+         AND created_at > NOW() - INTERVAL '10 minutes' RETURNING user_id`,
+        [state]
+      );
+      if (stateResult.rows.length === 0) {
+        return res.status(403).send("Invalid or expired OAuth state. Please try connecting again.");
+      }
+      const userId = stateResult.rows[0].user_id;
+
+      const clientId = process.env.INTUIT_CLIENT_ID;
+      const clientSecret = process.env.INTUIT_CLIENT_SECRET;
+      if (!clientId || !clientSecret) return res.status(500).send("QuickBooks not configured");
+
+      const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const redirectUri = `${protocol}://${host}/api/integrations/qbo/callback`;
+
+      const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+      const tokenResponse = await fetch("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${basicAuth}`,
+          "Accept": "application/json",
+        },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code: code as string,
+          redirect_uri: redirectUri,
+        }).toString(),
+      });
+
+      if (!tokenResponse.ok) {
+        const errBody = await tokenResponse.text();
+        console.error("QBO token exchange failed:", tokenResponse.status, errBody);
+        await logSync(userId, null, "connect", {}, { error: errBody }, "failed", "Token exchange failed");
+        return res.status(400).send("Failed to exchange authorization code");
+      }
+
+      const tokens = await tokenResponse.json();
+      const accessToken = tokens.access_token;
+      const refreshToken = tokens.refresh_token;
+      const expiresIn = tokens.expires_in || 3600;
+      const expiresAt = new Date(Date.now() + expiresIn * 1000);
+
+      let companyName: string | null = null;
+      try {
+        const infoRes = await fetch(
+          `https://quickbooks.api.intuit.com/v3/company/${realmId}/companyinfo/${realmId}`,
+          { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } }
+        );
+        if (infoRes.ok) {
+          const infoData = await infoRes.json();
+          companyName = infoData?.CompanyInfo?.CompanyName || null;
+        }
+      } catch {}
+
+      await pool.query(
+        `INSERT INTO qbo_connections (id, user_id, realm_id, access_token_encrypted, refresh_token_encrypted,
+           access_token_expires_at, connected_at, scopes, environment, status, company_name)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW(), $6, 'production', 'connected', $7)
+         ON CONFLICT (user_id) DO UPDATE SET
+           realm_id = $2, access_token_encrypted = $3, refresh_token_encrypted = $4,
+           access_token_expires_at = $5, connected_at = NOW(), scopes = $6,
+           status = 'connected', company_name = $7, last_error = NULL, disconnected_at = NULL`,
+        [userId, realmId, encryptToken(accessToken), encryptToken(refreshToken), expiresAt, "com.intuit.quickbooks.accounting", companyName]
+      );
+
+      await logSync(userId, null, "connect", { realmId }, { companyName, success: true }, "ok");
+
+      res.send(`<!DOCTYPE html><html><head><title>QuickBooks Connected</title><style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8f9fa;margin:0}.card{text-align:center;padding:40px;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,0.1);max-width:400px}h1{color:#16a34a;margin-bottom:8px}p{color:#64748b}</style></head><body><div class="card"><h1>Connected!</h1><p>QuickBooks is now connected${companyName ? ` to ${companyName}` : ""}. You can close this window and return to QuotePro.</p></div></body></html>`);
+    } catch (e: any) {
+      console.error("QBO callback error:", e);
+      res.status(500).send("An error occurred during QuickBooks connection");
+    }
+  });
+
+  router.post("/api/integrations/qbo/disconnect", requireAuth, async (req: any, res) => {
+    try {
+      await pool.query(
+        `UPDATE qbo_connections SET status = 'disconnected', disconnected_at = NOW(),
+                access_token_encrypted = NULL, refresh_token_encrypted = NULL
+         WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      await logSync(req.session.userId, null, "disconnect", {}, { success: true }, "ok");
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post("/api/integrations/qbo/test", requireAuth, async (req: any, res) => {
+    try {
+      const client = new QBOClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No QuickBooks connection found" });
+
+      const info = await client.getCompanyInfo();
+      await logSync(req.session.userId, null, "test_connection", {}, { companyName: info.CompanyName }, "ok");
+      res.json({ success: true, companyName: info.CompanyName });
+    } catch (e: any) {
+      await logSync(req.session.userId, null, "test_connection", {}, { error: e.message }, "failed", e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post("/api/integrations/qbo/create-invoice", requireAuth, async (req: any, res) => {
+    try {
+      const { quoteId } = req.body;
+      if (!quoteId) return res.status(400).json({ error: "quoteId is required" });
+
+      const result = await createQBOInvoiceForQuote(req.session.userId, quoteId);
+      if (!result) return res.status(400).json({ error: "QuickBooks not connected or quote not found" });
+
+      res.json(result);
+    } catch (e: any) {
+      await logSync(req.session.userId, req.body?.quoteId || null, "create_invoice", { quoteId: req.body?.quoteId }, { error: e.message }, "failed", e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/qbo/logs", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, user_id as "userId", quote_id as "quoteId", action,
+                request_summary as "requestSummary", response_summary as "responseSummary",
+                status, error_message as "errorMessage", created_at as "createdAt"
+         FROM qbo_sync_log WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [req.session.userId]
+      );
+      res.json(result.rows);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.put("/api/integrations/qbo/settings", requireAuth, async (req: any, res) => {
+    try {
+      const { autoCreateInvoice } = req.body;
+      await pool.query(
+        `UPDATE qbo_connections SET auto_create_invoice = $1 WHERE user_id = $2`,
+        [!!autoCreateInvoice, req.session.userId]
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/qbo/invoice-link/:quoteId", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT qbo_invoice_id as "qboInvoiceId", qbo_doc_number as "qboDocNumber", created_at as "createdAt"
+         FROM qbo_invoice_links WHERE user_id = $1 AND quote_id = $2`,
+        [req.session.userId, req.params.quoteId]
+      );
+      if (result.rows.length === 0) return res.json(null);
+      res.json(result.rows[0]);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/jobber/connect", requireAuth, requirePro as any, async (req: any, res) => {
+    try {
+      const clientId = process.env.JOBBER_CLIENT_ID;
+      const clientSecret = process.env.JOBBER_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        console.error("Jobber connect: missing credentials", { hasClientId: !!clientId, hasClientSecret: !!clientSecret });
+        return res.status(500).json({ error: "Jobber integration not configured" });
+      }
+
+      const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const redirectUri = `${protocol}://${host}/api/integrations/jobber/callback`;
+
+      const state = crypto.randomBytes(32).toString("hex");
+      await pool.query(
+        `INSERT INTO oauth_states (state, user_id, provider, created_at)
+         VALUES ($1, $2, 'jobber', NOW())`,
+        [state, req.session.userId]
+      );
+
+      const url = buildJobberAuthUrl(redirectUri, state);
+      res.json({ url });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post("/api/integrations/jobber/connect", requireAuth, requirePro as any, async (req: any, res) => {
+    try {
+      const clientId = process.env.JOBBER_CLIENT_ID;
+      const clientSecret = process.env.JOBBER_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        return res.status(500).json({ error: "Jobber integration not configured" });
+      }
+      const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const redirectUri = `${protocol}://${host}/api/integrations/jobber/callback`;
+      const state = crypto.randomBytes(32).toString("hex");
+      await pool.query(
+        `INSERT INTO oauth_states (state, user_id, provider, created_at)
+         VALUES ($1, $2, 'jobber', NOW())`,
+        [state, req.session.userId]
+      );
+      const url = buildJobberAuthUrl(redirectUri, state);
+      res.json({ url });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/jobber/callback", async (req: any, res) => {
+    let resolvedUserId: string | null = null;
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        return res.status(400).send("Missing required OAuth parameters");
+      }
+
+      const stateResult = await pool.query(
+        `DELETE FROM oauth_states WHERE state = $1 AND provider = 'jobber'
+         AND created_at > NOW() - INTERVAL '10 minutes' RETURNING user_id`,
+        [state]
+      );
+      if (stateResult.rows.length === 0) {
+        return res.status(403).send("Invalid or expired OAuth state. Please try connecting again.");
+      }
+      resolvedUserId = stateResult.rows[0].user_id;
+
+      const host = req.get("host") || process.env.REPLIT_DEV_DOMAIN || "";
+      const protocol = host.includes("localhost") ? "http" : "https";
+      const redirectUri = `${protocol}://${host}/api/integrations/jobber/callback`;
+
+      const tokens = await exchangeJobberCode(code as string, redirectUri);
+      const expiresAt = new Date(Date.now() + tokens.expiresIn * 1000);
+
+      await pool.query(
+        `INSERT INTO jobber_connections (id, user_id, access_token_encrypted, refresh_token_encrypted,
+           access_token_expires_at, connected_at, scopes, status)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW(), $5, 'connected')
+         ON CONFLICT (user_id) DO UPDATE SET
+           access_token_encrypted = $2, refresh_token_encrypted = $3,
+           access_token_expires_at = $4, connected_at = NOW(), scopes = $5,
+           status = 'connected', last_error = NULL, disconnected_at = NULL`,
+        [resolvedUserId, encryptToken(tokens.accessToken), encryptToken(tokens.refreshToken), expiresAt, "read:clients,write:clients,read:jobs,write:jobs"]
+      );
+
+      await logJobberSync(resolvedUserId, null, "connect", {}, { success: true }, "ok");
+
+      res.send(`<!DOCTYPE html><html><head><title>Jobber Connected</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f0fdf4}
+.card{text-align:center;padding:40px;border-radius:16px;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,0.1);max-width:360px}
+.icon{width:56px;height:56px;background:#dcfce7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+h2{color:#16a34a;margin:0 0 8px;font-size:20px}p{color:#64748b;margin:0;font-size:14px}</style></head>
+<body><div class="card"><div class="icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+<h2>Jobber Connected!</h2><p>You can close this window.</p></div>
+<script>if(window.opener){window.opener.postMessage('jobber_connected','*');}setTimeout(()=>{window.close();},1500);</script>
+</body></html>`);
+    } catch (e: any) {
+      console.error("Jobber callback error:", e);
+      if (resolvedUserId) {
+        try {
+          await logJobberSync(resolvedUserId, null, "connect", {}, { error: e.message }, "failed", e.message);
+        } catch (logErr) {
+          console.error("Failed to log Jobber sync:", logErr);
+        }
+      }
+      res.status(500).send("An error occurred during Jobber connection");
+    }
+  });
+
+  router.get("/api/integrations/jobber/status", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, status, connected_at as "connectedAt", scopes,
+                auto_create_job_on_quote_accept as "autoCreateJobOnQuoteAccept",
+                last_error as "lastError"
+         FROM jobber_connections WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      if (result.rows.length === 0) {
+        return res.json({ connected: false });
+      }
+      const conn = result.rows[0];
+      res.json({
+        connected: conn.status === "connected",
+        status: conn.status,
+        connectedAt: conn.connectedAt,
+        autoCreateJobOnQuoteAccept: conn.autoCreateJobOnQuoteAccept,
+        lastError: conn.lastError,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post("/api/integrations/jobber/disconnect", requireAuth, requirePro as any, async (req: any, res) => {
+    try {
+      const jobberClient = new JobberClient(req.session.userId);
+      const conn = await jobberClient.loadConnection();
+      if (conn) {
+        await jobberClient.ensureValidToken().catch(() => {});
+        await jobberClient.disconnectApp();
+      }
+      await pool.query(
+        `UPDATE jobber_connections SET status = 'disconnected', disconnected_at = NOW(),
+                access_token_encrypted = NULL, refresh_token_encrypted = NULL
+         WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      await logJobberSync(req.session.userId, null, "disconnect", {}, { success: true }, "ok");
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.put("/api/integrations/jobber/settings", requireAuth, requirePro as any, async (req: any, res) => {
+    try {
+      const { autoCreateJobOnQuoteAccept } = req.body;
+      await pool.query(
+        `UPDATE jobber_connections SET auto_create_job_on_quote_accept = $1 WHERE user_id = $2`,
+        [!!autoCreateJobOnQuoteAccept, req.session.userId]
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post("/api/integrations/jobber/sync-quote/:quoteId", requireAuth, requirePro as any, async (req: any, res) => {
+    try {
+      const { quoteId } = req.params;
+      const force = req.body?.force === true;
+      const result = await syncQuoteToJobber(req.session.userId, quoteId, "manual", force);
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/jobber/sync-status/:quoteId", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT jobber_client_id as "jobberClientId", jobber_job_id as "jobberJobId",
+                jobber_job_number as "jobberJobNumber", sync_status as "syncStatus",
+                sync_trigger as "syncTrigger", error_message as "errorMessage",
+                created_at as "createdAt"
+         FROM jobber_job_links WHERE user_id = $1 AND quote_id = $2
+         ORDER BY created_at DESC LIMIT 1`,
+        [req.session.userId, req.params.quoteId]
+      );
+      if (result.rows.length === 0) return res.json(null);
+      res.json(result.rows[0]);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/jobber/logs", requireAuth, async (req: any, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT id, user_id as "userId", quote_id as "quoteId", action,
+                request_summary as "requestSummary", response_summary as "responseSummary",
+                status, error_message as "errorMessage", created_at as "createdAt"
+         FROM jobber_sync_log WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [req.session.userId]
+      );
+      res.json(result.rows);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post("/api/integrations/jobber/test", requireAuth, async (req: any, res) => {
+    try {
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No Jobber connection found" });
+
+      await client.ensureValidToken();
+      await logJobberSync(req.session.userId, null, "test_connection", {}, { success: true }, "ok");
+      res.json({ success: true });
+    } catch (e: any) {
+      await logJobberSync(req.session.userId, null, "test_connection", {}, { error: e.message }, "failed", e.message);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/jobber/introspect-property-input", requireAuth, async (req: any, res) => {
+    try {
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No connection" });
+      await client.ensureValidToken();
+      const data = await (client as any).graphql(`
+        {
+          propertyInput: __type(name: "PropertyCreateInput") {
+            name kind inputFields { name type { name kind ofType { name kind ofType { name kind } } } }
+          }
+          propertyPayload: __type(name: "PropertyCreatePayload") {
+            name kind fields { name type { name kind ofType { name kind } } }
+          }
+          propertyMutation: __schema {
+            mutationType {
+              fields(includeDeprecated: true) {
+                name
+                args { name type { name kind ofType { name kind ofType { name kind } } } }
+              }
+            }
+          }
+        }
+      `);
+      const propMutation = data?.propertyMutation?.mutationType?.fields?.find((f: any) => f.name === "propertyCreate");
+      res.json({
+        PropertyCreateInput: data.propertyInput,
+        PropertyCreatePayload: data.propertyPayload,
+        propertyCreateArgs: propMutation?.args || [],
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/jobber/introspect-mutations", requireAuth, async (req: any, res) => {
+    try {
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No connection" });
+      await client.ensureValidToken();
+      const data = await (client as any).graphql(`
+        { __schema { mutationType { fields { name args { name type { name kind ofType { name kind } } } } } } }
+      `);
+      const fields = data.__schema?.mutationType?.fields || [];
+      const jobFields = fields.filter((f: any) =>
+        f.name.toLowerCase().includes("job") || f.name.toLowerCase().includes("request") || f.name.toLowerCase().includes("work")
+      );
+      res.json({ jobMutations: jobFields, allCount: fields.length });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/jobber/dashboard-stats", requireAuth, async (req: any, res) => {
+    try {
+      const connResult = await pool.query(
+        `SELECT status, connected_at as "connectedAt", auto_create_job_on_quote_accept as "autoSync"
+         FROM jobber_connections WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      const conn = connResult.rows[0];
+      if (!conn || conn.status === "disconnected") {
+        return res.json({ connected: false });
+      }
+
+      const statsResult = await pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE sync_status = 'success') as "jobsCreated",
+           COUNT(*) as "totalSyncs",
+           COUNT(*) FILTER (WHERE sync_status = 'failed') as "failedSyncs"
+         FROM jobber_job_links WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      const s = statsResult.rows[0];
+
+      res.json({
+        connected: true,
+        connectedAt: conn.connectedAt,
+        autoSyncEnabled: conn.autoSync,
+        jobsCreated: parseInt(s.jobsCreated) || 0,
+        totalSyncs: parseInt(s.totalSyncs) || 0,
+        failedSyncs: parseInt(s.failedSyncs) || 0,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/jobber/clients", requireAuth, requirePro as any, async (req: any, res) => {
+    try {
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No Jobber connection found" });
+
+      const cursor = req.query.cursor as string | undefined;
+      const limit = Math.min(parseInt(req.query.limit as string) || 25, 50);
+
+      const query = `
+        query FetchClients($first: Int!, $after: String) {
+          clients(first: $first, after: $after) {
+            nodes {
+              id
+              firstName
+              lastName
+              companyName
+              isCompany
+              emails { address description primary }
+              phones { number description primary }
+              billingAddress { street1 street2 city province postalCode country }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+            totalCount
+          }
+        }
+      `;
+
+      const variables: any = { first: limit };
+      if (cursor) variables.after = cursor;
+
+      const data = await client.graphql(query, variables);
+      const clients = data.clients;
+
+      const existingMappings = await pool.query(
+        `SELECT jobber_client_id as "jobberClientId" FROM jobber_client_mappings WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      const importedIds = new Set(existingMappings.rows.map((r: any) => r.jobberClientId));
+
+      const mapped = clients.nodes.map((c: any) => {
+        const primaryEmail = c.emails?.find((e: any) => e.primary)?.address || c.emails?.[0]?.address || null;
+        const primaryPhone = c.phones?.find((p: any) => p.primary)?.number || c.phones?.[0]?.number || null;
+        const addr = c.billingAddress;
+        const address = addr ? [addr.street1, addr.street2, addr.city, addr.province, addr.postalCode].filter(Boolean).join(", ") : null;
+
+        return {
+          jobberId: c.id,
+          firstName: c.firstName || "",
+          lastName: c.lastName || "",
+          companyName: c.companyName || null,
+          email: primaryEmail,
+          phone: primaryPhone,
+          address,
+          alreadyImported: importedIds.has(c.id),
+        };
+      });
+
+      res.json({
+        clients: mapped,
+        hasNextPage: clients.pageInfo.hasNextPage,
+        endCursor: clients.pageInfo.endCursor,
+        totalCount: clients.totalCount,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post("/api/integrations/jobber/import-clients", requireAuth, requirePro as any, async (req: any, res) => {
+    try {
+      const { clientIds } = req.body;
+      if (!clientIds || !Array.isArray(clientIds) || clientIds.length === 0) {
+        return res.status(400).json({ error: "clientIds array required" });
+      }
+      if (clientIds.length > 100) {
+        return res.status(400).json({ error: "Maximum 100 clients per import" });
+      }
+
+      const client = new JobberClient(req.session.userId);
+      const conn = await client.loadConnection();
+      if (!conn) return res.status(404).json({ error: "No Jobber connection found" });
+
+      const businessResult = await pool.query(
+        `SELECT id FROM businesses WHERE user_id = $1`,
+        [req.session.userId]
+      );
+      if (businessResult.rows.length === 0) {
+        return res.status(400).json({ error: "Business not found" });
+      }
+      const businessId = businessResult.rows[0].id;
+
+      const query = `
+        query FetchClientsById($ids: [EncodedId!]!) {
+          clients(filter: { ids: $ids }, first: 100) {
+            nodes {
+              id
+              firstName
+              lastName
+              companyName
+              isCompany
+              emails { address description primary }
+              phones { number description primary }
+              billingAddress { street1 street2 city province postalCode country }
+            }
+          }
+        }
+      `;
+
+      const data = await client.graphql(query, { ids: clientIds });
+      const jobberClients = data.clients.nodes;
+
+      let imported = 0;
+      let skipped = 0;
+      let failed = 0;
+      const results: any[] = [];
+
+      for (const jc of jobberClients) {
+        try {
+          const firstName = jc.firstName || "";
+          const lastName = jc.lastName || jc.companyName || "Unknown";
+          const email = jc.emails?.find((e: any) => e.primary)?.address || jc.emails?.[0]?.address || null;
+          const phone = jc.phones?.find((p: any) => p.primary)?.number || jc.phones?.[0]?.number || null;
+          const addr = jc.billingAddress;
+
+          const existingMapping = await pool.query(
+            `SELECT qp_customer_id FROM jobber_client_mappings WHERE user_id = $1 AND jobber_client_id = $2`,
+            [req.session.userId, jc.id]
+          );
+          if (existingMapping.rows.length > 0) {
+            skipped++;
+            results.push({ jobberId: jc.id, name: `${firstName} ${lastName}`, status: "skipped", reason: "Already imported" });
+            continue;
+          }
+
+          if (email) {
+            const emailMatch = await pool.query(
+              `SELECT id FROM customers WHERE business_id = $1 AND LOWER(email) = LOWER($2)`,
+              [businessId, email]
+            );
+            if (emailMatch.rows.length > 0) {
+              await pool.query(
+                `INSERT INTO jobber_client_mappings (id, user_id, qp_customer_id, jobber_client_id, created_at)
+                 VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+                 ON CONFLICT (user_id, qp_customer_id) DO NOTHING`,
+                [req.session.userId, emailMatch.rows[0].id, jc.id]
+              );
+              skipped++;
+              results.push({ jobberId: jc.id, name: `${firstName} ${lastName}`, status: "skipped", reason: "Email match found" });
+              continue;
+            }
+          }
+
+          if (phone) {
+            const normalizedPhone = phone.replace(/\D/g, "").slice(-10);
+            if (normalizedPhone.length >= 10) {
+              const phoneMatch = await pool.query(
+                `SELECT id FROM customers WHERE business_id = $1 AND REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), '(', ''), ')', ''), ' ', '') LIKE $2`,
+                [businessId, `%${normalizedPhone}`]
+              );
+              if (phoneMatch.rows.length > 0) {
+                await pool.query(
+                  `INSERT INTO jobber_client_mappings (id, user_id, qp_customer_id, jobber_client_id, created_at)
+                   VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+                   ON CONFLICT (user_id, qp_customer_id) DO NOTHING`,
+                  [req.session.userId, phoneMatch.rows[0].id, jc.id]
+                );
+                skipped++;
+                results.push({ jobberId: jc.id, name: `${firstName} ${lastName}`, status: "skipped", reason: "Phone match found" });
+                continue;
+              }
+            }
+          }
+
+          const address = addr ? addr.street1 || "" : "";
+          const city = addr?.city || "";
+          const state = addr?.province || "";
+          const zip = addr?.postalCode || "";
+
+          const insertResult = await pool.query(
+            `INSERT INTO customers (id, business_id, first_name, last_name, email, phone, address, city, state, zip, company, status, lead_source, created_at, updated_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'lead', 'jobber_import', NOW(), NOW())
+             RETURNING id`,
+            [businessId, firstName, lastName, email, phone, address, city, state, zip, jc.companyName || null]
+          );
+
+          await pool.query(
+            `INSERT INTO jobber_client_mappings (id, user_id, qp_customer_id, jobber_client_id, created_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+             ON CONFLICT (user_id, qp_customer_id) DO NOTHING`,
+            [req.session.userId, insertResult.rows[0].id, jc.id]
+          );
+
+          imported++;
+          results.push({ jobberId: jc.id, name: `${firstName} ${lastName}`, status: "imported" });
+        } catch (err: any) {
+          failed++;
+          results.push({ jobberId: jc.id, name: `${jc.firstName || ""} ${jc.lastName || ""}`, status: "failed", reason: err.message });
+        }
+      }
+
+      await logJobberSync(req.session.userId, null, "import_clients",
+        { clientCount: clientIds.length },
+        { imported, skipped, failed },
+        failed === clientIds.length ? "failed" : "ok"
+      );
+
+      res.json({ imported, skipped, failed, results });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.get("/api/integrations/jobber/token-status", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const token = (business as any).jobberApiToken;
+      res.json({ connected: !!token });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  router.post("/api/integrations/jobber/save-token", requireAuth, requirePro as any, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { apiToken } = req.body;
+      await pool.query(
+        `UPDATE businesses SET jobber_api_token = $1 WHERE id = $2`,
+        [apiToken?.trim() || null, business.id]
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  router.post("/api/integrations/jobber/sync-quote-token/:quoteId", requireAuth, requirePro as any, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const token = (business as any).jobberApiToken;
+      if (!token) return res.status(400).json({ message: "No Jobber API token configured. Add it in Settings → Integrations." });
+
+      const quote = await getQuoteById(req.params.quoteId);
+      if (!quote || quote.businessId !== business.id) return res.status(404).json({ message: "Quote not found" });
+
+      const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
+
+      // Step 1: Get or create Jobber client
+      const clientId = await jobberGetOrCreateClient(token, {
+        name: customer?.name,
+        email: customer?.email || undefined,
+        phone: customer?.phone || undefined,
+      });
+      if (!clientId) throw new Error("Could not find or create a Jobber client.");
+
+      // Step 2: Get or create property
+      const propertyId = await jobberGetOrCreateProperty(token, clientId, customer?.address || quote.address || null);
+      if (!propertyId) throw new Error("Could not find or create a Jobber property. Make sure the customer has a service address.");
+
+      // Step 3: Create job using $input: JobCreateInput! typed variable (Python approach)
+      const lineItems = (quote.lineItems as any[] || []).map((li: any) => ({
+        name: li.name || "Service",
+        quantity: li.quantity || 1,
+        unitPrice: String(li.unitPrice || li.price || "0.00"),
+      }));
+
+      const jobInput: any = {
+        clientId,
+        propertyId,
+        title: quote.title || `Cleaning Service — ${customer?.name || "Client"}`,
+        lineItems,
+      };
+      if (quote.notes) jobInput.instructions = quote.notes;
+
+      const jobData = await jobberGQL(token, `
+        mutation CreateJob($input: JobCreateInput!) {
+          jobCreate(input: $input) {
+            job { id jobNumber title }
+            userErrors { message path }
+          }
+        }
+      `, { input: jobInput });
+
+      const userErrors = jobData?.jobCreate?.userErrors || [];
+      if (userErrors.length) throw new Error(`Jobber job creation failed: ${userErrors.map((e: any) => e.message).join(", ")}`);
+
+      const job = jobData?.jobCreate?.job;
+      if (!job) throw new Error("jobCreate returned no job data");
+
+      // Record the job link
+      await pool.query(
+        `INSERT INTO jobber_job_links (id, quote_id, user_id, jobber_client_id, jobber_job_id, jobber_job_number, sync_status, created_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'success', NOW())
+         ON CONFLICT (quote_id) DO UPDATE SET jobber_job_id=$4, jobber_job_number=$5, sync_status='success'`,
+        [quote.id, req.session.userId!, clientId, job.id, String(job.jobNumber || "")]
+      );
+
+      res.json({ success: true, jobberJobId: job.id, jobberJobNumber: job.jobNumber, message: `Job #${job.jobNumber || ""} created in Jobber` });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });

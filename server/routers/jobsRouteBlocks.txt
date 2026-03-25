@@ -1,0 +1,1262 @@
+  router.get("/api/schedule/week-jobs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { weekStart } = req.query as { weekStart: string };
+      if (!weekStart) return res.status(400).json({ message: "weekStart required" });
+
+      const start = new Date(weekStart);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+
+      const allJobs = await getJobsByBusiness(business.id, { from: start, to: end });
+      const allEmployees = await db.select().from(employees).where(eq(employees.businessId, business.id));
+      const empMap = Object.fromEntries(allEmployees.map(e => [e.id, e]));
+
+      const enriched = await Promise.all(allJobs.filter(j => !j.skipped).map(async (j) => {
+        let customerName = "";
+        if (j.customerId) {
+          const c = await getCustomerById(j.customerId);
+          if (c) customerName = `${c.firstName} ${c.lastName}`.trim();
+        }
+        if (!customerName && j.quoteId) {
+          const q = await getQuoteById(j.quoteId);
+          if (q) customerName = (q as any).customerName || "";
+        }
+        const teamMemberNames = ((j.teamMembers || []) as string[]).map((id: string) => empMap[id]?.name || "").filter(Boolean);
+        const teamMemberEmails = ((j.teamMembers || []) as string[]).map((id: string) => empMap[id]?.email || "").filter(Boolean);
+        return { ...j, customerName, teamMemberNames, teamMemberEmails, durationHours: j.endDatetime ? (new Date(j.endDatetime).getTime() - new Date(j.startDatetime).getTime()) / 3600000 : 3 };
+      }));
+
+      // Validation warnings
+      const warnings: string[] = [];
+      const unassigned = enriched.filter(j => !j.teamMembers || (j.teamMembers as string[]).length === 0);
+      if (unassigned.length > 0) warnings.push(`${unassigned.length} job(s) have no cleaners assigned`);
+
+      const noTime = enriched.filter(j => !j.startDatetime);
+      if (noTime.length > 0) warnings.push(`${noTime.length} job(s) are missing a scheduled time`);
+
+      const noAddress = enriched.filter(j => !j.address);
+      if (noAddress.length > 0) warnings.push(`${noAddress.length} job(s) are missing an address`);
+
+      // Cleaners involved
+      const cleanerMap: Record<string, { employee: any; jobs: any[] }> = {};
+      for (const j of enriched) {
+        for (const empId of (j.teamMembers || []) as string[]) {
+          if (!cleanerMap[empId]) cleanerMap[empId] = { employee: empMap[empId], jobs: [] };
+          cleanerMap[empId].jobs.push(j);
+        }
+      }
+
+      const cleanersWithNoEmail = Object.values(cleanerMap).filter(c => !c.employee?.email);
+      if (cleanersWithNoEmail.length > 0) warnings.push(`${cleanersWithNoEmail.length} cleaner(s) have no email address`);
+
+      // Double-booking check
+      for (const [empId, { employee, jobs: empJobs }] of Object.entries(cleanerMap)) {
+        for (let i = 0; i < empJobs.length; i++) {
+          for (let k = i + 1; k < empJobs.length; k++) {
+            const aStart = new Date(empJobs[i].startDatetime).getTime();
+            const aEnd = empJobs[i].endDatetime ? new Date(empJobs[i].endDatetime).getTime() : aStart + 3 * 3600000;
+            const bStart = new Date(empJobs[k].startDatetime).getTime();
+            const bEnd = empJobs[k].endDatetime ? new Date(empJobs[k].endDatetime).getTime() : bStart + 3 * 3600000;
+            if (aStart < bEnd && bStart < aEnd) {
+              warnings.push(`${employee?.name || empId} is double-booked`);
+            }
+          }
+        }
+      }
+
+      return res.json({
+        jobs: enriched,
+        cleaners: Object.entries(cleanerMap).map(([id, { employee, jobs }]) => ({
+          id,
+          name: employee?.name || "Unknown",
+          email: employee?.email || "",
+          hasEmail: !!(employee?.email),
+          jobCount: jobs.length,
+        })),
+        warnings,
+        totalJobs: enriched.length,
+        totalCleaners: Object.keys(cleanerMap).length,
+      });
+    } catch (error: any) {
+      console.error("Schedule week-jobs error:", error);
+      return res.status(500).json({ message: "Failed to get week jobs" });
+    }
+  });
+
+  router.get("/api/schedule/publications", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { weekStart } = req.query as { weekStart?: string };
+
+      let pubs;
+      if (weekStart) {
+        pubs = await db.select().from(schedulePublications)
+          .where(and(eq(schedulePublications.businessId, business.id), eq(schedulePublications.weekStart, weekStart)))
+          .orderBy(desc(schedulePublications.createdAt));
+      } else {
+        pubs = await db.select().from(schedulePublications)
+          .where(eq(schedulePublications.businessId, business.id))
+          .orderBy(desc(schedulePublications.createdAt))
+          .limit(20);
+      }
+
+      return res.json(pubs);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get publications" });
+    }
+  });
+
+  router.get("/api/schedule/publications/:pubId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const [pub] = await db.select().from(schedulePublications)
+        .where(and(eq(schedulePublications.id, req.params.pubId), eq(schedulePublications.businessId, business.id)));
+      if (!pub) return res.status(404).json({ message: "Publication not found" });
+
+      const notifications = await db.select().from(cleanerScheduleNotifications)
+        .where(eq(cleanerScheduleNotifications.publicationId, pub.id))
+        .orderBy(cleanerScheduleNotifications.cleanerName);
+
+      return res.json({ ...pub, notifications });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get publication" });
+    }
+  });
+
+  router.post("/api/schedule/publish", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const userId = req.session.userId!;
+
+      const { weekStart, weekEnd, notes, publishScope } = req.body as {
+        weekStart: string; weekEnd: string; notes?: string; publishScope?: string;
+      };
+      if (!weekStart || !weekEnd) return res.status(400).json({ message: "weekStart and weekEnd required" });
+
+      const start = new Date(weekStart);
+      const end = new Date(weekStart);
+      end.setDate(end.getDate() + 7);
+
+      const allJobs = await getJobsByBusiness(business.id, { from: start, to: end });
+      const allEmployees = await db.select().from(employees).where(eq(employees.businessId, business.id));
+      const empMap = Object.fromEntries(allEmployees.map(e => [e.id, e]));
+
+      const validJobs = allJobs.filter(j => !j.skipped && j.startDatetime);
+      const enrichedJobs = await Promise.all(validJobs.map(async (j) => {
+        let customerName = "";
+        if (j.customerId) {
+          const c = await getCustomerById(j.customerId);
+          if (c) customerName = `${c.firstName} ${c.lastName}`.trim();
+        }
+        if (!customerName && j.quoteId) {
+          const q = await getQuoteById(j.quoteId);
+          if (q) customerName = (q as any).customerName || "";
+        }
+        const teamMemberNames = ((j.teamMembers || []) as string[]).map((id: string) => empMap[id]?.name || "").filter(Boolean);
+        return { ...j, customerName, teamMemberNames, durationHours: j.endDatetime ? (new Date(j.endDatetime).getTime() - new Date(j.startDatetime).getTime()) / 3600000 : 3 };
+      }));
+
+      // Build cleaner → jobs map
+      const cleanerJobMap: Record<string, any[]> = {};
+      for (const j of enrichedJobs) {
+        for (const empId of (j.teamMembers || []) as string[]) {
+          if (!cleanerJobMap[empId]) cleanerJobMap[empId] = [];
+          cleanerJobMap[empId].push(j);
+        }
+      }
+
+      // Determine version number
+      const prevPubs = await db.select().from(schedulePublications)
+        .where(and(eq(schedulePublications.businessId, business.id), eq(schedulePublications.weekStart, weekStart)))
+        .orderBy(desc(schedulePublications.versionNumber)).limit(1);
+      const versionNumber = prevPubs.length > 0 ? prevPubs[0].versionNumber + 1 : 1;
+
+      // Format week label
+      const wStart = new Date(weekStart);
+      const wEnd = new Date(weekEnd);
+      const weekLabel = `${wStart.toLocaleDateString("en-US", { month: "long", day: "numeric" })} – ${wEnd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`;
+
+      // Create publication
+      const [pub] = await db.insert(schedulePublications).values({
+        businessId: business.id,
+        weekStart,
+        weekEnd,
+        versionNumber,
+        publishedBy: userId,
+        publishScope: publishScope || "all",
+        snapshotJson: enrichedJobs as any,
+        notes: notes || "",
+        totalJobs: enrichedJobs.length,
+        totalCleaners: Object.keys(cleanerJobMap).length,
+      }).returning();
+
+      const domain = process.env.EXPO_PUBLIC_DOMAIN || `localhost:5000`;
+      const fromName = business.companyName || "QuotePro";
+      const results: any[] = [];
+
+      for (const [empId, empJobs] of Object.entries(cleanerJobMap)) {
+        const emp = empMap[empId];
+        if (!emp) continue;
+
+        const cleanerSnapshot = {
+          cleanerName: emp.name,
+          weekLabel,
+          jobs: empJobs.map(j => ({
+            id: j.id, customerName: j.customerName, address: j.address,
+            startDatetime: j.startDatetime, endDatetime: j.endDatetime,
+            jobType: j.jobType, cleanerNotes: j.cleanerNotes, teamMemberNames: j.teamMemberNames,
+            durationHours: j.durationHours,
+          })),
+        };
+
+        // Create notification record first to get ack token
+        const [notif] = await db.insert(cleanerScheduleNotifications).values({
+          publicationId: pub.id,
+          businessId: business.id,
+          cleanerId: emp.id,
+          cleanerName: emp.name,
+          cleanerEmail: emp.email || "",
+          sendStatus: emp.email ? "pending" : "skipped",
+          cleanerSnapshotJson: cleanerSnapshot as any,
+        }).returning();
+
+        if (!emp.email) {
+          results.push({ cleanerId: emp.id, name: emp.name, status: "skipped", reason: "no email" });
+          continue;
+        }
+
+        const emailHtml = buildCleanerEmailHtml({
+          cleanerName: emp.name,
+          weekLabel,
+          jobs: empJobs,
+          ackToken: notif.ackToken!,
+          companyName: fromName,
+          domain,
+        });
+
+        try {
+          await sendEmail({
+            to: emp.email,
+            subject: `Your Schedule for ${weekLabel} (v${versionNumber})`,
+            html: emailHtml,
+            fromName,
+            replyTo: business.email || null,
+          });
+
+          await db.update(cleanerScheduleNotifications)
+            .set({ sendStatus: "sent", sentAt: new Date() })
+            .where(eq(cleanerScheduleNotifications.id, notif.id));
+
+          results.push({ cleanerId: emp.id, name: emp.name, email: emp.email, status: "sent" });
+        } catch (emailErr: any) {
+          await db.update(cleanerScheduleNotifications)
+            .set({ sendStatus: "failed" })
+            .where(eq(cleanerScheduleNotifications.id, notif.id));
+          results.push({ cleanerId: emp.id, name: emp.name, email: emp.email, status: "failed", error: emailErr.message });
+        }
+      }
+
+      return res.json({ publication: pub, results, weekLabel, versionNumber });
+    } catch (error: any) {
+      console.error("Schedule publish error:", error);
+      return res.status(500).json({ message: "Failed to publish schedule" });
+    }
+  });
+
+  router.post("/api/schedule/publications/:pubId/resend/:notifId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const [pub] = await db.select().from(schedulePublications)
+        .where(and(eq(schedulePublications.id, req.params.pubId), eq(schedulePublications.businessId, business.id)));
+      if (!pub) return res.status(404).json({ message: "Publication not found" });
+
+      const [notif] = await db.select().from(cleanerScheduleNotifications)
+        .where(and(eq(cleanerScheduleNotifications.id, req.params.notifId), eq(cleanerScheduleNotifications.publicationId, pub.id)));
+      if (!notif) return res.status(404).json({ message: "Notification not found" });
+      if (!notif.cleanerEmail) return res.status(400).json({ message: "Cleaner has no email" });
+
+      const snap = notif.cleanerSnapshotJson as any;
+      const domain = process.env.EXPO_PUBLIC_DOMAIN || `localhost:5000`;
+      const fromName = business.companyName || "QuotePro";
+
+      const emailHtml = buildCleanerEmailHtml({
+        cleanerName: snap.cleanerName || notif.cleanerName,
+        weekLabel: snap.weekLabel || `Week of ${pub.weekStart}`,
+        jobs: snap.jobs || [],
+        ackToken: notif.ackToken!,
+        companyName: fromName,
+        domain,
+      });
+
+      await sendEmail({
+        to: notif.cleanerEmail,
+        subject: `[Resent] Your Schedule for ${snap.weekLabel || pub.weekStart}`,
+        html: emailHtml,
+        fromName,
+        replyTo: business.email || null,
+      });
+
+      await db.update(cleanerScheduleNotifications)
+        .set({ sendStatus: "sent", sentAt: new Date() })
+        .where(eq(cleanerScheduleNotifications.id, notif.id));
+
+      return res.json({ message: "Resent" });
+    } catch (error: any) {
+      console.error("Resend error:", error);
+      return res.status(500).json({ message: "Failed to resend" });
+    }
+  });
+
+  router.get("/api/schedule/ack/:token", async (req: Request, res: Response) => {
+    try {
+      const [notif] = await db.select().from(cleanerScheduleNotifications)
+        .where(eq(cleanerScheduleNotifications.ackToken, req.params.token));
+      if (!notif) return res.status(404).json({ message: "Schedule not found" });
+
+      const snap = notif.cleanerSnapshotJson as any;
+
+      // Prefer snapshot data; fall back to live DB lookup if snapshot is empty
+      let jobs: any[] = snap.jobs || [];
+      let weekLabel: string = snap.weekLabel || "";
+      let isUpdate = snap.isUpdate || false;
+
+      if (jobs.length === 0 || !weekLabel) {
+        // Look up publication to get week range
+        const [pub] = await db.select().from(schedulePublications)
+          .where(eq(schedulePublications.id, notif.publicationId));
+        if (pub) {
+          const weekStart = new Date(pub.weekStart);
+          const weekEnd = new Date(pub.weekEnd);
+          const fmtOpts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+          weekLabel = `${weekStart.toLocaleDateString("en-US", fmtOpts)} – ${weekEnd.toLocaleDateString("en-US", { ...fmtOpts, year: "numeric" })}`;
+          isUpdate = (pub.versionNumber || 1) > 1;
+
+          // Load this cleaner's jobs for the week
+          const allJobs = await getJobsByBusiness(notif.businessId, { from: weekStart, to: weekEnd });
+          const allEmployees = await db.select().from(employees).where(eq(employees.businessId, notif.businessId));
+          const empMap = Object.fromEntries(allEmployees.map(e => [e.id, e]));
+
+          const myJobs = allJobs.filter(j =>
+            !j.skipped &&
+            j.status !== "cancelled" &&
+            ((j.teamMembers || []) as string[]).includes(notif.cleanerId)
+          );
+
+          jobs = await Promise.all(myJobs.map(async j => {
+            let customerName = "";
+            if (j.customerId) {
+              const c = await getCustomerById(j.customerId);
+              if (c) customerName = `${c.firstName} ${c.lastName}`.trim();
+            }
+            const teamMemberNames = ((j.teamMembers || []) as string[])
+              .map((id: string) => empMap[id]?.name || "").filter(Boolean);
+            return {
+              ...j,
+              customerName,
+              teamMemberNames,
+              durationHours: j.endDatetime
+                ? (new Date(j.endDatetime).getTime() - new Date(j.startDatetime).getTime()) / 3600000
+                : 3,
+            };
+          }));
+        }
+      }
+
+      return res.json({
+        cleanerName: notif.cleanerName,
+        weekLabel,
+        jobs,
+        ackStatus: notif.ackStatus,
+        issueMessage: notif.issueMessage || "",
+        acknowledgedAt: notif.acknowledgedAt,
+        isUpdate,
+      });
+    } catch (error: any) {
+      console.error("Ack GET error:", error);
+      return res.status(500).json({ message: "Failed to load schedule" });
+    }
+  });
+
+  router.post("/api/schedule/ack/:token", async (req: Request, res: Response) => {
+    try {
+      const [notif] = await db.select().from(cleanerScheduleNotifications)
+        .where(eq(cleanerScheduleNotifications.ackToken, req.params.token));
+      if (!notif) return res.status(404).json({ message: "Schedule not found" });
+
+      const { action, issueMessage } = req.body as { action: "acknowledged" | "issue" | "unavailable"; issueMessage?: string };
+
+      await db.update(cleanerScheduleNotifications).set({
+        ackStatus: action,
+        acknowledgedAt: new Date(),
+        issueMessage: issueMessage || "",
+        updatedAt: new Date(),
+      }).where(eq(cleanerScheduleNotifications.id, notif.id));
+
+      return res.json({ message: "Response recorded" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to record response" });
+    }
+  });
+
+  router.post("/api/dispatch/send", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { channel, toPhone, toEmail, toName, message, subject } = req.body;
+      if (channel === "sms") {
+        if (!toPhone) return res.status(400).json({ message: "Phone number required" });
+        const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+        const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+        const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+        if (!twilioSid || !twilioToken || !twilioFrom) {
+          return res.status(503).json({ message: "SMS is not configured. Add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN to your environment secrets to enable text messaging." });
+        }
+        // Normalize to E.164 format (+1XXXXXXXXXX for US numbers)
+        const digitsOnly = toPhone.replace(/\D/g, "");
+        let normalizedPhone = toPhone;
+        if (digitsOnly.length === 10) {
+          normalizedPhone = `+1${digitsOnly}`;
+        } else if (digitsOnly.length === 11 && digitsOnly.startsWith("1")) {
+          normalizedPhone = `+${digitsOnly}`;
+        } else if (!toPhone.startsWith("+")) {
+          normalizedPhone = `+${digitsOnly}`;
+        }
+        console.log(`[Dispatch SMS] Sending to: ${normalizedPhone} from: ${twilioFrom}`);
+        const twilioRes = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({ From: twilioFrom, To: normalizedPhone, Body: message }).toString(),
+          }
+        );
+        const twilioBody = await twilioRes.json() as any;
+        if (!twilioRes.ok) {
+          console.error("Dispatch SMS error:", twilioRes.status, JSON.stringify(twilioBody));
+          const twilioMsg = twilioBody?.message || twilioBody?.error_message || "Failed to deliver SMS";
+          return res.status(500).json({ message: `SMS failed: ${twilioMsg}` });
+        }
+        console.log(`[Dispatch SMS] Success — SID: ${twilioBody.sid}, Status: ${twilioBody.status}`);
+        return res.json({ success: true, recipient: toName || normalizedPhone });
+      } else if (channel === "email") {
+        if (!toEmail) return res.status(400).json({ message: "Email required" });
+        const sendParams = getBusinessSendParams(business);
+        await sendEmail({
+          to: toEmail,
+          from: sendParams.from,
+          fromName: sendParams.fromName,
+          subject: subject || "Job Details",
+          html: `<pre style="font-family:sans-serif;font-size:14px;line-height:1.6;white-space:pre-wrap">${message}</pre>`,
+          text: message,
+        });
+        return res.json({ success: true, recipient: toName || toEmail });
+      } else {
+        return res.status(400).json({ message: "Invalid channel" });
+      }
+    } catch (error: any) {
+      console.error("Dispatch send error:", error);
+      return res.status(500).json({ message: error?.message || "Failed to send dispatch" });
+    }
+  });
+
+  router.post("/api/jobs/:id/assign", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { employeeIds } = req.body;
+      if (!Array.isArray(employeeIds)) return res.status(400).json({ message: "employeeIds must be array" });
+      const j = await updateJob(req.params.id, { teamMembers: employeeIds });
+      return res.json(j);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to assign employees" });
+    }
+  });
+
+  router.get("/api/jobs/calendar", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { from, to } = req.query as any;
+      const jobs = await getJobsByBusiness(business.id, {
+        from: from ? new Date(from) : undefined,
+        to: to ? new Date(to) : undefined,
+      });
+      // Enrich with customer names
+      const enriched = await Promise.all(
+        jobs.map(async (j) => {
+          let customerName = "";
+          let customerPhone = "";
+          if (j.customerId) {
+            const c = await getCustomerById(j.customerId);
+            if (c) {
+              customerName = `${c.firstName} ${c.lastName}`.trim();
+              customerPhone = c.phone || "";
+            }
+          }
+          // If no customer name, try to get from linked quote
+          if (!customerName && j.quoteId) {
+            const q = await getQuoteById(j.quoteId);
+            if (q) customerName = (q as any).customerName || "";
+          }
+          return { ...j, customerName, customerPhone };
+        })
+      );
+      return res.json(enriched);
+    } catch (error: any) {
+      console.error("Calendar jobs error:", error);
+      return res.status(500).json({ message: "Failed to get calendar jobs" });
+    }
+  });
+
+  router.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { status, customerId, quoteId, from, to } = req.query as any;
+      const list = await getJobsByBusiness(business.id, {
+        status,
+        customerId,
+        quoteId,
+        from: from ? new Date(from) : undefined,
+        to: to ? new Date(to) : undefined,
+      });
+      const customerIds = [...new Set(list.map((j) => j.customerId).filter(Boolean))] as string[];
+      const customerMap: Record<string, string> = {};
+      if (customerIds.length > 0) {
+        const customerList = await getCustomersByBusiness(business.id);
+        for (const c of customerList) {
+          customerMap[String(c.id)] = [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || c.name || "";
+        }
+      }
+      const enriched = list.map((j) => ({
+        ...j,
+        customerName: j.customerId ? (customerMap[String(j.customerId)] || null) : null,
+      }));
+      return res.json(enriched);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get jobs" });
+    }
+  });
+
+  router.get("/api/jobs/quote/:quoteId", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const list = await getJobsByBusiness(business.id, { quoteId: req.params.quoteId });
+      return res.json(list);
+    } catch (err: any) {
+      return res.status(500).json({ message: "Failed to get jobs for quote" });
+    }
+  });
+
+  router.get("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const j = await getJobById(req.params.id);
+      if (!j) return res.status(404).json({ message: "Job not found" });
+      const checklist = await getChecklistByJob(j.id);
+      let customer = null;
+      if (j.customerId) {
+        const c = await getCustomerById(j.customerId);
+        if (c) customer = { firstName: c.firstName, lastName: c.lastName, phone: c.phone, email: c.email };
+      }
+      return res.json({ ...j, checklist, customer });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get job" });
+    }
+  });
+
+  router.post("/api/jobs", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const j = await createJob({
+        ...req.body,
+        businessId: business.id,
+        startDatetime: new Date(req.body.startDatetime),
+        endDatetime: req.body.endDatetime ? new Date(req.body.endDatetime) : undefined,
+      });
+
+      if (req.body.checklist) {
+        for (let i = 0; i < req.body.checklist.length; i++) {
+          await createChecklistItem({
+            jobId: j.id,
+            label: req.body.checklist[i].label || req.body.checklist[i],
+            sortOrder: i,
+          });
+        }
+      }
+
+      try {
+        let customerName = "Customer";
+        if (j.customerId) {
+          const customer = await getCustomerById(j.customerId);
+          if (customer) customerName = `${customer.firstName} ${customer.lastName}`.trim();
+        }
+        await syncJobToGoogleCalendar(req.session.userId!, j, customerName);
+      } catch (calErr) {
+        console.error("Auto calendar sync error (create):", calErr);
+      }
+
+      return res.json(j);
+    } catch (error: any) {
+      console.error("Create job error:", error);
+      return res.status(500).json({ message: "Failed to create job" });
+    }
+  });
+
+  router.put("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const data = { ...req.body };
+      if (data.startDatetime) data.startDatetime = new Date(data.startDatetime);
+      if (data.endDatetime) data.endDatetime = new Date(data.endDatetime);
+      const j = await updateJob(req.params.id, data);
+
+      try {
+        let customerName = "Customer";
+        if (j.customerId) {
+          const customer = await getCustomerById(j.customerId);
+          if (customer) customerName = `${customer.firstName} ${customer.lastName}`.trim();
+        }
+        await syncJobToGoogleCalendar(req.session.userId!, j, customerName);
+      } catch (calErr) {
+        console.error("Auto calendar sync error (update):", calErr);
+      }
+
+      return res.json(j);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update job" });
+    }
+  });
+
+  router.delete("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteJob(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete job" });
+    }
+  });
+
+  router.get("/api/recurring-series", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const list = await getRecurringSeriesByBusiness(business.id);
+      return res.json(list);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get recurring series" });
+    }
+  });
+
+  router.post("/api/recurring-series", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const series = await createRecurringSeries({ ...req.body, businessId: business.id });
+      return res.json(series);
+    } catch (error: any) {
+      console.error("Create recurring series error:", error);
+      return res.status(500).json({ message: "Failed to create recurring series" });
+    }
+  });
+
+  router.get("/api/recurring-series/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const series = await getRecurringSeriesById(req.params.id);
+      if (!series) return res.status(404).json({ message: "Series not found" });
+      return res.json(series);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get series" });
+    }
+  });
+
+  router.put("/api/recurring-series/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const series = await updateRecurringSeries(req.params.id, req.body, true);
+      return res.json(series);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update series" });
+    }
+  });
+
+  router.post("/api/recurring-series/:id/cancel", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await cancelRecurringSeries(req.params.id);
+      return res.json({ message: "Series cancelled" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to cancel series" });
+    }
+  });
+
+  router.post("/api/recurring-series/:id/pause", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await updateRecurringSeries(req.params.id, { status: "paused" }, false);
+      return res.json({ message: "Series paused" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to pause series" });
+    }
+  });
+
+  router.post("/api/recurring-series/:id/resume", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await updateRecurringSeries(req.params.id, { status: "active" }, true);
+      return res.json({ message: "Series resumed" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to resume series" });
+    }
+  });
+
+  router.post("/api/jobs/:id/skip", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const j = await skipSeriesOccurrence(req.params.id);
+      return res.json(j);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to skip occurrence" });
+    }
+  });
+
+  router.post("/api/recurring-series/:id/generate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await generateSeriesJobs(req.params.id, 90);
+      return res.json({ message: "Jobs generated" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to generate jobs" });
+    }
+  });
+
+  router.post("/api/jobs/:id/send-confirmation", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const customer = (job as any).customerId ? await getCustomerById((job as any).customerId) : null;
+      const { channels = ["sms", "email"] } = req.body as { channels: string[] };
+
+      const customerFirstName = customer?.firstName || "there";
+      const companyName = (business as any).companyName || "your cleaning company";
+      const senderName = (business as any).senderName || companyName;
+      const address = (job as any).address || "";
+      const jobTypeRaw = (job as any).jobType || "regular";
+      const serviceLabels: Record<string, string> = {
+        "regular": "cleaning", "deep-clean": "deep clean", "move-in": "move-in clean",
+        "move-out": "move-out clean", "post-construction": "post-construction clean", "airbnb": "turnover clean",
+      };
+      const serviceLabel = serviceLabels[jobTypeRaw] || "cleaning";
+
+      const startDt: Date | null = (job as any).startDatetime ? new Date((job as any).startDatetime) : null;
+      const endDt: Date | null = (job as any).endDatetime ? new Date((job as any).endDatetime) : null;
+
+      const dateStr = startDt
+        ? startDt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+        : "";
+      const timeStr = startDt
+        ? startDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+        : "";
+      const endTimeStr = endDt
+        ? endDt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+        : "";
+      const arrivalWindow = endTimeStr ? `${timeStr} – ${endTimeStr}` : timeStr;
+
+      const results: Record<string, { success: boolean; message: string }> = {};
+
+      // ── SMS ────────────────────────────────────────────────────────────────
+      if (channels.includes("sms")) {
+        const toPhone = customer?.phone;
+        if (!toPhone) {
+          results.sms = { success: false, message: "No phone number on file" };
+        } else {
+          const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+          const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+          const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+          if (!twilioSid || !twilioToken || !twilioFrom) {
+            results.sms = { success: false, message: "SMS service not configured" };
+          } else {
+            const smsParts = [
+              `Hi ${customerFirstName} — your ${serviceLabel} is confirmed`,
+              dateStr ? ` for ${dateStr}` : "",
+              arrivalWindow ? ` with an arrival window of ${arrivalWindow}` : "",
+              address ? ` at ${address}` : "",
+              `. Reply with any questions. – ${senderName}`,
+            ];
+            const smsBody = smsParts.join("").slice(0, 160);
+            const twilioRes = await fetch(
+              `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({ From: twilioFrom, To: toPhone, Body: smsBody }).toString(),
+              }
+            );
+            if (!twilioRes.ok) {
+              const errText = await twilioRes.text();
+              console.error("Confirmation SMS error:", twilioRes.status, errText);
+              results.sms = { success: false, message: "Failed to send SMS" };
+            } else {
+              results.sms = { success: true, message: "SMS sent" };
+              await createCommunication({
+                businessId: business.id,
+                customerId: customer?.id || undefined,
+                jobId: job.id,
+                channel: "sms",
+                content: smsBody,
+                templateKey: "appointment_confirmation",
+                status: "sent",
+              });
+            }
+          }
+        }
+      }
+
+      // ── Email ──────────────────────────────────────────────────────────────
+      if (channels.includes("email")) {
+        const toEmail = customer?.email;
+        if (!toEmail) {
+          results.email = { success: false, message: "No email address on file" };
+        } else {
+          {
+            const subject = `Your ${serviceLabel} is confirmed for ${dateStr}`;
+            const plainBody = [
+              `Hi ${customerFirstName},`,
+              "",
+              `Your ${serviceLabel} is confirmed. Here are your appointment details:`,
+              "",
+              dateStr ? `Date:     ${dateStr}` : "",
+              arrivalWindow ? `Arrival:  ${arrivalWindow}` : "",
+              address ? `Location: ${address}` : "",
+              "",
+              "If you need to reschedule or have any questions, simply reply to this email.",
+              "",
+              "We look forward to seeing you soon!",
+              "",
+              senderName,
+              companyName,
+            ].filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n");
+
+            const primaryColor = (business as any).primaryColor || "#2563EB";
+            const { fromName: apptFromName, replyTo: apptReplyTo } = getBusinessSendParams(business);
+
+            const detailRows = [
+              dateStr ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Date</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${dateStr}</td></tr>` : "",
+              arrivalWindow ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Arrival</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${arrivalWindow}</td></tr>` : "",
+              address ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;vertical-align:top;white-space:nowrap">Location</td><td style="padding:8px 0;font-size:15px;color:#0f172a">${address}</td></tr>` : "",
+            ].filter(Boolean).join("");
+
+            const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;"><tr><td align="center"><table width="540" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.07);max-width:100%;"><tr><td style="background:${primaryColor};padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700">${companyName}</span></td></tr><tr><td style="padding:36px 32px 28px;"><div style="display:inline-block;background:#dcfce7;border-radius:20px;padding:5px 14px;margin-bottom:20px;"><span style="color:#16a34a;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Confirmed</span></div><h1 style="margin:0 0 10px;font-size:22px;font-weight:800;color:#0f172a;line-height:1.3">Your ${serviceLabel} is all set, ${customerFirstName}.</h1><p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.6">Here are your appointment details:</p><table cellpadding="0" cellspacing="0" style="border-left:3px solid ${primaryColor};padding-left:20px;margin-bottom:28px">${detailRows}</table><p style="margin:0 0 0;font-size:14px;color:#64748b;line-height:1.7">Need to reschedule or have a question? Simply reply to this email — we're happy to help.</p><p style="margin:24px 0 0;font-size:14px;color:#64748b;">We look forward to seeing you!<br><br><strong style="color:#0f172a;font-size:15px">${senderName}</strong><br><span style="color:#94a3b8">${companyName}</span></p></td></tr><tr><td style="padding:16px 32px 20px;border-top:1px solid #f1f5f9;"><p style="margin:0;font-size:11px;color:#cbd5e1;">Sent via QuotePro &mdash; Professional tools for cleaning businesses.</p></td></tr></table></td></tr></table></body></html>`;
+
+            try {
+              await sendEmail({
+                to: toEmail,
+                subject,
+                html: htmlBody,
+                text: plainBody,
+                fromName: apptFromName,
+                replyTo: apptReplyTo,
+              });
+              results.email = { success: true, message: "Email sent" };
+              await createCommunication({
+                businessId: business.id,
+                customerId: customer?.id || undefined,
+                jobId: job.id,
+                channel: "email",
+                content: plainBody,
+                templateKey: "appointment_confirmation",
+                status: "sent",
+              });
+            } catch (mailErr: any) {
+              console.error("[mail] Confirmation email error:", mailErr);
+              results.email = { success: false, message: "Email could not be delivered. Please try again or contact support." };
+            }
+          }
+        }
+      }
+
+      return res.json({ results });
+    } catch (error: any) {
+      console.error("Send confirmation error:", error);
+      return res.status(500).json({ message: "Failed to send confirmation" });
+    }
+  });
+
+  router.post("/api/jobs/:jobId/checklist", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const item = await createChecklistItem({ jobId: req.params.jobId, ...req.body });
+      return res.json(item);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to create checklist item" });
+    }
+  });
+
+  router.put("/api/checklist/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const item = await updateChecklistItem(req.params.id, req.body);
+      return res.json(item);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to update checklist item" });
+    }
+  });
+
+  router.delete("/api/checklist/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteChecklistItem(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete checklist item" });
+    }
+  });
+
+  router.get("/api/jobs/:jobId/photos", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const photos = await getPhotosByJob(req.params.jobId);
+      return res.json(photos);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get photos" });
+    }
+  });
+
+  router.post("/api/jobs/:jobId/photos", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { photoData, photoType, caption } = req.body;
+      if (!photoData) return res.status(400).json({ message: "Photo data required" });
+
+      const fs = await import("fs");
+      const path = await import("path");
+      const uploadsDir = path.join(process.cwd(), "uploads", "job-photos");
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const filePath = path.join(uploadsDir, fileName);
+
+      const base64Data = photoData.replace(/^data:image\/\w+;base64,/, "");
+      fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+
+      const photoUrl = `/uploads/job-photos/${fileName}`;
+      const photo = await createJobPhoto({
+        jobId: req.params.jobId,
+        photoUrl,
+        photoType: photoType || "after",
+        caption: caption || "",
+      });
+      return res.json(photo);
+    } catch (error: any) {
+      console.error("Photo upload error:", error);
+      return res.status(500).json({ message: "Failed to upload photo" });
+    }
+  });
+
+  router.delete("/api/photos/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await deleteJobPhoto(req.params.id);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete photo" });
+    }
+  });
+
+  router.post("/api/jobs/:id/start", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      if (job.status !== "scheduled") {
+        return res.status(409).json({ message: `Cannot start a job that is ${job.status}` });
+      }
+
+      const updatedJob = await updateJob(req.params.id, {
+        status: "in_progress",
+        startedAt: new Date(),
+      });
+
+      return res.json(updatedJob);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to start job" });
+    }
+  });
+
+  router.post("/api/jobs/:id/complete", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      if (job.status === "completed" || job.status === "canceled") {
+        return res.status(409).json({ message: `Cannot complete a job that is ${job.status}` });
+      }
+
+      const now = new Date();
+      const updatedJob = await updateJob(req.params.id, {
+        status: "completed",
+        startedAt: (job as any).startedAt || now,
+        completedAt: now,
+        endDatetime: now,
+      });
+
+      let nextJob = null;
+      if (job.recurrence && job.recurrence !== "none") {
+        const currentDate = new Date(job.startDatetime);
+        let nextDate: Date;
+
+        switch (job.recurrence) {
+          case "weekly":
+            nextDate = new Date(currentDate);
+            nextDate.setDate(nextDate.getDate() + 7);
+            break;
+          case "biweekly":
+            nextDate = new Date(currentDate);
+            nextDate.setDate(nextDate.getDate() + 14);
+            break;
+          case "monthly":
+            nextDate = new Date(currentDate);
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            break;
+          case "quarterly":
+            nextDate = new Date(currentDate);
+            nextDate.setMonth(nextDate.getMonth() + 3);
+            break;
+          default:
+            nextDate = new Date(currentDate);
+            nextDate.setDate(nextDate.getDate() + 7);
+        }
+
+        nextJob = await createJob({
+          businessId: job.businessId,
+          customerId: job.customerId || undefined,
+          quoteId: job.quoteId || undefined,
+          jobType: job.jobType,
+          startDatetime: nextDate,
+          recurrence: job.recurrence,
+          internalNotes: job.internalNotes,
+          address: job.address,
+          total: job.total || undefined,
+        });
+
+        const checklist = await getChecklistByJob(job.id);
+        for (let i = 0; i < checklist.length; i++) {
+          await createChecklistItem({
+            jobId: nextJob.id,
+            label: checklist[i].label,
+            sortOrder: checklist[i].sortOrder,
+          });
+        }
+      }
+
+      let ratingUrl: string | null = null;
+      if (updatedJob.ratingToken) {
+        ratingUrl = `${getPublicBaseUrl(req)}/rate/${updatedJob.ratingToken}`;
+      }
+
+      return res.json({
+        completedJob: updatedJob,
+        nextJob,
+        ratingUrl,
+        message: nextJob
+          ? `Job completed! Next ${job.recurrence} job scheduled.`
+          : "Job completed!",
+      });
+    } catch (error: any) {
+      console.error("Complete job error:", error);
+      return res.status(500).json({ message: "Failed to complete job" });
+    }
+  });
+
+  router.post("/api/jobs/:id/rate", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { rating, comment } = req.body;
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+      const updated = await rateJob(req.params.id, rating, comment);
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Rate job error:", error);
+      return res.status(500).json({ message: "Failed to rate job" });
+    }
+  });
+
+  router.get("/api/ratings/summary", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const summary = await getRatingsSummary(business.id);
+      return res.json(summary);
+    } catch (error: any) {
+      console.error("Ratings summary error:", error);
+      return res.status(500).json({ message: "Failed to get ratings summary" });
+    }
+  });
+
+  router.post("/api/jobs/:id/generate-update-token", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+      const existing = await pool.query(`SELECT update_token FROM jobs WHERE id = $1`, [req.params.id]);
+      if (existing.rows[0]?.update_token && existing.rows[0].update_token.length <= 16) {
+        return res.json({ token: existing.rows[0].update_token });
+      }
+      const crypto = await import("crypto");
+      const token = crypto.randomBytes(8).toString("hex");
+      await pool.query(`UPDATE jobs SET update_token = $1 WHERE id = $2`, [token, req.params.id]);
+      return res.json({ token });
+    } catch (error: any) {
+      console.error("Generate update token error:", error);
+      return res.status(500).json({ message: "Failed to generate update token" });
+    }
+  });
+
+  router.get("/api/jobs/:id/update-token", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await pool.query(`SELECT update_token FROM jobs WHERE id = $1`, [req.params.id]);
+      return res.json({ token: result.rows[0]?.update_token || null });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get update token" });
+    }
+  });
+
+  router.post("/api/jobs/:id/update-status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { status, note } = req.body;
+      if (!status) return res.status(400).json({ message: "Status is required" });
+      const validStatuses = ["scheduled", "en_route", "service_started", "in_progress", "final_touches", "completed"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      await pool.query(`UPDATE jobs SET detailed_status = $1, updated_at = NOW() WHERE id = $2`, [status, req.params.id]);
+
+      const coreStatus = status === "completed" ? "completed" : (status === "scheduled" ? "scheduled" : "in_progress");
+      await pool.query(`UPDATE jobs SET status = $1 WHERE id = $2`, [coreStatus, req.params.id]);
+
+      if (status === "en_route") {
+        await pool.query(`UPDATE jobs SET started_at = COALESCE(started_at, NOW()), en_route_at = COALESCE(en_route_at, NOW()) WHERE id = $1`, [req.params.id]);
+      }
+      if (status === "service_started") {
+        await pool.query(`UPDATE jobs SET started_at = COALESCE(started_at, NOW()), service_started_at = COALESCE(service_started_at, NOW()) WHERE id = $1`, [req.params.id]);
+      }
+      if (status === "completed") {
+        await pool.query(`UPDATE jobs SET completed_at = COALESCE(completed_at, NOW()) WHERE id = $1`, [req.params.id]);
+      }
+
+      await pool.query(
+        `INSERT INTO job_status_history (id, job_id, status, note, created_at, auto_generated) VALUES (gen_random_uuid(), $1, $2, $3, NOW(), false)`,
+        [req.params.id, status, note || ""]
+      );
+
+      const updated = await getJobById(req.params.id);
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Update job status error:", error);
+      return res.status(500).json({ message: "Failed to update status" });
+    }
+  });
+
+  router.get("/api/jobs/:id/timeline", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await pool.query(
+        `SELECT * FROM job_status_history WHERE job_id = $1 ORDER BY created_at ASC`,
+        [req.params.id]
+      );
+      return res.json(result.rows);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get timeline" });
+    }
+  });
+
+  router.post("/api/jobs/:id/notes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { content, customerVisible } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "Content is required" });
+      const result = await pool.query(
+        `INSERT INTO job_notes (id, job_id, content, customer_visible, created_at) VALUES (gen_random_uuid(), $1, $2, $3, NOW()) RETURNING *`,
+        [req.params.id, content.trim(), customerVisible || false]
+      );
+      return res.json(result.rows[0]);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to create note" });
+    }
+  });
+
+  router.get("/api/jobs/:id/notes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await pool.query(
+        `SELECT * FROM job_notes WHERE job_id = $1 ORDER BY created_at DESC`,
+        [req.params.id]
+      );
+      return res.json(result.rows);
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get notes" });
+    }
+  });
+
+  router.delete("/api/jobs/:id/notes/:noteId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await pool.query(`DELETE FROM job_notes WHERE id = $1 AND job_id = $2`, [req.params.noteId, req.params.id]);
+      return res.json({ message: "Deleted" });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to delete note" });
+    }
+  });
+
+  router.get("/api/booking-availability", requireAuth, async (req: any, res) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      const settings = await getBookingAvailability(business.id);
+      return res.json(settings || {
+        enabled: false,
+        allowedDays: [1, 2, 3, 4, 5],
+        timeWindows: [{ start: "08:00", end: "17:00" }],
+        slotDurationHours: 3,
+        slotIntervalHours: 2,
+        minNoticeHours: 24,
+        maxJobsPerDay: 4,
+        blackoutDates: [],
+        serviceAreaNotes: "",
+        confirmationMessage: "",
+      });
+    } catch (e) {
+      return res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  router.put("/api/booking-availability", requireAuth, async (req: any, res) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      const { enabled, allowedDays, timeWindows, slotDurationHours, slotIntervalHours, minNoticeHours, maxJobsPerDay, blackoutDates, serviceAreaNotes, confirmationMessage } = req.body;
+      const updated = await upsertBookingAvailability(business.id, {
+        enabled: typeof enabled === "boolean" ? enabled : undefined,
+        allowedDays: Array.isArray(allowedDays) ? allowedDays.map(Number) : undefined,
+        timeWindows: Array.isArray(timeWindows) ? timeWindows : undefined,
+        slotDurationHours: slotDurationHours !== undefined ? Number(slotDurationHours) : undefined,
+        slotIntervalHours: slotIntervalHours !== undefined ? Number(slotIntervalHours) : undefined,
+        minNoticeHours: minNoticeHours !== undefined ? Number(minNoticeHours) : undefined,
+        maxJobsPerDay: maxJobsPerDay !== undefined ? Number(maxJobsPerDay) : undefined,
+        blackoutDates: Array.isArray(blackoutDates) ? blackoutDates : undefined,
+        serviceAreaNotes: serviceAreaNotes !== undefined ? String(serviceAreaNotes) : undefined,
+        confirmationMessage: confirmationMessage !== undefined ? String(confirmationMessage) : undefined,
+      });
+      return res.json(updated);
+    } catch (e) {
+      return res.status(500).json({ error: "Server error" });
+    }
+  });
