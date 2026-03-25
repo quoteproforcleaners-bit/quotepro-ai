@@ -1,0 +1,135 @@
+I have a Node.js + Express backend, PostgreSQL via Drizzle ORM,
+SendGrid for email, and React 19 web + React Native mobile apps
+for QuotePro AI. I need a churn detection system and NPS 
+measurement that a $1B SaaS company would have.
+
+1. CHURN SIGNAL SCHEMA
+   Add via raw SQL:
+   
+   To users table:
+   last_active_at: timestamp  (update on every API request)
+   last_quote_sent_at: timestamp  (update on quote send)
+   churn_risk_score: integer DEFAULT 0  (0-100)
+   churn_intervention_sent_at: timestamp
+   nps_score: integer  (0-10, null until surveyed)
+   nps_surveyed_at: timestamp
+   nps_response: text
+
+2. LAST ACTIVE TRACKING
+   In server/middleware.ts, in the requireAuth middleware,
+   after successful auth:
+   
+   UPDATE users SET last_active_at = NOW() 
+   WHERE id = req.user.id
+   
+   Do this asynchronously (don't await) so it never 
+   adds latency to the request.
+
+3. CHURN RISK SCORING CRON
+   Add to server/index.ts, runs daily at 6am:
+   
+   For every paid user, compute churn_risk_score (0-100):
+   
+   Start at 0, add points for risk signals:
+   +30: No login in 7 days (paid user)
+   +20: No quote sent in 14 days
+   +15: Hit quote quota and didn't upgrade within 48h
+   +15: Opened cancel flow (CANCEL_INITIATED event exists)
+   +10: No login in 3 days (during trial)
+   +10: Trial has 2 days left, not upgraded
+   +5: Zero jobs scheduled (no quote ever accepted)
+   
+   Subtract points for health signals:
+   -20: Quote accepted in last 7 days
+   -15: Job completed in last 7 days  
+   -10: AI agent used in last 3 days
+   -10: Logged in today
+   
+   Cap at 0 minimum, 100 maximum.
+   Update churn_risk_score in users table.
+
+4. CHURN INTERVENTIONS
+   After scoring, trigger interventions by score band:
+   
+   Score 70-100 (HIGH RISK) — send once per week max:
+   Email subject: "Everything ok, [name]?"
+   Body: Short, personal-feeling email from Mike.
+   "I noticed you haven't logged into QuotePro in a while. 
+   Is there something we could be doing better? 
+   Hit reply — I personally read every response."
+   Also: flag in admin dashboard for manual outreach 
+   on accounts > $49/mo value.
+   
+   Score 40-69 (MEDIUM RISK) — send once per 2 weeks max:
+   Email: Feature they haven't tried yet that's relevant 
+   to their usage pattern. If they've never used AI 
+   follow-ups: "Your quotes are going cold — here's 
+   the 60-second fix."
+   
+   Score 0-39 (HEALTHY): No intervention.
+   
+   Never send an intervention if one was sent in the 
+   last 7 days (check churn_intervention_sent_at).
+
+5. NPS SURVEY SYSTEM
+   Trigger in-app NPS survey exactly 30 days after 
+   first paid subscription start (not trial start).
+   
+   WEB implementation:
+   Create: web/src/components/NPSSurvey.tsx
+   
+   - Appears as a bottom-right floating panel 
+     (not a blocking modal)
+   - Question: "How likely are you to recommend 
+     QuotePro to another cleaning business owner?"
+   - 0-10 number selector (tap to select)
+   - On selection:
+     Score 9-10 (Promoter): Show "What do you love most?"
+     Score 7-8 (Passive): Show "What could we improve?"
+     Score 0-6 (Detractor): Show "What's not working for you?"
+   - Text input for follow-up answer
+   - Submit button → POST /api/nps/submit
+   - After submit: "Thank you! Your feedback shapes 
+     every update we ship."
+   - Dismiss X (stores dismissed flag, never shows again)
+   
+   MOBILE implementation:
+   Create: client/screens/NPSSurveyModal.tsx
+   Same logic, renders as a bottom sheet modal.
+   
+   API: POST /api/nps/submit
+   Body: { score: number, followUp: string }
+   - Saves to users table (nps_score, nps_response, 
+     nps_surveyed_at)
+   - If score >= 9: trigger case study outreach email:
+     "Would you be willing to share your QuotePro 
+     story? We'd love to feature you." + calendly link
+   - If score <= 6: create a growth_task for the 
+     founder: "Follow up with [name] — detractor 
+     feedback: [response]"
+   - Track: trackEvent(userId, 'NPS_SUBMITTED', { score })
+
+6. ADMIN CHURN DASHBOARD
+   GET /api/admin/churn
+   Returns:
+   {
+     highRiskAccounts: [{ userId, email, tier, 
+       churnRiskScore, lastActiveAt, mrr }],
+     mediumRiskAccounts: [...],
+     weeklyChurnRate: string,  // "X%"
+     avgNpsScore: number,
+     npsBreakdown: { 
+       promoters: number,  // 9-10
+       passives: number,   // 7-8  
+       detractors: number  // 0-6
+     },
+     netPromoterScore: number  // calculated NPS
+   }
+   
+   GET /api/admin/churn?sortBy=mrr
+   Returns high-risk accounts sorted by monthly 
+   revenue value (prioritize saving biggest accounts).
+
+Show every new component, every cron addition, 
+every email template, and the complete admin 
+churn dashboard endpoint.

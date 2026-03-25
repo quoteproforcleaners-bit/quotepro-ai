@@ -4,6 +4,7 @@
 
 import bcrypt from "bcryptjs";
 import { Router, type Request, type Response } from "express";
+import { verifyUnsubscribeToken } from "../dripEmails";
 import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter, isGrowthOrAbove } from "../middleware";
@@ -2155,6 +2156,43 @@ Return ONLY valid JSON:
     } catch (error: any) {
       console.error("Job update page error:", error);
       return res.status(500).send("<html><body><h1>Error loading update page</h1></body></html>");
+    }
+  });
+
+  // ─── Email unsubscribe ────────────────────────────────────────────────────
+  function unsubscribePage(title: string, message: string, success: boolean): string {
+    const color = success ? "#1d3557" : "#c0392b";
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — QuotePro</title></head>
+<body style="margin:0;padding:0;background:#f4f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;">
+<div style="background:#fff;border-radius:12px;padding:48px 40px;max-width:440px;width:90%;text-align:center;box-shadow:0 2px 16px rgba(0,0,0,0.08);">
+  <div style="width:56px;height:56px;border-radius:50%;background:${color};margin:0 auto 20px;display:flex;align-items:center;justify-content:center;">
+    <span style="color:#fff;font-size:24px;">${success ? "&#10003;" : "&#33;"}</span>
+  </div>
+  <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#1d3557;">${title}</h1>
+  <p style="margin:0 0 28px;font-size:15px;color:#6b7280;line-height:1.6;">${message}</p>
+  <a href="https://getquotepro.ai/app" style="display:inline-block;background:#1d3557;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:15px;font-weight:600;">Return to QuotePro</a>
+</div>
+</body></html>`;
+  }
+
+  router.get("/api/email/unsubscribe", async (req: Request, res: Response) => {
+    try {
+      const { uid, token } = req.query as { uid?: string; token?: string };
+      if (!uid || !token) {
+        return res.status(400).send(unsubscribePage("Invalid Link", "This unsubscribe link is missing required information.", false));
+      }
+      const isValid = verifyUnsubscribeToken(uid, token);
+      if (!isValid) {
+        return res.status(400).send(unsubscribePage("Invalid Link", "This unsubscribe link is invalid or has expired.", false));
+      }
+      await pool.query(
+        `UPDATE users SET trial_drip_unsubscribed = TRUE WHERE id = $1`,
+        [uid]
+      );
+      return res.send(unsubscribePage("You've been unsubscribed", "You won't receive any more trial emails from us. Your account is still active.", true));
+    } catch (err: any) {
+      console.error("[drip] Unsubscribe error:", err.message);
+      return res.status(500).send(unsubscribePage("Error", "Something went wrong. Please try again or contact support.", false));
     }
   });
 

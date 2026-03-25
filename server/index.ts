@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
+import { processDripQueue } from "./dripEmails";
 
 const app = express();
 const log = console.log;
@@ -435,6 +436,22 @@ async function seedDemoUser() {
     }, msTillNextCheck);
   }
   scheduleAnalyticsTTL();
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // ─── Trial drip email cron: fires daily at 9am ────────────────────────────
+  function scheduleDripCron() {
+    setInterval(async () => {
+      const d = new Date();
+      if (d.getHours() === 9 && d.getMinutes() < 60) {
+        try {
+          await processDripQueue();
+        } catch (e: any) {
+          console.error("[drip] Cron failed:", e.message);
+        }
+      }
+    }, 60 * 60 * 1000); // check every hour
+  }
+  scheduleDripCron();
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

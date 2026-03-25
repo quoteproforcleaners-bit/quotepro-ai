@@ -1,0 +1,128 @@
+I have a Node.js + Express + TypeScript backend for QuotePro AI 
+(a cleaning business SaaS). Email is sent via SendGrid 
+(server/clients.ts). Users table is in shared/schema.ts managed 
+by Drizzle ORM. Cron jobs run in server/index.ts.
+
+Build a complete 5-email trial drip sequence for new signups.
+
+1. SCHEMA CHANGES
+   Add to users table in shared/schema.ts via raw SQL 
+   (drizzle-kit push is broken — use ALTER TABLE IF NOT EXISTS):
+   
+   trial_drip_enrolled_at: timestamp
+   trial_drip_last_sent_day: integer DEFAULT 0
+   trial_drip_completed: boolean DEFAULT false
+   trial_drip_unsubscribed: boolean DEFAULT false
+
+2. ENROLLMENT TRIGGER
+   In server/routers/authRouter.ts, after any successful 
+   account creation (register, Apple SSO, Google SSO):
+   - Set trial_drip_enrolled_at = NOW()
+   - Set trial_drip_last_sent_day = 0
+   - Immediately send Day 0 welcome email (see below)
+
+3. EMAIL TEMPLATES
+   Create server/emails/ folder with these HTML email templates.
+   All emails must be:
+   - Branded: navy header (#1d3557), QuotePro logo text, 
+     clean white body, footer with unsubscribe link
+   - From: hello@getquotepro.ai
+   - Reply-To: quoteproforcleaners@gmail.com
+   - Personalized with user's first name where possible
+
+   DAY 0 — Welcome (send immediately on signup)
+   Subject: "Welcome to QuotePro, [name] — here's where to start"
+   Body:
+   - "You're now on your 14-day free trial"
+   - ONE action: "Send your first quote in 60 seconds →"
+   - Brief 3-bullet what to expect this week
+   - Founder sign-off: "— Mike, founder & cleaning franchise owner"
+
+   DAY 2 — First quote nudge
+   Subject: "Have you sent your first quote yet, [name]?"
+   Body:
+   - If they HAVE sent a quote: "Great start! Here's how to 
+     turn that quote into a confirmed job with AI follow-up"
+   - If they HAVE NOT: "Most cleaning businesses close their 
+     first QuotePro job within 48 hours. Here's how →"
+   - Feature spotlight: Good/Better/Best proposals
+   - CTA: "Send a quote now →"
+   - Include: screenshot/mockup description of the 
+     3-tier proposal
+
+   DAY 4 — AI follow-up feature reveal
+   Subject: "This cleaning business recovered $400 with one button"
+   Body:
+   - Mini case study: cleaner who forgot to follow up, 
+     AI sent it automatically, closed the job
+   - Feature spotlight: AI follow-up automation
+   - "Your quotes that haven't been answered yet could 
+     be worth [estimated amount]"
+   - CTA: "See your unanswered quotes →" 
+     → links to /app/quotes?status=sent
+
+   DAY 7 — Halfway + urgency
+   Subject: "7 days down, 7 to go — here's your trial scorecard"
+   Body:
+   - Personalized stats block:
+     "Quotes sent: X | Jobs confirmed: X | 
+      Estimated revenue generated: $X"
+   - "Here's what Growth unlocks that you haven't 
+     tried yet:" → list top 3 unused Growth features
+   - Soft upgrade CTA: "Unlock everything for $49/mo →"
+   - "Or keep exploring free for 7 more days — no pressure"
+
+   DAY 13 — Last chance (only send if not upgraded)
+   Subject: "Your trial ends tomorrow, [name]"
+   Body:
+   - "Tomorrow your account moves to the free tier 
+     (5 quotes/month)"
+   - What they'll lose: bullet list of Growth features
+   - Urgency: "Lock in your current setup — upgrade today"
+   - Primary CTA: "Upgrade to Growth — $49/mo →"
+   - Secondary: "Questions? Reply to this email — 
+     Mike personally reads every reply"
+
+4. DRIP CRON JOB
+   In server/index.ts, add a cron that runs daily at 9am:
+   
+   - Query all users WHERE:
+     trial_drip_completed = false AND
+     trial_drip_unsubscribed = false AND
+     trial_started_at IS NOT NULL AND
+     subscriptionTier = 'free' (not yet upgraded)
+   
+   - For each user, calculate days_since_enrollment:
+     NOW() - trial_drip_enrolled_at
+   
+   - Send the appropriate email based on 
+     trial_drip_last_sent_day:
+     If last_sent = 0 and days >= 2 → send Day 2 email
+     If last_sent = 2 and days >= 4 → send Day 4 email
+     If last_sent = 4 and days >= 7 → send Day 7 email
+     If last_sent = 7 and days >= 13 → send Day 13 email
+     If last_sent = 13 → set trial_drip_completed = true
+   
+   - After sending: update trial_drip_last_sent_day
+   - Skip users who have already upgraded 
+     (subscriptionTier != 'free')
+   - Log each send to communications table
+
+5. PERSONALIZATION DATA
+   Before sending each email, fetch from DB:
+   - User's first name (parse from email if no name set)
+   - quotes_sent_count: COUNT from quotes table
+   - jobs_confirmed_count: COUNT from jobs table  
+   - estimated_revenue: SUM of accepted quote values
+   Use these to populate the Day 7 scorecard section.
+
+6. UNSUBSCRIBE ENDPOINT
+   GET /api/email/unsubscribe?token=:token
+   - Token is HMAC-SHA256 of userId + secret
+   - Sets trial_drip_unsubscribed = true
+   - Returns a simple HTML page: "You've been unsubscribed 
+     from QuotePro trial emails. Your account remains active."
+   - Include unsubscribe link in every email footer
+
+Show every new file, every email template HTML, 
+the complete cron logic, and the unsubscribe flow.

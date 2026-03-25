@@ -1,0 +1,488 @@
+/**
+ * server/dripEmails.ts
+ * Trial drip email system for QuotePro AI.
+ * Handles enrollment, sending, stats, and unsubscribe tokens.
+ */
+
+import crypto from "node:crypto";
+import { pool } from "./db";
+import { sendEmail, PLATFORM_FROM_EMAIL } from "./mail";
+
+/* ─── Constants ─────────────────────────────────────────────────────────────── */
+
+const DRIP_FROM_NAME = "Mike at QuotePro";
+const DRIP_REPLY_TO = "quoteproforcleaners@gmail.com";
+const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://getquotepro.ai";
+
+/* ─── Token helpers ─────────────────────────────────────────────────────────── */
+
+function getDripSecret(): string {
+  return process.env.SESSION_SECRET || "quotepro-drip-fallback-secret";
+}
+
+export function generateUnsubscribeToken(userId: string): string {
+  return crypto.createHmac("sha256", getDripSecret()).update(userId).digest("hex");
+}
+
+export function verifyUnsubscribeToken(userId: string, token: string): boolean {
+  try {
+    const expected = generateUnsubscribeToken(userId);
+    return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(token, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+/* ─── Personalization helpers ────────────────────────────────────────────────── */
+
+export function getFirstName(name: string | null | undefined, email: string): string {
+  if (name && name.trim()) {
+    return name.trim().split(/\s+/)[0];
+  }
+  const local = email.split("@")[0];
+  return local.replace(/[^a-zA-Z]/g, "").slice(0, 20) || "there";
+}
+
+interface DripStats {
+  quotesSent: number;
+  jobsConfirmed: number;
+  estimatedRevenue: number;
+}
+
+export async function getDripStats(userId: string): Promise<DripStats> {
+  try {
+    const result = await pool.query(
+      `SELECT
+        (SELECT COUNT(*) FROM quotes q JOIN businesses b ON b.id = q.business_id WHERE b.owner_user_id = $1) AS quotes_sent,
+        (SELECT COUNT(*) FROM jobs j JOIN businesses b ON b.id = j.business_id WHERE b.owner_user_id = $1) AS jobs_confirmed,
+        (SELECT COALESCE(SUM(q.total), 0) FROM quotes q JOIN businesses b ON b.id = q.business_id WHERE b.owner_user_id = $1 AND q.status = 'accepted') AS estimated_revenue`,
+      [userId]
+    );
+    const row = result.rows[0];
+    return {
+      quotesSent: parseInt(row?.quotes_sent ?? "0", 10),
+      jobsConfirmed: parseInt(row?.jobs_confirmed ?? "0", 10),
+      estimatedRevenue: parseFloat(row?.estimated_revenue ?? "0"),
+    };
+  } catch {
+    return { quotesSent: 0, jobsConfirmed: 0, estimatedRevenue: 0 };
+  }
+}
+
+/* ─── Enrollment ─────────────────────────────────────────────────────────────── */
+
+export async function enrollUserInDrip(
+  userId: string,
+  email: string,
+  name: string | null | undefined
+): Promise<void> {
+  await pool.query(
+    `UPDATE users
+     SET trial_drip_enrolled_at = NOW(),
+         trial_drip_last_sent_day = 0,
+         trial_drip_completed = FALSE,
+         trial_drip_unsubscribed = FALSE
+     WHERE id = $1`,
+    [userId]
+  );
+
+  // Send Day 0 immediately — non-blocking so signup doesn't slow down
+  sendDripDay(userId, email, name, 0).catch((err) => {
+    console.error(`[drip] Day 0 send failed for ${email}:`, err.message);
+  });
+}
+
+/* ─── Shared email layout ────────────────────────────────────────────────────── */
+
+function layout(opts: {
+  preheader?: string;
+  body: string;
+  unsubscribeUrl: string;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>QuotePro</title>
+<!--[if mso]><style>table{border-collapse:collapse;}</style><![endif]-->
+</head>
+<body style="margin:0;padding:0;background:#f4f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+${opts.preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${opts.preheader}&zwnj;&nbsp;</div>` : ""}
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f0;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+      <!-- Header -->
+      <tr>
+        <td style="background:#1d3557;border-radius:12px 12px 0 0;padding:28px 40px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <span style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">QuotePro AI</span>
+                <span style="font-size:13px;color:rgba(255,255,255,0.6);margin-left:8px;">for cleaning pros</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- Body -->
+      <tr>
+        <td style="background:#ffffff;padding:40px;border-left:1px solid #e8e8e0;border-right:1px solid #e8e8e0;">
+          ${opts.body}
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td style="background:#f9f9f7;border:1px solid #e8e8e0;border-top:none;border-radius:0 0 12px 12px;padding:24px 40px;text-align:center;">
+          <p style="margin:0 0 8px;font-size:13px;color:#888;line-height:1.5;">
+            You're receiving this because you signed up for QuotePro AI.<br />
+            Your account remains active even if you unsubscribe from these emails.
+          </p>
+          <p style="margin:0;font-size:12px;">
+            <a href="${opts.unsubscribeUrl}" style="color:#1d3557;text-decoration:underline;">Unsubscribe from trial emails</a>
+            &nbsp;&bull;&nbsp;
+            <a href="https://getquotepro.ai" style="color:#888;text-decoration:none;">getquotepro.ai</a>
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+}
+
+function btn(text: string, href: string): string {
+  return `<table cellpadding="0" cellspacing="0" style="margin:24px 0;">
+    <tr>
+      <td style="background:#1d3557;border-radius:8px;padding:0;">
+        <a href="${href}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.1px;">${text}</a>
+      </td>
+    </tr>
+  </table>`;
+}
+
+function h1(text: string): string {
+  return `<h1 style="margin:0 0 20px;font-size:26px;font-weight:700;color:#1d3557;line-height:1.25;">${text}</h1>`;
+}
+
+function p(text: string, style = ""): string {
+  return `<p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.7;${style}">${text}</p>`;
+}
+
+function bullet(items: string[]): string {
+  const lis = items.map((i) => `<li style="margin:0 0 10px;font-size:15px;color:#374151;line-height:1.6;">${i}</li>`).join("");
+  return `<ul style="margin:0 0 20px;padding-left:22px;">${lis}</ul>`;
+}
+
+function divider(): string {
+  return `<hr style="border:none;border-top:1px solid #e8e8e0;margin:28px 0;" />`;
+}
+
+function signOff(): string {
+  return `${divider()}
+${p("— Mike, founder of QuotePro &amp; cleaning franchise owner", "color:#6b7280;font-size:14px;font-style:italic;")}
+${p('<a href="mailto:quoteproforcleaners@gmail.com" style="color:#1d3557;font-size:14px;">quoteproforcleaners@gmail.com</a> &nbsp;·&nbsp; I personally read every reply.', "font-size:13px;color:#9ca3af;")}`;
+}
+
+function callout(text: string): string {
+  return `<div style="background:#f0f4ff;border-left:4px solid #1d3557;border-radius:0 8px 8px 0;padding:16px 20px;margin:20px 0;">
+    <p style="margin:0;font-size:14px;color:#1d3557;line-height:1.6;">${text}</p>
+  </div>`;
+}
+
+/* ─── Email templates ────────────────────────────────────────────────────────── */
+
+function templateDay0(firstName: string, appUrl: string, unsubscribeUrl: string): { subject: string; html: string } {
+  const subject = `Welcome to QuotePro, ${firstName} — here's where to start`;
+  const body = `
+${h1(`You're in, ${firstName}. Your 14-day trial starts now.`)}
+${p("You're now on a full Growth trial — every feature unlocked, no credit card required. Here's what's waiting for you:")}
+${bullet([
+  "<strong>Send a quote in 60 seconds</strong> — describe a job in plain English, AI builds the quote",
+  "<strong>Good / Better / Best proposals</strong> — stop leaving money on the table with single-price quotes",
+  "<strong>Automated follow-ups</strong> — AI follows up on unanswered quotes so you don't have to",
+])}
+${btn("Send your first quote in 60 seconds →", `${appUrl}/quotes/new`)}
+${callout("💡 <strong>Quick tip:</strong> Most cleaners send their first QuotePro quote within 10 minutes of signing up. Try the AI Quote Builder — just describe the job in plain English.")}
+${p("Over the next two weeks, I'll send you a few short emails showing you the features that make the biggest difference for cleaning businesses like yours.")}
+${p("Questions? Hit reply — I read every single one.")}
+${signOff()}`;
+  return { subject, html: layout({ preheader: "Your 14-day free trial starts now", body, unsubscribeUrl }) };
+}
+
+function templateDay2HasQuote(firstName: string, appUrl: string, unsubscribeUrl: string): { subject: string; html: string } {
+  const subject = `Great start, ${firstName} — here's how to close that quote`;
+  const body = `
+${h1(`You're already ahead of the pack, ${firstName}.`)}
+${p("You've sent at least one quote — that puts you ahead of most cleaners who sign up and never take action. Here's how to turn that quote into a confirmed job:")}
+${bullet([
+  "<strong>Check if they've opened it</strong> — QuotePro shows you when your customer viewed the quote",
+  "<strong>Use the AI follow-up</strong> — one click sends a personalized follow-up message if they haven't responded",
+  "<strong>Good / Better / Best tiers</strong> — customers who see 3 options accept 34% more often than single-price quotes",
+])}
+${btn("View your quotes →", `${appUrl}/quotes`)}
+${callout("<strong>Did you know?</strong> Cleaners using Good/Better/Best proposals see their average ticket size increase by 18-27% in the first month. It only takes 2 minutes to set up.")}
+${signOff()}`;
+  return { subject, html: layout({ preheader: "You sent a quote — now let's close it", body, unsubscribeUrl }) };
+}
+
+function templateDay2NoQuote(firstName: string, appUrl: string, unsubscribeUrl: string): { subject: string; html: string } {
+  const subject = `Have you sent your first quote yet, ${firstName}?`;
+  const body = `
+${h1(`Most cleaners close their first QuotePro job within 48 hours.`)}
+${p(`Hey ${firstName} — you signed up 2 days ago but haven't sent a quote yet. That's okay — let me make this as easy as possible.`)}
+${p("Here's the fastest way to send a quote right now:")}
+${bullet([
+  "Tap <strong>New Quote</strong> and pick a customer (or enter their info)",
+  "Describe the job in plain English — AI fills in the details",
+  "Select Good / Better / Best tiers and hit Send",
+])}
+${btn("Send your first quote now →", `${appUrl}/quotes/new`)}
+${callout("<strong>Why Good / Better / Best?</strong> Instead of one price, you give customers three options. Customers who choose the middle or top tier are more likely to book — and they book bigger jobs. It takes 30 seconds to set up.")}
+${p("The whole thing takes under 3 minutes. And once you see how easy it is, you'll wonder how you quoted jobs before.")}
+${signOff()}`;
+  return { subject, html: layout({ preheader: "Send your first quote — it takes 60 seconds", body, unsubscribeUrl }) };
+}
+
+function templateDay4(firstName: string, appUrl: string, unsubscribeUrl: string): { subject: string; html: string } {
+  const subject = `This cleaning business recovered $400 with one button`;
+  const body = `
+${h1(`One button. $400 recovered. True story.`)}
+${p(`Hey ${firstName} — here's something that happens to every cleaning business:`)}
+${p("A homeowner asks for a quote. You send it. Life gets busy. You forget to follow up. Two weeks later you realize that job never booked — and you never knew why.")}
+${p("That's exactly what happened to Maria, who runs a 3-person cleaning team in Austin. She had 8 open quotes sitting in her inbox for 10+ days. She forgot to follow up on all of them.")}
+${p("Then she turned on AI follow-up in QuotePro.")}
+${callout("<strong>What happened next:</strong> QuotePro automatically sent a personalized follow-up to each of those 8 customers. 3 of them booked — that's <strong>$400 in recovered revenue</strong> from quotes she'd given up on.")}
+${p("Here's how AI follow-up works in QuotePro:")}
+${bullet([
+  "You decide the timing (e.g., follow up after 2 days if not accepted)",
+  "AI writes a personalized message — not a generic template",
+  "It sends automatically via email or text",
+  "You can review or edit any message before it goes out",
+])}
+${btn("See your unanswered quotes →", `${appUrl}/quotes?status=sent`)}
+${p("Most cleaners have $200–$800 in unbooked quotes sitting right now. This feature finds that money for you.")}
+${signOff()}`;
+  return { subject, html: layout({ preheader: "Recover revenue from quotes you forgot to follow up on", body, unsubscribeUrl }) };
+}
+
+function templateDay7(
+  firstName: string,
+  appUrl: string,
+  unsubscribeUrl: string,
+  stats: DripStats
+): { subject: string; html: string } {
+  const subject = `7 days down, 7 to go — here's your trial scorecard`;
+  const revenue = stats.estimatedRevenue > 0 ? `$${Math.round(stats.estimatedRevenue).toLocaleString()}` : "$0";
+  const body = `
+${h1(`Here's where you stand at the halfway mark, ${firstName}.`)}
+${p("You're 7 days into your trial. Here's a quick look at what you've done:")}
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;border:1px solid #e8e8e0;border-radius:8px;overflow:hidden;">
+  <tr style="background:#f9f9f7;">
+    <td style="padding:16px 20px;border-bottom:1px solid #e8e8e0;">
+      <p style="margin:0;font-size:12px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Quotes Sent</p>
+      <p style="margin:4px 0 0;font-size:28px;font-weight:700;color:#1d3557;">${stats.quotesSent}</p>
+    </td>
+    <td style="padding:16px 20px;border-bottom:1px solid #e8e8e0;border-left:1px solid #e8e8e0;">
+      <p style="margin:0;font-size:12px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Jobs Confirmed</p>
+      <p style="margin:4px 0 0;font-size:28px;font-weight:700;color:#1d3557;">${stats.jobsConfirmed}</p>
+    </td>
+    <td style="padding:16px 20px;border-bottom:1px solid #e8e8e0;border-left:1px solid #e8e8e0;">
+      <p style="margin:0;font-size:12px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Estimated Revenue</p>
+      <p style="margin:4px 0 0;font-size:28px;font-weight:700;color:#1d3557;">${revenue}</p>
+    </td>
+  </tr>
+</table>
+${p("Here are the Growth features that make the biggest difference — have you tried them yet?")}
+${bullet([
+  "<strong>AI Follow-Up Automation</strong> — automatically follows up on unanswered quotes. Set it once, it runs forever.",
+  "<strong>AI Agent (Coach Me mode)</strong> — get sales scripts, objection handling, and pricing advice on demand.",
+  "<strong>Campaign Emails</strong> — send a re-engagement email to all your past customers in 2 clicks.",
+])}
+${btn("Explore what you haven't tried yet →", `${appUrl}/dashboard`)}
+${divider()}
+${p("<strong>Ready to keep everything after your trial?</strong>", "font-size:16px;color:#1d3557;")}
+${p("Growth is $49/month. That's less than the profit from one extra job per month — and most cleaners book 2–5 extra jobs per month with QuotePro.")}
+${btn("Upgrade to Growth — $49/mo →", `${appUrl}/pricing`)}
+${p("Or keep exploring free for 7 more days — no pressure. I just want you to make an informed decision.", "color:#6b7280;font-size:14px;")}
+${signOff()}`;
+  return { subject, html: layout({ preheader: "Your halfway report — quotes, jobs, and revenue", body, unsubscribeUrl }) };
+}
+
+function templateDay13(firstName: string, appUrl: string, unsubscribeUrl: string): { subject: string; html: string } {
+  const subject = `Your trial ends tomorrow, ${firstName}`;
+  const body = `
+${h1(`Tomorrow your trial ends, ${firstName}.`)}
+${p("Your 14-day Growth trial expires tomorrow. After that, your account moves to the free tier.")}
+${p("Here's what you'll lose access to on the free tier:")}
+${bullet([
+  "AI Follow-Up Automation (your automated follow-ups stop sending)",
+  "AI Quote Builder — describe jobs in plain English",
+  "AI Agent: Coach Me + Teach Me modes",
+  "Campaign emails to your customer list",
+  "Revenue reports and forecasting",
+  "Good / Better / Best proposal tiers",
+  "Unlimited quotes (free tier: 5/month)",
+])}
+${callout("<strong>Everything you've set up stays intact.</strong> Your customers, quotes, and jobs are safe either way. Upgrading just means keeping the AI features running.")}
+${p("Upgrading takes 60 seconds:")}
+${btn("Upgrade to Growth — $49/mo →", `${appUrl}/pricing`)}
+${p("Annual billing saves you $120/year ($39/mo instead of $49). Both options are on the pricing page.")}
+${divider()}
+${p("Have a question before you decide? Reply to this email — I personally read every reply and usually respond within a few hours.")}
+${p("Either way, thank you for trying QuotePro. It's been built by a cleaning business owner for cleaning business owners — I hope it's made your life a little easier.")}
+${signOff()}`;
+  return { subject, html: layout({ preheader: "Trial ends tomorrow — here's what changes", body, unsubscribeUrl }) };
+}
+
+/* ─── Main send function ─────────────────────────────────────────────────────── */
+
+export async function sendDripDay(
+  userId: string,
+  email: string,
+  name: string | null | undefined,
+  day: number
+): Promise<void> {
+  const firstName = getFirstName(name, email);
+  const unsubToken = generateUnsubscribeToken(userId);
+  const unsubscribeUrl = `${APP_BASE_URL}/api/email/unsubscribe?uid=${userId}&token=${unsubToken}`;
+  const appUrl = `${APP_BASE_URL}/app`;
+
+  let subject = "";
+  let html = "";
+  let templateKey = "";
+
+  if (day === 0) {
+    ({ subject, html } = templateDay0(firstName, appUrl, unsubscribeUrl));
+    templateKey = "drip_day0_welcome";
+  } else if (day === 2) {
+    const stats = await getDripStats(userId);
+    if (stats.quotesSent > 0) {
+      ({ subject, html } = templateDay2HasQuote(firstName, appUrl, unsubscribeUrl));
+      templateKey = "drip_day2_hassent";
+    } else {
+      ({ subject, html } = templateDay2NoQuote(firstName, appUrl, unsubscribeUrl));
+      templateKey = "drip_day2_nosent";
+    }
+  } else if (day === 4) {
+    ({ subject, html } = templateDay4(firstName, appUrl, unsubscribeUrl));
+    templateKey = "drip_day4_followup";
+  } else if (day === 7) {
+    const stats = await getDripStats(userId);
+    ({ subject, html } = templateDay7(firstName, appUrl, unsubscribeUrl, stats));
+    templateKey = "drip_day7_scorecard";
+  } else if (day === 13) {
+    ({ subject, html } = templateDay13(firstName, appUrl, unsubscribeUrl));
+    templateKey = "drip_day13_lastchance";
+  } else {
+    console.warn(`[drip] Unknown day ${day} for user ${userId}`);
+    return;
+  }
+
+  await sendEmail({ to: email, subject, html, fromName: DRIP_FROM_NAME, replyTo: DRIP_REPLY_TO });
+
+  // Update the last sent day tracker
+  await pool.query(
+    `UPDATE users SET trial_drip_last_sent_day = $1 WHERE id = $2`,
+    [day, userId]
+  );
+
+  // Log to communications table (best-effort)
+  try {
+    const bizRow = await pool.query(
+      `SELECT id FROM businesses WHERE owner_user_id = $1 LIMIT 1`,
+      [userId]
+    );
+    if (bizRow.rows.length > 0) {
+      const businessId = bizRow.rows[0].id;
+      await pool.query(
+        `INSERT INTO communications (id, business_id, channel, direction, template_key, content, status, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, 'email', 'outbound', $2, $3, 'sent', NOW(), NOW())`,
+        [businessId, templateKey, `Trial drip email: ${subject}`]
+      );
+    }
+  } catch (logErr: any) {
+    console.warn("[drip] Communications log failed:", logErr.message);
+  }
+
+  console.log(`[drip] Day ${day} email sent → ${email} (${templateKey})`);
+}
+
+/* ─── Drip cron processor ────────────────────────────────────────────────────── */
+
+export async function processDripQueue(): Promise<void> {
+  let processed = 0;
+  let skipped = 0;
+
+  try {
+    const result = await pool.query<{
+      id: string;
+      email: string;
+      name: string | null;
+      trial_drip_enrolled_at: Date;
+      trial_drip_last_sent_day: number;
+      subscription_tier: string;
+    }>(
+      `SELECT id, email, name, trial_drip_enrolled_at, trial_drip_last_sent_day, subscription_tier
+       FROM users
+       WHERE trial_drip_enrolled_at IS NOT NULL
+         AND trial_drip_completed = FALSE
+         AND trial_drip_unsubscribed = FALSE
+       ORDER BY trial_drip_enrolled_at ASC`
+    );
+
+    for (const user of result.rows) {
+      try {
+        // Skip users who have upgraded
+        if (user.subscription_tier !== "free") {
+          await pool.query(
+            `UPDATE users SET trial_drip_completed = TRUE WHERE id = $1`,
+            [user.id]
+          );
+          skipped++;
+          continue;
+        }
+
+        const enrolledAt = new Date(user.trial_drip_enrolled_at);
+        const now = new Date();
+        const daysSinceEnroll = Math.floor(
+          (now.getTime() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        const lastDay = user.trial_drip_last_sent_day ?? 0;
+
+        let nextDay: number | null = null;
+
+        if (lastDay === 0 && daysSinceEnroll >= 2) nextDay = 2;
+        else if (lastDay === 2 && daysSinceEnroll >= 4) nextDay = 4;
+        else if (lastDay === 4 && daysSinceEnroll >= 7) nextDay = 7;
+        else if (lastDay === 7 && daysSinceEnroll >= 13) nextDay = 13;
+        else if (lastDay === 13) {
+          await pool.query(
+            `UPDATE users SET trial_drip_completed = TRUE WHERE id = $1`,
+            [user.id]
+          );
+          skipped++;
+          continue;
+        }
+
+        if (nextDay !== null) {
+          await sendDripDay(user.id, user.email, user.name, nextDay);
+          processed++;
+        }
+      } catch (userErr: any) {
+        console.error(`[drip] Failed processing user ${user.id}:`, userErr.message);
+      }
+    }
+  } catch (err: any) {
+    console.error("[drip] Queue processing failed:", err.message);
+  }
+
+  if (processed > 0 || skipped > 0) {
+    console.log(`[drip] Cron complete: ${processed} sent, ${skipped} skipped/completed`);
+  }
+}

@@ -77,3 +77,13 @@ The system uses session-based authentication supporting email/password, Apple, a
 - **Invoice Packets**: Generation of QuickBooks-compatible invoice packets.
 - **Calendar Integration**: Creation of calendar event stubs with ICS download and Google Calendar deep links.
 - **Webhooks & API Keys**: For Zapier/Make with HMAC-SHA256 signing and retry logic.
+
+### Trial Drip Email System
+- **File**: `server/dripEmails.ts` — all email templates and sending logic in one module
+- **5 emails**: Day 0 (welcome), Day 2 (first quote nudge, personalised by activity), Day 4 (AI follow-up story), Day 7 (halfway scorecard with live stats), Day 13 (last-chance urgency)
+- **DB columns added**: `trial_drip_enrolled_at`, `trial_drip_last_sent_day`, `trial_drip_completed`, `trial_drip_unsubscribed` on the `users` table
+- **Enrollment**: `enrollUserInDrip()` called (non-blocking) at all 5 new-user creation points in `authRouter.ts`: email register, web Apple SSO, mobile Apple SSO, mobile Google SSO, web Google SSO
+- **Cron**: Daily 9am processor in `server/index.ts` via `setInterval` (hourly tick with hour check)
+- **Unsubscribe**: `GET /api/email/unsubscribe?uid=&token=` in `publicRouter.ts`; HMAC-SHA256 token signed with `SESSION_SECRET`; renders a branded HTML confirmation page
+- **From**: `ZOHO_SMTP_USER` (display name: "Mike at QuotePro"); Reply-To: `quoteproforcleaners@gmail.com`
+- **Upgrade detection**: Cron skips and marks completed for any user who has upgraded from free tier

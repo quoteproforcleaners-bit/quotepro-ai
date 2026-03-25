@@ -141,6 +141,10 @@ export async function updateUser(userId: string, data: Partial<{
   referredBy: string | null;
   referralCreditsMonths: number;
   aiFollowUpsUsedThisMonth: number;
+  trialDripEnrolledAt: Date | null;
+  trialDripLastSentDay: number;
+  trialDripCompleted: boolean;
+  trialDripUnsubscribed: boolean;
 }>): Promise<User> {
   const [user] = await db
     .update(users)

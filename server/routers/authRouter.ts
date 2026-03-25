@@ -24,6 +24,7 @@ import {
   getQuickQuoteHTML, getPrivacyPolicyHTML, getTermsOfServiceHTML, getDeleteAccountHTML,
   syncJobToGoogleCalendar,
 } from "../helpers";
+import { enrollUserInDrip } from "../dripEmails";
 import {
   getUserById, getUserByEmail, getUserByProviderId, createUser, updateUser,
   getBusinessByOwner, createBusiness, updateBusiness,
@@ -134,6 +135,7 @@ const router = Router();
       });
 
       const business = await createBusiness(user.id);
+      enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
 
       await new Promise<void>((resolve, reject) => {
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
@@ -286,6 +288,7 @@ const router = Router();
         }
         user = await createUser({ email, name, authProvider: "apple", providerId });
         await createBusiness(user.id);
+        enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
       }
 
       await new Promise<void>((resolve, reject) => {
@@ -356,6 +359,7 @@ const router = Router();
         });
 
         const business = await createBusiness(user.id);
+        enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
         await new Promise<void>((resolve, reject) => {
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
@@ -433,6 +437,7 @@ const router = Router();
         });
 
         const business = await createBusiness(user.id);
+        enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
         await new Promise<void>((resolve, reject) => {
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
@@ -528,6 +533,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         }
         user = await createUser({ email, name, authProvider: "google", providerId });
         await createBusiness(user.id);
+        enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
         needsOnboarding = true;
       } else {
         const business = await getBusinessByOwner(user.id);

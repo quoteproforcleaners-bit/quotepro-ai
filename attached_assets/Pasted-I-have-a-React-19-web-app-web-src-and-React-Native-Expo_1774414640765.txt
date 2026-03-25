@@ -1,0 +1,141 @@
+I have a React 19 web app (web/src/) and React Native Expo 
+mobile app (client/screens/). The AI Agent has 3 modes:
+My Business, Coach Me, Teach Me. 7-step onboarding exists 
+on both platforms. I need to make the AI Agent the defining 
+first-session experience and cut onboarding to 3 steps.
+
+1. CUT ONBOARDING TO 3 STEPS (WEB)
+   Find the web onboarding flow (likely in web/src/pages/ 
+   or a multi-step onboarding component).
+   
+   REMOVE all steps except:
+   Step 1: "What's your business name?" + logo upload (optional)
+   Step 2: "What do you charge for a standard house clean?" 
+           (single price input, sets minimum ticket)
+   Step 3: "Send your first quote" — immediately opens 
+           the quote builder with a pre-filled demo property
+   
+   ALL other settings (employees, integrations, advanced 
+   branding, communication language, follow-up schedule) 
+   move to a "Complete your setup" secondary checklist 
+   that appears in the dashboard sidebar AFTER onboarding.
+   
+   The secondary checklist shows: "Setup X% complete" 
+   with a progress bar. Completing each item dismisses 
+   it from the list. This checklist is visible but 
+   non-blocking — it never prevents core usage.
+
+2. CUT ONBOARDING TO 3 STEPS (MOBILE)
+   Find the mobile onboarding screens in client/screens/.
+   Apply the same 3-step reduction.
+   
+   Mobile step 3 should auto-open the QuoteCreateScreen 
+   with a "Try it with a sample property" pre-fill option:
+   - Pre-fills: 3 bed, 2 bath, 1800 sqft, average condition
+   - User can edit or send as-is
+   - Generates a real Good/Better/Best quote
+   - CTA: "Send this to yourself as a test" 
+     (sends to their own email/phone)
+
+3. AI AGENT HERO MOMENT (WEB — first login only)
+   After onboarding step 3 completes, before showing 
+   the main dashboard, show a full-screen interstitial:
+   
+   Create: web/src/components/AIAgentIntro.tsx
+   
+   Layout:
+   - Dark navy background with subtle animation
+   - Headline: "Meet your AI Business Coach"
+   - Subhead: "Ask it anything about your business, 
+     your quotes, or how to grow."
+   
+   Three mode cards (clickable):
+   
+   Card 1 — My Business (icon: chart)
+   Label: "My Business"
+   Example question shown: "Which of my quotes 
+   are about to expire this week?"
+   Click → sends this exact question to the AI agent 
+   and shows the live response in a preview panel
+   
+   Card 2 — Coach Me (icon: target)  
+   Label: "Coach Me"
+   Example: "How do I handle a customer who says 
+   my price is too high?"
+   Click → live AI response in preview panel
+   
+   Card 3 — Teach Me (icon: book)
+   Label: "Teach Me"
+   Example: "What's a good profit margin for 
+   a residential cleaning business?"
+   Click → live AI response in preview panel
+   
+   After user clicks one card and sees the response:
+   CTA button: "Open AI Assistant →" 
+   → navigates to /app/ai-assistant
+   Secondary: "Go to dashboard →" (skip)
+   
+   Store in localStorage: ai_intro_shown = true
+   Never show again after first time.
+   
+   Track: trackEvent(userId, 'AI_AGENT_INTRO_SHOWN')
+   Track: trackEvent(userId, 'AI_AGENT_INTRO_CARD_CLICKED', 
+          { mode: 'my_business' | 'coach' | 'teach' })
+
+4. AI AGENT HERO MOMENT (MOBILE)
+   Create: client/screens/AIAgentIntroScreen.tsx
+   
+   Same concept adapted for mobile:
+   - Full screen with dark gradient background
+   - Liquid glass cards for each mode (iOS 26 style)
+   - Haptic feedback on card tap (expo-haptics)
+   - Swipeable — user swipes through all 3 modes
+   - Each mode shows a pre-written example Q&A 
+     (don't make live AI call here — use static examples 
+     for speed and reliability)
+   - Final screen: "Your AI coach is ready" 
+     + "Start asking →" button
+   
+   Add to RootStackNavigator.tsx as a modal screen 
+   shown after onboarding completes, once only.
+
+5. AI AGENT PERSISTENT NUDGES
+   After the intro, the AI Agent should surface itself 
+   contextually throughout the product:
+   
+   Web — add to these pages, in a subtle sidebar card:
+   
+   On /app/quotes (quote list):
+   "Ask AI: Which quotes should I follow up on today?"
+   → clicking pre-fills the AI agent with this question
+   
+   On /app/jobs (job list):
+   "Ask AI: How should I upsell my next scheduled client?"
+   
+   On /app/dashboard:
+   "Ask AI: What's my biggest revenue opportunity this week?"
+   
+   Each nudge shows once per session (sessionStorage flag).
+   Clicking opens the AI agent panel with the question 
+   pre-loaded and ready to send.
+
+6. PROGRESSIVE FEATURE DISCLOSURE
+   In the web sidebar (web/src/components/Layout.tsx):
+   
+   For users with < 5 quotes sent, HIDE these nav items:
+   - Lead Radar
+   - Campaigns  
+   - Automations
+   - Email Sequences
+   - Integrations
+   
+   Show instead a single "Unlock more features" item 
+   that links to the setup checklist.
+   
+   After 5 quotes sent: reveal all nav items with a 
+   subtle "New" badge on each for 3 days.
+   Track quote count via GET /api/quotes/count.
+
+Show every new component, every screen, every 
+onboarding flow change, and the complete 
+AI intro interstitial code.

@@ -35,6 +35,10 @@ export const users = pgTable("users", {
   referredBy: text("referred_by"),
   referralCreditsMonths: integer("referral_credits_months").default(0),
   aiFollowUpsUsedThisMonth: integer("ai_follow_ups_used_this_month").default(0),
+  trialDripEnrolledAt: timestamp("trial_drip_enrolled_at"),
+  trialDripLastSentDay: integer("trial_drip_last_sent_day").default(0),
+  trialDripCompleted: boolean("trial_drip_completed").default(false),
+  trialDripUnsubscribed: boolean("trial_drip_unsubscribed").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

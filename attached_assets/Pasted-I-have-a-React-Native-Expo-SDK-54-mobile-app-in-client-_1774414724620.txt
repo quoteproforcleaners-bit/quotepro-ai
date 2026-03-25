@@ -1,0 +1,210 @@
+I have a React Native Expo SDK 54 mobile app in client/.
+It currently targets iOS only. I need to:
+1. Enable Android compatibility
+2. Build a systematic push notification strategy
+
+PART A: ANDROID COMPATIBILITY
+
+1. AUDIT iOS-SPECIFIC DEPENDENCIES
+   Check client/package.json and all screen files for:
+   
+   - expo-glass-effect (iOS 26 Liquid Glass) — 
+     must have Android fallback
+   - Any API calls using Platform.OS === 'ios' checks — 
+     audit every one
+   - expo-haptics — works on Android, confirm
+   - RevenueCat (@react-native-purchases/purchases) — 
+     confirm Android SDK is included
+   - expo-notifications — works on Android, 
+     requires FCM setup
+   
+   For each iOS-only dependency, implement a Platform 
+   check with Android fallback:
+   
+   import { Platform } from 'react-native'
+   
+   const cardStyle = Platform.select({
+     ios: glassEffect styles,
+     android: standard elevated card styles with 
+              white background and shadow
+   })
+
+2. ANDROID GLASS EFFECT FALLBACK
+   The iOS 26 Liquid Glass design must degrade gracefully.
+   
+   Create: client/components/GlassCard.tsx
+   
+   On iOS 26+: uses expo-glass-effect (existing behavior)
+   On iOS < 26: uses a frosted blur effect 
+                (expo-blur BlurView)
+   On Android: uses standard Material-style card 
+               (white/cream background, elevation shadow, 
+                rounded corners matching the design system)
+   
+   Replace all direct glass effect usage with 
+   GlassCard component throughout the app.
+
+3. APP.JSON ANDROID CONFIG
+   In app.json / app.config.ts, add Android configuration:
+   
+   android: {
+     package: "ai.getquotepro.app",
+     versionCode: 1,
+     adaptiveIcon: {
+       foregroundImage: "./assets/icon-foreground.png",
+       backgroundColor: "#1d3557"
+     },
+     permissions: [
+       "CAMERA",
+       "READ_EXTERNAL_STORAGE", 
+       "WRITE_EXTERNAL_STORAGE",
+       "NOTIFICATIONS"
+     ],
+     googleServicesFile: "./google-services.json"
+   }
+
+4. FIREBASE CLOUD MESSAGING SETUP
+   For Android push notifications via Expo:
+   
+   - Add placeholder for google-services.json 
+     (actual file comes from Firebase console)
+   - Update server/helpers.ts or wherever push 
+     notifications are sent:
+     Expo push API handles both APNs (iOS) and 
+     FCM (Android) automatically — confirm the 
+     push sending code uses Expo's push API, 
+     not direct APNs
+   
+   In client/lib/notifications.ts (create if not exists):
+   - Register for push permissions on app launch
+   - Handle Android notification channels:
+     Expo.Notifications.setNotificationChannelAsync('quotes', {
+       name: 'Quote Updates',
+       importance: AndroidImportance.HIGH,
+       vibrationPattern: [0, 250, 250, 250],
+       sound: 'default'
+     })
+     
+     Expo.Notifications.setNotificationChannelAsync('jobs', {
+       name: 'Job Alerts', 
+       importance: AndroidImportance.HIGH,
+       sound: 'default'
+     })
+     
+     Expo.Notifications.setNotificationChannelAsync('growth', {
+       name: 'Growth & Tips',
+       importance: AndroidImportance.DEFAULT,
+       sound: null  // silent
+     })
+
+5. REVENUE CAT ANDROID
+   In client/lib/subscription.ts:
+   Configure Purchases for both platforms:
+   
+   await Purchases.configure({
+     apiKey: Platform.select({
+       ios: process.env.EXPO_PUBLIC_RC_IOS_KEY,
+       android: process.env.EXPO_PUBLIC_RC_ANDROID_KEY,
+     }),
+     appUserID: userId
+   })
+   
+   Add EXPO_PUBLIC_RC_ANDROID_KEY to .env.
+   Create matching Android products in RevenueCat dashboard 
+   (document the product IDs in a comment).
+
+PART B: PUSH NOTIFICATION PLAYBOOK
+
+6. PUSH NOTIFICATION SERVICE
+   Create: server/pushNotifications.ts
+   
+   export async function sendPush(
+     userId: string,
+     notification: {
+       title: string,
+       body: string,
+       data?: Record<string, any>,
+       channel?: 'quotes' | 'jobs' | 'growth'
+     }
+   ): Promise<void>
+   
+   - Looks up push token from push_tokens table
+   - Sends via Expo Push API
+   - Logs to communications table
+   - Never throws — silent fail with logging
+
+7. IMPLEMENT 6 PUSH NOTIFICATION TRIGGERS
+   Add sendPush() calls in these locations:
+   
+   TRIGGER 1 — Quote viewed by customer
+   Location: publicRouter.ts, POST /q/:token/track
+   Notification:
+   title: "👀 Your quote was just viewed!"
+   body: "[Customer name] opened your quote. 
+          Follow up now while it's fresh."
+   data: { screen: 'QuoteDetail', quoteId }
+   Channel: quotes
+   
+   TRIGGER 2 — Quote accepted
+   Location: publicRouter.ts, POST /q/:token/accept
+   Notification:
+   title: "🎉 New job confirmed!"
+   body: "[Customer name] accepted your quote. 
+          Tap to schedule the job."
+   data: { screen: 'QuoteDetail', quoteId }
+   Channel: quotes
+   
+   TRIGGER 3 — Follow-up due
+   Location: follow-up processing cron
+   Notification:
+   title: "📬 [X] quotes need follow-up today"
+   body: "Your AI is ready to send follow-ups. 
+          Tap to review and send."
+   data: { screen: 'FollowUpQueue' }
+   Channel: quotes
+   Send max once per day, only if queue > 0
+   
+   TRIGGER 4 — Job starting in 1 hour
+   Location: jobs cron (add new hourly check)
+   Notification:
+   title: "🧹 Job starting in 1 hour"
+   body: "[Customer name] at [address]. 
+          Tap to see the checklist."
+   data: { screen: 'JobDetail', jobId }
+   Channel: jobs
+   
+   TRIGGER 5 — Weekly revenue recap (Sunday 6pm)
+   Location: new weekly cron
+   Notification:
+   title: "📊 Your week in review"
+   body: "You sent [X] quotes and earned $[Y] 
+          this week. See your full report."
+   data: { screen: 'Dashboard' }
+   Channel: growth
+   
+   TRIGGER 6 — App Store review request
+   Location: client-side only (no server involvement)
+   In client/screens/ — after these events:
+   a) First quote accepted: 2 second delay, 
+      then StoreReview.requestReview()
+   b) 5th completed job: same pattern
+   c) Store in AsyncStorage: review_requested = true
+      Never request more than once.
+
+8. PUSH NOTIFICATION PREFERENCES
+   Add to user preferences (web Settings page + 
+   mobile Settings screen):
+   
+   Toggle controls for each channel:
+   - "Quote activity" (on by default)
+   - "Job reminders" (on by default)  
+   - "Growth tips & weekly recap" (on by default)
+   
+   Store preferences in userPreferences table as JSONB:
+   push_prefs: { quotes: true, jobs: true, growth: true }
+   
+   Check preferences before every sendPush() call.
+
+Show every new file, every trigger location, 
+the complete Android configuration, and the 
+push service implementation.
