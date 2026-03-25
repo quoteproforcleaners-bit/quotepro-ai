@@ -34,6 +34,7 @@ import automationsRouter from "./routers/automationsRouter";
 import integrationsRouter from "./routers/integrationsRouter";
 import businessRouter from "./routers/businessRouter";
 import publicRouter from "./routers/publicRouter";
+import revenuecatRouter from "./routers/revenuecatRouter";
 
 // Session type extension
 declare module "express-session" {
@@ -94,6 +95,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(automationsRouter);
   app.use(integrationsRouter);
   app.use(businessRouter);
+  app.use(revenuecatRouter);
   app.use(publicRouter);
 
   // 4. HTTP server

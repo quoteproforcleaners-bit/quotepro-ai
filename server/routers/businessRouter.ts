@@ -718,9 +718,29 @@ const router = Router();
             };
             if (session.customer) updateData.stripeCustomerId = session.customer as string;
             if (session.subscription) updateData.stripeSubscriptionId = session.subscription as string;
+            updateData.subscriptionPlatform = "stripe";
+            updateData.subscriptionSyncedAt = new Date();
+            if (session.subscription) updateData.stripeSubscriptionStatus = "active";
             await updateUser(userId, updateData as any);
             trackEvent(userId, AnalyticsEvents.UPGRADE_COMPLETED, { plan: planMeta, interval: intervalMeta }).catch(() => {});
             console.log(`Subscription activated for user ${userId} on plan ${planMeta}`);
+
+            // Sync to RevenueCat: grant promotional entitlement so mobile reflects web purchase
+            try {
+              const { grantRevenueCatEntitlement } = await import("./revenuecatRouter");
+              const user = await getUserById(userId);
+              const appUserId = (user as any)?.revenuecatUserId || userId;
+              const durationMonths = intervalMeta === "annual" ? 12 : 1;
+              await grantRevenueCatEntitlement(appUserId, planMeta, durationMonths);
+              await pool.query(
+                "UPDATE users SET revenuecat_entitlement = $1, revenuecat_user_id = $2, subscription_synced_at = NOW() WHERE id = $3",
+                [planMeta, appUserId, userId]
+              );
+              console.log(`[Stripe→RC] Granted ${planMeta} entitlement to ${appUserId}`);
+            } catch (rcErr: any) {
+              console.error("[Stripe→RC] Failed to sync to RevenueCat:", rcErr.message);
+              // Non-fatal — DB is source of truth
+            }
 
             // Referral credit: give referrer 1 free month when referred user upgrades
             try {
@@ -758,6 +778,9 @@ const router = Router();
               subscriptionTier: isActive ? planFromMeta : "free",
               subscriptionExpiresAt: isActive ? null : new Date(),
               stripeSubscriptionId: subscription.id,
+              stripeSubscriptionStatus: subscription.status,
+              subscriptionPlatform: isActive ? "stripe" : null,
+              subscriptionSyncedAt: new Date(),
             } as any);
             console.log(`Subscription ${isActive ? "active (" + planFromMeta + ")" : "cancelled"} for user ${userId}`);
           }
@@ -804,6 +827,71 @@ const router = Router();
     } catch (error: any) {
       console.error("Webhook error:", error);
       return res.status(500).json({ message: "Webhook processing failed" });
+    }
+  });
+
+  // ── Unified subscription status endpoint ──────────────────────────────────
+  router.get("/api/subscription/status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const result = await pool.query(
+        `SELECT subscription_tier, subscription_interval, subscription_expires_at,
+                stripe_customer_id, stripe_subscription_id, stripe_subscription_status,
+                revenuecat_user_id, revenuecat_entitlement,
+                subscription_platform, subscription_synced_at,
+                trial_started_at, created_at
+         FROM users WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+
+      if (result.rows.length === 0) return res.status(404).json({ message: "User not found" });
+
+      const u = result.rows[0];
+      const tier = (u.subscription_tier || "free") as string;
+      const platform = (u.subscription_platform as string | null) ?? null;
+
+      // Derive status
+      let status: "active" | "trialing" | "past_due" | "cancelled" = "cancelled";
+      if (tier !== "free") {
+        if (u.stripe_subscription_status === "past_due") {
+          status = "past_due";
+        } else {
+          status = "active";
+        }
+      } else {
+        // Check trial
+        const FREE_TRIAL_DAYS = 14;
+        const trialRef = u.trial_started_at || u.created_at;
+        const ageMs = trialRef ? Date.now() - new Date(trialRef).getTime() : Infinity;
+        if (ageMs < FREE_TRIAL_DAYS * 86_400_000) {
+          status = "trialing";
+        }
+      }
+
+      const isOnTrial = status === "trialing";
+      const FREE_TRIAL_DAYS = 14;
+      const trialRef = u.trial_started_at || u.created_at;
+      const ageMs = trialRef ? Date.now() - new Date(trialRef).getTime() : Infinity;
+      const trialDaysRemaining = isOnTrial
+        ? Math.max(0, FREE_TRIAL_DAYS - Math.floor(ageMs / 86_400_000))
+        : null;
+
+      return res.json({
+        tier,
+        platform,
+        status,
+        currentPeriodEnd: u.subscription_expires_at ?? null,
+        isOnTrial,
+        trialDaysRemaining,
+        canManageOnWeb: platform === "stripe" || platform === null,
+        canManageOnIOS: platform === "revenuecat",
+        stripeCustomerId: u.stripe_customer_id ?? null,
+        revenuecatUserId: u.revenuecat_user_id ?? null,
+        syncedAt: u.subscription_synced_at ?? null,
+      });
+    } catch (err: any) {
+      console.error("[subscription/status]", err.message);
+      return res.status(500).json({ message: "Failed to get subscription status" });
     }
   });
 

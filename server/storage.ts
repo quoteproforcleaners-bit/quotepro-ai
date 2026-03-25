@@ -133,9 +133,15 @@ export async function createUser(data: {
 
 export async function updateUser(userId: string, data: Partial<{
   subscriptionTier: string;
+  subscriptionInterval: string;
   subscriptionExpiresAt: Date | null;
   stripeCustomerId: string;
   stripeSubscriptionId: string;
+  stripeSubscriptionStatus: string;
+  revenuecatUserId: string;
+  revenuecatEntitlement: string;
+  subscriptionPlatform: string | null;
+  subscriptionSyncedAt: Date;
   trialStartedAt: Date | null;
   referralCode: string | null;
   referredBy: string | null;

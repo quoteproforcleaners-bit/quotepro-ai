@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./auth";
 import { apiPost } from "./api";
 
@@ -26,6 +27,12 @@ interface SubscriptionContextType {
   hasAI: boolean;
   hasPremium: boolean;
   quotesPerMonth: number;
+  // Unified platform fields
+  platform: "stripe" | "revenuecat" | null;
+  subscriptionStatus: "active" | "trialing" | "past_due" | "cancelled";
+  canManageOnWeb: boolean;
+  canManageOnIOS: boolean;
+  trialDaysRemaining: number | null;
   showPaywall: () => void;
   hidePaywall: () => void;
   paywallVisible: boolean;
@@ -37,11 +44,28 @@ interface SubscriptionContextType {
 const SubscriptionContext = createContext<SubscriptionContextType | null>(null);
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  const tier = ((user as any)?.subscriptionTier || "free") as PlanTier;
+  // Fetch unified subscription status from DB
+  const { data: statusData } = useQuery<{
+    tier: string;
+    platform: "stripe" | "revenuecat" | null;
+    status: "active" | "trialing" | "past_due" | "cancelled";
+    currentPeriodEnd: string | null;
+    isOnTrial: boolean;
+    trialDaysRemaining: number | null;
+    canManageOnWeb: boolean;
+    canManageOnIOS: boolean;
+  }>({
+    queryKey: ["/api/subscription/status"],
+    enabled: isAuthenticated,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const tier = ((statusData?.tier || (user as any)?.subscriptionTier || "free")) as PlanTier;
 
   const isPro = tier === "pro";
   const isGrowth = tier === "growth" || tier === "pro";
@@ -51,6 +75,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const hasAI = isGrowth;
   const hasPremium = isPro;
   const quotesPerMonth = PLAN_LIMITS[tier]?.quotesPerMonth ?? 3;
+
+  // Platform fields from unified status
+  const platform = statusData?.platform ?? null;
+  const subscriptionStatus = statusData?.status ?? "cancelled";
+  const canManageOnWeb = statusData?.canManageOnWeb ?? true;
+  const canManageOnIOS = statusData?.canManageOnIOS ?? false;
+  const trialDaysRemaining = statusData?.trialDaysRemaining ?? null;
 
   // 14-day product-level free trial, anchored to trialStartedAt (falls back to createdAt)
   const trialRef = (user as any)?.trialStartedAt ?? (user as any)?.createdAt;
@@ -96,6 +127,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         tier, isPro, isGrowth, isStarter, isFree,
         isInFreeTrial, freeTrialDaysLeft,
         hasUnlimitedQuotes, hasAI, hasPremium, quotesPerMonth,
+        platform, subscriptionStatus, canManageOnWeb, canManageOnIOS, trialDaysRemaining,
         showPaywall, hidePaywall, paywallVisible,
         startCheckout, openPortal, checkoutLoading,
       }}

@@ -80,6 +80,10 @@ interface SubscriptionContextType {
   trialInfo: TrialInfo;
   isInFreeTrial: boolean;       // true if account < 14 days old and on free tier
   freeTrialDaysLeft: number;    // days remaining in the product-level free trial
+  // Platform awareness
+  platform: "stripe" | "revenuecat" | null;
+  canManageOnWeb: boolean;      // can manage on web (Stripe)
+  canManageOnIOS: boolean;      // can manage on iOS (RevenueCat / App Store)
   purchase: (pkg?: PurchasesPackage) => Promise<boolean>;
   restore: () => Promise<boolean>;
   retryLoadOfferings: () => Promise<void>;
@@ -157,6 +161,28 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
   const [trialInfo, setTrialInfo] = useState<TrialInfo>({ hasFreeTrial: false, trialDurationDays: null, trialDurationText: null });
   const configuredRef = useRef(false);
+
+  // Platform awareness state
+  const [platform, setPlatform] = useState<"stripe" | "revenuecat" | null>(null);
+  const [canManageOnWeb, setCanManageOnWeb] = useState(true);
+  const [canManageOnIOS, setCanManageOnIOS] = useState(false);
+
+  // Fetch unified subscription status for platform fields
+  useEffect(() => {
+    if (!user) return;
+    apiRequest("GET", "/api/subscription/status")
+      .then((data: any) => {
+        if (data?.platform !== undefined) setPlatform(data.platform ?? null);
+        if (data?.canManageOnWeb !== undefined) setCanManageOnWeb(data.canManageOnWeb);
+        if (data?.canManageOnIOS !== undefined) setCanManageOnIOS(data.canManageOnIOS);
+        // Override tier if server knows better (e.g. Stripe web purchase)
+        if (data?.tier && data.tier !== "free") {
+          const serverTier = tierFromDbString(data.tier);
+          setTier(prev => TIER_RANK[serverTier] > TIER_RANK[prev] ? serverTier : prev);
+        }
+      })
+      .catch(() => {});
+  }, [user]);
 
   const isPro = tier === "growth" || tier === "pro";       // Growth+ access (Growth-gated features)
   const isGrowth = tier === "growth" || tier === "pro";    // Same as isPro, explicit alias
@@ -441,6 +467,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         trialInfo,
         isInFreeTrial,
         freeTrialDaysLeft,
+        platform,
+        canManageOnWeb,
+        canManageOnIOS,
         purchase,
         restore,
         retryLoadOfferings: loadOfferings,

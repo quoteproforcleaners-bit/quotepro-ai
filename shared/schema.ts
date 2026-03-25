@@ -28,6 +28,11 @@ export const users = pgTable("users", {
   subscriptionExpiresAt: timestamp("subscription_expires_at"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  stripeSubscriptionStatus: text("stripe_subscription_status"),
+  revenuecatUserId: text("revenuecat_user_id"),
+  revenuecatEntitlement: text("revenuecat_entitlement"),
+  subscriptionPlatform: text("subscription_platform"), // 'stripe' | 'revenuecat' | null
+  subscriptionSyncedAt: timestamp("subscription_synced_at"),
   quotesThisMonth: integer("quotes_this_month").default(0),
   quotesMonthResetAt: timestamp("quotes_month_reset_at"),
   trialStartedAt: timestamp("trial_started_at"),

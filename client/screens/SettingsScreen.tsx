@@ -44,7 +44,7 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
-  const { isPro, subscriptionStatus, trialDaysLeft, restore, tier, isInFreeTrial, freeTrialDaysLeft } = useSubscription();
+  const { isPro, subscriptionStatus, trialDaysLeft, restore, tier, isInFreeTrial, freeTrialDaysLeft, platform, canManageOnWeb, canManageOnIOS } = useSubscription();
   const TIER_DISPLAY: Record<string, string> = { starter: "Starter", growth: "Growth", pro: "Pro" };
   const tierDisplayName = TIER_DISPLAY[tier] || "Pro";
   const [restoring, setRestoring] = useState(false);
@@ -542,7 +542,53 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
-      {Platform.OS === "ios" ? (
+      {/* Platform-aware subscription management */}
+      {canManageOnIOS && Platform.OS === "ios" ? (
+        <Pressable
+          onPress={() => Linking.openURL("https://apps.apple.com/account/subscriptions")}
+          style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.sm }]}
+          testID="button-manage-subscription-ios"
+        >
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="credit-card" size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                Manage Subscription
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                View or cancel in the App Store
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+          </View>
+        </Pressable>
+      ) : canManageOnWeb && tier !== "free" ? (
+        <Pressable
+          onPress={() => {
+            const domain = process.env.EXPO_PUBLIC_DOMAIN || "https://quotepro.ai";
+            Linking.openURL(`${domain}/app/settings`);
+          }}
+          style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.sm }]}
+          testID="button-manage-subscription-web"
+        >
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+              <Feather name="credit-card" size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>
+                Manage Subscription
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                View or cancel on the web dashboard
+              </ThemedText>
+            </View>
+            <Feather name="external-link" size={20} color={theme.textSecondary} />
+          </View>
+        </Pressable>
+      ) : Platform.OS === "ios" ? (
         <Pressable
           onPress={() => Linking.openURL("https://apps.apple.com/account/subscriptions")}
           style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border, marginBottom: Spacing.sm }]}
