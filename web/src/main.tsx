@@ -9,10 +9,18 @@ import App from "./App";
 import "./index.css";
 import "./lib/i18n";
 
-// Intake links live at /intake/:id (outside the /app prefix).
-// Use basename "/" for those paths so React Router can match them.
-const isIntakePath = window.location.pathname.startsWith("/intake/");
-const basename = isIntakePath ? "/" : "/app";
+// Some paths live outside the /app prefix and need basename "/":
+// - /intake/:id  — public lead capture links
+// - /pricing/*, /subscription/*, /register, /login, /dashboard, /onboarding
+//   — top-level routes for direct navigation and ad conversion tracking
+const TOP_LEVEL_PATHS = [
+  "/intake/", "/pricing", "/subscription", "/register",
+  "/login", "/dashboard", "/onboarding", "/upgrade",
+];
+const isTopLevelPath = TOP_LEVEL_PATHS.some((p) =>
+  window.location.pathname === p || window.location.pathname.startsWith(p + "/") || window.location.pathname.startsWith(p)
+);
+const basename = isTopLevelPath ? "/" : "/app";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

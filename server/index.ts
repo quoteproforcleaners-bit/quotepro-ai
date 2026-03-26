@@ -279,6 +279,20 @@ function configureExpoAndLanding(app: express.Application) {
       }
     });
 
+    // Top-level web app routes that need SPA fallback (for direct navigation & ad tracking)
+    const TOP_LEVEL_SPA_ROUTES = [
+      "/pricing/success", "/pricing/cancel", "/pricing", "/upgrade",
+      "/subscription/success", "/register", "/login", "/dashboard",
+      "/onboarding",
+    ];
+    for (const route of TOP_LEVEL_SPA_ROUTES) {
+      app.get(route, (_req: Request, res: Response) => {
+        const indexPath = path.join(webDistPath, "index.html");
+        if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+        res.status(404).send("Not found");
+      });
+    }
+
     app.use(async (req: Request, res: Response, next: NextFunction) => {
       if (req.path.startsWith("/app") || req.path.startsWith("/intake/")) {
         const indexPath = path.join(webDistPath, "index.html");
