@@ -299,12 +299,18 @@ export default function QuoteDetailPage() {
     }
     setAiCommsSending(true);
     try {
-      await apiPost("/api/communications", {
+      // Extract subject line if the draft starts with "Subject: ..."
+      const subjectMatch = draft.match(/^Subject:\s*(.+)/i);
+      const subject = subjectMatch
+        ? subjectMatch[1].trim()
+        : `${messagePurposes.find((m) => m.value === msgPurpose)?.label || "Message"} from ${business?.companyName || "Us"}`;
+      const content = subjectMatch ? draft.replace(/^Subject:.*\n\n?/i, "").trim() : draft;
+
+      await apiPost("/api/communications/send-direct", {
         customerId: quote.customerId,
-        type: msgChannel,
         channel: msgChannel,
-        content: draft,
-        ...(msgChannel === "email" ? { subject: `${messagePurposes.find((m) => m.value === msgPurpose)?.label || "Message"} — ${quote.customerName || ""}`.trim() } : {}),
+        content,
+        ...(msgChannel === "email" ? { subject } : {}),
       });
       showToast(`${msgChannel === "sms" ? "SMS" : "Email"} sent!`, "success");
       setAiDrafts((prev) => ({ ...prev, [currentDraftKey]: "" }));
@@ -356,9 +362,8 @@ export default function QuoteDetailPage() {
     }
     setPlaySending((prev) => ({ ...prev, [recIndex]: true }));
     try {
-      await apiPost("/api/communications", {
+      await apiPost("/api/communications/send-direct", {
         customerId: quote.customerId,
-        type: channel,
         channel,
         content: draft,
         ...(channel === "email" ? { subject: rec.title || "A message from us" } : {}),
