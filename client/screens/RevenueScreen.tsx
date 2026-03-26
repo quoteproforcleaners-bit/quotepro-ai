@@ -14,6 +14,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useCurrency } from "@/context/CurrencyContext";
+import { formatCurrency } from "@/utils/currency";
 
 interface PipelineData {
   totalPipeline: number;
@@ -42,6 +44,7 @@ export default function RevenueScreen() {
   const { theme } = useTheme();
   const { isPro } = useSubscription();
   const { t } = useLanguage();
+  const { currency } = useCurrency();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
 
@@ -167,7 +170,7 @@ export default function RevenueScreen() {
         <View style={styles.statsRow}>
           <StatCard
             title={t.revenue.pipeline}
-            value={`$${(pipeline?.totalPipeline || 0).toLocaleString()}`}
+            value={formatCurrency(pipeline?.totalPipeline || 0, currency)}
             icon="dollar-sign"
             color={theme.primary}
           />

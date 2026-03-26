@@ -86,6 +86,7 @@ export const businesses = pgTable("businesses", {
   timezone: text("timezone").notNull().default("America/New_York"),
   appLanguage: varchar("app_language", { length: 10 }).default("en"),
   commLanguage: varchar("comm_language", { length: 10 }).default("en"),
+  currency: varchar("currency", { length: 3 }).default("USD"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   sendgridApiKey: text("sendgrid_api_key"),
   stripeAccountId: text("stripe_account_id"),

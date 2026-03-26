@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
 import { apiPut, apiPost, apiGet, apiDelete, apiPatch } from "../lib/api";
+import { CURRENCIES, type SupportedCurrency } from "../utils/currency";
 import { queryClient } from "../lib/queryClient";
 import {
   Building2,
@@ -421,6 +422,7 @@ export default function SettingsPage() {
   const [commercialEnabled, setCommercialEnabled] = useState(false);
   const [appLanguage, setAppLanguage] = useState("en");
   const [commLanguage, setCommLanguage] = useState("en");
+  const [currency, setCurrency] = useState<SupportedCurrency>("USD");
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
 
@@ -542,6 +544,7 @@ export default function SettingsPage() {
       setPaymentMethods(methods);
       setAppLanguage((business as any).appLanguage || "en");
       setCommLanguage((business as any).commLanguage || "en");
+      setCurrency(((business as any).currency as SupportedCurrency) || "USD");
       setLogoUri((business as any).logoUri || null);
     }
   }, [business]);
@@ -1404,9 +1407,9 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Language" icon={Globe} />
+            <CardHeader title="Language & Currency" icon={Globe} />
             <p className="text-sm text-slate-500 mb-4">
-              Choose the language used for AI-generated quotes, emails, and customer communications.
+              Choose the language and currency used across your account, quotes, and customer communications.
             </p>
             <div className="space-y-4">
               <div>
@@ -1459,6 +1462,36 @@ export default function SettingsPage() {
                       {lang.label}
                       {commLanguage === lang.value ? (
                         <CheckCircle className="w-3.5 h-3.5 inline-block ml-1.5 text-primary-600" />
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Divider />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Currency</label>
+                <p className="text-xs text-slate-500 mb-2">Used for all pricing displays, quotes, and revenue figures throughout the app</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {CURRENCIES.map((c) => (
+                    <button
+                      key={c.code}
+                      onClick={() => {
+                        setCurrency(c.code);
+                        apiPatch("/api/business", { currency: c.code }).then(() => {
+                          refresh();
+                          showSaved("features");
+                        });
+                      }}
+                      className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all border text-left flex items-center gap-2 ${
+                        currency === c.code
+                          ? "bg-primary-50 text-primary-700 border-primary-200"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="text-base font-bold w-8 text-center">{c.symbol}</span>
+                      <span>{c.label}</span>
+                      {currency === c.code ? (
+                        <CheckCircle className="w-3.5 h-3.5 ml-auto text-primary-600" />
                       ) : null}
                     </button>
                   ))}

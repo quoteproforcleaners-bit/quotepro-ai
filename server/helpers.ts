@@ -1712,6 +1712,7 @@ export function formatBusiness(b: any) {
     avatarConfig: b.avatarConfig || null,
     appLanguage: b.appLanguage || "en",
     commLanguage: b.commLanguage || "en",
+    currency: b.currency || "USD",
   };
 }
 

@@ -21,6 +21,8 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useCurrency } from "@/context/CurrencyContext";
+import { formatCurrency } from "@/utils/currency";
 import {
   CustomerInfo,
   HomeDetails,
@@ -109,6 +111,7 @@ export default function QuotePreviewScreen({
   const { isPro } = useSubscription();
   const { requestConsent } = useAIConsent();
   const { communicationLanguage } = useLanguage();
+  const { currency } = useCurrency();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
   type DraftPurpose = "initial_quote" | "follow_up" | "thank_you" | "booking_confirmation" | "reschedule";
@@ -648,7 +651,7 @@ export default function QuotePreviewScreen({
                 Selected Quote
               </ThemedText>
               <ThemedText type="hero" style={{ color: theme.primary, marginTop: 4 }}>
-                {"$"}{total.toFixed(2)}
+                {formatCurrency(total, currency, { decimals: true })}
               </ThemedText>
               <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2, textTransform: "capitalize" }}>
                 {selectedOpt.serviceTypeName}
@@ -864,11 +867,11 @@ export default function QuotePreviewScreen({
                       </ThemedText>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                         <ThemedText type="small" style={{ color: theme.textSecondary }}>
-                          {"$"}{current.toFixed(2)}
+                          {formatCurrency(current, currency, { decimals: true })}
                         </ThemedText>
                         <Feather name="arrow-right" size={12} color={diffColor} />
                         <ThemedText type="small" style={{ color: diffColor, fontWeight: "700" }}>
-                          {"$"}{suggested.toFixed(2)}
+                          {formatCurrency(suggested, currency, { decimals: true })}
                         </ThemedText>
                         <Pressable
                           onPress={() => setPriceOverrides((prev) => ({ ...prev, [tier]: suggested }))}
@@ -960,20 +963,20 @@ export default function QuotePreviewScreen({
         <View style={[styles.breakdownCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
           <View style={styles.breakdownRow}>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>Subtotal</ThemedText>
-            <ThemedText type="small" style={{ color: theme.textSecondary }}>{"$"}{subtotal.toFixed(2)}</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>{formatCurrency(subtotal, currency, { decimals: true })}</ThemedText>
           </View>
           {taxRate > 0 ? (
             <View style={styles.breakdownRow}>
               <ThemedText type="small" style={{ color: theme.textSecondary }}>
                 {"Tax ("}{taxRate}{"%)"}
               </ThemedText>
-              <ThemedText type="small" style={{ color: theme.textSecondary }}>{"$"}{taxAmount.toFixed(2)}</ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>{formatCurrency(taxAmount, currency, { decimals: true })}</ThemedText>
             </View>
           ) : null}
           <View style={[styles.breakdownDivider, { backgroundColor: theme.border }]} />
           <View style={styles.breakdownRow}>
             <ThemedText type="body" style={{ fontWeight: "700" }}>Total</ThemedText>
-            <ThemedText type="body" style={{ fontWeight: "700", color: theme.primary }}>{"$"}{total.toFixed(2)}</ThemedText>
+            <ThemedText type="body" style={{ fontWeight: "700", color: theme.primary }}>{formatCurrency(total, currency, { decimals: true })}</ThemedText>
           </View>
         </View>
 

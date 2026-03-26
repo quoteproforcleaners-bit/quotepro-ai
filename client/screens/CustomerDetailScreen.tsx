@@ -28,6 +28,8 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { useApp } from "@/context/AppContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useCurrency } from "@/context/CurrencyContext";
+import { formatCurrency } from "@/utils/currency";
 import { ProGate } from "@/components/ProGate";
 import { useAIConsent } from "@/context/AIConsentContext";
 
@@ -68,6 +70,7 @@ export default function CustomerDetailScreen() {
   const { isPro } = useSubscription();
   const { requestConsent } = useAIConsent();
   const { communicationLanguage, t } = useLanguage();
+  const { currency } = useCurrency();
   const [showCommForm, setShowCommForm] = useState(false);
   const [commChannel, setCommChannel] = useState<string>("phone");
   const [commSubject, setCommSubject] = useState("");
@@ -707,7 +710,7 @@ export default function CustomerDetailScreen() {
               >
                 <View style={styles.listItemContent}>
                   <ThemedText type="body" style={{ fontWeight: "500" }}>
-                    {q.total ? `$${Number(q.total).toFixed(2)}` : "No total"}
+                    {q.total ? formatCurrency(Number(q.total), currency, { decimals: true }) : "No total"}
                   </ThemedText>
                   <ThemedText
                     type="caption"
@@ -790,7 +793,7 @@ export default function CustomerDetailScreen() {
                 <View style={styles.listItemRight}>
                   {j.total ? (
                     <ThemedText type="small" style={{ fontWeight: "500" }}>
-                      {`$${Number(j.total).toFixed(2)}`}
+                      {formatCurrency(Number(j.total), currency, { decimals: true })}
                     </ThemedText>
                   ) : null}
                   <View

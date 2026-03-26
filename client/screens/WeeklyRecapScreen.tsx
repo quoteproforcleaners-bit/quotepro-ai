@@ -19,6 +19,8 @@ import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { StatCard } from "@/components/StatCard";
 import { useTheme } from "@/hooks/useTheme";
+import { useCurrency } from "@/context/CurrencyContext";
+import { formatCurrency } from "@/utils/currency";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { trackEvent } from "@/lib/analytics";
@@ -120,6 +122,7 @@ export default function WeeklyRecapScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme } = useTheme();
   const dt = useDesignTokens();
+  const { currency } = useCurrency();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
 
@@ -281,7 +284,7 @@ export default function WeeklyRecapScreen() {
             <View style={styles.statsRow}>
               <StatCard
                 title="Revenue Won"
-                value={`$${(recap?.revenueWon ?? 0).toLocaleString()}`}
+                value={formatCurrency(recap?.revenueWon ?? 0, currency)}
                 icon="dollar-sign"
                 color={theme.success}
               />
@@ -289,7 +292,7 @@ export default function WeeklyRecapScreen() {
                 title="Biggest Win"
                 value={
                   recap?.biggestWin != null && recap.biggestWin !== 0
-                    ? `$${(typeof recap.biggestWin === "number" ? recap.biggestWin : recap.biggestWin?.total ?? 0).toLocaleString()}`
+                    ? formatCurrency(typeof recap.biggestWin === "number" ? recap.biggestWin : recap.biggestWin?.total ?? 0, currency)
                     : "--"
                 }
                 icon="award"
@@ -331,7 +334,7 @@ export default function WeeklyRecapScreen() {
                       type="small"
                       style={{ color: theme.textSecondary, marginTop: 2 }}
                     >
-                      {`${recap.mostAtRiskOpen.customerFirstName || ""} ${recap.mostAtRiskOpen.customerLastName || ""} - $${(recap.mostAtRiskOpen.total ?? 0).toLocaleString()} (sent ${getDaysAgo(recap.mostAtRiskOpen.sentAt)} days ago)`}
+                      {`${recap.mostAtRiskOpen.customerFirstName || ""} ${recap.mostAtRiskOpen.customerLastName || ""} - ${formatCurrency(recap.mostAtRiskOpen.total ?? 0, currency)} (sent ${getDaysAgo(recap.mostAtRiskOpen.sentAt)} days ago)`}
                     </ThemedText>
                   </View>
                 </View>

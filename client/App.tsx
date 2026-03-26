@@ -12,6 +12,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { AppProvider } from "@/context/AppContext";
 import { SubscriptionProvider } from "@/context/SubscriptionContext";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { CurrencyProvider } from "@/context/CurrencyContext";
 import { AIConsentProvider } from "@/context/AIConsentContext";
 import { TutorialProvider } from "@/context/TutorialContext";
 import { TourOverlay } from "@/components/TourOverlay";
@@ -112,17 +113,19 @@ export default function App() {
           <GestureHandlerRootView style={styles.root}>
             <SafeKeyboardProvider>
               <LanguageProvider>
-                <AuthProvider>
-                  <AppProvider>
-                    <SubscriptionProvider>
-                      <AIConsentProvider>
-                        <TutorialProvider>
-                          <ThemedNavigation />
-                        </TutorialProvider>
-                      </AIConsentProvider>
-                    </SubscriptionProvider>
-                  </AppProvider>
-                </AuthProvider>
+                <CurrencyProvider>
+                  <AuthProvider>
+                    <AppProvider>
+                      <SubscriptionProvider>
+                        <AIConsentProvider>
+                          <TutorialProvider>
+                            <ThemedNavigation />
+                          </TutorialProvider>
+                        </AIConsentProvider>
+                      </SubscriptionProvider>
+                    </AppProvider>
+                  </AuthProvider>
+                </CurrencyProvider>
               </LanguageProvider>
               <StatusBar style="auto" />
             </SafeKeyboardProvider>

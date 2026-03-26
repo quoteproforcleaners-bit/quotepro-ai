@@ -65,6 +65,7 @@ The system uses session-based authentication supporting email/password, Apple, a
 - **Jobber**: OAuth2 integration for client and job creation.
 
 ### Multilingual System
+- **Currency**: Each business can set their preferred currency (`businesses.currency` column, VARCHAR(3), default `USD`). Options: USD, CAD, GBP. Stored on the business record and synced via `PATCH /api/business`. Mobile: `CurrencyProvider` wraps the app; `useCurrency()` hook in any screen. Web: `currency` state in `SettingsPage.tsx`. Utility: `client/utils/currency.ts` (shared) and `web/src/utils/currency.ts`. `formatCurrency(amount, currency, options?)` uses `Intl.NumberFormat`. Key screens updated: `RevenueScreen`, `WeeklyRecapScreen`, `CustomerDetailScreen`, `QuotePreviewScreen`, `DashboardPage`.
 - **App Language**: Each business can set their interface language (`businesses.app_language` column). Options: en/es/pt/ru. Synced to `i18next` on login/change via App.tsx effect. Translation files in `web/src/locales/{en,es,pt,ru}.json`. Library: `react-i18next`.
 - **Outbound Communication Language**: Each business sets a default language for customer-facing communications (`businesses.comm_language`). Used in AI-generated follow-ups, quotes, reminders, etc. via `getLangInstruction()` in routes.ts.
 - **Customer Language Override**: Each customer can have a `preferred_language` column override. The `getEffectiveLang(customerId, businessCommLanguage)` helper in routes.ts checks this first. Follow-up messages and quote messages now use this resolver.

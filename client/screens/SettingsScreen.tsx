@@ -25,6 +25,8 @@ import { PAYMENT_METHOD_LABELS, getPaymentOptions } from "@/lib/paymentOptions";
 import { Switch } from "react-native";
 import { useLanguage } from "@/context/LanguageContext";
 import { LANGUAGE_LABELS, type Language } from "@/i18n";
+import { useCurrency } from "@/context/CurrencyContext";
+import { CURRENCIES, type SupportedCurrency } from "@/utils/currency";
 import { syncNotificationSchedule } from "@/lib/notifications";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useDarkModePreference } from "@/hooks/useColorScheme";
@@ -50,6 +52,7 @@ export default function SettingsScreen() {
   const [restoring, setRestoring] = useState(false);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
+  const { currency, setCurrency } = useCurrency();
   const { preference: darkModePref, setPreference: setDarkModePref } = useDarkModePreference();
   const { hasConsented: aiConsented, requestConsent: requestAIConsent, revokeConsent: revokeAIConsent } = useAIConsent();
   const tutorialCtx = useTutorial();
@@ -1796,6 +1799,41 @@ export default function SettingsScreen() {
               </ThemedText>
             </View>
             {communicationLanguage === lang ? (
+              <Feather name="check" size={20} color={theme.primary} />
+            ) : null}
+          </Pressable>
+        ))}
+      </View>
+
+      <ThemedText type="subtitle" style={{ marginBottom: Spacing.xs, marginTop: Spacing.lg }}>
+        Currency
+      </ThemedText>
+      <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+        Used for all pricing displays, quotes, and revenue figures in the app
+      </ThemedText>
+      <View style={[styles.languageSelector, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+        {CURRENCIES.map((c) => (
+          <Pressable
+            key={c.code}
+            onPress={() => setCurrency(c.code)}
+            style={[
+              styles.languageOption,
+              {
+                backgroundColor: currency === c.code ? `${theme.primary}15` : "transparent",
+                borderColor: currency === c.code ? theme.primary : "transparent",
+              },
+            ]}
+            testID={`settings-currency-${c.code}`}
+          >
+            <ThemedText type="body" style={{ fontWeight: "700", marginRight: Spacing.sm, color: currency === c.code ? theme.primary : theme.text, minWidth: 28 }}>
+              {c.symbol}
+            </ThemedText>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: currency === c.code ? "700" : "500" }}>
+                {c.label}
+              </ThemedText>
+            </View>
+            {currency === c.code ? (
               <Feather name="check" size={20} color={theme.primary} />
             ) : null}
           </Pressable>

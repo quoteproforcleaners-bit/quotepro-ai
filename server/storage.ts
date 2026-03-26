@@ -193,6 +193,7 @@ export async function updateBusiness(
     timezone: string;
     appLanguage: string;
     commLanguage: string;
+    currency: string;
     onboardingComplete: boolean;
     stripeAccountId: string | null;
     stripeOnboardingComplete: boolean;

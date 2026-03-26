@@ -37,11 +37,16 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Button, Badge, Card, CardHeader, ProgressBar, MetricRing, FunnelBar } from "../components/ui";
+import { formatCurrency } from "../utils/currency";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+function makeFmt(currency: string) {
+  return (n: number) => formatCurrency(n, currency);
+}
+
 function fmt(n: number) {
-  return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  return formatCurrency(n, "USD");
 }
 
 function getHour() {
@@ -773,7 +778,7 @@ function AIGrowthTools({ navigate }: { navigate: (path: string) => void }) {
 
 // ─── Revenue Chart ────────────────────────────────────────────────────────────
 
-function RevenueChart({ quotes }: { quotes: any[] }) {
+function RevenueChart({ quotes, fmt }: { quotes: any[]; fmt: (n: number) => string }) {
   const monthlyData = useMemo(() => {
     const now = new Date();
     const months: { label: string; revenue: number }[] = [];
@@ -849,6 +854,7 @@ function RevenueChart({ quotes }: { quotes: any[] }) {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { business } = useAuth();
+  const fmt = makeFmt((business as any)?.currency || "USD");
   const { isInFreeTrial, freeTrialDaysLeft } = useSubscription();
   const { data: quotes = [] } = useQuery<any[]>({ queryKey: ["/api/quotes"] });
   const { data: customers = [] } = useQuery<any[]>({ queryKey: ["/api/customers"] });
@@ -1427,7 +1433,7 @@ export default function DashboardPage() {
           <span className="text-xs text-slate-400">Last 6 months</span>
         </div>
         <div className="p-5">
-          <RevenueChart quotes={quotes} />
+          <RevenueChart quotes={quotes} fmt={fmt} />
         </div>
       </div>
 
