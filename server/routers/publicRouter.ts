@@ -1353,6 +1353,11 @@ loadMonth(nextMo);
         better: "Thorough cleaning with extra attention to detail",
         best: "Premium deep clean with all the extras"
       };
+      const tierDescriptions: Record<string, string> = {
+        good: escHtml(qpPublic?.goodDescription || "Covers all the essentials — surfaces wiped, floors vacuumed and mopped, bathrooms and kitchen cleaned. Great for regular maintenance between deeper cleans."),
+        better: escHtml(qpPublic?.betterDescription || "Everything in Good, plus more thorough attention throughout. Includes detailed work in bathrooms and kitchen, baseboards wiped, and a top-to-bottom tidy of every room."),
+        best: escHtml(qpPublic?.bestDescription || "Our most comprehensive clean. Everything in Better, plus inside appliances, interior windows, detailed cabinet fronts, and any add-ons you selected — nothing is missed."),
+      };
 
       const optionDataItems: { key: string; price: number; name: string; scope: string; recurringPrice: number | null }[] = [];
       let optionsHtml = "";
@@ -1373,6 +1378,7 @@ loadMonth(nextMo);
         const isRecommendedPublic = key === publicRecommended;
         const recurringHtml = recurringPrice !== null ? `<div class="option-recurring">Then $${recurringPrice.toFixed(2)}/visit</div>` : "";
         const recommendedBadgeHtml = isRecommendedPublic ? `<div class="recommended-badge">MOST POPULAR</div>` : "";
+        const tierDesc = tierDescriptions[key] || "";
         optionsHtml += `<div class="option-card${isSelected ? " selected" : ""}" data-key="${key}" onclick="selectOption('${key}')">
           ${recommendedBadgeHtml}
           <div class="option-row">
@@ -1386,6 +1392,7 @@ loadMonth(nextMo);
               ${recurringHtml}
             </div>
           </div>
+          ${tierDesc ? `<div class="option-desc">${tierDesc}</div>` : ""}
         </div>`;
       }
 

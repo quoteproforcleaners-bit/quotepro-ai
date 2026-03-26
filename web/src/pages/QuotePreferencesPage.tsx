@@ -27,6 +27,9 @@ interface QuotePreferences {
   termsText: string;
   brandColor: string;
   defaultExpirationDays: number;
+  goodDescription: string;
+  betterDescription: string;
+  bestDescription: string;
 }
 
 const defaultPreferences: QuotePreferences = {
@@ -43,6 +46,9 @@ const defaultPreferences: QuotePreferences = {
   termsText: "",
   brandColor: "#2563EB",
   defaultExpirationDays: 14,
+  goodDescription: "Covers all the essentials — surfaces wiped, floors vacuumed and mopped, bathrooms and kitchen cleaned. Great for regular maintenance between deeper cleans.",
+  betterDescription: "Everything in Good, plus more thorough attention throughout. Includes detailed work in bathrooms and kitchen, baseboards wiped, and a top-to-bottom tidy of every room.",
+  bestDescription: "Our most comprehensive clean. Everything in Better, plus inside appliances, interior windows, detailed cabinet fronts, and any add-ons you selected — nothing is missed.",
 };
 
 const BRAND_COLORS = [
@@ -214,6 +220,39 @@ export default function QuotePreferencesPage() {
               style={{ backgroundColor: prefs.brandColor || "#2563EB" }}
             />
           </div>
+        </Card>
+      </div>
+
+      <div>
+        <SectionLabel>Service Tier Descriptions</SectionLabel>
+        <Card className="mt-3 space-y-5">
+          <p className="text-sm text-slate-500">
+            These descriptions appear on your customer-facing quote page under each option. Use 1–3 sentences to explain what's included so customers can choose with confidence.
+          </p>
+          {(
+            [
+              { key: "goodDescription" as const, label: "Good", color: "#64748B" },
+              { key: "betterDescription" as const, label: "Better", color: "#2563EB" },
+              { key: "bestDescription" as const, label: "Best", color: "#059669" },
+            ]
+          ).map(({ key, label, color }) => (
+            <div key={key}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span
+                  className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold text-white"
+                  style={{ backgroundColor: color }}
+                >
+                  {label}
+                </span>
+              </div>
+              <Textarea
+                value={prefs[key]}
+                onChange={(e) => updatePref(key, e.target.value)}
+                placeholder={`Describe what's included in the ${label} option...`}
+                rows={3}
+              />
+            </div>
+          ))}
         </Card>
       </div>
 
