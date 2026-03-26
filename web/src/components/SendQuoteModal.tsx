@@ -42,7 +42,7 @@ export default function SendQuoteModal({ quoteId, quote, business, onClose, onSe
     ? new Date(quote.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : null;
 
-  const defaultEmail = customer?.email || "";
+  const defaultEmail = quote?.customerEmail || customer?.email || (quote?.propertyDetails as any)?.customerEmail || "";
 
   const [to, setTo] = useState(defaultEmail);
   const [cc, setCc] = useState("");
