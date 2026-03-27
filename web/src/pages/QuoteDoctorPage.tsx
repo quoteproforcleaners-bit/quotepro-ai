@@ -43,7 +43,8 @@ export default function QuoteDoctorPage() {
     new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        const MAX = 1400;
+        // Keep under ~1MB base64 (~750KB raw) to stay within proxy limits
+        const MAX = 900;
         let w = img.width, h = img.height;
         if (w > MAX || h > MAX) {
           if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
@@ -52,7 +53,7 @@ export default function QuoteDoctorPage() {
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
-        const compressed = canvas.toDataURL("image/jpeg", 0.82);
+        const compressed = canvas.toDataURL("image/jpeg", 0.72);
         resolve({ base64: compressed.split(",")[1], mimeType: "image/jpeg", preview: compressed });
       };
       img.src = dataUrl;
@@ -86,20 +87,42 @@ export default function QuoteDoctorPage() {
     setOptimized(null);
     try {
       const body: Record<string, string> = {};
-      if (tab === "paste") body.quoteText = quoteText.trim();
-      else { body.imageBase64 = imageBase64!; body.imageMimeType = imageMimeType; }
+      if (tab === "paste") {
+        body.quoteText = quoteText.trim();
+      } else {
+        const b64 = imageBase64!;
+        // Rough size check: base64 is ~1.37x the binary size
+        const approxKB = Math.round(b64.length * 0.75 / 1024);
+        if (approxKB > 1800) {
+          setError("Image is too large. Please use a smaller or cropped screenshot.");
+          setLoading(false);
+          return;
+        }
+        body.imageBase64 = b64;
+        body.imageMimeType = imageMimeType;
+      }
 
       const res = await fetch("/api/quote-doctor/optimize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Something went wrong."); return; }
+
+      let data: any = {};
+      try { data = await res.json(); } catch { /* non-json response */ }
+
+      if (!res.ok) {
+        setError(data.error || `Server error (${res.status}). Please try again.`);
+        return;
+      }
+      if (!data.optimized) {
+        setError("No optimized quote was returned. Please try again.");
+        return;
+      }
       setOptimized(data.optimized);
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (err: any) {
+      setError(err?.message || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }

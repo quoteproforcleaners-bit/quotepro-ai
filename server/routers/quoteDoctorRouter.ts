@@ -51,9 +51,15 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: R
       imageMimeType?: string;
     };
 
+    console.log("[QuoteDoctor] request — hasText:", !!quoteText, "hasImage:", !!imageBase64,
+      imageBase64 ? `(~${Math.round(imageBase64.length * 0.75 / 1024)}KB)` : "");
+
     if (!quoteText && !imageBase64) {
       return res.status(400).json({ error: "Quote text or image required" });
     }
+
+    // For image requests, use gpt-4o for better vision quality
+    const model = imageBase64 ? "gpt-4o" : "gpt-4o-mini";
 
     const messages: any[] = imageBase64
       ? [
@@ -65,6 +71,7 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: R
                 type: "image_url",
                 image_url: {
                   url: `data:${imageMimeType || "image/jpeg"};base64,${imageBase64}`,
+                  detail: "low",
                 },
               },
               {
@@ -83,15 +90,19 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: R
         ];
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model,
       messages,
       max_tokens: 900,
     });
 
     const optimized = completion.choices[0]?.message?.content?.trim() ?? "";
+    console.log("[QuoteDoctor] success — output length:", optimized.length);
     return res.json({ optimized });
-  } catch (err) {
-    console.error("Quote Doctor error:", err);
-    return res.status(500).json({ error: "Failed to optimize quote. Please try again." });
+  } catch (err: any) {
+    console.error("[QuoteDoctor] error:", err?.message || err, err?.status, err?.code);
+    const msg = err?.message?.includes("image") || err?.code === "invalid_request_error"
+      ? "Could not read the image. Please try a clearer screenshot or paste the quote as text."
+      : "Failed to optimize quote. Please try again.";
+    return res.status(500).json({ error: msg });
   }
 });

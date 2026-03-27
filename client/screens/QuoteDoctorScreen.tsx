@@ -10,7 +10,8 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as Clipboard from "expo-clipboard";
+import * as Linking from "expo-linking";
 import { useTheme } from "@/hooks/useTheme";
 
 const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
@@ -95,11 +96,8 @@ export default function QuoteDoctorScreen() {
 
   const handleCopy = async () => {
     if (!optimized) return;
-    const { default: Clipboard } = await import("@react-native-clipboard/clipboard").catch(() =>
-      ({ default: { setString: () => {} } })
-    );
     try {
-      Clipboard.setString(optimized);
+      await Clipboard.setStringAsync(optimized);
     } catch {
       await Share.share({ message: optimized });
     }
@@ -285,11 +283,7 @@ export default function QuoteDoctorScreen() {
                 In 60 seconds, from your phone, with built-in follow-up so you never lose a job to a faster competitor.
               </Text>
               <TouchableOpacity
-                onPress={() => {
-                  import("expo-linking").then(({ default: Linking }) => {
-                    Linking.openURL("https://getquotepro.ai/register");
-                  });
-                }}
+                onPress={() => Linking.openURL("https://getquotepro.ai/register")}
                 style={styles.trialBtn}
                 activeOpacity={0.85}
               >
