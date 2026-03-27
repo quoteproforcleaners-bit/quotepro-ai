@@ -37,6 +37,7 @@ import publicRouter from "./routers/publicRouter";
 import revenuecatRouter from "./routers/revenuecatRouter";
 import npsRouter from "./routers/npsRouter";
 import { quoteDoctorRouter } from "./routers/quoteDoctorRouter";
+import { supportRouter } from "./routers/supportRouter";
 
 // Session type extension
 declare module "express-session" {
@@ -100,6 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(revenuecatRouter);
   app.use(npsRouter);
   app.use(quoteDoctorRouter);
+  app.use(supportRouter);
   app.use(publicRouter);
 
   // 4. HTTP server

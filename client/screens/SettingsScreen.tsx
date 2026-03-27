@@ -65,6 +65,14 @@ export default function SettingsScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [supportModalVisible, setSupportModalVisible] = useState(false);
+  const [supportName, setSupportName] = useState(`${user?.firstName || ""} ${user?.lastName || ""}`.trim());
+  const [supportEmail, setSupportEmail] = useState(user?.email || "");
+  const [supportMessage, setSupportMessage] = useState("");
+  const [supportScreenshots, setSupportScreenshots] = useState<{ filename: string; base64: string; mimeType: string; uri: string }[]>([]);
+  const [supportStatus, setSupportStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [supportErrorMsg, setSupportErrorMsg] = useState("");
+  const [supportTicketId, setSupportTicketId] = useState("");
 
   const { data: growthSettings, refetch: refetchGrowthSettings } = useQuery<any>({
     queryKey: ["/api/growth-automation-settings"],
@@ -1952,6 +1960,189 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
+      {/* Support Modal */}
+      <Modal visible={supportModalVisible} animationType="slide" transparent onRequestClose={() => setSupportModalVisible(false)}>
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" }}>
+          <View style={{ backgroundColor: theme.cardBackground, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 20, paddingBottom: insets.bottom + 20, maxHeight: "92%" }}>
+            {/* Handle + Header */}
+            <View style={{ alignItems: "center", marginBottom: 4 }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border }} />
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+              <View>
+                <ThemedText type="h4">Contact Support</ThemedText>
+                <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>We typically reply within a few hours</ThemedText>
+              </View>
+              <Pressable onPress={() => setSupportModalVisible(false)} style={{ padding: 6, borderRadius: 20, backgroundColor: `${theme.textSecondary}18` }}>
+                <Feather name="x" size={18} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
+              {supportStatus === "success" ? (
+                <View style={{ alignItems: "center", paddingVertical: 32 }}>
+                  <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: `${theme.success}20`, alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+                    <Feather name="check-circle" size={36} color={theme.success} />
+                  </View>
+                  <ThemedText type="h4" style={{ textAlign: "center", marginBottom: 8 }}>Message sent!</ThemedText>
+                  <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", lineHeight: 20, marginBottom: 12 }}>
+                    You'll receive a confirmation email shortly. We'll follow up as soon as possible.
+                  </ThemedText>
+                  <View style={{ backgroundColor: `${theme.success}15`, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
+                    <ThemedText type="small" style={{ color: theme.success, fontWeight: "700", fontFamily: "monospace" }}>
+                      Ticket {supportTicketId}
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    onPress={() => setSupportModalVisible(false)}
+                    style={{ marginTop: 24, backgroundColor: theme.primary, paddingHorizontal: 32, paddingVertical: 12, borderRadius: 12 }}
+                  >
+                    <ThemedText type="body" style={{ color: "#fff", fontWeight: "700" }}>Done</ThemedText>
+                  </Pressable>
+                </View>
+              ) : (
+                <>
+                  {/* Name */}
+                  <View>
+                    <ThemedText type="small" style={{ fontWeight: "700", marginBottom: 6, color: theme.textSecondary }}>Your Name</ThemedText>
+                    <RNTextInput
+                      value={supportName}
+                      onChangeText={setSupportName}
+                      placeholder="Jane Smith"
+                      placeholderTextColor={theme.textSecondary}
+                      style={{ backgroundColor: theme.inputBackground, borderWidth: 1.5, borderColor: theme.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.text }}
+                    />
+                  </View>
+
+                  {/* Email */}
+                  <View>
+                    <ThemedText type="small" style={{ fontWeight: "700", marginBottom: 6, color: theme.textSecondary }}>Email Address</ThemedText>
+                    <RNTextInput
+                      value={supportEmail}
+                      onChangeText={setSupportEmail}
+                      placeholder="jane@example.com"
+                      placeholderTextColor={theme.textSecondary}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      style={{ backgroundColor: theme.inputBackground, borderWidth: 1.5, borderColor: theme.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.text }}
+                    />
+                  </View>
+
+                  {/* Plan */}
+                  <View>
+                    <ThemedText type="small" style={{ fontWeight: "700", marginBottom: 6, color: theme.textSecondary }}>Your Plan</ThemedText>
+                    <View style={{ backgroundColor: theme.inputBackground, borderWidth: 1.5, borderColor: theme.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, flexDirection: "row", alignItems: "center" }}>
+                      <View style={{ backgroundColor: theme.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginRight: 8 }}>
+                        <ThemedText type="small" style={{ color: "#fff", fontWeight: "800", fontSize: 11 }}>
+                          {(tier || "free").toUpperCase()}
+                        </ThemedText>
+                      </View>
+                      <ThemedText type="body" style={{ color: theme.textSecondary }}>
+                        {{ free: "Free Trial", starter: "Starter ($19/mo)", growth: "Growth ($49/mo)", pro: "Pro ($99/mo)" }[tier as string] || "Free Trial"}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {/* Message */}
+                  <View>
+                    <ThemedText type="small" style={{ fontWeight: "700", marginBottom: 6, color: theme.textSecondary }}>Describe the Issue</ThemedText>
+                    <RNTextInput
+                      value={supportMessage}
+                      onChangeText={setSupportMessage}
+                      placeholder="Please describe what happened, what you expected to happen, and any steps to reproduce..."
+                      placeholderTextColor={theme.textSecondary}
+                      multiline
+                      numberOfLines={6}
+                      textAlignVertical="top"
+                      style={{ backgroundColor: theme.inputBackground, borderWidth: 1.5, borderColor: theme.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.text, minHeight: 140 }}
+                    />
+                  </View>
+
+                  {/* Screenshots */}
+                  <View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <ThemedText type="small" style={{ fontWeight: "700", color: theme.textSecondary }}>Screenshots (optional)</ThemedText>
+                      <ThemedText type="small" style={{ color: theme.textSecondary }}>{supportScreenshots.length}/3</ThemedText>
+                    </View>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                      {supportScreenshots.map((s, i) => (
+                        <View key={i} style={{ position: "relative" }}>
+                          <Image source={{ uri: s.uri }} style={{ width: 80, height: 80, borderRadius: 10, borderWidth: 1.5, borderColor: theme.border }} />
+                          <Pressable
+                            onPress={() => setSupportScreenshots(prev => prev.filter((_, j) => j !== i))}
+                            style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#ef4444", width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center" }}
+                          >
+                            <Feather name="x" size={11} color="#fff" />
+                          </Pressable>
+                        </View>
+                      ))}
+                      {supportScreenshots.length < 3 && (
+                        <Pressable
+                          onPress={async () => {
+                            const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"] as any, base64: true, quality: 0.7 });
+                            if (!result.canceled && result.assets[0]) {
+                              const asset = result.assets[0];
+                              setSupportScreenshots(prev => [
+                                ...prev,
+                                { filename: `screenshot-${prev.length + 1}.jpg`, base64: asset.base64 || "", mimeType: "image/jpeg", uri: asset.uri },
+                              ]);
+                            }
+                          }}
+                          style={{ width: 80, height: 80, borderRadius: 10, borderWidth: 1.5, borderStyle: "dashed", borderColor: theme.border, alignItems: "center", justifyContent: "center", backgroundColor: theme.inputBackground }}
+                        >
+                          <Feather name="paperclip" size={22} color={theme.textSecondary} />
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+
+                  {supportStatus === "error" && (
+                    <View style={{ backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca", borderRadius: 10, padding: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Feather name="alert-circle" size={15} color="#dc2626" />
+                      <ThemedText type="small" style={{ color: "#dc2626", flex: 1 }}>{supportErrorMsg}</ThemedText>
+                    </View>
+                  )}
+
+                  {/* Submit */}
+                  <Pressable
+                    onPress={async () => {
+                      if (!supportName.trim() || !supportEmail.trim() || !supportMessage.trim()) return;
+                      setSupportStatus("loading");
+                      setSupportErrorMsg("");
+                      try {
+                        const res = await apiRequest("POST", "/api/support/ticket", {
+                          name: supportName,
+                          email: supportEmail,
+                          tier,
+                          message: supportMessage,
+                          screenshots: supportScreenshots.map(s => ({ filename: s.filename, base64: s.base64, mimeType: s.mimeType })),
+                        });
+                        setSupportTicketId((res as any).ticketId || "");
+                        setSupportStatus("success");
+                        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      } catch (err: any) {
+                        setSupportErrorMsg(err?.message || "Failed to send. Please try again.");
+                        setSupportStatus("error");
+                      }
+                    }}
+                    disabled={supportStatus === "loading" || !supportName.trim() || !supportEmail.trim() || !supportMessage.trim()}
+                    style={{
+                      backgroundColor: (supportStatus === "loading" || !supportName.trim() || !supportEmail.trim() || !supportMessage.trim()) ? theme.textSecondary : theme.primary,
+                      borderRadius: 14, paddingVertical: 16, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8,
+                    }}
+                  >
+                    <Feather name={supportStatus === "loading" ? "loader" : "send"} size={17} color="#fff" />
+                    <ThemedText type="body" style={{ color: "#fff", fontWeight: "700" }}>
+                      {supportStatus === "loading" ? "Sending..." : "Send Message"}
+                    </ThemedText>
+                  </Pressable>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <SectionHeader title="Help & Support" />
 
       <Pressable
@@ -1976,23 +2167,32 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Pressable
-        onPress={() => Linking.openURL("mailto:quoteproforcleaners@gmail.com")}
+        onPress={() => {
+          setSupportName(`${user?.firstName || ""} ${user?.lastName || ""}`.trim());
+          setSupportEmail(user?.email || "");
+          setSupportMessage("");
+          setSupportScreenshots([]);
+          setSupportStatus("idle");
+          setSupportErrorMsg("");
+          setSupportTicketId("");
+          setSupportModalVisible(true);
+        }}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-contact-support"
       >
         <View style={styles.settingsLinkContent}>
           <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.success}15` }]}>
-            <Feather name="mail" size={20} color={theme.success} />
+            <Feather name="life-buoy" size={20} color={theme.success} />
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>
               Contact Support
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              quoteproforcleaners@gmail.com
+              We typically reply within a few hours
             </ThemedText>
           </View>
-          <Feather name="external-link" size={18} color={theme.textSecondary} />
+          <Feather name="chevron-right" size={18} color={theme.textSecondary} />
         </View>
       </Pressable>
 

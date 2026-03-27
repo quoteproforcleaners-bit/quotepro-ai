@@ -18,8 +18,9 @@ import {
   ArrowUpRight, Wrench, Inbox, Radio, Cpu, Link2, DollarSign, Building2,
   RefreshCw, CheckSquare, BarChart2, Star, Layers, BookOpen, Sliders,
   Clipboard, PlugZap, Moon, Sun, FolderOpen, MailOpen, Brain, UserCog,
-  Search, Plus, ChevronRight, type LucideIcon,
+  Search, Plus, ChevronRight, LifeBuoy, type LucideIcon,
 } from "lucide-react";
+import { SupportModal } from "./SupportModal";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -465,6 +466,7 @@ export function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [navTooltipsEnabled, setNavTooltipsEnabled] = useState(() => {
     try { return localStorage.getItem(NAV_TOOLTIPS_KEY) !== "false"; } catch { return true; }
   });
@@ -681,6 +683,18 @@ export function Layout() {
           </button>
         </div>
 
+        {/* Help & Support */}
+        <div className="px-3 pb-2 shrink-0">
+          <button
+            onClick={() => { setSupportOpen(true); setSidebarOpen(false); }}
+            className="nav-item w-full"
+            style={{ color: "#a1a1aa" }}
+          >
+            <LifeBuoy style={{ width: "14px", height: "14px" }} />
+            <span style={{ fontSize: "12.5px" }}>Help &amp; Support</span>
+          </button>
+        </div>
+
         <AppStoreQR />
 
         {/* Upgrade CTA */}
@@ -829,6 +843,7 @@ export function Layout() {
       {/* AI chat bubble — hidden on the full AI assistant page */}
       {location.pathname !== "/ai-assistant" && <AIChatBubble />}
       <NPSSurvey />
+      {supportOpen && <SupportModal onClose={() => setSupportOpen(false)} />}
     </div>
     </AIToastProvider>
   );
