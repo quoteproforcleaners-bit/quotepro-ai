@@ -283,7 +283,7 @@ function configureExpoAndLanding(app: express.Application) {
     const TOP_LEVEL_SPA_ROUTES = [
       "/pricing/success", "/pricing/cancel", "/pricing", "/upgrade",
       "/subscription/success", "/register", "/login", "/dashboard",
-      "/onboarding",
+      "/onboarding", "/quote-doctor",
     ];
     for (const route of TOP_LEVEL_SPA_ROUTES) {
       app.get(route, (_req: Request, res: Response) => {

@@ -60,6 +60,7 @@ import EmployeesPage from "./pages/EmployeesPage";
 import SchedulePublishPage from "./pages/SchedulePublishPage";
 import ScheduleAckPage from "./pages/ScheduleAckPage";
 import OnboardingWizardPage from "./pages/OnboardingWizardPage";
+import QuoteDoctorPage from "./pages/QuoteDoctorPage";
 
 export default function App() {
   const { isAuthenticated, isLoading, business, needsOnboarding } = useAuth();
@@ -108,6 +109,7 @@ export default function App() {
             )
           }
         />
+        <Route path="/quote-doctor" element={<QuoteDoctorPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/upgrade" element={<Navigate to="/pricing" replace />} />
         <Route path="/pricing/success" element={

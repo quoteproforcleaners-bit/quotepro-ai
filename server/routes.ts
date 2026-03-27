@@ -36,6 +36,7 @@ import businessRouter from "./routers/businessRouter";
 import publicRouter from "./routers/publicRouter";
 import revenuecatRouter from "./routers/revenuecatRouter";
 import npsRouter from "./routers/npsRouter";
+import { quoteDoctorRouter } from "./routers/quoteDoctorRouter";
 
 // Session type extension
 declare module "express-session" {
@@ -98,6 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(businessRouter);
   app.use(revenuecatRouter);
   app.use(npsRouter);
+  app.use(quoteDoctorRouter);
   app.use(publicRouter);
 
   // 4. HTTP server

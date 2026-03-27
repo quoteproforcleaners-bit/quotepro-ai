@@ -1,0 +1,222 @@
+Build a standalone "Quote Doctor" tool and add it as the 
+first item in the main navigation — before everything else. 
+It should feel like a hero feature, not a buried utility.
+
+---
+
+PAGE LOCATION & NAVIGATION
+
+Add "Quote Doctor" as the first nav item in the main app 
+navigation with a ⚡ icon. Make it visually distinct from 
+other nav items — use a green highlight or badge that says 
+"FREE" to draw the eye. On mobile it should be the first 
+item in the bottom tab bar.
+
+---
+
+PAGE DESIGN
+
+Create a dedicated page at /quote-doctor with this layout:
+
+HERO:
+- Headline: "Is Your Quote Losing You Jobs?"
+- Subheadline: "Paste your current quote below. Quote Doctor 
+  will analyze it and rewrite it to convert better — free, 
+  in seconds."
+- Usage counter showing: "X free optimizations remaining" 
+  (starts at 3, counts down per email)
+
+INPUT SECTION:
+Two tabs side by side:
+Tab 1 — "Paste Your Quote" (large text area)
+Tab 2 — "Upload Screenshot" (image upload, accepts jpg/png)
+
+Below the input:
+- Email field: "Where should we send your optimized quote?"
+- Large green button: "Optimize My Quote ⚡"
+- Small text below: "Takes 10 seconds. No credit card. 
+  Ever."
+
+OUTPUT SECTION (shown after optimization):
+Split screen showing:
+- LEFT: "Your Original Quote" (their text, slightly faded)
+- RIGHT: "Optimized Version ✓" (rewritten quote, bold, 
+  highlighted)
+
+Below the output:
+- Score badges showing what was improved:
+  ✓ Professional tone
+  ✓ Clear pricing presentation  
+  ✓ Trust signals added
+  ✓ Call to action strengthened
+  ✓ Urgency created
+
+- Green CTA button: "Get This Automatically on Every 
+  Quote → Start Free 7-Day Trial"
+- Secondary text: "No credit card required"
+
+LIMIT ENFORCEMENT:
+- Track optimizations by email address
+- After 3 uses show: "You've used all 3 free optimizations. 
+  Start your free trial to get unlimited Quote Doctor access 
+  plus full QuotePro AI."
+- Store usage count in database tied to email
+
+---
+
+ANTHROPIC API INTEGRATION
+
+When user submits their quote, make a call to the 
+Anthropic Claude API with this exact system prompt:
+
+---
+
+SYSTEM PROMPT:
+
+You are Quote Doctor, an expert in helping cleaning 
+business owners win more jobs through better quoting. 
+You have 15 years of experience in the cleaning industry 
+and know exactly what makes a client choose one cleaning 
+company over another.
+
+When given a cleaning business quote, you will:
+
+1. Analyze what's weak or missing
+2. Rewrite it as a complete, improved version
+
+Your rewritten quote must:
+
+TONE & PROFESSIONALISM:
+- Sound confident and professional without being stiff
+- Use warm, trustworthy language
+- Address the client by name if provided, otherwise use 
+  "Hello" or the property address
+- Sign off with the cleaning company owner's name if 
+  provided
+
+PRICING PRESENTATION:
+- Present pricing clearly using a Good/Better/Best 
+  structure if only one price was given
+- Add a "Most Popular" badge to the middle option
+- Show exactly what's included at each tier
+- If recurring service, show monthly vs one-time pricing
+- Add an annual savings option if applicable
+
+TRUST SIGNALS:
+- Add "Licensed & Insured" if not already present
+- Add a satisfaction guarantee statement
+- Mention years of experience if provided
+- Add a response time commitment: 
+  "This quote is valid for 7 days"
+
+URGENCY & CALL TO ACTION:
+- Add a clear expiration: "This quote expires in 7 days"
+- Include one strong call to action: 
+  "Reply to this email or call/text [number] to confirm 
+  your booking"
+- Add a P.S. that creates soft urgency: 
+  "P.S. Our schedule fills up quickly — booking now 
+  secures your preferred date."
+
+FOLLOW UP LANGUAGE:
+- End with: "I'll follow up in 2 days to answer any 
+  questions. Looking forward to working with you!"
+
+FORMAT:
+- Return ONLY the rewritten quote
+- Do not include explanations, commentary, or preamble
+- Use clean formatting with clear sections
+- Keep it under 400 words
+- Make it feel human and personal, not templated
+
+---
+
+USER PROMPT:
+
+Here is the cleaning business quote to optimize:
+
+[INSERT USER'S QUOTE TEXT HERE]
+
+If this is an image, extract all text from the image 
+first, then optimize it.
+
+---
+
+DISPLAY RESULTS:
+
+Show the original quote on the left and the optimized 
+version on the right in a clean split view.
+
+Parse the response and display it with proper formatting 
+— line breaks, bold headers, and clear sections.
+
+Below the result show these improvement badges 
+dynamically based on what was added:
+- "✓ Good/Better/Best pricing added" 
+  (if pricing structure was added)
+- "✓ Trust signals added" 
+  (if licensed/insured/guarantee was added)
+- "✓ Urgency created" 
+  (if expiration date was added)
+- "✓ Follow-up sequence included"
+- "✓ Professional tone applied"
+
+---
+
+COPY BUTTON:
+Add a "Copy Optimized Quote" button that copies the 
+rewritten version to clipboard with one click.
+
+Add a "Download as PDF" button that generates a clean 
+PDF of the optimized quote they can send directly.
+
+---
+
+AFTER RESULTS — CONVERSION MOMENT:
+
+Show this block immediately below the results:
+
+"⚡ QuotePro sends quotes like this automatically — 
+in 60 seconds, from your phone, with built-in 
+follow-up so you never lose a lead to a faster 
+competitor."
+
+[Start My Free 7-Day Trial →] ← large green button
+
+"No credit card required. Cancel anytime."
+
+---
+
+SHARE PROMPT:
+
+After results show, display:
+
+"Know another cleaning business owner with a weak quote? 
+Share Quote Doctor with them:"
+
+[Share Link Button] that copies 
+https://getquotepro.ai/quote-doctor to clipboard
+
+---
+
+MOBILE OPTIMIZATION:
+
+On mobile, stack the original and optimized quotes 
+vertically instead of side by side. Make the 
+"Copy Quote" button full width and thumb-friendly 
+(min 56px height). The email field and optimize 
+button should be easily reachable with one thumb.
+
+---
+
+ANALYTICS:
+
+Track these events:
+- Quote Doctor page visited
+- Quote submitted for optimization
+- Result viewed
+- Copy button clicked
+- Trial CTA clicked
+- Share button clicked
+
+Send these to Google Analytics as custom events.

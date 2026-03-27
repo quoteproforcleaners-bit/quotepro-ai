@@ -15,7 +15,7 @@ import "./lib/i18n";
 //   — top-level routes for direct navigation and ad conversion tracking
 const TOP_LEVEL_PATHS = [
   "/intake/", "/pricing", "/subscription", "/register",
-  "/login", "/dashboard", "/onboarding", "/upgrade",
+  "/login", "/dashboard", "/onboarding", "/upgrade", "/quote-doctor",
 ];
 const isTopLevelPath = TOP_LEVEL_PATHS.some((p) =>
   window.location.pathname === p || window.location.pathname.startsWith(p + "/") || window.location.pathname.startsWith(p)

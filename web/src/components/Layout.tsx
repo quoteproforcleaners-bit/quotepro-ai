@@ -45,6 +45,7 @@ const navSections: NavSection[] = [
   {
     label: null,
     items: [
+      { to: "/quote-doctor", label: "Quote Doctor", icon: Zap, description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — revenue at a glance, pipeline health, recent quotes, and team activity." },
     ],
   },
@@ -194,8 +195,11 @@ function NavItemWithTooltip({
         onClick={() => setSidebarOpen(false)}
         className={({ isActive }) => `nav-item w-full ${isActive ? "nav-item-active" : ""}`}
       >
-        <item.icon className="shrink-0" style={{ width: "15px", height: "15px", opacity: 0.85 }} />
-        <span className="flex-1 text-[13px]">{t(NAV_LABEL_KEYS[item.to] || item.label)}</span>
+        <item.icon className="shrink-0" style={{ width: "15px", height: "15px", opacity: item.to === "/quote-doctor" ? 1 : 0.85, color: item.to === "/quote-doctor" ? "#10b981" : undefined }} />
+        <span className="flex-1 text-[13px]" style={item.to === "/quote-doctor" ? { fontWeight: 700, color: "#059669" } : undefined}>{t(NAV_LABEL_KEYS[item.to] || item.label)}</span>
+        {item.to === "/quote-doctor" ? (
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500 text-white uppercase tracking-wider leading-none">FREE</span>
+        ) : null}
         {item.to === "/intake-requests" && intakeNewCount > 0 ? (
           <span className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
             style={{ minWidth: "18px", height: "18px", fontSize: "10px", padding: "0 4px" }}>

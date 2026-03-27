@@ -33,6 +33,7 @@ import CalendarScreen from "@/screens/CalendarScreen";
 import GrowthDashboardScreen from "@/screens/GrowthDashboardScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import LeadFinderScreen from "@/screens/LeadFinderScreen";
+import QuoteDoctorScreen from "@/screens/QuoteDoctorScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
@@ -40,6 +41,7 @@ import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useLanguage } from "@/context/LanguageContext";
 
 export type MainTabParamList = {
+  QuoteDoctorTab: undefined;
   HomeTab: undefined;
   CustomersTab: undefined;
   QuotesTab: undefined;
@@ -322,6 +324,28 @@ export default function MainTabNavigator() {
         headerStyle: screenOptions.headerStyle as any,
       }}
     >
+      <Tab.Screen
+        name="QuoteDoctorTab"
+        component={QuoteDoctorScreen}
+        options={{
+          title: "Quote Doctor",
+          headerTitle: "Quote Doctor ⚡",
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="zap" color={focused ? "#10b981" : color} size={size} focused={focused} />
+          ),
+          tabBarLabel: ({ color, focused }) => (
+            <View style={{ alignItems: "center" }}>
+              <Text style={{ fontSize: 10, fontWeight: focused ? "700" : "500", color: focused ? "#10b981" : color, marginTop: -2 }}>
+                Quote Dr.
+              </Text>
+              <View style={{ backgroundColor: "#10b981", borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, marginTop: 1 }}>
+                <Text style={{ fontSize: 7, fontWeight: "800", color: "#fff", letterSpacing: 0.5 }}>FREE</Text>
+              </View>
+            </View>
+          ),
+        }}
+        listeners={{ tabPress: handleTabPress }}
+      />
       <Tab.Screen
         name="HomeTab"
         component={DashboardScreen}
