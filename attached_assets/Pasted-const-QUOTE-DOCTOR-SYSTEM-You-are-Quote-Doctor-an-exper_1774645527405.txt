@@ -1,8 +1,3 @@
-import { Router, Request, Response } from "express";
-import { openai } from "../clients";
-
-export const quoteDoctorRouter = Router();
-
 const QUOTE_DOCTOR_SYSTEM = `You are Quote Doctor, an expert in helping cleaning business owners win more jobs through better quoting. You have 15 years of experience in the cleaning industry and know exactly what makes a client choose one cleaning company over another.
 
 When given a cleaning business quote, you will:
@@ -43,47 +38,30 @@ FORMAT:
 - Keep it under 400 words
 - Make it feel human and personal, not templated`;
 
-quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: Response) => {
+// POST /api/quote-doctor/optimize
+app.post("/api/quote-doctor/optimize", async (req, res) => {
   try {
-    const { quoteText, imageBase64, imageMimeType } = req.body as {
-      quoteText?: string;
-      imageBase64?: string;
-      imageMimeType?: string;
-    };
-
+    const { quoteText, imageBase64, imageMimeType } = req.body;
     if (!quoteText && !imageBase64) {
       return res.status(400).json({ error: "Quote text or image required" });
     }
 
-    const messages: any[] = imageBase64
-      ? [
-          { role: "system", content: QUOTE_DOCTOR_SYSTEM },
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${imageMimeType || "image/jpeg"};base64,${imageBase64}`,
-                },
-              },
-              {
-                type: "text",
-                text: "Read this cleaning quote image carefully. DO NOT reproduce the extracted text. Write ONLY the optimized rewritten quote.",
-              },
-            ],
-          },
+    const messages = imageBase64 ? [
+      { role: "system", content: QUOTE_DOCTOR_SYSTEM },
+      {
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: `data:${imageMimeType || "image/jpeg"};base64,${imageBase64}` } },
+          { type: "text", text: "Read this cleaning quote image carefully. DO NOT reproduce the extracted text. Write ONLY the optimized rewritten quote." }
         ]
-      : [
-          { role: "system", content: QUOTE_DOCTOR_SYSTEM },
-          {
-            role: "user",
-            content: `Optimize this cleaning quote:\n\n${quoteText}`,
-          },
-        ];
+      }
+    ] : [
+      { role: "system", content: QUOTE_DOCTOR_SYSTEM },
+      { role: "user", content: `Optimize this cleaning quote:\n\n${quoteText}` }
+    ];
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages,
       max_tokens: 900,
     });
