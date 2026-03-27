@@ -1,30 +1,473 @@
 import { useState, useRef } from "react";
-import { Zap, Copy, Download, Upload, FileText, Loader2, X, Check, ArrowRight, Share2, ChevronRight } from "lucide-react";
+import { Zap, Copy, Download, Upload, FileText, Loader2, X, Check, ArrowRight, Share2, ChevronRight, Star } from "lucide-react";
 
-function markdownToHtml(text: string): string {
-  const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const lines = escaped.split("\n");
-  const out: string[] = [];
-  let inList = false;
-  for (const raw of lines) {
-    let line = raw
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/__(.*?)__/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>");
-    if (/^\s*[-•]\s+/.test(raw)) {
-      if (!inList) { out.push("<ul>"); inList = true; }
-      out.push(`<li>${line.replace(/^\s*[-•]\s+/, "")}</li>`);
-    } else {
-      if (inList) { out.push("</ul>"); inList = false; }
-      if (/^#{1,2}\s/.test(raw)) out.push(`<h2>${line.replace(/^#+\s*/, "")}</h2>`);
-      else if (line.trim() === "" || line.trim() === "---") out.push("<br>");
-      else out.push(`<p>${line}</p>`);
-    }
-  }
-  if (inList) out.push("</ul>");
-  return out.join("\n");
+// ─── Proposal Parser ───────────────────────────────────────────────────────────
+interface PricingTier {
+  label: string;          // "Good", "Better", "Best"
+  title: string;          // "Essential Cleaning"
+  badge?: string;         // "Most Popular"
+  bullets: string[];
+  price?: string;
 }
 
+interface ParsedProposal {
+  intro: string[];
+  tiers: PricingTier[];
+  closing: string[];
+  raw: string;
+}
+
+function parseProposal(text: string): ParsedProposal {
+  const lines = text.split("\n");
+  const tiers: PricingTier[] = [];
+  const intro: string[] = [];
+  const closing: string[] = [];
+  let current: PricingTier | null = null;
+  let pastTiers = false;
+  let inTierSection = false;
+
+  const TIER_RE = /^[\*\#\s]*(Good|Better|Best)\s*[:–-]\s*(.+)/i;
+  const BULLET_RE = /^\s*[-•*]\s+(.+)/;
+  const HEADER_RE = /^#+\s+(.+)/;
+  const PRICE_RE = /total\s*[:=]?\s*\$?([\d,]+\.?\d*)/i;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line === "---") continue;
+
+    // Strip markdown bold/italic for analysis
+    const clean = line.replace(/\*\*/g, "").replace(/\*/g, "").replace(/^#+\s*/, "");
+
+    const tierMatch = TIER_RE.exec(clean);
+    if (tierMatch) {
+      if (current) tiers.push(current);
+      const fullTitle = tierMatch[2].replace(/\(most popular\)/i, "").trim();
+      const isMostPopular = /most popular/i.test(tierMatch[2]) || tierMatch[1].toLowerCase() === "better";
+      current = {
+        label: tierMatch[1],
+        title: fullTitle,
+        badge: isMostPopular ? "Most Popular" : undefined,
+        bullets: [],
+      };
+      inTierSection = true;
+      continue;
+    }
+
+    // Section header (### Service Options etc.) — skip label, just mark section
+    if (HEADER_RE.test(line)) {
+      inTierSection = false;
+      continue;
+    }
+
+    if (current) {
+      const bMatch = BULLET_RE.exec(line);
+      if (bMatch) {
+        const bulletText = bMatch[1].replace(/\*\*/g, "").replace(/\*/g, "");
+        const priceMatch = PRICE_RE.exec(bulletText);
+        if (priceMatch) {
+          current.price = `$${priceMatch[1]}`;
+        } else {
+          current.bullets.push(bulletText);
+        }
+      } else if (line && !HEADER_RE.test(line)) {
+        // Non-bullet text after a tier = closing starts
+        if (current) { tiers.push(current); current = null; pastTiers = true; }
+        closing.push(clean);
+      }
+    } else if (!inTierSection && !pastTiers) {
+      intro.push(clean);
+    } else if (pastTiers || (!inTierSection && tiers.length > 0)) {
+      closing.push(clean);
+    } else {
+      intro.push(clean);
+    }
+  }
+  if (current) tiers.push(current);
+
+  return { intro, tiers, closing, raw: text };
+}
+
+// ─── Beautiful Web Proposal Card ───────────────────────────────────────────────
+function ProposalCard({ parsed }: { parsed: ParsedProposal }) {
+  const hasTiers = parsed.tiers.length > 0;
+
+  return (
+    <div style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+      {/* Header */}
+      <div style={{
+        background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%)",
+        borderRadius: "20px 20px 0 0",
+        padding: "36px 40px 28px",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.06,
+          backgroundImage: "radial-gradient(circle at 80% 20%, white 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }} />
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+            <div style={{
+              background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: "100px", padding: "3px 12px",
+              fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.9)",
+              letterSpacing: "0.04em", textTransform: "uppercase",
+            }}>
+              Cleaning Services Proposal
+            </div>
+          </div>
+          <h1 style={{ fontSize: "24px", fontWeight: 800, color: "#fff", margin: "0 0 16px", lineHeight: 1.2 }}>
+            Your Personalized Cleaning Quote
+          </h1>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {["✓ Licensed & Insured", "✓ Satisfaction Guaranteed", "Valid for 7 days"].map((b) => (
+              <span key={b} style={{
+                background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: "100px", padding: "4px 12px",
+                fontSize: "11.5px", fontWeight: 600, color: "rgba(255,255,255,0.85)",
+              }}>{b}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ background: "#f8fafc", padding: "32px 40px", borderRadius: "0 0 20px 20px" }}>
+
+        {/* Intro */}
+        {parsed.intro.length > 0 && (
+          <div style={{
+            background: "#fff", borderRadius: "16px", padding: "24px 28px",
+            marginBottom: "28px", border: "1px solid #e2e8f0",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}>
+            {parsed.intro.map((line, i) => (
+              <p key={i} style={{
+                fontSize: "15px", lineHeight: 1.75, color: "#374151",
+                margin: i < parsed.intro.length - 1 ? "0 0 12px" : 0,
+              }}>{line}</p>
+            ))}
+          </div>
+        )}
+
+        {/* Service Options */}
+        {hasTiers && (
+          <>
+            <p style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "14px" }}>
+              Service Options
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "28px" }}>
+              {parsed.tiers.map((tier) => {
+                const isPopular = !!tier.badge;
+                const colorMap: Record<string, { bg: string; accent: string; ring: string; label: string }> = {
+                  good:   { bg: "#fff",     accent: "#0ea5e9", ring: "#e0f2fe", label: "#0369a1" },
+                  better: { bg: "#faf5ff",  accent: "#7c3aed", ring: "#ede9fe", label: "#6d28d9" },
+                  best:   { bg: "#fffbeb",  accent: "#d97706", ring: "#fde68a", label: "#b45309" },
+                };
+                const c = colorMap[tier.label.toLowerCase()] || colorMap.good;
+
+                return (
+                  <div key={tier.label} style={{
+                    background: c.bg, borderRadius: "14px",
+                    border: `2px solid ${isPopular ? c.accent : c.ring}`,
+                    overflow: "hidden",
+                    boxShadow: isPopular ? `0 4px 20px ${c.accent}22` : "0 1px 3px rgba(0,0,0,0.05)",
+                    position: "relative",
+                  }}>
+                    {isPopular && (
+                      <div style={{
+                        position: "absolute", top: 0, right: 0,
+                        background: `linear-gradient(135deg, ${c.accent}, #6d28d9)`,
+                        color: "#fff", fontSize: "10px", fontWeight: 800,
+                        padding: "4px 14px", borderRadius: "0 12px 0 10px",
+                        letterSpacing: "0.05em", textTransform: "uppercase",
+                      }}>
+                        Most Popular
+                      </div>
+                    )}
+                    <div style={{ padding: "18px 22px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+                        <div>
+                          <span style={{
+                            display: "inline-block", background: c.ring,
+                            color: c.label, fontSize: "10px", fontWeight: 800,
+                            padding: "2px 10px", borderRadius: "100px",
+                            textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px",
+                          }}>
+                            {tier.label}
+                          </span>
+                          <p style={{ fontSize: "16px", fontWeight: 700, color: "#111827", margin: 0 }}>
+                            {tier.title}
+                          </p>
+                        </div>
+                        {tier.price && (
+                          <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "12px" }}>
+                            <p style={{ fontSize: "22px", fontWeight: 800, color: c.label, margin: 0, lineHeight: 1 }}>
+                              {tier.price}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        {tier.bullets.map((b, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                            <span style={{ color: c.accent, fontSize: "14px", fontWeight: 700, marginTop: "1px", flexShrink: 0 }}>✓</span>
+                            <span style={{ fontSize: "14px", color: "#374151", lineHeight: 1.6 }}>{b}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Closing */}
+        {parsed.closing.length > 0 && (
+          <div style={{
+            background: "#fff", borderRadius: "16px", padding: "24px 28px",
+            border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}>
+            {parsed.closing.map((line, i) => (
+              <p key={i} style={{
+                fontSize: "15px", lineHeight: 1.75, color: "#374151",
+                margin: i < parsed.closing.length - 1 ? "0 0 12px" : 0,
+              }}>{line}</p>
+            ))}
+          </div>
+        )}
+
+        {/* Fallback: if parsing found nothing */}
+        {!hasTiers && parsed.intro.length === 0 && (
+          <div style={{ background: "#fff", borderRadius: "16px", padding: "28px", border: "1px solid #e2e8f0" }}>
+            <pre style={{ fontSize: "14px", lineHeight: 1.75, color: "#374151", whiteSpace: "pre-wrap", fontFamily: "inherit", margin: 0 }}>
+              {parsed.raw}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── PDF Generator ─────────────────────────────────────────────────────────────
+function generatePdfHtml(parsed: ParsedProposal): string {
+  const tierCardHtml = (tier: PricingTier) => {
+    const colorMap: Record<string, { bg: string; accent: string; ring: string; badge: string }> = {
+      good:   { bg: "#ffffff", accent: "#0ea5e9", ring: "#e0f2fe", badge: "#0369a1" },
+      better: { bg: "#faf5ff", accent: "#7c3aed", ring: "#ede9fe", badge: "#6d28d9" },
+      best:   { bg: "#fffbeb", accent: "#d97706", ring: "#fde68a", badge: "#b45309" },
+    };
+    const c = colorMap[tier.label.toLowerCase()] || colorMap.good;
+    const isPopular = !!tier.badge;
+
+    const bulletsHtml = tier.bullets.map(b =>
+      `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
+         <span style="color:${c.accent};font-weight:800;flex-shrink:0;margin-top:1px">✓</span>
+         <span style="font-size:13.5px;color:#374151;line-height:1.6">${b.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</span>
+       </div>`
+    ).join("");
+
+    return `
+      <div style="background:${c.bg};border-radius:14px;border:2px solid ${isPopular ? c.accent : c.ring};overflow:hidden;margin-bottom:12px;position:relative;${isPopular ? `box-shadow:0 4px 20px ${c.accent}33` : ""}">
+        ${isPopular ? `<div style="position:absolute;top:0;right:0;background:linear-gradient(135deg,${c.accent},#6d28d9);color:#fff;font-size:9px;font-weight:800;padding:4px 14px;border-radius:0 12px 0 10px;letter-spacing:.05em;text-transform:uppercase">Most Popular</div>` : ""}
+        <div style="padding:18px 22px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+            <div>
+              <span style="display:inline-block;background:${c.ring};color:${c.badge};font-size:9.5px;font-weight:800;padding:2px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${tier.label}</span>
+              <p style="font-size:16px;font-weight:700;color:#111827;margin:0">${tier.title.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</p>
+            </div>
+            ${tier.price ? `<div style="text-align:right;flex-shrink:0;margin-left:12px"><p style="font-size:24px;font-weight:800;color:${c.badge};margin:0;line-height:1">${tier.price}</p></div>` : ""}
+          </div>
+          ${bulletsHtml}
+        </div>
+      </div>`;
+  };
+
+  const introHtml = parsed.intro.map(l =>
+    `<p style="font-size:15px;line-height:1.8;color:#374151;margin:0 0 12px">${l.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</p>`
+  ).join("");
+
+  const closingHtml = parsed.closing.map(l =>
+    `<p style="font-size:15px;line-height:1.8;color:#374151;margin:0 0 12px">${l.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</p>`
+  ).join("");
+
+  const tiersHtml = parsed.tiers.map(tierCardHtml).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cleaning Services Proposal</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    background: #eef2f7;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: #1a1a1a;
+  }
+  .save-bar {
+    background: #0f172a;
+    padding: 12px 24px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .save-bar button {
+    background: linear-gradient(135deg, #16a34a, #059669);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 32px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: .01em;
+    box-shadow: 0 2px 8px rgba(22,163,74,0.4);
+  }
+  .save-bar button:hover { background: linear-gradient(135deg, #15803d, #047857); }
+  .save-bar span { color: rgba(255,255,255,0.5); font-size: 13px; }
+  .wrapper { max-width: 700px; margin: 32px auto 60px; }
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 8px 48px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%);
+    padding: 44px 48px 36px;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .header-inner { position: relative; }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 100px;
+    padding: 4px 14px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .header h1 {
+    font-size: 30px;
+    font-weight: 800;
+    color: #fff;
+    margin: 0 0 18px;
+    line-height: 1.15;
+    letter-spacing: -.01em;
+  }
+  .pills { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 100px;
+    padding: 4px 13px;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.85);
+  }
+  .body { background: #f8fafc; padding: 36px 48px 48px; }
+  .section-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 14px;
+    margin-top: 28px;
+  }
+  .text-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px 28px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 28px;
+  }
+  .footer-strip {
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+    border-top: 2px solid #bbf7d0;
+    padding: 28px 48px;
+    text-align: center;
+  }
+  .footer-strip p { font-size: 13px; color: #374151; line-height: 1.6; }
+  .footer-strip .trust { display: flex; justify-content: center; gap: 24px; margin-top: 16px; }
+  .footer-strip .trust-item { font-size: 12px; font-weight: 600; color: #059669; }
+  @media print {
+    body { background: #fff; }
+    .save-bar { display: none; }
+    .wrapper { margin: 0; max-width: 100%; }
+    .card { box-shadow: none; border-radius: 0; }
+    .header, .header::before { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <div class="save-bar">
+    <button onclick="window.print()">Save as PDF / Print</button>
+    <span>or press Ctrl/Cmd + P</span>
+  </div>
+  <div class="wrapper">
+    <div class="card">
+      <div class="header">
+        <div class="header-inner">
+          <div class="eyebrow">Cleaning Services Proposal</div>
+          <h1>Your Personalized<br>Cleaning Quote</h1>
+          <div class="pills">
+            <span class="pill">✓ Licensed &amp; Insured</span>
+            <span class="pill">✓ Satisfaction Guaranteed</span>
+            <span class="pill">Valid for 7 days</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="body">
+        ${parsed.intro.length > 0 ? `<div class="text-card">${introHtml}</div>` : ""}
+        ${parsed.tiers.length > 0 ? `<p class="section-label" style="margin-top:0">Service Options</p>${tiersHtml}` : ""}
+        ${parsed.closing.length > 0 ? `<div class="text-card" style="margin-top:28px;margin-bottom:0">${closingHtml}</div>` : ""}
+        ${!parsed.intro.length && !parsed.tiers.length && !parsed.closing.length ? `<div class="text-card"><pre style="white-space:pre-wrap;font-family:inherit;font-size:14px;line-height:1.75;color:#374151">${parsed.raw.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</pre></div>` : ""}
+      </div>
+
+      <div class="footer-strip">
+        <p>Ready to book? Reply to this proposal or call us to get started.</p>
+        <div class="trust">
+          <span class="trust-item">✓ Fully Insured</span>
+          <span class="trust-item">✓ Background Checked</span>
+          <span class="trust-item">✓ Satisfaction Guarantee</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────────────────
 export default function QuoteDoctorPage() {
   const [tab, setTab] = useState<"paste" | "upload">("paste");
   const [quoteText, setQuoteText] = useState("");
@@ -33,6 +476,7 @@ export default function QuoteDoctorPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [optimized, setOptimized] = useState<string | null>(null);
+  const [parsed, setParsed] = useState<ParsedProposal | null>(null);
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +487,6 @@ export default function QuoteDoctorPage() {
     new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
-        // Keep under ~1MB base64 (~750KB raw) to stay within proxy limits
         const MAX = 900;
         let w = img.width, h = img.height;
         if (w > MAX || h > MAX) {
@@ -65,16 +508,13 @@ export default function QuoteDoctorPage() {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const { base64, mimeType, preview } = await compressImage(ev.target?.result as string);
-      setImageBase64(base64);
-      setImageMimeType(mimeType);
-      setImagePreview(preview);
+      setImageBase64(base64); setImageMimeType(mimeType); setImagePreview(preview);
     };
     reader.readAsDataURL(file);
   };
 
   const clearImage = () => {
-    setImageBase64(null);
-    setImagePreview(null);
+    setImageBase64(null); setImagePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -82,24 +522,18 @@ export default function QuoteDoctorPage() {
     e.preventDefault();
     if (tab === "paste" && !quoteText.trim()) { setError("Please paste your quote text."); return; }
     if (tab === "upload" && !imageBase64) { setError("Please upload a screenshot first."); return; }
-    setLoading(true);
-    setError(null);
-    setOptimized(null);
+    setLoading(true); setError(null); setOptimized(null); setParsed(null);
     try {
       const body: Record<string, string> = {};
       if (tab === "paste") {
         body.quoteText = quoteText.trim();
       } else {
         const b64 = imageBase64!;
-        // Rough size check: base64 is ~1.37x the binary size
-        const approxKB = Math.round(b64.length * 0.75 / 1024);
-        if (approxKB > 1800) {
+        if (Math.round(b64.length * 0.75 / 1024) > 1800) {
           setError("Image is too large. Please use a smaller or cropped screenshot.");
-          setLoading(false);
-          return;
+          setLoading(false); return;
         }
-        body.imageBase64 = b64;
-        body.imageMimeType = imageMimeType;
+        body.imageBase64 = b64; body.imageMimeType = imageMimeType;
       }
 
       const res = await fetch("/api/quote-doctor/optimize", {
@@ -109,17 +543,13 @@ export default function QuoteDoctorPage() {
       });
 
       let data: any = {};
-      try { data = await res.json(); } catch { /* non-json response */ }
+      try { data = await res.json(); } catch { /* non-json */ }
+      if (!res.ok) { setError(data.error || `Server error (${res.status}). Please try again.`); return; }
+      if (!data.optimized) { setError("No optimized quote was returned. Please try again."); return; }
 
-      if (!res.ok) {
-        setError(data.error || `Server error (${res.status}). Please try again.`);
-        return;
-      }
-      if (!data.optimized) {
-        setError("No optimized quote was returned. Please try again.");
-        return;
-      }
+      const p = parseProposal(data.optimized);
       setOptimized(data.optimized);
+      setParsed(p);
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     } catch (err: any) {
       setError(err?.message || "Something went wrong. Please try again.");
@@ -131,131 +561,127 @@ export default function QuoteDoctorPage() {
   const handleCopy = async () => {
     if (!optimized) return;
     await navigator.clipboard.writeText(optimized);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
   const copyShareLink = () => {
     navigator.clipboard.writeText("https://getquotepro.ai/quote-doctor");
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
+    setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const handlePDF = () => {
-    if (!optimized) return;
+    if (!parsed) return;
     const w = window.open("", "_blank");
     if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Cleaning Services Proposal</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Helvetica Neue',Arial,sans-serif;background:#eef2f7;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.save-bar{background:#1e3a5f;padding:12px 24px;text-align:center;position:sticky;top:0;z-index:10}
-.save-bar button{background:#16a34a;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.01em}
-.page{max-width:720px;margin:28px auto 60px;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.13);overflow:hidden}
-.ph{background:linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%);padding:40px 44px 32px}
-.ph h1{font-size:28px;font-weight:800;color:#fff;margin-bottom:16px}
-.ph .pill{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.9);font-size:11px;font-weight:600;padding:4px 12px;border-radius:100px;margin-right:8px}
-.pb{padding:40px 44px}
-.pb p{font-size:15px;line-height:1.8;color:#374151;margin-bottom:12px}
-.pb h2{font-size:17px;font-weight:700;color:#111827;margin:20px 0 8px}
-.pb ul{list-style:none;padding:0;margin:8px 0 16px}
-.pb ul li{font-size:14px;color:#374151;padding:4px 0 4px 22px;position:relative;line-height:1.7}
-.pb ul li::before{content:"✓";position:absolute;left:0;color:#16a34a;font-weight:800}
-.pb br{display:block;height:6px;content:""}
-strong{color:#111827;font-weight:700}
-@media print{body{background:#fff}.save-bar{display:none}.page{box-shadow:none;border-radius:0;margin:0;max-width:100%}.ph{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-</style></head><body>
-<div class="save-bar"><button onclick="window.print()">Save as PDF / Print</button></div>
-<div class="page">
-  <div class="ph">
-    <h1>Cleaning Services Proposal</h1>
-    <span class="pill">&#10003; Licensed &amp; Insured</span>
-    <span class="pill">Valid for 7 days</span>
-  </div>
-  <div class="pb">${markdownToHtml(optimized)}</div>
-</div></body></html>`);
+    w.document.write(generatePdfHtml(parsed));
     w.document.close();
-    setTimeout(() => w.print(), 400);
+    setTimeout(() => w.print(), 600);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #f0f4ff 0%, #f8fafc 60%, #fff 100%)" }}>
       {/* Hero */}
-      <div className="max-w-4xl mx-auto px-4 pt-12 pb-8 text-center">
-        <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-700 px-4 py-1.5 rounded-full text-sm font-semibold mb-6">
-          <Zap className="w-4 h-4" />
-          Free AI Tool
+      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "64px 24px 32px", textAlign: "center" }}>
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: "8px",
+          background: "linear-gradient(135deg, #d1fae5, #a7f3d0)",
+          color: "#065f46", padding: "6px 18px", borderRadius: "100px",
+          fontSize: "13px", fontWeight: 700, marginBottom: "24px",
+          border: "1px solid #6ee7b7",
+        }}>
+          <Zap style={{ width: "14px", height: "14px" }} />
+          Free AI Tool — No Account Needed
         </div>
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight mb-4">
-          Is Your Quote<br className="hidden sm:block" /> Losing You Jobs?
+
+        <h1 style={{
+          fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 900, lineHeight: 1.1,
+          color: "#0f172a", marginBottom: "20px", letterSpacing: "-0.02em",
+        }}>
+          Is Your Quote<br />
+          <span style={{ background: "linear-gradient(135deg, #2563eb, #7c3aed)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            Losing You Jobs?
+          </span>
         </h1>
-        <p className="text-lg text-slate-500 max-w-xl mx-auto mb-3">
-          Paste your current quote or upload a screenshot. Quote Doctor will rewrite it to convert more jobs — free, in seconds.
+
+        <p style={{ fontSize: "18px", color: "#64748b", maxWidth: "520px", margin: "0 auto 8px", lineHeight: 1.65 }}>
+          Paste your current quote or upload a screenshot. Quote Doctor rewrites it to win more jobs — in seconds.
         </p>
-        <p className="text-sm text-slate-400">No account needed. No credit card. Ever.</p>
+        <p style={{ fontSize: "13px", color: "#94a3b8", marginBottom: 0 }}>No credit card. No sign up. Instant results.</p>
       </div>
 
-      {/* Input Section */}
-      <div className="max-w-3xl mx-auto px-4 pb-8">
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Input Card */}
+      <div style={{ maxWidth: "760px", margin: "0 auto", padding: "0 20px 40px" }}>
+        <form onSubmit={handleSubmit} style={{
+          background: "#fff", borderRadius: "24px",
+          border: "1px solid #e2e8f0", boxShadow: "0 4px 32px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+          overflow: "hidden",
+        }}>
           {/* Tabs */}
-          <div className="flex border-b border-gray-100">
+          <div style={{ display: "flex", borderBottom: "1px solid #f1f5f9" }}>
             {(["paste", "upload"] as const).map((t) => (
               <button key={t} type="button" onClick={() => setTab(t)}
-                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors ${
-                  tab === t
-                    ? "bg-white text-emerald-600 border-b-2 border-emerald-500"
-                    : "bg-gray-50 text-gray-500 hover:text-gray-700"
-                }`}>
+                style={{
+                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                  padding: "14px 0", fontSize: "13.5px", fontWeight: 700, cursor: "pointer", border: "none",
+                  background: tab === t ? "#fff" : "#f8fafc",
+                  color: tab === t ? "#2563eb" : "#94a3b8",
+                  borderBottom: tab === t ? "2px solid #2563eb" : "2px solid transparent",
+                  transition: "all 0.15s",
+                }}>
                 {t === "paste"
-                  ? <><FileText className="w-4 h-4" />Paste Quote</>
-                  : <><Upload className="w-4 h-4" />Upload Screenshot</>}
+                  ? <><FileText style={{ width: "15px", height: "15px" }} />Paste Quote Text</>
+                  : <><Upload style={{ width: "15px", height: "15px" }} />Upload Screenshot</>}
               </button>
             ))}
           </div>
 
-          <div className="p-6 space-y-4">
+          <div style={{ padding: "24px" }}>
             {tab === "paste" ? (
               <textarea
                 value={quoteText}
                 onChange={(e) => setQuoteText(e.target.value)}
                 placeholder={"Paste your current quote here...\n\nExample:\nHi Sarah,\nYour clean is $180. Let me know.\n- Mike"}
                 rows={10}
-                className="w-full border border-gray-200 rounded-xl p-4 text-sm text-gray-800 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
+                style={{
+                  width: "100%", border: "1.5px solid #e2e8f0", borderRadius: "14px",
+                  padding: "16px", fontSize: "14px", color: "#1e293b",
+                  lineHeight: 1.7, resize: "none", outline: "none",
+                  background: "#f8fafc", fontFamily: "inherit",
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={e => { (e.target as any).style.borderColor = "#2563eb"; (e.target as any).style.background = "#fff"; }}
+                onBlur={e => { (e.target as any).style.borderColor = "#e2e8f0"; (e.target as any).style.background = "#f8fafc"; }}
               />
             ) : (
               <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
+                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleImageUpload} style={{ display: "none" }} />
                 {imagePreview ? (
-                  <div className="relative">
-                    <img src={imagePreview} alt="Quote screenshot" className="w-full max-h-80 object-contain rounded-xl border border-gray-200" />
-                    <button
-                      type="button"
-                      onClick={clearImage}
-                      className="absolute top-2 right-2 bg-white rounded-full p-1.5 shadow border border-gray-200 text-gray-500 hover:text-red-500 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
+                  <div style={{ position: "relative" }}>
+                    <img src={imagePreview} alt="Quote screenshot" style={{ width: "100%", maxHeight: "280px", objectFit: "contain", borderRadius: "14px", border: "1.5px solid #e2e8f0" }} />
+                    <button type="button" onClick={clearImage} style={{
+                      position: "absolute", top: "8px", right: "8px", background: "#fff", borderRadius: "100%",
+                      width: "30px", height: "30px", display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "1px solid #e2e8f0", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                    }}>
+                      <X style={{ width: "14px", height: "14px", color: "#64748b" }} />
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full border-2 border-dashed border-gray-200 rounded-xl p-12 flex flex-col items-center justify-center gap-3 hover:border-emerald-400 hover:bg-emerald-50/30 transition-colors cursor-pointer"
+                  <button type="button" onClick={() => fileInputRef.current?.click()} style={{
+                    width: "100%", border: "2px dashed #e2e8f0", borderRadius: "14px",
+                    padding: "52px 20px", display: "flex", flexDirection: "column", alignItems: "center",
+                    justifyContent: "center", gap: "12px", cursor: "pointer", background: "#f8fafc",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as any).style.borderColor = "#2563eb"; (e.currentTarget as any).style.background = "#eff6ff"; }}
+                  onMouseLeave={e => { (e.currentTarget as any).style.borderColor = "#e2e8f0"; (e.currentTarget as any).style.background = "#f8fafc"; }}
                   >
-                    <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center">
-                      <Upload className="w-6 h-6 text-emerald-600" />
+                    <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: "linear-gradient(135deg, #dbeafe, #bfdbfe)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Upload style={{ width: "24px", height: "24px", color: "#2563eb" }} />
                     </div>
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-gray-700">Click to upload a screenshot</p>
-                      <p className="text-xs text-gray-400 mt-1">PNG, JPG, or WEBP — any quote screenshot works</p>
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ fontSize: "14px", fontWeight: 700, color: "#374151", margin: "0 0 4px" }}>Click to upload a screenshot</p>
+                      <p style={{ fontSize: "12px", color: "#94a3b8", margin: 0 }}>PNG, JPG, or WEBP • Any quote screenshot works</p>
                     </div>
                   </button>
                 )}
@@ -263,115 +689,155 @@ strong{color:#111827;font-weight:700}
             )}
 
             {error && (
-              <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 px-4 py-3 rounded-xl">
-                <X className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: "8px",
+                background: "#fef2f2", border: "1px solid #fecaca",
+                borderRadius: "12px", padding: "12px 16px", marginTop: "16px",
+                fontSize: "13.5px", color: "#dc2626",
+              }}>
+                <X style={{ width: "15px", height: "15px", flexShrink: 0, marginTop: "1px" }} />
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-bold py-4 rounded-xl text-base transition-colors shadow-sm shadow-emerald-200"
-            >
+            <button type="submit" disabled={loading} style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+              background: loading ? "#94a3b8" : "linear-gradient(135deg, #16a34a, #059669)",
+              color: "#fff", fontWeight: 800, fontSize: "15px", padding: "16px",
+              borderRadius: "14px", border: "none", cursor: loading ? "not-allowed" : "pointer",
+              marginTop: "16px", boxShadow: loading ? "none" : "0 4px 16px rgba(22,163,74,0.35)",
+              transition: "all 0.15s",
+            }}>
               {loading
-                ? <><Loader2 className="w-5 h-5 animate-spin" />Optimizing your quote...</>
-                : <><Zap className="w-5 h-5" />Optimize My Quote</>}
+                ? <><Loader2 style={{ width: "18px", height: "18px" }} className="animate-spin" />Optimizing your quote...</>
+                : <><Zap style={{ width: "18px", height: "18px" }} />Optimize My Quote — It's Free</>}
             </button>
-
-            <p className="text-center text-xs text-gray-400">
-              Takes about 10 seconds. No account needed. No credit card. Ever.
-            </p>
+            <p style={{ textAlign: "center", fontSize: "12px", color: "#94a3b8", margin: "10px 0 0" }}>Takes about 10 seconds</p>
           </div>
         </form>
       </div>
 
-      {/* Results */}
-      {optimized && (
-        <div ref={resultRef} className="max-w-3xl mx-auto px-4 pb-8 space-y-5">
-          {/* Optimized output */}
-          <div className="bg-white rounded-2xl border-2 border-emerald-400 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-emerald-100 bg-emerald-50/60">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-600" />
-                <span className="text-sm font-bold text-emerald-700 uppercase tracking-wide">Optimized Version</span>
-              </div>
-              <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-semibold">AI Enhanced</span>
+      {/* ─── Results ─── */}
+      {optimized && parsed && (
+        <div ref={resultRef} style={{ maxWidth: "760px", margin: "0 auto", padding: "0 20px 60px" }}>
+
+          {/* Score banner */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "12px",
+            background: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+            border: "1.5px solid #86efac", borderRadius: "16px",
+            padding: "14px 20px", marginBottom: "20px",
+          }}>
+            <div style={{
+              width: "40px", height: "40px", borderRadius: "12px", flexShrink: 0,
+              background: "linear-gradient(135deg, #16a34a, #059669)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Check style={{ width: "20px", height: "20px", color: "#fff" }} />
             </div>
-            <div className="p-6">
-              <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">{optimized}</pre>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: "14px", fontWeight: 800, color: "#14532d", margin: "0 0 2px" }}>Quote Optimized</p>
+              <p style={{ fontSize: "12.5px", color: "#15803d", margin: 0 }}>Rewritten to build trust, justify pricing, and convert more jobs</p>
             </div>
+            <div style={{ display: "flex", gap: "2px" }}>
+              {[1,2,3,4,5].map(i => <Star key={i} style={{ width: "14px", height: "14px", fill: "#16a34a", color: "#16a34a" }} />)}
+            </div>
+          </div>
+
+          {/* Proposal preview */}
+          <div style={{
+            borderRadius: "24px",
+            boxShadow: "0 8px 48px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05)",
+            overflow: "hidden",
+            marginBottom: "20px",
+            border: "1px solid rgba(0,0,0,0.06)",
+          }}>
+            <ProposalCard parsed={parsed} />
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={handleCopy}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl transition-colors"
-            >
-              {copied ? <><Check className="w-4 h-4 text-emerald-400" />Copied!</> : <><Copy className="w-4 h-4" />Copy Quote</>}
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
+            <button onClick={handleCopy} style={{
+              flex: 1, minWidth: "140px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              padding: "14px 20px", borderRadius: "14px", border: "none", cursor: "pointer",
+              background: "#0f172a", color: "#fff", fontSize: "14px", fontWeight: 700,
+              transition: "all 0.15s",
+            }}>
+              {copied ? <><Check style={{ width: "15px", height: "15px", color: "#4ade80" }} />Copied!</> : <><Copy style={{ width: "15px", height: "15px" }} />Copy Raw Text</>}
             </button>
-            <button
-              onClick={handlePDF}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 border-2 border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Save as PDF
+            <button onClick={handlePDF} style={{
+              flex: 1, minWidth: "140px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              padding: "14px 20px", borderRadius: "14px", cursor: "pointer",
+              background: "#fff", border: "2px solid #e2e8f0", color: "#374151", fontSize: "14px", fontWeight: 700,
+              transition: "all 0.15s",
+            }}>
+              <Download style={{ width: "15px", height: "15px" }} />Save as PDF
             </button>
           </div>
 
-          {/* Try again */}
-          <div className="text-center">
-            <button
-              onClick={() => { setOptimized(null); setQuoteText(""); clearImage(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-              className="text-sm text-gray-500 hover:text-gray-700 font-medium underline underline-offset-2 transition-colors"
-            >
+          <div style={{ textAlign: "center", marginBottom: "28px" }}>
+            <button onClick={() => { setOptimized(null); setParsed(null); setQuoteText(""); clearImage(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: "13px", color: "#94a3b8", textDecoration: "underline", textUnderlineOffset: "3px" }}>
               Optimize another quote
             </button>
           </div>
 
           {/* Conversion CTA */}
-          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 rounded-2xl p-8 text-center">
-            <p className="text-base font-bold text-gray-900 mb-1">
-              QuotePro sends quotes like this automatically
-            </p>
-            <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
-              In 60 seconds, from your phone, with built-in follow-up so you never lose a job to a faster competitor.
-            </p>
-            <a
-              href="/register"
-              className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-8 py-4 rounded-xl text-base transition-colors shadow-sm shadow-emerald-200"
-            >
-              Start My Free 7-Day Trial <ArrowRight className="w-5 h-5" />
-            </a>
-            <p className="text-xs text-gray-400 mt-3">No credit card required. Cancel anytime.</p>
+          <div style={{
+            background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)",
+            borderRadius: "20px", padding: "36px 40px", textAlign: "center",
+            position: "relative", overflow: "hidden",
+          }}>
+            <div style={{
+              position: "absolute", inset: 0, opacity: 0.05,
+              backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
+              backgroundSize: "20px 20px",
+            }} />
+            <div style={{ position: "relative" }}>
+              <p style={{ fontSize: "20px", fontWeight: 800, color: "#fff", marginBottom: "10px", lineHeight: 1.3 }}>
+                QuotePro sends quotes like this automatically
+              </p>
+              <p style={{ fontSize: "14px", color: "rgba(147,197,253,0.9)", maxWidth: "400px", margin: "0 auto 24px", lineHeight: 1.65 }}>
+                Beautiful proposals, auto follow-up, built-in CRM — from your phone, in 60 seconds.
+              </p>
+              <a href="/register" style={{
+                display: "inline-flex", alignItems: "center", gap: "8px",
+                background: "linear-gradient(135deg, #16a34a, #059669)",
+                color: "#fff", fontWeight: 800, padding: "14px 32px",
+                borderRadius: "14px", textDecoration: "none", fontSize: "15px",
+                boxShadow: "0 4px 20px rgba(22,163,74,0.4)",
+              }}>
+                Start My Free 7-Day Trial <ArrowRight style={{ width: "18px", height: "18px" }} />
+              </a>
+              <p style={{ fontSize: "12px", color: "rgba(148,163,184,0.8)", marginTop: "12px" }}>No credit card required. Cancel anytime.</p>
+            </div>
           </div>
 
           {/* Share */}
-          <div className="text-center">
-            <p className="text-sm text-gray-500 mb-3">
-              Know another cleaning business owner with a weak quote? Share Quote Doctor:
-            </p>
-            <button
-              onClick={copyShareLink}
-              className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl transition-colors"
-            >
-              <Share2 className="w-4 h-4" />
+          <div style={{ textAlign: "center", marginTop: "24px" }}>
+            <p style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "10px" }}>Know another cleaner with a weak quote? Share this tool:</p>
+            <button onClick={copyShareLink} style={{
+              display: "inline-flex", alignItems: "center", gap: "8px",
+              padding: "10px 20px", borderRadius: "12px", cursor: "pointer",
+              background: "#fff", border: "1.5px solid #e2e8f0", color: "#374151",
+              fontSize: "13px", fontWeight: 600, transition: "all 0.15s",
+            }}>
+              <Share2 style={{ width: "14px", height: "14px" }} />
               {linkCopied ? "Link copied!" : "Copy Share Link"}
             </button>
           </div>
         </div>
       )}
 
-      {/* Bottom sign-in link (before result) */}
+      {/* Bottom sign-in link */}
       {!optimized && (
-        <div className="max-w-2xl mx-auto px-4 pb-16 text-center">
-          <p className="text-sm text-gray-400 mb-2">Already using QuotePro?</p>
-          <a
-            href="/login"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            Sign in to your account <ChevronRight className="w-4 h-4" />
+        <div style={{ maxWidth: "600px", margin: "0 auto", padding: "0 24px 80px", textAlign: "center" }}>
+          <p style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "8px" }}>Already using QuotePro?</p>
+          <a href="/login" style={{
+            display: "inline-flex", alignItems: "center", gap: "6px",
+            fontSize: "14px", fontWeight: 700, color: "#374151", textDecoration: "none",
+          }}>
+            Sign in to your account <ChevronRight style={{ width: "15px", height: "15px" }} />
           </a>
         </div>
       )}
