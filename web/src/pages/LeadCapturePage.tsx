@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "../components/ui";
+import QRCode from "qrcode";
 import {
   Link2, Copy, Check, ToggleLeft, ToggleRight, ExternalLink, Code2,
-  Globe, Search, Instagram, Mail, MessageCircle,
+  Globe, Search, Instagram, Mail, MessageCircle, Download, QrCode,
+  Printer,
 } from "lucide-react";
 
 interface LeadCaptureSettings {
@@ -26,7 +28,10 @@ export default function LeadCapturePage() {
   const [btnRadius, setBtnRadius] = useState(8);
   const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "error">("idle");
   const [copied, setCopied] = useState<"link" | "code" | null>(null);
+  const [qrColor, setQrColor] = useState("#1e293b");
   const checkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+  const qrSize = 220;
 
   useEffect(() => {
     if (settings) {
@@ -34,6 +39,51 @@ export default function LeadCapturePage() {
       setButtonTextInput(settings.buttonText || "Get a Free Quote");
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (!qrCanvasRef.current || !settings?.publicUrl) return;
+    QRCode.toCanvas(qrCanvasRef.current, settings.publicUrl, {
+      width: qrSize,
+      margin: 2,
+      color: { dark: qrColor, light: "#ffffff" },
+      errorCorrectionLevel: "H",
+    }).catch(() => {});
+  }, [settings?.publicUrl, qrColor, qrSize]);
+
+  const handleDownloadQR = () => {
+    if (!qrCanvasRef.current || !settings?.publicUrl) return;
+    const slug = settings.slug || "quote-link";
+
+    // Build a higher-res offscreen canvas with padding + label
+    const padding = 32;
+    const labelHeight = 48;
+    const size = qrSize + padding * 2;
+    const totalHeight = size + labelHeight;
+
+    const offscreen = document.createElement("canvas");
+    offscreen.width = size;
+    offscreen.height = totalHeight;
+    const ctx = offscreen.getContext("2d")!;
+
+    // White background
+    ctx.fillStyle = "#ffffff";
+    ctx.roundRect(0, 0, size, totalHeight, 16);
+    ctx.fill();
+
+    // Draw the rendered QR canvas onto offscreen
+    ctx.drawImage(qrCanvasRef.current, padding, padding, qrSize, qrSize);
+
+    // URL label underneath
+    ctx.fillStyle = "#64748b";
+    ctx.font = "bold 13px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(settings.publicUrl.replace(/^https?:\/\//, ""), size / 2, size + 26);
+
+    const link = document.createElement("a");
+    link.download = `quotepro-qr-${slug}.png`;
+    link.href = offscreen.toDataURL("image/png");
+    link.click();
+  };
 
   const updateMutation = useMutation({
     mutationFn: async (updates: Partial<{ slug: string; enabled: boolean; buttonText: string }>) => {
@@ -199,6 +249,99 @@ export default function LeadCapturePage() {
                 {label}
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* QR Code for Print */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+        <div>
+          <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+            <QrCode className="w-4 h-4 text-blue-600" />
+            QR Code for Flyers &amp; Brochures
+          </h3>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Customers scan it with their phone camera to request a quote instantly. Download and drop it on any printed material.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-6 items-start">
+          {/* QR preview */}
+          <div className="flex flex-col items-center gap-2 flex-shrink-0">
+            <div className="border-2 border-slate-200 rounded-xl p-3 bg-white shadow-sm">
+              <canvas ref={qrCanvasRef} style={{ display: "block", borderRadius: 6 }} />
+            </div>
+            <p className="text-[11px] text-slate-400 text-center max-w-[180px] leading-relaxed">
+              Scan to test — goes to your live quote link
+            </p>
+          </div>
+
+          {/* Controls */}
+          <div className="flex-1 space-y-4 w-full">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">QR Color</label>
+              <div className="flex items-center gap-3">
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { label: "Dark", color: "#1e293b" },
+                    { label: "Blue", color: "#1d4ed8" },
+                    { label: "Green", color: "#059669" },
+                    { label: "Black", color: "#000000" },
+                  ].map(({ label, color }) => (
+                    <button
+                      key={color}
+                      onClick={() => setQrColor(color)}
+                      title={label}
+                      className={`w-8 h-8 rounded-lg border-2 transition-all ${qrColor === color ? "border-blue-500 scale-110" : "border-slate-200 hover:border-slate-400"}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={qrColor}
+                      onChange={e => setQrColor(e.target.value)}
+                      className="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer"
+                      title="Custom color"
+                    />
+                    <span className="text-xs text-slate-400">Custom</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border border-slate-100 rounded-xl bg-slate-50 p-4 space-y-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                <Printer className="w-3.5 h-3.5" />
+                Print ideas
+              </p>
+              <ul className="space-y-1">
+                {[
+                  "Door hangers with before/after cleaning photos",
+                  "Business cards with QR in the corner",
+                  "Yard signs after a job",
+                  "Vehicle magnets",
+                  "Mailer postcards to neighborhoods",
+                ].map(tip => (
+                  <li key={tip} className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <span className="w-1 h-1 rounded-full bg-blue-400 flex-shrink-0" />
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <button
+              onClick={handleDownloadQR}
+              disabled={!settings?.publicUrl}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download className="w-4 h-4" />
+              Download QR Code (PNG)
+            </button>
+            <p className="text-xs text-slate-400">
+              High-quality PNG — ready for print at any size. The QR code links directly to your unique quote request page.
+            </p>
           </div>
         </div>
       </div>
