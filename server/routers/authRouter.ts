@@ -171,6 +171,12 @@ const router = Router();
         return res.status(400).json({ message: "Email and password are required" });
       }
 
+      // Deactivated demo accounts
+      const DEACTIVATED_EMAILS = ["demo@quotepro.com", "todo@quotepro.com"];
+      if (DEACTIVATED_EMAILS.includes(email.toLowerCase().trim())) {
+        return res.status(401).json({ message: "This account has been deactivated. Please create your own account to continue." });
+      }
+
       const user = await getUserByEmail(email);
       if (!user || !user.passwordHash) {
         return res.status(401).json({ message: "Invalid email or password" });

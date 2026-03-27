@@ -438,8 +438,7 @@ async function seedToDoDemo() {
 
   setupErrorHandler(app);
 
-  await seedDemoUser();
-  await seedToDoDemo();
+  // Demo accounts disabled — credentials no longer seeded on startup
 
   // ─── Nightly auto-purge: hard-delete records soft-deleted more than 30 days ago ──
   async function purgeSoftDeleted() {
