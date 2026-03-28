@@ -849,29 +849,15 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       const sqft = propertyDetails.sqft;
       
       const options = (quote.options as any) || {};
-      const optionsArray = [
-        {
-          key: 'good',
-          label: 'Good',
-          name: options.good?.name || 'Good',
-          scope: options.good?.scope || '',
-          price: options.good?.price || 0,
-        },
-        {
-          key: 'better',
-          label: 'Better',
-          name: options.better?.name || 'Better',
-          scope: options.better?.scope || '',
-          price: options.better?.price || 0,
-        },
-        {
-          key: 'best',
-          label: 'Best',
-          name: options.best?.name || 'Best',
-          scope: options.best?.scope || '',
-          price: options.best?.price || 0,
-        },
-      ];
+      const optionsArray = (["good", "better", "best"] as const)
+        .filter(k => options[k] !== undefined)
+        .map(k => ({
+          key: k as string,
+          label: k.charAt(0).toUpperCase() + k.slice(1),
+          name: options[k]?.name || options[k]?.serviceTypeName || (k.charAt(0).toUpperCase() + k.slice(1)),
+          scope: options[k]?.scope || '',
+          price: Number(options[k]?.price || 0),
+        }));
 
       // Property info section
       const propertyInfoHtml = (beds || baths || sqft) ? `
@@ -1063,10 +1049,22 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
       };
       const toneDesc = toneMap[tone] || toneMap.professional;
 
-      const systemPrompt = `You are a sales email writer for ${companyName}, a residential cleaning company. Write emails in a ${toneDesc} tone. Keep the email under 150 words. No emojis. Sound human, not like a template. Start directly — no "I hope this email finds you well." Return a JSON object with two fields: "subject" (string) and "body" (string, plain text with newlines).`;
+      const allOptions = (quote.options as any) || {};
+      const optionLines = (["good", "better", "best"] as const)
+        .filter(k => allOptions[k] !== undefined)
+        .map(k => {
+          const o = allOptions[k];
+          const name = o.name || o.serviceTypeName || k;
+          const price = Number(o.price || 0);
+          const isRec = k === recommendedKey;
+          return `  - ${name}: $${price.toFixed(0)}${isRec ? " (recommended)" : ""}`;
+        })
+        .join("\n");
+
+      const systemPrompt = `You are a sales email writer for ${companyName}, a residential cleaning company. Write emails in a ${toneDesc} tone. Keep the email under 160 words. No emojis. Sound human, not like a template. Start directly — no "I hope this email finds you well." Return a JSON object with two fields: "subject" (string) and "body" (string, plain text with newlines). IMPORTANT: Do NOT repeat the specific prices in the email body — the quote email already includes clickable option cards showing each price. Instead, reference the package names and invite the customer to choose.`;
 
       const userPrompt = `Write a quote email to ${customerName}:
-- Recommended plan: "${selectedOption.name || "Standard Clean"}" at $${total.toFixed(0)}
+${optionLines ? `- Packages included in this quote:\n${optionLines}` : `- Recommended plan: "${selectedOption.name || "Standard Clean"}" (recommended)`}
 - Frequency: ${frequency}
 - Property: ${propertyDetails.beds ? `${propertyDetails.beds} bed` : ""} ${propertyDetails.baths ? `${propertyDetails.baths} bath` : ""}${propertyDetails.sqft ? ` ${propertyDetails.sqft} sqft` : ""}
 ${expirationStr ? `- Quote expires: ${expirationStr}` : ""}
@@ -1075,10 +1073,11 @@ ${extraInstructions ? `- Extra context: ${extraInstructions}` : ""}
 
 The email should:
 1. Greet ${customerName} by name
-2. Reference their quote and the recommended package
-3. Create gentle urgency around the expiration if applicable
-4. Invite them to reply with questions
-5. Sign off warmly from ${senderName}`;
+2. Let them know their quote includes ${optionLines ? "multiple package options to choose from" : "a cleaning package"} — the option cards below the email body will show the full details and pricing
+3. Highlight the recommended package by name (not price)
+4. Create gentle urgency around the expiration if applicable
+5. Invite them to reply with questions
+6. Sign off warmly from ${senderName}`;
 
       try {
         const completion = await openai.chat.completions.create({
@@ -1136,11 +1135,15 @@ The email should:
       const sqft = propertyDetails.sqft;
       
       const options = (quote.options as any) || {};
-      const optionsArray = [
-        { key: 'good', label: 'Good', name: options.good?.name || 'Good', scope: options.good?.scope || '', price: options.good?.price || 0 },
-        { key: 'better', label: 'Better', name: options.better?.name || 'Better', scope: options.better?.scope || '', price: options.better?.price || 0 },
-        { key: 'best', label: 'Best', name: options.best?.name || 'Best', scope: options.best?.scope || '', price: options.best?.price || 0 },
-      ];
+      const optionsArray = (["good", "better", "best"] as const)
+        .filter(k => options[k] !== undefined)
+        .map(k => ({
+          key: k as string,
+          label: k.charAt(0).toUpperCase() + k.slice(1),
+          name: options[k]?.name || options[k]?.serviceTypeName || (k.charAt(0).toUpperCase() + k.slice(1)),
+          scope: options[k]?.scope || '',
+          price: Number(options[k]?.price || 0),
+        }));
 
       const propertyInfoHtml = (beds || baths || sqft) ? `
       <tr><td align="center" style="padding:24px 20px;background-color:#ffffff;border-bottom:1px solid #eeeeee;">
