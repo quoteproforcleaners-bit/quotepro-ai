@@ -35,6 +35,8 @@ import {
   getLostEmailTemplate,
 } from "@/lib/messageTemplates";
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
 interface DormantCustomer {
   id: string;
   firstName: string;
@@ -66,7 +68,20 @@ interface Preferences {
 
 type TabType = "dormant" | "lost";
 
+// ── Constants ──────────────────────────────────────────────────────────────
+
 const THRESHOLD_OPTIONS = [60, 90, 120];
+
+/** Recovery value estimated as 25% of a dormant customer's average ticket. */
+const DORMANT_RECOVERY_RATE = 0.25;
+
+/** Recovery value for a declined quote (10% of quote total). */
+const LOST_DECLINED_RECOVERY_RATE = 0.10;
+
+/** Recovery value for an expired quote (20% of quote total). */
+const LOST_EXPIRED_RECOVERY_RATE = 0.20;
+
+// ── Helper Functions ───────────────────────────────────────────────────────
 
 function getDaysAgo(dateStr: string): string {
   const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
@@ -79,13 +94,14 @@ function getDaysAgo(dateStr: string): string {
 }
 
 function getDormantEstimate(avgTicket: number | null): number {
-  return (avgTicket || 150) * 0.25;
+  return (avgTicket || 150) * DORMANT_RECOVERY_RATE;
 }
 
 function getLostEstimate(total: number, status: string): number {
-  return status === "expired" ? total * 0.20 : total * 0.10;
+  return status === "expired"
+    ? total * LOST_EXPIRED_RECOVERY_RATE
+    : total * LOST_DECLINED_RECOVERY_RATE;
 }
-
 
 function getLostDisplayName(item: LostQuote): string {
   if (item.customerFirstName) {
@@ -122,6 +138,7 @@ function getLostEmail(item: LostQuote): string | null {
   return null;
 }
 
+// ── Sub-components ─────────────────────────────────────────────────────────
 
 function ActionButton({
   icon,
@@ -151,6 +168,8 @@ function ActionButton({
     </Pressable>
   );
 }
+
+// ── Main Screen ────────────────────────────────────────────────────────────
 
 export default function OpportunitiesScreen() {
   const insets = useSafeAreaInsets();
@@ -200,12 +219,8 @@ export default function OpportunitiesScreen() {
 
   const estimatedRecoverable = useMemo(() => {
     let total = 0;
-    dormant.forEach((c) => {
-      total += getDormantEstimate(c.avgTicket);
-    });
-    lost.forEach((q) => {
-      total += getLostEstimate(q.total, q.status);
-    });
+    dormant.forEach((c) => { total += getDormantEstimate(c.avgTicket); });
+    lost.forEach((q) => { total += getLostEstimate(q.total, q.status); });
     return Math.round(total);
   }, [dormant, lost]);
 
@@ -338,24 +353,9 @@ export default function OpportunitiesScreen() {
           </View>
         </View>
         <View style={styles.actionsRow}>
-          <ActionButton
-            icon="message-square"
-            label="Text"
-            onPress={() => handleDormantText(item)}
-            color={theme.primary}
-          />
-          <ActionButton
-            icon="mail"
-            label="Email"
-            onPress={() => handleDormantEmail(item)}
-            color={theme.primary}
-          />
-          <ActionButton
-            icon="slash"
-            label="DNC"
-            onPress={() => handleDnc(item.id, `${item.firstName} ${item.lastName}`)}
-            color={theme.error}
-          />
+          <ActionButton icon="message-square" label="Text" onPress={() => handleDormantText(item)} color={theme.primary} />
+          <ActionButton icon="mail" label="Email" onPress={() => handleDormantEmail(item)} color={theme.primary} />
+          <ActionButton icon="slash" label="DNC" onPress={() => handleDnc(item.id, `${item.firstName} ${item.lastName}`)} color={theme.error} />
         </View>
       </Card>
     );
@@ -396,30 +396,10 @@ export default function OpportunitiesScreen() {
           </View>
         </View>
         <View style={styles.actionsRow}>
-          <ActionButton
-            icon="message-square"
-            label="Text"
-            onPress={() => handleLostText(item)}
-            color={theme.primary}
-          />
-          <ActionButton
-            icon="mail"
-            label="Email"
-            onPress={() => handleLostEmail(item)}
-            color={theme.primary}
-          />
-          <ActionButton
-            icon="check"
-            label="Attempted"
-            onPress={() => handleMarkAttempted(item.id)}
-            color={theme.success}
-          />
-          <ActionButton
-            icon="slash"
-            label="DNC"
-            onPress={() => handleDnc(item.customerId, displayName)}
-            color={theme.error}
-          />
+          <ActionButton icon="message-square" label="Text" onPress={() => handleLostText(item)} color={theme.primary} />
+          <ActionButton icon="mail" label="Email" onPress={() => handleLostEmail(item)} color={theme.primary} />
+          <ActionButton icon="check" label="Attempted" onPress={() => handleMarkAttempted(item.id)} color={theme.success} />
+          <ActionButton icon="slash" label="DNC" onPress={() => handleDnc(item.customerId, displayName)} color={theme.error} />
         </View>
       </Card>
     );
@@ -430,215 +410,208 @@ export default function OpportunitiesScreen() {
 
   return (
     <ProGate featureName="Opportunities">
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <FlatList
-        data={listData as any[]}
-        keyExtractor={(item: any) => activeTab === "dormant" ? item.id : `lost-${item.id}`}
-        renderItem={activeTab === "dormant" ? renderDormantItem as any : renderLostItem as any}
-        contentContainerStyle={[
-          styles.listContent,
-          {
-            paddingTop: headerHeight + Spacing.md,
-            paddingBottom: insets.bottom + Spacing.xl,
-          },
-          ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
-        ]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListHeaderComponent={
-          <View>
-            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: theme.primary + "10", borderWidth: 1, borderColor: theme.primary + "25", borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.md, gap: Spacing.sm }}>
-              <Feather name="info" size={15} color={theme.primary} style={{ marginTop: 1 }} />
-              <View style={{ flex: 1 }}>
-                <ThemedText type="small" style={{ color: theme.textSecondary, lineHeight: 18 }}>
-                  Reach out to individual customers below, or create a bulk email campaign to contact everyone at once.
-                </ThemedText>
-              </View>
-              <Pressable
-                onPress={() => navigation.navigate("ReactivationCampaigns" as any)}
-                style={{ backgroundColor: theme.primary, borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 4 }}
-              >
-                <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "700" }}>Campaigns</ThemedText>
-                <Feather name="arrow-right" size={12} color="#FFFFFF" />
-              </Pressable>
-            </View>
-
-            <Card style={[styles.summaryCard, { borderWidth: 1.5, borderColor: theme.primary }]}>
-              <View style={styles.summaryRow}>
-                <View style={[styles.summaryIcon, { backgroundColor: `${theme.primary}15` }]}>
-                  <Feather name="target" size={22} color={theme.primary} />
-                </View>
+      <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+        <FlatList
+          data={listData as any[]}
+          keyExtractor={(item: any) => activeTab === "dormant" ? item.id : `lost-${item.id}`}
+          renderItem={activeTab === "dormant" ? renderDormantItem as any : renderLostItem as any}
+          contentContainerStyle={[
+            styles.listContent,
+            {
+              paddingTop: headerHeight + Spacing.md,
+              paddingBottom: insets.bottom + Spacing.xl,
+            },
+            ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
+          ]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListHeaderComponent={
+            <View>
+              <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: theme.primary + "10", borderWidth: 1, borderColor: theme.primary + "25", borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.md, gap: Spacing.sm }}>
+                <Feather name="info" size={15} color={theme.primary} style={{ marginTop: 1 }} />
                 <View style={{ flex: 1 }}>
-                  <ThemedText type="subtitle" style={{ fontWeight: "600" }}>
-                    {`Reactivation Opportunities: ${totalCount}`}
-                  </ThemedText>
-                  <ThemedText type="h4" style={{ color: theme.success, marginTop: 2 }}>
-                    {`Estimated Recoverable: $${estimatedRecoverable.toLocaleString()}`}
+                  <ThemedText type="small" style={{ color: theme.textSecondary, lineHeight: 18 }}>
+                    Reach out to individual customers below, or create a bulk email campaign to contact everyone at once.
                   </ThemedText>
                 </View>
-              </View>
-            </Card>
-
-            <View style={styles.tabRow}>
-              <Pressable
-                onPress={() => setActiveTab("dormant")}
-                style={[
-                  styles.tab,
-                  activeTab === "dormant"
-                    ? { backgroundColor: theme.primary }
-                    : { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" },
-                ]}
-                testID="tab-dormant"
-              >
-                <ThemedText
-                  type="small"
-                  style={{
-                    color: activeTab === "dormant" ? "#FFFFFF" : theme.textSecondary,
-                    fontWeight: "600",
-                  }}
-                >
-                  {`Dormant (${dormant.length})`}
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                onPress={() => setActiveTab("lost")}
-                style={[
-                  styles.tab,
-                  activeTab === "lost"
-                    ? { backgroundColor: theme.primary }
-                    : { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" },
-                ]}
-                testID="tab-lost"
-              >
-                <ThemedText
-                  type="small"
-                  style={{
-                    color: activeTab === "lost" ? "#FFFFFF" : theme.textSecondary,
-                    fontWeight: "600",
-                  }}
-                >
-                  {`Lost Quotes (${lost.length})`}
-                </ThemedText>
-              </Pressable>
-            </View>
-
-            {activeTab === "dormant" ? (
-              <View style={styles.filterRow}>
-                <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                  {"Inactive for at least:"}
-                </ThemedText>
                 <Pressable
-                  onPress={() => setShowThresholdPicker(!showThresholdPicker)}
-                  style={[styles.filterBtn, { borderColor: theme.border }]}
-                  testID="threshold-picker"
+                  onPress={() => navigation.navigate("ReactivationCampaigns" as any)}
+                  style={{ backgroundColor: theme.primary, borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 4 }}
                 >
-                  <ThemedText type="small" style={{ fontWeight: "500" }}>
-                    {`${thresholdDays} days`}
-                  </ThemedText>
-                  <Feather name="chevron-down" size={14} color={theme.textSecondary} />
+                  <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "700" }}>Campaigns</ThemedText>
+                  <Feather name="arrow-right" size={12} color="#FFFFFF" />
                 </Pressable>
-                {showThresholdPicker ? (
-                  <View style={[styles.dropdownMenu, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                    {THRESHOLD_OPTIONS.map((opt) => (
-                      <Pressable
-                        key={opt}
-                        onPress={() => {
-                          setThresholdDays(opt);
-                          setShowThresholdPicker(false);
-                        }}
-                        style={[
-                          styles.dropdownItem,
-                          opt === thresholdDays ? { backgroundColor: `${theme.primary}15` } : {},
-                        ]}
-                        testID={`threshold-${opt}`}
-                      >
-                        <ThemedText
-                          type="small"
-                          style={{
-                            fontWeight: opt === thresholdDays ? "600" : "400",
-                            color: opt === thresholdDays ? theme.primary : theme.text,
-                          }}
-                        >
-                          {`${opt} days`}
-                        </ThemedText>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
               </View>
-            ) : null}
-          </View>
-        }
-        ListEmptyComponent={
-          isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={theme.primary} />
-            </View>
-          ) : activeTab === "dormant" ? (
-            <ActionEmptyState
-              icon="users"
-              title="No dormant customers yet"
-              description="As you complete jobs, past clients who haven't rebooked will appear here."
-              ctaLabel="Schedule a Job"
-              onCta={() => navigation.navigate("Main", { screen: "JobsTab" })}
-              testID="empty-dormant"
-            />
-          ) : (
-            <ActionEmptyState
-              icon="file-text"
-              title="No lost quotes"
-              description="When sent quotes expire without a response, they'll appear here for recovery."
-              ctaLabel="Send a Quote"
-              onCta={() => navigation.navigate("QuoteCalculator")}
-              testID="empty-lost-quotes"
-            />
-          )
-        }
-      />
 
-      <Modal
-        visible={dncModalCustomer !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDncModalCustomer(null)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setDncModalCustomer(null)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
-            <View style={[styles.modalIcon, { backgroundColor: `${theme.error}15` }]}>
-              <Feather name="slash" size={28} color={theme.error} />
+              <Card style={[styles.summaryCard, { borderWidth: 1.5, borderColor: theme.primary }]}>
+                <View style={styles.summaryRow}>
+                  <View style={[styles.summaryIcon, { backgroundColor: `${theme.primary}15` }]}>
+                    <Feather name="target" size={22} color={theme.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText type="subtitle" style={{ fontWeight: "600" }}>
+                      {`Reactivation Opportunities: ${totalCount}`}
+                    </ThemedText>
+                    <ThemedText type="h4" style={{ color: theme.success, marginTop: 2 }}>
+                      {`Estimated Recoverable: $${estimatedRecoverable.toLocaleString()}`}
+                    </ThemedText>
+                  </View>
+                </View>
+              </Card>
+
+              <View style={styles.tabRow}>
+                <Pressable
+                  onPress={() => setActiveTab("dormant")}
+                  style={[
+                    styles.tab,
+                    activeTab === "dormant"
+                      ? { backgroundColor: theme.primary }
+                      : { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" },
+                  ]}
+                  testID="tab-dormant"
+                >
+                  <ThemedText
+                    type="small"
+                    style={{ color: activeTab === "dormant" ? "#FFFFFF" : theme.textSecondary, fontWeight: "600" }}
+                  >
+                    {`Dormant (${dormant.length})`}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => setActiveTab("lost")}
+                  style={[
+                    styles.tab,
+                    activeTab === "lost"
+                      ? { backgroundColor: theme.primary }
+                      : { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" },
+                  ]}
+                  testID="tab-lost"
+                >
+                  <ThemedText
+                    type="small"
+                    style={{ color: activeTab === "lost" ? "#FFFFFF" : theme.textSecondary, fontWeight: "600" }}
+                  >
+                    {`Lost Quotes (${lost.length})`}
+                  </ThemedText>
+                </Pressable>
+              </View>
+
+              {activeTab === "dormant" ? (
+                <View style={styles.filterRow}>
+                  <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                    {"Inactive for at least:"}
+                  </ThemedText>
+                  <Pressable
+                    onPress={() => setShowThresholdPicker(!showThresholdPicker)}
+                    style={[styles.filterBtn, { borderColor: theme.border }]}
+                    testID="threshold-picker"
+                  >
+                    <ThemedText type="small" style={{ fontWeight: "500" }}>
+                      {`${thresholdDays} days`}
+                    </ThemedText>
+                    <Feather name="chevron-down" size={14} color={theme.textSecondary} />
+                  </Pressable>
+                  {showThresholdPicker ? (
+                    <View style={[styles.dropdownMenu, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                      {THRESHOLD_OPTIONS.map((opt) => (
+                        <Pressable
+                          key={opt}
+                          onPress={() => { setThresholdDays(opt); setShowThresholdPicker(false); }}
+                          style={[
+                            styles.dropdownItem,
+                            opt === thresholdDays ? { backgroundColor: `${theme.primary}15` } : {},
+                          ]}
+                          testID={`threshold-${opt}`}
+                        >
+                          <ThemedText
+                            type="small"
+                            style={{
+                              fontWeight: opt === thresholdDays ? "600" : "400",
+                              color: opt === thresholdDays ? theme.primary : theme.text,
+                            }}
+                          >
+                            {`${opt} days`}
+                          </ThemedText>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
-            <ThemedText type="h4" style={{ textAlign: "center", marginTop: Spacing.md }}>
-              {"Mark as Do Not Contact?"}
-            </ThemedText>
-            <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
-              {dncModalCustomer ? `${dncModalCustomer.name} will be removed from outreach lists.` : ""}
-            </ThemedText>
-            <View style={styles.modalActions}>
-              <Pressable
-                onPress={() => setDncModalCustomer(null)}
-                style={[styles.modalBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }]}
-                testID="dnc-cancel"
-              >
-                <ThemedText type="subtitle" style={{ fontWeight: "600" }}>
-                  {"Cancel"}
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                onPress={confirmDnc}
-                style={[styles.modalBtn, { backgroundColor: theme.error }]}
-                testID="dnc-confirm"
-              >
-                <ThemedText type="subtitle" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-                  {"Confirm"}
-                </ThemedText>
-              </Pressable>
-            </View>
+          }
+          ListEmptyComponent={
+            isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.primary} />
+              </View>
+            ) : activeTab === "dormant" ? (
+              <ActionEmptyState
+                icon="users"
+                title="No dormant customers yet"
+                description="As you complete jobs, past clients who haven't rebooked will appear here."
+                ctaLabel="Schedule a Job"
+                onCta={() => navigation.navigate("Main", { screen: "JobsTab" })}
+                testID="empty-dormant"
+              />
+            ) : (
+              <ActionEmptyState
+                icon="file-text"
+                title="No lost quotes"
+                description="When sent quotes expire without a response, they'll appear here for recovery."
+                ctaLabel="Send a Quote"
+                onCta={() => navigation.navigate("QuoteCalculator")}
+                testID="empty-lost-quotes"
+              />
+            )
+          }
+        />
+
+        <Modal
+          visible={dncModalCustomer !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDncModalCustomer(null)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setDncModalCustomer(null)}>
+            <Pressable style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
+              <View style={[styles.modalIcon, { backgroundColor: `${theme.error}15` }]}>
+                <Feather name="slash" size={28} color={theme.error} />
+              </View>
+              <ThemedText type="h4" style={{ textAlign: "center", marginTop: Spacing.md }}>
+                {"Mark as Do Not Contact?"}
+              </ThemedText>
+              <ThemedText type="body" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
+                {dncModalCustomer ? `${dncModalCustomer.name} will be removed from outreach lists.` : ""}
+              </ThemedText>
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={() => setDncModalCustomer(null)}
+                  style={[styles.modalBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }]}
+                  testID="dnc-cancel"
+                >
+                  <ThemedText type="subtitle" style={{ fontWeight: "600" }}>
+                    {"Cancel"}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={confirmDnc}
+                  style={[styles.modalBtn, { backgroundColor: theme.error }]}
+                  testID="dnc-confirm"
+                >
+                  <ThemedText type="subtitle" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                    {"Confirm"}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
     </ProGate>
   );
 }
+
+// ── Styles ─────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
