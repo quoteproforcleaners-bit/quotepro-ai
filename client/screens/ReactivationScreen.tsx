@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   StyleSheet,
-  FlatList,
   RefreshControl,
   Modal,
   TextInput,
@@ -14,6 +13,7 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -67,8 +67,8 @@ export default function ReactivationScreen() {
   const { requestConsent } = useAIConsent();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
+  const navigation = useNavigation<any>();
 
-  const [segment, setSegment] = useState<"dormant" | "lost">("dormant");
   const [modalVisible, setModalVisible] = useState(false);
   const [modalStep, setModalStep] = useState<"templates" | "custom" | "customize">("templates");
   const [campaignName, setCampaignName] = useState("");
@@ -90,14 +90,9 @@ export default function ReactivationScreen() {
   const [editingContent, setEditingContent] = useState("");
   const [hasUnsavedEdits, setHasUnsavedEdits] = useState(false);
 
-  const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"], enabled: segment === "dormant" });
-  const lostQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/lost"], enabled: segment === "lost" });
+  const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"] });
   const customersQuery = useQuery<any[]>({ queryKey: ["/api/customers"] });
   const campaignsQuery = useQuery<any[]>({ queryKey: ["/api/campaigns"] });
-
-  const data = segment === "dormant" ? dormantQuery.data : lostQuery.data;
-  const isLoading = segment === "dormant" ? dormantQuery.isLoading : lostQuery.isLoading;
-  const isRefetching = segment === "dormant" ? dormantQuery.isRefetching : lostQuery.isRefetching;
 
   const totalDormant = dormantQuery.data?.length ?? 0;
   const estimatedValue = dormantQuery.data?.reduce((sum: number, c: any) => sum + (c.avgTicket ?? 0), 0) ?? 0;
@@ -132,27 +127,6 @@ export default function ReactivationScreen() {
     setSelectedCustomerIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
-  };
-
-  const handleReachOut = async (item: any) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await apiRequest("POST", "/api/growth-tasks", {
-      type: "REACTIVATION",
-      customerId: item.customerId ?? item.id,
-      estimatedValue: item.avgTicket,
-    });
-    queryClient.invalidateQueries({ queryKey: ["/api/opportunities/dormant"] });
-  };
-
-  const handleRecover = async (item: any) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await apiRequest("POST", "/api/growth-tasks", {
-      type: "ABANDONED_RECOVERY",
-      customerId: item.customerId ?? item.id,
-      quoteId: item.quoteId ?? item.id,
-      estimatedValue: item.total,
-    });
-    queryClient.invalidateQueries({ queryKey: ["/api/opportunities/lost"] });
   };
 
   const buildFullPrompt = () => {
@@ -282,71 +256,6 @@ export default function ReactivationScreen() {
     setSelectedPromptChips([]);
     setCustomPrompt("");
   };
-
-  const refetch = () => {
-    if (segment === "dormant") dormantQuery.refetch();
-    else lostQuery.refetch();
-  };
-
-  const renderDormantItem = ({ item }: { item: any }) => (
-    <Card style={styles.listCard}>
-      <View style={styles.itemRow}>
-        <View style={{ flex: 1 }}>
-          <ThemedText type="subtitle">{item.customerName ?? item.name}</ThemedText>
-          <ThemedText type="caption" style={{ color: dt.textSecondary }}>
-            Last job: {item.lastJobDate ?? "N/A"}
-          </ThemedText>
-          <ThemedText type="small" style={{ color: dt.accent }}>
-            Avg ticket: ${item.avgTicket?.toFixed(0) ?? "0"}
-          </ThemedText>
-        </View>
-        <Pressable
-          testID={`button-reach-out-${item.id}`}
-          onPress={() => handleReachOut(item)}
-          style={[styles.actionBtn, { backgroundColor: dt.accentSoft }]}
-        >
-          <Feather name="phone" size={14} color={dt.accent} />
-          <ThemedText type="caption" style={{ color: dt.accent, marginLeft: 4 }}>Reach Out</ThemedText>
-        </Pressable>
-      </View>
-    </Card>
-  );
-
-  const renderLostItem = ({ item }: { item: any }) => (
-    <Card style={styles.listCard}>
-      <View style={styles.itemRow}>
-        <View style={{ flex: 1 }}>
-          <ThemedText type="subtitle">{item.customerName ?? item.name}</ThemedText>
-          <ThemedText type="caption" style={{ color: dt.textSecondary }}>
-            Total: ${item.total?.toFixed(0) ?? "0"}
-          </ThemedText>
-          <View style={[styles.statusBadge, { backgroundColor: item.status === "expired" ? theme.warning + "20" : theme.error + "20" }]}>
-            <ThemedText type="caption" style={{ color: item.status === "expired" ? theme.warning : theme.error }}>
-              {item.status ?? "expired"}
-            </ThemedText>
-          </View>
-        </View>
-        <Pressable
-          testID={`button-recover-${item.id}`}
-          onPress={() => handleRecover(item)}
-          style={[styles.actionBtn, { backgroundColor: theme.success + "15" }]}
-        >
-          <Feather name="refresh-cw" size={14} color={theme.success} />
-          <ThemedText type="caption" style={{ color: theme.success, marginLeft: 4 }}>Recover</ThemedText>
-        </Pressable>
-      </View>
-    </Card>
-  );
-
-  const SegmentOption = ({ label, value }: { label: string; value: "dormant" | "lost" }) => (
-    <Pressable
-      testID={`tab-${value}`}
-      onPress={() => setSegment(value)}
-      style={[styles.segmentTab, segment === value ? { backgroundColor: dt.accent } : { backgroundColor: dt.surfaceSecondary }]}
-    >
-      <ThemedText type="small" style={{ color: segment === value ? "#FFFFFF" : dt.textPrimary }}>{label}</ThemedText>
-    </Pressable>
-  );
 
   const renderTemplatesStep = () => {
     if (generatingContent) return (
@@ -579,104 +488,91 @@ export default function ReactivationScreen() {
   return (
     <ProGate featureName="Reactivation Campaigns">
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
-      <FlatList
-        data={data ?? []}
-        keyExtractor={(item, i) => item.id?.toString() ?? i.toString()}
-        renderItem={segment === "dormant" ? renderDormantItem : renderLostItem}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={dt.accent} />}
+      <ScrollView
+        refreshControl={<RefreshControl refreshing={dormantQuery.isRefetching} onRefresh={() => { dormantQuery.refetch(); campaignsQuery.refetch(); }} tintColor={dt.accent} />}
         contentContainerStyle={{ paddingTop: headerHeight + Spacing.xl, paddingBottom: insets.bottom + 100, paddingHorizontal: Spacing.lg, ...(useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined) }}
-        ListHeaderComponent={
-          <>
-            <Card style={{ marginBottom: Spacing.md, padding: Spacing.md }}>
-              <View style={{ flexDirection: "row", alignItems: "flex-start", gap: Spacing.sm }}>
-                <Feather name="info" size={16} color={dt.accent} style={{ marginTop: 2 }} />
-                <View style={{ flex: 1 }}>
-                  <ThemedText type="small" style={{ color: dt.textSecondary, lineHeight: 20, marginBottom: Spacing.sm }}>
-                    <ThemedText type="small" style={{ fontWeight: "700", color: dt.textPrimary }}>Dormant Customers</ThemedText>
-                    {" "}are customers who had a completed job but haven't booked again in over 60 days. They already know your work and are the easiest to win back.
-                  </ThemedText>
-                  <ThemedText type="small" style={{ color: dt.textSecondary, lineHeight: 20 }}>
-                    <ThemedText type="small" style={{ fontWeight: "700", color: dt.textPrimary }}>Lost Quotes</ThemedText>
-                    {" "}are quotes you sent that were never accepted and have since expired (over 30 days old). A quick follow-up can often recover this revenue.
-                  </ThemedText>
-                </View>
-              </View>
-            </Card>
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Cross-link banner */}
+        <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: dt.accent + "10", borderWidth: 1, borderColor: dt.accent + "25", borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.md, gap: Spacing.sm }}>
+          <Feather name="info" size={15} color={dt.accent} style={{ marginTop: 1 }} />
+          <View style={{ flex: 1 }}>
+            <ThemedText type="small" style={{ color: dt.textSecondary, lineHeight: 18 }}>
+              Send bulk emails to dormant customers or lost leads. To reach one person directly, use Win-Back.
+            </ThemedText>
+          </View>
+          <Pressable
+            onPress={() => navigation.navigate("Opportunities" as any)}
+            style={{ backgroundColor: dt.accent, borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 4 }}
+          >
+            <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "700" }}>Win-Back</ThemedText>
+            <Feather name="arrow-right" size={12} color="#FFFFFF" />
+          </Pressable>
+        </View>
 
-            <Card style={{...styles.summaryCard, borderColor: dt.border}}>
-              <View style={styles.summaryRow}>
-                <View style={styles.summaryItem}>
-                  <ThemedText type="h2" testID="text-dormant-count">{totalDormant}</ThemedText>
-                  <ThemedText type="caption" style={{ color: dt.textSecondary }}>Dormant Customers</ThemedText>
-                </View>
-                <View style={[styles.summaryDivider, { backgroundColor: dt.border }]} />
-                <View style={styles.summaryItem}>
-                  <ThemedText type="h2" testID="text-recovery-value">${estimatedValue.toLocaleString()}</ThemedText>
-                  <ThemedText type="caption" style={{ color: dt.textSecondary }}>Est. Recovery Value</ThemedText>
-                </View>
-              </View>
-            </Card>
-            {(campaignsQuery.data?.length ?? 0) > 0 ? (
-              <View style={{ marginBottom: Spacing.lg }}>
-                <ThemedText type="h4" style={{ marginBottom: Spacing.sm }}>Your Campaigns</ThemedText>
-                {campaignsQuery.data?.slice(0, 5).map((campaign: any) => {
-                  const customerCount = Array.isArray(campaign.customerIds) ? campaign.customerIds.length : 0;
-                  return (
-                    <Pressable
-                      key={campaign.id}
-                      onPress={() => {
-                        setViewingCampaign(campaign);
-                        setEditingSubject(campaign.messageSubject || "");
-                        setEditingContent(campaign.messageContent || "");
-                        setHasUnsavedEdits(false);
-                        setConfirmSend(false);
-                        setSendResult(null);
-                        setRecipientData(null);
-                        if (!campaign.messageContent) {
-                          generateAndAttachContent(campaign);
-                        }
-                      }}
-                      style={{ flexDirection: "row", alignItems: "center", paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: dt.border }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <ThemedText type="subtitle">{campaign.name}</ThemedText>
-                        <ThemedText type="caption" style={{ color: dt.textSecondary }}>
-                          Email{customerCount > 0 ? ` \u00B7 ${customerCount} customer${customerCount !== 1 ? "s" : ""}` : ""}{` \u00B7 ${campaign.status}`}
-                        </ThemedText>
-                      </View>
-                      <Feather name="chevron-right" size={18} color={dt.textSecondary} />
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
+        {/* Summary stats */}
+        <Card style={{...styles.summaryCard, borderColor: dt.border, marginBottom: Spacing.lg}}>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}>
+              <ThemedText type="h2" testID="text-dormant-count">{totalDormant}</ThemedText>
+              <ThemedText type="caption" style={{ color: dt.textSecondary }}>Dormant Customers</ThemedText>
+            </View>
+            <View style={[styles.summaryDivider, { backgroundColor: dt.border }]} />
+            <View style={styles.summaryItem}>
+              <ThemedText type="h2" testID="text-recovery-value">${estimatedValue.toLocaleString()}</ThemedText>
+              <ThemedText type="caption" style={{ color: dt.textSecondary }}>Est. Recovery Value</ThemedText>
+            </View>
+          </View>
+        </Card>
 
-            <View style={styles.segmentRow}>
-              <SegmentOption label="Dormant" value="dormant" />
-              <SegmentOption label="Lost Quotes" value="lost" />
+        {/* Campaigns list */}
+        {(campaignsQuery.data?.length ?? 0) > 0 ? (
+          <View style={{ marginBottom: Spacing.lg }}>
+            <ThemedText type="h4" style={{ marginBottom: Spacing.sm }}>Your Campaigns</ThemedText>
+            {campaignsQuery.data?.slice(0, 5).map((campaign: any) => {
+              const customerCount = Array.isArray(campaign.customerIds) ? campaign.customerIds.length : 0;
+              return (
+                <Pressable
+                  key={campaign.id}
+                  onPress={() => {
+                    setViewingCampaign(campaign);
+                    setEditingSubject(campaign.messageSubject || "");
+                    setEditingContent(campaign.messageContent || "");
+                    setHasUnsavedEdits(false);
+                    setConfirmSend(false);
+                    setSendResult(null);
+                    setRecipientData(null);
+                    if (!campaign.messageContent) {
+                      generateAndAttachContent(campaign);
+                    }
+                  }}
+                  style={{ flexDirection: "row", alignItems: "center", paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: dt.border }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <ThemedText type="subtitle">{campaign.name}</ThemedText>
+                    <ThemedText type="caption" style={{ color: dt.textSecondary }}>
+                      Email{customerCount > 0 ? ` \u00B7 ${customerCount} customer${customerCount !== 1 ? "s" : ""}` : ""}{` \u00B7 ${campaign.status}`}
+                    </ThemedText>
+                  </View>
+                  <Feather name="chevron-right" size={18} color={dt.textSecondary} />
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : campaignsQuery.isLoading ? (
+          <ActivityIndicator color={dt.accent} style={{ marginTop: Spacing["3xl"] }} />
+        ) : (
+          <View style={styles.emptyState}>
+            <View style={[styles.emptyStateIcon, { backgroundColor: `${dt.accent}12` }]}>
+              <Feather name="mail" size={32} color={dt.accent} />
             </View>
-          </>
-        }
-        ListEmptyComponent={
-          isLoading ? (
-            <ActivityIndicator color={dt.accent} style={{ marginTop: Spacing["3xl"] }} />
-          ) : (
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyStateIcon, { backgroundColor: `${dt.accent}12` }]}>
-                <Feather name="users" size={32} color={dt.accent} />
-              </View>
-              <ThemedText type="h4" style={{ color: dt.textPrimary, marginTop: Spacing.lg, textAlign: "center" }}>
-                {segment === "dormant" ? "No dormant customers yet" : "No lost quotes"}
-              </ThemedText>
-              <ThemedText type="body" style={{ color: dt.textSecondary, marginTop: Spacing.sm, textAlign: "center", paddingHorizontal: Spacing.xl }}>
-                {segment === "dormant"
-                  ? "Create your first campaign to win back past customers or recover lost quotes automatically."
-                  : "When sent quotes expire without a response, they'll appear here for recovery."}
-              </ThemedText>
-            </View>
-          )
-        }
-      />
+            <ThemedText type="h4" style={{ color: dt.textPrimary, marginTop: Spacing.lg, textAlign: "center" }}>No campaigns yet</ThemedText>
+            <ThemedText type="body" style={{ color: dt.textSecondary, marginTop: Spacing.sm, textAlign: "center", paddingHorizontal: Spacing.xl }}>
+              Create your first campaign to reach dormant customers or recover lost quotes with a single email blast.
+            </ThemedText>
+          </View>
+        )}
+      </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.md, backgroundColor: theme.backgroundRoot, borderTopColor: dt.border }]}>
         <Pressable

@@ -315,7 +315,7 @@ export default function RootStackNavigator() {
             name="Opportunities"
             component={OpportunitiesScreen}
             options={{
-              headerTitle: "Opportunities",
+              headerTitle: "Win-Back Opportunities",
             }}
           />
           <Stack.Screen
@@ -343,7 +343,7 @@ export default function RootStackNavigator() {
             name="ReactivationCampaigns"
             component={ReactivationScreen}
             options={{
-              headerTitle: "Reactivation",
+              headerTitle: "Campaigns",
             }}
           />
           <Stack.Screen

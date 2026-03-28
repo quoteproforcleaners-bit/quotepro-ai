@@ -460,6 +460,22 @@ export default function OpportunitiesScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={
           <View>
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: theme.primary + "10", borderWidth: 1, borderColor: theme.primary + "25", borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.md, gap: Spacing.sm }}>
+              <Feather name="info" size={15} color={theme.primary} style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <ThemedText type="small" style={{ color: theme.textSecondary, lineHeight: 18 }}>
+                  Reach out to individual customers below, or create a bulk email campaign to contact everyone at once.
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => navigation.navigate("ReactivationCampaigns" as any)}
+                style={{ backgroundColor: theme.primary, borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 4 }}
+              >
+                <ThemedText type="caption" style={{ color: "#FFFFFF", fontWeight: "700" }}>Campaigns</ThemedText>
+                <Feather name="arrow-right" size={12} color="#FFFFFF" />
+              </Pressable>
+            </View>
+
             <Card style={[styles.summaryCard, { borderWidth: 1.5, borderColor: theme.primary }]}>
               <View style={styles.summaryRow}>
                 <View style={[styles.summaryIcon, { backgroundColor: `${theme.primary}15` }]}>

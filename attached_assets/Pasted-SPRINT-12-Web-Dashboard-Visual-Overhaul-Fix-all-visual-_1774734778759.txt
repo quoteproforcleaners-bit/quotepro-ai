@@ -1,0 +1,369 @@
+SPRINT 12 — Web Dashboard Visual Overhaul
+
+Fix all visual and navigation issues identified in the 
+QuotePro web dashboard. This is a frontend-only sprint — 
+no backend changes required.
+
+TECH STACK: React 18, Tailwind CSS, existing component 
+structure
+
+═══════════════════════════════
+FIX 1 — LEFT NAV RESTRUCTURE
+═══════════════════════════════
+
+Reorganize the sidebar navigation into 3 clear groups.
+Remove "OPERATIONS" and "INTELLIGENCE" labels entirely.
+Replace with:
+
+CORE (no label — these are unlabeled, always visible)
+  - Dashboard
+  - Quotes
+  - Customers
+  - Jobs
+
+TOOLS (section label: "TOOLS")
+  - Quote Doctor (keep FREE badge)
+  - Commercial Quote
+  - Quote from Notes
+  - Objection Assistant
+  - Sales Assistant
+
+SETTINGS (section label: "SETTINGS")
+  - Price Settings
+  - Quote Settings
+  - Pricing Engine
+  - Sales Strategy
+  - Schedule
+  - Team Members
+  - Quote Requests
+
+IMPLEMENTATION:
+- CORE items have no section label and sit at the top
+- Section labels: uppercase, 11px, font-weight 600, 
+  letter-spacing 0.7px, color: text-muted
+  Add 24px margin-top above each label
+- All nav items: 36px height, 12px horizontal padding,
+  8px border-radius, 14px font-size, font-weight 500
+- Active item: background blue-50 (light mode) or 
+  rgba(255,255,255,0.08) (dark), text: theme primary blue
+  left border: 2px solid theme.primary
+- Hover: background rgba(0,0,0,0.04) light / 
+  rgba(255,255,255,0.05) dark
+- Nav width: 240px fixed
+- Add a thin 1px right border on the nav: 
+  border-right: 1px solid rgba(0,0,0,0.06)
+
+COLLAPSE SETTINGS group by default:
+- Show only CORE and TOOLS on first load
+- SETTINGS items hidden behind a "Settings" row 
+  with a chevron toggle
+- Persist open/closed state in localStorage:
+  key: "quotepro_nav_settings_open"
+
+═══════════════════════════════
+FIX 2 — DEDUPLICATE HERO VS CARDS
+═══════════════════════════════
+
+The hero banner and the stat cards below currently show 
+identical metrics. Differentiate them:
+
+HERO BANNER (today's snapshot — narrow time window):
+Keep the 4-stat strip but change the metrics to:
+  1. TODAY'S REVENUE — revenue from jobs completed today
+     (was: month revenue)
+  2. JOBS THIS WEEK — keep as-is
+  3. CLOSE RATE — keep as-is  
+  4. FOLLOW-UPS DUE TODAY — count of follow-ups due 
+     specifically today (was: overall follow-up status)
+
+STAT CARDS BELOW (broader context — monthly view):
+Card 1: REVENUE WON THIS MONTH
+  - Large number: monthly total
+  - Subtext: "vs $X last month" with up/down arrow 
+    and % change
+  - Badge: "Live" if current month, "Final" if past
+
+Card 2: ACTIVE JOBS
+  - Large number: count of scheduled upcoming jobs
+  - Subtext: "X total scheduled"
+  - Add: "Next job: [date]" if any scheduled
+
+Card 3: CLOSE RATE
+  - Large number: close rate %
+  - Subtext: change from last month (e.g. "↑ 5% vs last month")
+  - Status badge: use amber for <40%, green for >60%, 
+    blue for 40-60% (not red)
+
+Card 4: PIPELINE VALUE
+  - Large number: total value of open quotes
+  - Subtext: "X accepted, need scheduling"
+  - Badge: count of pending items
+
+═══════════════════════════════
+FIX 3 — HERO BANNER VISUAL POLISH
+═══════════════════════════════
+
+The hard edge between the dark hero and the light card 
+section below is jarring. Fix the transition:
+
+Option A (dark theme — recommended):
+- Extend the dark background to the full page
+- Main content area background: #0a0a0f
+- Cards: background #16161e, border: 1px solid 
+  rgba(255,255,255,0.08)
+- This creates a cohesive dark dashboard like Linear/Vercel
+
+Option B (light theme — if dark is too heavy):
+- Change hero background to a subtle gradient:
+  background: linear-gradient(180deg, #0f172a 0%, 
+  #0f172a 60%, transparent 100%)
+- Blend into the light card section below
+- No hard edge
+
+IMPLEMENT OPTION A (full dark) as the default.
+
+HERO BANNER specific fixes:
+- Greeting text: 
+  "Good evening" — 32px, font-weight 400, color: 
+  rgba(255,255,255,0.7)
+  "Mike's Cleaning" — 32px, font-weight 700, color: white
+- Subtext "$330 recognized this month — keep pushing":
+  font-size: 15px, color: rgba(255,255,255,0.55)
+- Date label "SATURDAY, MARCH 28":
+  font-size: 11px, font-weight: 600, letter-spacing: 1.5px
+  color: rgba(255,255,255,0.4)
+- "+ New Quote" button in hero:
+  Remove it — it duplicates the one in the top nav bar
+  The top nav button is sufficient
+
+HERO STAT STRIP:
+- Dividers between stats: 1px solid rgba(255,255,255,0.1)
+- Stat labels: 11px, uppercase, letter-spacing 0.8px,
+  color: rgba(255,255,255,0.45)
+- Stat values: 24px, font-weight 700
+- Green values: #4ade80
+- Amber values (needs attention): #fbbf24  
+- Red values: only for truly broken states, not 
+  "low but improvable" metrics
+
+═══════════════════════════════
+FIX 4 — "GET QUOTEPRO RUNNING" CARD
+═══════════════════════════════
+
+Make this card feel urgent when incomplete and 
+celebratory when complete.
+
+INCOMPLETE STATE (< 4 steps done):
+- Card border: 2px solid theme.warning (#f59e0b)
+- Left side: 4px solid warning color accent bar
+- Background: rgba(245,158,11,0.06) — very subtle amber tint
+- Title: "Get QuotePro Running" — 16px, font-weight 700
+- Subtitle: "3 of 4 steps complete" — keep as-is
+- Progress bar: height 6px, amber color, rounded
+- The single remaining action item should be MORE prominent:
+  - Show it as a full-width row with:
+    Icon in amber circle background
+    Bold action text
+    Arrow CTA on right: "Complete →" in amber
+  - Add urgency text below: 
+    "Complete setup to unlock full automation"
+
+COMPLETE STATE (4/4):
+- Card border: 2px solid theme.success (#22c55e)  
+- Background: rgba(34,197,94,0.06)
+- Title: "Setup Complete! 🎉"
+- Subtitle: "Your account is fully configured"
+- Hide the action item row
+- Show a small confetti or checkmark animation on 
+  first completion (CSS animation, no library needed)
+- Auto-collapse this card after 7 days post-completion:
+  Store completion date in localStorage
+  key: "quotepro_setup_completed_at"
+
+═══════════════════════════════
+FIX 5 — FLOATING AI BUTTON LABEL
+═══════════════════════════════
+
+The purple floating button (bottom right) needs a label 
+so users know what it does.
+
+CHANGES:
+- On first visit (no localStorage key "quotepro_ai_seen"):
+  Expand the button to show: [✦ icon] "Ask AI"
+  Width: auto, padding: 12px 20px
+  After 4 seconds OR on first click: collapse to icon only
+  Set localStorage "quotepro_ai_seen" = true
+
+- On subsequent visits: icon only (current behavior)
+
+- Add a tooltip on hover (desktop):
+  "Ask AI — get quotes, insights, and help"
+  Tooltip: dark background, white text, appears above button
+  CSS only, no library
+
+- Change button color from generic purple to your 
+  brand primary blue (#2563eb) with a subtle gradient:
+  background: linear-gradient(135deg, #2563eb, #06b6d4)
+  This ties it to your brand instead of feeling random
+
+- Add a subtle pulse animation on first load 
+  (before user has clicked it):
+  CSS keyframe: scale 1 → 1.08 → 1, 2s interval, 
+  stops after 3 pulses
+
+═══════════════════════════════
+FIX 6 — STAT BADGE SYSTEM
+═══════════════════════════════
+
+Standardize ALL status badges across the dashboard 
+to use one consistent pill component.
+
+CREATE a StatusBadge component:
+Props: 
+  label: string
+  variant: "live" | "success" | "warning" | 
+           "error" | "info" | "neutral"
+
+Styles per variant:
+  live:    bg #dcfce7, text #166534, dot: #22c55e (pulsing)
+  success: bg #dcfce7, text #166534
+  warning: bg #fef3c7, text #92400e
+  error:   bg #fee2e2, text #991b1b
+  info:    bg #dbeafe, text #1e40af
+  neutral: bg #f1f5f9, text #475569
+
+All badges:
+  border-radius: 100px (full pill)
+  padding: 2px 10px
+  font-size: 11px
+  font-weight: 600
+  letter-spacing: 0.3px
+
+REPLACE all existing badge implementations:
+  "Live" badge → variant="live" with pulsing dot
+  "Low" badge → variant="warning" label="Needs Attention"
+  "2 pending" badge → variant="info" label="2 Pending"
+  Any error states → variant="error"
+
+═══════════════════════════════
+FIX 7 — CLOSE RATE COLOR LOGIC
+═══════════════════════════════
+
+Change the close rate color system from binary 
+red/green to a 3-tier system:
+
+< 25%:  red   (#ef4444) — "Needs attention"
+25-50%: amber (#f59e0b) — "Room to improve"  
+> 50%:  green (#22c55e) — "Strong"
+
+Apply this logic everywhere close rate is displayed:
+- Hero stat strip
+- Stat card
+- Any table or list view
+
+The status text below the number should also change:
+< 25%:  "Needs attention"
+25-50%: "Room to improve"
+> 50%:  "Strong close rate"
+
+═══════════════════════════════
+FIX 8 — GLOBAL DARK THEME POLISH
+═══════════════════════════════
+
+Since we're going full dark (Fix 3 Option A), 
+apply these global styles consistently:
+
+CSS variables to set on :root (dark mode):
+--bg-root: #09090f
+--bg-card: #16161e  
+--bg-card-hover: #1e1e2e
+--border: rgba(255,255,255,0.08)
+--border-hover: rgba(255,255,255,0.14)
+--text-primary: #f8fafc
+--text-secondary: #94a3b8
+--text-muted: #475569
+--accent-blue: #2563eb
+--accent-cyan: #06b6d4
+--success: #22c55e
+--warning: #f59e0b
+--error: #ef4444
+
+Apply to:
+- All Card components: bg-card, border
+- All nav items: correct hover/active states
+- All input fields: bg #1e1e2e, border rgba(255,255,255,0.1)
+- Page background: bg-root
+- Section labels: text-muted
+
+TOP NAV BAR:
+- Background: rgba(9,9,15,0.8) with backdrop-blur: 12px
+- Border bottom: 1px solid var(--border)
+- Make it sticky/fixed at top
+- Height: 56px
+- "+ New Quote" button: gradient background 
+  linear-gradient(135deg, #2563eb, #06b6d4)
+  border-radius: 8px, font-weight: 600, 
+  box-shadow: 0 0 20px rgba(37,99,235,0.3)
+
+═══════════════════════════════
+FIX 9 — TODAY SECTION BELOW CARDS
+═══════════════════════════════
+
+The "TODAY — Saturday, Mar 28" section visible at the 
+bottom of the screenshot needs polish:
+
+- Section header: 
+  "TODAY" label: 11px, uppercase, letter-spacing 1px,
+  text-muted color
+  Date: same line, text-secondary, normal weight
+  Green dot before "TODAY": 8px circle, 
+  background #22c55e, subtle pulse animation
+
+- If no events today:
+  Don't show an empty section
+  Instead show: "No jobs or follow-ups scheduled today.
+  [+ Schedule a Job]" as a subtle inline CTA
+
+═══════════════════════════════
+IMPLEMENTATION ORDER
+═══════════════════════════════
+
+Do these in this exact order to avoid breaking changes:
+
+1. Set up CSS variables (Fix 8) — foundation for everything
+2. Nav restructure (Fix 1) — structural
+3. Badge system (Fix 6) — shared component used everywhere
+4. Close rate color logic (Fix 7) — logic layer
+5. Hero banner polish (Fix 3) — visual
+6. Deduplicate stats (Fix 2) — data/display
+7. Setup card (Fix 4) — component
+8. AI button (Fix 5) — interaction
+9. Today section (Fix 9) — polish
+
+═══════════════════════════════
+DO NOT CHANGE
+═══════════════════════════════
+- All API calls and data fetching logic
+- Routing and navigation behavior
+- The greeting text content ("Good evening, Mike's Cleaning")
+- The progress bar percentage calculation
+- Any existing component that is not mentioned above
+- Mobile/responsive breakpoints (address in a separate sprint)
+
+═══════════════════════════════
+TESTING CHECKLIST
+═══════════════════════════════
+- Nav groups render correctly with correct items in each
+- Settings group collapses/expands and persists state
+- Hero stats differ from card stats (no duplicates)
+- No hard edge between hero and card section
+- Setup card shows amber border when incomplete
+- Setup card shows green border when all steps done
+- AI button shows "Ask AI" label on first visit only
+- All badges use the new StatusBadge component
+- Close rate <25% shows red, 25-50% amber, >50% green
+- Dark theme is consistent across all sections
+- Top nav is sticky and blurs content behind it
+
+Confirm when complete with a screenshot of the 
+updated dashboard.

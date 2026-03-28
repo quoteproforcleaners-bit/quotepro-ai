@@ -146,7 +146,7 @@ export default function GrowthDashboardScreen() {
     { label: "Follow-Up Queue", sub: `${followUpQueue.length} quote${followUpQueue.length !== 1 ? "s" : ""} waiting`, icon: "clock" as const, screen: "FollowUpQueue" },
     { label: "Automations", sub: "Manage AI sequences", icon: "cpu" as const, screen: "AutomationsHub" },
     { label: "Upsell Opportunities", sub: `${upsellOpps.length} client${upsellOpps.length !== 1 ? "s" : ""} to grow`, icon: "trending-up" as const, screen: "UpsellOpportunities" },
-    { label: "Reactivation", sub: `${dormantOpps.length} dormant client${dormantOpps.length !== 1 ? "s" : ""}`, icon: "user-plus" as const, screen: "ReactivationCampaigns" },
+    { label: "Campaigns", sub: `${dormantOpps.length} dormant client${dormantOpps.length !== 1 ? "s" : ""}`, icon: "user-plus" as const, screen: "ReactivationCampaigns" },
     { label: "Reviews & Referrals", sub: `${reviewRequests.length} pending`, icon: "star" as const, screen: "ReviewsReferrals" },
   ];
 
@@ -156,7 +156,7 @@ export default function GrowthDashboardScreen() {
     { label: "Upsells", count: upsellOpps.length, icon: "trending-up" as const, screen: "UpsellOpportunities" },
     { label: "Reviews", count: reviewRequests.length, icon: "star" as const, screen: "ReviewsReferrals" },
     { label: "Rebook", count: rebookCandidates.length, icon: "repeat" as const, screen: "TasksQueue" },
-    { label: "Reactivation", count: dormantOpps.length, icon: "user-plus" as const, screen: "ReactivationCampaigns" },
+    { label: "Campaigns", count: dormantOpps.length, icon: "user-plus" as const, screen: "ReactivationCampaigns" },
   ];
 
   return (
