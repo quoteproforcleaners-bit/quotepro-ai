@@ -22,7 +22,7 @@ import * as MailComposer from "expo-mail-composer";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
-import { EmptyState } from "@/components/EmptyState";
+import { ActionEmptyState } from "@/components/ActionEmptyState";
 import { MomentumToast } from "@/components/MomentumToast";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
@@ -153,6 +153,11 @@ export default function FollowUpQueueScreen() {
   const { data: queue = [], refetch, isLoading } = useQuery<FollowUpItem[]>({
     queryKey: ["/api/followup-queue"],
   });
+
+  const { data: reportStats } = useQuery<{ sentQuotes: number }>({
+    queryKey: ["/api/reports/stats"],
+  });
+  const sentQuotes = reportStats?.sentQuotes ?? 0;
 
   const touchMutation = useMutation({
     mutationFn: async (body: { quoteId: number; channel: string; snoozedUntil?: string }) => {
@@ -498,12 +503,24 @@ export default function FollowUpQueueScreen() {
           ]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={
-            <EmptyState
-              icon="check-circle"
-              iconColor={theme.success}
-              title="All caught up!"
-              description="No follow-ups needed right now."
-            />
+            sentQuotes === 0 ? (
+              <ActionEmptyState
+                icon="send"
+                title="Build your follow-up pipeline"
+                description="Send your first quote to start building your follow-up pipeline."
+                ctaLabel="Create a Quote"
+                onCta={() => navigation.navigate("QuoteCalculator")}
+                testID="empty-followup-no-quotes"
+              />
+            ) : (
+              <ActionEmptyState
+                icon="check-circle"
+                iconColor={theme.success}
+                title="You're all caught up!"
+                description="Every quote has been followed up on. Check back after sending more quotes."
+                testID="empty-followup-done"
+              />
+            )
           }
           showsVerticalScrollIndicator={false}
         />

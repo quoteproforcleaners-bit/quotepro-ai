@@ -13,13 +13,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as SMS from "expo-sms";
 import * as MailComposer from "expo-mail-composer";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
-import { EmptyState } from "@/components/EmptyState";
+import { ActionEmptyState } from "@/components/ActionEmptyState";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
@@ -167,6 +169,7 @@ function ActionButton({
 export default function OpportunitiesScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { theme, isDark } = useTheme();
   const { businessProfile } = useApp();
   const queryClient = useQueryClient();
@@ -568,12 +571,23 @@ export default function OpportunitiesScreen() {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.primary} />
             </View>
+          ) : activeTab === "dormant" ? (
+            <ActionEmptyState
+              icon="users"
+              title="No dormant customers yet"
+              description="As you complete jobs, past clients who haven't rebooked will appear here."
+              ctaLabel="Schedule a Job"
+              onCta={() => navigation.navigate("Main", { screen: "JobsTab" })}
+              testID="empty-dormant"
+            />
           ) : (
-            <EmptyState
-              icon="check-circle"
-              iconColor={theme.success}
-              title="No opportunities found"
-              description="No opportunities found right now. Great job staying on top of your clients!"
+            <ActionEmptyState
+              icon="file-text"
+              title="No lost quotes"
+              description="When sent quotes expire without a response, they'll appear here for recovery."
+              ctaLabel="Send a Quote"
+              onCta={() => navigation.navigate("QuoteCalculator")}
+              testID="empty-lost-quotes"
             />
           )
         }

@@ -640,14 +640,16 @@ export default function ReactivationScreen() {
             <ActivityIndicator color={dt.accent} style={{ marginTop: Spacing["3xl"] }} />
           ) : (
             <View style={styles.emptyState}>
-              <Feather name="users" size={48} color={dt.textSecondary} />
-              <ThemedText type="subtitle" style={{ color: dt.textSecondary, marginTop: Spacing.md }}>
-                {segment === "dormant" ? "No dormant customers found" : "No lost quotes found"}
+              <View style={[styles.emptyStateIcon, { backgroundColor: `${dt.accent}12` }]}>
+                <Feather name="users" size={32} color={dt.accent} />
+              </View>
+              <ThemedText type="h4" style={{ color: dt.textPrimary, marginTop: Spacing.lg, textAlign: "center" }}>
+                {segment === "dormant" ? "No dormant customers yet" : "No lost quotes"}
               </ThemedText>
-              <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.xs, textAlign: "center", paddingHorizontal: Spacing.xl }}>
+              <ThemedText type="body" style={{ color: dt.textSecondary, marginTop: Spacing.sm, textAlign: "center", paddingHorizontal: Spacing.xl }}>
                 {segment === "dormant"
-                  ? "Customers who haven't booked in 60+ days will appear here"
-                  : "Quotes sent but not accepted after 30+ days will show up here"}
+                  ? "Create your first campaign to win back past customers or recover lost quotes automatically."
+                  : "When sent quotes expire without a response, they'll appear here for recovery."}
               </ThemedText>
             </View>
           )
@@ -948,7 +950,8 @@ const styles = StyleSheet.create({
   itemRow: { flexDirection: "row", alignItems: "center" },
   actionBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.xs },
   statusBadge: { alignSelf: "flex-start", paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.xs, marginTop: 4 },
-  emptyState: { alignItems: "center", justifyContent: "center", paddingTop: Spacing["5xl"] },
+  emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: Spacing["5xl"], paddingHorizontal: Spacing.xl },
+  emptyStateIcon: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },
   bottomBar: {
     position: "absolute",
     bottom: 0,

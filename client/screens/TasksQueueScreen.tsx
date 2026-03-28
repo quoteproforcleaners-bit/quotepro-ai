@@ -191,13 +191,13 @@ function EmptyState() {
   return (
     <View style={styles.emptyContainer}>
       <View style={[styles.emptyIconWrap, { backgroundColor: dt.accentSoft }]}>
-        <Feather name="check-circle" size={32} color={dt.accent} />
+        <Feather name="cpu" size={32} color={dt.accent} />
       </View>
       <ThemedText type="h4" style={{ marginTop: Spacing.lg, textAlign: "center" }}>
-        All caught up!
+        No growth tasks yet
       </ThemedText>
       <ThemedText type="body" style={{ color: dt.textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
-        No growth tasks right now. Your automation engine will queue new tasks as opportunities arise.
+        Your AI growth tasks will appear here once you start sending quotes and completing jobs. Check back soon.
       </ThemedText>
     </View>
   );

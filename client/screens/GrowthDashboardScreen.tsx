@@ -172,53 +172,82 @@ export default function GrowthDashboardScreen() {
           showsVerticalScrollIndicator={false}
         >
 
-          {/* ── Quote Performance ── */}
-          <View style={s.section}>
-            <SectionLabel title="Quote Performance" theme={theme} />
-            <View style={s.grid}>
-              <MetricCard
-                value={String(sentQuotes)} label="Sent" sub="all time"
-                cardBg={cardBg} divider={divider} theme={theme}
-              />
-              <MetricCard
-                value={closeRate > 0 ? `${closeRate}%` : "—"} label="Close Rate" sub="accepted / sent"
-                accent cardBg={cardBg} divider={divider} theme={theme}
-              />
-              <MetricCard
-                value={avgValue > 0 ? fmt(avgValue) : "—"} label="Avg Value" sub="per quote"
-                cardBg={cardBg} divider={divider} theme={theme}
-              />
-              <MetricCard
-                value={String(acceptedQuotes)} label="Accepted" sub="quotes won"
-                cardBg={cardBg} divider={divider} theme={theme}
-              />
+          {/* ── Quote Performance & Revenue (or Welcome Card) ── */}
+          {stats?.totalQuotes === 0 ? (
+            <View style={[s.section, { paddingTop: Spacing.sm }]}>
+              <View style={[s.welcomeCard, { backgroundColor: cardBg, borderColor: theme.primary }]}>
+                <View style={[s.welcomeIconWrap, { backgroundColor: `${theme.primary}12` }]}>
+                  <Feather name="bar-chart-2" size={28} color={theme.primary} />
+                </View>
+                <ThemedText style={[s.welcomeTitle, { color: theme.text }]}>
+                  Welcome to your Growth Dashboard
+                </ThemedText>
+                <ThemedText style={[s.welcomeBody, { color: theme.textSecondary }]}>
+                  Your stats will appear here as you send quotes and win jobs. Start by creating your first quote.
+                </ThemedText>
+                <Pressable
+                  onPress={() => nav("QuoteCalculator")}
+                  style={({ pressed }) => [s.welcomeBtn, { backgroundColor: theme.primary, opacity: pressed ? 0.85 : 1 }]}
+                  testID="button-create-first-quote"
+                >
+                  <Feather name="plus" size={16} color="#FFFFFF" />
+                  <ThemedText style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 15, marginLeft: 6 }}>
+                    Create First Quote
+                  </ThemedText>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          ) : (
+            <>
+              {/* ── Quote Performance ── */}
+              <View style={s.section}>
+                <SectionLabel title="Quote Performance" theme={theme} />
+                <View style={s.grid}>
+                  <MetricCard
+                    value={String(sentQuotes)} label="Sent" sub="all time"
+                    cardBg={cardBg} divider={divider} theme={theme}
+                  />
+                  <MetricCard
+                    value={closeRate > 0 ? `${closeRate}%` : "—"} label="Close Rate" sub="accepted / sent"
+                    accent cardBg={cardBg} divider={divider} theme={theme}
+                  />
+                  <MetricCard
+                    value={avgValue > 0 ? fmt(avgValue) : "—"} label="Avg Value" sub="per quote"
+                    cardBg={cardBg} divider={divider} theme={theme}
+                  />
+                  <MetricCard
+                    value={String(acceptedQuotes)} label="Accepted" sub="quotes won"
+                    cardBg={cardBg} divider={divider} theme={theme}
+                  />
+                </View>
+              </View>
 
-          {/* ── Revenue ── */}
-          <View style={s.section}>
-            <SectionLabel title="Revenue" theme={theme} />
-            <View style={s.grid}>
-              <MetricCard
-                value={totalRevenue > 0 ? fmt(totalRevenue) : "—"} label="Total Revenue" sub="all time"
-                accent cardBg={cardBg} divider={divider} theme={theme}
-              />
-              <MetricCard
-                value={openQuoteValue > 0 ? fmt(openQuoteValue) : "—"} label="Open Pipeline" sub="pending quotes"
-                cardBg={cardBg} divider={divider} theme={theme}
-              />
-              <MetricCard
-                value={forecastedRevenue > 0 ? fmt(forecastedRevenue) : "—"} label="Forecasted" sub="est. closings"
-                cardBg={cardBg} divider={divider} theme={theme}
-              />
-              <MetricCard
-                value={amountAtRisk > 0 ? fmt(amountAtRisk) : "$0"} label="At Risk"
-                sub={`${followUpQueue.length} without reply`}
-                onPress={() => nav("FollowUpQueue")}
-                cardBg={cardBg} divider={divider} theme={theme}
-              />
-            </View>
-          </View>
+              {/* ── Revenue ── */}
+              <View style={s.section}>
+                <SectionLabel title="Revenue" theme={theme} />
+                <View style={s.grid}>
+                  <MetricCard
+                    value={totalRevenue > 0 ? fmt(totalRevenue) : "—"} label="Total Revenue" sub="all time"
+                    accent cardBg={cardBg} divider={divider} theme={theme}
+                  />
+                  <MetricCard
+                    value={openQuoteValue > 0 ? fmt(openQuoteValue) : "—"} label="Open Pipeline" sub="pending quotes"
+                    cardBg={cardBg} divider={divider} theme={theme}
+                  />
+                  <MetricCard
+                    value={forecastedRevenue > 0 ? fmt(forecastedRevenue) : "—"} label="Forecasted" sub="est. closings"
+                    cardBg={cardBg} divider={divider} theme={theme}
+                  />
+                  <MetricCard
+                    value={amountAtRisk > 0 ? fmt(amountAtRisk) : "$0"} label="At Risk"
+                    sub={`${followUpQueue.length} without reply`}
+                    onPress={() => nav("FollowUpQueue")}
+                    cardBg={cardBg} divider={divider} theme={theme}
+                  />
+                </View>
+              </View>
+            </>
+          )}
 
           {/* ── Opportunities ── */}
           <View style={s.section}>
@@ -358,4 +387,38 @@ const s = StyleSheet.create({
   listLabel: { fontSize: 14, fontWeight: "500" },
   listSub: { fontSize: 12, marginTop: 1 },
   activityTime: { fontSize: 11, flexShrink: 0 },
+
+  welcomeCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1.5,
+    padding: Spacing.xl,
+    alignItems: "center",
+  },
+  welcomeIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.md,
+  },
+  welcomeTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: Spacing.sm,
+  },
+  welcomeBody: {
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 21,
+    marginBottom: Spacing.xl,
+  },
+  welcomeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.sm,
+  },
 });

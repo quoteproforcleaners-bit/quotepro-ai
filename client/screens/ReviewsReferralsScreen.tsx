@@ -14,6 +14,8 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTheme } from "@/hooks/useTheme";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
@@ -81,6 +83,7 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default function ReviewsReferralsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
@@ -366,11 +369,20 @@ export default function ReviewsReferralsScreen() {
       <ThemedText type="h4" style={{ textAlign: "center", marginTop: Spacing.lg }}>
         {"No Review Requests Yet"}
       </ThemedText>
-      <ThemedText type="small" style={{ color: dt.textSecondary, textAlign: "center", marginTop: Spacing.xs }}>
-        {"Tap the button below to request a review from a customer."}
+      <ThemedText type="small" style={{ color: dt.textSecondary, textAlign: "center", marginTop: Spacing.sm }}>
+        {"Ask your first customer for a review after completing a job. Reviews help you win more business."}
       </ThemedText>
+      <Pressable
+        onPress={() => navigation.navigate("Main", { screen: "JobsTab" })}
+        style={[s.emptyCtaBtn, { backgroundColor: dt.accent }]}
+        testID="button-view-completed-jobs"
+      >
+        <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700" }}>
+          {"View Completed Jobs"}
+        </ThemedText>
+      </Pressable>
     </View>
-  ), [dt]);
+  ), [dt, navigation]);
 
   const renderCustomerPickerStep = () => (
     <View style={{ flex: 1 }}>
@@ -620,6 +632,7 @@ const s = StyleSheet.create({
   actionBtn: { flex: 1, flexDirection: "row", ...centered, paddingVertical: Spacing.sm, borderRadius: BorderRadius.sm, minHeight: 36 },
   empty: { ...centered, paddingVertical: Spacing["5xl"] },
   emptyIcon: { width: 64, height: 64, borderRadius: 32, ...centered },
+  emptyCtaBtn: { marginTop: Spacing.lg, paddingHorizontal: Spacing["2xl"], paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, minWidth: 200, alignItems: "center" },
   fab: { position: "absolute", right: Spacing.lg, width: 56, height: 56, borderRadius: 28, ...centered },
   modalOverlay: { flex: 1, justifyContent: "flex-end" },
   modalContent: {
