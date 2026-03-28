@@ -103,3 +103,14 @@ The system uses session-based authentication supporting email/password, Apple, a
 - **Unsubscribe**: `GET /api/email/unsubscribe?uid=&token=` in `publicRouter.ts`; HMAC-SHA256 token signed with `SESSION_SECRET`; renders a branded HTML confirmation page
 - **From**: `ZOHO_SMTP_USER` (display name: "Mike at QuotePro"); Reply-To: `quoteproforcleaners@gmail.com`
 - **Upgrade detection**: Cron skips and marks completed for any user who has upgraded from free tier
+### Lead Link Microsite (Sprint 13)
+- **New page**: `web/src/pages/LeadLinkPage.tsx` — 4-step progressive disclosure quote request page for customers
+- **Route**: `/request/:slug` — served as SPA from `server/index.ts` (no longer redirects to `/intake/:code`)
+- **API**: `GET /api/public/lead-link-config/:slug` — returns business info + pricing config (public, no auth)
+- **API**: `POST /api/public/lead-link-event` — event tracking endpoint (public, no auth)
+- **API**: `GET /api/business/lead-link-analytics` — 30-day analytics for business owner (auth: Growth+)
+- **DB**: `lead_link_events` table — tracks visits, step completions, and submissions per session
+- **Flow**: Step 1 (bedrooms/bathrooms/type) → calculating animation → Price Reveal (count-up animation) → Step 2 (size/condition/pets/add-ons/date) → Step 3 (contact gate) → Step 4 (confirmation)
+- **Price calc**: Client-side using `hourlyRate`, `minimumTicket`, `sqftFactor` from config; multipliers for service type, condition, pet count
+- **Analytics strip**: Added to `LeadCapturePage.tsx` — shows Visits (30d), Requests, Conv. Rate with color-coded badges
+- **Old intake flow**: `/intake/:businessId` → `IntakePage.tsx` still works for backward compatibility

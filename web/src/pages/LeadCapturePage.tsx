@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 import {
   Link2, Copy, Check, ToggleLeft, ToggleRight, ExternalLink, Code2,
   Globe, Search, Instagram, Mail, MessageCircle, Download, QrCode,
-  Printer,
+  Printer, BarChart2, Users, TrendingUp, Zap,
 } from "lucide-react";
 
 interface LeadCaptureSettings {
@@ -15,11 +15,21 @@ interface LeadCaptureSettings {
   publicUrl: string;
 }
 
+interface LeadLinkAnalytics {
+  visits: number;
+  conversions: number;
+  conversionRate: number;
+}
+
 export default function LeadCapturePage() {
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useQuery<LeadCaptureSettings>({
     queryKey: ["/api/business/lead-capture-settings"],
+  });
+
+  const { data: analytics } = useQuery<LeadLinkAnalytics>({
+    queryKey: ["/api/business/lead-link-analytics"],
   });
 
   const [slugInput, setSlugInput] = useState("");
@@ -176,6 +186,47 @@ export default function LeadCapturePage() {
         title="Lead Capture Link"
         subtitle="Share your link anywhere — customers fill it out, leads land in your inbox automatically."
       />
+
+      {/* Analytics Strip */}
+      {analytics && (
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            {
+              icon: Users,
+              label: "Visits (30d)",
+              value: analytics.visits.toLocaleString(),
+              color: "text-blue-600",
+              bg: "bg-blue-50",
+            },
+            {
+              icon: TrendingUp,
+              label: "Requests",
+              value: analytics.conversions.toLocaleString(),
+              color: "text-emerald-600",
+              bg: "bg-emerald-50",
+            },
+            {
+              icon: Zap,
+              label: "Conv. Rate",
+              value: `${analytics.conversionRate}%`,
+              color:
+                analytics.conversionRate >= 20 ? "text-emerald-600"
+                  : analytics.conversionRate >= 10 ? "text-amber-600"
+                  : "text-slate-500",
+              bg:
+                analytics.conversionRate >= 20 ? "bg-emerald-50"
+                  : analytics.conversionRate >= 10 ? "bg-amber-50"
+                  : "bg-slate-50",
+            },
+          ].map(({ icon: Icon, label, value, color, bg }) => (
+            <div key={label} className={`${bg} border border-slate-100 rounded-xl p-4 text-center`}>
+              <Icon className={`w-4 h-4 ${color} mx-auto mb-1.5`} />
+              <p className={`text-xl font-black ${color} leading-none mb-1`}>{value}</p>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Enable / Disable */}
       <div className="bg-white border border-slate-200 rounded-xl p-5">

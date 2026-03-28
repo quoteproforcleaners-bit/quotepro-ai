@@ -2150,6 +2150,69 @@ Return ONLY valid JSON:
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // ─── Lead Link Config (new microsite) ────────────────────────────────────────
+  router.get("/api/public/lead-link-config/:slug", async (req: Request, res: Response) => {
+    try {
+      const slug = req.params.slug?.toLowerCase().trim();
+      if (!slug) return res.status(400).json({ error: "slug required" });
+      const r = await pool.query(
+        `SELECT b.id, b.company_name, b.logo_uri, b.primary_color, b.phone, b.email,
+                b.public_quote_enabled, b.intake_code
+         FROM businesses b WHERE b.public_quote_slug = $1 LIMIT 1`,
+        [slug],
+      );
+      if (!r.rows.length) return res.status(404).json({ error: "not_found" });
+      const row = r.rows[0];
+      if (!row.public_quote_enabled) return res.status(410).json({ error: "disabled" });
+      let pricing = { hourlyRate: 40, minimumTicket: 80, sqftFactor: 0.0085 };
+      try {
+        const ps = await getPricingByBusiness(row.id);
+        if (ps) {
+          pricing = {
+            hourlyRate: ps.hourlyRate ?? 40,
+            minimumTicket: ps.minimumTicket ?? 80,
+            sqftFactor: (ps as any).sqftFactor ?? 0.0085,
+          };
+        }
+      } catch {}
+      res.json({
+        slug,
+        businessId: row.intake_code || row.id,
+        companyName: row.company_name,
+        logoUri: row.logo_uri || null,
+        primaryColor: row.primary_color || "#2563EB",
+        phone: row.phone || null,
+        email: row.email || null,
+        rating: 4.9,
+        pricing,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ─── Lead Link Event Tracking ─────────────────────────────────────────────
+  router.post("/api/public/lead-link-event", async (req: Request, res: Response) => {
+    try {
+      const { slug, eventType, sessionId } = req.body;
+      if (!slug || !eventType) return res.status(400).json({ message: "slug and eventType required" });
+      const biz = await pool.query(
+        `SELECT id FROM businesses WHERE public_quote_slug = $1 LIMIT 1`, [slug]
+      );
+      const businessId = biz.rows[0]?.id;
+      if (!businessId) return res.status(404).json({ message: "not found" });
+      await pool.query(
+        `INSERT INTO lead_link_events (business_id, event_type, session_id, created_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT DO NOTHING`,
+        [businessId, eventType, sessionId || null],
+      ).catch(() => {});
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   router.get("/job-updates/:token", (req: Request, res: Response) => {
     res.redirect(301, `/j/${req.params.token}`);
   });

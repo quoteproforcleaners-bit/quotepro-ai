@@ -34,6 +34,7 @@ import AIAssistantPage from "./pages/AIAssistantPage";
 import WalkthroughAIPage from "./pages/WalkthroughAIPage";
 import ToolkitPage from "./pages/ToolkitPage";
 import IntakePage from "./pages/IntakePage";
+import LeadLinkPage from "./pages/LeadLinkPage";
 import IntakeRequestsPage from "./pages/IntakeRequestsPage";
 import LeadCapturePage from "./pages/LeadCapturePage";
 import LeadFinderPage from "./pages/LeadFinderPage";
@@ -187,6 +188,9 @@ export default function App() {
 
         {/* Public intake form — no auth required */}
         <Route path="/intake/:businessId" element={<IntakePage />} />
+
+        {/* Lead Link microsite — slug-based branded quote request page */}
+        <Route path="/request/:slug" element={<LeadLinkPage />} />
 
         {/* Public cleaner schedule acknowledgment page */}
         <Route path="/schedule-ack/:token" element={<ScheduleAckPage />} />

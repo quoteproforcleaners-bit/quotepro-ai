@@ -1186,6 +1186,42 @@ const router = Router();
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // ─── Lead Link Analytics ─────────────────────────────────────────────────
+  router.get("/api/business/lead-link-analytics", requireAuth, requireGrowth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const [visits, conversions, recentEvents] = await Promise.all([
+        pool.query(
+          `SELECT COUNT(DISTINCT session_id) as count FROM lead_link_events WHERE business_id = $1 AND event_type = 'leadlink_visit' AND created_at > NOW() - INTERVAL '30 days'`,
+          [business.id]
+        ),
+        pool.query(
+          `SELECT COUNT(DISTINCT session_id) as count FROM lead_link_events WHERE business_id = $1 AND event_type = 'leadlink_submitted' AND created_at > NOW() - INTERVAL '30 days'`,
+          [business.id]
+        ),
+        pool.query(
+          `SELECT event_type, session_id, created_at FROM lead_link_events WHERE business_id = $1 ORDER BY created_at DESC LIMIT 50`,
+          [business.id]
+        ),
+      ]);
+
+      const visitCount = parseInt(visits.rows[0]?.count ?? "0");
+      const conversionCount = parseInt(conversions.rows[0]?.count ?? "0");
+      const conversionRate = visitCount > 0 ? Math.round((conversionCount / visitCount) * 100) : 0;
+
+      res.json({
+        visits: visitCount,
+        conversions: conversionCount,
+        conversionRate,
+        recentEvents: recentEvents.rows,
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   router.get("/api/files", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
