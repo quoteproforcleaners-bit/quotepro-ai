@@ -18,7 +18,8 @@ import {
   ArrowUpRight, Wrench, Inbox, Radio, Cpu, Link2, DollarSign, Building2,
   RefreshCw, CheckSquare, BarChart2, Star, Layers, BookOpen, Sliders,
   Clipboard, PlugZap, Moon, Sun, FolderOpen, MailOpen, Brain, UserCog,
-  Search, Plus, ChevronRight, ChevronDown, LifeBuoy, type LucideIcon,
+  Search, Plus, ChevronRight, ChevronDown, LifeBuoy, CircleUser,
+  Repeat2, type LucideIcon,
 } from "lucide-react";
 import { SupportModal } from "./SupportModal";
 
@@ -46,37 +47,58 @@ const SETTINGS_NAV_KEY = "quotepro_nav_settings_open";
 
 // CORE — unlabeled, always visible
 const CORE_NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard",  label: "Dashboard",  icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — revenue at a glance, pipeline health, recent quotes, and team activity." },
-  { to: "/quotes",     label: "Quotes",     icon: FileText, shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
-  { to: "/customers",  label: "Customers",  icon: Users, pro: true, description: "Full contact history, quote history, job records, and notes for every client in one place." },
-  { to: "/jobs",       label: "Jobs",       icon: Briefcase, pro: true, description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
+  { to: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — revenue at a glance, pipeline health, recent quotes, and team activity." },
+  { to: "/quotes",       label: "Quotes",       icon: FileText,        shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
+  { to: "/customers",    label: "Customers",    icon: Users,           pro: true,        description: "Full contact history, quote history, job records, and notes for every client in one place." },
+  { to: "/jobs",         label: "Jobs",         icon: Briefcase,       pro: true,        description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
+  { to: "/follow-ups",   label: "Follow-Ups",   icon: Bell,                              description: "Every quote that needs a follow-up, ranked by priority. Never let a lead go cold." },
+  { to: "/opportunities",label: "Opportunities",icon: TrendingUp,      pro: true,        description: "Upsell and re-engage existing customers — AI surfaces the best opportunities automatically." },
+];
+
+// GROWTH — labeled section
+const GROWTH_NAV_ITEMS: NavItem[] = [
+  { to: "/growth",           label: "Growth Dashboard",   icon: BarChart2,  pro: true, description: "Track growth metrics, win rate trends, revenue benchmarks, and your pipeline health over time." },
+  { to: "/revenue",          label: "Revenue",            icon: DollarSign, pro: true, description: "Full revenue reporting — monthly totals, job type breakdown, and trends vs. prior periods." },
+  { to: "/lead-finder",      label: "Lead Finder",        icon: Search,     pro: true, description: "AI-powered local lead discovery — find homeowners in your area who are likely to need cleaning." },
+  { to: "/reactivation",     label: "Win-Back",           icon: Repeat2,    pro: true, description: "Automatically identify and re-engage past customers who haven't booked in 60+ days." },
+  { to: "/weekly-recap",     label: "Weekly Recap",       icon: BookOpen,   pro: true, description: "AI-generated weekly summary of your quotes, jobs, revenue, and follow-up priorities." },
+  { to: "/reviews-referrals",label: "Reviews & Referrals",icon: Star,       pro: true, description: "Automate Google review requests and track referrals from your best customers." },
 ];
 
 // TOOLS — labeled section
 const TOOLS_NAV_ITEMS: NavItem[] = [
-  { to: "/quote-doctor",      label: "Quote Doctor",       icon: Zap, description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
-  { to: "/commercial-quote",  label: "Commercial Quote",   icon: Building2, pro: true, description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
-  { to: "/walkthrough-ai",    label: "Quote from Notes",   icon: Wand2, description: "Paste your walkthrough notes and let AI generate a complete, ready-to-send quote instantly." },
-  { to: "/closing-assistant", label: "Objection Assistant",icon: Target, pro: true, description: "AI coach that gives you word-for-word responses to price pushback and sales objections." },
-  { to: "/ai-assistant",      label: "Sales Assistant",    icon: Bot, pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
+  { to: "/quote-doctor",      label: "Quote Doctor",       icon: Zap,         description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
+  { to: "/commercial-quote",  label: "Commercial Quote",   icon: Building2,   pro: true, description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
+  { to: "/walkthrough-ai",    label: "Quote from Notes",   icon: Wand2,                  description: "Paste your walkthrough notes and let AI generate a complete, ready-to-send quote instantly." },
+  { to: "/closing-assistant", label: "Objection Assistant",icon: Target,      pro: true, description: "AI coach that gives you word-for-word responses to price pushback and sales objections." },
+  { to: "/ai-assistant",      label: "Sales Assistant",    icon: Bot,         pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
+  { to: "/automations",       label: "Automations",        icon: Cpu,         pro: true, description: "Set up automated follow-ups, review requests, and customer sequences that run on autopilot." },
+  { to: "/email-sequences",   label: "Email Sequences",    icon: MailOpen,    pro: true, description: "Drip campaigns and one-off emails — automated sequences that nurture leads into booked jobs." },
+  { to: "/tasks-queue",       label: "Task Queue",         icon: CheckSquare, pro: true, description: "AI-generated action items prioritized by impact — your daily to-do list for growing faster." },
+  { to: "/toolkit",           label: "Toolkit",            icon: Wrench,                 description: "Calculators, scripts, templates, and reference tools for running a professional cleaning business." },
 ];
 
 // SETTINGS — collapsible labeled section
 const SETTINGS_NAV_ITEMS: NavItem[] = [
-  { to: "/settings",          label: "Price Settings",   icon: Settings, description: "Set your base rates, add-on prices, discounts, and tax rules for all your cleaning services." },
-  { to: "/quote-preferences", label: "Quote Settings",   icon: Sliders, description: "Control what appears on your quotes — service lines, terms, branding, and layout preferences." },
-  { to: "/pricing-logic",     label: "Pricing Engine",   icon: Brain, description: "AI-powered pricing logic based on your market, home size, and service type. Set your rates here." },
-  { to: "/sales-strategy",    label: "Sales Strategy",   icon: Layers, pro: true, description: "Personalized playbooks and talking points to help you close more jobs at higher prices." },
-  { to: "/calendar",          label: "Schedule",         icon: CalendarDays, pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
-  { to: "/employees",         label: "Team Members",     icon: UserCog, description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
-  { to: "/lead-capture",      label: "Lead Capture Link", icon: Link2, description: "Share your branded quote request link — customers submit details, you get instant leads." },
-  { to: "/intake-requests",   label: "Quote Requests",   icon: Inbox, description: "Leads submitted through your website intake form — review, respond, or convert them to quotes." },
+  { to: "/settings",          label: "Price Settings",    icon: Settings,    description: "Set your base rates, add-on prices, discounts, and tax rules for all your cleaning services." },
+  { to: "/quote-preferences", label: "Quote Settings",    icon: Sliders,     description: "Control what appears on your quotes — service lines, terms, branding, and layout preferences." },
+  { to: "/pricing-logic",     label: "Pricing Engine",    icon: Brain,       description: "AI-powered pricing logic based on your market, home size, and service type. Set your rates here." },
+  { to: "/sales-strategy",    label: "Sales Strategy",    icon: Layers,      pro: true, description: "Personalized playbooks and talking points to help you close more jobs at higher prices." },
+  { to: "/calendar",          label: "Schedule",          icon: CalendarDays,pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
+  { to: "/employees",         label: "Team Members",      icon: UserCog,                description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
+  { to: "/lead-capture",      label: "Lead Capture Link", icon: Link2,                  description: "Share your branded quote request link — customers submit details, you get instant leads." },
+  { to: "/intake-requests",   label: "Quote Requests",    icon: Inbox,                  description: "Leads submitted through your website intake form — review, respond, or convert them to quotes." },
+  { to: "/file-library",      label: "File Library",      icon: FolderOpen,             description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
+  { to: "/qbo-settings",      label: "QuickBooks",        icon: PlugZap,                description: "Sync your quotes, invoices, and payments directly to QuickBooks Online." },
+  { to: "/jobber",            label: "Jobber",            icon: Clipboard,              description: "Connect your Jobber account to sync jobs, customers, and scheduling automatically." },
+  { to: "/account-settings",  label: "Account",           icon: CircleUser,             description: "Manage your profile, password, notification preferences, and billing information." },
 ];
 
-// Legacy: keep all nav items for command palette (not shown in sidebar)
+// All nav items for command palette
 const navSections: NavSection[] = [
-  { label: null, items: CORE_NAV_ITEMS },
-  { label: "TOOLS", items: TOOLS_NAV_ITEMS },
+  { label: null,       items: CORE_NAV_ITEMS },
+  { label: "GROWTH",   items: GROWTH_NAV_ITEMS },
+  { label: "TOOLS",    items: TOOLS_NAV_ITEMS },
   { label: "SETTINGS", items: SETTINGS_NAV_ITEMS },
 ];
 
@@ -604,6 +626,29 @@ export function Layout() {
                 t={t}
               />
             ))}
+          </div>
+
+          {/* GROWTH */}
+          <div style={{ marginTop: "24px" }}>
+            <p
+              className="px-3 mb-1"
+              style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", color: "#a1a1aa" }}
+            >
+              GROWTH
+            </p>
+            <div className="space-y-0.5">
+              {GROWTH_NAV_ITEMS.map((item) => (
+                <NavItemWithTooltip
+                  key={item.to}
+                  item={item}
+                  enabled={navTooltipsEnabled}
+                  intakeNewCount={intakeNewCount}
+                  isPro={isPro}
+                  setSidebarOpen={setSidebarOpen}
+                  t={t}
+                />
+              ))}
+            </div>
           </div>
 
           {/* TOOLS */}
