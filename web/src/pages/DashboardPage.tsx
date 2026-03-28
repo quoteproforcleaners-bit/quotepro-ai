@@ -66,8 +66,16 @@ function todayLabel() {
 
 // ─── Command Header ──────────────────────────────────────────────────────────
 
+function getCloseRateColor(rate: number): string {
+  if (rate <= 0) return "#94a3b8";
+  if (rate < 25) return "#ef4444";
+  if (rate <= 50) return "#f59e0b";
+  return "#4ade80";
+}
+
 function CommandHeader({
   business,
+  todayRevenue,
   monthRevenue,
   weekJobs,
   closeRate,
@@ -79,6 +87,7 @@ function CommandHeader({
   navigate,
 }: {
   business: any;
+  todayRevenue: number;
   monthRevenue: number;
   weekJobs: number;
   closeRate: number;
@@ -90,7 +99,8 @@ function CommandHeader({
   navigate: (path: string) => void;
 }) {
   const hasRisk = followUpQueueCount > 0;
-  const closeRateColor = closeRate >= 50 ? "#10b981" : closeRate >= 35 ? "#f59e0b" : closeRate > 0 ? "#ef4444" : "#94a3b8";
+  const closeRateColor = getCloseRateColor(closeRate);
+  const dayStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
 
   return (
     <div className="mb-6">
@@ -103,9 +113,7 @@ function CommandHeader({
         }}
       >
         {/* Grid overlay */}
-        <div
-          className="absolute inset-0 pointer-events-none hero-grid-overlay"
-        />
+        <div className="absolute inset-0 pointer-events-none hero-grid-overlay" />
         {/* Blue glow */}
         <div
           className="absolute pointer-events-none"
@@ -126,29 +134,30 @@ function CommandHeader({
         <div className="relative z-10 px-6 pt-6 pb-5">
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
+              {/* Fix 3: Date label — 11px, 600 weight, 1.5px letter-spacing */}
               <p
-                className="text-[11px] font-semibold uppercase tracking-widest mb-2"
-                style={{ color: "rgba(147,197,253,0.6)", letterSpacing: "0.1em" }}
+                className="mb-2"
+                style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "1.5px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}
               >
-                {todayLabel()}
+                {dayStr}
               </p>
-              <h1
-                className="text-[26px] lg:text-[30px] font-bold leading-tight tracking-tight text-white"
-                style={{ letterSpacing: "-0.02em" }}
-              >
-                {greeting()}
+              {/* Fix 3: Greeting — 32px, 400 weight + company name 32px, 700 weight */}
+              <h1 style={{ fontSize: "32px", lineHeight: 1.1, letterSpacing: "-0.02em" }}>
+                <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.7)" }}>{greeting()}</span>
                 {business?.companyName ? (
-                  <span style={{ color: "rgba(255,255,255,0.65)", fontWeight: 400 }}>,&nbsp;{business.companyName}</span>
+                  <><br /><span style={{ fontWeight: 700, color: "#ffffff" }}>{business.companyName}</span></>
                 ) : null}
               </h1>
-              <p className="text-[13px] mt-1.5" style={{ color: "rgba(147,197,253,0.7)" }}>
+              {/* Fix 3: Subtext — 15px, rgba(255,255,255,0.55) */}
+              <p className="mt-2" style={{ fontSize: "15px", color: "rgba(255,255,255,0.55)" }}>
                 {monthRevenue > 0
                   ? `${fmt(monthRevenue)} recognized this month — keep pushing`
                   : "Your revenue operations command center"}
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0 mt-0.5">
-              {isInFreeTrial ? (
+            {/* Fix 3: Remove "+ New Quote" button — only show trial badge */}
+            {isInFreeTrial ? (
+              <div className="shrink-0 mt-0.5">
                 <button
                   onClick={() => navigate("/pricing")}
                   className="text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
@@ -156,21 +165,11 @@ function CommandHeader({
                 >
                   Trial: {freeTrialDaysLeft}d left
                 </button>
-              ) : null}
-              <button
-                onClick={() => navigate("/quotes/new")}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-[13px] transition-all active:scale-[0.97]"
-                style={{ background: "rgba(255,255,255,0.95)", color: "#1d4ed8" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "white"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.95)"; }}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                New Quote
-              </button>
-            </div>
+              </div>
+            ) : null}
           </div>
 
-          {/* Metric strip */}
+          {/* Fix 2 + Fix 3: Stat strip — today's snapshot metrics */}
           <div
             className="grid grid-cols-2 sm:grid-cols-4 gap-0 rounded-xl overflow-hidden"
             style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.04)" }}
@@ -178,10 +177,10 @@ function CommandHeader({
             {[
               {
                 icon: DollarSign,
-                label: "Month Revenue",
-                value: fmt(monthRevenue),
-                valueColor: "#34d399",
-                iconColor: "#34d399",
+                label: "Today's Revenue",
+                value: fmt(todayRevenue),
+                valueColor: todayRevenue > 0 ? "#4ade80" : "rgba(255,255,255,0.6)",
+                iconColor: "#4ade80",
               },
               {
                 icon: Briefcase,
@@ -199,10 +198,10 @@ function CommandHeader({
               },
               {
                 icon: followUpQueueCount > 0 ? PhoneMissed : CheckCircle,
-                label: followUpQueueCount > 0 ? "At Risk" : "Follow-ups",
-                value: followUpQueueCount > 0 ? fmt(amountAtRisk) : "Clear",
-                valueColor: followUpQueueCount > 0 ? "#fbbf24" : "#34d399",
-                iconColor: followUpQueueCount > 0 ? "#fbbf24" : "#34d399",
+                label: "Follow-Ups Due Today",
+                value: followUpQueueCount > 0 ? String(followUpQueueCount) : "Clear",
+                valueColor: followUpQueueCount > 0 ? "#fbbf24" : "#4ade80",
+                iconColor: followUpQueueCount > 0 ? "#fbbf24" : "#4ade80",
                 clickable: followUpQueueCount > 0,
               },
             ].map((stat, i) => (
@@ -210,22 +209,24 @@ function CommandHeader({
                 key={i}
                 onClick={stat.clickable ? () => navigate("/follow-ups") : undefined}
                 className={`px-5 py-4 flex items-start gap-3 ${i > 0 ? "border-l" : ""} ${stat.clickable ? "cursor-pointer hover:bg-white/5 transition-colors" : ""}`}
-                style={{ borderLeftColor: "rgba(255,255,255,0.07)" }}
+                style={{ borderLeftColor: "rgba(255,255,255,0.1)" }}
               >
                 <stat.icon
                   className="shrink-0 mt-0.5"
                   style={{ width: "14px", height: "14px", color: stat.iconColor, opacity: 0.85 }}
                 />
                 <div className="min-w-0">
+                  {/* Fix 3: Stat labels — 11px, uppercase, 0.8px letter-spacing, rgba(255,255,255,0.45) */}
                   <p
-                    className="text-[10px] uppercase tracking-wider mb-1 font-medium"
-                    style={{ color: "rgba(147,197,253,0.5)", letterSpacing: "0.07em" }}
+                    className="mb-1 font-medium uppercase"
+                    style={{ fontSize: "11px", letterSpacing: "0.8px", color: "rgba(255,255,255,0.45)" }}
                   >
                     {stat.label}
                   </p>
+                  {/* Fix 3: Stat values — 24px, 700 weight */}
                   <p
-                    className="text-[18px] font-bold leading-none stat-number"
-                    style={{ color: stat.valueColor }}
+                    className="leading-none stat-number"
+                    style={{ fontSize: "24px", fontWeight: 700, color: stat.valueColor }}
                   >
                     {stat.value}
                   </p>
@@ -357,19 +358,40 @@ function TodayOperations({
   const nextJob = todayJobs.find((j: any) => j.status !== "completed") || todayJobs[0];
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden mb-6 shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Today</span>
-          <span className="text-xs text-slate-400">— {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</span>
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/40 overflow-hidden mb-6 shadow-sm">
+      {/* Fix 9: TODAY header — pulsing green dot, uppercase tracking */}
+      <div
+        className="flex items-center justify-between px-5 py-3.5 border-b dark:border-slate-700/60"
+        style={{ borderBottomColor: "var(--border)", background: "var(--bg-card)" }}
+      >
+        <div className="flex items-center gap-2.5">
+          {/* Fix 9: Pulsing green dot with glow */}
+          <div className="relative w-2 h-2">
+            <div
+              className="absolute inset-0 rounded-full today-dot"
+              style={{ background: "#10b981" }}
+            />
+            <div
+              className="absolute -inset-1 rounded-full animate-ping opacity-40"
+              style={{ background: "#10b981" }}
+            />
+          </div>
+          <span
+            className="font-bold uppercase"
+            style={{ fontSize: "11px", letterSpacing: "1.5px", color: "#10b981" }}
+          >
+            TODAY
+          </span>
+          <span className="text-xs text-slate-400 dark:text-slate-500">
+            {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          </span>
         </div>
         <button
           onClick={() => navigate("/calendar")}
-          className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1"
+          className="flex items-center gap-1 text-xs font-semibold"
+          style={{ color: "#2563eb" }}
         >
-          Calendar <ChevronRight className="w-3 h-3" />
+          View Calendar <ChevronRight className="w-3 h-3" />
         </button>
       </div>
 
@@ -683,44 +705,117 @@ function StartHereChecklist({
   ];
   const completedCount = steps.filter((s) => s.done).length;
   const allDone = completedCount === steps.length;
-  if (allDone) return null;
   const pct = Math.round((completedCount / steps.length) * 100);
 
+  // Fix 4: Celebratory complete state — don't return null
+  if (allDone) {
+    return (
+      <div
+        className="rounded-2xl overflow-hidden mb-6 setup-complete-animation"
+        style={{ border: "2px solid #10b981", background: "linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(5,150,105,0.04) 100%)" }}
+      >
+        <div className="px-5 py-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+            <CheckCircle className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div className="flex-1">
+            <h2 className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">QuotePro is fully set up</h2>
+            <p className="text-xs text-emerald-700 dark:text-emerald-500 mt-0.5">All systems active — automation is running, quotes are live.</p>
+          </div>
+          <button
+            onClick={() => navigate("/growth")}
+            className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 shrink-0"
+          >
+            View Growth Hub <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Fix 4: Urgent incomplete state — amber warning treatment
+  const remainingSteps = steps.filter((s) => !s.done);
+  const nextStep = remainingSteps[0];
+
   return (
-    <div className="rounded-2xl border border-primary-200 dark:border-primary-800/50 bg-primary-50/40 dark:bg-primary-900/20 overflow-hidden mb-6">
-      <div className="px-5 py-4 border-b border-primary-100 dark:border-primary-800/40 flex items-center justify-between">
+    <div
+      className="rounded-2xl overflow-hidden mb-6"
+      style={{
+        border: "2px solid #f59e0b",
+        background: "linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(217,119,6,0.03) 100%)",
+      }}
+    >
+      {/* Amber accent bar */}
+      <div style={{ height: "3px", background: "linear-gradient(90deg, #f59e0b, #fbbf24)" }} />
+
+      <div className="px-5 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-primary-100 dark:bg-primary-800/50 flex items-center justify-center">
-            <Target className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+          <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
           </div>
           <div>
-            <h2 className="font-bold text-primary-900 dark:text-white text-sm">Get QuotePro Running</h2>
-            <p className="text-xs text-primary-600 dark:text-slate-400 mt-0.5">{completedCount} of {steps.length} steps complete</p>
+            <h2 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Complete setup to unlock full automation</h2>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{completedCount} of {steps.length} steps done · {steps.length - completedCount} remaining</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-28 h-1.5 rounded-full bg-primary-100 dark:bg-primary-800/50 overflow-hidden">
-            <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-24 h-1.5 rounded-full bg-amber-100 overflow-hidden">
+            <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
           </div>
-          <span className="text-xs font-bold text-primary-600 dark:text-slate-400">{pct}%</span>
+          <span className="text-xs font-bold text-amber-600">{pct}%</span>
         </div>
       </div>
-      <div className="divide-y divide-primary-100 dark:divide-primary-800/40">
-        {steps.filter((s) => !s.done).slice(0, 3).map((step) => (
-          <div key={step.id} className="flex items-center gap-4 px-5 py-3.5">
-            <div className="w-8 h-8 rounded-full border-2 border-primary-200 dark:border-primary-700/60 flex items-center justify-center shrink-0">
-              <step.icon className="w-3.5 h-3.5 text-primary-400 dark:text-primary-500" />
+
+      {/* Completed steps (greyed) */}
+      <div className="px-5 pb-1">
+        <div className="divide-y divide-amber-100">
+          {steps.filter((s) => s.done).map((step) => (
+            <div key={step.id} className="flex items-center gap-3 py-2.5 opacity-50">
+              <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+              </div>
+              <p className="text-xs font-medium text-slate-500 line-through">{step.label}</p>
             </div>
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex-1">{step.label}</p>
-            <button
-              onClick={() => navigate(step.path)}
-              className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 flex items-center gap-1 shrink-0"
-            >
-              {step.cta} <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-        ))}
+          ))}
+
+          {/* Next step — prominent amber CTA */}
+          {nextStep ? (
+            <div className="flex items-center gap-3 py-3">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+                style={{ background: "#f59e0b" }}
+              >
+                <nextStep.icon className="w-3 h-3 text-white" />
+              </div>
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 flex-1">{nextStep.label}</p>
+              <button
+                onClick={() => navigate(nextStep.path)}
+                className="flex items-center gap-1 text-xs font-bold text-white px-3 py-1.5 rounded-lg shrink-0"
+                style={{ background: "#f59e0b" }}
+              >
+                Complete <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+          ) : null}
+
+          {/* Other remaining steps (dimmer) */}
+          {remainingSteps.slice(1).map((step) => (
+            <div key={step.id} className="flex items-center gap-3 py-2.5 opacity-60">
+              <div className="w-6 h-6 rounded-full border-2 border-amber-200 flex items-center justify-center shrink-0">
+                <step.icon className="w-3 h-3 text-amber-400" />
+              </div>
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{step.label}</p>
+              <button
+                onClick={() => navigate(step.path)}
+                className="text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-1 shrink-0 ml-auto"
+              >
+                {step.cta} <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
+      <div style={{ height: "4px" }} />
     </div>
   );
 }
@@ -959,20 +1054,41 @@ export default function DashboardPage() {
     [acceptedQuotes, jobs]
   );
 
+  // Fix 2: Last month revenue for comparison
+  const lastMonthRevenue = useMemo(() => {
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return acceptedQuotes
+      .filter((q: any) => {
+        const d = new Date(q.createdAt);
+        return d.getMonth() === lastMonth.getMonth() && d.getFullYear() === lastMonth.getFullYear();
+      })
+      .reduce((s: number, q: any) => s + (Number(q.total) || 0), 0);
+  }, [acceptedQuotes]);
+
+  // Fix 2: Next scheduled job
+  const nextScheduledJob = useMemo(() => {
+    const now = Date.now();
+    return jobs
+      .filter((j: any) => j.startDatetime && new Date(j.startDatetime).getTime() > now && j.status !== "completed")
+      .sort((a: any, b: any) => new Date(a.startDatetime).getTime() - new Date(b.startDatetime).getTime())[0] || null;
+  }, [jobs]);
+
   // ── User maturity flags ────────────────────────────────────────────────────
   const isNewUser = quotes.length === 0;
   const hasPricing = !!(pricing && (pricing.laborRate > 0 || pricing.baseRate > 0 || pricing.targetMarginPct > 0));
   const hasQuotes = quotes.length > 0;
   const hasCustomers = customers.length > 0;
   const hasFollowUpActivity = currentStreak > 0 || followUpQueueCount > 0;
-  const showChecklist = !hasQuotes || !hasCustomers || !hasFollowUpActivity;
+  // Fix 4: Always show checklist — component handles incomplete (urgent) vs complete (celebratory)
+  const showChecklist = true;
 
   const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   const streakDaysToShow = Math.min(currentStreak, 7);
 
-  // ── Close rate determination for KPI color ────────────────────────────────
+  // ── Fix 7: 3-tier close rate color ────────────────────────────────────────
   const closeRateColor: "emerald" | "amber" | "red" =
-    closeRate >= 50 ? "emerald" : closeRate >= 30 ? "amber" : "red";
+    closeRate > 50 ? "emerald" : closeRate >= 25 ? "amber" : "red";
 
   // ── Attention items ────────────────────────────────────────────────────────
   const attentionItems = useMemo<AttentionItem[]>(() => {
@@ -1150,6 +1266,7 @@ export default function DashboardPage() {
       {/* 1. Command Header */}
       <CommandHeader
         business={business}
+        todayRevenue={todayRevenue}
         monthRevenue={monthlyRevenue}
         weekJobs={weekJobs}
         closeRate={closeRate}
@@ -1172,48 +1289,56 @@ export default function DashboardPage() {
         />
       ) : null}
 
-      {/* 3. KPI Momentum Row */}
+      {/* 3. KPI Momentum Row — Fix 2: differentiated monthly view */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* Fix 2: Revenue Won This Month */}
         <KPICard
-          label="Revenue Won"
-          value={fmt(totalRevenue)}
-          subtitle={`${fmt(monthlyRevenue)} this month`}
+          label="Revenue Won This Month"
+          value={fmt(monthlyRevenue)}
+          subtitle={lastMonthRevenue > 0
+            ? `${monthlyRevenue >= lastMonthRevenue ? "↑" : "↓"} ${Math.abs(Math.round(((monthlyRevenue - lastMonthRevenue) / Math.max(lastMonthRevenue, 1)) * 100))}% vs ${fmt(lastMonthRevenue)} last mo`
+            : "vs $0 last month"}
           icon={DollarSign}
           color="emerald"
-          badge={totalRevenue > 0 ? "Live" : undefined}
+          badge="Live"
           badgePositive
           onClick={() => navigate("/opportunities")}
         />
+        {/* Fix 2: Active Jobs with next job */}
         <KPICard
           label="Active Jobs"
           value={activeJobs.length}
-          subtitle={`${jobs.length} total scheduled`}
+          subtitle={nextScheduledJob
+            ? `Next: ${new Date(nextScheduledJob.startDatetime).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+            : `${jobs.length} total scheduled`}
           icon={Briefcase}
           color="blue"
           onClick={() => navigate("/jobs")}
         />
+        {/* Fix 7: Close Rate with 3-tier badge */}
         <KPICard
           label="Close Rate"
           value={closeRate > 0 ? `${Math.round(closeRate)}%` : "—"}
           subtitle={
-            closeRate >= 50 ? "Excellent performance" :
-            closeRate >= 35 ? "Room to improve" :
+            closeRate > 50 ? "Strong close rate" :
+            closeRate >= 25 ? "Room to improve" :
             closeRate > 0 ? "Needs attention" :
             "Send quotes to start tracking"
           }
           icon={Target}
           color={closeRateColor}
-          badge={closeRate >= 50 ? "Strong" : closeRate > 0 && closeRate < 35 ? "Low" : undefined}
-          badgePositive={closeRate >= 50}
+          badge={closeRate > 50 ? "Strong" : closeRate >= 25 ? "Improving" : closeRate > 0 ? "Needs Attention" : undefined}
+          badgePositive={closeRate > 50}
           onClick={() => navigate("/quotes")}
         />
+        {/* Fix 2: Pipeline Value */}
         <KPICard
           label="Pipeline Value"
           value={fmt(pipelineValue)}
           subtitle={`${unscheduledAccepted} accepted, need scheduling`}
           icon={TrendingUp}
           color={unscheduledAccepted > 0 ? "amber" : "violet"}
-          badge={unscheduledAccepted > 0 ? `${unscheduledAccepted} pending` : undefined}
+          badge={unscheduledAccepted > 0 ? `${unscheduledAccepted} Pending` : undefined}
           badgePositive={false}
           onClick={() => navigate("/quotes?filter=accepted")}
         />

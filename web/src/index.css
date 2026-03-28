@@ -459,6 +459,124 @@ input[type="range"]::-moz-range-thumb {
   font-family: var(--font-sans);
 }
 
+/* ─── Fix 8: Dark Mode CSS Variables ────────────────────────────────────── */
+
+:root {
+  --bg-root: #F5F4F1;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f9f9f7;
+  --border: rgba(0,0,0,0.07);
+  --border-hover: rgba(0,0,0,0.12);
+  --text-primary: #09090b;
+  --text-secondary: #52525b;
+  --text-muted: #a1a1aa;
+  --accent-blue: #2563eb;
+  --accent-cyan: #06b6d4;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+}
+
+html.dark {
+  --bg-root: #09090f;
+  --bg-card: #16161e;
+  --bg-card-hover: #1e1e2e;
+  --border: rgba(255,255,255,0.08);
+  --border-hover: rgba(255,255,255,0.14);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+  --accent-blue: #2563eb;
+  --accent-cyan: #06b6d4;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+}
+
+/* ─── Fix 6: Status Badge ────────────────────────────────────────────────── */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 100px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.status-badge-live    { background: #dcfce7; color: #166534; }
+.status-badge-success { background: #dcfce7; color: #166534; }
+.status-badge-warning { background: #fef3c7; color: #92400e; }
+.status-badge-error   { background: #fee2e2; color: #991b1b; }
+.status-badge-info    { background: #dbeafe; color: #1e40af; }
+.status-badge-neutral { background: #f1f5f9; color: #475569; }
+
+html.dark .status-badge-live    { background: rgba(34,197,94,0.15); color: #4ade80; }
+html.dark .status-badge-success { background: rgba(34,197,94,0.15); color: #4ade80; }
+html.dark .status-badge-warning { background: rgba(245,158,11,0.15); color: #fbbf24; }
+html.dark .status-badge-error   { background: rgba(239,68,68,0.15);  color: #f87171; }
+html.dark .status-badge-info    { background: rgba(37,99,235,0.2);   color: #93c5fd; }
+html.dark .status-badge-neutral { background: rgba(71,85,105,0.2);   color: #94a3b8; }
+
+.status-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-badge-live .status-badge-dot    { background: #22c55e; animation: pulse-live 2s ease-in-out infinite; }
+.status-badge-success .status-badge-dot { background: #22c55e; }
+.status-badge-warning .status-badge-dot { background: #f59e0b; }
+.status-badge-error .status-badge-dot   { background: #ef4444; }
+.status-badge-info .status-badge-dot    { background: #3b82f6; }
+.status-badge-neutral .status-badge-dot { background: #94a3b8; }
+
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+/* ─── Fix 5: AI Button Animations ───────────────────────────────────────── */
+
+@keyframes ai-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 20px rgba(37,99,235,0.4), 0 2px 8px rgba(0,0,0,0.15); }
+  50%       { transform: scale(1.08); box-shadow: 0 6px 28px rgba(37,99,235,0.55), 0 2px 8px rgba(0,0,0,0.18); }
+}
+
+.ai-bubble-pulse {
+  animation: ai-pulse 2s ease-in-out 3;
+}
+
+/* ─── Fix 4: Setup Complete Animation ───────────────────────────────────── */
+
+@keyframes setup-complete {
+  0%   { transform: scale(0.8); opacity: 0; }
+  60%  { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.setup-complete-icon {
+  animation: setup-complete 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ─── Fix 9: Today Green Dot ─────────────────────────────────────────────── */
+
+@keyframes pulse-green-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50%       { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+}
+
+.today-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  animation: pulse-green-dot 2s ease-in-out infinite;
+}
+
 /* ─── Dashboard Hero ─────────────────────────────────────────────────────── */
 
 .hero-grid-overlay {

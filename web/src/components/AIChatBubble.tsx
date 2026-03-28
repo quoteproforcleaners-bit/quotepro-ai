@@ -320,34 +320,64 @@ export default function AIChatBubble() {
         </div>
       )}
 
-      {/* ── Bubble Button ── */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
-        style={{
-          background: open ? "#374151" : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
-          boxShadow: open
-            ? "0 4px 20px rgba(0,0,0,0.25)"
-            : "0 4px 20px rgba(79,70,229,0.4), 0 2px 8px rgba(0,0,0,0.15)",
-        }}
-        title="QuotePro AI"
-      >
-        {open ? (
-          <X className="w-5 h-5 text-white" />
-        ) : (
-          <div className="relative">
-            <Sparkles className="w-5 h-5 text-white" />
-            {unread && (
-              <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white" />
-            )}
-          </div>
+      {/* ── Bubble Button — Fix 5: brand blue gradient, "Ask AI" label, pulse ring ── */}
+      <div className="fixed bottom-5 right-5 z-50 flex flex-col items-center gap-1.5">
+        {/* "Ask AI" label — only when closed */}
+        {!open && (
+          <span
+            className="text-[10px] font-bold uppercase tracking-widest select-none"
+            style={{ color: "#2563eb", letterSpacing: "1.2px", textShadow: "0 1px 4px rgba(37,99,235,0.2)" }}
+          >
+            Ask AI
+          </span>
         )}
-      </button>
+        <div className="relative">
+          {/* Pulse ring — only when closed */}
+          {!open && (
+            <span
+              className="absolute inset-0 rounded-full ai-pulse"
+              style={{
+                background: "rgba(37,99,235,0.25)",
+                animation: "aiPulse 2.2s ease-out infinite",
+              }}
+            />
+          )}
+          <button
+            onClick={() => setOpen((o) => !o)}
+            className="relative w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+            style={{
+              background: open
+                ? "#374151"
+                : "linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)",
+              boxShadow: open
+                ? "0 4px 20px rgba(0,0,0,0.25)"
+                : "0 4px 24px rgba(37,99,235,0.45), 0 2px 8px rgba(0,0,0,0.15)",
+            }}
+            title="QuotePro AI"
+          >
+            {open ? (
+              <X className="w-5 h-5 text-white" />
+            ) : (
+              <div className="relative">
+                <Sparkles className="w-5 h-5 text-white" />
+                {unread && (
+                  <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white" />
+                )}
+              </div>
+            )}
+          </button>
+        </div>
+      </div>
 
       <style>{`
         @keyframes bubbleIn {
           from { opacity: 0; transform: scale(0.85) translateY(12px); }
           to   { opacity: 1; transform: scale(1)    translateY(0); }
+        }
+        @keyframes aiPulse {
+          0%   { transform: scale(1);    opacity: 0.7; }
+          70%  { transform: scale(1.55); opacity: 0;   }
+          100% { transform: scale(1.55); opacity: 0;   }
         }
       `}</style>
     </>
