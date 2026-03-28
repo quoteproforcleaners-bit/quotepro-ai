@@ -274,6 +274,7 @@ export default function QuoteDetailPage() {
       const res = await apiPost(`/api/ai/generate-message`, {
         purpose,
         channel,
+        quoteId: quote.id,
         customerName: quote.customerName,
         companyName: businessProfile?.companyName || "",
         senderName: businessProfile?.senderName || "",
@@ -311,6 +312,7 @@ export default function QuoteDetailPage() {
         channel: msgChannel,
         content,
         ...(msgChannel === "email" ? { subject } : {}),
+        ...(msgPurpose === "send_quote" && msgChannel === "email" ? { quoteId: quote.id } : {}),
       });
       showToast(`${msgChannel === "sms" ? "SMS" : "Email"} sent!`, "success");
       setAiDrafts((prev) => ({ ...prev, [currentDraftKey]: "" }));

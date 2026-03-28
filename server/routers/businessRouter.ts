@@ -314,11 +314,12 @@ const router = Router();
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const { customerId, channel, content, subject } = req.body as {
+      const { customerId, channel, content, subject, quoteId } = req.body as {
         customerId: string;
         channel: "email" | "sms";
         content: string;
         subject?: string;
+        quoteId?: string;
       };
 
       if (!customerId || !channel || !content?.trim()) {
@@ -337,7 +338,44 @@ const router = Router();
         if (!toEmail) return res.status(400).json({ message: "Customer has no email address on file" });
         const { fromName, replyTo } = getBusinessSendParams(business);
         const emailSubject = subject || `A message from ${fromName}`;
-        const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${content.split("\n").map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join("")}</td></tr><tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
+        const qpEmail = (business as any).quotePreferences;
+        const primaryColor = qpEmail?.brandColor || business.primaryColor || "#2563EB";
+
+        // Build option cards when a quoteId is provided (send_quote flow)
+        let optionCardsHtml = "";
+        if (quoteId) {
+          try {
+            const quoteData = await getQuoteById(quoteId);
+            if (quoteData && quoteData.publicToken) {
+              const quoteUrl = `${getPublicBaseUrl(req)}/q/${quoteData.publicToken}`;
+              const opts = (quoteData.options as any) || {};
+              const savedRec = (quoteData as any).recommendedOption || "better";
+              const tierCards = (["good", "better", "best"] as const)
+                .filter(k => opts[k] !== undefined)
+                .map(k => {
+                  const opt = opts[k];
+                  const price = Number(opt.price || 0);
+                  const name = opt.name || opt.serviceTypeName || (k.charAt(0).toUpperCase() + k.slice(1));
+                  const scope = opt.scope || "";
+                  const isRec = k === savedRec;
+                  const borderColor = isRec ? primaryColor : "#eeeeee";
+                  const bgColor = isRec ? "#f9f9ff" : "#ffffff";
+                  const badgeHtml = isRec
+                    ? `<div style="display:inline-block;background:${primaryColor};color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;margin-bottom:12px;letter-spacing:0.5px;">RECOMMENDED</div><br/>`
+                    : "";
+                  return `<tr><td style="padding:8px 16px;"><table width="100%" cellpadding="0" cellspacing="0" style="border:2px solid ${borderColor};border-radius:8px;background-color:${bgColor};"><tr><td style="padding:20px;">${badgeHtml}<div style="font-size:18px;font-weight:700;color:#333333;margin-bottom:4px;">${name}</div>${scope ? `<div style="font-size:13px;color:#666666;margin-bottom:14px;line-height:1.4;">${scope}</div>` : ""}<div style="font-size:26px;font-weight:700;color:${primaryColor};margin-bottom:16px;">$${price.toFixed(2)}</div><a href="${quoteUrl}?option=${k}" style="display:block;background:${primaryColor};color:white;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;text-align:center;">Accept ${name}</a></td></tr></table></td></tr>`;
+                })
+                .join("");
+              if (tierCards) {
+                optionCardsHtml = `<tr><td style="padding:24px 0 8px;text-align:center;border-top:1px solid #eeeeee;"><h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#333333;">Your Quote Options</h2><p style="margin:0;font-size:13px;color:#666666;">Select the package that works best for you.</p></td></tr><tr><td><table width="100%" cellpadding="0" cellspacing="0">${tierCards}</table></td></tr><tr><td style="padding:16px;text-align:center;background-color:#f9f9f9;border-top:1px solid #eeeeee;"><p style="margin:0;font-size:12px;color:#666666;line-height:1.5;">Or reply with <strong>1</strong> (Good), <strong>2</strong> (Better), or <strong>3</strong> (Best) to select your option.</p></td></tr>`;
+              }
+            }
+          } catch (e) {
+            console.error("[send-direct] Failed to build option cards:", e);
+          }
+        }
+
+        const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${content.split("\n").map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join("")}</td></tr>${optionCardsHtml}<tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
         await sendEmail({ to: toEmail, subject: emailSubject, html: htmlBody, text: content, fromName, replyTo });
       } else {
         const twilioSid = process.env.TWILIO_ACCOUNT_SID;

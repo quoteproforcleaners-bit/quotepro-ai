@@ -1566,7 +1566,7 @@ Return exactly this JSON structure:
 
   router.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { channel, total, status, quoteLink, bookingLink, paymentMethodsText, language: commLang } = req.body;
+      const { channel, total, status, quoteLink, bookingLink, paymentMethodsText, language: commLang, quoteId } = req.body;
       const purpose = sanitizeAndLog(req.body.purpose || "", req.session.userId!, "generate-message-purpose");
       const customerName = sanitizeAndLog(req.body.customerName || "", req.session.userId!, "generate-message-customer");
       const companyName = sanitizeAndLog(req.body.companyName || "", req.session.userId!, "generate-message-company");
@@ -1575,9 +1575,35 @@ Return exactly this JSON structure:
       const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
 
       const genMsgBusiness = await getBusinessByOwner(req.session.userId!);
-      const quoteContext = total ? ` Quote total: $${total}.` : "";
       const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
       const langInstruction = getLangInstruction(commLang || (genMsgBusiness as any)?.commLanguage);
+
+      // For send_quote purpose, fetch the quote options for richer context
+      let quotePackageContext = "";
+      let quoteRecommendedName = "";
+      if (purpose === "send_quote" && quoteId) {
+        try {
+          const quoteData = await getQuoteById(quoteId);
+          if (quoteData) {
+            const opts = (quoteData.options as any) || {};
+            const recKey = (quoteData as any).recommendedOption || "better";
+            const tierLines = (["good", "better", "best"] as const)
+              .filter(k => opts[k] !== undefined)
+              .map(k => {
+                const o = opts[k];
+                const name = o.name || o.serviceTypeName || (k.charAt(0).toUpperCase() + k.slice(1));
+                const price = Number(o.price || 0);
+                const isRec = k === recKey;
+                if (isRec) quoteRecommendedName = name;
+                return `${name}: $${price.toFixed(0)}${isRec ? " (recommended)" : ""}`;
+              });
+            if (tierLines.length > 0) {
+              quotePackageContext = ` The quote includes ${tierLines.length} packages: ${tierLines.join(", ")}.`;
+            }
+          }
+        } catch {}
+      }
+      const quoteContext = quotePackageContext || (total ? ` Quote total: $${total}.` : "");
 
       let systemPrompt: string;
       let userPrompt: string;
@@ -1585,6 +1611,9 @@ Return exactly this JSON structure:
       if (msgType === "sms") {
         systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
         userPrompt = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
+      } else if (purpose === "send_quote") {
+        systemPrompt = `Write a short professional email (under 160 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. IMPORTANT: Do NOT mention specific dollar amounts — the email will include clickable pricing cards below showing each package with its price. Instead, mention the package names and invite the customer to choose. Do NOT include any URLs in the body — a styled quote button is added automatically. Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+        userPrompt = `Write a quote delivery email to ${customerName || "the customer"}.${quoteContext}${quoteRecommendedName ? ` Highlight the recommended package "${quoteRecommendedName}" by name.` : ""} The email should: greet ${customerName || "them"} by name, let them know their quote has multiple cleaning packages to choose from (pricing cards will appear below), invite them to reply with questions, sign off warmly from ${senderName || "the team"}.${paymentInfo} Reply with ONLY the email.`;
       } else {
         systemPrompt = `Write a short professional email (under 150 words) for "${companyName || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Do NOT include the raw URL in the email body. Instead, write a sentence like "You can view and accept your quote by clicking the link below." A styled button with the link will be automatically added after your email.` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
         userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
