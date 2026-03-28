@@ -69,6 +69,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { to: "/sales-strategy",    label: "Sales Strategy",   icon: Layers, pro: true, description: "Personalized playbooks and talking points to help you close more jobs at higher prices." },
   { to: "/calendar",          label: "Schedule",         icon: CalendarDays, pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
   { to: "/employees",         label: "Team Members",     icon: UserCog, description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
+  { to: "/lead-capture",      label: "Lead Capture Link", icon: Link2, description: "Share your branded quote request link — customers submit details, you get instant leads." },
   { to: "/intake-requests",   label: "Quote Requests",   icon: Inbox, description: "Leads submitted through your website intake form — review, respond, or convert them to quotes." },
 ];
 
