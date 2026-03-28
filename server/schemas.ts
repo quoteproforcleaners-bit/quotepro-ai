@@ -14,7 +14,8 @@ export class AppError extends Error {
 }
 
 // ─── Quote Options ────────────────────────────────────────────────────────────
-// The options JSONB column stores one entry per tier (good/better/best).
+// The options JSONB column stores one entry per option key.
+// Keys are arbitrary strings (historically good/better/best, but any name is valid).
 // Each tier has at minimum: price, name, scope, and the list of add-ons included.
 
 export const QuoteTierSchema = z.object({
@@ -27,11 +28,8 @@ export const QuoteTierSchema = z.object({
   totalHours: z.number().nonnegative().optional(),
 });
 
-export const QuoteOptionsSchema = z.object({
-  good: QuoteTierSchema,
-  better: QuoteTierSchema,
-  best: QuoteTierSchema,
-});
+// Accepts any option key names — not just good/better/best
+export const QuoteOptionsSchema = z.record(z.string(), QuoteTierSchema);
 
 export type QuoteOptions = z.infer<typeof QuoteOptionsSchema>;
 export type QuoteTier = z.infer<typeof QuoteTierSchema>;
