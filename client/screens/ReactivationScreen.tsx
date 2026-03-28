@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  FlatList,
   useWindowDimensions,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -16,7 +17,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
@@ -75,6 +76,7 @@ export default function ReactivationScreen() {
   const [campaignSegment, setCampaignSegment] = useState<Segment>("dormant");
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [generatingContent, setGeneratingContent] = useState(false);
   const [viewingCampaign, setViewingCampaign] = useState<any>(null);
   const [sendingCampaign, setSendingCampaign] = useState(false);
@@ -91,20 +93,31 @@ export default function ReactivationScreen() {
   const [hasUnsavedEdits, setHasUnsavedEdits] = useState(false);
 
   const dormantQuery = useQuery<any[]>({ queryKey: ["/api/opportunities/dormant"] });
-  const customersQuery = useQuery<any[]>({ queryKey: ["/api/customers"] });
   const campaignsQuery = useQuery<any[]>({ queryKey: ["/api/campaigns"] });
+
+  const customersInfiniteQuery = useInfiniteQuery({
+    queryKey: ["/api/customers/paginated", debouncedSearch],
+    queryFn: async ({ pageParam = 1 }: { pageParam: number }) => {
+      const params = new URLSearchParams({ page: String(pageParam), limit: "50" });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const res = await apiRequest("GET", `/api/customers?${params}`);
+      return res.json() as Promise<{ customers: any[]; total: number; page: number; totalPages: number; hasMore: boolean }>;
+    },
+    getNextPageParam: (lastPage: any) => lastPage.hasMore ? lastPage.page + 1 : undefined,
+    initialPageParam: 1,
+    enabled: campaignSegment === "custom" && modalVisible,
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(customerSearch), 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
+
+  const allCustomers = customersInfiniteQuery.data?.pages.flatMap((p: any) => p.customers) ?? [];
+  const totalCustomers = customersInfiniteQuery.data?.pages[0]?.total ?? 0;
 
   const totalDormant = dormantQuery.data?.length ?? 0;
   const estimatedValue = dormantQuery.data?.reduce((sum: number, c: any) => sum + (c.avgTicket ?? 0), 0) ?? 0;
-
-  const filteredCustomers = useMemo(() => {
-    if (!customersQuery.data) return [];
-    const search = customerSearch.toLowerCase();
-    return customersQuery.data.filter((c: any) => {
-      if (!search) return true;
-      return (c.name || "").toLowerCase().includes(search) || (c.email || "").toLowerCase().includes(search) || (c.phone || "").includes(search);
-    });
-  }, [customersQuery.data, customerSearch]);
 
   useEffect(() => {
     if (confirmSend && viewingCampaign?.id) {
@@ -423,40 +436,61 @@ export default function ReactivationScreen() {
             testID="input-customer-search"
             value={customerSearch}
             onChangeText={setCustomerSearch}
-            placeholder="Search by name, email, or phone..."
+            placeholder="Search by name or email..."
             placeholderTextColor={dt.textSecondary}
             style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border, marginBottom: Spacing.sm }]}
           />
+          {allCustomers.length > 0 || totalCustomers > 0 ? (
+            <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: Spacing.xs }}>
+              {`Showing ${allCustomers.length} of ${totalCustomers} customers`}
+            </ThemedText>
+          ) : null}
           <View style={[styles.customerList, { borderColor: dt.border }]}>
-            {customersQuery.isLoading ? (
-              <ActivityIndicator color={dt.accent} style={{ padding: Spacing.lg }} />
-            ) : filteredCustomers.length === 0 ? (
-              <ThemedText type="caption" style={{ color: dt.textSecondary, padding: Spacing.md, textAlign: "center" }}>
-                No customers found
-              </ThemedText>
-            ) : (
-              <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled>
-                {filteredCustomers.map((c: any) => {
-                  const isSelected = selectedCustomerIds.includes(c.id.toString());
-                  return (
-                    <Pressable
-                      key={c.id}
-                      testID={`customer-${c.id}`}
-                      onPress={() => toggleCustomer(c.id.toString())}
-                      style={[styles.customerRow, { backgroundColor: isSelected ? dt.accentSoft : "transparent" }]}
-                    >
-                      <View style={[styles.checkbox, { borderColor: isSelected ? dt.accent : dt.border, backgroundColor: isSelected ? dt.accent : "transparent" }]}>
-                        {isSelected ? <Feather name="check" size={12} color="#FFFFFF" /> : null}
-                      </View>
-                      <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                        <ThemedText type="small">{c.name || "Unnamed"}</ThemedText>
-                        {c.email ? <ThemedText type="caption" style={{ color: dt.textSecondary }}>{c.email}</ThemedText> : null}
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            )}
+            <FlatList
+              data={allCustomers}
+              keyExtractor={(item) => item.id.toString()}
+              style={{ maxHeight: 160 }}
+              nestedScrollEnabled
+              onEndReached={() => {
+                if (customersInfiniteQuery.hasNextPage && !customersInfiniteQuery.isFetchingNextPage) {
+                  customersInfiniteQuery.fetchNextPage();
+                }
+              }}
+              onEndReachedThreshold={0.4}
+              renderItem={({ item: c }) => {
+                const isSelected = selectedCustomerIds.includes(c.id.toString());
+                const displayName = c.name || `${c.firstName || ""} ${c.lastName || ""}`.trim() || "Unnamed";
+                return (
+                  <Pressable
+                    testID={`customer-${c.id}`}
+                    onPress={() => toggleCustomer(c.id.toString())}
+                    style={[styles.customerRow, { backgroundColor: isSelected ? dt.accentSoft : "transparent" }]}
+                  >
+                    <View style={[styles.checkbox, { borderColor: isSelected ? dt.accent : dt.border, backgroundColor: isSelected ? dt.accent : "transparent" }]}>
+                      {isSelected ? <Feather name="check" size={12} color="#FFFFFF" /> : null}
+                    </View>
+                    <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                      <ThemedText type="small">{displayName}</ThemedText>
+                      {c.email ? <ThemedText type="caption" style={{ color: dt.textSecondary }}>{c.email}</ThemedText> : null}
+                    </View>
+                  </Pressable>
+                );
+              }}
+              ListEmptyComponent={
+                customersInfiniteQuery.isLoading ? (
+                  <ActivityIndicator color={dt.accent} style={{ padding: Spacing.lg }} />
+                ) : (
+                  <ThemedText type="caption" style={{ color: dt.textSecondary, padding: Spacing.md, textAlign: "center" }}>
+                    No customers found
+                  </ThemedText>
+                )
+              }
+              ListFooterComponent={
+                customersInfiniteQuery.isFetchingNextPage ? (
+                  <ActivityIndicator color={dt.accent} style={{ padding: Spacing.sm }} />
+                ) : null
+              }
+            />
           </View>
         </View>
       ) : null}

@@ -4,7 +4,7 @@
 
 import { Router, type Request, type Response } from "express";
 import { pool, db } from "../db";
-import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql, ilike, or } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import { callAI } from "../aiClient";
@@ -81,7 +81,35 @@ const router = Router();
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const { search, status } = req.query as any;
+      const { search, status, page, limit } = req.query as any;
+
+      if (page !== undefined || limit !== undefined) {
+        const pageNum = Math.max(1, parseInt(page || "1", 10));
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit || "50", 10)));
+        const offset = (pageNum - 1) * limitNum;
+
+        const searchConditions = search
+          ? or(
+              ilike(customers.firstName, `%${search}%`),
+              ilike(customers.lastName, `%${search}%`),
+              ilike(customers.email, `%${search}%`)
+            )
+          : undefined;
+
+        const whereClause = searchConditions
+          ? and(eq(customers.businessId, business.id), isNull(customers.deletedAt), searchConditions)
+          : and(eq(customers.businessId, business.id), isNull(customers.deletedAt));
+
+        const [countResult, list] = await Promise.all([
+          db.select({ count: sql<number>`count(*)::int` }).from(customers).where(whereClause),
+          db.select().from(customers).where(whereClause).orderBy(desc(customers.updatedAt)).limit(limitNum).offset(offset),
+        ]);
+
+        const total = countResult[0]?.count ?? 0;
+        const totalPages = Math.ceil(total / limitNum);
+        return res.json({ customers: list, total, page: pageNum, totalPages, hasMore: pageNum < totalPages });
+      }
+
       const list = await getCustomersByBusiness(business.id, { search, status });
       return res.json(list);
     } catch (error: any) {
