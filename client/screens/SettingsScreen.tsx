@@ -1364,6 +1364,67 @@ export default function SettingsScreen() {
 
         <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
 
+        {/* Server-side smart trigger preferences */}
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Activation reminders</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              Nudges in your first 72 hours to send your first quote
+            </ThemedText>
+          </View>
+          <Switch
+            value={currentPrefs.pushPrefs?.activationReminders !== false}
+            onValueChange={(val) =>
+              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs ?? {}), activationReminders: val } })
+            }
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-push-activation"
+          />
+        </View>
+
+        <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
+
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Quote expiry alerts</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              Push alert 24 hours before a sent quote expires
+            </ThemedText>
+          </View>
+          <Switch
+            value={currentPrefs.pushPrefs?.quoteExpiryAlerts !== false}
+            onValueChange={(val) =>
+              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs ?? {}), quoteExpiryAlerts: val } })
+            }
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-push-quote-expiry"
+          />
+        </View>
+
+        <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
+
+        <View style={styles.prefRow}>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Win-back alerts</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+              Monday digest of clients who haven't booked in 90 days
+            </ThemedText>
+          </View>
+          <Switch
+            value={currentPrefs.pushPrefs?.dormantCustomerAlerts !== false}
+            onValueChange={(val) =>
+              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs ?? {}), dormantCustomerAlerts: val } })
+            }
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-push-dormant"
+          />
+        </View>
+
+        <View style={[styles.prefDivider, { backgroundColor: theme.border }]} />
+
         <View style={styles.prefRow}>
           <View style={{ flex: 1 }}>
             <ThemedText type="body" style={{ fontWeight: "600" }}>{t.settings.quietHoursLabel}</ThemedText>

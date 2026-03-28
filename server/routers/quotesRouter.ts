@@ -25,6 +25,7 @@ import {
 import { logSync } from "../qbo-client";
 import { trackEvent } from "../analytics";
 import { maybeAwardBadge } from "../badgeRewards";
+import { onFirstQuoteSent } from "../notificationScheduler";
 import { AnalyticsEvents } from "../../shared/analytics-events";
 import {
   getUserById, getUserByEmail, getUserByProviderId, createUser, updateUser,
@@ -381,6 +382,23 @@ const router = Router();
       }
 
       trackEvent(req.session.userId!, AnalyticsEvents.FIRST_QUOTE_SENT, { quoteId: q.id, channel }).catch(() => {});
+
+      // Fire congrats push + cancel activation triggers on the very first quote sent
+      pool.query(
+        `SELECT COUNT(*) AS c
+         FROM quotes q2
+         JOIN businesses b2 ON b2.id = q2.business_id
+         WHERE b2.owner_user_id = $1
+           AND q2.status IN ('sent','viewed','accepted','declined')
+           AND q2.deleted_at IS NULL`,
+        [req.session.userId],
+      ).then(async (r) => {
+        const total = parseInt(r.rows[0]?.c ?? "0", 10);
+        if (total === 1) {
+          await onFirstQuoteSent(req.session.userId!);
+        }
+      }).catch(() => {});
+
       return res.json(q);
     } catch (error: any) {
       console.error("Send quote error:", error);

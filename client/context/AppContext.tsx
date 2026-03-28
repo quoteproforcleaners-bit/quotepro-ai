@@ -7,6 +7,7 @@ import {
 } from "@/types";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/context/AuthContext";
+import { registerForPushNotificationsAsync, savePushTokenToServer } from "@/lib/notifications";
 
 interface AppContextType {
   isLoading: boolean;
@@ -86,6 +87,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await registerForPushNotificationsAsync();
+        if (token && !cancelled) {
+          await savePushTokenToServer(token);
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const updateBusinessProfile = async (updates: Partial<BusinessProfile>) => {
     const newProfile = { ...businessProfile, ...updates };

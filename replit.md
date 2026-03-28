@@ -79,6 +79,21 @@ The system uses session-based authentication supporting email/password, Apple, a
 - **Calendar Integration**: Creation of calendar event stubs with ICS download and Google Calendar deep links.
 - **Webhooks & API Keys**: For Zapier/Make with HMAC-SHA256 signing and retry logic.
 
+### Smart Push Notification Trigger System
+- **File**: `server/notificationScheduler.ts` — full lifecycle for server-side push triggers
+- **Table**: `notification_triggers` — UUID PK, user_id (FK), trigger_type, scheduled_for, sent_at, cancelled_at, payload (JSONB). Created automatically on server startup via `initNotificationTables()`.
+- **Trigger types**:
+  - `activation_24h / _48h / _70h`: seeded for every new user; auto-cancelled when first quote is sent; sends nudge copy via channel "growth" if still unsent
+  - `first_quote_congrats`: event-based, fired by `onFirstQuoteSent(userId)` called from `POST /api/quotes/:id/send`
+  - `quote_expiry_reminder`: fires 24 h before any 'sent' quote expires, channel "quotes"
+  - `dormant_customer_digest`: every Monday 9 AM, channel "growth", counts customers with no job in 90 days
+- **Guards**: quiet hours (9 PM – 8 AM server time), ≤ 2 pushes per user per 24 h, 30-day inactivity check
+- **Per-type user prefs**: `pushPrefs.activationReminders`, `pushPrefs.quoteExpiryAlerts`, `pushPrefs.dormantCustomerAlerts` — checked before each send; stored in `user_preferences.push_prefs` JSONB alongside existing `quotes / jobs / growth` channel prefs
+- **Cron**: runs every 5 minutes in `server/index.ts` via `setInterval`
+- **Frontend push registration**: `client/context/AppContext.tsx` calls `registerForPushNotificationsAsync()` + `savePushTokenToServer()` from `client/lib/notifications.ts` after user auth (no-op on web, no-op if no EAS projectId)
+- **Notification tap deep links**: `NotificationTapHandler` component in `client/navigation/RootStackNavigator.tsx` listens via `Notifications.addNotificationResponseReceivedListener` and navigates to `QuoteCalculator`, `FollowUpQueue`, `Opportunities`, or `JobDetail` based on `notification.data.screen`
+- **Settings UI**: 3 new toggles in SettingsScreen "Notifications" section (Activation reminders, Quote expiry alerts, Win-back alerts) with testIDs `switch-push-activation`, `switch-push-quote-expiry`, `switch-push-dormant`
+
 ### Trial Drip Email System
 - **File**: `server/dripEmails.ts` — all email templates and sending logic in one module
 - **5 emails**: Day 0 (welcome), Day 2 (first quote nudge, personalised by activity), Day 4 (AI follow-up story), Day 7 (halfway scorecard with live stats), Day 13 (last-chance urgency)

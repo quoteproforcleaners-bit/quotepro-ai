@@ -8,6 +8,7 @@ import { pool } from "./db";
 import { processDripQueue } from "./dripEmails";
 import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
 import { sendPush } from "./pushNotifications";
+import { initNotificationTables, runNotificationScheduler } from "./notificationScheduler";
 
 const app = express();
 const log = console.log;
@@ -694,6 +695,14 @@ async function seedToDoDemo() {
     }, 60 * 60 * 1000);
   }
   scheduleWeeklyRecapPushCron();
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // ─── Smart notification trigger scheduler: runs every 5 minutes ──────────
+  await initNotificationTables();
+  runNotificationScheduler().catch((e: any) => console.error("[notif-scheduler] Initial run failed:", e.message));
+  setInterval(() => {
+    runNotificationScheduler().catch((e: any) => console.error("[notif-scheduler] Cron failed:", e.message));
+  }, 5 * 60 * 1000);
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

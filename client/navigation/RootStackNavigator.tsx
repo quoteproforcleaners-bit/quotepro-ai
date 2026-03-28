@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
@@ -166,6 +167,38 @@ function PostOnboardingAIIntroTrigger() {
   return null;
 }
 
+function NotificationTapHandler() {
+  const navigation = useNavigation<any>();
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = (response.notification.request.content.data ?? {}) as Record<string, any>;
+      if (!data.screen) return;
+      try {
+        switch (data.screen) {
+          case "QuoteCalculator":
+            navigation.navigate("QuoteCalculator");
+            break;
+          case "FollowUpQueue":
+            navigation.navigate("Main", { screen: "Growth" });
+            break;
+          case "Opportunities":
+            navigation.navigate("Main", { screen: "Growth" });
+            break;
+          case "JobDetail":
+            if (data.jobId) navigation.navigate("JobDetail", { jobId: data.jobId });
+            break;
+          default:
+            break;
+        }
+      } catch {}
+    });
+    return () => sub.remove();
+  }, [navigation]);
+
+  return null;
+}
+
 export default function RootStackNavigator() {
   const screenOptions = useScreenOptions();
   const { isLoading: authLoading, user, isGuest, needsOnboarding: authNeedsOnboarding } = useAuth();
@@ -225,6 +258,7 @@ export default function RootStackNavigator() {
                 <PostOnboardingPaywallTrigger />
                 <PostOnboardingAIIntroTrigger />
                 <NPSSurveyTrigger />
+                <NotificationTapHandler />
                 <MainTabNavigator />
               </>
             )}
