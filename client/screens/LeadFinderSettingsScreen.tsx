@@ -129,18 +129,10 @@ function CityInput({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&featuretype=city&addressdetails=1`;
-        const r = await fetch(url, { headers: { "Accept-Language": "en" } });
-        const data: any[] = await r.json();
-        const found = data
-          .filter((d) => d.address)
-          .map((d) => {
-            const city = d.address.city || d.address.town || d.address.village || d.name;
-            const state = d.address.state_code || d.address.state || "";
-            return city && state ? `${city}, ${state}` : city || "";
-          })
-          .filter((c: string) => c && !cities.includes(c));
-        setSuggestions([...new Set(found)].slice(0, 5) as string[]);
+        const res = await apiRequest("GET", `/api/geocode/city-suggestions?q=${encodeURIComponent(q)}`);
+        const data: { display: string; city: string; state: string }[] = await res.json();
+        const found = data.map((d) => d.display).filter((c) => c && !cities.includes(c));
+        setSuggestions(found.slice(0, 5));
       } catch {
         setSuggestions([]);
       } finally {
