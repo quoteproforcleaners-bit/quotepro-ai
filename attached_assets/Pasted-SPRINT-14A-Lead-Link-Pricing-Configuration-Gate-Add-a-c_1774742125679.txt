@@ -1,0 +1,198 @@
+SPRINT 14A — Lead Link Pricing Configuration Gate
+
+Add a configuration detection system that warns 
+software users when their pricing isn't set up, 
+and shows a disclaimer on the Lead Link microsite 
+when default pricing is being used.
+
+DEFINITION OF "PRICING CONFIGURED":
+A business owner is considered "pricing configured" 
+when ALL of the following are true:
+  1. hourlyRate is set AND > 0 AND != default value (35)
+  2. minimumTicket is set AND > 0 AND != default value (100)
+  3. At least one serviceType has been customized
+     (name is not one of the factory defaults)
+  4. At least 3 add-on prices have been set to non-zero
+
+Create a server-side function isPricingConfigured(userId) 
+that checks these conditions and returns:
+{
+  configured: boolean,
+  missingItems: string[], // list of what's not set up
+  completionPercent: number // 0-100
+}
+
+Store the result in the lead_link_config API response 
+so the microsite can access it.
+
+═══════════════════════════════
+BACKEND CHANGES
+═══════════════════════════════
+
+1. UPDATE GET /api/lead-link/:token/config endpoint:
+   Add to the response:
+   {
+     ...existingFields,
+     pricingConfigured: boolean,
+     pricingCompletionPercent: number,
+     pricingMissingItems: string[],
+     usingDefaultPricing: boolean
+   }
+
+2. ADD GET /api/lead-link/pricing-status endpoint
+   (authenticated — for software user only):
+   Returns isPricingConfigured() result for 
+   the current user
+
+3. LOG when Lead Link is viewed with default pricing:
+   Add column to lead_link_events:
+   used_default_pricing BOOLEAN DEFAULT false
+   Set to true when usingDefaultPricing is true 
+   on leadlink_visit event
+
+═══════════════════════════════
+SOFTWARE USER WARNINGS
+═══════════════════════════════
+
+4. DASHBOARD BANNER (highest priority warning):
+   If pricingConfigured === false AND the user 
+   has a Lead Link enabled:
+
+   Show a persistent banner ABOVE the hero section 
+   on the dashboard:
+
+   Style:
+     Background: linear-gradient(135deg, 
+       rgba(245,158,11,0.12), rgba(245,158,11,0.06))
+     Border: 1px solid rgba(245,158,11,0.4)
+     Border-left: 4px solid #f59e0b
+     Border-radius: 12px
+     Padding: 16px 20px
+     Margin-bottom: 16px
+
+   Content:
+     Left: warning icon (amber)
+     Title: "Set up your pricing before sharing Lead Link"
+     Body: "Your Lead Link is active but using default 
+     prices that may not match your rates. Customers 
+     could receive inaccurate estimates."
+     
+     Two buttons:
+     Primary: "Set Up Pricing →" 
+       → navigates to Price Settings
+       Style: amber background, dark text
+     Secondary: "Dismiss for now"
+       → hides banner for 24 hours
+       → stores dismissal in localStorage with timestamp
+       key: "quotepro_pricing_banner_dismissed_at"
+       → ALWAYS reappears after 24 hours until 
+         pricing is configured
+       → Never permanently dismissable
+
+5. LEAD LINK PAGE WARNING:
+   On the Lead Link settings/share page, if pricing 
+   is not configured:
+
+   Replace the standard "Share your link" section 
+   with a two-panel layout:
+
+   TOP PANEL (warning):
+     Background: amber-50
+     Border: 2px solid #f59e0b
+     Border-radius: 12px
+     
+     Icon: large warning triangle (48px, amber)
+     Title: "Configure pricing first (recommended)"
+     Body: "Your Lead Link works, but customers will 
+     see estimated prices based on industry defaults 
+     that may be higher or lower than your actual rates. 
+     This can lead to sticker shock or underpricing."
+     
+     Completion indicator:
+     "Pricing setup: [X]% complete"
+     Progress bar: amber, shows completionPercent
+     
+     Missing items list (from pricingMissingItems):
+     Each shown as a row with ✗ icon and link to fix:
+     "✗ Hourly rate not set → Set it now"
+     "✗ Minimum ticket not set → Set it now"
+     "✗ Add-on prices not configured → Configure"
+     
+     Button: "Complete Pricing Setup →"
+     Style: full width, amber, prominent
+
+   BOTTOM PANEL (allow anyway):
+     Thin separator with text: "or continue without 
+     configuring (not recommended)"
+     
+     Show the Lead Link share UI in a slightly 
+     reduced opacity (0.7) with a blur overlay 
+     that clears on click:
+     
+     Overlay text: "Click to share anyway"
+     
+     When clicked: opacity goes to 1, overlay 
+     disappears, user can copy/share the link
+     Log event: leadlink_shared_without_pricing
+
+6. LEAD LINK SETTINGS PAGE — Pricing completion widget:
+   Always show (even when configured) a small 
+   pricing health card:
+
+   Title: "Pricing Configuration"
+   
+   If configured:
+     Green checkmark, "Pricing configured ✓"
+     "Your Lead Link will show accurate estimates"
+     Link: "Review pricing settings"
+   
+   If not configured:
+     Show completion bar and missing items
+     Same as above but more compact
+
+═══════════════════════════════
+MICROSITE DISCLAIMER
+═══════════════════════════════
+
+7. When usingDefaultPricing === true, show a 
+   disclaimer banner on the Lead Link microsite:
+
+   Position: sticky at the TOP of the microsite 
+   (above everything including the business logo)
+   
+   Style:
+     Background: #fef3c7 (amber-100)
+     Border-bottom: 2px solid #f59e0b
+     Padding: 10px 16px
+     Font-size: 13px
+     Text-align: center
+   
+   Content:
+     "⚠️ Estimates on this page are approximate. 
+     [BusinessName] will confirm your exact price 
+     before any work begins."
+   
+   This is shown to the CUSTOMER — it protects the 
+   business owner from customer complaints about 
+   price discrepancy.
+
+   When usingDefaultPricing === false:
+   Do NOT show this banner. Clean experience only.
+
+8. PRICE RANGE ADJUSTMENT when using default pricing:
+   When usingDefaultPricing === true, widen the 
+   price range displayed to the customer:
+
+   Instead of: lowEstimate = base * 0.85
+   Use:        lowEstimate = base * 0.70
+
+   Instead of: highEstimate = base * 1.25  
+   Use:        highEstimate = base * 1.50
+
+   This wider range is more honest about the 
+   uncertainty when default pricing is used.
+   
+   Also change the range label from:
+   "Your estimated price"
+   To:
+   "Estimated
