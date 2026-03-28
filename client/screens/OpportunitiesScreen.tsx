@@ -28,6 +28,12 @@ import { useApp } from "@/context/AppContext";
 import { apiRequest } from "@/lib/query-client";
 import { trackEvent } from "@/lib/analytics";
 import { ProGate } from "@/components/ProGate";
+import {
+  getDormantSmsTemplate,
+  getDormantEmailTemplate,
+  getLostSmsTemplate,
+  getLostEmailTemplate,
+} from "@/lib/messageTemplates";
 
 interface DormantCustomer {
   id: string;
@@ -80,16 +86,6 @@ function getLostEstimate(total: number, status: string): number {
   return status === "expired" ? total * 0.20 : total * 0.10;
 }
 
-function getDormantSmsTemplate(firstName: string, senderName: string): string {
-  return `Hi ${firstName}! It's been a while since your last cleaning. We'd love to have you back - mention this message for a special returning client offer! - ${senderName}`;
-}
-
-function getDormantEmailTemplate(firstName: string, senderName: string): { subject: string; body: string } {
-  return {
-    subject: `We miss you, ${firstName}!`,
-    body: `Hi ${firstName},\n\nIt's been a while since we last cleaned for you, and we wanted to reach out! We'd love to get you back on the schedule.\n\nMention this email for a special returning client offer.\n\nBest,\n${senderName}`,
-  };
-}
 
 function getLostDisplayName(item: LostQuote): string {
   if (item.customerFirstName) {
@@ -126,16 +122,6 @@ function getLostEmail(item: LostQuote): string | null {
   return null;
 }
 
-function getLostSmsTemplate(firstName: string, quoteTotal: number, senderName: string): string {
-  return `Hi ${firstName}! I noticed the quote I sent for $${quoteTotal} didn't work out. Would you like me to put together something different? - ${senderName}`;
-}
-
-function getLostEmailTemplate(firstName: string, quoteTotal: number, senderName: string): { subject: string; body: string } {
-  return {
-    subject: "Let's revisit your cleaning quote",
-    body: `Hi ${firstName},\n\nI wanted to reach out about the cleaning quote for $${quoteTotal} that I sent over. I understand it may not have been the right fit at the time.\n\nI'd love the chance to put together something that works better for you. Whether it's adjusting the scope, frequency, or pricing, I'm happy to make it work.\n\nJust reply to this email and we can get started.\n\nBest,\n${senderName}`,
-  };
-}
 
 function ActionButton({
   icon,

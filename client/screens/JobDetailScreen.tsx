@@ -35,6 +35,7 @@ import { useSubscription } from "@/context/SubscriptionContext";
 import * as Clipboard from "expo-clipboard";
 import * as SMS from "expo-sms";
 import { trackEvent } from "@/lib/analytics";
+import { getReviewRequestSms } from "@/lib/messageTemplates";
 
 type RouteParams = {
   JobDetail: { jobId: string };
@@ -458,19 +459,12 @@ export default function JobDetailScreen() {
     addNoteMutation.mutate({ content: newNoteText.trim(), customerVisible: newNoteVisible });
   };
 
-  const REVIEW_REQUEST_LINES: Record<string, string> = {
-    en: "After your service, would you mind leaving a quick review?",
-    es: "Despu\u00e9s de su servicio, \u00bfle importar\u00eda dejarnos una rese\u00f1a r\u00e1pida?",
-    pt: "Ap\u00f3s o servi\u00e7o, voc\u00ea se importaria de deixar uma avalia\u00e7\u00e3o r\u00e1pida?",
-    ru: "\u041f\u043e\u0441\u043b\u0435 \u043e\u0431\u0441\u043b\u0443\u0436\u0438\u0432\u0430\u043d\u0438\u044f, \u043d\u0435 \u043c\u043e\u0433\u043b\u0438 \u0431\u044b \u0432\u044b \u043e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u0431\u044b\u0441\u0442\u0440\u044b\u0439 \u043e\u0442\u0437\u044b\u0432?",
-  };
-
   const handleSendJobReviewRequest = async () => {
     if (!job || !growthSettings?.googleReviewLink?.trim()) return;
     const customerName = job.customer ? `${job.customer.firstName || ""} ${job.customer.lastName || ""}`.trim() : "there";
     const reviewLink = growthSettings.googleReviewLink.trim();
-    const line = REVIEW_REQUEST_LINES[communicationLanguage] || REVIEW_REQUEST_LINES.en;
-    const msg = `Hi ${customerName}! ${line} ${reviewLink}`;
+    const senderName = businessProfile?.senderName || businessProfile?.companyName || "";
+    const msg = getReviewRequestSms(customerName, reviewLink, senderName, communicationLanguage);
     setReviewSending(true);
     try {
       const phone = job.customer?.phone;
