@@ -152,9 +152,9 @@ const SECTION_LABEL_KEYS: Record<string, string> = {
 const NAV_TOOLTIPS_KEY = "qp_nav_tooltips";
 
 function NavItemWithTooltip({
-  item, enabled, intakeNewCount, isPro, setSidebarOpen, t,
+  item, enabled, intakeNewCount, quoteResponseCount, isPro, setSidebarOpen, t,
 }: {
-  item: NavItem; enabled: boolean; intakeNewCount: number;
+  item: NavItem; enabled: boolean; intakeNewCount: number; quoteResponseCount: number;
   isPro: boolean; setSidebarOpen: (v: boolean) => void; t: (k: string) => string;
 }) {
   const [tooltipTop, setTooltipTop] = useState<number | null>(null);
@@ -193,6 +193,12 @@ function NavItemWithTooltip({
         <span className="flex-1 text-[13px]" style={item.to === "/quote-doctor" ? { fontWeight: 700, color: "#059669" } : undefined}>{t(NAV_LABEL_KEYS[item.to] || item.label)}</span>
         {item.to === "/quote-doctor" ? (
           <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500 text-white uppercase tracking-wider leading-none">FREE</span>
+        ) : null}
+        {item.to === "/quotes" && quoteResponseCount > 0 ? (
+          <span className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
+            style={{ minWidth: "18px", height: "18px", fontSize: "10px", padding: "0 4px" }}>
+            {quoteResponseCount > 99 ? "99+" : quoteResponseCount}
+          </span>
         ) : null}
         {item.to === "/intake-requests" && intakeNewCount > 0 ? (
           <span className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
@@ -489,6 +495,33 @@ export function Layout() {
   const quoteCount = quoteCountData?.count ?? 0;
   const featureUnlocked = quoteCount >= 5;
 
+  // Badge: count accepted/declined responses since user last visited /quotes
+  const QP_QUOTES_CHECKED_KEY = "qp_quotes_last_checked";
+  const [lastQuotesChecked] = useState<string>(() => {
+    try { return localStorage.getItem(QP_QUOTES_CHECKED_KEY) || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); } catch { return new Date(0).toISOString(); }
+  });
+  const { data: quoteResponseData, refetch: refetchResponseCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/quotes/response-count", lastQuotesChecked],
+    queryFn: async () => {
+      const res = await fetch(`/api/quotes/response-count?since=${encodeURIComponent(lastQuotesChecked)}`, { credentials: "include" });
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    refetchInterval: 60_000,
+  });
+  const quoteResponseCount = quoteResponseData?.count ?? 0;
+
+  // Clear badge when user navigates to /quotes
+  useEffect(() => {
+    if (location.pathname === "/quotes" || location.pathname.startsWith("/quotes/")) {
+      try {
+        const now = new Date().toISOString();
+        localStorage.setItem(QP_QUOTES_CHECKED_KEY, now);
+        refetchResponseCount();
+      } catch {}
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [location.pathname]);
@@ -621,6 +654,7 @@ export function Layout() {
                 item={item}
                 enabled={navTooltipsEnabled}
                 intakeNewCount={intakeNewCount}
+                quoteResponseCount={quoteResponseCount}
                 isPro={isPro}
                 setSidebarOpen={setSidebarOpen}
                 t={t}
@@ -643,6 +677,7 @@ export function Layout() {
                   item={item}
                   enabled={navTooltipsEnabled}
                   intakeNewCount={intakeNewCount}
+                  quoteResponseCount={quoteResponseCount}
                   isPro={isPro}
                   setSidebarOpen={setSidebarOpen}
                   t={t}
@@ -666,6 +701,7 @@ export function Layout() {
                   item={item}
                   enabled={navTooltipsEnabled}
                   intakeNewCount={intakeNewCount}
+                  quoteResponseCount={quoteResponseCount}
                   isPro={isPro}
                   setSidebarOpen={setSidebarOpen}
                   t={t}
@@ -702,6 +738,7 @@ export function Layout() {
                     item={item}
                     enabled={navTooltipsEnabled}
                     intakeNewCount={intakeNewCount}
+                    quoteResponseCount={quoteResponseCount}
                     isPro={isPro}
                     setSidebarOpen={setSidebarOpen}
                     t={t}

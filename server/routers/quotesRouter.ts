@@ -139,6 +139,29 @@ const router = Router();
     }
   });
 
+  // Returns count of quotes that became accepted or declined after a given timestamp
+  router.get("/api/quotes/response-count", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const sinceRaw = req.query.since as string | undefined;
+      const since = sinceRaw ? new Date(sinceRaw) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const result = await pool.query(
+        `SELECT COUNT(*) AS c FROM quotes
+         WHERE business_id = $1
+           AND deleted_at IS NULL
+           AND (
+             (status = 'accepted' AND accepted_at > $2)
+             OR (status = 'declined' AND declined_at > $2)
+           )`,
+        [business.id, since]
+      );
+      return res.json({ count: parseInt(result.rows[0]?.c ?? "0", 10) });
+    } catch {
+      return res.status(500).json({ message: "Failed to get response count" });
+    }
+  });
+
   router.get("/api/quotes/count", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
