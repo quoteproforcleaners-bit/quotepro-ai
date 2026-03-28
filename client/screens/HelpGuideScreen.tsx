@@ -1,5 +1,13 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView, useWindowDimensions } from "react-native";
+import React, { useState, useMemo, useCallback } from "react";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  TextInput,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -7,6 +15,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface Section {
   id: string;
@@ -425,7 +434,7 @@ function getGuideData(isEnglish: boolean): Section[] {
         "Personaliza Cada Interaccion: Usa el nombre del cliente, menciona su propiedad especifica y detalles de tus notas.",
         "Pide Resenas Despues de Buenos Trabajos: El mejor momento es justo despues de una limpieza cuando el cliente esta mas contento. Usa la funcion de Resenas y Referidos.",
         "Ofrece Incentivos por Referidos: Di a tus clientes: 'Si refieren a un amigo, ambos reciben $25 de descuento.' El boca a boca es la fuente de clientes mas fuerte.",
-        "Revisa tus Numeros Semanalmente: Consulta tu Resumen Semanal. Conoce tu tasa de cierre, valor promedio y ingresos. Lo que se mide, se mejora.",
+        "Sigue tus Numeros Semanalmente: Revisa tu Resumen Semanal cada semana. Conoce tu tasa de cierre, valor promedio de cotizacion e ingresos.",
       ],
     },
     {
@@ -452,13 +461,50 @@ export default function HelpGuideScreen() {
   const { language } = useLanguage();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 200);
 
   const sections = getGuideData(language === "en" || language === "pt" || language === "ru");
 
-  const toggleSection = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
+  const filteredSections = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return sections;
+    return sections.filter(
+      (section) =>
+        section.title.toLowerCase().includes(q) ||
+        section.content.some((item) => item.toLowerCase().includes(q))
+    );
+  }, [sections, debouncedSearch]);
+
+  const toggleSection = useCallback((id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    setExpandedId(null);
+  }, []);
+
+  const isSearchActive = searchQuery.length > 0;
+  const autoExpandAll = filteredSections.length <= 3 && debouncedSearch.trim().length > 0;
+
+  const isExpanded = (id: string) => {
+    if (autoExpandAll) return true;
+    return expandedId === id;
   };
+
+  const isEnglish = language === "en" || language === "pt" || language === "ru";
+  const placeholderText = isEnglish ? "Search the guide..." : "Buscar en la guia...";
+  const resultText =
+    filteredSections.length === 1
+      ? isEnglish
+        ? `1 section matches "${debouncedSearch}"`
+        : `1 seccion coincide con "${debouncedSearch}"`
+      : isEnglish
+      ? `${filteredSections.length} sections match "${debouncedSearch}"`
+      : `${filteredSections.length} secciones coinciden con "${debouncedSearch}"`;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -469,13 +515,21 @@ export default function HelpGuideScreen() {
           ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as const }] : []),
         ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
+        {/* Header card */}
         <View style={[styles.headerCard, { backgroundColor: `${theme.primary}10`, borderColor: `${theme.primary}25` }]}>
           <View style={[styles.headerIcon, { backgroundColor: theme.primary }]}>
             <Feather name="book-open" size={22} color="#FFFFFF" />
           </View>
           <ThemedText type="h3" style={{ marginTop: Spacing.md }}>
-            {language === "es" ? "Guía del Usuario QuotePro" : language === "pt" ? "Guia do Usuário QuotePro" : language === "ru" ? "Руководство QuotePro" : "QuotePro User Guide"}
+            {language === "es"
+              ? "Guía del Usuario QuotePro"
+              : language === "pt"
+              ? "Guia do Usuário QuotePro"
+              : language === "ru"
+              ? "Руководство QuotePro"
+              : "QuotePro User Guide"}
           </ThemedText>
           <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.xs, textAlign: "center" }}>
             {language === "es"
@@ -488,8 +542,71 @@ export default function HelpGuideScreen() {
           </ThemedText>
         </View>
 
-        {sections.map((section) => {
-          const isExpanded = expandedId === section.id;
+        {/* Search input */}
+        <View
+          style={[
+            styles.searchContainer,
+            { backgroundColor: theme.backgroundSecondary, borderColor: theme.border },
+          ]}
+        >
+          <Feather name="search" size={16} color={theme.textSecondary} />
+          <TextInput
+            placeholder={placeholderText}
+            placeholderTextColor={theme.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={[styles.searchInput, { color: theme.text }]}
+            clearButtonMode={Platform.OS === "ios" ? "while-editing" : "never"}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            testID="guide-search-input"
+          />
+          {Platform.OS !== "ios" && isSearchActive ? (
+            <Pressable onPress={clearSearch} testID="guide-search-clear" hitSlop={8}>
+              <Feather name="x" size={16} color={theme.textSecondary} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Result count */}
+        {isSearchActive && debouncedSearch.trim().length > 0 ? (
+          <ThemedText
+            type="caption"
+            style={{ color: theme.textSecondary, marginBottom: Spacing.sm, marginTop: -Spacing.xs }}
+            testID="guide-result-count"
+          >
+            {resultText}
+          </ThemedText>
+        ) : null}
+
+        {/* Empty state */}
+        {filteredSections.length === 0 ? (
+          <View style={styles.emptyState} testID="guide-empty-state">
+            <Feather name="search" size={24} color={theme.textSecondary} />
+            <ThemedText type="body" style={{ color: theme.text, marginTop: Spacing.sm, textAlign: "center" }}>
+              {isEnglish ? `No results for "${searchQuery}"` : `Sin resultados para "${searchQuery}"`}
+            </ThemedText>
+            <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center", marginTop: Spacing.xs }}>
+              {isEnglish
+                ? "Try a different keyword or browse all sections below"
+                : "Prueba otra palabra clave o explora todas las secciones"}
+            </ThemedText>
+            <Pressable
+              onPress={clearSearch}
+              style={[styles.clearBtn, { backgroundColor: `${theme.primary}15`, borderColor: `${theme.primary}30` }]}
+              testID="guide-clear-search"
+            >
+              <ThemedText type="small" style={{ color: theme.primary, fontWeight: "600" }}>
+                {isEnglish ? "Clear search" : "Limpiar busqueda"}
+              </ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Section list */}
+        {filteredSections.map((section) => {
+          const expanded = isExpanded(section.id);
           return (
             <View key={section.id}>
               <Pressable
@@ -498,28 +615,28 @@ export default function HelpGuideScreen() {
                   styles.sectionHeader,
                   {
                     backgroundColor: theme.cardBackground,
-                    borderColor: isExpanded ? `${theme.primary}40` : theme.border,
+                    borderColor: expanded ? `${theme.primary}40` : theme.border,
                   },
                 ]}
                 testID={`guide-section-${section.id}`}
               >
-                <View style={[styles.sectionIcon, { backgroundColor: isExpanded ? `${theme.primary}15` : `${theme.textSecondary}10` }]}>
-                  <Feather name={section.icon} size={18} color={isExpanded ? theme.primary : theme.textSecondary} />
+                <View style={[styles.sectionIcon, { backgroundColor: expanded ? `${theme.primary}15` : `${theme.textSecondary}10` }]}>
+                  <Feather name={section.icon} size={18} color={expanded ? theme.primary : theme.textSecondary} />
                 </View>
                 <ThemedText
                   type="body"
-                  style={{ flex: 1, fontWeight: "600", color: isExpanded ? theme.primary : theme.text }}
+                  style={{ flex: 1, fontWeight: "600", color: expanded ? theme.primary : theme.text }}
                 >
                   {section.title}
                 </ThemedText>
                 <Feather
-                  name={isExpanded ? "chevron-up" : "chevron-down"}
+                  name={expanded ? "chevron-up" : "chevron-down"}
                   size={20}
-                  color={isExpanded ? theme.primary : theme.textSecondary}
+                  color={expanded ? theme.primary : theme.textSecondary}
                 />
               </Pressable>
 
-              {isExpanded ? (
+              {expanded ? (
                 <View style={[styles.sectionContent, { backgroundColor: theme.cardBackground, borderColor: `${theme.primary}20` }]}>
                   {section.content.map((item, idx) => (
                     <View key={idx} style={styles.bulletRow}>
@@ -560,6 +677,34 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    marginBottom: Spacing.lg,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: Spacing["3xl"],
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.xs,
+  },
+  clearBtn: {
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
   sectionHeader: {
     flexDirection: "row",
