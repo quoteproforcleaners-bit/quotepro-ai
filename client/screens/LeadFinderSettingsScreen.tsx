@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   View,
   StyleSheet,
@@ -121,25 +122,23 @@ function CityInput({
   const [text, setText] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedText = useDebounce(text, 350);
 
-  const fetchSuggestions = (q: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (q.trim().length < 2) { setSuggestions([]); return; }
-    debounceRef.current = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await apiRequest("GET", `/api/geocode/city-suggestions?q=${encodeURIComponent(q)}`);
-        const data: { display: string; city: string; state: string }[] = await res.json();
+  useEffect(() => {
+    if (debouncedText.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    setLoading(true);
+    apiRequest("GET", `/api/geocode/city-suggestions?q=${encodeURIComponent(debouncedText)}`)
+      .then((res) => res.json())
+      .then((data: { display: string; city: string; state: string }[]) => {
         const found = data.map((d) => d.display).filter((c) => c && !cities.includes(c));
         setSuggestions(found.slice(0, 5));
-      } catch {
-        setSuggestions([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 350);
-  };
+      })
+      .catch(() => setSuggestions([]))
+      .finally(() => setLoading(false));
+  }, [debouncedText]);
 
   const pick = (city: string) => {
     onAddCity(city);
@@ -160,7 +159,7 @@ function CityInput({
         <TextInput
           style={[tagStyles.input, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text }]}
           value={text}
-          onChangeText={(t) => { setText(t); fetchSuggestions(t); }}
+          onChangeText={setText}
           placeholder="e.g. Austin, Chicago"
           placeholderTextColor={theme.textSecondary}
           onSubmitEditing={commit}

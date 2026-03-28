@@ -18,6 +18,7 @@ import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/useDebounce";
 import { ThemedText } from "@/components/ThemedText";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
@@ -76,7 +77,7 @@ export default function ReactivationScreen() {
   const [campaignSegment, setCampaignSegment] = useState<Segment>("dormant");
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(customerSearch, 300);
   const [generatingContent, setGeneratingContent] = useState(false);
   const [viewingCampaign, setViewingCampaign] = useState<any>(null);
   const [sendingCampaign, setSendingCampaign] = useState(false);
@@ -107,11 +108,6 @@ export default function ReactivationScreen() {
     initialPageParam: 1,
     enabled: campaignSegment === "custom" && modalVisible,
   });
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(customerSearch), 300);
-    return () => clearTimeout(timer);
-  }, [customerSearch]);
 
   const allCustomers = customersInfiniteQuery.data?.pages.flatMap((p: any) => p.customers) ?? [];
   const totalCustomers = customersInfiniteQuery.data?.pages[0]?.total ?? 0;
@@ -432,14 +428,25 @@ export default function ReactivationScreen() {
           <ThemedText type="small" style={{ color: dt.textSecondary, marginBottom: Spacing.sm }}>
             Select Customers ({selectedCustomerIds.length} selected)
           </ThemedText>
-          <TextInput
-            testID="input-customer-search"
-            value={customerSearch}
-            onChangeText={setCustomerSearch}
-            placeholder="Search by name or email..."
-            placeholderTextColor={dt.textSecondary}
-            style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border, marginBottom: Spacing.sm }]}
-          />
+          <View style={{ marginBottom: Spacing.sm }}>
+            <TextInput
+              testID="input-customer-search"
+              value={customerSearch}
+              onChangeText={setCustomerSearch}
+              placeholder="Search by name or email..."
+              placeholderTextColor={dt.textSecondary}
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: dt.textPrimary, borderColor: dt.border, marginBottom: 0, paddingRight: 36 }]}
+            />
+            <View style={{ position: "absolute", right: Spacing.sm, top: 0, bottom: 0, justifyContent: "center" }}>
+              {customerSearch !== debouncedSearch ? (
+                <ActivityIndicator size="small" color={dt.textSecondary} />
+              ) : customerSearch.length > 0 ? (
+                <Pressable onPress={() => setCustomerSearch("")} hitSlop={8} testID="button-clear-customer-search">
+                  <Feather name="x" size={16} color={dt.textSecondary} />
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
           {allCustomers.length > 0 || totalCustomers > 0 ? (
             <ThemedText type="caption" style={{ color: dt.textSecondary, marginBottom: Spacing.xs }}>
               {`Showing ${allCustomers.length} of ${totalCustomers} customers`}
