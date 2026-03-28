@@ -10,11 +10,15 @@ import "./index.css";
 import "./lib/i18n";
 
 // Some paths live outside the /app prefix and need basename "/":
-// - /intake/:id  — public lead capture links
+// - /intake/:id       — public lead capture links (legacy)
+// - /request/:slug    — branded lead link microsite
+// - /schedule-ack/:t  — schedule acknowledgement links
+// - /q/:token         — public quote view links
 // - /pricing/*, /subscription/*, /register, /login, /dashboard, /onboarding
 //   — top-level routes for direct navigation and ad conversion tracking
 const TOP_LEVEL_PATHS = [
-  "/intake/", "/pricing", "/subscription", "/register",
+  "/intake/", "/request/", "/schedule-ack/", "/q/",
+  "/pricing", "/subscription", "/register",
   "/login", "/dashboard", "/onboarding", "/upgrade", "/quote-doctor",
 ];
 const isTopLevelPath = TOP_LEVEL_PATHS.some((p) =>
