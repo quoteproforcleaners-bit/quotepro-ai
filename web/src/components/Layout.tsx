@@ -49,6 +49,7 @@ const SETTINGS_NAV_KEY = "quotepro_nav_settings_open";
 const CORE_NAV_ITEMS: NavItem[] = [
   { to: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — revenue at a glance, pipeline health, recent quotes, and team activity." },
   { to: "/quotes",       label: "Quotes",       icon: FileText,        shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
+  { to: "/lead-capture", label: "Lead Capture", icon: Link2,                             description: "Share your branded quote request link — customers submit details, you get instant leads." },
   { to: "/customers",    label: "Customers",    icon: Users,           pro: true,        description: "Full contact history, quote history, job records, and notes for every client in one place." },
   { to: "/jobs",         label: "Jobs",         icon: Briefcase,       pro: true,        description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
   { to: "/follow-ups",   label: "Follow-Ups",   icon: Bell,                              description: "Every quote that needs a follow-up, ranked by priority. Never let a lead go cold." },
@@ -86,7 +87,6 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { to: "/sales-strategy",    label: "Sales Strategy",    icon: Layers,      pro: true, description: "Personalized playbooks and talking points to help you close more jobs at higher prices." },
   { to: "/calendar",          label: "Schedule",          icon: CalendarDays,pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
   { to: "/employees",         label: "Team Members",      icon: UserCog,                description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
-  { to: "/lead-capture",      label: "Lead Capture Link", icon: Link2,                  description: "Share your branded quote request link — customers submit details, you get instant leads." },
   { to: "/intake-requests",   label: "Quote Requests",    icon: Inbox,                  description: "Leads submitted through your website intake form — review, respond, or convert them to quotes." },
   { to: "/file-library",      label: "File Library",      icon: FolderOpen,             description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
   { to: "/qbo-settings",      label: "QuickBooks",        icon: PlugZap,                description: "Sync your quotes, invoices, and payments directly to QuickBooks Online." },
