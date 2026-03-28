@@ -1,0 +1,60 @@
+The customer search input in ReactivationScreen triggers 
+re-filtering on every keystroke. Add debouncing to prevent 
+performance issues and unnecessary API calls.
+
+NOTE: If Sprint 5 (pagination) is already implemented, 
+this sprint handles the frontend debounce specifically. 
+If Sprint 5 is not yet done, this sprint adds client-side 
+debounce to the existing filteredCustomers useMemo.
+
+IMPLEMENTATION:
+
+1. CREATE a useDebounce hook at /hooks/useDebounce.ts:
+
+export function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState<T>(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
+2. IN ReactivationScreen:
+
+Replace:
+  const [customerSearch, setCustomerSearch] = useState("");
+
+With:
+  const [customerSearch, setCustomerSearch] = useState("");
+  const debouncedSearch = useDebounce(customerSearch, 300);
+
+Replace all usages of customerSearch in:
+  - filteredCustomers useMemo dependency array
+  - useInfiniteQuery queryKey (if Sprint 5 is done)
+  
+With debouncedSearch
+
+Keep the TextInput bound to customerSearch (not debounced) 
+so it stays responsive to typing.
+
+3. ADD a loading indicator during debounce delay:
+   - Show a small ActivityIndicator inside the search 
+     input when customerSearch !== debouncedSearch
+   - Position it on the right side of the input field
+   - This gives users feedback that results are updating
+
+4. ADD clear button to search input:
+   - When customerSearch.length > 0, show an X button 
+     inside the input field on the right
+   - Tapping it clears customerSearch and debouncedSearch 
+     immediately (no debounce on clear)
+
+5. ALSO apply useDebounce to the city search in 
+   LeadFinderSettingsScreen (CityInput component), 
+   replacing the manual setTimeout/clearTimeout 
+   debounce with the shared hook.
+
+Test: Type rapidly in customer search — API/filter 
+only runs after 300ms of inactivity. Input field 
+stays responsive throughout.

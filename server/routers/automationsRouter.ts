@@ -930,6 +930,55 @@ Respond with JSON: {"reply": string}`
     }
   });
 
+  router.get("/api/campaigns/:id/recipients", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const campaign = await getCampaignById(req.params.id);
+      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+      let targetCustomers: any[] = [];
+
+      if (Array.isArray(campaign.customerIds) && campaign.customerIds.length > 0) {
+        for (const cid of campaign.customerIds as string[]) {
+          const c = await getCustomerById(cid);
+          if (c) targetCustomers.push(c);
+        }
+      } else if (campaign.segment === "dormant") {
+        targetCustomers = await getDormantCustomers(business.id, 90);
+      } else if (campaign.segment === "lost") {
+        const lostQuotes = await getLostQuotes(business.id, 180);
+        const seen = new Set<string>();
+        for (const lq of lostQuotes) {
+          const cid = lq.customerId;
+          if (cid && !seen.has(cid)) {
+            seen.add(cid);
+            const c = await getCustomerById(cid);
+            if (c && c.email) targetCustomers.push(c);
+          }
+        }
+      } else {
+        const allCustomers = await getCustomersByBusiness(business.id);
+        targetCustomers = allCustomers.filter((c: any) => c.email);
+      }
+
+      const withEmail = campaign.channel !== "sms"
+        ? targetCustomers.filter((c: any) => c.email)
+        : targetCustomers.filter((c: any) => c.phone);
+
+      const preview = withEmail.slice(0, 5).map((c: any) => ({
+        name: `${c.firstName || ""} ${c.lastName || ""}`.trim() || "Customer",
+        email: c.email || c.phone || "",
+      }));
+
+      return res.json({ count: withEmail.length, preview });
+    } catch (error: any) {
+      console.error("Campaign recipients error:", error);
+      return res.status(500).json({ message: "Failed to get recipients" });
+    }
+  });
+
   router.post("/api/campaigns/:id/send", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);

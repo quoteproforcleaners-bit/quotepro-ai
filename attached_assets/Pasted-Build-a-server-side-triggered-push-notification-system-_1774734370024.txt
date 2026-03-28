@@ -1,0 +1,316 @@
+Build a server-side triggered push notification system 
+focused on activation milestones. The goal is to nudge 
+new users toward their first quote send within 72 hours 
+and keep engaged users coming back daily.
+
+TECH STACK NOTES:
+- Use Expo Push Notifications (expo-server-sdk on backend)
+- Push tokens are already collected via Expo's 
+  getPushTokenAsync — verify this is stored in your DB
+- This sprint is backend-heavy with small frontend changes
+
+═══════════════════════════════
+BACKEND — DATABASE
+═══════════════════════════════
+
+1. CREATE notification_triggers table:
+CREATE TABLE notification_triggers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  trigger_type VARCHAR(50) NOT NULL,
+  scheduled_for TIMESTAMPTZ NOT NULL,
+  sent_at TIMESTAMPTZ,
+  cancelled_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX ON notification_triggers(user_id, trigger_type);
+CREATE INDEX ON notification_triggers(scheduled_for) 
+  WHERE sent_at IS NULL AND cancelled_at IS NULL;
+
+2. ADD push_token column to users table if not exists:
+ALTER TABLE users 
+  ADD COLUMN IF NOT EXISTS push_token TEXT,
+  ADD COLUMN IF NOT EXISTS push_token_updated_at TIMESTAMPTZ;
+
+═══════════════════════════════
+BACKEND — TRIGGER DEFINITIONS
+═══════════════════════════════
+
+3. CREATE /lib/notificationTriggers.ts with these 
+   trigger types and their schedule logic:
+
+TRIGGER 1: "first_quote_24h"
+  Schedule: 24 hours after user createdAt
+  Condition to send: user has sent 0 quotes
+  Cancel if: user sends their first quote before it fires
+  Message:
+    Title: "Your first quote is waiting 🧹"
+    Body: "You signed up yesterday but haven't sent a 
+    quote yet. It takes 60 seconds — try it now."
+    Data: { screen: "QuoteCalculator" }
+
+TRIGGER 2: "first_quote_48h"  
+  Schedule: 48 hours after user createdAt
+  Condition to send: user has sent 0 quotes
+  Cancel if: user sends their first quote before it fires
+  Message:
+    Title: "Still time to activate your trial ⏰"
+    Body: "Most QuotePro users send their first quote 
+    within 24 hours. Don't let your trial go to waste."
+    Data: { screen: "QuoteCalculator" }
+
+TRIGGER 3: "first_quote_70h"
+  Schedule: 70 hours after user createdAt (2h before cutoff)
+  Condition to send: user has sent 0 quotes
+  Cancel if: user sends their first quote before it fires
+  Message:
+    Title: "2 hours left in your activation window ⚡"
+    Body: "Send one quote before your 72-hour window 
+    closes. Takes 60 seconds."
+    Data: { screen: "QuoteCalculator" }
+
+TRIGGER 4: "first_quote_sent_congrats"
+  Schedule: Immediate (fired on event, not cron)
+  Trigger event: user sends their first quote ever
+  Message:
+    Title: "First quote sent! 🎉"
+    Body: "Great start. Now follow up in 24 hours to 
+    double your close rate."
+    Data: { screen: "FollowUpQueue" }
+
+TRIGGER 5: "follow_up_daily_reminder"
+  Schedule: Daily at 8:00 AM user's local time
+  Condition to send: user has open follow-ups due today
+  Only send if: user has been active in the last 14 days
+  Message:
+    Title: "You have [N] follow-up[s] due today"
+    Body: "Tap to reach out — consistent follow-up 
+    wins more jobs."
+    Data: { screen: "FollowUpQueue" }
+
+TRIGGER 6: "dormant_customer_detected"
+  Schedule: Fires when a new customer crosses the 
+    dormant threshold (90 days since last job)
+  At most: once per week per user (batch digest)
+  Message:
+    Title: "[N] client[s] haven't booked in 90 days"
+    Body: "Reach out now to recover estimated 
+    $[X] in revenue."
+    Data: { screen: "Opportunities" }
+
+TRIGGER 7: "quote_expiring_soon"
+  Schedule: 24 hours before a sent quote expires
+  Condition: quote is still in "sent" status
+  Message:
+    Title: "[CustomerName]'s quote expires tomorrow"
+    Body: "Follow up now before they choose a 
+    competitor."
+    Data: { screen: "FollowUpQueue", quoteId: id }
+
+═══════════════════════════════
+BACKEND — SCHEDULER
+═══════════════════════════════
+
+4. CREATE /jobs/notificationScheduler.ts:
+   A cron job that runs every 5 minutes and:
+   
+   a) SEEDS triggers for new users:
+      - Find users created in last 24h with no triggers
+      - Insert triggers 1, 2, 3 scheduled at 
+        createdAt + 24h/48h/70h respectively
+
+   b) FIRES due triggers:
+      - SELECT * FROM notification_triggers 
+        WHERE scheduled_for <= NOW()
+        AND sent_at IS NULL
+        AND cancelled_at IS NULL
+      - For each trigger, re-check the send condition
+        (e.g. "has 0 quotes" — verify this is still true)
+      - If condition met: send push, mark sent_at = NOW()
+      - If condition no longer met: mark cancelled_at = NOW()
+
+   c) SENDS the daily follow-up reminder (trigger 5):
+      - At 8 AM per user timezone (or 8 AM UTC as fallback):
+      - Query follow-up queue count for each active user
+      - Send if count > 0
+
+5. CREATE /lib/pushNotificationService.ts:
+
+import { Expo } from "expo-server-sdk";
+const expo = new Expo();
+
+export async function sendPushNotification({
+  pushToken,
+  title,
+  body,
+  data,
+}: {
+  pushToken: string;
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+}) {
+  if (!Expo.isExpoPushToken(pushToken)) return;
+  
+  const message = {
+    to: pushToken,
+    sound: "default" as const,
+    title,
+    body,
+    data: data || {},
+  };
+
+  try {
+    const chunks = expo.chunkPushNotifications([message]);
+    for (const chunk of chunks) {
+      const receipts = await expo.sendPushNotificationsAsync(chunk);
+      // Log receipts for debugging
+      console.log("Push sent:", receipts);
+    }
+  } catch (error) {
+    console.error("Push notification error:", error);
+  }
+}
+
+6. CANCELLATION HOOKS — add these to existing endpoints:
+
+  In POST /api/quotes (when quote is sent):
+    - Cancel triggers 1, 2, 3 for this user if they exist
+    - Fire trigger 4 (first quote congrats) if this is 
+      their first ever sent quote
+      (check: SELECT COUNT(*) FROM quotes WHERE userId = X 
+       AND status != 'draft' LIMIT 2 — if count === 1, 
+       it's their first)
+
+  In PUT /api/quotes/:id/status:
+    - If status becomes "sent", same as above
+
+7. INSTALL expo-server-sdk on backend:
+   npm install expo-server-sdk
+
+═══════════════════════════════
+BACKEND — API ENDPOINTS
+═══════════════════════════════
+
+8. CREATE these notification management endpoints:
+
+PUT /api/user/push-token
+  Body: { token: string }
+  Action: Update push_token and push_token_updated_at 
+    for current user
+
+GET /api/user/notification-preferences
+  Returns: {
+    activationReminders: boolean,
+    dailyFollowUpReminder: boolean,
+    quoteExpiryAlerts: boolean,
+    dormantCustomerAlerts: boolean
+  }
+  
+PUT /api/user/notification-preferences
+  Body: same shape as above
+  Action: Update user notification preferences in DB
+  Side effect: If a preference is disabled, cancel all 
+    pending triggers of that type for the user
+
+═══════════════════════════════
+FRONTEND CHANGES
+═══════════════════════════════
+
+9. IN /hooks/usePushNotifications.ts (create this):
+
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import { apiRequest } from "@/lib/query-client";
+
+export async function registerForPushNotifications() {
+  if (!Device.isDevice) return null;
+  
+  const { status: existingStatus } = 
+    await Notifications.getPermissionsAsync();
+  
+  let finalStatus = existingStatus;
+  
+  if (existingStatus !== "granted") {
+    const { status } = 
+      await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  
+  if (finalStatus !== "granted") return null;
+  
+  const token = (await Notifications.getExpoPushTokenAsync()).data;
+  
+  // Save to backend
+  await apiRequest("PUT", "/api/user/push-token", { token });
+  
+  return token;
+}
+
+10. CALL registerForPushNotifications() in AppContext 
+    or your root component after user authenticates:
+    - Only call once per app session
+    - Store result in AsyncStorage to avoid re-requesting
+      @quotepro_push_registered
+
+11. HANDLE DEEP LINKS from notification taps:
+    In your root navigation component, add:
+    
+    useEffect(() => {
+      const sub = Notifications.addNotificationResponseReceivedListener(
+        response => {
+          const data = response.notification.request.content.data;
+          if (data?.screen) {
+            navigation.navigate(data.screen, 
+              data.quoteId ? { quoteId: data.quoteId } : undefined
+            );
+          }
+        }
+      );
+      return () => sub.remove();
+    }, []);
+
+12. ADD notification preferences UI in Settings screen:
+    
+    New section: "Notifications"
+    
+    Toggle rows (using existing Switch component style):
+    - "Activation reminders" — get nudged to send first quote
+    - "Daily follow-up reminder" — 8 AM digest of due follow-ups  
+    - "Quote expiry alerts" — 24h before quotes expire
+    - "Dormant customer alerts" — weekly revenue recovery digest
+    
+    Each toggle calls PUT /api/user/notification-preferences
+    Show a "Notifications are disabled in device settings" 
+    warning if permissions are not granted, with a 
+    "Enable in Settings" deep link button.
+
+═══════════════════════════════
+GUARDRAILS
+═══════════════════════════════
+
+13. IMPLEMENT these safety limits server-side:
+    - Max 2 push notifications per user per day
+    - No notifications between 9 PM and 8 AM local time
+    - If a push token returns an InvalidCredentials or 
+      DeviceNotRegistered error from Expo, clear the 
+      push_token for that user immediately
+    - Never send a notification if the user has been 
+      inactive (no API calls) for more than 30 days
+
+═══════════════════════════════
+TESTING CHECKLIST
+═══════════════════════════════
+
+- New user gets activation reminder at 24h if no quote sent
+- Sending first quote cancels pending activation triggers
+- First quote congrats notification fires immediately
+- Daily follow-up nudge only fires when queue has items
+- Disabling a preference in Settings cancels pending triggers
+- Tapping a notification deep links to the correct screen
+- No notification fires outside 8 AM - 9 PM window
+- Max 2 notifications per day per user enforced
+
+Confirm when scheduler is running and show sample 
+notification trigger rows from the DB.

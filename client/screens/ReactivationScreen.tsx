@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -80,6 +80,8 @@ export default function ReactivationScreen() {
   const [sendingCampaign, setSendingCampaign] = useState(false);
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
   const [confirmSend, setConfirmSend] = useState(false);
+  const [recipientData, setRecipientData] = useState<{ count: number; preview: { name: string; email: string }[] } | null>(null);
+  const [recipientLoading, setRecipientLoading] = useState(false);
   const [aiError, setAiError] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
   const [selectedPromptChips, setSelectedPromptChips] = useState<string[]>([]);
@@ -108,6 +110,23 @@ export default function ReactivationScreen() {
       return (c.name || "").toLowerCase().includes(search) || (c.email || "").toLowerCase().includes(search) || (c.phone || "").includes(search);
     });
   }, [customersQuery.data, customerSearch]);
+
+  useEffect(() => {
+    if (confirmSend && viewingCampaign?.id) {
+      setRecipientData(null);
+      setRecipientLoading(true);
+      apiRequest("GET", `/api/campaigns/${viewingCampaign.id}/recipients`)
+        .then((res: any) => {
+          if (res && typeof res === "object" && "count" in res) {
+            setRecipientData(res);
+          } else {
+            setRecipientData({ count: 0, preview: [] });
+          }
+        })
+        .catch(() => setRecipientData({ count: 0, preview: [] }))
+        .finally(() => setRecipientLoading(false));
+    }
+  }, [confirmSend, viewingCampaign?.id]);
 
   const toggleCustomer = (id: string) => {
     setSelectedCustomerIds((prev) =>
@@ -610,6 +629,9 @@ export default function ReactivationScreen() {
                         setEditingSubject(campaign.messageSubject || "");
                         setEditingContent(campaign.messageContent || "");
                         setHasUnsavedEdits(false);
+                        setConfirmSend(false);
+                        setSendResult(null);
+                        setRecipientData(null);
                         if (!campaign.messageContent) {
                           generateAndAttachContent(campaign);
                         }
@@ -775,14 +797,20 @@ export default function ReactivationScreen() {
 
             {sendResult ? (
               <View style={{ alignItems: "center", paddingVertical: Spacing.md }}>
-                <Feather name="check-circle" size={32} color={theme.success} />
-                <ThemedText type="subtitle" style={{ marginTop: Spacing.sm, color: theme.success }}>Campaign Sent</ThemedText>
-                <ThemedText type="body" style={{ color: dt.textSecondary, marginTop: 4 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: theme.success + "18", alignItems: "center", justifyContent: "center", marginBottom: Spacing.sm }}>
+                  <Feather name="check-circle" size={32} color={theme.success} />
+                </View>
+                <ThemedText type="subtitle" style={{ color: theme.success, fontWeight: "700" }}>Campaign Sent</ThemedText>
+                <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: Spacing.sm }}>
+                  <ThemedText style={{ fontSize: 32, fontWeight: "700", color: theme.success }}>{sendResult.sent}</ThemedText>
+                  <ThemedText type="body" style={{ color: dt.textSecondary }}>customers reached</ThemedText>
+                </View>
+                <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
                   {sendResult.sent} of {sendResult.total} messages delivered
                 </ThemedText>
                 {sendResult.failed > 0 ? (
                   <ThemedText type="caption" style={{ color: theme.error, marginTop: 4 }}>
-                    {sendResult.failed} failed (missing contact info)
+                    {sendResult.failed} skipped (missing contact info)
                   </ThemedText>
                 ) : null}
                 <Pressable
@@ -793,13 +821,54 @@ export default function ReactivationScreen() {
                 </Pressable>
               </View>
             ) : confirmSend ? (
-              <View>
-                <View style={{ backgroundColor: theme.warning + "15", borderRadius: BorderRadius.sm, padding: Spacing.md, marginBottom: Spacing.md }}>
-                  <ThemedText type="subtitle" style={{ marginBottom: 4 }}>Confirm Send</ThemedText>
-                  <ThemedText type="body" style={{ color: dt.textSecondary }}>
-                    This will send the email to all {viewingCampaign?.segment === "dormant" ? "past customers" : viewingCampaign?.segment === "lost" ? "quote leads" : "targeted customers"}. This cannot be undone.
-                  </ThemedText>
+              <View style={{ gap: Spacing.md }}>
+                <ThemedText type="subtitle" style={{ fontWeight: "700" }}>Ready to Send?</ThemedText>
+
+                {/* Recipient summary card */}
+                <View style={{ backgroundColor: theme.primary + "08", borderWidth: 1, borderColor: theme.primary + "20", borderRadius: BorderRadius.md, padding: Spacing.md }}>
+                  {recipientLoading ? (
+                    <View style={{ alignItems: "center", paddingVertical: Spacing.md }}>
+                      <ActivityIndicator size="small" color={theme.primary} />
+                      <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: Spacing.xs }}>Counting recipients...</ThemedText>
+                    </View>
+                  ) : recipientData !== null ? (
+                    recipientData.count === 0 ? (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                        <Feather name="alert-circle" size={20} color={theme.error} />
+                        <ThemedText type="body" style={{ color: theme.error, flex: 1 }}>No customers match this segment</ThemedText>
+                      </View>
+                    ) : (
+                      <View>
+                        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6, marginBottom: Spacing.xs }}>
+                          <ThemedText style={{ fontSize: 36, fontWeight: "700", color: theme.primary, lineHeight: 42 }}>{recipientData.count}</ThemedText>
+                          <ThemedText type="body" style={{ color: dt.textSecondary }}>customers will receive this email</ThemedText>
+                        </View>
+                        {recipientData.preview.length > 0 ? (
+                          <ThemedText type="caption" style={{ color: dt.textSecondary, marginTop: 2 }}>
+                            {recipientData.preview.slice(0, 3).map(p => p.name).join(", ")}
+                            {recipientData.count > 3 ? ` + ${recipientData.count - 3} more` : ""}
+                          </ThemedText>
+                        ) : null}
+                      </View>
+                    )
+                  ) : null}
                 </View>
+
+                {/* Subject preview */}
+                {(viewingCampaign?.messageSubject || editingSubject) ? (
+                  <View style={{ backgroundColor: dt.surfaceSecondary, borderRadius: BorderRadius.sm, padding: Spacing.sm, gap: 2 }}>
+                    <ThemedText type="caption" style={{ color: dt.textSecondary, textTransform: "uppercase", fontSize: 10, letterSpacing: 0.5 }}>Subject</ThemedText>
+                    <ThemedText type="body" style={{ fontWeight: "500" }} numberOfLines={2}>{editingSubject || viewingCampaign?.messageSubject}</ThemedText>
+                  </View>
+                ) : null}
+
+                {/* Warning */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.xs }}>
+                  <Feather name="alert-triangle" size={14} color={theme.warning} />
+                  <ThemedText type="caption" style={{ color: dt.textSecondary }}>This action cannot be undone.</ThemedText>
+                </View>
+
+                {/* Action buttons */}
                 <View style={{ flexDirection: "row", gap: Spacing.sm }}>
                   <Pressable
                     onPress={() => setConfirmSend(false)}
@@ -807,28 +876,34 @@ export default function ReactivationScreen() {
                   >
                     <ThemedText type="small" style={{ color: dt.textSecondary, fontWeight: "600" }}>Cancel</ThemedText>
                   </Pressable>
-                  <Pressable
-                    onPress={async () => {
-                      setConfirmSend(false);
-                      setSendingCampaign(true);
-                      try {
-                        const res = await apiRequest("POST", `/api/campaigns/${viewingCampaign?.id}/send`, {});
-                        const data = await res.json();
-                        setSendResult(data);
-                        setViewingCampaign((prev: any) => prev ? { ...prev, status: "sent" } : prev);
-                        queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-                      } catch (e: any) {
-                        let msg = "Failed to send campaign";
-                        try { const errData = await e?.response?.json(); msg = errData?.message || msg; } catch {}
-                        setSendResult({ sent: 0, failed: 1, total: 1 });
-                      } finally {
-                        setSendingCampaign(false);
-                      }
-                    }}
-                    style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: theme.error }}
-                  >
-                    <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600" }}>Send Now</ThemedText>
-                  </Pressable>
+                  {recipientData !== null && recipientData.count === 0 ? (
+                    <View style={{ flex: 2, alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: dt.surfaceSecondary }}>
+                      <ThemedText type="caption" style={{ color: dt.textSecondary, textAlign: "center" }}>No recipients found</ThemedText>
+                    </View>
+                  ) : (
+                    <Pressable
+                      disabled={recipientLoading || recipientData === null}
+                      onPress={async () => {
+                        setConfirmSend(false);
+                        setSendingCampaign(true);
+                        try {
+                          const res = await apiRequest("POST", `/api/campaigns/${viewingCampaign?.id}/send`, {});
+                          setSendResult(res as { sent: number; failed: number; total: number });
+                          setViewingCampaign((prev: any) => prev ? { ...prev, status: "sent" } : prev);
+                          queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+                        } catch {
+                          setSendResult({ sent: 0, failed: 1, total: 1 });
+                        } finally {
+                          setSendingCampaign(false);
+                        }
+                      }}
+                      style={{ flex: 2, alignItems: "center", justifyContent: "center", paddingVertical: Spacing.md, borderRadius: BorderRadius.sm, backgroundColor: recipientLoading || recipientData === null ? dt.surfaceSecondary : theme.success, opacity: recipientLoading || recipientData === null ? 0.6 : 1 }}
+                    >
+                      <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "700" }}>
+                        {recipientLoading ? "Loading..." : `Send to ${recipientData?.count ?? "..."}`}
+                      </ThemedText>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             ) : (

@@ -1,0 +1,55 @@
+OpportunitiesScreen has a StyleSheet.create block defined 
+BEFORE the import statements at the top of the file. Fix 
+this and do a general code cleanup pass on the file.
+
+FIXES REQUIRED:
+
+1. STYLESHEET ORDERING:
+- Move the StyleSheet.create block that appears before 
+  imports to the BOTTOM of the file, after the component
+- Verify no runtime errors after the move
+- This is a critical structural fix
+
+2. EXTRACT MAGIC NUMBERS to named constants at the 
+   top of the file (after imports, before component):
+
+const DORMANT_RECOVERY_RATE = 0.25; // 25% of avg ticket
+const LOST_DECLINED_RECOVERY_RATE = 0.10; // 10% of quote
+const LOST_EXPIRED_RECOVERY_RATE = 0.20; // 20% of quote
+
+Replace all raw number literals in getDormantEstimate 
+and getLostEstimate with these constants.
+
+3. TYPESCRIPT: Add explicit return types to all helper 
+   functions that are missing them:
+   - getDaysAgo(dateStr: string): string
+   - getDormantEstimate(avgTicket: number | null): number
+   - getLostEstimate(total: number, status: string): number
+   - getLostDisplayName(item: LostQuote): string
+   - getLostFirstName(item: LostQuote): string
+   - getLostPhone(item: LostQuote): string | null
+   - getLostEmail(item: LostQuote): string | null
+
+4. REMOVE DEAD CODE:
+- The filterRow, filterChip, listContent, taskCard, 
+  taskRow, typeIconWrap, taskCenter, taskRight, 
+  priorityBadge, dotsRow, dot, actionsRow, actionBtn, 
+  emptyContainer, emptyIconWrap, loadingContainer 
+  styles at the very top of the file appear to be 
+  leftover from a previous version — audit whether 
+  any of these are actually used. Remove unused ones.
+
+5. CONSOLIDATE duplicate StyleSheet entries:
+- actionsRow appears twice with different properties
+- Merge into one canonical definition
+
+6. ADD COMMENTS above each section of the file:
+   // ── Types ──
+   // ── Constants ──  
+   // ── Helper Functions ──
+   // ── Sub-components ──
+   // ── Main Screen ──
+   // ── Styles ──
+
+Test: File compiles with no errors. All functionality 
+unchanged. StyleSheet is at the bottom.
