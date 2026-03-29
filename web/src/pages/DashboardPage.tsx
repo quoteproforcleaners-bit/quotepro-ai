@@ -35,6 +35,8 @@ import {
   Clock,
   Inbox,
   AlertCircle,
+  Link2,
+  X,
 } from "lucide-react";
 import { Button, Badge, Card, CardHeader, ProgressBar, MetricRing, FunnelBar } from "../components/ui";
 import { formatCurrency } from "../utils/currency";
@@ -967,6 +969,12 @@ export default function DashboardPage() {
     distribution: Record<number, number>;
   }>({ queryKey: ["/api/ratings/summary"] });
   const { data: pricing } = useQuery<any>({ queryKey: ["/api/pricing"] });
+  const { data: pricingStatus } = useQuery<{
+    configured: boolean;
+    usingDefaultPricing: boolean;
+    completionPercent: number;
+    missingItems: string[];
+  }>({ queryKey: ["/api/lead-link/pricing-status"] });
   const { data: intakeCountData } = useQuery<{ count: number; newCount: number; reviewCount: number }>({
     queryKey: ["/api/intake-requests/count"],
     refetchInterval: 60_000,
@@ -980,6 +988,22 @@ export default function DashboardPage() {
 
   const totalRevenue = acceptedQuotes.reduce((sum: number, q: any) => sum + (Number(q.total) || 0), 0);
   const activeJobs = jobs.filter((j: any) => j.status === "scheduled" || j.status === "in_progress");
+
+  // Pricing banner dismiss (7-day snooze)
+  const [pricingBannerDismissed, setPricingBannerDismissed] = useState<boolean>(() => {
+    try {
+      const ts = localStorage.getItem("qp_pricing_banner_dismissed_until");
+      if (ts && Date.now() < parseInt(ts, 10)) return true;
+    } catch {}
+    return false;
+  });
+
+  function dismissPricingBanner() {
+    try {
+      localStorage.setItem("qp_pricing_banner_dismissed_until", String(Date.now() + 7 * 24 * 60 * 60 * 1000));
+    } catch {}
+    setPricingBannerDismissed(true);
+  }
 
   // Revenue milestone modal
   const MILESTONES = [1000, 5000, 10000];
@@ -1288,6 +1312,48 @@ export default function DashboardPage() {
           navigate={navigate}
         />
       ) : null}
+
+      {/* 2b. Pricing not configured banner */}
+      {pricingStatus && !pricingStatus.configured && !pricingBannerDismissed && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 mb-6 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+            <Link2 className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-900">
+              Your Lead Link is showing approximate pricing
+            </p>
+            <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+              Customers visiting your quote link see ballpark estimates — not your real rates.
+              Finish pricing setup to show accurate prices and win more cleans.
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="flex-1 h-1.5 rounded-full bg-amber-200 overflow-hidden max-w-[140px]">
+                <div
+                  className="h-full bg-amber-500 rounded-full transition-all"
+                  style={{ width: `${pricingStatus.completionPercent}%` }}
+                />
+              </div>
+              <span className="text-xs font-bold text-amber-600">{pricingStatus.completionPercent}% set up</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => navigate("/lead-capture")}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+            >
+              Fix Now <ChevronRight className="w-3 h-3" />
+            </button>
+            <button
+              onClick={dismissPricingBanner}
+              className="p-1.5 rounded-lg text-amber-400 hover:text-amber-600 hover:bg-amber-100 transition-colors"
+              title="Dismiss for 7 days"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 3. KPI Momentum Row — Fix 2: differentiated monthly view */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

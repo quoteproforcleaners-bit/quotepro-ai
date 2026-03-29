@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/ui";
 import QRCode from "qrcode";
 import {
   Link2, Copy, Check, ToggleLeft, ToggleRight, ExternalLink, Code2,
   Globe, Search, Instagram, Mail, MessageCircle, Download, QrCode,
-  Printer, BarChart2, Users, TrendingUp, Zap,
+  Printer, BarChart2, Users, TrendingUp, Zap, AlertTriangle, ChevronRight,
+  CheckCircle2, Settings,
 } from "lucide-react";
 
 interface LeadCaptureSettings {
@@ -21,8 +23,16 @@ interface LeadLinkAnalytics {
   conversionRate: number;
 }
 
+interface PricingStatus {
+  configured: boolean;
+  usingDefaultPricing: boolean;
+  completionPercent: number;
+  missingItems: string[];
+}
+
 export default function LeadCapturePage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: settings, isLoading } = useQuery<LeadCaptureSettings>({
     queryKey: ["/api/business/lead-capture-settings"],
@@ -30,6 +40,10 @@ export default function LeadCapturePage() {
 
   const { data: analytics } = useQuery<LeadLinkAnalytics>({
     queryKey: ["/api/business/lead-link-analytics"],
+  });
+
+  const { data: pricingStatus } = useQuery<PricingStatus>({
+    queryKey: ["/api/lead-link/pricing-status"],
   });
 
   const [slugInput, setSlugInput] = useState("");
@@ -225,6 +239,90 @@ export default function LeadCapturePage() {
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pricing Health Card */}
+      {pricingStatus && (
+        <div
+          className={`rounded-xl border p-5 ${
+            pricingStatus.configured
+              ? "bg-emerald-50 border-emerald-200"
+              : "bg-amber-50 border-amber-300"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                  pricingStatus.configured ? "bg-emerald-500" : "bg-amber-400"
+                }`}
+              >
+                {pricingStatus.configured
+                  ? <CheckCircle2 className="w-5 h-5 text-white" />
+                  : <AlertTriangle className="w-5 h-5 text-white" />
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3
+                  className={`font-bold text-sm ${
+                    pricingStatus.configured ? "text-emerald-800" : "text-amber-900"
+                  }`}
+                >
+                  {pricingStatus.configured
+                    ? "Pricing configured — estimates are accurate"
+                    : "Pricing setup incomplete — customers see approximate estimates"
+                  }
+                </h3>
+                <p
+                  className={`text-xs mt-1 leading-relaxed ${
+                    pricingStatus.configured ? "text-emerald-700" : "text-amber-800"
+                  }`}
+                >
+                  {pricingStatus.configured
+                    ? "Your pricing is set up. Customers on your Lead Link see accurate estimates based on your real rates."
+                    : `Customers are seeing ballpark ranges instead of your real prices. Complete your pricing setup to build trust and reduce surprises.`
+                  }
+                </p>
+                {!pricingStatus.configured && pricingStatus.missingItems.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {pricingStatus.missingItems.map(item => (
+                      <span
+                        key={item}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {/* Completion progress bar */}
+                {!pricingStatus.configured && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-amber-200 overflow-hidden">
+                      <div
+                        className="h-full bg-amber-500 rounded-full transition-all"
+                        style={{ width: `${pricingStatus.completionPercent}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold text-amber-600 shrink-0">
+                      {pricingStatus.completionPercent}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            {!pricingStatus.configured && (
+              <button
+                onClick={() => navigate("/pricing")}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors shrink-0"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Set Up Pricing
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
       )}
 

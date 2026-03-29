@@ -2151,6 +2151,78 @@ Return ONLY valid JSON:
   });
 
   // ─── Lead Link Config (new microsite) ────────────────────────────────────────
+  // ─── Pricing Configuration Checker ───────────────────────────────────────
+  function checkPricingConfigured(stored: any): {
+    configured: boolean;
+    missingItems: string[];
+    completionPercent: number;
+    usingDefaultPricing: boolean;
+  } {
+    const s = stored || {};
+    const missing: string[] = [];
+    let passed = 0;
+    const TOTAL = 4;
+
+    // 1. Hourly rate customized
+    const hr = Number(s.hourlyRate ?? 0);
+    if (hr > 0 && hr !== 35 && hr !== 40 && hr !== 45) {
+      passed++;
+    } else {
+      missing.push("Hourly rate not set");
+    }
+
+    // 2. Minimum ticket customized
+    const mt = Number(s.minimumTicket ?? 0);
+    if (mt > 0 && mt !== 100 && mt !== 80) {
+      passed++;
+    } else {
+      missing.push("Minimum ticket not set");
+    }
+
+    // 3. At least one service type customized
+    const FACTORY_NAMES = new Set([
+      "standard", "standard clean", "deep clean", "deep",
+      "move in/out", "move in / out", "move-in/move-out",
+      "move out", "recurring", "recurring clean",
+    ]);
+    const serviceTypes: any[] = s.serviceTypes || [];
+    const hasCustomST = serviceTypes.some(
+      (st: any) => st?.name && !FACTORY_NAMES.has(st.name.trim().toLowerCase())
+    );
+    if (hasCustomST) {
+      passed++;
+    } else {
+      missing.push("Service type names not customized");
+    }
+
+    // 4. At least 3 add-on prices set
+    const addOns = s.addOnPrices || {};
+    const nonZero = Object.values(addOns).filter((v: any) => Number(v) > 0).length;
+    if (nonZero >= 3) {
+      passed++;
+    } else {
+      missing.push(`Add-on prices not configured (${nonZero}/3 set)`);
+    }
+
+    const configured = passed === TOTAL;
+    return {
+      configured,
+      missingItems: missing,
+      completionPercent: Math.round((passed / TOTAL) * 100),
+      usingDefaultPricing: !configured,
+    };
+  }
+
+  // Default add-on prices used when none are configured
+  const DEFAULT_ADD_ON_PRICES = {
+    insideFridge: 0, insideOven: 0, insideCabinets: 0,
+    interiorWindows: 0, blindsDetail: 0, baseboardsDetail: 0,
+    laundryFoldOnly: 0, dishes: 0, organizationTidy: 0,
+    biannualDeepClean: 0, insideWindows: 0, laundry: 0,
+    organizing: 0, garage: 0, baseboards: 0, blinds: 0,
+    carpetCleaning: 0, wallWashing: 0,
+  };
+
   router.get("/api/public/lead-link-config/:slug", async (req: Request, res: Response) => {
     try {
       const slug = req.params.slug?.toLowerCase().trim();
@@ -2164,17 +2236,40 @@ Return ONLY valid JSON:
       if (!r.rows.length) return res.status(404).json({ error: "not_found" });
       const row = r.rows[0];
       if (!row.public_quote_enabled) return res.status(410).json({ error: "disabled" });
-      let pricing = { hourlyRate: 40, minimumTicket: 80, sqftFactor: 0.0085 };
+
+      // Fetch full pricing settings
+      let storedSettings: any = {};
       try {
         const ps = await getPricingByBusiness(row.id);
-        if (ps) {
-          pricing = {
-            hourlyRate: ps.hourlyRate ?? 40,
-            minimumTicket: ps.minimumTicket ?? 80,
-            sqftFactor: (ps as any).sqftFactor ?? 0.0085,
-          };
-        }
+        if (ps?.settings) storedSettings = ps.settings as any;
       } catch {}
+
+      const pricingStatus = checkPricingConfigured(storedSettings);
+
+      // Build full pricing config for the client-side engine
+      const pricingConfig = {
+        hourlyRate: Number(storedSettings.hourlyRate ?? 40),
+        minimumTicket: Number(storedSettings.minimumTicket ?? 100),
+        taxRate: Number(storedSettings.taxRate ?? 0),
+        serviceTypes: (storedSettings.serviceTypes || []) as any[],
+        goodOptionId: storedSettings.goodOptionId || null,
+        betterOptionId: storedSettings.betterOptionId || null,
+        bestOptionId: storedSettings.bestOptionId || null,
+        frequencyDiscounts: {
+          weekly: Number((storedSettings.frequencyDiscounts as any)?.weekly ?? 0),
+          biweekly: Number((storedSettings.frequencyDiscounts as any)?.biweekly ?? 0),
+          monthly: Number((storedSettings.frequencyDiscounts as any)?.monthly ?? 0),
+        },
+        addOnPrices: { ...DEFAULT_ADD_ON_PRICES, ...(storedSettings.addOnPrices || {}) },
+      };
+
+      // Legacy compact pricing for backward compat
+      const legacyPricing = {
+        hourlyRate: pricingConfig.hourlyRate,
+        minimumTicket: pricingConfig.minimumTicket,
+        sqftFactor: Number(storedSettings.sqftFactor ?? 0.0085),
+      };
+
       res.json({
         slug,
         businessId: row.intake_code || row.id,
@@ -2184,7 +2279,12 @@ Return ONLY valid JSON:
         phone: row.phone || null,
         email: row.email || null,
         rating: 4.9,
-        pricing,
+        pricing: legacyPricing,
+        pricingConfig,
+        pricingConfigured: pricingStatus.configured,
+        usingDefaultPricing: pricingStatus.usingDefaultPricing,
+        pricingCompletionPercent: pricingStatus.completionPercent,
+        pricingMissingItems: pricingStatus.missingItems,
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -2194,7 +2294,7 @@ Return ONLY valid JSON:
   // ─── Lead Link Event Tracking ─────────────────────────────────────────────
   router.post("/api/public/lead-link-event", async (req: Request, res: Response) => {
     try {
-      const { slug, eventType, sessionId } = req.body;
+      const { slug, eventType, sessionId, usedDefaultPricing } = req.body;
       if (!slug || !eventType) return res.status(400).json({ message: "slug and eventType required" });
       const biz = await pool.query(
         `SELECT id FROM businesses WHERE public_quote_slug = $1 LIMIT 1`, [slug]
@@ -2202,10 +2302,9 @@ Return ONLY valid JSON:
       const businessId = biz.rows[0]?.id;
       if (!businessId) return res.status(404).json({ message: "not found" });
       await pool.query(
-        `INSERT INTO lead_link_events (business_id, event_type, session_id, created_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT DO NOTHING`,
-        [businessId, eventType, sessionId || null],
+        `INSERT INTO lead_link_events (business_id, event_type, session_id, used_default_pricing, created_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [businessId, eventType, sessionId || null, Boolean(usedDefaultPricing)],
       ).catch(() => {});
       res.json({ ok: true });
     } catch (e: any) {

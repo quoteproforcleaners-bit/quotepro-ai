@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import {
   ChevronRight, ChevronLeft, Check, Loader2, AlertCircle, Shield,
-  Share2, Clock, Star, Home, Wind, RefreshCw, ArrowRight, Plus, Minus, Zap,
+  Share2, Clock, Star, Home, Wind, RefreshCw, ArrowRight, Plus, Minus, Zap, AlertTriangle,
 } from "lucide-react";
+import { calculateLeadLinkEstimate } from "../lib/leadLinkPricingEngine";
+import type { LeadLinkPricingConfig, QuoteInputs, AddOnKey } from "../lib/leadLinkPricingEngine";
 
 const API_BASE = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -22,6 +24,11 @@ interface LeadLinkConfig {
     minimumTicket: number;
     sqftFactor?: number;
   };
+  pricingConfig?: LeadLinkPricingConfig;
+  pricingConfigured: boolean;
+  usingDefaultPricing: boolean;
+  pricingCompletionPercent: number;
+  pricingMissingItems: string[];
 }
 
 type FlowStep = "step1" | "calculating" | "reveal" | "step2" | "step3" | "step4";
@@ -56,6 +63,16 @@ async function trackEvent(slug: string, eventType: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slug, eventType, sessionId: getSessionId() }),
+    });
+  } catch {}
+}
+
+async function trackEventWithMeta(slug: string, eventType: string, usedDefaultPricing: boolean) {
+  try {
+    await fetch(`${API_BASE}/api/public/lead-link-event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug, eventType, sessionId: getSessionId(), usedDefaultPricing }),
     });
   } catch {}
 }
@@ -331,7 +348,7 @@ export default function LeadLinkPage() {
         if (d.error || d.message) { setConfigError(true); return; }
         setConfig(d);
         document.title = `${d.companyName} — Get a Free Quote`;
-        trackEvent(slug, "leadlink_visit");
+        trackEventWithMeta(slug, "leadlink_visit", !!d.usingDefaultPricing);
       })
       .catch(() => setConfigError(true))
       .finally(() => setConfigLoading(false));
@@ -343,6 +360,32 @@ export default function LeadLinkPage() {
   const computePrice = useCallback(
     (sqft?: SqftRange | null, cond?: Condition | null, pets?: boolean, petCount?: number) => {
       if (!config || beds === null || baths === null || serviceType === null) return null;
+
+      // Use the new engine when pricingConfig is available
+      if (config.pricingConfig) {
+        const condMap: Record<Condition, QuoteInputs["conditionLevel"]> = {
+          great: "excellent", average: "average", needs_work: "dirty",
+        };
+        const cleaningTypeMap: Record<ServiceType, QuoteInputs["cleaningType"]> = {
+          standard: "standard", deep: "deep", move: "moveinout", recurring: "recurring",
+        };
+        const sqftMid = sqft ? SQFT_MIDPOINTS[sqft] : null;
+        const inputs: QuoteInputs = {
+          bedrooms: parseInt(beds),
+          bathrooms: parseFloat(baths),
+          sqft: sqftMid,
+          cleaningType: cleaningTypeMap[serviceType],
+          frequency: serviceType === "recurring" ? "biweekly" : "onetime",
+          conditionLevel: cond ? condMap[cond] : "good",
+          petCount: pets ? (petCount ?? 1) : 0,
+          addOns: [] as AddOnKey[],
+          usingDefaultPricing: config.usingDefaultPricing,
+        };
+        const estimate = calculateLeadLinkEstimate(inputs, config.pricingConfig);
+        return { low: estimate.lowEstimate, high: estimate.highEstimate };
+      }
+
+      // Legacy fallback
       return calcPriceRange(
         parseInt(beds), parseFloat(baths), serviceType, config.pricing,
         sqft, cond, pets, petCount,
@@ -357,7 +400,7 @@ export default function LeadLinkPage() {
     if (!price) return;
     setPriceRange(price);
     setStep("calculating");
-    trackEvent(slug!, "leadlink_step1_complete");
+    trackEventWithMeta(slug!, "leadlink_step1_complete", !!config?.usingDefaultPricing);
     setTimeout(() => setStep("reveal"), 900);
     scrollToTop();
   }
@@ -429,7 +472,7 @@ export default function LeadLinkPage() {
         const err = await r.json().catch(() => ({}));
         throw new Error(err.message || "Submission failed. Please try again.");
       }
-      trackEvent(slug!, "leadlink_submitted");
+      trackEventWithMeta(slug!, "leadlink_submitted", !!config?.usingDefaultPricing);
       setStep("step4");
       scrollToTop();
     } catch (e: any) {
@@ -464,6 +507,24 @@ export default function LeadLinkPage() {
       className="min-h-screen flex flex-col"
       style={{ background: "linear-gradient(160deg, #f8faff 0%, #eff6ff 100%)" }}
     >
+      {/* Default pricing disclaimer — sticky at very top */}
+      {config.usingDefaultPricing && (
+        <div
+          style={{
+            position: "sticky", top: 0, zIndex: 30,
+            background: "#fef3c7",
+            borderBottom: "2px solid #f59e0b",
+            padding: "10px 16px",
+            fontSize: 13,
+            textAlign: "center",
+            color: "#78350f",
+          }}
+        >
+          <AlertTriangle className="inline w-3.5 h-3.5 mr-1 mb-0.5" style={{ color: "#d97706" }} />
+          Estimates on this page are approximate. {config.companyName} will confirm your exact price before any work begins.
+        </div>
+      )}
+
       {/* Scroll target */}
       <div ref={scrollTopRef} />
 
@@ -610,10 +671,14 @@ export default function LeadLinkPage() {
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-5">
                 <div className="text-center">
                   <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4" style={{ letterSpacing: "1.5px" }}>
-                    {serviceType === "standard" ? "Standard Clean"
-                      : serviceType === "deep" ? "Deep Clean"
-                      : serviceType === "move" ? "Move In/Out Clean"
-                      : "Recurring Clean"} · One-time estimate
+                    {config.usingDefaultPricing ? "Estimated price range" : (
+                      <>
+                        {serviceType === "standard" ? "Standard Clean"
+                          : serviceType === "deep" ? "Deep Clean"
+                          : serviceType === "move" ? "Move In/Out Clean"
+                          : "Recurring Clean"} · One-time estimate
+                      </>
+                    )}
                   </p>
 
                   <div
@@ -637,10 +702,16 @@ export default function LeadLinkPage() {
                     ))}
                   </div>
 
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Exact price depends on home condition and any add-on services.
-                    Your final quote will be sent after you share a few more details.
-                  </p>
+                  {config.usingDefaultPricing ? (
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Exact pricing depends on your home's specifics and will be confirmed by {config.companyName}.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Exact price depends on home condition and any add-on services.
+                      Your final quote will be sent after you share a few more details.
+                    </p>
+                  )}
                 </div>
               </div>
 

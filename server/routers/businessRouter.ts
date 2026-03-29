@@ -1224,6 +1224,47 @@ const router = Router();
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // ─── Lead Link Pricing Status ─────────────────────────────────────────────
+  router.get("/api/lead-link/pricing-status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const ps = await getPricingByBusiness(business.id);
+      const s: any = (ps?.settings as any) || {};
+      const missing: string[] = [];
+      let passed = 0;
+      const TOTAL = 4;
+      const FACTORY_NAMES = new Set(["standard","standard clean","deep clean","deep","move in/out","move in / out","move-in/move-out","move out","recurring","recurring clean"]);
+
+      const hr = Number(s.hourlyRate ?? 0);
+      if (hr > 0 && hr !== 35 && hr !== 40 && hr !== 45) passed++;
+      else missing.push("Hourly rate not set");
+
+      const mt = Number(s.minimumTicket ?? 0);
+      if (mt > 0 && mt !== 100 && mt !== 80) passed++;
+      else missing.push("Minimum ticket not set");
+
+      const serviceTypes: any[] = s.serviceTypes || [];
+      const hasCustomST = serviceTypes.some((st: any) => st?.name && !FACTORY_NAMES.has(st.name.trim().toLowerCase()));
+      if (hasCustomST) passed++;
+      else missing.push("Service type names not customized");
+
+      const addOns = s.addOnPrices || {};
+      const nonZero = Object.values(addOns).filter((v: any) => Number(v) > 0).length;
+      if (nonZero >= 3) passed++;
+      else missing.push(`Add-on prices not configured (${nonZero}/3 set)`);
+
+      res.json({
+        configured: passed === TOTAL,
+        missingItems: missing,
+        completionPercent: Math.round((passed / TOTAL) * 100),
+        usingDefaultPricing: passed < TOTAL,
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ─── Lead Link Analytics ─────────────────────────────────────────────────
   router.get("/api/business/lead-link-analytics", requireAuth, requireGrowth, async (req: any, res: Response) => {
     try {
