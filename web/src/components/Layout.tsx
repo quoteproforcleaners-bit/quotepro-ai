@@ -47,11 +47,14 @@ const SETTINGS_NAV_KEY = "quotepro_nav_settings_open";
 
 // CORE — unlabeled, always visible
 const CORE_NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — jobs today, pipeline health, and the most important actions." },
-  { to: "/quotes",       label: "Quotes",       icon: FileText,        shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
-  { to: "/customers",    label: "Customers",    icon: Users,           pro: true,       description: "Full contact history, quote history, job records, and notes for every client in one place." },
-  { to: "/jobs",         label: "Jobs",         icon: Briefcase,       pro: true,       description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
-  { to: "/calendar",     label: "Schedule",     icon: CalendarDays,    pro: true,       description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
+  { to: "/dashboard",      label: "Dashboard",       icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — jobs today, pipeline health, and the most important actions." },
+  { to: "/lead-capture",   label: "Lead Capture",    icon: Link2,                            description: "Share your branded quote request link — customers submit details, you get instant leads." },
+  { to: "/intake-requests",label: "Quote Requests",  icon: Inbox,                            description: "View and manage quote requests submitted through your lead capture link." },
+  { to: "/commercial-quote",label: "Commercial Quote",icon: Building2,       pro: true,      description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
+  { to: "/quotes",         label: "Quotes",          icon: FileText,        shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
+  { to: "/customers",      label: "Customers",       icon: Users,           pro: true,       description: "Full contact history, quote history, job records, and notes for every client in one place." },
+  { to: "/jobs",           label: "Jobs",            icon: Briefcase,       pro: true,       description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
+  { to: "/calendar",       label: "Schedule",        icon: CalendarDays,    pro: true,       description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
 ];
 
 // BUSINESS — labeled section (was GROWTH)
@@ -65,9 +68,6 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
 // TOOLS — labeled section (collapsed by default)
 const TOOLS_NAV_ITEMS: NavItem[] = [
   { to: "/quote-doctor",      label: "Quote Doctor",       icon: Zap,         description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
-  { to: "/lead-capture",      label: "Lead Capture",       icon: Link2,       description: "Share your branded quote request link — customers submit details, you get instant leads." },
-  { to: "/intake-requests",   label: "Quote Requests",     icon: Inbox,       description: "View and manage quote requests submitted through your lead capture link." },
-  { to: "/commercial-quote",  label: "Commercial Quote",   icon: Building2,   pro: true, description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
   { to: "/automations",       label: "Automations",        icon: Cpu,         pro: true, description: "Set up automated follow-ups, review requests, and customer sequences that run on autopilot." },
   { to: "/email-sequences",   label: "Automated Emails",   icon: MailOpen,    pro: true, description: "Drip campaigns and one-off emails — automated sequences that nurture leads into booked jobs." },
   { to: "/ai-assistant",      label: "Sales Assistant",    icon: Bot,         pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
