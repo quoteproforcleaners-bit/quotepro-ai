@@ -268,3 +268,108 @@ export async function sendTestReminder(businessId: string): Promise<{ emailSent:
 
   return { emailSent, smsSent };
 }
+
+// ── Tip Request Scheduler ────────────────────────────────────────────────────
+
+export async function runTipRequestScheduler(): Promise<void> {
+  try {
+    const replitDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
+    const baseUrl = process.env.EXPO_PUBLIC_DOMAIN
+      || (replitDomain ? `https://${replitDomain}` : "https://quotepro.ai");
+
+    const jobs = await pool.query<{
+      job_id: string; business_id: string; company_name: string;
+      logo_uri: string | null; tip_token: string;
+      tip_request_delay: number; job_type: string | null;
+      customer_email: string | null; customer_phone: string | null;
+      first_name: string | null; last_name: string | null;
+      sender_name: string | null; email: string;
+    }>(`
+      SELECT j.id AS job_id, j.business_id, j.tip_token, j.job_type,
+             b.company_name, b.logo_uri, b.tip_request_delay, b.email,
+             b.sender_name,
+             c.email AS customer_email, c.phone AS customer_phone,
+             c.first_name, c.last_name
+      FROM jobs j
+      JOIN businesses b ON j.business_id = b.id
+      LEFT JOIN customers c ON j.customer_id = c.id
+      WHERE j.status = 'completed'
+        AND b.tips_enabled = TRUE
+        AND j.tip_request_sent_at IS NULL
+        AND j.tip_token IS NOT NULL
+        AND j.completed_at < NOW() - (b.tip_request_delay || ' hours')::interval
+        AND (c.email IS NOT NULL OR c.phone IS NOT NULL)
+      LIMIT 50
+    `);
+
+    for (const job of jobs.rows) {
+      const tipUrl = `${baseUrl}/tip/${job.tip_token}`;
+      const firstName = job.first_name || "there";
+      const cleanerBiz = job.company_name;
+      const jobType = job.job_type || "cleaning service";
+
+      let sent = false;
+
+      // Send email
+      if (job.customer_email) {
+        try {
+          const html = `<div style="font-family:'Helvetica Neue',sans-serif;max-width:520px;margin:0 auto;padding:24px 16px">
+<div style="text-align:center;margin-bottom:24px">
+  ${job.logo_uri ? `<img src="${job.logo_uri}" alt="${cleanerBiz}" style="width:48px;height:48px;border-radius:12px;object-fit:contain;margin:0 auto 8px">` : ""}
+  <h2 style="color:#1e293b;font-size:20px;font-weight:800;margin:0">${cleanerBiz}</h2>
+</div>
+<h1 style="color:#1e293b;font-size:24px;font-weight:800;margin-bottom:8px">Hi ${firstName}! Your home looks amazing.</h1>
+<p style="color:#64748b;font-size:15px;line-height:1.6;margin-bottom:24px">
+  We just finished your ${jobType}. If you're happy with the result, your crew would love a small tip — it means the world to them!
+</p>
+<div style="text-align:center;margin:28px 0">
+  <a href="${tipUrl}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px">
+    Leave a tip
+  </a>
+</div>
+<p style="color:#94a3b8;font-size:12px;line-height:1.5;text-align:center">
+  Secure payment powered by Stripe. Completely optional — we're grateful either way!
+</p>
+</div>`;
+          const { sendEmail, getBusinessSendParams } = await import("./mail");
+          await sendEmail({
+            to: job.customer_email,
+            from: undefined,
+            subject: `Hi ${firstName} — leave a tip for your ${cleanerBiz} crew?`,
+            html,
+            text: `Hi ${firstName}! We just finished your ${jobType}. Leave a tip for your crew here: ${tipUrl}`,
+            fromName: job.sender_name || cleanerBiz,
+            replyTo: job.email,
+          });
+          sent = true;
+        } catch (err: any) {
+          console.error(`[tips] Email failed for job ${job.job_id}:`, err.message);
+        }
+      }
+
+      // Send SMS
+      if (job.customer_phone) {
+        try {
+          const body = `Hi ${firstName}! ${cleanerBiz} just finished your cleaning. Leave a tip for your crew: ${tipUrl}`;
+          await sendSms(job.customer_phone, body.slice(0, 300));
+          sent = true;
+        } catch (err: any) {
+          console.error(`[tips] SMS failed for job ${job.job_id}:`, err.message);
+        }
+      }
+
+      if (sent) {
+        await pool.query(
+          `UPDATE jobs SET tip_request_sent_at = NOW() WHERE id = $1`,
+          [job.job_id]
+        );
+      }
+    }
+
+    if (jobs.rows.length > 0) {
+      console.log(`[tips] Processed ${jobs.rows.length} tip request(s)`);
+    }
+  } catch (err: any) {
+    console.error("[tips] Tip request scheduler error:", err.message);
+  }
+}

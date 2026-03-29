@@ -942,6 +942,26 @@ const router = Router();
               console.error("Referral credit error:", refErr.message);
             }
           }
+
+          // ── Tip payment handling ──────────────────────────────────────────
+          if (session.metadata?.type === "tip" && session.metadata?.tipId) {
+            const { tipId } = session.metadata;
+            try {
+              await pool.query(
+                `UPDATE tips SET status='paid', paid_at=NOW(), stripe_checkout_session_id=$1 WHERE id=$2`,
+                [session.id, tipId]
+              );
+              // Also update job.tip_amount for quick reference
+              await pool.query(
+                `UPDATE jobs SET tip_amount = (SELECT amount FROM tips WHERE id=$1) WHERE id = (SELECT job_id FROM tips WHERE id=$1)`,
+                [tipId]
+              );
+              console.log(`Tip paid: ${tipId}`);
+            } catch (tipErr: any) {
+              console.error("Tip webhook error:", tipErr.message);
+            }
+          }
+
           break;
         }
         case "customer.subscription.deleted":
@@ -1769,6 +1789,91 @@ router.post("/api/reminder-preferences/test", requireAuth, async (req: any, res:
     res.json({ success: true, ...result });
   } catch (e: any) {
     res.status(500).json({ message: e.message });
+  }
+});
+
+// ── Tip Settings ──────────────────────────────────────────────────────────────
+
+router.get("/api/tip-settings", requireAuth, async (req: any, res: Response) => {
+  try {
+    const bizRes = await pool.query(
+      `SELECT id, tips_enabled, tip_percentage_options, tip_distribution_percent, tip_request_delay
+       FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
+      [req.user.id]
+    );
+    if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
+    const b = bizRes.rows[0];
+    return res.json({
+      tipsEnabled: b.tips_enabled,
+      tipPercentageOptions: b.tip_percentage_options || [18, 22, 25],
+      tipDistributionPercent: b.tip_distribution_percent ?? 100,
+      tipRequestDelay: b.tip_request_delay ?? 2,
+    });
+  } catch (e: any) {
+    console.error("GET /api/tip-settings error:", e);
+    return res.status(500).json({ message: "Failed to fetch tip settings" });
+  }
+});
+
+router.put("/api/tip-settings", requireAuth, async (req: any, res: Response) => {
+  try {
+    const bizRes = await pool.query(
+      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.user.id]
+    );
+    if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
+    const bizId = bizRes.rows[0].id;
+    const {
+      tipsEnabled, tipPercentageOptions, tipDistributionPercent, tipRequestDelay
+    } = req.body;
+
+    await pool.query(
+      `UPDATE businesses SET
+        tips_enabled = COALESCE($1, tips_enabled),
+        tip_percentage_options = COALESCE($2, tip_percentage_options),
+        tip_distribution_percent = COALESCE($3, tip_distribution_percent),
+        tip_request_delay = COALESCE($4, tip_request_delay)
+       WHERE id = $5`,
+      [
+        tipsEnabled !== undefined ? tipsEnabled : null,
+        tipPercentageOptions ? JSON.stringify(tipPercentageOptions) : null,
+        tipDistributionPercent !== undefined ? tipDistributionPercent : null,
+        tipRequestDelay !== undefined ? tipRequestDelay : null,
+        bizId,
+      ]
+    );
+    return res.json({ success: true });
+  } catch (e: any) {
+    console.error("PUT /api/tip-settings error:", e);
+    return res.status(500).json({ message: "Failed to save tip settings" });
+  }
+});
+
+// ── Tip History ───────────────────────────────────────────────────────────────
+
+router.get("/api/tips", requireAuth, async (req: any, res: Response) => {
+  try {
+    const bizRes = await pool.query(
+      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.user.id]
+    );
+    if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
+    const bizId = bizRes.rows[0].id;
+
+    const rows = await pool.query(
+      `SELECT t.id, t.job_id, t.amount, t.percentage, t.status, t.created_at, t.paid_at,
+              c.first_name, c.last_name, c.email AS customer_email,
+              j.job_type, j.completed_at
+       FROM tips t
+       LEFT JOIN jobs j ON t.job_id = j.id
+       LEFT JOIN customers c ON t.customer_id = c.id
+       WHERE t.business_id=$1
+       ORDER BY t.created_at DESC
+       LIMIT 100`,
+      [bizId]
+    );
+    return res.json(rows.rows);
+  } catch (e: any) {
+    console.error("GET /api/tips error:", e);
+    return res.status(500).json({ message: "Failed to fetch tips" });
   }
 });
 

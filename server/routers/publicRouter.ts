@@ -2393,4 +2393,119 @@ Return ONLY valid JSON:
     }
   });
 
+// ── Public Tip Page API ───────────────────────────────────────────────────────
+
+router.get("/api/public/tip-page/:token", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const jobRes = await pool.query(
+      `SELECT j.id, j.job_type, j.total, j.completed_at, j.tip_token,
+              j.tip_request_sent_at, j.tip_amount,
+              b.id AS business_id, b.company_name, b.logo_uri,
+              b.tips_enabled, b.tip_percentage_options,
+              c.first_name, c.last_name, c.email AS customer_email,
+              e.name AS team_member_name
+       FROM jobs j
+       JOIN businesses b ON j.business_id = b.id
+       LEFT JOIN customers c ON j.customer_id = c.id
+       LEFT JOIN employees e ON (j.team_members->0->>'id')::varchar = e.id::varchar
+       WHERE j.tip_token = $1 LIMIT 1`,
+      [token]
+    );
+    if (!jobRes.rows.length) return res.status(404).json({ message: "Tip page not found" });
+    const row = jobRes.rows[0];
+    if (!row.tips_enabled) return res.status(404).json({ message: "Tip collection is not enabled for this business" });
+
+    const tipCheck = await pool.query(
+      `SELECT id, amount, status FROM tips WHERE job_id=$1 AND status='paid' LIMIT 1`,
+      [row.id]
+    );
+    const alreadyPaid = tipCheck.rows.length > 0;
+
+    return res.json({
+      jobId: row.id,
+      businessName: row.company_name,
+      logoUri: row.logo_uri,
+      jobType: row.job_type,
+      total: row.total ? parseFloat(row.total) : null,
+      completedAt: row.completed_at,
+      customerName: row.first_name ? `${row.first_name} ${row.last_name || ""}`.trim() : null,
+      teamMemberName: row.team_member_name || null,
+      percentageOptions: row.tip_percentage_options || [18, 22, 25],
+      alreadyPaid,
+      paidAmount: alreadyPaid ? parseFloat(tipCheck.rows[0].amount) : null,
+    });
+  } catch (e: any) {
+    console.error("GET /api/public/tip-page/:token error:", e);
+    return res.status(500).json({ message: "Failed to load tip page" });
+  }
+});
+
+router.post("/api/public/tip-page/:token/checkout", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { amountCents } = req.body;
+    if (!amountCents || amountCents < 100) {
+      return res.status(400).json({ message: "Tip must be at least $1.00" });
+    }
+
+    const jobRes = await pool.query(
+      `SELECT j.id, j.business_id, j.customer_id, j.total, j.job_type,
+              b.company_name, b.tips_enabled, b.tip_percentage_options
+       FROM jobs j
+       JOIN businesses b ON j.business_id = b.id
+       WHERE j.tip_token = $1 LIMIT 1`,
+      [token]
+    );
+    if (!jobRes.rows.length) return res.status(404).json({ message: "Tip page not found" });
+    const job = jobRes.rows[0];
+    if (!job.tips_enabled) return res.status(400).json({ message: "Tips not enabled" });
+
+    const stripe = getStripe();
+    if (!stripe) return res.status(503).json({ message: "Payment not configured" });
+
+    const crypto = await import("crypto");
+    const tipId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO tips (id, job_id, business_id, customer_id, amount, percentage, status, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW())`,
+      [
+        tipId, job.id, job.business_id, job.customer_id || null,
+        (amountCents / 100).toFixed(2),
+        job.total ? ((amountCents / 100) / parseFloat(job.total) * 100).toFixed(2) : null,
+      ]
+    );
+
+    const baseUrl = getPublicBaseUrl(req);
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [{
+        price_data: {
+          currency: "usd",
+          unit_amount: amountCents,
+          product_data: {
+            name: `Tip for ${job.job_type || "cleaning service"} — ${job.company_name}`,
+            description: `Thank you for the great service!`,
+          },
+        },
+        quantity: 1,
+      }],
+      metadata: {
+        type: "tip",
+        tipId,
+        jobId: job.id,
+        businessId: job.business_id,
+      },
+      success_url: `${baseUrl}/tip/${token}?success=1`,
+      cancel_url: `${baseUrl}/tip/${token}?cancelled=1`,
+    });
+
+    return res.json({ checkoutUrl: session.url });
+  } catch (e: any) {
+    console.error("POST /api/public/tip-page/:token/checkout error:", e);
+    return res.status(500).json({ message: "Failed to create checkout session" });
+  }
+});
+
 export default router;

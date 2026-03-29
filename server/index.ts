@@ -9,7 +9,7 @@ import { processDripQueue } from "./dripEmails";
 import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
 import { sendPush } from "./pushNotifications";
 import { initNotificationTables, runNotificationScheduler } from "./notificationScheduler";
-import { runAppointmentReminderScheduler } from "./appointmentReminderScheduler";
+import { runAppointmentReminderScheduler, runTipRequestScheduler } from "./appointmentReminderScheduler";
 import { runCleanerNotificationScheduler } from "./cleanerNotificationScheduler";
 import { seedPristineHomeDemo } from "./seedPristineDemo";
 
@@ -701,6 +701,12 @@ async function seedToDoDemo() {
   runCleanerNotificationScheduler().catch((e: any) => console.error("[cleaner-notifications] Initial run failed:", e.message));
   setInterval(() => {
     runCleanerNotificationScheduler().catch((e: any) => console.error("[cleaner-notifications] Cron failed:", e.message));
+  }, 60 * 60 * 1000);
+
+  // ─── Tip request scheduler: runs every hour ───────────────────────────────
+  runTipRequestScheduler().catch((e: any) => console.error("[tips] Initial run failed:", e.message));
+  setInterval(() => {
+    runTipRequestScheduler().catch((e: any) => console.error("[tips] Cron failed:", e.message));
   }, 60 * 60 * 1000);
   // ─────────────────────────────────────────────────────────────────────────────
 

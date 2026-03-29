@@ -439,6 +439,27 @@ export default function SettingsPage() {
 
   const { data: cleanerPrefs } = useQuery<any>({ queryKey: ["/api/cleaner-notification-preferences"] });
   const { data: teamMembers = [] } = useQuery<any[]>({ queryKey: ["/api/employees"] });
+  const { data: tipSettings, refetch: refetchTipSettings } = useQuery<any>({ queryKey: ["/api/tip-settings"] });
+  const { data: tipHistory = [] } = useQuery<any[]>({ queryKey: ["/api/tips"] });
+  const [tipsForm, setTipsForm] = useState({ tipsEnabled: false, tipPercentageOptions: [18, 22, 25], tipRequestDelay: 2 });
+  const [tipsSaved, setTipsSaved] = useState(false);
+  useEffect(() => {
+    if (tipSettings) {
+      setTipsForm({
+        tipsEnabled: tipSettings.tipsEnabled ?? false,
+        tipPercentageOptions: tipSettings.tipPercentageOptions || [18, 22, 25],
+        tipRequestDelay: tipSettings.tipRequestDelay ?? 2,
+      });
+    }
+  }, [tipSettings]);
+  const saveTipSettings = async () => {
+    try {
+      await apiPut("/api/tip-settings", tipsForm);
+      refetchTipSettings();
+      setTipsSaved(true);
+      setTimeout(() => setTipsSaved(false), 3000);
+    } catch {}
+  };
 
   useEffect(() => {
     if (!reminderPrefs) return;
@@ -776,6 +797,7 @@ export default function SettingsPage() {
     "automations",
     "reminders",
     "reviews",
+    "tips",
     "features",
     "booking",
     "integrations",
@@ -2153,6 +2175,128 @@ export default function SettingsPage() {
               <p className="text-sm text-slate-500 mb-1">More integrations coming soon</p>
               <p className="text-xs text-slate-400">ServiceTitan, Housecall Pro, Square, and more</p>
             </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === "tips" ? (
+        <div className="max-w-2xl space-y-6">
+          {tipsSaved ? (
+            <div className="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 animate-scale-in">
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-700">Tip settings saved</span>
+            </div>
+          ) : null}
+
+          <Card>
+            <CardHeader title="Automated Tip Collection" icon={Gift} />
+            <p className="text-sm text-slate-500 mb-4">
+              When enabled, QuotePro automatically sends your customer a personalized tip link after each completed job.
+              Customers can tip securely via Stripe — no awkward cash conversations needed.
+            </p>
+
+            <div className="flex items-center justify-between py-3 border-b border-slate-100 mb-4">
+              <div>
+                <p className="text-sm font-medium text-slate-800">Enable tip requests</p>
+                <p className="text-xs text-slate-500 mt-0.5">Send a tip link to customers after job completion</p>
+              </div>
+              <Toggle
+                checked={tipsForm.tipsEnabled}
+                onChange={(v) => setTipsForm((f) => ({ ...f, tipsEnabled: v }))}
+              />
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm font-medium text-slate-700 mb-2">Suggested tip percentages</p>
+              <p className="text-xs text-slate-500 mb-3">Customers will see preset tip amounts based on their job total.</p>
+              <div className="flex flex-wrap gap-2">
+                {[10, 15, 18, 20, 22, 25, 30].map((pct) => {
+                  const isSelected = tipsForm.tipPercentageOptions.includes(pct);
+                  return (
+                    <button
+                      key={pct}
+                      onClick={() => setTipsForm((f) => ({
+                        ...f,
+                        tipPercentageOptions: isSelected
+                          ? f.tipPercentageOptions.filter((p) => p !== pct)
+                          : [...f.tipPercentageOptions, pct].sort((a, b) => a - b),
+                      }))}
+                      className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all ${
+                        isSelected
+                          ? "border-amber-500 bg-amber-50 text-amber-700"
+                          : "border-slate-200 text-slate-500 hover:border-amber-300"
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  );
+                })}
+              </div>
+              {tipsForm.tipPercentageOptions.length === 0 ? (
+                <p className="text-xs text-red-500 mt-1">Select at least one percentage</p>
+              ) : null}
+            </div>
+
+            <div className="mb-5">
+              <p className="text-sm font-medium text-slate-700 mb-2">Send tip request</p>
+              <Select
+                value={String(tipsForm.tipRequestDelay)}
+                onChange={(e) => setTipsForm((f) => ({ ...f, tipRequestDelay: Number((e.target as HTMLSelectElement).value) }))}
+                options={[
+                  { value: "1", label: "1 hour after job completion" },
+                  { value: "2", label: "2 hours after job completion" },
+                  { value: "4", label: "4 hours after job completion" },
+                  { value: "8", label: "8 hours after job completion" },
+                  { value: "24", label: "24 hours after job completion" },
+                ]}
+              />
+            </div>
+
+            <Button variant="primary" icon={Save} onClick={saveTipSettings}>
+              Save tip settings
+            </Button>
+          </Card>
+
+          <Card>
+            <CardHeader title="Tip History" icon={DollarSign} />
+            {tipHistory.length === 0 ? (
+              <div className="py-8 text-center">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                  <Gift className="w-6 h-6 text-slate-400" />
+                </div>
+                <p className="text-slate-500 text-sm">No tips received yet.</p>
+                <p className="text-slate-400 text-xs mt-1">Tips will appear here once customers start tipping.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {tipHistory.slice(0, 20).map((tip: any) => (
+                  <div key={tip.id} className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">
+                        {tip.first_name ? `${tip.first_name} ${tip.last_name || ""}`.trim() : "Anonymous"}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {tip.job_type || "Cleaning"} &middot; {tip.paid_at
+                          ? new Date(tip.paid_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                          : new Date(tip.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-emerald-700">
+                        ${parseFloat(tip.amount).toFixed(2)}
+                      </p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        tip.status === "paid"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-100 text-slate-500"
+                      }`}>
+                        {tip.status === "paid" ? "Paid" : "Pending"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       ) : null}

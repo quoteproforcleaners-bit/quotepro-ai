@@ -1107,12 +1107,19 @@ const router = Router();
       }
 
       const now = new Date();
+      const { randomUUID } = await import("crypto");
+      const tipToken = randomUUID();
       const updatedJob = await updateJob(req.params.id, {
         status: "completed",
         startedAt: (job as any).startedAt || now,
         completedAt: now,
         endDatetime: now,
       });
+      // Store tip token on job for later tip request
+      await pool.query(
+        `UPDATE jobs SET tip_token = $1 WHERE id = $2`,
+        [tipToken, job.id]
+      );
 
       let nextJob = null;
       if (job.recurrence && job.recurrence !== "none") {

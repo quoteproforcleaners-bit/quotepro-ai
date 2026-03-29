@@ -60,6 +60,7 @@ import PricingLogicPage from "./pages/PricingLogicPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import SchedulePublishPage from "./pages/SchedulePublishPage";
 import ScheduleAckPage from "./pages/ScheduleAckPage";
+import TipPage from "./pages/TipPage";
 import OnboardingWizardPage from "./pages/OnboardingWizardPage";
 import QuoteDoctorPage from "./pages/QuoteDoctorPage";
 
@@ -194,6 +195,9 @@ export default function App() {
 
         {/* Public cleaner schedule acknowledgment page */}
         <Route path="/schedule-ack/:token" element={<ScheduleAckPage />} />
+
+        {/* Public customer tip page */}
+        <Route path="/tip/:token" element={<TipPage />} />
 
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>

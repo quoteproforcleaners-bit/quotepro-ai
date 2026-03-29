@@ -5,7 +5,7 @@ import { apiPut, apiPatch, apiPost } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import {
   Building2, DollarSign, ArrowRight, ArrowLeft,
-  Upload, Check, Sparkles, Mail, MessageSquare, Link2,
+  Upload, Check, Sparkles, Mail, MessageSquare, Link2, Gift,
 } from "lucide-react";
 import AIAgentIntro from "../components/AIAgentIntro";
 
@@ -13,8 +13,9 @@ const STEPS = [
   { id: 1, label: "Business" },
   { id: 2, label: "Save Time" },
   { id: 3, label: "Grow" },
-  { id: 4, label: "Pricing" },
-  { id: 5, label: "Activate Trial" },
+  { id: 4, label: "Tips" },
+  { id: 5, label: "Pricing" },
+  { id: 6, label: "Activate Trial" },
 ];
 
 const EMAIL_OPTIONS = [
@@ -73,7 +74,10 @@ export default function OnboardingWizardPage() {
   const [growEmailOption, setGrowEmailOption] = useState<"skip" | "send">("skip");
   const [growSending, setGrowSending] = useState(false);
 
-  // Step 4 fields — pricing
+  // Step 4 fields — Tips
+  const [tipsEnabled, setTipsEnabled] = useState(true);
+
+  // Step 5 fields — pricing
   const [minimumTicket, setMinimumTicket] = useState(150);
 
   const uploadLogo = async (file: File) => {
@@ -133,15 +137,25 @@ export default function OnboardingWizardPage() {
   const handleStep4Next = async () => {
     setSaving(true);
     try {
-      await apiPut("/api/pricing", { minimumTicket });
-      queryClient.invalidateQueries({ queryKey: ["/api/pricing"] });
+      await apiPut("/api/tip-settings", { tipsEnabled, tipPercentageOptions: [18, 22, 25], tipRequestDelay: 2 }).catch(() => {});
     } finally {
       setSaving(false);
     }
     setStep(5);
   };
 
-  const handleStep5Go = async () => {
+  const handleStep5Next = async () => {
+    setSaving(true);
+    try {
+      await apiPut("/api/pricing", { minimumTicket });
+      queryClient.invalidateQueries({ queryKey: ["/api/pricing"] });
+    } finally {
+      setSaving(false);
+    }
+    setStep(6);
+  };
+
+  const handleStep6Go = async () => {
     setSaving(true);
     try {
       await apiPatch("/api/business", { onboardingComplete: true });
@@ -176,7 +190,7 @@ export default function OnboardingWizardPage() {
             </div>
             <span className="text-white font-bold text-lg tracking-tight">QuotePro AI</span>
           </div>
-          <p className="text-slate-400 text-sm">You're {6 - step} steps from your first quote</p>
+          <p className="text-slate-400 text-sm">You're {7 - step} steps from your first quote</p>
         </div>
 
         {/* Step progress */}
@@ -532,8 +546,117 @@ export default function OnboardingWizardPage() {
           </div>
         )}
 
-        {/* ── Step 4 — Pricing ─────────────────────────────────────── */}
+        {/* ── Step 4 — Tips ────────────────────────────────────────── */}
         {step === 4 && (
+          <div className="bg-slate-900/70 border border-slate-700/50 rounded-2xl p-8 backdrop-blur-sm">
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
+                <Gift className="w-7 h-7 text-white" />
+              </div>
+              <h2 className="text-white font-extrabold text-2xl leading-tight mb-3 max-w-sm mx-auto">
+                Earn more with every job using{" "}
+                <span className="bg-amber-500/15 text-amber-300 rounded px-2 py-0.5 italic font-black">automated tip requests!</span>
+              </h2>
+              <p className="text-slate-400 text-sm max-w-sm mx-auto">
+                QuotePro sends your customers a personalized tip link 2 hours after each cleaning — so happy clients can easily leave a gratuity, no awkwardness needed.
+              </p>
+            </div>
+
+            {/* Phone mockup — tip page preview */}
+            <div className="relative mb-6">
+              <div className="absolute -top-2 -left-2 z-10 pointer-events-none select-none">
+                <span
+                  style={{ fontFamily: "'Segoe Script', 'Brush Script MT', cursive", transform: "rotate(-12deg)", display: "block" }}
+                  className="text-slate-500 text-sm"
+                >
+                  Preview
+                </span>
+                <svg width="40" height="20" viewBox="0 0 40 20" className="ml-4 mt-0.5 opacity-40">
+                  <path d="M2 4 Q20 2 36 14" stroke="#94a3b8" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                  <path d="M32 10 L36 14 L30 15" stroke="#94a3b8" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="mx-auto w-[200px] relative">
+                <div className="bg-slate-800 border-2 border-slate-600 rounded-[28px] p-[6px] shadow-2xl">
+                  <div className="rounded-[22px] overflow-hidden" style={{ height: 260 }}>
+                    {/* Header bar */}
+                    <div className="bg-gradient-to-br from-blue-600 to-blue-700 px-3 pt-3 pb-4 text-center">
+                      <div className="flex items-center justify-center py-1.5 mb-1">
+                        <div className="w-10 h-1 bg-white/20 rounded-full" />
+                      </div>
+                      <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center mx-auto mb-1.5">
+                        <Gift className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      <p className="text-white text-[8px] font-bold">Pristine Home Cleaning</p>
+                      <p className="text-blue-200 text-[7px]">Thanks! Your home looks great.</p>
+                    </div>
+                    {/* Body */}
+                    <div className="bg-white px-3 py-2.5">
+                      <p className="text-slate-700 text-[8px] font-semibold text-center mb-2">Leave a tip for your crew</p>
+                      <div className="grid grid-cols-3 gap-1 mb-2">
+                        {[{ pct: "18%", amt: "$27" }, { pct: "22%", amt: "$33" }, { pct: "25%", amt: "$37" }].map((t, i) => (
+                          <div
+                            key={i}
+                            className={`rounded-lg py-1.5 text-center border ${i === 1 ? "border-blue-500 bg-blue-50" : "border-slate-200"}`}
+                          >
+                            <p className={`text-[8px] font-bold ${i === 1 ? "text-blue-700" : "text-slate-700"}`}>{t.amt}</p>
+                            <p className={`text-[6px] ${i === 1 ? "text-blue-400" : "text-slate-400"}`}>{t.pct}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="bg-blue-600 rounded-lg py-1.5 text-center">
+                        <p className="text-white text-[8px] font-bold">Send $33 tip</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Enable toggle */}
+            <div className="max-w-[480px] mx-auto mb-3">
+              <button
+                onClick={() => setTipsEnabled(!tipsEnabled)}
+                className={`w-full flex items-center gap-4 px-5 py-4 rounded-[10px] border-2 text-left transition-all ${
+                  tipsEnabled ? "border-amber-500 bg-amber-500/[0.06]" : "border-slate-700/50 bg-slate-800/40"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  tipsEnabled ? "border-amber-500 bg-amber-500" : "border-slate-600 bg-transparent"
+                }`}>
+                  {tipsEnabled && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+                <div>
+                  <p className="text-white text-sm font-medium">Enable automated tip requests</p>
+                  <p className="text-slate-400 text-xs mt-0.5">Sent 2 hours after each completed job</p>
+                </div>
+              </button>
+            </div>
+
+            <p className="text-center text-slate-500 text-xs mb-5">You can customize tip percentages and timing in Settings.</p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep(3)}
+                className="px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <button
+                onClick={handleStep4Next}
+                disabled={saving}
+                className="flex-1 py-3.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-white font-bold flex items-center justify-center gap-2 transition-all"
+              >
+                {saving
+                  ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  : <>Next <ArrowRight className="w-4 h-4" /></>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 5 — Pricing ─────────────────────────────────────── */}
+        {step === 5 && (
           <div className="bg-slate-900/70 border border-slate-700/50 rounded-2xl p-8 backdrop-blur-sm">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
@@ -572,11 +695,11 @@ export default function OnboardingWizardPage() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setStep(3)} className="px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-1.5 transition-colors">
+              <button onClick={() => setStep(4)} className="px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-1.5 transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
               <button
-                onClick={handleStep4Next}
+                onClick={handleStep5Next}
                 disabled={saving}
                 className="flex-1 py-3.5 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white font-bold flex items-center justify-center gap-2 transition-all"
               >
@@ -586,8 +709,8 @@ export default function OnboardingWizardPage() {
           </div>
         )}
 
-        {/* ── Step 5 — First Quote ──────────────────────────────────── */}
-        {step === 5 && (
+        {/* ── Step 6 — First Quote ──────────────────────────────────── */}
+        {step === 6 && (
           <div className="bg-slate-900/70 border border-slate-700/50 rounded-2xl p-8 backdrop-blur-sm text-center">
             <div className="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center mx-auto mb-5">
               <Sparkles className="w-8 h-8 text-purple-400" />
@@ -616,7 +739,7 @@ export default function OnboardingWizardPage() {
             </div>
 
             <button
-              onClick={handleStep5Go}
+              onClick={handleStep6Go}
               disabled={saving}
               className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold flex items-center justify-center gap-2 transition-all mb-3"
             >
@@ -625,7 +748,7 @@ export default function OnboardingWizardPage() {
                 : <><Sparkles className="w-4 h-4" /> Build my first quote</>}
             </button>
 
-            <button onClick={() => setStep(4)} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
+            <button onClick={() => setStep(5)} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
               Back
             </button>
           </div>
