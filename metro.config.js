@@ -14,7 +14,7 @@ config.server = config.server || {};
 config.server.enhanceMiddleware = (middleware) => {
   return (req, res, next) => {
     const url = req.url || "";
-    if (url.startsWith("/home/") || url.startsWith("/api/portal/") || url.startsWith("/app/assets/")) {
+    if (url.startsWith("/home/") || url.startsWith("/tip/") || url.startsWith("/api/portal/") || url.startsWith("/api/public/") || url.startsWith("/app/assets/")) {
       const proxyReq = http.request(
         {
           hostname: "localhost",

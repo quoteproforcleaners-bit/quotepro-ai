@@ -48,13 +48,24 @@ export default function TipPage() {
       .catch(() => { setError("Failed to load tip page."); setLoading(false); });
   }, [token]);
 
-  const getPresetAmounts = (): { pct: number; cents: number }[] => {
+  const getPresetAmounts = (): { label: string; sublabel: string; cents: number }[] => {
     if (!data) return [];
-    return (data.percentageOptions || [18, 22, 25]).map((pct) => {
-      const raw = data.total ? (data.total * pct / 100) : 0;
-      const cents = raw > 0 ? Math.round(raw) * 100 : 0;
-      return { pct, cents };
-    });
+    if (data.total && data.total > 0) {
+      return (data.percentageOptions || [18, 22, 25]).map((pct) => {
+        const dollarAmt = data.total! * pct / 100;
+        const cents = Math.round(dollarAmt * 100);
+        return { label: formatCurrency(cents / 100), sublabel: `${pct}%`, cents };
+      }).filter((p) => p.cents >= 100);
+    }
+    // No job total — show flat amounts
+    return [
+      { label: "$5",  sublabel: "Small token",  cents: 500  },
+      { label: "$10", sublabel: "Nice gesture", cents: 1000 },
+      { label: "$15", sublabel: "Appreciated",  cents: 1500 },
+      { label: "$20", sublabel: "Exceptional",  cents: 2000 },
+      { label: "$25", sublabel: "Outstanding",  cents: 2500 },
+      { label: "$30", sublabel: "Amazing!",     cents: 3000 },
+    ];
   };
 
   const effectiveCents = (() => {
@@ -196,25 +207,23 @@ export default function TipPage() {
 
           {/* Preset amounts */}
           <div className="grid grid-cols-3 gap-2.5 mb-3">
-            {presets.map(({ pct, cents }) => (
-              cents > 0 ? (
-                <button
-                  key={pct}
-                  onClick={() => { setSelectedCents(cents); setCustomAmount(""); }}
-                  className={`py-3.5 rounded-2xl border-2 text-center transition-all ${
-                    selectedCents === cents && selectedCents !== -1
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-slate-200 hover:border-blue-300 hover:bg-blue-50/50"
-                  }`}
-                >
-                  <p className={`text-base font-bold ${selectedCents === cents && selectedCents !== -1 ? "text-blue-700" : "text-slate-800"}`}>
-                    {formatCurrency(cents / 100)}
-                  </p>
-                  <p className={`text-xs mt-0.5 ${selectedCents === cents && selectedCents !== -1 ? "text-blue-500" : "text-slate-400"}`}>
-                    {pct}%
-                  </p>
-                </button>
-              ) : null
+            {presets.map(({ label, sublabel, cents }) => (
+              <button
+                key={cents}
+                onClick={() => { setSelectedCents(cents); setCustomAmount(""); }}
+                className={`py-3.5 rounded-2xl border-2 text-center transition-all ${
+                  selectedCents === cents && selectedCents !== -1
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-slate-200 hover:border-blue-300 hover:bg-blue-50/50"
+                }`}
+              >
+                <p className={`text-base font-bold ${selectedCents === cents && selectedCents !== -1 ? "text-blue-700" : "text-slate-800"}`}>
+                  {label}
+                </p>
+                <p className={`text-xs mt-0.5 ${selectedCents === cents && selectedCents !== -1 ? "text-blue-500" : "text-slate-400"}`}>
+                  {sublabel}
+                </p>
+              </button>
             ))}
           </div>
 

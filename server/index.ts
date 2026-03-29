@@ -318,6 +318,13 @@ function configureExpoAndLanding(app: express.Application) {
       res.status(404).send("Not found");
     });
 
+    // /tip/:token — customer tip page (public, uses same React SPA)
+    app.get("/tip/:token", (_req: Request, res: Response) => {
+      const indexPath = path.join(webDistPath, "index.html");
+      if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+      res.status(404).send("Not found");
+    });
+
     // Top-level web app routes that need SPA fallback (for direct navigation & ad tracking)
     const TOP_LEVEL_SPA_ROUTES = [
       "/pricing/success", "/pricing/cancel", "/pricing", "/upgrade",

@@ -18,7 +18,7 @@ import "./lib/i18n";
 // - /pricing/*, /subscription/*, /register, /login, /dashboard, /onboarding
 //   — top-level routes for direct navigation and ad conversion tracking
 const TOP_LEVEL_PATHS = [
-  "/intake/", "/request/", "/schedule-ack/", "/q/", "/home/",
+  "/intake/", "/request/", "/schedule-ack/", "/q/", "/home/", "/tip/",
   "/pricing", "/subscription", "/register",
   "/login", "/dashboard", "/onboarding", "/upgrade", "/quote-doctor",
 ];

@@ -37,6 +37,30 @@ export async function initPortalTables() {
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS portal_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS portal_color TEXT`);
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS portal_welcome_message TEXT`);
+    // Tips infrastructure
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tips_enabled BOOLEAN NOT NULL DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_percentage_options JSONB DEFAULT '[18, 22, 25]'`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_distribution_percent INTEGER DEFAULT 100`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_request_delay INTEGER DEFAULT 2`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tip_token VARCHAR(64)`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tip_amount NUMERIC(10,2)`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tip_request_sent_at TIMESTAMPTZ`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tips (
+        id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        job_id VARCHAR(36) NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        business_id VARCHAR(36) NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+        customer_id VARCHAR(36),
+        amount NUMERIC(10,2) NOT NULL,
+        percentage NUMERIC(5,2),
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        stripe_session_id TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        paid_at TIMESTAMPTZ
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tips_job_id ON tips(job_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_jobs_tip_token ON jobs(tip_token)`);
     console.log("[portal] Tables ready");
   } catch (e: any) {
     console.error("[portal] initPortalTables error:", e.message);
