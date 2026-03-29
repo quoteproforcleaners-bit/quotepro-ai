@@ -428,11 +428,31 @@ export default function SettingsPage() {
 
   const { data: reminderPrefs } = useQuery<any>({ queryKey: ["/api/reminder-preferences"] });
 
+  // Cleaner notification preferences state
+  const [cleanerEnabled, setCleanerEnabled] = useState(true);
+  const [cleanerEmail, setCleanerEmail] = useState(true);
+  const [cleanerSms, setCleanerSms] = useState(true);
+  const [cleanerTiming, setCleanerTiming] = useState("both");
+  const [cleanerSaving, setCleanerSaving] = useState(false);
+  const [cleanerTestSending, setCleanerTestSending] = useState(false);
+  const [cleanerTestSent, setCleanerTestSent] = useState(false);
+
+  const { data: cleanerPrefs } = useQuery<any>({ queryKey: ["/api/cleaner-notification-preferences"] });
+  const { data: teamMembers = [] } = useQuery<any[]>({ queryKey: ["/api/employees"] });
+
   useEffect(() => {
     if (!reminderPrefs) return;
     setReminderEmailDays(reminderPrefs.emailReminderDays === null ? "null" : String(reminderPrefs.emailReminderDays ?? 3));
     setReminderSmsDays(reminderPrefs.smsReminderDays === null ? "null" : String(reminderPrefs.smsReminderDays ?? 1));
   }, [reminderPrefs]);
+
+  useEffect(() => {
+    if (!cleanerPrefs) return;
+    setCleanerEnabled(cleanerPrefs.enabled ?? true);
+    setCleanerEmail(cleanerPrefs.email ?? true);
+    setCleanerSms(cleanerPrefs.sms ?? true);
+    setCleanerTiming(cleanerPrefs.timing ?? "both");
+  }, [cleanerPrefs]);
 
   const handleSaveReminders = async () => {
     setReminderSaving(true);
@@ -455,6 +475,31 @@ export default function SettingsPage() {
       setTimeout(() => setReminderTestSent(false), 5000);
     } catch {}
     setReminderTestSending(false);
+  };
+
+  const handleSaveCleanerNotifications = async () => {
+    setCleanerSaving(true);
+    try {
+      await apiPut("/api/cleaner-notification-preferences", {
+        enabled: cleanerEnabled,
+        email: cleanerEmail,
+        sms: cleanerSms,
+        timing: cleanerTiming,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/cleaner-notification-preferences"] });
+      showSaved("reminders");
+    } catch {}
+    setCleanerSaving(false);
+  };
+
+  const handleTestCleanerNotification = async (employeeId?: string) => {
+    setCleanerTestSending(true);
+    try {
+      await apiPost("/api/cleaner-notification-preferences/test", { employeeId });
+      setCleanerTestSent(true);
+      setTimeout(() => setCleanerTestSent(false), 5000);
+    } catch {}
+    setCleanerTestSending(false);
   };
 
   const [commercialEnabled, setCommercialEnabled] = useState(false);
@@ -1470,6 +1515,124 @@ export default function SettingsPage() {
               </Button>
             )}
           </Card>
+
+          {/* Team Notifications section */}
+          <Card>
+            <CardHeader title="Cleaner Job Notifications" icon={Bell} />
+            <p className="text-sm text-slate-500 mb-5">
+              Automatically notify your team about upcoming jobs via email and text.
+            </p>
+
+            {/* Master toggle */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Notify cleaners automatically</p>
+                <p className="text-xs text-slate-400">Send job details to assigned team members</p>
+              </div>
+              <button
+                onClick={() => setCleanerEnabled(!cleanerEnabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${cleanerEnabled ? "bg-primary-500" : "bg-slate-200"}`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${cleanerEnabled ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
+            </div>
+
+            {cleanerEnabled ? (
+              <div className="space-y-4 pl-0">
+                {/* Email sub-toggle */}
+                <div className="flex items-center justify-between py-2.5 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm text-slate-700">Send email notifications</span>
+                  </div>
+                  <button
+                    onClick={() => setCleanerEmail(!cleanerEmail)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${cleanerEmail ? "bg-blue-500" : "bg-slate-200"}`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${cleanerEmail ? "translate-x-4" : "translate-x-1"}`} />
+                  </button>
+                </div>
+
+                {/* SMS sub-toggle */}
+                <div className="flex items-center justify-between py-2.5 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-cyan-500" />
+                    <span className="text-sm text-slate-700">Send text notifications</span>
+                  </div>
+                  <button
+                    onClick={() => setCleanerSms(!cleanerSms)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${cleanerSms ? "bg-cyan-500" : "bg-slate-200"}`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${cleanerSms ? "translate-x-4" : "translate-x-1"}`} />
+                  </button>
+                </div>
+
+                {/* Timing */}
+                <div className="py-2.5 border-t border-slate-100">
+                  <p className="text-sm font-medium text-slate-700 mb-2">Notify cleaners:</p>
+                  <select
+                    value={cleanerTiming}
+                    onChange={(e) => setCleanerTiming(e.target.value)}
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  >
+                    <option value="assign">When job is assigned (immediately)</option>
+                    <option value="day_before">Day before the job</option>
+                    <option value="both">Both — when assigned AND day before</option>
+                  </select>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex items-center gap-3">
+              <Button icon={Save} onClick={handleSaveCleanerNotifications} loading={cleanerSaving} size="sm">
+                Save Cleaner Settings
+              </Button>
+            </div>
+          </Card>
+
+          {/* Team member list */}
+          {teamMembers.length > 0 ? (
+            <Card>
+              <CardHeader title="Team Member Notifications" icon={Bell} />
+              <p className="text-sm text-slate-500 mb-4">Send a test notification to a specific team member.</p>
+              <div className="space-y-3">
+                {teamMembers.map((emp: any) => (
+                  <div key={emp.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                        style={{ backgroundColor: emp.color || "#6366f1" }}
+                      >
+                        {(emp.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{emp.name}</p>
+                        <div className="flex items-center gap-3 text-xs text-slate-500">
+                          {emp.phone ? <span>{emp.phone}</span> : null}
+                          {emp.email ? <span>{emp.email}</span> : (
+                            <span className="text-amber-600 font-medium">No email — SMS only</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleTestCleanerNotification(emp.id)}
+                      loading={cleanerTestSending}
+                    >
+                      Send test
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              {cleanerTestSent ? (
+                <div className="mt-4 flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium">
+                  <CheckCircle className="w-4 h-4" /> Test sent! Check their email and phone.
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
         </div>
       ) : null}
 

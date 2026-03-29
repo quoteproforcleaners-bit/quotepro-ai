@@ -556,9 +556,31 @@ const router = Router();
       const { employeeIds } = req.body;
       if (!Array.isArray(employeeIds)) return res.status(400).json({ message: "employeeIds must be array" });
       const j = await updateJob(req.params.id, { teamMembers: employeeIds });
+      // Trigger assignment notifications if cleaners were added
+      if (employeeIds.length > 0) {
+        try {
+          const business = await getBusinessByOwner((req as any).session?.userId);
+          if (business) {
+            const { sendCleanerAssignmentNotification } = await import("../cleanerNotificationScheduler");
+            sendCleanerAssignmentNotification(business.id, req.params.id, employeeIds).catch(() => {});
+          }
+        } catch { /* non-fatal */ }
+      }
       return res.json(j);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to assign employees" });
+    }
+  });
+
+  router.post("/api/jobs/:id/send-work-order", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner((req as any).session?.userId);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { sendWorkOrderEmail } = await import("../cleanerNotificationScheduler");
+      const result = await sendWorkOrderEmail(business.id, req.params.id);
+      return res.json({ success: true, ...result });
+    } catch (error: any) {
+      return res.status(400).json({ message: error?.message || "Failed to send work order" });
     }
   });
 

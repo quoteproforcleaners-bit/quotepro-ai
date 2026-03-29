@@ -470,6 +470,17 @@ function OverviewTab({
   const [ratingValue, setRatingValue] = useState(job.satisfactionRating || 0);
   const [skipConfirm, setSkipConfirm] = useState(false);
 
+  const sendWorkOrderMutation = useMutation({
+    mutationFn: () => apiPost(`/api/jobs/${job.id}/send-work-order`, {}),
+    onSuccess: (data: any) => {
+      const names = data?.cleaners?.join(", ") || "cleaner";
+      onToast(`Work order sent to ${names}`, "success");
+    },
+    onError: (err: any) => {
+      onToast(err?.message || "Failed to send work order", "error");
+    },
+  });
+
   const { data: series } = useQuery<any>({
     queryKey: [`/api/recurring-series/${job.seriesId}`],
     enabled: !!job.seriesId,
@@ -574,6 +585,22 @@ function OverviewTab({
           onToast={onToast}
         />
       ) : null}
+
+      {/* Send Work Order button */}
+      <div className="flex">
+        <button
+          onClick={() => sendWorkOrderMutation.mutate()}
+          disabled={sendWorkOrderMutation.isPending}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-50"
+        >
+          {sendWorkOrderMutation.isPending ? (
+            <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
+          Send Work Order to Cleaner
+        </button>
+      </div>
 
       <div>
         <div className="flex items-center justify-between mb-2">

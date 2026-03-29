@@ -5,15 +5,16 @@ import { apiPut, apiPatch } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import {
   Building2, DollarSign, ArrowRight, ArrowLeft,
-  Upload, Check, Sparkles, Mail, MessageSquare,
+  Upload, Check, Sparkles, Mail, MessageSquare, Users,
 } from "lucide-react";
 import AIAgentIntro from "../components/AIAgentIntro";
 
 const STEPS = [
   { id: 1, label: "Your Business" },
   { id: 2, label: "Save Time" },
-  { id: 3, label: "Your Pricing" },
-  { id: 4, label: "First Quote" },
+  { id: 3, label: "Save More" },
+  { id: 4, label: "Your Pricing" },
+  { id: 5, label: "First Quote" },
 ];
 
 const EMAIL_OPTIONS = [
@@ -64,11 +65,14 @@ export default function OnboardingWizardPage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
 
-  // Step 2 fields — reminder preferences
+  // Step 2 fields — customer reminder preferences
   const [emailDays, setEmailDays] = useState("3");
   const [smsDays, setSmsDays] = useState("1");
 
-  // Step 3 fields — pricing
+  // Step 3 fields — cleaner notification preferences
+  const [cleanerNotify, setCleanerNotify] = useState(true);
+
+  // Step 4 fields — pricing
   const [minimumTicket, setMinimumTicket] = useState(150);
 
   const uploadLogo = async (file: File) => {
@@ -116,15 +120,30 @@ export default function OnboardingWizardPage() {
   const handleStep3Next = async () => {
     setSaving(true);
     try {
-      await apiPut("/api/pricing", { minimumTicket });
-      queryClient.invalidateQueries({ queryKey: ["/api/pricing"] });
+      await apiPut("/api/cleaner-notification-preferences", {
+        enabled: cleanerNotify,
+        timing: "both",
+        email: true,
+        sms: true,
+      }).catch(() => {});
     } finally {
       setSaving(false);
     }
     setStep(4);
   };
 
-  const handleStep4Go = async () => {
+  const handleStep4Next = async () => {
+    setSaving(true);
+    try {
+      await apiPut("/api/pricing", { minimumTicket });
+      queryClient.invalidateQueries({ queryKey: ["/api/pricing"] });
+    } finally {
+      setSaving(false);
+    }
+    setStep(5);
+  };
+
+  const handleStep5Go = async () => {
     setSaving(true);
     try {
       await apiPatch("/api/business", { onboardingComplete: true });
@@ -159,7 +178,7 @@ export default function OnboardingWizardPage() {
             </div>
             <span className="text-white font-bold text-lg tracking-tight">QuotePro AI</span>
           </div>
-          <p className="text-slate-400 text-sm">You're {5 - step} steps from your first quote</p>
+          <p className="text-slate-400 text-sm">You're {6 - step} steps from your first quote</p>
         </div>
 
         {/* Step progress */}
@@ -221,28 +240,36 @@ export default function OnboardingWizardPage() {
                   </div>
                 )}
                 <div>
-                  <p className="text-white text-sm font-medium">{logoUri ? "Change logo" : "Upload logo"}</p>
-                  <p className="text-slate-500 text-xs">PNG, JPG — shown on your quotes</p>
+                  <p className="text-slate-300 text-sm font-medium">{logoUri ? "Change logo" : "Upload logo"}</p>
+                  <p className="text-slate-500 text-xs">PNG, JPG up to 2MB</p>
                 </div>
-                {logoUploading && <div className="ml-auto w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />}
               </div>
-              <input ref={logoRef} type="file" accept="image/*" className="hidden"
-                onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])} />
+              <input
+                ref={logoRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadLogo(f);
+                }}
+              />
+              {logoUploading && <p className="text-slate-400 text-xs mt-2">Uploading...</p>}
             </div>
 
             <button
               onClick={handleStep1Next}
-              disabled={!companyName.trim() || saving}
-              className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold flex items-center justify-center gap-2 transition-all"
+              disabled={saving || !companyName.trim()}
+              className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold flex items-center justify-center gap-2 transition-all"
             >
               {saving
                 ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                : <>Continue <ArrowRight className="w-4 h-4" /></>}
+                : <>Next <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
         )}
 
-        {/* ── Step 2 — Save Time (Reminder Config) ─────────────────── */}
+        {/* ── Step 2 — Save Time (Customer Reminder Config) ─────────── */}
         {step === 2 && (
           <div className="bg-slate-900/70 border border-slate-700/50 rounded-2xl p-8 backdrop-blur-sm">
             {/* Headline */}
@@ -299,7 +326,6 @@ export default function OnboardingWizardPage() {
             {/* Phone mockup preview */}
             {(showEmailPreview || showSmsPreview) && (
               <div className="relative mb-6">
-                {/* Handwritten "Example" label */}
                 <div className="absolute -top-2 -left-2 z-10 pointer-events-none select-none">
                   <span
                     style={{ fontFamily: "'Segoe Script', 'Brush Script MT', cursive", transform: "rotate(-12deg)", display: "block" }}
@@ -312,8 +338,6 @@ export default function OnboardingWizardPage() {
                     <path d="M32 10 L36 14 L30 15" stroke="#94a3b8" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-
-                {/* Phone mockup */}
                 <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mx-4 shadow-xl">
                   <div className="space-y-2.5">
                     {showEmailPreview && (
@@ -366,8 +390,132 @@ export default function OnboardingWizardPage() {
           </div>
         )}
 
-        {/* ── Step 3 — Pricing ─────────────────────────────────────── */}
+        {/* ── Step 3 — Save More Time (Cleaner Notifications) ──────── */}
         {step === 3 && (
+          <div className="bg-slate-900/70 border border-slate-700/50 rounded-2xl p-8 backdrop-blur-sm">
+            {/* Headline */}
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-purple-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-500/30">
+                <Users className="w-7 h-7 text-white" />
+              </div>
+              <h2 className="text-white font-extrabold text-2xl leading-tight mb-3 max-w-sm mx-auto">
+                Save another ~11 hours per week by notifying your cleaners about their appointments and details,{" "}
+                <span className="bg-violet-500/15 text-violet-300 rounded px-2 py-0.5 italic font-black">automagically!</span>
+              </h2>
+              <p className="text-slate-400 text-sm max-w-sm mx-auto">
+                Your cleaners will be notified by email AND text to ensure they see the notification. On top of that, you can also print work orders, route sheets, and more!
+              </p>
+            </div>
+
+            {/* Radio options */}
+            <div className="space-y-3 mb-3 max-w-[480px] mx-auto">
+              {/* Option 1 */}
+              <button
+                onClick={() => setCleanerNotify(true)}
+                className={`w-full flex items-center gap-4 px-5 py-4 rounded-[10px] border text-left transition-all ${
+                  cleanerNotify
+                    ? "border-2 border-blue-500 bg-blue-500/[0.04]"
+                    : "border border-slate-700/50 bg-slate-800/40 hover:bg-slate-800/60"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  cleanerNotify ? "border-teal-500 bg-teal-500" : "border-slate-600 bg-transparent"
+                }`}>
+                  {cleanerNotify && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+                <span className="text-white text-sm font-medium">Email and text my cleaners one day before the appointment</span>
+              </button>
+
+              {/* Option 2 */}
+              <button
+                onClick={() => setCleanerNotify(false)}
+                className={`w-full flex items-center gap-4 px-5 py-4 rounded-[10px] border text-left transition-all ${
+                  !cleanerNotify
+                    ? "border-2 border-blue-500 bg-blue-500/[0.04]"
+                    : "border border-slate-700/50 bg-slate-800/40 hover:bg-slate-800/60"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  !cleanerNotify ? "border-teal-500 bg-teal-500" : "border-slate-600 bg-transparent"
+                }`}>
+                  {!cleanerNotify && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+                <span className="text-white text-sm font-medium">Do not notify my cleaners for now</span>
+              </button>
+            </div>
+
+            <p className="text-center text-slate-500 text-xs mb-5">You can change this later in your settings.</p>
+
+            {/* Phone mockup preview */}
+            <div className="relative mb-6">
+              <div className="absolute -top-2 -left-2 z-10 pointer-events-none select-none">
+                <span
+                  style={{ fontFamily: "'Segoe Script', 'Brush Script MT', cursive", transform: "rotate(-12deg)", display: "block" }}
+                  className="text-slate-500 text-sm"
+                >
+                  Example
+                </span>
+                <svg width="40" height="20" viewBox="0 0 40 20" className="ml-4 mt-0.5 opacity-40">
+                  <path d="M2 4 Q20 2 36 14" stroke="#94a3b8" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                  <path d="M32 10 L36 14 L30 15" stroke="#94a3b8" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className={`relative bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mx-4 shadow-xl transition-all duration-300 ${!cleanerNotify ? "opacity-30" : ""}`}>
+                {!cleanerNotify && (
+                  <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl">
+                    <p className="text-slate-300 font-semibold text-sm bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-700">Cleaner notifications will be disabled</p>
+                  </div>
+                )}
+                <div className="space-y-2.5">
+                  {/* Email preview */}
+                  <div className="bg-slate-900/80 rounded-xl p-3 border border-slate-700/30">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Mail className="w-3 h-3 text-violet-400 flex-shrink-0" />
+                      <span className="text-violet-400 text-xs font-bold tracking-wider uppercase">Email</span>
+                    </div>
+                    <p className="text-white text-xs font-semibold mb-0.5 leading-snug">
+                      Work order for tomorrow's appointment
+                    </p>
+                    <p className="text-slate-400 text-xs leading-snug line-clamp-2">
+                      Hi Sarah, reminder about tomorrow's job: Mr. Johnson Family, Deep Cleaning Service...
+                    </p>
+                  </div>
+                  {/* SMS preview */}
+                  <div className="bg-slate-900/80 rounded-xl p-3 border border-slate-700/30">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <MessageSquare className="w-3 h-3 text-violet-400 flex-shrink-0" />
+                      <span className="text-violet-400 text-xs font-bold tracking-wider uppercase">Text</span>
+                    </div>
+                    <p className="text-slate-500 text-xs mb-0.5">Your business phone</p>
+                    <p className="text-white text-xs leading-snug">Your cleaning with Johnson Family is scheduled for tomorrow at 09:00 AM. 123 Main St...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Nav */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep(2)}
+                className="px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <button
+                onClick={handleStep3Next}
+                disabled={saving}
+                className="flex-1 py-3.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-bold flex items-center justify-center gap-2 transition-all"
+              >
+                {saving
+                  ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  : <>Next <ArrowRight className="w-4 h-4" /></>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4 — Pricing ─────────────────────────────────────── */}
+        {step === 4 && (
           <div className="bg-slate-900/70 border border-slate-700/50 rounded-2xl p-8 backdrop-blur-sm">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
@@ -406,11 +554,11 @@ export default function OnboardingWizardPage() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-1.5 transition-colors">
+              <button onClick={() => setStep(3)} className="px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold flex items-center gap-1.5 transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
               <button
-                onClick={handleStep3Next}
+                onClick={handleStep4Next}
                 disabled={saving}
                 className="flex-1 py-3.5 rounded-xl bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white font-bold flex items-center justify-center gap-2 transition-all"
               >
@@ -420,8 +568,8 @@ export default function OnboardingWizardPage() {
           </div>
         )}
 
-        {/* ── Step 4 — First Quote ──────────────────────────────────── */}
-        {step === 4 && (
+        {/* ── Step 5 — First Quote ──────────────────────────────────── */}
+        {step === 5 && (
           <div className="bg-slate-900/70 border border-slate-700/50 rounded-2xl p-8 backdrop-blur-sm text-center">
             <div className="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center mx-auto mb-5">
               <Sparkles className="w-8 h-8 text-purple-400" />
@@ -450,7 +598,7 @@ export default function OnboardingWizardPage() {
             </div>
 
             <button
-              onClick={handleStep4Go}
+              onClick={handleStep5Go}
               disabled={saving}
               className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold flex items-center justify-center gap-2 transition-all mb-3"
             >
@@ -459,7 +607,7 @@ export default function OnboardingWizardPage() {
                 : <><Sparkles className="w-4 h-4" /> Build my first quote</>}
             </button>
 
-            <button onClick={() => setStep(3)} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
+            <button onClick={() => setStep(4)} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
               Back
             </button>
           </div>

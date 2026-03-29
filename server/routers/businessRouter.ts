@@ -1476,6 +1476,73 @@ router.get("/api/geocode/city-suggestions", requireAuth, geocodeLimiter, async (
   }
 });
 
+// ── Cleaner Notification Preferences ─────────────────────────────────────────
+
+router.get("/api/cleaner-notification-preferences", requireAuth, async (req: any, res: Response) => {
+  try {
+    const r = await pool.query(
+      `SELECT cleaner_notifications_enabled, cleaner_notification_days,
+              cleaner_notification_email, cleaner_notification_sms,
+              cleaner_notification_timing
+       FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
+      [req.user.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Business not found" });
+    const row = r.rows[0];
+    res.json({
+      enabled: row.cleaner_notifications_enabled ?? true,
+      days: row.cleaner_notification_days ?? 1,
+      email: row.cleaner_notification_email ?? true,
+      sms: row.cleaner_notification_sms ?? true,
+      timing: row.cleaner_notification_timing ?? "both",
+    });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.put("/api/cleaner-notification-preferences", requireAuth, async (req: any, res: Response) => {
+  try {
+    const { enabled, days, email, sms, timing } = req.body;
+    await pool.query(
+      `UPDATE businesses
+       SET cleaner_notifications_enabled=$1,
+           cleaner_notification_days=$2,
+           cleaner_notification_email=$3,
+           cleaner_notification_sms=$4,
+           cleaner_notification_timing=$5,
+           updated_at=NOW()
+       WHERE owner_user_id=$6`,
+      [
+        enabled !== undefined ? Boolean(enabled) : true,
+        days !== undefined ? Number(days) : 1,
+        email !== undefined ? Boolean(email) : true,
+        sms !== undefined ? Boolean(sms) : true,
+        timing || "both",
+        req.user.id,
+      ]
+    );
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.post("/api/cleaner-notification-preferences/test", requireAuth, async (req: any, res: Response) => {
+  try {
+    const bizRes = await pool.query(
+      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.user.id]
+    );
+    if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
+    const { employeeId } = req.body;
+    const { sendTestCleanerNotification } = await import("../cleanerNotificationScheduler");
+    const result = await sendTestCleanerNotification(bizRes.rows[0].id, employeeId);
+    res.json({ success: true, ...result });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // ── Reminder Preferences ─────────────────────────────────────────────────────
 
 router.get("/api/reminder-preferences", requireAuth, async (req: any, res: Response) => {

@@ -156,7 +156,11 @@ export default function EmployeesPage() {
                       <span className="flex items-center gap-1">
                         <Mail className="w-3 h-3" />{emp.email}
                       </span>
-                    ) : null}
+                    ) : (
+                      <span className="flex items-center gap-1 text-amber-600">
+                        <Mail className="w-3 h-3" />No email — SMS only
+                      </span>
+                    )}
                   </div>
                   {emp.notes ? (
                     <p className="text-xs text-slate-400 mt-1 truncate">{emp.notes}</p>

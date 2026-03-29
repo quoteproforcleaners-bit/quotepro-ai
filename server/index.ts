@@ -10,6 +10,7 @@ import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
 import { sendPush } from "./pushNotifications";
 import { initNotificationTables, runNotificationScheduler } from "./notificationScheduler";
 import { runAppointmentReminderScheduler } from "./appointmentReminderScheduler";
+import { runCleanerNotificationScheduler } from "./cleanerNotificationScheduler";
 import { seedPristineHomeDemo } from "./seedPristineDemo";
 
 const app = express();
@@ -694,6 +695,12 @@ async function seedToDoDemo() {
   runAppointmentReminderScheduler().catch((e: any) => console.error("[reminders] Initial run failed:", e.message));
   setInterval(() => {
     runAppointmentReminderScheduler().catch((e: any) => console.error("[reminders] Cron failed:", e.message));
+  }, 60 * 60 * 1000);
+
+  // ─── Cleaner notification scheduler: runs every hour ─────────────────────
+  runCleanerNotificationScheduler().catch((e: any) => console.error("[cleaner-notifications] Initial run failed:", e.message));
+  setInterval(() => {
+    runCleanerNotificationScheduler().catch((e: any) => console.error("[cleaner-notifications] Cron failed:", e.message));
   }, 60 * 60 * 1000);
   // ─────────────────────────────────────────────────────────────────────────────
 
