@@ -66,6 +66,7 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
 const TOOLS_NAV_ITEMS: NavItem[] = [
   { to: "/quote-doctor",      label: "Quote Doctor",       icon: Zap,         description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
   { to: "/lead-capture",      label: "Lead Capture",       icon: Link2,       description: "Share your branded quote request link — customers submit details, you get instant leads." },
+  { to: "/intake-requests",   label: "Quote Requests",     icon: Inbox,       description: "View and manage quote requests submitted through your lead capture link." },
   { to: "/commercial-quote",  label: "Commercial Quote",   icon: Building2,   pro: true, description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
   { to: "/automations",       label: "Automations",        icon: Cpu,         pro: true, description: "Set up automated follow-ups, review requests, and customer sequences that run on autopilot." },
   { to: "/email-sequences",   label: "Automated Emails",   icon: MailOpen,    pro: true, description: "Drip campaigns and one-off emails — automated sequences that nurture leads into booked jobs." },
