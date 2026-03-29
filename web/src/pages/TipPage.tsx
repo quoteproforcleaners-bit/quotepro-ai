@@ -51,7 +51,7 @@ export default function TipPage() {
   const getPresetAmounts = (): { label: string; sublabel: string; cents: number }[] => {
     if (!data) return [];
     if (data.total && data.total > 0) {
-      return (data.percentageOptions || [18, 22, 25]).map((pct) => {
+      return (data.percentageOptions || [15, 18, 20, 25]).map((pct) => {
         const dollarAmt = data.total! * pct / 100;
         const cents = Math.round(dollarAmt * 100);
         return { label: formatCurrency(cents / 100), sublabel: `${pct}%`, cents };
@@ -206,7 +206,7 @@ export default function TipPage() {
           )}
 
           {/* Preset amounts */}
-          <div className="grid grid-cols-3 gap-2.5 mb-3">
+          <div className="grid grid-cols-2 gap-2.5 mb-3">
             {presets.map(({ label, sublabel, cents }) => (
               <button
                 key={cents}

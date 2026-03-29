@@ -468,13 +468,13 @@ export default function SettingsPage() {
   const { data: teamMembers = [] } = useQuery<any[]>({ queryKey: ["/api/employees"] });
   const { data: tipSettings, refetch: refetchTipSettings } = useQuery<any>({ queryKey: ["/api/tip-settings"] });
   const { data: tipHistory = [] } = useQuery<any[]>({ queryKey: ["/api/tips"] });
-  const [tipsForm, setTipsForm] = useState({ tipsEnabled: false, tipPercentageOptions: [18, 22, 25], tipRequestDelay: 2 });
+  const [tipsForm, setTipsForm] = useState({ tipsEnabled: false, tipPercentageOptions: [15, 18, 20, 25], tipRequestDelay: 2 });
   const [tipsSaved, setTipsSaved] = useState(false);
   useEffect(() => {
     if (tipSettings) {
       setTipsForm({
         tipsEnabled: tipSettings.tipsEnabled ?? false,
-        tipPercentageOptions: tipSettings.tipPercentageOptions || [18, 22, 25],
+        tipPercentageOptions: tipSettings.tipPercentageOptions || [15, 18, 20, 25],
         tipRequestDelay: tipSettings.tipRequestDelay ?? 2,
       });
     }

@@ -39,7 +39,7 @@ export async function initPortalTables() {
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS portal_welcome_message TEXT`);
     // Tips infrastructure
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tips_enabled BOOLEAN NOT NULL DEFAULT FALSE`);
-    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_percentage_options JSONB DEFAULT '[18, 22, 25]'`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_percentage_options JSONB DEFAULT '[15, 18, 20, 25]'`);
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_distribution_percent INTEGER DEFAULT 100`);
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_request_delay INTEGER DEFAULT 2`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tip_token VARCHAR(64)`);
