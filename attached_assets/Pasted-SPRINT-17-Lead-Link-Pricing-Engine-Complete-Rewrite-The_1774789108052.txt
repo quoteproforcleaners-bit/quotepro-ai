@@ -1,0 +1,663 @@
+SPRINT 17 — Lead Link Pricing Engine Complete Rewrite
+
+The current pricing logic is broken. Deep cleans and 
+move in/outs are returning the same price as standard 
+cleans (~$90) and the range doesn't change between 
+cleaning types. This is a complete rewrite of the 
+pricing calculation engine using real industry data.
+
+═══════════════════════════════
+WHY IT'S BROKEN (ROOT CAUSE)
+═══════════════════════════════
+
+Most likely causes — fix ALL of these:
+
+1. Service type multipliers are not being applied 
+   to the calculation — the code is probably 
+   fetching the multiplier but not using it
+
+2. The hourlyRate from the business config is 
+   likely 0, null, or not being passed correctly 
+   to the calculation function — causing the 
+   engine to multiply against $0
+
+3. The bedroom/bathroom hour lookup table has 
+   values that are too low — producing a base 
+   that even with multipliers comes out wrong
+
+4. The cleaning type selected on the microsite 
+   (standard/deep/moveinout) is not being mapped 
+   correctly to the serviceType multiplier in 
+   the config
+
+Fix all four. Do not patch — rewrite the engine.
+
+═══════════════════════════════
+INDUSTRY BENCHMARK DATA
+(Use these as floor checks and defaults)
+═══════════════════════════════
+
+These are real US market averages for 2024-2026.
+Use them to validate output and as fallbacks 
+when business owner pricing is not configured:
+
+STANDARD CLEAN (recurring ready home):
+  Studio/1bd:     $80  – $120
+  2bd/1-2ba:      $120 – $170
+  3bd/2ba:        $150 – $220
+  4bd/3ba:        $200 – $280
+  5bd/3+ba:       $250 – $350
+
+DEEP CLEAN (first time or neglected home):
+  Studio/1bd:     $150 – $250
+  2bd/1-2ba:      $200 – $350
+  3bd/2ba:        $280 – $420
+  4bd/3ba:        $350 – $550
+  5bd/3+ba:       $450 – $700
+
+MOVE IN / MOVE OUT:
+  Studio/1bd:     $200 – $300
+  2bd/1-2ba:      $280 – $400
+  3bd/2ba:        $350 – $550
+  4bd/3ba:        $450 – $700
+  5bd/3+ba:       $550 – $900
+
+POST CONSTRUCTION:
+  Studio/1bd:     $300 – $500
+  2bd/1-2ba:      $400 – $650
+  3bd/2ba:        $500 – $800
+  4bd/3ba:        $650 – $1000
+  5bd/3+ba:       $800 – $1400
+
+AIRBNB TURNOVER:
+  Studio/1bd:     $75  – $120
+  2bd:            $100 – $160
+  3bd:            $130 – $200
+  4bd+:           $160 – $260
+
+HOURLY RATE INDUSTRY AVERAGE: $45-$65/hour
+DEFAULT FALLBACK IF NOT SET: $50/hour
+MINIMUM TICKET INDUSTRY AVERAGE: $100-$120
+DEFAULT FALLBACK IF NOT SET: $110
+
+═══════════════════════════════
+SERVICE TYPE MULTIPLIERS
+(Apply ON TOP of standard clean base)
+═══════════════════════════════
+
+These multipliers are non-negotiable. They MUST 
+produce meaningfully different price ranges:
+
+Standard Clean:       1.00x  (base)
+Deep Clean:           1.85x  (almost 2x — this 
+                              is the most common 
+                              mistake, devs set 
+                              this too low)
+Move In / Move Out:   2.20x  (empty home, every 
+                              surface, inside 
+                              everything)
+Post Construction:    2.80x  (debris, dust, 
+                              heavy scrubbing)
+Airbnb Turnover:      0.75x  (quick reset, 
+                              usually smaller)
+Recurring (add-on):   0.85x  (frequency discount 
+                              baked in at base)
+
+═══════════════════════════════
+BASE HOURS LOOKUP TABLE
+(Rewrite with accurate values)
+═══════════════════════════════
+
+These are STANDARD CLEAN hours. Multipliers 
+are applied on top.
+
+const BASE_HOURS_BY_CONFIG = {
+  // key: `${bedrooms}_${bathrooms}`
+  "0_1":   1.25,  // studio, 1 bath
+  "1_1":   1.75,  // 1bd/1ba
+  "1_1.5": 1.90,
+  "2_1":   2.25,  // 2bd/1ba
+  "2_1.5": 2.50,
+  "2_2":   2.75,  // 2bd/2ba ← most common
+  "2_2.5": 3.00,
+  "3_1":   2.75,
+  "3_1.5": 3.00,
+  "3_2":   3.25,  // 3bd/2ba
+  "3_2.5": 3.50,
+  "3_3":   3.75,
+  "4_2":   4.00,
+  "4_2.5": 4.25,
+  "4_3":   4.50,  // 4bd/3ba
+  "4_3.5": 4.75,
+  "4_4":   5.00,
+  "5_3":   5.50,
+  "5_3.5": 5.75,
+  "5_4":   6.25,
+  "6_4":   7.50,
+}
+
+FALLBACK if exact combo not in table:
+  estimatedHours = (bedrooms * 0.75) + (bathrooms * 0.60) + 0.50
+  Minimum: 1.25 hours
+  Maximum: 10.0 hours
+
+IF sqft is provided, use it as a SANITY CHECK 
+not a replacement:
+  sqft_hours = sqft / 350  (industry standard: 
+    1 hour per 350 sqft for standard clean)
+  
+  If sqft_hours differs from table_hours by >40%:
+    Use the AVERAGE of the two:
+    estimatedHours = (sqft_hours + table_hours) / 2
+  Else:
+    Use table_hours (more reliable for small homes)
+    
+  This prevents wild swings from incorrect sqft 
+  entries while still using the data when valid.
+
+═══════════════════════════════
+FULL CALCULATION FUNCTION
+(Complete rewrite — replace existing entirely)
+═══════════════════════════════
+
+export function calculateLeadLinkEstimate(
+  inputs: QuoteInputs,
+  config: LeadLinkPricingConfig
+): PriceEstimate {
+
+  // ── STEP 1: RESOLVE HOURLY RATE ──
+  // Never allow 0 or null to propagate
+  const hourlyRate = (
+    config?.pricing?.hourlyRate > 0 
+      ? config.pricing.hourlyRate 
+      : 50  // industry default fallback
+  );
+
+  const minimumTicket = (
+    config?.pricing?.minimumTicket > 0 
+      ? config.pricing.minimumTicket 
+      : 110  // industry default fallback
+  );
+
+  // ── STEP 2: GET BASE HOURS ──
+  const lookupKey = `${inputs.bedrooms}_${inputs.bathrooms}`;
+  
+  let tableHours = BASE_HOURS_BY_CONFIG[lookupKey];
+  
+  // Fallback formula if key not in table
+  if (!tableHours) {
+    tableHours = Math.max(
+      1.25,
+      (inputs.bedrooms * 0.75) + 
+      (inputs.bathrooms * 0.60) + 0.50
+    );
+  }
+  
+  // Sanity check with sqft if provided
+  let estimatedHours = tableHours;
+  if (inputs.sqft && inputs.sqft > 200) {
+    const sqftHours = inputs.sqft / 350;
+    const variance = Math.abs(sqftHours - tableHours) / tableHours;
+    if (variance > 0.40) {
+      estimatedHours = (sqftHours + tableHours) / 2;
+    }
+  }
+
+  // ── STEP 3: SERVICE TYPE MULTIPLIER ──
+  // THIS IS THE CRITICAL STEP THAT WAS BROKEN
+  
+  const SERVICE_MULTIPLIERS = {
+    standard:       1.00,
+    deep:           1.85,
+    moveinout:      2.20,
+    postconstruct:  2.80,
+    airbnb:         0.75,
+    recurring:      1.00,  // discount applied later
+  };
+  
+  // ALSO check the business owner's configured 
+  // serviceType multiplier and use the HIGHER 
+  // of the two (their config or our baseline):
+  let configMultiplier = 1.0;
+  
+  if (config?.pricing?.serviceTypes?.length > 0) {
+    const serviceTypeMap = {
+      standard:      config.pricing.goodOptionId,
+      deep:          config.pricing.betterOptionId,
+      moveinout:     config.pricing.bestOptionId,
+      postconstruct: config.pricing.bestOptionId,
+      airbnb:        config.pricing.goodOptionId,
+      recurring:     config.pricing.goodOptionId,
+    };
+    
+    const mappedId = serviceTypeMap[inputs.cleaningType];
+    const serviceType = config.pricing.serviceTypes.find(
+      st => st.id === mappedId
+    );
+    configMultiplier = serviceType?.multiplier || 1.0;
+  }
+  
+  // Use whichever is higher — protects against 
+  // business owner setting multipliers too low
+  const baselineMultiplier = 
+    SERVICE_MULTIPLIERS[inputs.cleaningType] || 1.0;
+  
+  const finalMultiplier = Math.max(
+    baselineMultiplier, 
+    configMultiplier
+  );
+  
+  // Apply multiplier to hours
+  const adjustedHours = estimatedHours * finalMultiplier;
+
+  // ── STEP 4: BASE LABOR COST ──
+  const baseLabor = adjustedHours * hourlyRate;
+
+  // ── STEP 5: CONDITION ADJUSTMENT ──
+  const CONDITION_MULTIPLIERS = {
+    excellent: 0.90,
+    good:      1.00,
+    average:   1.18,
+    dirty:     1.40,
+  };
+  const conditionMult = 
+    CONDITION_MULTIPLIERS[inputs.conditionLevel] || 1.0;
+  const afterCondition = baseLabor * conditionMult;
+
+  // ── STEP 6: PET FEE ──
+  // Flat fee structure — not percentage
+  const PET_FEES = { 0: 0, 1: 20, 2: 35, 3: 50 };
+  const petFee = PET_FEES[Math.min(inputs.petCount, 3)] || 50;
+
+  // ── STEP 7: ADD-ONS ──
+  // Use business config prices, fall back to 
+  // industry averages if not configured:
+  const ADD_ON_DEFAULTS = {
+    insideFridge:    35,
+    insideOven:      35,
+    insideCabinets:  50,
+    interiorWindows: 45,
+    blindsDetail:    30,
+    baseboardsDetail:40,
+    laundryFoldOnly: 30,
+    dishes:          25,
+    organizationTidy:60,
+  };
+  
+  const addOnsTotal = (inputs.addOns || []).reduce(
+    (sum, addOn) => {
+      const configPrice = 
+        config?.pricing?.addOnPrices?.[addOn];
+      const price = (configPrice > 0) 
+        ? configPrice 
+        : (ADD_ON_DEFAULTS[addOn] || 0);
+      return sum + price;
+    }, 0
+  );
+
+  // ── STEP 8: SUBTOTAL ──
+  const subtotalBeforeDiscount = 
+    afterCondition + petFee + addOnsTotal;
+
+  // ── STEP 9: FREQUENCY DISCOUNT ──
+  const FREQUENCY_DISCOUNTS = {
+    onetime:  0,
+    weekly:   config?.pricing?.frequencyDiscounts?.weekly 
+              ?? 20,
+    biweekly: config?.pricing?.frequencyDiscounts?.biweekly 
+              ?? 15,
+    monthly:  config?.pricing?.frequencyDiscounts?.monthly 
+              ?? 10,
+  };
+  
+  const discountPct = 
+    (FREQUENCY_DISCOUNTS[inputs.frequency] || 0) / 100;
+  const frequencyDiscount = 
+    subtotalBeforeDiscount * discountPct;
+  const afterDiscount = 
+    subtotalBeforeDiscount - frequencyDiscount;
+
+  // ── STEP 10: APPLY MINIMUM TICKET ──
+  const subtotal = Math.max(afterDiscount, minimumTicket);
+
+  // ── STEP 11: TAX ──
+  const taxRate = config?.pricing?.taxRate || 0;
+  const tax = subtotal * (taxRate / 100);
+  const total = subtotal + tax;
+
+  // ── STEP 12: INDUSTRY BENCHMARK CROSS-CHECK ──
+  // Compare our calculated total against the 
+  // industry benchmark ranges above.
+  // If our total is BELOW the industry low, 
+  // something is wrong — use industry low instead.
+  
+  const INDUSTRY_BENCHMARKS = {
+    standard: {
+      0:  { low: 80,  high: 120 },
+      1:  { low: 120, high: 170 },
+      2:  { low: 120, high: 220 },
+      3:  { low: 150, high: 280 },
+      4:  { low: 200, high: 350 },
+      5:  { low: 250, high: 450 },
+    },
+    deep: {
+      0:  { low: 150, high: 250 },
+      1:  { low: 200, high: 300 },
+      2:  { low: 200, high: 400 },
+      3:  { low: 280, high: 500 },
+      4:  { low: 350, high: 650 },
+      5:  { low: 450, high: 800 },
+    },
+    moveinout: {
+      0:  { low: 200, high: 300 },
+      1:  { low: 250, high: 380 },
+      2:  { low: 280, high: 450 },
+      3:  { low: 350, high: 600 },
+      4:  { low: 450, high: 750 },
+      5:  { low: 550, high: 950 },
+    },
+    postconstruct: {
+      0:  { low: 300, high: 500 },
+      1:  { low: 350, high: 600 },
+      2:  { low: 400, high: 700 },
+      3:  { low: 500, high: 900 },
+      4:  { low: 650, high: 1100 },
+      5:  { low: 800, high: 1500 },
+    },
+    airbnb: {
+      0:  { low: 65,  high: 100 },
+      1:  { low: 75,  high: 130 },
+      2:  { low: 100, high: 170 },
+      3:  { low: 130, high: 210 },
+      4:  { low: 160, high: 270 },
+      5:  { low: 200, high: 340 },
+    },
+    recurring: {
+      0:  { low: 70,  high: 110 },
+      1:  { low: 100, high: 150 },
+      2:  { low: 100, high: 190 },
+      3:  { low: 130, high: 230 },
+      4:  { low: 170, high: 290 },
+      5:  { low: 210, high: 370 },
+    },
+  };
+
+  const bedroomKey = Math.min(
+    inputs.bedrooms, 5
+  ) as 0|1|2|3|4|5;
+  
+  const cleaningTypeKey = inputs.cleaningType in 
+    INDUSTRY_BENCHMARKS 
+      ? inputs.cleaningType 
+      : "standard";
+  
+  const benchmark = 
+    INDUSTRY_BENCHMARKS[cleaningTypeKey]?.[bedroomKey];
+
+  // If our calculated total is below industry low:
+  // Use the industry low as the floor
+  const flooredTotal = benchmark 
+    ? Math.max(total, benchmark.low * 0.85)
+    : total;
+
+  // ── STEP 13: CALCULATE RANGE ──
+  let rangeFactor: { low: number; high: number };
+  
+  if (inputs.usingDefaultPricing) {
+    // Wide range — uncertainty due to no config
+    rangeFactor = { low: 0.75, high: 1.45 };
+  } else if (inputs.sqft && inputs.sqft > 200) {
+    // Narrow range — sqft gives precision
+    rangeFactor = { low: 0.88, high: 1.18 };
+  } else if (
+    inputs.conditionLevel === "dirty" || 
+    inputs.cleaningType === "postconstruct"
+  ) {
+    // Wider range — hard to predict without seeing
+    rangeFactor = { low: 0.80, high: 1.35 };
+  } else {
+    // Standard range
+    rangeFactor = { low: 0.85, high: 1.25 };
+  }
+
+  // If we have a benchmark, also cap the high 
+  // end at benchmark.high * 1.15 (15% above market)
+  // This prevents absurdly high estimates
+  const roundTo5 = (n: number) => 
+    Math.round(n / 5) * 5;
+
+  let lowEstimate = roundTo5(
+    flooredTotal * rangeFactor.low
+  );
+  let highEstimate = roundTo5(
+    flooredTotal * rangeFactor.high
+  );
+
+  // Apply benchmark floors and ceilings
+  if (benchmark) {
+    lowEstimate = Math.max(
+      lowEstimate, 
+      roundTo5(benchmark.low * 0.80)
+    );
+    highEstimate = Math.min(
+      highEstimate,
+      roundTo5(benchmark.high * 1.20)
+    );
+  }
+
+  // Ensure minimum spread of $40
+  if (highEstimate - lowEstimate < 40) {
+    highEstimate = lowEstimate + 40;
+  }
+
+  const midEstimate = roundTo5(
+    (lowEstimate + highEstimate) / 2
+  );
+
+  // ── STEP 14: CONFIDENCE ──
+  let confidence: "high" | "medium" | "low";
+  if (inputs.usingDefaultPricing) {
+    confidence = "low";
+  } else if (inputs.sqft && inputs.sqft > 200) {
+    confidence = "high";
+  } else {
+    confidence = "medium";
+  }
+
+  // ── STEP 15: LABELS ──
+  const SERVICE_LABELS = {
+    standard:      "Standard Clean",
+    deep:          "Deep Clean",
+    moveinout:     "Move In / Move Out",
+    postconstruct: "Post-Construction",
+    airbnb:        "Airbnb Turnover",
+    recurring:     "Recurring Clean",
+  };
+
+  const FREQUENCY_LABELS = {
+    onetime:  "One-time",
+    weekly:   "Weekly recurring",
+    biweekly: "Every 2 weeks",
+    monthly:  "Monthly recurring",
+  };
+
+  return {
+    lowEstimate,
+    highEstimate,
+    midEstimate,
+    serviceTypeName: SERVICE_LABELS[
+      inputs.cleaningType
+    ] || "Standard Clean",
+    frequencyLabel: FREQUENCY_LABELS[
+      inputs.frequency
+    ] || "One-time",
+    frequencyDiscountPercent: discountPct * 100,
+    addOnsSubtotal: addOnsTotal,
+    calculatedTotal: roundTo5(flooredTotal),
+    benchmark: benchmark || null,
+    breakdown: {
+      baseLabor:           roundTo5(baseLabor),
+      serviceMultiplier:   finalMultiplier,
+      adjustedHours:       Math.round(adjustedHours * 4) / 4,
+      conditionAdjustment: roundTo5(
+        afterCondition - baseLabor
+      ),
+      petFee,
+      addOnsTotal,
+      frequencyDiscount:   roundTo5(frequencyDiscount),
+      subtotal:            roundTo5(subtotal),
+      tax:                 roundTo5(tax),
+      total:               roundTo5(flooredTotal),
+    },
+    confidence,
+    usingIndustryFloor: flooredTotal > total,
+  };
+}
+
+═══════════════════════════════
+DEBUGGING OUTPUT
+═══════════════════════════════
+
+Add a console.log in development mode that 
+shows the full calculation for every estimate:
+
+if (process.env.NODE_ENV === 'development') {
+  console.table({
+    cleaningType:      inputs.cleaningType,
+    bedrooms:          inputs.bedrooms,
+    bathrooms:         inputs.bathrooms,
+    tableHours:        tableHours,
+    finalMultiplier:   finalMultiplier,
+    adjustedHours:     adjustedHours,
+    hourlyRate:        hourlyRate,
+    baseLabor:         baseLabor,
+    afterCondition:    afterCondition,
+    petFee:            petFee,
+    addOnsTotal:       addOnsTotal,
+    subtotal:          subtotal,
+    flooredTotal:      flooredTotal,
+    lowEstimate:       lowEstimate,
+    highEstimate:      highEstimate,
+    benchmarkLow:      benchmark?.low,
+    benchmarkHigh:     benchmark?.high,
+    usingIndustryFloor: flooredTotal > total,
+  });
+}
+
+This makes it easy to see exactly where the 
+number comes from and catch any future bugs.
+
+═══════════════════════════════
+MICROSITE UI CHANGES
+═══════════════════════════════
+
+1. When cleaningType changes, ANIMATE the 
+   price range update prominently:
+   - Numbers count up/down over 400ms
+   - Brief scale pulse: transform scale(1.04) 
+     then back to 1
+   - This makes it obvious the price changed
+
+2. Add a service type context line below 
+   the price range:
+   "Estimated for a [X] bed [Y] bath [ServiceType]"
+   e.g. "Estimated for a 2 bed 2 bath Deep Clean"
+   font-size: 14px, color: text-muted
+
+3. Add a "Why this range?" expandable section:
+   Small "ℹ️ How is this calculated?" link
+   On click, expand to show:
+   "This estimate is based on [X] hours of 
+   cleaning at local market rates, adjusted 
+   for your home's size and condition. 
+   [BusinessName] will confirm the exact 
+   price before any work begins."
+   
+4. When cleaningType = "moveinout" or 
+   "postconstruct", add a note:
+   "🏠 [Move in/out / Post-construction] cleans 
+   typically take 2-3x longer than standard 
+   cleans — every surface is cleaned from scratch."
+   Background: blue-50, border: blue-200
+   font-size: 13px
+
+═══════════════════════════════
+VALIDATION TESTS
+═══════════════════════════════
+
+Run ALL of these and verify outputs before 
+deploying. Use hourlyRate=$50, minimum=$110, 
+no tax, no add-ons, good condition, one-time:
+
+TEST 1 — 2bd/2ba Standard Clean:
+  Expected: $120 – $170
+  Must NOT be below $100
+  Must NOT be above $250
+
+TEST 2 — 2bd/2ba Deep Clean:
+  Expected: $200 – $320
+  Must be AT LEAST 1.7x higher than TEST 1 low
+  Must NOT be below $180
+
+TEST 3 — 2bd/2ba Move In/Out:
+  Expected: $250 – $380
+  Must be AT LEAST 2x higher than TEST 1 low
+  Must NOT be below $220
+
+TEST 4 — 3bd/2ba Move In/Out:
+  Expected: $320 – $500
+  Must NOT be below $300
+
+TEST 5 — 4bd/3ba Deep Clean:
+  Expected: $380 – $580
+  Must NOT be below $340
+
+TEST 6 — Studio Standard Clean:
+  Expected: $80 – $130
+  Must NOT be below $80
+  Minimum ticket enforced: $110 floor
+
+TEST 7 — 2bd/2ba Airbnb Turnover:
+  Expected: $100 – $170
+  Must be LOWER than Standard Clean (0.75x)
+
+TEST 8 — Same inputs, different cleaning types:
+  2bd/2ba, good condition, one-time:
+  Standard:     $120 – $170
+  Deep:         $200 – $320  (must be >1.7x standard)
+  Move In/Out:  $250 – $380  (must be >2x standard)
+  THESE THREE MUST BE MEANINGFULLY DIFFERENT.
+  If any two of them produce the same range: 
+  THE TEST FAILS.
+
+TEST 9 — With business config hourlyRate=$65:
+  2bd/2ba Standard, good, one-time
+  Expected: $155 – $220 (scaled from $50/hr base)
+
+TEST 10 — Default pricing flag (usingDefaultPricing=true):
+  Same inputs as TEST 1
+  Expected: wider range $90 – $250
+  low should be ~25% lower than configured pricing
+  high should be ~45% higher than configured pricing
+
+Show console.table output for each test.
+All 10 tests must pass before deploying.
+
+═══════════════════════════════
+DO NOT CHANGE
+═══════════════════════════════
+- The Lead Link form fields or flow
+- The submission logic or API calls
+- The business owner's pricing settings UI
+- The main app quote calculator
+- Any existing database schema
+- The URL structure or token system
+
+═══════════════════════════════
+FINAL TESTING CHECKLIST
+═══════════════════════════════
+- Standard clean and deep clean show 
+  DIFFERENT price ranges (deep must be >70% higher)
+- Move in/out shows DIFFERENT range from deep clean
+  (move in/out must be >15% higher than deep)
+- $90 never appear

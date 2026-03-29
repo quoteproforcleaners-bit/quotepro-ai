@@ -318,6 +318,7 @@ export default function LeadLinkPage() {
   const [priceRange, setPriceRange] = useState<{ low: number; high: number } | null>(null);
   const [priceFlash, setPriceFlash] = useState(false);
   const [accuracyTooltip, setAccuracyTooltip] = useState(false);
+  const [showWhyRange, setShowWhyRange] = useState(false);
   const prevSpreadRef = useRef<number | null>(null);
   const lowCount = useCountUp(priceRange?.low ?? 0, step === "reveal");
   const highCount = useCountUp(priceRange?.high ?? 0, step === "reveal");
@@ -676,6 +677,16 @@ export default function LeadLinkPage() {
                 </p>
               </div>
 
+              {/* Move-in/out info note */}
+              {(serviceType === "move") && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 mb-4 flex gap-2">
+                  <Clock className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-700 leading-relaxed">
+                    Move in/out cleans typically take 2–3x longer than standard cleans — every surface is cleaned from scratch.
+                  </p>
+                </div>
+              )}
+
               {/* Big price reveal */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-5">
                 <div className="text-center">
@@ -697,8 +708,20 @@ export default function LeadLinkPage() {
                     ${lowCount.toLocaleString()} – ${highCount.toLocaleString()}
                   </div>
 
+                  {/* Context line */}
+                  <p className="text-sm text-slate-500 mb-4">
+                    Estimated for a{" "}
+                    <span className="font-medium text-slate-700">
+                      {beds === "0" ? "studio" : `${beds} bed`} / {baths} bath{" "}
+                      {serviceType === "standard" ? "Standard Clean"
+                        : serviceType === "deep" ? "Deep Clean"
+                        : serviceType === "move" ? "Move In/Out"
+                        : "Recurring Clean"}
+                    </span>
+                  </p>
+
                   {/* Trust signals */}
-                  <div className="flex items-center justify-center gap-4 flex-wrap mb-5">
+                  <div className="flex items-center justify-center gap-4 flex-wrap mb-4">
                     {[
                       "No hidden fees",
                       "Free to get a quote",
@@ -711,16 +734,25 @@ export default function LeadLinkPage() {
                     ))}
                   </div>
 
-                  {config.usingDefaultPricing ? (
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Exact pricing depends on your home's specifics and will be confirmed by {config.companyName}.
-                    </p>
-                  ) : (
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Exact price depends on home condition and any add-on services.
-                      Your final quote will be sent after you share a few more details.
-                    </p>
-                  )}
+                  {/* Why this range? */}
+                  <div className="border-t border-slate-100 pt-4">
+                    <button
+                      onClick={() => setShowWhyRange((v) => !v)}
+                      className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 mx-auto transition-colors"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      How is this calculated?
+                      <ChevronRight className={`w-3 h-3 transition-transform ${showWhyRange ? "rotate-90" : ""}`} />
+                    </button>
+                    {showWhyRange && (
+                      <div className="mt-3 text-xs text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3 text-left">
+                        This estimate is based on the typical hours for a{" "}
+                        {beds === "0" ? "studio" : `${beds}-bedroom`} home at local market rates,
+                        adjusted for your home's size and cleaning type.{" "}
+                        {config.companyName} will confirm the exact price before any work begins.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
