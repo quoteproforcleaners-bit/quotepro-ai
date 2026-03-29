@@ -201,15 +201,10 @@ export function calculateLeadLinkEstimate(
     rangeWidth = { low: 0.85, high: 1.25 };
   }
 
-  let lowEstimate = roundTo5(total * rangeWidth.low);
-  let highEstimate = roundTo5(total * rangeWidth.high);
-
-  // Never show below minimum ticket
-  if (lowEstimate < minimumTicket) {
-    lowEstimate = minimumTicket;
-    highEstimate = Math.max(highEstimate, roundTo5(minimumTicket * 1.3));
-  }
-
+  // Range is applied to the total (which already has minimum ticket baked in via Step 11)
+  // Never override the range here — minimum ticket enforcement belongs in Step 11 only
+  const lowEstimate = roundTo5(total * rangeWidth.low);
+  const highEstimate = roundTo5(total * rangeWidth.high);
   const midEstimate = roundTo5((lowEstimate + highEstimate) / 2);
 
   // STEP 15: Confidence

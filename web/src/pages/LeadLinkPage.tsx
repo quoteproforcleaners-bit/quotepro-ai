@@ -317,6 +317,8 @@ export default function LeadLinkPage() {
   // Price reveal
   const [priceRange, setPriceRange] = useState<{ low: number; high: number } | null>(null);
   const [priceFlash, setPriceFlash] = useState(false);
+  const [accuracyTooltip, setAccuracyTooltip] = useState(false);
+  const prevSpreadRef = useRef<number | null>(null);
   const lowCount = useCountUp(priceRange?.low ?? 0, step === "reveal");
   const highCount = useCountUp(priceRange?.high ?? 0, step === "reveal");
 
@@ -416,6 +418,13 @@ export default function LeadLinkPage() {
       const next = { ...prev, ...updates };
       const price = computePrice(next.sqft, next.condition, next.pets, next.petCount);
       if (price) {
+        const newSpread = price.high - price.low;
+        const prevSpread = prevSpreadRef.current;
+        if (prevSpread !== null && newSpread < prevSpread) {
+          setAccuracyTooltip(true);
+          setTimeout(() => setAccuracyTooltip(false), 1500);
+        }
+        prevSpreadRef.current = newSpread;
         setPriceRange(price);
         setPriceFlash(true);
         setTimeout(() => setPriceFlash(false), 700);
@@ -744,6 +753,26 @@ export default function LeadLinkPage() {
 
               {/* Persistent price bar */}
               <PriceBadge low={priceRange.low} high={priceRange.high} flash={priceFlash} />
+
+              {/* "Getting more accurate" tooltip — fades in/out when range narrows */}
+              <div
+                style={{
+                  overflow: "hidden",
+                  maxHeight: accuracyTooltip ? "32px" : "0px",
+                  opacity: accuracyTooltip ? 1 : 0,
+                  transition: "max-height 0.25s ease, opacity 0.25s ease",
+                  marginBottom: accuracyTooltip ? "12px" : "0px",
+                  textAlign: "center",
+                }}
+              >
+                <span
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+                  style={{ background: "#dbeafe", color: "#1d4ed8" }}
+                >
+                  <Zap className="w-3 h-3" />
+                  Getting more accurate…
+                </span>
+              </div>
 
               <div className="text-center mb-5">
                 <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: primary, letterSpacing: "1.5px" }}>
