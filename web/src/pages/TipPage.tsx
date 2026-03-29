@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 interface TipPageData {
-  jobId: string;
+  jobId: string | null;
   businessName: string;
   logoUri: string | null;
   jobType: string | null;
@@ -13,6 +13,7 @@ interface TipPageData {
   percentageOptions: number[];
   alreadyPaid: boolean;
   paidAmount: number | null;
+  stripeReady: boolean;
 }
 
 function formatCurrency(amount: number): string {
@@ -279,7 +280,10 @@ export default function TipPage() {
           </button>
 
           <p className="text-slate-400 text-[11px] text-center mt-3 leading-relaxed">
-            Secure payment powered by Stripe. Tips go directly to {data.businessName}.
+            Secure payment powered by Stripe.{" "}
+            {data.stripeReady
+              ? `Tips go directly to ${data.businessName}.`
+              : `Tips are processed securely on behalf of ${data.businessName}.`}
           </p>
         </div>
       </div>

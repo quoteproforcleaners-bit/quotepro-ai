@@ -2403,6 +2403,7 @@ router.get("/api/public/tip-page/:token", async (req: Request, res: Response) =>
               j.tip_request_sent_at, j.tip_amount,
               b.id AS business_id, b.company_name, b.logo_uri,
               b.tips_enabled, b.tip_percentage_options,
+              b.stripe_account_id, b.stripe_onboarding_complete,
               c.first_name, c.last_name, c.email AS customer_email,
               e.name AS team_member_name
        FROM jobs j
@@ -2417,6 +2418,7 @@ router.get("/api/public/tip-page/:token", async (req: Request, res: Response) =>
     if (!row) {
       const portalRes = await pool.query(
         `SELECT b.id AS business_id, b.company_name, b.logo_uri, b.tips_enabled, b.tip_percentage_options,
+                b.stripe_account_id, b.stripe_onboarding_complete,
                 c.first_name, c.last_name,
                 j.id AS job_id, j.job_type, j.total, j.completed_at, j.tip_amount,
                 e.name AS team_member_name
@@ -2458,6 +2460,7 @@ router.get("/api/public/tip-page/:token", async (req: Request, res: Response) =>
       percentageOptions: row.tip_percentage_options || [18, 22, 25],
       alreadyPaid,
       paidAmount: alreadyPaid ? parseFloat(tipCheck.rows[0].amount) : null,
+      stripeReady: !!(row.stripe_account_id && row.stripe_onboarding_complete),
     });
   } catch (e: any) {
     console.error("GET /api/public/tip-page/:token error:", e);
@@ -2475,7 +2478,8 @@ router.post("/api/public/tip-page/:token/checkout", async (req: Request, res: Re
 
     const jobRes = await pool.query(
       `SELECT j.id, j.business_id, j.customer_id, j.total, j.job_type,
-              b.company_name, b.tips_enabled, b.tip_percentage_options
+              b.company_name, b.tips_enabled, b.tip_percentage_options,
+              b.stripe_account_id, b.stripe_onboarding_complete
        FROM jobs j
        JOIN businesses b ON j.business_id = b.id
        WHERE j.tip_token = $1 LIMIT 1`,
@@ -2486,6 +2490,7 @@ router.post("/api/public/tip-page/:token/checkout", async (req: Request, res: Re
       // Fallback: portal token lookup
       const portalRes = await pool.query(
         `SELECT b.id AS business_id, b.company_name, b.tips_enabled, b.tip_percentage_options,
+                b.stripe_account_id, b.stripe_onboarding_complete,
                 cp.customer_id,
                 j.id, j.total, j.job_type
          FROM customer_portals cp
@@ -2510,6 +2515,8 @@ router.post("/api/public/tip-page/:token/checkout", async (req: Request, res: Re
         company_name: pr.company_name,
         tips_enabled: pr.tips_enabled,
         tip_percentage_options: pr.tip_percentage_options,
+        stripe_account_id: pr.stripe_account_id,
+        stripe_onboarding_complete: pr.stripe_onboarding_complete,
       };
     }
     if (!job) return res.status(404).json({ message: "Tip page not found" });
@@ -2531,6 +2538,7 @@ router.post("/api/public/tip-page/:token/checkout", async (req: Request, res: Re
     );
 
     const baseUrl = getPublicBaseUrl(req);
+    const useConnectedAccount = !!(job.stripe_account_id && job.stripe_onboarding_complete);
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
@@ -2545,11 +2553,17 @@ router.post("/api/public/tip-page/:token/checkout", async (req: Request, res: Re
         },
         quantity: 1,
       }],
+      ...(useConnectedAccount ? {
+        payment_intent_data: {
+          transfer_data: { destination: job.stripe_account_id },
+        },
+      } : {}),
       metadata: {
         type: "tip",
         tipId,
-        jobId: job.id,
+        jobId: job.id || "",
         businessId: job.business_id,
+        stripeAccountId: job.stripe_account_id || "",
       },
       success_url: `${baseUrl}/tip/${token}?success=1`,
       cancel_url: `${baseUrl}/tip/${token}?cancelled=1`,
