@@ -1266,6 +1266,185 @@ const router = Router();
     }
   });
 
+  // ─── Lead Link Guide Email ────────────────────────────────────────────────
+  router.get("/api/lead-link/guide-status", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const r = await pool.query(
+        `SELECT lead_link_guide_sent_at, public_quote_slug FROM businesses WHERE id=$1`,
+        [business.id]
+      );
+      const row = r.rows[0] || {};
+      res.json({
+        sentAt: row.lead_link_guide_sent_at || null,
+        hasSlug: !!row.public_quote_slug,
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  router.post("/api/lead-link/send-guide-email", requireAuth, async (req: any, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      // Ensure slug exists
+      const slug = await ensurePublicSlug(business.id, business.companyName || "my-cleaning-co");
+
+      // Build URL
+      const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+      const host = req.headers["x-forwarded-host"] || req.headers.host || "app.getquotepro.ai";
+      const leadLinkUrl = `${proto}://${host}/request/${slug}`;
+      const pricingUrl = `${proto}://${host}/settings?tab=payments`;
+      const shareUrl = `${proto}://${host}/lead-link`;
+
+      // Get owner name and email
+      const ownerFullName: string = (business as any).senderName || "";
+      const ownerFirstName = ownerFullName.split(" ")[0] || "there";
+      const toEmail: string = (business as any).email || "";
+      if (!toEmail) return res.status(400).json({ message: "No email address on file" });
+
+      const html = buildLeadLinkGuideEmail({ ownerFirstName, leadLinkUrl, pricingUrl, shareUrl });
+
+      await sendEmail({
+        to: toEmail,
+        subject: "Your QuotePro Lead Link — Get leads while you sleep",
+        html,
+        fromName: PLATFORM_FROM_NAME,
+        replyTo: "mike@getquotepro.ai",
+      });
+
+      // Log sent_at
+      await pool.query(`UPDATE businesses SET lead_link_guide_sent_at=NOW() WHERE id=$1`, [business.id]);
+
+      res.json({ sent: true, leadLinkUrl });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  function buildLeadLinkGuideEmail(opts: {
+    ownerFirstName: string;
+    leadLinkUrl: string;
+    pricingUrl: string;
+    shareUrl: string;
+  }): string {
+    const { ownerFirstName, leadLinkUrl, pricingUrl, shareUrl } = opts;
+    return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Your QuotePro Lead Link</title></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;min-height:100%;">
+  <tr><td align="center" style="padding:24px 16px 48px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">
+
+      <!-- Header -->
+      <tr><td style="background:#0f172a;border-radius:14px 14px 0 0;padding:32px 36px;">
+        <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">QuotePro</div>
+        <div style="font-size:26px;font-weight:900;color:#ffffff;letter-spacing:-0.03em;line-height:1.2;">Your Lead Link is ready.</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.5);margin-top:8px;">Capture cleaning leads 24/7, on autopilot.</div>
+      </td></tr>
+
+      <!-- Body -->
+      <tr><td style="background:#ffffff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;padding:36px;">
+
+        <p style="margin:0 0 24px;font-size:15px;color:#334155;line-height:1.6;">Hi ${ownerFirstName},</p>
+        <p style="margin:0 0 28px;font-size:15px;color:#334155;line-height:1.6;">Great news — you're one step away from capturing cleaning leads 24/7 on autopilot.</p>
+
+        <!-- Lead Link Box -->
+        <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:24px;margin-bottom:28px;text-align:center;">
+          <div style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;">Your Lead Link</div>
+          <a href="${leadLinkUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 28px;border-radius:10px;letter-spacing:-0.01em;">${leadLinkUrl}</a>
+          <p style="margin:12px 0 0;font-size:12px;color:#4ade80;">Share this link anywhere to capture leads automatically</p>
+        </div>
+
+        <!-- What is it -->
+        <div style="background:#f8fafc;border-radius:10px;padding:20px;margin-bottom:28px;">
+          <div style="font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;">What is the Lead Link?</div>
+          <p style="margin:0 0 12px;font-size:14px;color:#475569;line-height:1.6;">Your Lead Link is a personalized webpage where potential customers can:</p>
+          <table cellpadding="0" cellspacing="0">
+            <tr><td style="padding:3px 0;font-size:14px;color:#334155;"><span style="color:#16a34a;font-weight:700;margin-right:8px;">✓</span>Enter their home details</td></tr>
+            <tr><td style="padding:3px 0;font-size:14px;color:#334155;"><span style="color:#16a34a;font-weight:700;margin-right:8px;">✓</span>See an instant price estimate</td></tr>
+            <tr><td style="padding:3px 0;font-size:14px;color:#334155;"><span style="color:#16a34a;font-weight:700;margin-right:8px;">✓</span>Submit their contact information</td></tr>
+            <tr><td style="padding:3px 0;font-size:14px;color:#334155;"><span style="color:#16a34a;font-weight:700;margin-right:8px;">✓</span>Request a quote — automatically</td></tr>
+          </table>
+          <p style="margin:12px 0 0;font-size:13px;color:#64748b;line-height:1.5;">You get notified instantly when a new lead comes in, and QuotePro builds the quote automatically.</p>
+        </div>
+
+        <!-- 3 Ways -->
+        <div style="margin-bottom:28px;">
+          <div style="font-size:13px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px;">3 Ways to Use Your Lead Link</div>
+
+          <div style="display:flex;gap:12px;margin-bottom:14px;">
+            <div style="width:28px;height:28px;background:#eff6ff;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <span style="font-size:14px;font-weight:800;color:#2563eb;">1</span>
+            </div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:3px;">Add it to your website</div>
+              <div style="font-size:13px;color:#64748b;line-height:1.5;">Replace your "Contact Us" page with your Lead Link. Visitors become leads instead of just reading and leaving.</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;margin-bottom:14px;">
+            <div style="width:28px;height:28px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <span style="font-size:14px;font-weight:800;color:#16a34a;">2</span>
+            </div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:3px;">Put it in your email signature</div>
+              <div style="font-size:13px;color:#64748b;line-height:1.5;">Every email you send becomes a potential lead source. Example: <em>"Get a free cleaning quote in 60 seconds: ${leadLinkUrl}"</em></div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:12px;">
+            <div style="width:28px;height:28px;background:#fdf4ff;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <span style="font-size:14px;font-weight:800;color:#9333ea;">3</span>
+            </div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:3px;">Share it on social media</div>
+              <div style="font-size:13px;color:#64748b;line-height:1.5;">Post on Facebook, Nextdoor, and Instagram: <em>"Get an instant cleaning quote for your home →"</em></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Before you share -->
+        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px;margin-bottom:28px;">
+          <div style="font-size:13px;font-weight:700;color:#c2410c;margin-bottom:6px;">Before You Share</div>
+          <p style="margin:0;font-size:13px;color:#92400e;line-height:1.5;">Make sure your pricing is configured so customers see accurate estimates.</p>
+        </div>
+
+        <!-- CTAs -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+          <tr>
+            <td style="padding-right:8px;" width="50%">
+              <a href="${pricingUrl}" style="display:block;background:#0f172a;color:#ffffff;font-size:13px;font-weight:700;text-decoration:none;padding:14px 16px;border-radius:10px;text-align:center;">Configure My Pricing</a>
+            </td>
+            <td style="padding-left:8px;" width="50%">
+              <a href="${shareUrl}" style="display:block;background:#0f172a;color:#ffffff;font-size:13px;font-weight:700;text-decoration:none;padding:14px 16px;border-radius:10px;text-align:center;">Share My Lead Link</a>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Closing -->
+        <div style="border-top:1px solid #f1f5f9;padding-top:24px;">
+          <p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Questions? Reply to this email — I read every one.</p>
+          <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#0f172a;">Mike</p>
+          <p style="margin:0 0 20px;font-size:13px;color:#94a3b8;">Founder, QuotePro</p>
+          <div style="background:#f8fafc;border-left:3px solid #e2e8f0;padding:12px 16px;border-radius:0 8px 8px 0;">
+            <p style="margin:0;font-size:13px;color:#64748b;line-height:1.5;font-style:italic;">P.S. Businesses that share their Lead Link on social media get an average of 3-5 new quote requests in their first week.</p>
+          </div>
+        </div>
+
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>`;
+  }
+
   // ─── Lead Link Analytics ─────────────────────────────────────────────────
   router.get("/api/business/lead-link-analytics", requireAuth, requireGrowth, async (req: any, res: Response) => {
     try {

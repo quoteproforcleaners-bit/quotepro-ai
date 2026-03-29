@@ -1,20 +1,20 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { apiPut, apiPatch } from "../lib/api";
+import { apiPut, apiPatch, apiPost } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import {
   Building2, DollarSign, ArrowRight, ArrowLeft,
-  Upload, Check, Sparkles, Mail, MessageSquare, Users,
+  Upload, Check, Sparkles, Mail, MessageSquare, Link2,
 } from "lucide-react";
 import AIAgentIntro from "../components/AIAgentIntro";
 
 const STEPS = [
-  { id: 1, label: "Your Business" },
+  { id: 1, label: "Business" },
   { id: 2, label: "Save Time" },
-  { id: 3, label: "Save More" },
-  { id: 4, label: "Your Pricing" },
-  { id: 5, label: "First Quote" },
+  { id: 3, label: "Grow" },
+  { id: 4, label: "Pricing" },
+  { id: 5, label: "Activate Trial" },
 ];
 
 const EMAIL_OPTIONS = [
@@ -69,8 +69,9 @@ export default function OnboardingWizardPage() {
   const [emailDays, setEmailDays] = useState("3");
   const [smsDays, setSmsDays] = useState("1");
 
-  // Step 3 fields — cleaner notification preferences
-  const [cleanerNotify, setCleanerNotify] = useState(true);
+  // Step 3 fields — Grow (Lead Link)
+  const [growEmailOption, setGrowEmailOption] = useState<"skip" | "send">("skip");
+  const [growSending, setGrowSending] = useState(false);
 
   // Step 4 fields — pricing
   const [minimumTicket, setMinimumTicket] = useState(150);
@@ -118,16 +119,13 @@ export default function OnboardingWizardPage() {
   };
 
   const handleStep3Next = async () => {
-    setSaving(true);
-    try {
-      await apiPut("/api/cleaner-notification-preferences", {
-        enabled: cleanerNotify,
-        timing: "both",
-        email: true,
-        sms: true,
-      }).catch(() => {});
-    } finally {
-      setSaving(false);
+    if (growEmailOption === "send") {
+      setGrowSending(true);
+      try {
+        await apiPost("/api/lead-link/send-guide-email", {}).catch(() => {});
+      } finally {
+        setGrowSending(false);
+      }
     }
     setStep(4);
   };
@@ -390,108 +388,128 @@ export default function OnboardingWizardPage() {
           </div>
         )}
 
-        {/* ── Step 3 — Save More Time (Cleaner Notifications) ──────── */}
+        {/* ── Step 3 — Grow (Lead Link) ─────────────────────────────── */}
         {step === 3 && (
           <div className="bg-slate-900/70 border border-slate-700/50 rounded-2xl p-8 backdrop-blur-sm">
             {/* Headline */}
             <div className="text-center mb-6">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-purple-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-500/30">
-                <Users className="w-7 h-7 text-white" />
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-teal-500 to-emerald-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/30">
+                <Link2 className="w-7 h-7 text-white" />
               </div>
               <h2 className="text-white font-extrabold text-2xl leading-tight mb-3 max-w-sm mx-auto">
-                Save another ~11 hours per week by notifying your cleaners about their appointments and details,{" "}
-                <span className="bg-violet-500/15 text-violet-300 rounded px-2 py-0.5 italic font-black">automagically!</span>
+                Land more appointments by allowing your website visitors to get a quote. They can request an appointment entirely on their own with your new{" "}
+                <span className="bg-teal-500/15 text-teal-300 rounded px-2 py-0.5 italic font-black">QuotePro Lead Link!</span>
               </h2>
               <p className="text-slate-400 text-sm max-w-sm mx-auto">
-                Your cleaners will be notified by email AND text to ensure they see the notification. On top of that, you can also print work orders, route sheets, and more!
+                Create a shareable link that captures leads 24/7 — embed it on your website, share it on social media, or put it in your email signature. No technical knowledge required!
               </p>
             </div>
 
-            {/* Radio options */}
-            <div className="space-y-3 mb-3 max-w-[480px] mx-auto">
-              {/* Option 1 */}
-              <button
-                onClick={() => setCleanerNotify(true)}
-                className={`w-full flex items-center gap-4 px-5 py-4 rounded-[10px] border text-left transition-all ${
-                  cleanerNotify
-                    ? "border-2 border-blue-500 bg-blue-500/[0.04]"
-                    : "border border-slate-700/50 bg-slate-800/40 hover:bg-slate-800/60"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                  cleanerNotify ? "border-teal-500 bg-teal-500" : "border-slate-600 bg-transparent"
-                }`}>
-                  {cleanerNotify && <div className="w-2 h-2 rounded-full bg-white" />}
-                </div>
-                <span className="text-white text-sm font-medium">Email and text my cleaners one day before the appointment</span>
-              </button>
-
-              {/* Option 2 */}
-              <button
-                onClick={() => setCleanerNotify(false)}
-                className={`w-full flex items-center gap-4 px-5 py-4 rounded-[10px] border text-left transition-all ${
-                  !cleanerNotify
-                    ? "border-2 border-blue-500 bg-blue-500/[0.04]"
-                    : "border border-slate-700/50 bg-slate-800/40 hover:bg-slate-800/60"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                  !cleanerNotify ? "border-teal-500 bg-teal-500" : "border-slate-600 bg-transparent"
-                }`}>
-                  {!cleanerNotify && <div className="w-2 h-2 rounded-full bg-white" />}
-                </div>
-                <span className="text-white text-sm font-medium">Do not notify my cleaners for now</span>
-              </button>
-            </div>
-
-            <p className="text-center text-slate-500 text-xs mb-5">You can change this later in your settings.</p>
-
-            {/* Phone mockup preview */}
+            {/* Phone mockup — Lead Link form preview */}
             <div className="relative mb-6">
               <div className="absolute -top-2 -left-2 z-10 pointer-events-none select-none">
                 <span
                   style={{ fontFamily: "'Segoe Script', 'Brush Script MT', cursive", transform: "rotate(-12deg)", display: "block" }}
                   className="text-slate-500 text-sm"
                 >
-                  Example
+                  Preview
                 </span>
                 <svg width="40" height="20" viewBox="0 0 40 20" className="ml-4 mt-0.5 opacity-40">
                   <path d="M2 4 Q20 2 36 14" stroke="#94a3b8" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
                   <path d="M32 10 L36 14 L30 15" stroke="#94a3b8" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
-              <div className={`relative bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 mx-4 shadow-xl transition-all duration-300 ${!cleanerNotify ? "opacity-30" : ""}`}>
-                {!cleanerNotify && (
-                  <div className="absolute inset-0 flex items-center justify-center z-10 rounded-2xl">
-                    <p className="text-slate-300 font-semibold text-sm bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-700">Cleaner notifications will be disabled</p>
-                  </div>
-                )}
-                <div className="space-y-2.5">
-                  {/* Email preview */}
-                  <div className="bg-slate-900/80 rounded-xl p-3 border border-slate-700/30">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Mail className="w-3 h-3 text-violet-400 flex-shrink-0" />
-                      <span className="text-violet-400 text-xs font-bold tracking-wider uppercase">Email</span>
+              {/* Phone shell */}
+              <div className="mx-auto w-[200px] relative">
+                <div className="bg-slate-800 border-2 border-slate-600 rounded-[28px] p-[6px] shadow-2xl">
+                  {/* Notch */}
+                  <div className="bg-slate-900 rounded-[22px] overflow-hidden" style={{ height: 260 }}>
+                    <div className="flex items-center justify-center py-2 border-b border-slate-700/50">
+                      <div className="w-12 h-1 bg-slate-700 rounded-full" />
                     </div>
-                    <p className="text-white text-xs font-semibold mb-0.5 leading-snug">
-                      Work order for tomorrow's appointment
-                    </p>
-                    <p className="text-slate-400 text-xs leading-snug line-clamp-2">
-                      Hi Sarah, reminder about tomorrow's job: Mr. Johnson Family, Deep Cleaning Service...
-                    </p>
-                  </div>
-                  {/* SMS preview */}
-                  <div className="bg-slate-900/80 rounded-xl p-3 border border-slate-700/30">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <MessageSquare className="w-3 h-3 text-violet-400 flex-shrink-0" />
-                      <span className="text-violet-400 text-xs font-bold tracking-wider uppercase">Text</span>
+                    {/* Step indicator */}
+                    <div className="px-4 pt-3 pb-2">
+                      <div className="flex items-center gap-1.5 mb-3">
+                        {[1, 2, 3].map((n) => (
+                          <div
+                            key={n}
+                            className={`h-1 flex-1 rounded-full ${n === 2 ? "bg-teal-500" : n < 2 ? "bg-teal-500/40" : "bg-slate-700"}`}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-teal-400 text-[9px] font-bold uppercase tracking-wide mb-2">Step 2: Your Home</p>
+                      {/* Form fields */}
+                      <div className="space-y-1.5">
+                        <p className="text-slate-300 text-[9px] font-semibold">Service Address</p>
+                        <div className="bg-slate-800 border border-slate-600 rounded-md px-2 py-1.5">
+                          <p className="text-[8px] text-slate-500">Address Line 1</p>
+                          <p className="text-[9px] text-slate-300">Street 1</p>
+                        </div>
+                        <div className="bg-slate-800 border border-slate-600 rounded-md px-2 py-1.5">
+                          <p className="text-[8px] text-slate-500">Address Line 2</p>
+                          <p className="text-[9px] text-slate-400 italic">Street 2</p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {["City", "State", "ZIP"].map((label) => (
+                            <div key={label} className="bg-slate-800 border border-slate-600 rounded-md px-1.5 py-1.5">
+                              <p className="text-[7px] text-slate-500 truncate">{label}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Partially visible row — cut off at bottom */}
+                        <div className="bg-slate-800 border border-slate-600 rounded-md px-2 py-1.5 overflow-hidden" style={{ maxHeight: 24 }}>
+                          <p className="text-[8px] text-slate-400">Is this an empty home?</p>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-slate-500 text-xs mb-0.5">Your business phone</p>
-                    <p className="text-white text-xs leading-snug">Your cleaning with Johnson Family is scheduled for tomorrow at 09:00 AM. 123 Main St...</p>
                   </div>
                 </div>
+                {/* Gradient fade at bottom suggesting more content */}
+                <div className="absolute bottom-[6px] left-[6px] right-[6px] h-10 rounded-b-[22px] bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
               </div>
             </div>
+
+            {/* Radio options */}
+            <div className="space-y-3 mb-3 max-w-[480px] mx-auto">
+              {/* Option 1 — Send email */}
+              <button
+                onClick={() => setGrowEmailOption("send")}
+                className={`w-full flex items-center gap-4 px-5 py-4 rounded-[10px] border text-left transition-all ${
+                  growEmailOption === "send"
+                    ? "border-2 border-teal-500 bg-teal-500/[0.06]"
+                    : "border border-slate-700/50 bg-slate-800/40 hover:bg-slate-800/60"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  growEmailOption === "send" ? "border-teal-500 bg-teal-500" : "border-slate-600 bg-transparent"
+                }`}>
+                  {growEmailOption === "send" && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-teal-400 flex-shrink-0" />
+                  <span className="text-white text-sm font-medium">Send me an email with details and examples</span>
+                </div>
+              </button>
+
+              {/* Option 2 — Maybe later (default) */}
+              <button
+                onClick={() => setGrowEmailOption("skip")}
+                className={`w-full flex items-center gap-4 px-5 py-4 rounded-[10px] border text-left transition-all ${
+                  growEmailOption === "skip"
+                    ? "border-2 border-teal-500 bg-teal-500/[0.06]"
+                    : "border border-slate-700/50 bg-slate-800/40 hover:bg-slate-800/60"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  growEmailOption === "skip" ? "border-teal-500 bg-teal-500" : "border-slate-600 bg-transparent"
+                }`}>
+                  {growEmailOption === "skip" && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+                <span className="text-white text-sm font-medium">Maybe later</span>
+              </button>
+            </div>
+
+            <p className="text-center text-slate-500 text-xs mb-5">You can set this up anytime from your settings.</p>
 
             {/* Nav */}
             <div className="flex gap-3">
@@ -503,11 +521,11 @@ export default function OnboardingWizardPage() {
               </button>
               <button
                 onClick={handleStep3Next}
-                disabled={saving}
-                className="flex-1 py-3.5 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-bold flex items-center justify-center gap-2 transition-all"
+                disabled={growSending}
+                className="flex-1 py-3.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white font-bold flex items-center justify-center gap-2 transition-all"
               >
-                {saving
-                  ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                {growSending
+                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending...</>
                   : <>Next <ArrowRight className="w-4 h-4" /></>}
               </button>
             </div>

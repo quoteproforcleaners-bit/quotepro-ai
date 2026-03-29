@@ -57,6 +57,35 @@ export default function LeadCapturePage() {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const qrSize = 220;
 
+  const [guideSent, setGuideSent] = useState(false);
+  const [guideSending, setGuideSending] = useState(false);
+
+  const { data: guideStatus } = useQuery<{ sentAt: string | null; hasSlug: boolean }>({
+    queryKey: ["/api/lead-link/guide-status"],
+  });
+
+  const handleSendGuide = async () => {
+    setGuideSending(true);
+    try {
+      const res = await fetch("/api/lead-link/send-guide-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        setGuideSent(true);
+        queryClient.invalidateQueries({ queryKey: ["/api/lead-link/guide-status"] });
+      }
+    } catch {
+      // fail silently
+    } finally {
+      setGuideSending(false);
+    }
+  };
+
+  const showGuideCard = !guideStatus?.sentAt && !guideSent;
+
   useEffect(() => {
     if (settings) {
       setSlugInput(settings.slug || "");
@@ -200,6 +229,31 @@ export default function LeadCapturePage() {
         title="Lead Capture Link"
         subtitle="Share your link anywhere — customers fill it out, leads land in your inbox automatically."
       />
+
+      {/* Guide email card — shown if guide has not been sent yet */}
+      {showGuideCard ? (
+        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+            <Mail className="w-4 h-4 text-teal-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-teal-900">Get setup instructions by email</p>
+            <p className="text-xs text-teal-700 mt-0.5">We'll send you examples and tips for sharing your Lead Link effectively.</p>
+          </div>
+          <button
+            onClick={handleSendGuide}
+            disabled={guideSending}
+            className="flex-shrink-0 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+          >
+            {guideSending ? "Sending..." : "Send me the setup guide"}
+          </button>
+        </div>
+      ) : guideSent ? (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <p className="text-sm font-medium text-emerald-800">Sent! Check your inbox for setup instructions.</p>
+        </div>
+      ) : null}
 
       {/* Analytics Strip */}
       {analytics && (
