@@ -567,29 +567,6 @@ export default function CustomerPortalPage() {
                 </div>
               )}
 
-              {/* Tip prompt */}
-              {business.tipsEnabled && lastJob.tipToken && (
-                <div style={{ borderTop: "1px solid #f1f5f9", marginTop: 14, paddingTop: 12 }}>
-                  {lastJob.tipAmount ? (
-                    <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>
-                      You tipped ${lastJob.tipAmount.toFixed(2)}
-                      {lastJob.assignedCleaner ? ` — ${lastJob.assignedCleaner.firstName} thanks you!` : ""}
-                    </p>
-                  ) : (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <p style={{ margin: 0, fontSize: 14, color: "#64748b" }}>
-                        {lastJob.assignedCleaner ? `Leave ${lastJob.assignedCleaner.firstName} a tip?` : "Leave a tip?"}
-                      </p>
-                      <a
-                        href={`/tip/${lastJob.tipToken}`}
-                        style={{ fontSize: 13, fontWeight: 600, color: accentColor }}
-                      >
-                        Leave a Tip →
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </>
         )}
@@ -622,6 +599,42 @@ export default function CustomerPortalPage() {
             )}
           </div>
         </>
+
+        {/* ── SECTION 5b: Leave a Tip ── */}
+        {business.tipsEnabled && (
+          <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: "0 0 2px", fontSize: 15, fontWeight: 600, color: "#0f172a" }}>
+                {lastJob?.assignedCleaner
+                  ? `Leave ${lastJob.assignedCleaner.firstName} a tip`
+                  : "Leave your cleaner a tip"}
+              </p>
+              <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+                {lastJob?.tipAmount
+                  ? `You tipped $${lastJob.tipAmount.toFixed(2)} — thank you!`
+                  : "Show your appreciation for great service"}
+              </p>
+            </div>
+            {!lastJob?.tipAmount && (
+              <a
+                href={`/tip/${token}`}
+                style={{
+                  flexShrink: 0,
+                  background: accentColor,
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  padding: "8px 16px",
+                  borderRadius: 20,
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Leave a Tip
+              </a>
+            )}
+          </div>
+        )}
 
         {/* ── SECTION 6: Upcoming Schedule ── */}
         {upcomingJobs.length > 0 && (

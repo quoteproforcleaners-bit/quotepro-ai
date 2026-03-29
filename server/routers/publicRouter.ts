@@ -2412,23 +2412,47 @@ router.get("/api/public/tip-page/:token", async (req: Request, res: Response) =>
        WHERE j.tip_token = $1 LIMIT 1`,
       [token]
     );
-    if (!jobRes.rows.length) return res.status(404).json({ message: "Tip page not found" });
-    const row = jobRes.rows[0];
+    // Fallback: try portal token lookup if no job-level tip_token matched
+    let row = jobRes.rows[0];
+    if (!row) {
+      const portalRes = await pool.query(
+        `SELECT b.id AS business_id, b.company_name, b.logo_uri, b.tips_enabled, b.tip_percentage_options,
+                c.first_name, c.last_name,
+                j.id AS job_id, j.job_type, j.total, j.completed_at, j.tip_amount,
+                e.name AS team_member_name
+         FROM customer_portals cp
+         JOIN businesses b ON cp.business_id = b.id
+         LEFT JOIN customers c ON cp.customer_id = c.id
+         LEFT JOIN LATERAL (
+           SELECT j2.id, j2.job_type, j2.total, j2.completed_at, j2.tip_amount, j2.team_members
+           FROM jobs j2
+           WHERE j2.customer_id = cp.customer_id AND j2.business_id = cp.business_id
+           ORDER BY j2.completed_at DESC NULLS LAST, j2.created_at DESC LIMIT 1
+         ) j ON true
+         LEFT JOIN employees e ON (j.team_members->0->>'id')::varchar = e.id::varchar
+         WHERE cp.token = $1 LIMIT 1`,
+        [token]
+      );
+      if (!portalRes.rows.length) return res.status(404).json({ message: "Tip page not found" });
+      row = { ...portalRes.rows[0], id: portalRes.rows[0].job_id };
+    }
     if (!row.tips_enabled) return res.status(404).json({ message: "Tip collection is not enabled for this business" });
 
-    const tipCheck = await pool.query(
-      `SELECT id, amount, status FROM tips WHERE job_id=$1 AND status='paid' LIMIT 1`,
-      [row.id]
-    );
+    const tipCheck = row.id
+      ? await pool.query(
+          `SELECT id, amount, status FROM tips WHERE job_id=$1 AND status='paid' LIMIT 1`,
+          [row.id]
+        )
+      : { rows: [] as any[] };
     const alreadyPaid = tipCheck.rows.length > 0;
 
     return res.json({
-      jobId: row.id,
+      jobId: row.id || null,
       businessName: row.company_name,
       logoUri: row.logo_uri,
-      jobType: row.job_type,
+      jobType: row.job_type || null,
       total: row.total ? parseFloat(row.total) : null,
-      completedAt: row.completed_at,
+      completedAt: row.completed_at || null,
       customerName: row.first_name ? `${row.first_name} ${row.last_name || ""}`.trim() : null,
       teamMemberName: row.team_member_name || null,
       percentageOptions: row.tip_percentage_options || [18, 22, 25],
@@ -2457,8 +2481,38 @@ router.post("/api/public/tip-page/:token/checkout", async (req: Request, res: Re
        WHERE j.tip_token = $1 LIMIT 1`,
       [token]
     );
-    if (!jobRes.rows.length) return res.status(404).json({ message: "Tip page not found" });
-    const job = jobRes.rows[0];
+    let job = jobRes.rows[0];
+    if (!job) {
+      // Fallback: portal token lookup
+      const portalRes = await pool.query(
+        `SELECT b.id AS business_id, b.company_name, b.tips_enabled, b.tip_percentage_options,
+                cp.customer_id,
+                j.id, j.total, j.job_type
+         FROM customer_portals cp
+         JOIN businesses b ON cp.business_id = b.id
+         LEFT JOIN LATERAL (
+           SELECT j2.id, j2.total, j2.job_type
+           FROM jobs j2
+           WHERE j2.customer_id = cp.customer_id AND j2.business_id = cp.business_id
+           ORDER BY j2.completed_at DESC NULLS LAST, j2.created_at DESC LIMIT 1
+         ) j ON true
+         WHERE cp.token = $1 LIMIT 1`,
+        [token]
+      );
+      if (!portalRes.rows.length) return res.status(404).json({ message: "Tip page not found" });
+      const pr = portalRes.rows[0];
+      job = {
+        id: pr.id,
+        business_id: pr.business_id,
+        customer_id: pr.customer_id,
+        total: pr.total,
+        job_type: pr.job_type,
+        company_name: pr.company_name,
+        tips_enabled: pr.tips_enabled,
+        tip_percentage_options: pr.tip_percentage_options,
+      };
+    }
+    if (!job) return res.status(404).json({ message: "Tip page not found" });
     if (!job.tips_enabled) return res.status(400).json({ message: "Tips not enabled" });
 
     const stripe = getStripe();
