@@ -22,6 +22,7 @@ import {
   getQuickQuoteHTML, getPrivacyPolicyHTML, getTermsOfServiceHTML, getDeleteAccountHTML,
   syncJobToGoogleCalendar,
 } from "../helpers";
+import { getOrCreatePortalToken } from "./portalRouter";
 import {
   getUserById, getUserByEmail, getUserByProviderId, createUser, updateUser,
   getBusinessByOwner, createBusiness, updateBusiness,
@@ -958,20 +959,32 @@ const router = Router();
             const primaryColor = (business as any).primaryColor || "#2563EB";
             const { fromName: apptFromName, replyTo: apptReplyTo } = getBusinessSendParams(business);
 
+            // Portal link — look up or create the customer's portal token
+            let portalSection = "";
+            let portalPlainText = "";
+            if (customer?.id) {
+              try {
+                const portalToken = await getOrCreatePortalToken(customer.id, business.id);
+                const portalUrl = `${getPublicBaseUrl(req)}/home/${portalToken}`;
+                portalSection = `<div style="text-align:center;margin:28px 0 20px"><a href="${portalUrl}" style="background:${primaryColor};color:#ffffff;text-decoration:none;padding:13px 28px;border-radius:8px;font-size:15px;font-weight:700;display:inline-block;letter-spacing:0.2px">View Your Home Portal</a><p style="margin:10px 0 0;font-size:12px;color:#94a3b8">Manage preferences, view history &amp; request reschedules</p></div>`;
+                portalPlainText = `\nManage your appointments and preferences: ${portalUrl}\n`;
+              } catch (_) { /* non-blocking */ }
+            }
+
             const detailRows = [
               dateStr ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Date</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${dateStr}</td></tr>` : "",
               arrivalWindow ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Arrival</td><td style="padding:8px 0;font-size:15px;font-weight:600;color:#0f172a">${arrivalWindow}</td></tr>` : "",
               address ? `<tr><td style="padding:8px 16px 8px 0;color:#94a3b8;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;vertical-align:top;white-space:nowrap">Location</td><td style="padding:8px 0;font-size:15px;color:#0f172a">${address}</td></tr>` : "",
             ].filter(Boolean).join("");
 
-            const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;"><tr><td align="center"><table width="540" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.07);max-width:100%;"><tr><td style="background:${primaryColor};padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700">${companyName}</span></td></tr><tr><td style="padding:36px 32px 28px;"><div style="display:inline-block;background:#dcfce7;border-radius:20px;padding:5px 14px;margin-bottom:20px;"><span style="color:#16a34a;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Confirmed</span></div><h1 style="margin:0 0 10px;font-size:22px;font-weight:800;color:#0f172a;line-height:1.3">Your ${serviceLabel} is all set, ${customerFirstName}.</h1><p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.6">Here are your appointment details:</p><table cellpadding="0" cellspacing="0" style="border-left:3px solid ${primaryColor};padding-left:20px;margin-bottom:28px">${detailRows}</table><p style="margin:0 0 0;font-size:14px;color:#64748b;line-height:1.7">Need to reschedule or have a question? Simply reply to this email — we're happy to help.</p><p style="margin:24px 0 0;font-size:14px;color:#64748b;">We look forward to seeing you!<br><br><strong style="color:#0f172a;font-size:15px">${senderName}</strong><br><span style="color:#94a3b8">${companyName}</span></p></td></tr><tr><td style="padding:16px 32px 20px;border-top:1px solid #f1f5f9;"><p style="margin:0;font-size:11px;color:#cbd5e1;">Sent via QuotePro &mdash; Professional tools for cleaning businesses.</p></td></tr></table></td></tr></table></body></html>`;
+            const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 16px;"><tr><td align="center"><table width="540" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.07);max-width:100%;"><tr><td style="background:${primaryColor};padding:24px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:700">${companyName}</span></td></tr><tr><td style="padding:36px 32px 28px;"><div style="display:inline-block;background:#dcfce7;border-radius:20px;padding:5px 14px;margin-bottom:20px;"><span style="color:#16a34a;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Confirmed</span></div><h1 style="margin:0 0 10px;font-size:22px;font-weight:800;color:#0f172a;line-height:1.3">Your ${serviceLabel} is all set, ${customerFirstName}.</h1><p style="margin:0 0 28px;font-size:15px;color:#64748b;line-height:1.6">Here are your appointment details:</p><table cellpadding="0" cellspacing="0" style="border-left:3px solid ${primaryColor};padding-left:20px;margin-bottom:28px">${detailRows}</table>${portalSection}<p style="margin:0 0 0;font-size:14px;color:#64748b;line-height:1.7">Need to reschedule or have a question? Simply reply to this email — we're happy to help.</p><p style="margin:24px 0 0;font-size:14px;color:#64748b;">We look forward to seeing you!<br><br><strong style="color:#0f172a;font-size:15px">${senderName}</strong><br><span style="color:#94a3b8">${companyName}</span></p></td></tr><tr><td style="padding:16px 32px 20px;border-top:1px solid #f1f5f9;"><p style="margin:0;font-size:11px;color:#cbd5e1;">Sent via QuotePro &mdash; Professional tools for cleaning businesses.</p></td></tr></table></td></tr></table></body></html>`;
 
             try {
               await sendEmail({
                 to: toEmail,
                 subject,
                 html: htmlBody,
-                text: plainBody,
+                text: plainBody + portalPlainText,
                 fromName: apptFromName,
                 replyTo: apptReplyTo,
               });
