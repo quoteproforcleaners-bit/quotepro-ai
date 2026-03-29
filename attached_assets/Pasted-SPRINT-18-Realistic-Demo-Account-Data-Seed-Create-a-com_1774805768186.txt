@@ -1,0 +1,989 @@
+SPRINT 18 — Realistic Demo Account Data Seed
+
+Create a complete data seeding script that populates 
+a specific test account with realistic data representing 
+a thriving $20,000/month residential cleaning business 
+called "Pristine Home Cleaning" based in the Main Line 
+area of Philadelphia, PA.
+
+This seed should make the app feel ALIVE — like a real 
+business that has been operating for 8 months. Every 
+number, name, date, and interaction should feel authentic.
+
+═══════════════════════════════
+HOW TO RUN
+═══════════════════════════════
+
+Create a file: /scripts/seedDemoAccount.ts
+
+Run with: npx ts-node scripts/seedDemoAccount.ts
+
+Add a flag to prevent accidental re-runs:
+  Check for existing seed: 
+  SELECT COUNT(*) FROM customers 
+  WHERE user_id = DEMO_USER_ID
+  If count > 10, abort with message:
+  "Demo account already seeded. 
+  Use --force to reseed."
+
+DEMO_USER_ID: The ID of the test account you 
+want to seed. Set this as an environment variable:
+DEMO_USER_ID=123 npx ts-node scripts/seedDemoAccount.ts
+
+After seeding, print a summary:
+  ✅ 47 customers created
+  ✅ 89 quotes created ($34,240 total value)
+  ✅ 124 jobs created
+  ✅ 6 team members created
+  ✅ 23 follow-up tasks created
+  ✅ 8 reviews created
+  ✅ 4 campaigns created
+  ✅ Demo account ready
+
+═══════════════════════════════
+BUSINESS PROFILE
+═══════════════════════════════
+
+UPDATE the demo user's business profile:
+
+companyName: "Pristine Home Cleaning"
+senderName: "Ashley"
+ownerName: "Ashley Donovan"
+email: "ashley@pristinehomecleaning.com"
+phone: "(610) 555-0142"
+address: "247 Lancaster Ave, Wayne, PA 19087"
+website: "pristinehomecleaning.com"
+serviceArea: "Main Line, Philadelphia PA"
+hourlyRate: 52
+minimumTicket: 120
+taxRate: 0
+
+Frequency discounts:
+  weekly: 20
+  biweekly: 15
+  monthly: 10
+
+Service types:
+  Standard Clean:       multiplier 1.00
+  Deep Clean:           multiplier 1.85
+  Move In/Move Out:     multiplier 2.20
+  Post Construction:    multiplier 2.80
+  Airbnb Turnover:      multiplier 0.75
+
+Add-on prices:
+  insideFridge:     35
+  insideOven:       35
+  insideCabinets:   50
+  interiorWindows:  45
+  blindsDetail:     30
+  baseboardsDetail: 40
+  laundryFoldOnly:  30
+  dishes:           25
+  organizationTidy: 60
+
+═══════════════════════════════
+TEAM MEMBERS (6 total)
+═══════════════════════════════
+
+Create these team members:
+
+1. Ashley Donovan
+   Role: Owner/Operator
+   Phone: (610) 555-0142
+   Email: ashley@pristinehomecleaning.com
+   Status: active
+   startDate: 8 months ago
+
+2. Maria Santos
+   Role: Lead Cleaner
+   Phone: (610) 555-0198
+   Email: maria@pristinehomecleaning.com
+   Status: active
+   startDate: 7 months ago
+   Notes: "Most experienced cleaner, handles 
+   deep cleans and move-outs"
+
+3. Destiny Williams
+   Role: Cleaner
+   Phone: (610) 555-0231
+   Status: active
+   startDate: 5 months ago
+
+4. Rosa Gutierrez
+   Role: Cleaner
+   Phone: (610) 555-0274
+   Status: active
+   startDate: 4 months ago
+   Notes: "Speaks Spanish, great with pets"
+
+5. Jasmine Taylor
+   Role: Cleaner
+   Phone: (610) 555-0312
+   Status: active
+   startDate: 2 months ago
+   Notes: "Still in training period"
+
+6. Brittany Chen
+   Role: Cleaner
+   Phone: (610) 555-0356
+   Status: inactive
+   startDate: 6 months ago
+   endDate: 1 month ago
+   Notes: "Left for full-time position elsewhere"
+
+═══════════════════════════════
+CUSTOMERS (47 total)
+═══════════════════════════════
+
+Create a realistic mix of customer types.
+All addresses should be in the Main Line / 
+Philadelphia suburbs area.
+
+RECURRING CLIENTS — BIWEEKLY (18 customers)
+These are the backbone of the $20K/month.
+Each has 2 jobs per month at $150-$280/visit.
+
+1.  Sarah Mitchell
+    504 Chestnut Hill Rd, Villanova PA 19085
+    Phone: (610) 555-1001
+    Email: smitchell@gmail.com
+    Tags: [VIP, Biweekly]
+    Notes: "Has 2 dogs. Key under mat. 
+    Prefers mornings. Tip always $20."
+    avgTicket: 185
+    status: active
+
+2.  James & Lauren Hoffman
+    38 Berkley Rd, Devon PA 19333
+    Phone: (610) 555-1002
+    Email: jhoffman@comcast.net
+    Tags: [Biweekly, Referral]
+    Notes: "3 kids, very messy. Add 30 min 
+    to scheduled time. Pays by Venmo."
+    avgTicket: 225
+    status: active
+
+3.  Patricia Nguyen
+    892 County Line Rd, Bryn Mawr PA 19010
+    Phone: (610) 555-1003
+    Email: pnguyen@yahoo.com
+    Tags: [Biweekly, VIP]
+    Notes: "Retired. Always home during clean. 
+    Loves to chat. Very particular about 
+    baseboards."
+    avgTicket: 165
+    status: active
+
+4.  Robert & Diana Chen
+    15 Fox Hollow Lane, Malvern PA 19355
+    Phone: (610) 555-1004
+    Email: rchen@gmail.com
+    Tags: [Biweekly]
+    Notes: "Both WFH. Clean home office too. 
+    Has a cat — Rosa prefers this one."
+    avgTicket: 210
+    status: active
+
+5.  Amanda Kowalski
+    271 Montgomery Ave, Haverford PA 19041
+    Phone: (610) 555-1005
+    Email: akowalski@outlook.com
+    Tags: [Biweekly, Referral]
+    Notes: "Referred by Sarah Mitchell. 
+    Allergic to strong scents — use 
+    unscented products only."
+    avgTicket: 175
+    status: active
+
+6.  Thomas & Wendy Burke
+    44 Sugartown Rd, Berwyn PA 19312
+    Phone: (610) 555-1006
+    Email: tburke@gmail.com
+    Tags: [Biweekly]
+    avgTicket: 240
+    status: active
+
+7.  Jennifer Walsh
+    617 Old Eagle School Rd, Wayne PA 19087
+    Phone: (610) 555-1007
+    Email: jwalsh@gmail.com
+    Tags: [Biweekly, VIP]
+    Notes: "Executive. Very neat home. 
+    Tip always $30. Send reminder day before."
+    avgTicket: 195
+    status: active
+
+8.  Michael & Grace Thompson
+    83 Waterloo Rd, Devon PA 19333
+    Phone: (610) 555-1008
+    Email: mthompson@comcast.net
+    Tags: [Biweekly]
+    avgTicket: 220
+    status: active
+
+9.  Kathleen Donahue
+    355 Conestoga Rd, Berwyn PA 19312
+    Phone: (610) 555-1009
+    Email: kdonahue@gmail.com
+    Tags: [Biweekly]
+    Notes: "Elderly, very appreciative. 
+    Lives alone. Always has coffee ready."
+    avgTicket: 155
+    status: active
+
+10. David & Priya Patel
+    129 Darby Creek Rd, Newtown Square PA 19073
+    Phone: (610) 555-1010
+    Email: dpatel@gmail.com
+    Tags: [Biweekly, Referral]
+    avgTicket: 200
+    status: active
+
+11. Susan Caldwell
+    488 Old Lancaster Rd, Haverford PA 19041
+    Phone: (610) 555-1011
+    Email: scaldwell@yahoo.com
+    Tags: [Biweekly]
+    Notes: "2 cats. Extra time for pet hair."
+    avgTicket: 180
+    status: active
+
+12. Brian & Nicole Murphy
+    72 Beaumont Rd, Devon PA 19333
+    Phone: (610) 555-1012
+    Email: bmurphy@gmail.com
+    Tags: [Biweekly]
+    avgTicket: 215
+    status: active
+
+13. Lisa Greenbaum
+    941 Penllyn Pike, Blue Bell PA 19422
+    Phone: (610) 555-1013
+    Email: lgreenbaum@gmail.com
+    Tags: [Biweekly, VIP]
+    Notes: "Interior designer. Very high 
+    standards. Always inspects after. 
+    Worth keeping happy."
+    avgTicket: 260
+    status: active
+
+14. Christopher Hayes
+    204 Sproul Rd, Villanova PA 19085
+    Phone: (610) 555-1014
+    Email: chayes@comcast.net
+    Tags: [Biweekly]
+    avgTicket: 170
+    status: active
+
+15. Nancy & Frank DiSantis
+    567 Boot Rd, Downingtown PA 19335
+    Phone: (610) 555-1015
+    Email: ndisantis@outlook.com
+    Tags: [Biweekly]
+    avgTicket: 190
+    status: active
+
+16. Rachel Kim
+    33 Louella Ave, Wayne PA 19087
+    Phone: (610) 555-1016
+    Email: rkim@gmail.com
+    Tags: [Biweekly, Referral]
+    avgTicket: 165
+    status: active
+
+17. Steven & Carol Whitman
+    718 Swedesford Rd, Berwyn PA 19312
+    Phone: (610) 555-1017
+    Email: swhitman@gmail.com
+    Tags: [Biweekly]
+    avgTicket: 235
+    status: active
+
+18. Diane Obrien
+    156 Summit Ave, Malvern PA 19355
+    Phone: (610) 555-1018
+    Email: dobrien@yahoo.com
+    Tags: [Biweekly]
+    Notes: "Recently divorced, new to managing 
+    home alone. Very loyal client."
+    avgTicket: 175
+    status: active
+
+RECURRING CLIENTS — MONTHLY (12 customers)
+$150-$350 per visit, once a month.
+
+19. Andrew & Melissa Foster
+    892 Upper Gulph Rd, Wayne PA 19087
+    Phone: (610) 555-1019
+    Email: afoster@gmail.com
+    Tags: [Monthly]
+    avgTicket: 280
+    status: active
+
+20. Karen Silverman
+    245 W Lancaster Ave, Paoli PA 19301
+    Phone: (610) 555-1020
+    Email: ksilverman@comcast.net
+    Tags: [Monthly]
+    avgTicket: 225
+    status: active
+
+21. Mark & Julie Antonelli
+    57 Hathaway Lane, Villanova PA 19085
+    Phone: (610) 555-1021
+    Email: mantonelli@gmail.com
+    Tags: [Monthly]
+    avgTicket: 310
+    status: active
+
+22. Dorothy Fernandez
+    380 Meeting House Rd, Berwyn PA 19312
+    Phone: (610) 555-1022
+    Tags: [Monthly, Elderly]
+    avgTicket: 160
+    status: active
+
+23. Ryan & Stephanie Park
+    614 Tredyffrin Rd, Strafford PA 19087
+    Phone: (610) 555-1023
+    Email: rpark@gmail.com
+    Tags: [Monthly]
+    avgTicket: 255
+    status: active
+
+24. Gloria Washington
+    129 Sproul Rd, Bryn Mawr PA 19010
+    Phone: (610) 555-1024
+    Tags: [Monthly]
+    avgTicket: 185
+    status: active
+
+25. Timothy & Barbara Long
+    47 Woodland Ave, Wayne PA 19087
+    Phone: (610) 555-1025
+    Email: tlong@outlook.com
+    Tags: [Monthly]
+    avgTicket: 290
+    status: active
+
+26. Melissa Oconnor
+    783 Conestoga Rd, Berwyn PA 19312
+    Phone: (610) 555-1026
+    Email: moconnor@gmail.com
+    Tags: [Monthly, Referral]
+    avgTicket: 210
+    status: active
+
+27. Harold & Joan Fischer
+    22 Robin Hood Rd, Wayne PA 19087
+    Phone: (610) 555-1027
+    Tags: [Monthly, Elderly]
+    avgTicket: 175
+    status: active
+
+28. Alicia Monroe
+    491 Old Gulph Rd, Villanova PA 19085
+    Phone: (610) 555-1028
+    Email: amonroe@gmail.com
+    Tags: [Monthly]
+    avgTicket: 220
+    status: active
+
+29. George & Barbara Hartwell
+    316 Catfish Lane, Malvern PA 19355
+    Phone: (610) 555-1029
+    Tags: [Monthly]
+    avgTicket: 265
+    status: active
+
+30. Irene Castellano
+    58 Academy Rd, Glenside PA 19038
+    Phone: (610) 555-1030
+    Email: icastellano@yahoo.com
+    Tags: [Monthly]
+    avgTicket: 195
+    status: active
+
+ONE-TIME / OCCASIONAL CLIENTS (10 customers)
+Mix of past customers, some dormant.
+
+31. Kevin Branigan — Move Out
+    (Former address) 847 Lancaster Ave, 
+    Berwyn PA 19312
+    Phone: (610) 555-1031
+    Email: kbranigan@gmail.com
+    Tags: [One-Time, MoveOut]
+    lastJobDate: 3 months ago
+    status: inactive
+
+32. Samantha Cruz — Deep Clean
+    234 Forest Rd, Narberth PA 19072
+    Phone: (610) 555-1032
+    Email: scruz@gmail.com
+    Tags: [One-Time]
+    lastJobDate: 4 months ago
+    status: inactive
+    Notes: "Said she'd call back for regular 
+    service but hasn't yet. Good candidate 
+    for reactivation."
+
+33. Daniel Fitzpatrick — Post Construction
+    19 Mill Rd, Exton PA 19341
+    Phone: (610) 555-1033
+    Email: dfitzpatrick@gmail.com
+    Tags: [One-Time, PostConstruct]
+    lastJobDate: 2 months ago
+    status: inactive
+
+34. Emma Johansson — Deep Clean
+    445 W Wayne Ave, Wayne PA 19087
+    Phone: (610) 555-1034
+    Email: ejohansson@gmail.com
+    Tags: [One-Time]
+    lastJobDate: 5 months ago
+    status: inactive
+
+35. Phillip & Dana Garrett — Move Out
+    (Former address) 273 Gulph Mills Rd,
+    King of Prussia PA 19406
+    Phone: (610) 555-1035
+    Tags: [One-Time, MoveOut]
+    lastJobDate: 6 months ago
+    status: inactive
+
+36. Monica Reyes — Standard Clean
+    67 S Wayne Ave, Wayne PA 19087
+    Phone: (610) 555-1036
+    Email: mreyes@gmail.com
+    Tags: [One-Time, Lead]
+    status: lead
+    Notes: "Came in via Lead Link. 
+    Quote sent, no response yet."
+
+37. Charles & Vivian Park
+    334 Glenhardie Rd, Wayne PA 19087
+    Phone: (610) 555-1037
+    Email: cpark@gmail.com
+    Tags: [One-Time]
+    lastJobDate: 7 months ago
+    status: inactive
+    Notes: "Dormant — good reactivation candidate"
+
+38. Heather Simmons
+    781 Lancaster Ave, Malvern PA 19355
+    Phone: (610) 555-1038
+    Email: hsimmons@gmail.com
+    Tags: [Lead]
+    status: lead
+    Notes: "Requested quote via website. 
+    Waiting on response."
+
+39. Anthony Greco
+    156 Paoli Pike, Paoli PA 19301
+    Phone: (610) 555-1039
+    Tags: [One-Time]
+    lastJobDate: 4 months ago
+    status: inactive
+
+40. Catherine Duffy
+    892 Cathcart Rd, Blue Bell PA 19422
+    Phone: (610) 555-1040
+    Email: cduffy@outlook.com
+    Tags: [One-Time, Referral]
+    lastJobDate: 3 months ago
+    status: inactive
+    Notes: "Referred by Jennifer Walsh. 
+    Did one deep clean, never rebooked."
+
+COMMERCIAL CLIENTS (7 customers)
+
+41. Greenfield Pediatrics
+    425 Lancaster Ave, Wayne PA 19087
+    Phone: (610) 555-1041
+    Email: office@greenfield-peds.com
+    Tags: [Commercial, Weekly, VIP]
+    Notes: "Medical office. Weekly clean. 
+    Must use hospital-grade products. 
+    Early morning only — before 7am."
+    avgTicket: 385
+    status: active
+
+42. Main Line Yoga Studio
+    88 W Lancaster Ave, Paoli PA 19301
+    Phone: (610) 555-1042
+    Email: info@mainlineyoga.com
+    Tags: [Commercial, Weekly]
+    Notes: "Clean hardwood floors with 
+    specific product only. 
+    After 8pm preferred."
+    avgTicket: 275
+    status: active
+
+43. Strafford Realty Group
+    214 E Lancaster Ave, Paoli PA 19301
+    Phone: (610) 555-1043
+    Email: facilities@straffordrealty.com
+    Tags: [Commercial, Biweekly]
+    Notes: "Office cleaning. 3 suites. 
+    Has own cleaning supplies."
+    avgTicket: 320
+    status: active
+
+44. Devon Dental Associates
+    571 Lancaster Ave, Devon PA 19333
+    Phone: (610) 555-1044
+    Tags: [Commercial, Weekly]
+    avgTicket: 420
+    status: active
+
+45. Berwyn Athletic Club
+    33 Waterloo Rd, Berwyn PA 19312
+    Phone: (610) 555-1045
+    Email: manager@berwynathleticclub.com
+    Tags: [Commercial, Weekly]
+    Notes: "Locker rooms + lobby. 
+    2 cleaners required."
+    avgTicket: 510
+    status: active
+
+46. The Covered Bridge Inn (Airbnb)
+    124 Bridge Rd, Phoenixville PA 19460
+    Phone: (610) 555-1046
+    Email: host@coveredbridgeinn.com
+    Tags: [Commercial, Airbnb, OnDemand]
+    Notes: "Airbnb host. Calls for turnover 
+    cleans 1-3 days before checkout. 
+    Flexible but urgent."
+    avgTicket: 195
+    status: active
+
+47. Valley Forge Chiropractic
+    892 DeKalb Pike, Blue Bell PA 19422
+    Phone: (610) 555-1047
+    Email: admin@vfchiro.com
+    Tags: [Commercial, Monthly]
+    avgTicket: 340
+    status: active
+
+═══════════════════════════════
+QUOTES (89 total)
+═══════════════════════════════
+
+Generate quotes spread across the last 8 months.
+Mix of statuses to make the dashboard look real.
+
+STATUS DISTRIBUTION:
+  accepted:  52 quotes  (~$28,500 total value)
+  sent:      14 quotes  (~$4,200 total value — 
+                         these show in follow-up queue)
+  declined:   8 quotes  (~$2,100 total value)
+  expired:    9 quotes  (~$2,800 total value)
+  draft:      6 quotes  (recent, in progress)
+
+QUOTE GENERATION RULES:
+
+For each RECURRING customer (customers 1-30):
+  Create 1 initial quote (status: accepted)
+  dated 1-8 months ago
+  Use their avgTicket as the quote total
+  cleaningType matches their service type
+  frequency matches their recurrence
+
+For ONE-TIME customers (31-40):
+  Create 1 quote each
+  Mix of accepted (31-35), sent (36-38), 
+  declined (39), expired (40)
+
+For COMMERCIAL customers (41-47):
+  Create 1-2 quotes each
+  Most accepted, one sent (follow-up needed)
+
+For the SENT quotes (follow-up queue):
+  Date them 3-12 days ago
+  These will populate the Follow-Up Queue
+
+SPECIFIC QUOTES TO CREATE:
+
+These quotes make the dashboard interesting:
+
+1. Monica Reyes — Standard Clean
+   Status: sent
+   Date: 5 days ago
+   Total: $165
+   Bedrooms: 3, Bathrooms: 2
+   Note: "Came in via Lead Link"
+
+2. Heather Simmons — Deep Clean
+   Status: sent  
+   Date: 8 days ago
+   Total: $285
+   Bedrooms: 3, Bathrooms: 2.5
+
+3. Catherine Duffy — Recurring Standard
+   Status: sent
+   Date: 3 days ago
+   Total: $175
+   Note: "Follow up — she did one deep clean, 
+   pitch biweekly recurring"
+
+4. A large Move Out quote
+   Customer: Daniel Fitzpatrick
+   Status: accepted
+   Date: 2 months ago
+   Total: $650
+   Note: "Big job — post-reno move out"
+
+5. A declined quote with note
+   Customer: Anthony Greco
+   Status: declined
+   Date: 4 months ago
+   Total: $195
+   Note: "Said price was too high. 
+   Went with a competitor."
+
+6. Recent high-value quote
+   Customer: Berwyn Athletic Club
+   Status: sent
+   Date: 2 days ago
+   Total: $510
+   Note: "Upgrade from monthly to weekly — 
+   big win if we close this"
+
+═══════════════════════════════
+JOBS (124 total)
+═══════════════════════════════
+
+Create jobs spread across the last 8 months 
+AND future scheduled jobs.
+
+PAST COMPLETED JOBS (98 jobs):
+
+For each biweekly customer: 
+  Create ~16 past jobs (8 months × 2/month)
+  Status: completed
+  Space them every 14 days
+  Assign to Maria, Destiny, or Rosa
+
+For each monthly customer:
+  Create ~8 past jobs
+  Status: completed
+
+For commercial customers:
+  Weekly: ~32 past jobs each
+  Biweekly: ~16 past jobs each
+  Monthly: ~8 past jobs each
+
+UPCOMING SCHEDULED JOBS (26 jobs):
+
+Create jobs for the next 4 weeks for all 
+active recurring customers.
+Status: scheduled
+
+SPECIFIC NOTABLE JOBS:
+
+1. Today's job (in progress):
+   Customer: Jennifer Walsh
+   Status: in_progress
+   detailedStatus: service_started
+   StartTime: today at 9:00 AM
+   Assignee: Maria Santos
+   Total: $195
+
+2. Tomorrow's jobs (3 scheduled):
+   - Sarah Mitchell 10:00 AM — Maria Santos
+   - Greenfield Pediatrics 6:30 AM — Maria + Rosa
+   - Robert & Diana Chen 1:00 PM — Destiny
+
+3. A job completed 10 minutes ago:
+   Customer: Patricia Nguyen
+   Status: completed
+   completedAt: 10 minutes ago
+   Assignee: Rosa Gutierrez
+   Total: $165
+   satisfactionRating: 5
+   ratingComment: "Rosa was wonderful as always!"
+
+JOB DETAILS:
+  Each job should have:
+  - jobType matching the customer's service
+  - address from customer record
+  - recurrence matching customer's frequency
+  - internalNotes with realistic content:
+    e.g. "Key under mat", "Dog in backyard — 
+    keep gate closed", "Focus on kitchen"
+  - total matching customer's avgTicket
+
+═══════════════════════════════
+REVENUE DATA
+═══════════════════════════════
+
+The monthly revenue should look like a 
+growing business:
+
+Month 1 (8 months ago): $8,400
+Month 2:                 $11,200
+Month 3:                 $13,800
+Month 4:                 $15,500
+Month 5:                 $16,900
+Month 6:                 $18,200
+Month 7:                 $19,400
+Month 8 (current):       $21,100 (partial month)
+
+Generate enough jobs/quotes per month to 
+produce these revenue numbers. Mark jobs 
+as completed with the correct dates to 
+populate the revenue reporting.
+
+═══════════════════════════════
+FOLLOW-UP TASKS (23 total)
+═══════════════════════════════
+
+Create growth tasks that populate the 
+Tasks Queue and Growth Dashboard:
+
+OVERDUE (7 tasks):
+  - Follow up: Monica Reyes quote (5 days old)
+  - Follow up: Heather Simmons quote (8 days old)
+  - Review request: Patricia Nguyen (job 3 days ago)
+  - Rebook: Catherine Duffy (one-time 3 months ago)
+  - Reactivation: Samantha Cruz (dormant 4 months)
+  - Reactivation: Charles & Vivian Park (7 months)
+  - Upsell deep clean: Sarah Mitchell 
+    (recurring 6 months, no deep clean yet)
+
+DUE TODAY (5 tasks):
+  - Follow up: Berwyn Athletic Club quote (2 days)
+  - Review request: Jennifer Walsh (today's job)
+  - Rebook: Emma Johansson (5 months dormant)
+  - Referral ask: James & Lauren Hoffman
+    (VIP client, great relationship)
+  - Upsell add-ons: Lisa Greenbaum
+    (no add-ons ever, high-value client)
+
+UPCOMING (11 tasks):
+  - Various follow-ups, review requests, 
+    and rebook nudges spread over next 7 days
+  - Mix of all task types
+
+Each task should have:
+  priorityScore: 60-95 (higher for overdue)
+  estimatedValue: realistic dollar amount
+  customerName: from customer list above
+  taskType: one of the valid types
+
+═══════════════════════════════
+REVIEWS (8 total)
+═══════════════════════════════
+
+Create review request records with 
+these completed reviews:
+
+1. Sarah Mitchell — 5 stars
+   "Ashley and her team are amazing! 
+   My house is spotless every time. 
+   Maria is incredibly thorough."
+   date: 6 weeks ago
+
+2. Patricia Nguyen — 5 stars
+   "Rosa always does a beautiful job. 
+   I've been using Pristine for 7 months 
+   and wouldn't switch for anything."
+   date: 3 weeks ago
+
+3. Jennifer Walsh — 5 stars
+   "Reliable, professional, and my home 
+   always looks perfect. Worth every penny."
+   date: 5 weeks ago
+
+4. James Hoffman — 4 stars
+   "Great service overall. Would give 5 
+   stars but we had one reschedule. 
+   Always communicative."
+   date: 4 weeks ago
+
+5. Thomas Burke — 5 stars
+   "Best cleaning service on the Main Line. 
+   Highly recommend!"
+   date: 2 weeks ago
+
+6. Lisa Greenbaum — 5 stars
+   "As someone in the interior design 
+   industry, I have very high standards. 
+   Pristine Home Cleaning meets all of them."
+   date: 3 weeks ago
+
+7. Greenfield Pediatrics — 5 stars
+   "Our medical office requires exceptional 
+   cleanliness. Pristine delivers every week 
+   without fail."
+   date: 1 month ago
+
+8. Daniel Fitzpatrick — 4 stars
+   "Great job on a huge post-construction 
+   mess. Took longer than expected but 
+   results were excellent."
+   date: 2 months ago
+
+═══════════════════════════════
+REACTIVATION CAMPAIGNS (4 total)
+═══════════════════════════════
+
+1. "Spring Re-Engagement 2026"
+   Status: sent
+   Segment: dormant
+   SentAt: 3 weeks ago
+   Recipients: 8
+   messageSubject: "We miss you — 
+   spring is a great time for a fresh start"
+   messageContent: "Hi [Name], it's been 
+   a while since we've had the pleasure of 
+   cleaning your home. Spring is here and 
+   we'd love to get you back on the schedule. 
+   As a returning client, mention this message 
+   for $25 off your next clean. 
+   — Ashley at Pristine Home Cleaning"
+
+2. "Lost Quote Recovery — March"
+   Status: sent
+   Segment: lost
+   SentAt: 1 week ago
+   Recipients: 5
+   messageSubject: "Still interested in 
+   a cleaning quote?"
+
+3. "Summer Deep Clean Promo"
+   Status: draft
+   Segment: dormant
+   messageSubject: "Summer is coming — 
+   time for a deep clean?"
+
+4. "Win-Back — Long Dormant"
+   Status: draft
+   Segment: custom
+   customerIds: [IDs of customers 
+   dormant >5 months]
+
+═══════════════════════════════
+SALES STRATEGY SETTINGS
+═══════════════════════════════
+
+selectedProfile: "professional"
+escalationEnabled: true
+
+═══════════════════════════════
+AUTOMATIONS HUB SETTINGS
+═══════════════════════════════
+
+marketingModeEnabled: true
+quoteFollowUpEnabled: true
+abandonedRecoveryEnabled: true
+rebookNudgeEnabled: true
+reviewRequestEnabled: true
+referralAskEnabled: true
+upsellSuggestionEnabled: true
+reactivationEnabled: true
+
+maxSendsPerDay: 5
+quietHoursEnabled: true
+quietHoursStart: "21:00"
+quietHoursEnd: "08:00"
+followUpCooldownDays: 3
+maxFollowUpsPerQuote: 4
+
+═══════════════════════════════
+GROWTH DASHBOARD TARGETS
+═══════════════════════════════
+
+After seeding, the Growth Dashboard should show:
+
+Revenue Won This Month:  ~$21,100
+Open Pipeline:           ~$6,400
+Close Rate:              ~76%
+Active Jobs This Week:   12
+Follow-Ups Due Today:    5
+Opportunities Count:     23
+Growth Score:            82/100
+
+═══════════════════════════════
+IMPLEMENTATION NOTES
+═══════════════════════════════
+
+1. Use transactions — if any insert fails, 
+   roll back everything and report the error.
+   Don't leave the DB in a partial state.
+
+2. Generate realistic timestamps:
+   - Past jobs: spread evenly across 8 months
+   - Jobs happen Mon-Sat, 7am-5pm only
+   - No jobs on Sundays or major holidays
+   - Space recurring jobs exactly 7 or 14 days apart
+
+3. For quote totals — add small variations:
+   avgTicket ± $10-20 randomly
+   So it doesn't look like every quote is 
+   exactly the same amount.
+
+4. Assign jobs to team members realistically:
+   - Maria Santos: gets 40% of jobs (most experienced)
+   - Destiny Williams: 25%
+   - Rosa Gutierrez: 25%
+   - Jasmine Taylor: 10% (newer, simpler jobs)
+   - Ashley (owner): only on commercial jobs
+
+5. Internal notes on jobs should be varied 
+   and realistic:
+   "Key under mat — lock deadbolt on way out"
+   "Dog crated in laundry room"
+   "Focus extra time on master bath"
+   "Client will be home — she works from 
+   home on Fridays"
+   "Add baseboards to this visit — been 3 months"
+   "New area rug in living room — 
+   use attachment only"
+
+6. Create a RESET script alongside the seed:
+   /scripts/resetDemoAccount.ts
+   Deletes all seeded data for DEMO_USER_ID
+   Requires --confirm flag to run:
+   npx ts-node scripts/resetDemoAccount.ts --confirm
+
+═══════════════════════════════
+TESTING CHECKLIST
+═══════════════════════════════
+
+After running the seed, verify:
+
+Dashboard:
+- [ ] Revenue shows ~$21,100 for current month
+- [ ] "Today's job" shows Jennifer Walsh in progress
+- [ ] Follow-Up Queue shows 5 due today
+- [ ] Growth Score shows 80+
+
+Customers:
+- [ ] 47 customers visible
+- [ ] VIP tags on correct customers
+- [ ] Dormant customers show in Opportunities
+- [ ] Commercial customers show correct tags
+
+Jobs:
+- [ ] Today's schedule shows 3 jobs
+- [ ] Jennifer Walsh job shows "In Progress" status
+- [ ] Patricia Nguyen job shows "Completed" + 5 stars
+- [ ] Future jobs visible in Schedule view
+
+Quotes:
+- [ ] Follow-up queue shows 6 sent quotes
+- [ ] Berwyn Athletic Club quote shows as priority
+- [ ] Close rate shows ~76%
+
+Growth:
+- [ ] Tasks Queue shows 23 tasks
+- [ ] 7 overdue tasks show in red
+- [ ] Opportunities shows dormant customers
+- [ ] Reactivation campaigns show 2 sent, 2 draft
+
+Confirm with a screenshot of:
+1. The main dashboard
+2. The Customers list
+3. The Tasks Queue
+4. The Schedule view showing this week
