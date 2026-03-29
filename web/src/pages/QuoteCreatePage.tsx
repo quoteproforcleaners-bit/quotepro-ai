@@ -176,6 +176,9 @@ export default function QuoteCreatePage() {
   const [manualEdits, setManualEdits] = useState<Set<string>>(new Set());
   const [editingTier, setEditingTier] = useState<"good" | "better" | "best" | null>(null);
   const [editingValue, setEditingValue] = useState<string>("");
+  const [firstCleanOverrides, setFirstCleanOverrides] = useState<{good?: number; better?: number; best?: number}>({});
+  const [editingFirstCleanTier, setEditingFirstCleanTier] = useState<"good" | "better" | "best" | null>(null);
+  const [editingFirstCleanValue, setEditingFirstCleanValue] = useState<string>("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [adjustment, setAdjustment] = useState<ManualAdjustment>({ amount: 0, note: "" });
 
@@ -276,6 +279,16 @@ export default function QuoteCreatePage() {
     setEditingValue("");
   };
 
+  const commitFirstCleanEdit = (tier: "good" | "better" | "best") => {
+    const parsed = parseFloat(editingFirstCleanValue.replace(/[^0-9.]/g, ""));
+    if (!isNaN(parsed) && parsed > 0) {
+      setFirstCleanOverrides((prev) => ({ ...prev, [tier]: Math.round(parsed) }));
+      setManualEdits((prev) => new Set(prev).add(`${tier}-first`));
+    }
+    setEditingFirstCleanTier(null);
+    setEditingFirstCleanValue("");
+  };
+
   const generateAiScopes = async () => {
     setAiScopesLoading(true);
     try {
@@ -359,9 +372,9 @@ export default function QuoteCreatePage() {
       : undefined;
 
     const selected = quote[selectedOption];
-    const goodPrice = aiPriceOverrides?.good ?? quote.good.price;
-    const betterPrice = aiPriceOverrides?.better ?? quote.better.price;
-    const bestPrice = aiPriceOverrides?.best ?? quote.best.price;
+    const goodPrice = (aiPriceOverrides?.good ?? quote.good.price) + (adjustment.amount || 0);
+    const betterPrice = (aiPriceOverrides?.better ?? quote.better.price) + (adjustment.amount || 0);
+    const bestPrice = (aiPriceOverrides?.best ?? quote.best.price) + (adjustment.amount || 0);
     const finalPrices = { good: goodPrice, better: betterPrice, best: bestPrice };
     const finalPrice = finalPrices[selectedOption];
 
@@ -381,7 +394,7 @@ export default function QuoteCreatePage() {
       options: {
         good: {
           price: goodPrice,
-          firstCleanPrice: quote.good.firstCleanPrice ?? undefined,
+          firstCleanPrice: firstCleanOverrides.good != null ? firstCleanOverrides.good + (adjustment.amount || 0) : (quote.good.firstCleanPrice != null ? quote.good.firstCleanPrice + (adjustment.amount || 0) : undefined),
           name: "Good",
           serviceTypeName: quote.good.name || "Touch Up",
           serviceTypeId: quote.good.serviceTypeId || "touch-up",
@@ -390,7 +403,7 @@ export default function QuoteCreatePage() {
         },
         better: {
           price: betterPrice,
-          firstCleanPrice: quote.better.firstCleanPrice ?? undefined,
+          firstCleanPrice: firstCleanOverrides.better != null ? firstCleanOverrides.better + (adjustment.amount || 0) : (quote.better.firstCleanPrice != null ? quote.better.firstCleanPrice + (adjustment.amount || 0) : undefined),
           name: "Better",
           serviceTypeName: quote.better.name || "Standard Clean",
           serviceTypeId: quote.better.serviceTypeId || "standard",
@@ -399,7 +412,7 @@ export default function QuoteCreatePage() {
         },
         best: {
           price: bestPrice,
-          firstCleanPrice: quote.best.firstCleanPrice ?? undefined,
+          firstCleanPrice: firstCleanOverrides.best != null ? firstCleanOverrides.best + (adjustment.amount || 0) : (quote.best.firstCleanPrice != null ? quote.best.firstCleanPrice + (adjustment.amount || 0) : undefined),
           name: "Best",
           serviceTypeName: quote.best.name || "Deep Clean",
           serviceTypeId: quote.best.serviceTypeId || "deep-clean",
@@ -1033,7 +1046,8 @@ export default function QuoteCreatePage() {
                 const data = quote[tier];
                 const isSelected = selectedOption === tier;
                 const isRecommended = recommendedOption === tier;
-                const displayPrice = aiPriceOverrides?.[tier] ?? data.price;
+                const displayPrice = (aiPriceOverrides?.[tier] ?? data.price) + (adjustment.amount || 0);
+                const displayFirstVisit = (firstCleanOverrides?.[tier] ?? data.firstCleanPrice ?? 0) + (adjustment.amount || 0);
                 const aiScope = aiScopes?.[tier];
                 return (
                   <div key={tier} className="relative">
@@ -1060,10 +1074,44 @@ export default function QuoteCreatePage() {
                       <p className="text-xs text-slate-500">{data.name}</p>
                       {data.firstCleanPrice ? (
                         <>
-                          <p className="text-2xl font-bold text-slate-900 mt-2 tracking-tight">
-                            ${data.firstCleanPrice.toFixed(0)}
-                            <span className="text-xs font-normal text-slate-400 ml-1">first visit</span>
-                          </p>
+                          <div
+                            className="flex items-center gap-1.5 mt-2 group/firstprice cursor-text"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingFirstCleanTier(tier);
+                              setEditingFirstCleanValue(String(displayFirstVisit.toFixed(0)));
+                            }}
+                          >
+                            {editingFirstCleanTier === tier ? (
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <span className="text-2xl font-bold text-slate-900 tracking-tight">$</span>
+                                <input
+                                  autoFocus
+                                  type="number"
+                                  min={1}
+                                  value={editingFirstCleanValue}
+                                  onChange={(e) => setEditingFirstCleanValue(e.target.value)}
+                                  onBlur={() => commitFirstCleanEdit(tier)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") commitFirstCleanEdit(tier);
+                                    if (e.key === "Escape") { setEditingFirstCleanTier(null); setEditingFirstCleanValue(""); }
+                                  }}
+                                  className="w-24 text-2xl font-bold text-slate-900 border border-primary-400 rounded px-2 py-0.5 tracking-tight focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                />
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-2xl font-bold text-slate-900 tracking-tight">
+                                  ${displayFirstVisit.toFixed(0)}
+                                  {manualEdits.has(`${tier}-first`) ? (
+                                    <span className="text-xs font-normal text-primary-600 ml-1.5">Edited</span>
+                                  ) : null}
+                                  <span className="text-xs font-normal text-slate-400 ml-1">first visit</span>
+                                </p>
+                                <Pencil className="w-3.5 h-3.5 text-slate-300 group-hover/firstprice:text-primary-500 transition-colors mb-0.5" />
+                              </>
+                            )}
+                          </div>
                           <div
                             className="flex items-center gap-1 mt-0.5 group/price cursor-text"
                             onClick={(e) => {
@@ -1201,7 +1249,7 @@ export default function QuoteCreatePage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => { setAiPriceOverrides(null); setManualEdits(new Set()); }}
+                  onClick={() => { setAiPriceOverrides(null); setFirstCleanOverrides({}); setManualEdits(new Set()); }}
                 >
                   Reset to Calculated Prices
                 </Button>
