@@ -208,7 +208,14 @@ router.get("/api/portal/:token", async (req: Request, res: Response) => {
         ),
       ]);
 
-    const lastJobRow = lastJobResult.rows[0];
+    let lastJobRow = lastJobResult.rows[0];
+
+    // Auto-generate a tip_token for the last job if tips are enabled and token is missing
+    if (lastJobRow && p.tips_enabled && !lastJobRow.tip_token) {
+      const tipTok = crypto.randomBytes(16).toString("hex");
+      await pool.query(`UPDATE jobs SET tip_token = $1 WHERE id = $2`, [tipTok, lastJobRow.id]).catch(() => {});
+      lastJobRow = { ...lastJobRow, tip_token: tipTok };
+    }
 
     // Fetch photos + tip status for last job
     let lastJobPhotos: any[] = [];
