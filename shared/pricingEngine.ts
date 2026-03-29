@@ -124,6 +124,18 @@ function getPetHours(petType: string, shedding: boolean): number {
 function roundToNearest5(v: number): number { return Math.round(v / 5) * 5; }
 function roundHours(h: number): number { return Math.round(h * 2) / 2; }
 
+// Minutes of labor per 1,000 sqft, by service type
+function getMinsPer1kSqft(typeId: string): number {
+  switch (typeId) {
+    case "touch-up":          return 30;
+    case "standard":          return 40;
+    case "deep-clean":        return 60;
+    case "move-in-out":       return 75;
+    case "post-construction": return 90;
+    default:                  return 40; // fall back to standard rate
+  }
+}
+
 function getFreqDiscount(freq: string, discounts: { weekly: number; biweekly: number; monthly: number }): number {
   if (freq === "weekly") return discounts.weekly / 100;
   if (freq === "biweekly") return discounts.biweekly / 100;
@@ -237,8 +249,10 @@ function calcTier(
   const recurringPrice = roundToNearest5(recurringCalc);
 
   const price      = isOneTime ? firstCleanPrice : recurringPrice;
-  // Estimated hours for display (approximate: tierBase ÷ hourlyRate)
-  const totalHours = roundHours(tierBase / Math.max(hourlyRate, 1));
+  // Estimated hours: sqft-based (minutes per 1k sqft by service type)
+  const totalHours = property.sqft > 0
+    ? roundHours((property.sqft / 1000) * getMinsPer1kSqft(st.id) / 60)
+    : 0;
 
   // ── Line items (amounts shown after tier multiplier — sum ≈ pre-minimum total) ─
   const lineItems: LineItem[]     = [];
@@ -396,7 +410,12 @@ export function computeResidentialQuote(
     }
   }
 
-  return { good, better, best, baseHours: 0, addOnHours, addOnPrice, hourlyRate: p.hourlyRate ?? 45 };
+  // Base labor for the "better" (standard) tier, sqft-based
+  const baseHours = property.sqft > 0
+    ? roundHours((property.sqft / 1000) * getMinsPer1kSqft(p.betterOptionId ?? "standard") / 60)
+    : 0;
+
+  return { good, better, best, baseHours, addOnHours, addOnPrice, hourlyRate: p.hourlyRate ?? 45 };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
