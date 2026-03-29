@@ -9,6 +9,7 @@ import { processDripQueue } from "./dripEmails";
 import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
 import { sendPush } from "./pushNotifications";
 import { initNotificationTables, runNotificationScheduler } from "./notificationScheduler";
+import { seedPristineHomeDemo } from "./seedPristineDemo";
 
 const app = express();
 const log = console.log;
@@ -410,49 +411,6 @@ async function seedToDoDemo() {
   }
 }
 
-async function seedPristineDemo() {
-  try {
-    const email = "demo@pristinehomecleaning.com";
-    const password = "PristineDemo2026!";
-    const existing = await pool.query(`SELECT id FROM users WHERE LOWER(email) = $1`, [email.toLowerCase()]);
-    let userId: string;
-    if (existing.rows.length > 0) {
-      userId = existing.rows[0].id;
-      await pool.query(
-        `UPDATE users SET subscription_tier = 'pro', subscription_expires_at = NOW() + INTERVAL '1 year',
-         stripe_subscription_status = 'active', name = 'Ashley Donovan' WHERE id = $1`,
-        [userId]
-      );
-    } else {
-      const passwordHash = await bcrypt.hash(password, 12);
-      userId = (await pool.query(`SELECT gen_random_uuid() AS id`)).rows[0].id;
-      await pool.query(
-        `INSERT INTO users (id, email, password_hash, name, auth_provider, subscription_tier,
-           subscription_expires_at, stripe_subscription_status, created_at, updated_at)
-         VALUES ($1, $2, $3, 'Ashley Donovan', 'email', 'pro', NOW() + INTERVAL '1 year', 'active', NOW(), NOW())`,
-        [userId, email.toLowerCase(), passwordHash]
-      );
-      log(`Pristine demo account created: ${email}`);
-    }
-    const biz = await pool.query(`SELECT id FROM businesses WHERE owner_user_id = $1 LIMIT 1`, [userId]);
-    if (biz.rows.length === 0) {
-      const bizId = (await pool.query(`SELECT gen_random_uuid() AS id`)).rows[0].id;
-      const slug = `pristine-home-cleaning-${bizId.slice(0, 8)}`;
-      await pool.query(
-        `INSERT INTO businesses (id, owner_user_id, company_name, email, phone, address, sender_name,
-           sender_title, booking_link, email_signature, sms_signature, primary_color,
-           onboarding_complete, public_quote_slug, public_quote_enabled, created_at, updated_at)
-         VALUES ($1,$2,'Pristine Home Cleaning','ashley@pristinehomecleaning.com','(610) 555-0142',
-           '247 Lancaster Ave, Wayne, PA 19087','Ashley','Owner','','','','#1E40AF',true,$3,true,NOW(),NOW())`,
-        [bizId, userId, slug]
-      );
-    }
-    log(`Pristine demo account ready: ${email} / ${password}`);
-  } catch (e: any) {
-    console.error("seedPristineDemo error:", e.message);
-  }
-}
-
 (async () => {
   setupCors(app);
   setupBodyParsing(app);
@@ -465,7 +423,7 @@ async function seedPristineDemo() {
   setupErrorHandler(app);
 
   // ─── Demo accounts ────────────────────────────────────────────────────────────
-  seedPristineDemo();
+  seedPristineHomeDemo();
 
   // ─── Nightly auto-purge: hard-delete records soft-deleted more than 30 days ago ──
   async function purgeSoftDeleted() {
