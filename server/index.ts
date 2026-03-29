@@ -12,6 +12,7 @@ import { initNotificationTables, runNotificationScheduler } from "./notification
 import { runAppointmentReminderScheduler, runTipRequestScheduler } from "./appointmentReminderScheduler";
 import { runCleanerNotificationScheduler } from "./cleanerNotificationScheduler";
 import { seedPristineHomeDemo } from "./seedPristineDemo";
+import { initPortalTables, backfillPortalTokens } from "./routers/portalRouter";
 
 const app = express();
 const log = console.log;
@@ -263,6 +264,58 @@ function configureExpoAndLanding(app: express.Application) {
       } catch {
         return res.sendFile(indexPath);
       }
+    });
+
+    // /home/:token — Customer portal with OG meta tag injection
+    app.get("/home/:token", async (req: Request, res: Response) => {
+      const { token } = req.params;
+      const indexPath = path.join(webDistPath, "index.html");
+      if (!fs.existsSync(indexPath)) return res.status(404).send("Not found");
+      try {
+        const { pool } = await import("./db");
+        const r = await pool.query(
+          `SELECT b.company_name, b.logo_uri,
+                  (SELECT jp.photo_url FROM job_photos jp
+                   JOIN jobs j ON jp.job_id = j.id
+                   WHERE j.customer_id = cp.customer_id
+                     AND jp.photo_type = 'after'
+                     AND jp.customer_visible = true
+                   ORDER BY j.completed_at DESC LIMIT 1) AS last_after_photo
+           FROM customer_portals cp
+           JOIN businesses b ON cp.business_id = b.id
+           WHERE cp.token = $1 LIMIT 1`,
+          [token]
+        );
+        let html = fs.readFileSync(indexPath, "utf8");
+        const row = r.rows[0];
+        if (row) {
+          const ogTitle = `${row.company_name} — Your Cleaning Portal`;
+          const ogDesc = "View your upcoming clean, photos from your last visit, and more.";
+          const ogImage = row.last_after_photo || row.logo_uri || "";
+          const ogTags = [
+            `<meta property="og:title" content="${ogTitle.replace(/"/g, "&quot;")}">`,
+            `<meta property="og:description" content="${ogDesc}">`,
+            `<meta property="og:image" content="${ogImage}">`,
+            `<meta property="og:type" content="website">`,
+            `<meta name="twitter:card" content="summary_large_image">`,
+            `<meta name="twitter:title" content="${ogTitle.replace(/"/g, "&quot;")}">`,
+            `<meta name="twitter:description" content="${ogDesc}">`,
+            ogImage ? `<meta name="twitter:image" content="${ogImage}">` : "",
+            `<title>${ogTitle}</title>`,
+          ].filter(Boolean).join("\n    ");
+          html = html.replace(/<title>[^<]*<\/title>/, ogTags);
+        }
+        return res.type("html").send(html);
+      } catch {
+        return res.sendFile(indexPath);
+      }
+    });
+
+    // /home/:token/* — sub-pages of portal (preferences, reschedule, etc.)
+    app.get("/home/:token/:subpage", (_req: Request, res: Response) => {
+      const indexPath = path.join(webDistPath, "index.html");
+      if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+      res.status(404).send("Not found");
     });
 
     // Top-level web app routes that need SPA fallback (for direct navigation & ad tracking)
@@ -681,6 +734,11 @@ async function seedToDoDemo() {
     }, 60 * 60 * 1000);
   }
   scheduleWeeklyRecapPushCron();
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // ─── Customer portal tables + token backfill ─────────────────────────────
+  await initPortalTables();
+  backfillPortalTokens().catch((e: any) => console.error("[portal] Backfill error:", e.message));
   // ─────────────────────────────────────────────────────────────────────────────
 
   // ─── Smart notification trigger scheduler: runs every 5 minutes ──────────

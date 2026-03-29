@@ -18,6 +18,9 @@ import {
   MessageSquare,
   BanIcon,
   Shield,
+  Link2,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import DispatchCard from "../components/DispatchCard";
@@ -41,6 +44,10 @@ export default function CustomerDetailPage() {
   const [saved, setSaved] = useState(false);
   const [aiMessage, setAiMessage] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [portalLinkOpen, setPortalLinkOpen] = useState(false);
+  const [portalUrl, setPortalUrl] = useState("");
+  const [portalSmsSent, setPortalSmsSent] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const { data: customer, isLoading } = useQuery<any>({
     queryKey: [`/api/customers/${id}`],
@@ -119,6 +126,26 @@ export default function CustomerDetailPage() {
     },
   });
 
+  const portalLinkMutation = useMutation({
+    mutationFn: () =>
+      apiPost(`/api/portal/send-link`, { customerId: id }) as Promise<any>,
+    onSuccess: (data: any) => {
+      setPortalUrl(data.portalUrl || "");
+      setPortalSmsSent(data.smsSent || false);
+      setPortalLinkOpen(true);
+    },
+  });
+
+  const copyPortalLink = async () => {
+    try {
+      await navigator.clipboard.writeText(portalUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // fallback — select text in the field
+    }
+  };
+
   const generateMessage = async () => {
     setAiLoading(true);
     try {
@@ -172,6 +199,15 @@ export default function CustomerDetailPage() {
               className={customer.isVip ? "border-amber-200 bg-amber-50 text-amber-700" : ""}
             >
               {customer.isVip ? "VIP" : "Set VIP"}
+            </Button>
+            <Button
+              variant="secondary"
+              icon={Link2}
+              onClick={() => portalLinkMutation.mutate()}
+              size="sm"
+              disabled={portalLinkMutation.isPending}
+            >
+              {portalLinkMutation.isPending ? "Getting link..." : "Portal Link"}
             </Button>
             <Button
               icon={FileText}
@@ -545,6 +581,70 @@ export default function CustomerDetailPage() {
         confirmLabel="Delete"
         loading={deleteMutation.isPending}
       />
+
+      {/* Portal Link Modal */}
+      {portalLinkOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.4)" }}
+          onClick={() => setPortalLinkOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                <Link2 className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Customer Portal Link</h3>
+                <p className="text-xs text-slate-500">
+                  {portalSmsSent
+                    ? "Link sent via SMS to customer"
+                    : "Copy and share this link with your customer"}
+                </p>
+              </div>
+            </div>
+
+            {portalSmsSent && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-lg">
+                <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <p className="text-sm text-emerald-700">
+                  SMS sent to {customer.firstName}'s phone number
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+                <p className="text-sm text-slate-700 truncate font-mono">{portalUrl}</p>
+              </div>
+              <button
+                onClick={copyPortalLink}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors flex-shrink-0"
+              >
+                {linkCopied ? (
+                  <><Check className="w-4 h-4 text-emerald-500" /> Copied!</>
+                ) : (
+                  <><Copy className="w-4 h-4" /> Copy</>
+                )}
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 mb-4">
+              This link gives {customer.firstName} access to their personal portal — upcoming cleans, photos, and preferences.
+            </p>
+
+            <button
+              onClick={() => setPortalLinkOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

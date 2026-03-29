@@ -470,6 +470,12 @@ function OverviewTab({
   const [ratingValue, setRatingValue] = useState(job.satisfactionRating || 0);
   const [skipConfirm, setSkipConfirm] = useState(false);
 
+  const { data: portalPrefs } = useQuery<any>({
+    queryKey: [`/api/portal/customer/${jobCustomer?.id}/preferences`],
+    enabled: !!jobCustomer?.id,
+    queryFn: () => apiGet(`/api/portal/customer/${jobCustomer.id}/preferences`),
+  });
+
   const sendWorkOrderMutation = useMutation({
     mutationFn: () => apiPost(`/api/jobs/${job.id}/send-work-order`, {}),
     onSuccess: (data: any) => {
@@ -585,6 +591,58 @@ function OverviewTab({
           onToast={onToast}
         />
       ) : null}
+
+      {/* Customer Home Preferences */}
+      {portalPrefs?.preferences && (
+        <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-blue-900">Customer Preferences</p>
+            <span className="text-xs text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full">From My Home portal</span>
+          </div>
+          <div className="space-y-1.5 text-sm text-blue-800">
+            {portalPrefs.preferences.hasPets ? (
+              <div className="flex items-start gap-2">
+                <span className="text-blue-400 mt-0.5">•</span>
+                <span>
+                  {portalPrefs.preferences.petCount || 1}{" "}
+                  {portalPrefs.preferences.petType || "pet"}
+                  {(portalPrefs.preferences.petCount || 1) > 1 ? "s" : ""}
+                  {portalPrefs.preferences.petNotes ? ` — ${portalPrefs.preferences.petNotes}` : ""}
+                </span>
+              </div>
+            ) : null}
+            {portalPrefs.preferences.accessMethod && portalPrefs.preferences.accessMethod !== "home" ? (
+              <div className="flex items-start gap-2">
+                <span className="text-blue-400 mt-0.5">•</span>
+                <span>
+                  Access:{" "}
+                  {portalPrefs.preferences.accessMethod === "lockbox"
+                    ? `Lockbox${portalPrefs.preferences.accessCode ? ` (code: ${portalPrefs.preferences.accessCode})` : ""}`
+                    : portalPrefs.preferences.accessMethod === "garage"
+                    ? `Garage code: ${portalPrefs.preferences.accessCode || ""}`
+                    : portalPrefs.preferences.accessMethod === "hide_key"
+                    ? `Key: ${portalPrefs.preferences.accessLocation || "see notes"}`
+                    : portalPrefs.preferences.accessMethod === "key_mat"
+                    ? "Key under mat"
+                    : portalPrefs.preferences.accessMethod}
+                </span>
+              </div>
+            ) : null}
+            {portalPrefs.preferences.specialInstructions ? (
+              <div className="flex items-start gap-2">
+                <span className="text-blue-400 mt-0.5">•</span>
+                <span>{portalPrefs.preferences.specialInstructions}</span>
+              </div>
+            ) : null}
+            {portalPrefs.preferences.areasToSkip?.length > 0 ? (
+              <div className="flex items-start gap-2">
+                <span className="text-blue-400 mt-0.5">•</span>
+                <span>Skip: {portalPrefs.preferences.areasToSkip.join(", ")}</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* Send Work Order button */}
       <div className="flex">

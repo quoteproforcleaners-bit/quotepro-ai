@@ -14,10 +14,11 @@ import "./lib/i18n";
 // - /request/:slug    — branded lead link microsite
 // - /schedule-ack/:t  — schedule acknowledgement links
 // - /q/:token         — public quote view links
+// - /home/:token      — customer "My Home" portal (Sprint 23)
 // - /pricing/*, /subscription/*, /register, /login, /dashboard, /onboarding
 //   — top-level routes for direct navigation and ad conversion tracking
 const TOP_LEVEL_PATHS = [
-  "/intake/", "/request/", "/schedule-ack/", "/q/",
+  "/intake/", "/request/", "/schedule-ack/", "/q/", "/home/",
   "/pricing", "/subscription", "/register",
   "/login", "/dashboard", "/onboarding", "/upgrade", "/quote-doctor",
 ];

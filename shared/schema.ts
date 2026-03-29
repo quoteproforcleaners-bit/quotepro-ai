@@ -1344,6 +1344,34 @@ export const aiUsageLogs = pgTable("ai_usage_logs", {
 
 export type AIUsageLog = typeof aiUsageLogs.$inferSelect;
 
+// ═══════════════════════════════════════════════════════════════════
+// Sprint 23 — Customer Portal tables
+// ═══════════════════════════════════════════════════════════════════
+export const customerPortals = pgTable("customer_portals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+  businessId: varchar("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 64 }).unique().notNull(),
+  preferences: jsonb("preferences"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastViewedAt: timestamp("last_viewed_at"),
+  viewCount: integer("view_count").notNull().default(0),
+});
+
+export const rescheduleRequests = pgTable("reschedule_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portalToken: varchar("portal_token", { length: 64 }).notNull(),
+  jobId: varchar("job_id").references(() => jobs.id, { onDelete: "set null" }),
+  requestedDate: text("requested_date").notNull(),
+  preferredTime: text("preferred_time").notNull().default("either"),
+  customerNote: text("customer_note").notNull().default(""),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type CustomerPortal = typeof customerPortals.$inferSelect;
+export type RescheduleRequest = typeof rescheduleRequests.$inferSelect;
+
 // ─── Backward-compatibility aliases (used by auto-generated router imports) ───
 export const photos = jobPhotos;
 export const preferences = userPreferences;

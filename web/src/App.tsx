@@ -63,6 +63,9 @@ import ScheduleAckPage from "./pages/ScheduleAckPage";
 import TipPage from "./pages/TipPage";
 import OnboardingWizardPage from "./pages/OnboardingWizardPage";
 import QuoteDoctorPage from "./pages/QuoteDoctorPage";
+import CustomerPortalPage from "./pages/CustomerPortalPage";
+import PreferencesPage from "./pages/portal/PreferencesPage";
+import ReschedulePage from "./pages/portal/ReschedulePage";
 
 export default function App() {
   const { isAuthenticated, isLoading, business, needsOnboarding } = useAuth();
@@ -198,6 +201,11 @@ export default function App() {
 
         {/* Public customer tip page */}
         <Route path="/tip/:token" element={<TipPage />} />
+
+        {/* Public customer portal — no auth required */}
+        <Route path="/home/:token" element={<CustomerPortalPage />} />
+        <Route path="/home/:token/preferences" element={<PreferencesPage />} />
+        <Route path="/home/:token/reschedule" element={<ReschedulePage />} />
 
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>

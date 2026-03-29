@@ -289,10 +289,12 @@ export async function runTipRequestScheduler(): Promise<void> {
              b.company_name, b.logo_uri, b.tip_request_delay, b.email,
              b.sender_name,
              c.email AS customer_email, c.phone AS customer_phone,
-             c.first_name, c.last_name
+             c.first_name, c.last_name,
+             cp.token AS portal_token
       FROM jobs j
       JOIN businesses b ON j.business_id = b.id
       LEFT JOIN customers c ON j.customer_id = c.id
+      LEFT JOIN customer_portals cp ON cp.customer_id = j.customer_id AND cp.business_id = j.business_id
       WHERE j.status = 'completed'
         AND b.tips_enabled = TRUE
         AND j.tip_request_sent_at IS NULL
@@ -304,6 +306,7 @@ export async function runTipRequestScheduler(): Promise<void> {
 
     for (const job of jobs.rows) {
       const tipUrl = `${baseUrl}/tip/${job.tip_token}`;
+      const portalUrl = job.portal_token ? `${baseUrl}/home/${job.portal_token}` : null;
       const firstName = job.first_name || "there";
       const cleanerBiz = job.company_name;
       const jobType = job.job_type || "cleaning service";
@@ -350,8 +353,10 @@ export async function runTipRequestScheduler(): Promise<void> {
       // Send SMS
       if (job.customer_phone) {
         try {
-          const body = `Hi ${firstName}! ${cleanerBiz} just finished your cleaning. Leave a tip for your crew: ${tipUrl}`;
-          await sendSms(job.customer_phone, body.slice(0, 300));
+          const smsParts = [`Hi ${firstName}! ${cleanerBiz} just finished your cleaning. Leave a tip: ${tipUrl}`];
+          if (portalUrl) smsParts.push(` View your portal: ${portalUrl}`);
+          const body = smsParts.join("").slice(0, 300);
+          await sendSms(job.customer_phone, body);
           sent = true;
         } catch (err: any) {
           console.error(`[tips] SMS failed for job ${job.job_id}:`, err.message);

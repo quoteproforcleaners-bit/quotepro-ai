@@ -40,6 +40,9 @@ import {
   Upload,
   Trash2,
   Image,
+  Home,
+  ExternalLink,
+  Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -427,6 +430,30 @@ export default function SettingsPage() {
   const [reminderTestSent, setReminderTestSent] = useState(false);
 
   const { data: reminderPrefs } = useQuery<any>({ queryKey: ["/api/reminder-preferences"] });
+
+  const { data: portalSettings } = useQuery<any>({ queryKey: ["/api/portal-settings"] });
+  const { data: portalStats } = useQuery<any>({ queryKey: ["/api/portal-stats"] });
+
+  const [portalEnabled, setPortalEnabled] = useState(true);
+  const [portalColor, setPortalColor] = useState("");
+  const [portalWelcomeMessage, setPortalWelcomeMessage] = useState("");
+
+  useEffect(() => {
+    if (portalSettings) {
+      setPortalEnabled(portalSettings.portalEnabled !== false);
+      setPortalColor(portalSettings.portalColor || "");
+      setPortalWelcomeMessage(portalSettings.portalWelcomeMessage || "");
+    }
+  }, [portalSettings]);
+
+  const savePortalSettings = useMutation({
+    mutationFn: () =>
+      apiPut("/api/portal-settings", { portalEnabled, portalColor, portalWelcomeMessage }) as Promise<any>,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portal-settings"] });
+      showSaved("portal");
+    },
+  });
 
   // Cleaner notification preferences state
   const [cleanerEnabled, setCleanerEnabled] = useState(true);
@@ -1732,6 +1759,90 @@ export default function SettingsPage() {
 
       {tab === "features" ? (
         <div className="max-w-2xl space-y-6">
+
+          {/* Customer Portal */}
+          <Card>
+            <CardHeader title="Customer Portal" icon={Home} />
+            <p className="text-sm text-slate-500 mb-4">
+              Give each customer a personal "My Home" portal — they can view upcoming cleans, after photos, and set home preferences.
+            </p>
+
+            {/* Stats row */}
+            {portalStats && (
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                {[
+                  { label: "Active Portals", value: portalStats.totalPortals },
+                  { label: "Viewed This Month", value: portalStats.viewedThisMonth },
+                  { label: "Total Views", value: portalStats.viewedPortals },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
+                    <p className="text-2xl font-bold text-primary-600">{s.value}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {/* Toggle */}
+              <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">Enable Customer Portals</p>
+                  <p className="text-xs text-slate-500">Customers can access their portal at /home/[unique-token]</p>
+                </div>
+                <Toggle checked={portalEnabled} onChange={setPortalEnabled} />
+              </div>
+
+              {/* Brand color */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Portal Accent Color</label>
+                <p className="text-xs text-slate-500 mb-2">Hex color used for the portal header and buttons. Defaults to your primary brand color.</p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={portalColor || "#2563EB"}
+                    onChange={(e) => setPortalColor(e.target.value)}
+                    className="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer"
+                  />
+                  <Input
+                    value={portalColor}
+                    onChange={(e) => setPortalColor(e.target.value)}
+                    placeholder="#2563EB"
+                    className="max-w-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Welcome message */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Welcome Message</label>
+                <p className="text-xs text-slate-500 mb-2">Shown to customers at the top of their portal. Keep it warm and personal.</p>
+                <textarea
+                  value={portalWelcomeMessage}
+                  onChange={(e) => setPortalWelcomeMessage(e.target.value)}
+                  placeholder="Thanks for trusting us with your home! We look forward to your visit."
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 resize-none focus:outline-none focus:ring-2 focus:ring-primary-300 text-slate-800 placeholder-slate-400"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-xs text-slate-400 flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5" />
+                  Share links from any Customer Detail page
+                </p>
+                <Button
+                  icon={Save}
+                  onClick={() => savePortalSettings.mutate()}
+                  disabled={savePortalSettings.isPending}
+                  size="sm"
+                >
+                  {saved && savedSection === "portal" ? "Saved!" : "Save Portal Settings"}
+                </Button>
+              </div>
+            </div>
+          </Card>
+
           <Card>
             <CardHeader title="Features" icon={Sliders} />
             <p className="text-sm text-slate-500 mb-4">
