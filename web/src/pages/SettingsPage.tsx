@@ -419,6 +419,44 @@ export default function SettingsPage() {
     referralBookingLink: "",
   });
 
+  // Reminder preferences state
+  const [reminderEmailDays, setReminderEmailDays] = useState<string>("3");
+  const [reminderSmsDays, setReminderSmsDays] = useState<string>("1");
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderTestSending, setReminderTestSending] = useState(false);
+  const [reminderTestSent, setReminderTestSent] = useState(false);
+
+  const { data: reminderPrefs } = useQuery<any>({ queryKey: ["/api/reminder-preferences"] });
+
+  useEffect(() => {
+    if (!reminderPrefs) return;
+    setReminderEmailDays(reminderPrefs.emailReminderDays === null ? "null" : String(reminderPrefs.emailReminderDays ?? 3));
+    setReminderSmsDays(reminderPrefs.smsReminderDays === null ? "null" : String(reminderPrefs.smsReminderDays ?? 1));
+  }, [reminderPrefs]);
+
+  const handleSaveReminders = async () => {
+    setReminderSaving(true);
+    try {
+      await apiPut("/api/reminder-preferences", {
+        emailReminderDays: reminderEmailDays === "null" ? null : Number(reminderEmailDays),
+        smsReminderDays: reminderSmsDays === "null" ? null : Number(reminderSmsDays),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/reminder-preferences"] });
+      showSaved("reminders");
+    } catch {}
+    setReminderSaving(false);
+  };
+
+  const handleTestReminder = async () => {
+    setReminderTestSending(true);
+    try {
+      await apiPost("/api/reminder-preferences/test", {});
+      setReminderTestSent(true);
+      setTimeout(() => setReminderTestSent(false), 5000);
+    } catch {}
+    setReminderTestSending(false);
+  };
+
   const [commercialEnabled, setCommercialEnabled] = useState(false);
   const [appLanguage, setAppLanguage] = useState("en");
   const [commLanguage, setCommLanguage] = useState("en");
@@ -691,6 +729,7 @@ export default function SettingsPage() {
     "branding",
     "payments",
     "automations",
+    "reminders",
     "reviews",
     "features",
     "booking",
@@ -1311,6 +1350,126 @@ export default function SettingsPage() {
               Save Automation Settings
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {tab === "reminders" ? (
+        <div className="max-w-2xl space-y-6">
+          {/* Header card */}
+          <Card>
+            <CardHeader title="Automated Customer Reminders" icon={Bell} />
+            <p className="text-sm text-slate-500 mb-6">
+              Remind customers before their appointments automatically — reducing no-shows and saving you hours of manual outreach.
+            </p>
+
+            {/* Email */}
+            <div className="mb-5">
+              <div className="flex items-center gap-2 mb-2">
+                <Mail className="w-4 h-4 text-blue-500" />
+                <span className="text-sm font-semibold text-slate-800">Email Reminder</span>
+              </div>
+              <select
+                value={reminderEmailDays}
+                onChange={(e) => setReminderEmailDays(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="1">Email them one day before appointment</option>
+                <option value="2">Email them two days before appointment</option>
+                <option value="3">Email them three days before appointment</option>
+                <option value="7">Email them one week before appointment</option>
+                <option value="null">Don't send email reminders</option>
+              </select>
+            </div>
+
+            {/* SMS */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <MessageSquare className="w-4 h-4 text-cyan-500" />
+                <span className="text-sm font-semibold text-slate-800">SMS Reminder</span>
+              </div>
+              <select
+                value={reminderSmsDays}
+                onChange={(e) => setReminderSmsDays(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="0">Text them morning of appointment</option>
+                <option value="1">Text them one day before appointment</option>
+                <option value="2">Text them two days before appointment</option>
+                <option value="3">Text them three days before appointment</option>
+                <option value="null">Don't send text reminders</option>
+              </select>
+              <p className="text-xs text-slate-400 mt-1.5">SMS is never sent between 9 PM and 8 AM.</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button icon={Save} onClick={handleSaveReminders} loading={reminderSaving} size="sm">
+                Save Reminder Settings
+              </Button>
+            </div>
+          </Card>
+
+          {/* Preview card */}
+          {(reminderEmailDays !== "null" || reminderSmsDays !== "null") && (
+            <Card>
+              <CardHeader title="Message Preview" icon={MessageSquare} />
+              <p className="text-sm text-slate-500 mb-4">This is what your customers will receive:</p>
+              <div className="space-y-3">
+                {reminderEmailDays !== "null" && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Mail className="w-3.5 h-3.5 text-blue-500" />
+                      <span className="text-blue-600 text-xs font-bold uppercase tracking-wider">Email</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800 mb-1">
+                      {reminderEmailDays === "0"
+                        ? "Reminder: Your cleaning is TODAY"
+                        : reminderEmailDays === "1"
+                        ? "You've got a cleaning appointment scheduled for tomorrow"
+                        : `Your cleaning appointment is in ${reminderEmailDays} days`}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Your cleaning is scheduled {reminderEmailDays === "0" ? "TODAY" : reminderEmailDays === "1" ? "tomorrow at 09:00 AM" : `in ${reminderEmailDays} days at 09:00 AM`}. Contact us to cancel or reschedule.
+                    </p>
+                  </div>
+                )}
+                {reminderSmsDays !== "null" && (
+                  <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-cyan-500" />
+                      <span className="text-cyan-600 text-xs font-bold uppercase tracking-wider">Text</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-1">From: your business phone</p>
+                    <p className="text-sm text-slate-700">
+                      Hi [Customer]! Reminder: [Business] is cleaning your home {reminderSmsDays === "0" ? "TODAY" : reminderSmsDays === "1" ? "tomorrow" : `in ${reminderSmsDays} days`}{reminderSmsDays !== "0" ? " at 09:00 AM" : ""}. To reschedule call [Phone]. Reply STOP to opt out.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Test send card */}
+          <Card>
+            <CardHeader title="Send a Test" icon={Zap} />
+            <p className="text-sm text-slate-500 mb-4">
+              Send a test reminder to your own phone and email so you can see exactly what customers receive.
+            </p>
+            {reminderTestSent ? (
+              <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium">
+                <CheckCircle className="w-4 h-4" /> Test sent! Check your phone and email.
+              </div>
+            ) : (
+              <Button
+                icon={Zap}
+                variant="secondary"
+                size="sm"
+                onClick={handleTestReminder}
+                loading={reminderTestSending}
+              >
+                Send me a test reminder
+              </Button>
+            )}
+          </Card>
         </div>
       ) : null}
 

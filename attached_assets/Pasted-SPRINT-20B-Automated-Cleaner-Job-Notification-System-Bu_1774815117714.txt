@@ -1,0 +1,328 @@
+SPRINT 20B — Automated Cleaner Job 
+Notification System
+
+Build an automated system that notifies 
+cleaners (team members) about their upcoming 
+jobs via email AND SMS. This feature should 
+be configured during onboarding AND 
+accessible from settings.
+
+This is a separate onboarding step from 
+Sprint 20A — it comes immediately AFTER 
+the customer reminder step.
+
+═══════════════════════════════
+ONBOARDING STEP — "Save More Time"
+═══════════════════════════════
+
+Same header bar design as Sprint 20A.
+Step indicators: 
+  ✓ Business | ✓ Save Time | 3 Grow | 
+  4 About You | 5 Activate Trial
+
+BODY CONTENT:
+
+Same founder avatar (Mike's photo)
+
+HEADLINE:
+"Save another ~11 hours per week by 
+notifying your cleaners about their 
+appointments and details, automagically!"
+
+Style: same as Sprint 20A headline
+
+SUBTEXT:
+"Your cleaners will be notified by email 
+AND text to ensure they see the notification. 
+On top of that, you can also print work 
+orders, route sheets, and more!"
+
+TWO RADIO OPTIONS (not dropdowns):
+
+Style: Full-width selectable rows
+  Border: 1px solid #e2e8f0
+  Border-radius: 10px
+  Padding: 16px 20px
+  Background: white
+  max-width: 480px centered
+
+OPTION 1 (default selected):
+  Radio button: teal filled
+  Border when selected: 2px solid #2563eb
+  Background when selected: rgba(37,99,235,0.04)
+  Text: "Email and text my cleaners one 
+  day before the appointment"
+
+OPTION 2:
+  Radio button: empty circle
+  Text: "Do not notify my cleaners for now"
+
+Helper text: "You can change this later 
+in your settings."
+
+EXAMPLE PREVIEW:
+Same phone mockup design as Sprint 20A.
+
+EMAIL preview card:
+  Subject: "Work order for tomorrow's appointment"
+  Body preview: "Mr. [Client Name], 
+  [Service Type] Service..."
+  
+TEXT preview card:
+  From: business phone number
+  Body: "Your cleaning with [Client Name] 
+  is scheduled for tomorrow at [Time]...."
+
+UPDATE PREVIEW:
+When Option 2 is selected:
+  Dim the preview to 30% opacity
+  Add overlay text: "Cleaner notifications 
+  will be disabled"
+When Option 1 is selected:
+  Full opacity, show normal preview
+
+═══════════════════════════════
+BACKEND — CLEANER NOTIFICATIONS
+═══════════════════════════════
+
+1. ADD to user settings:
+   cleanerNotificationsEnabled: boolean
+   cleanerNotificationDays: integer (0 = same day, 1 = day before)
+   cleanerNotificationEmail: boolean (default true)
+   cleanerNotificationSms: boolean (default true)
+
+2. SAVE onboarding selection:
+   POST /api/user/cleaner-notification-preferences
+   Body: { enabled: boolean }
+
+3. UPDATE JOB ASSIGNMENT FLOW:
+   When a job is assigned to a team member 
+   AND cleanerNotificationsEnabled = true:
+   
+   Immediately send assignment notification:
+   
+   EMAIL to team member:
+     Subject: "New job assigned: 
+     [ClientName] on [Date]"
+     
+     Body:
+     "Hi [CleanerFirstName],
+     
+     You have a cleaning job assigned:
+     
+     CLIENT: [ClientName]
+     ADDRESS: [JobAddress]
+     DATE: [DayOfWeek], [Date]
+     TIME: [StartTime] - [EndTime]
+     SERVICE: [JobType]
+     NOTES: [InternalNotes]
+     
+     [If pets] ⚠️ Pets: [PetInfo]
+     [If access] 🔑 Access: [AccessNotes]
+     
+     Please confirm you've seen this 
+     by replying to this email.
+     
+     [BusinessName]"
+   
+   SMS to team member:
+     "New job: [ClientFirstName] at 
+     [Address] on [Day] at [Time]. 
+     [ServiceType]. Check email for details."
+
+4. REMINDER SCHEDULER for cleaners:
+   
+   Separate from customer reminders.
+   Runs every hour.
+   
+   Find jobs where:
+     startDatetime = tomorrow (within 24h)
+     assignedTeamMemberId is not null
+     cleanerNotificationsEnabled = true
+     cleaner reminder not already sent
+   
+   Send REMINDER email to cleaner:
+     Subject: "Reminder: Job tomorrow — 
+     [ClientName] at [Time]"
+     
+     Body:
+     "Hi [CleanerFirstName],
+     
+     Reminder about tomorrow's job:
+     
+     CLIENT: [ClientName]
+     ADDRESS: [JobAddress]
+     TIME: [StartTime]
+     SERVICE: [JobType]
+     
+     CHECKLIST ITEMS: [if any]
+     [bullet list of checklist items]
+     
+     SPECIAL NOTES: [InternalNotes]
+     
+     See you tomorrow!
+     [BusinessName]"
+   
+   SMS reminder to cleaner:
+     "Reminder: [ClientFirstName] tomorrow 
+     at [Time], [Address]. 
+     [ServiceType]. Reply STOP to opt out."
+
+5. WORK ORDER EMAIL:
+   Business owner can manually trigger 
+   a work order send from the job detail screen.
+   
+   This is different from the automatic reminder —
+   it's a detailed work order PDF attachment.
+   
+   Work Order PDF content:
+     Header: [BusinessName] logo + "WORK ORDER"
+     Job #: [ID]
+     Date: [Date]
+     Time: [StartTime] - [EndTime]
+     Assigned to: [CleanerName]
+     
+     CLIENT INFORMATION:
+     Name: [ClientName]
+     Address: [JobAddress]
+     Phone: [ClientPhone]
+     
+     SERVICE DETAILS:
+     Type: [JobType]
+     Frequency: [Recurrence]
+     Notes: [InternalNotes]
+     
+     CHECKLIST:
+     [All checklist items with empty checkboxes]
+     
+     ACCESS INFORMATION:
+     [If key code / lockbox / etc]
+     
+     Footer: "Please complete all checklist 
+     items and note any issues."
+   
+   Generate this PDF server-side using 
+   existing PDF generation library.
+   Attach to the work order email.
+
+6. ADD reminder_log entries for cleaner 
+   notifications (same table, different type):
+   reminder_type: "cleaner_assignment" | 
+   "cleaner_reminder" | "work_order"
+
+═══════════════════════════════
+JOB DETAIL SCREEN — SEND WORK ORDER
+═══════════════════════════════
+
+On the Job Detail screen, add a 
+"Send Work Order" button:
+
+Position: in the Overview tab, below 
+the job details card
+
+Button style:
+  Outlined, secondary
+  Icon: Feather "send"
+  Label: "Send Work Order to Cleaner"
+
+On tap:
+  If no cleaner assigned: 
+    Show alert "Assign a cleaner first"
+  If cleaner has no email:
+    Show alert "Add cleaner email in 
+    Team Members settings"
+  Otherwise:
+    Generate work order PDF
+    Send email with PDF attached
+    Show success toast: 
+    "Work order sent to [CleanerName]"
+    Log in reminder_log
+
+═══════════════════════════════
+SETTINGS PAGE
+═══════════════════════════════
+
+Add "Team Notifications" section to Settings:
+
+Title: "Cleaner Job Notifications"
+Subtitle: "Automatically notify your 
+team about upcoming jobs"
+
+MASTER TOGGLE:
+  "Notify cleaners automatically"
+  Switch: on/off
+
+When on, show:
+  EMAIL sub-toggle: 
+    "Send email notifications" on/off
+  
+  SMS sub-toggle:
+    "Send text notifications" on/off
+  
+  TIMING dropdown:
+    "Notify cleaners:"
+    Options:
+      "When job is assigned (immediately)"
+      "Day before the job"
+      "Both — when assigned AND day before"
+      ← Default: "Both"
+
+TEAM MEMBER LIST:
+  Show each active team member with:
+  Name | Phone | Email | Notifications toggle
+  
+  Individual toggle per team member:
+    Allows disabling notifications for 
+    specific cleaners (e.g. owner/admin)
+  
+  "Add email" link for members missing email
+
+TEST BUTTON per team member:
+  "Send test notification →"
+  Sends a sample job notification to 
+  that specific team member
+
+═══════════════════════════════
+TEAM MEMBER PROFILE — ADD EMAIL
+═══════════════════════════════
+
+If a team member doesn't have an email address,
+notifications can only go by SMS.
+
+In the team member profile/edit screen:
+  Add email field if not already present:
+  Label: "Email address"
+  Placeholder: "cleaner@email.com"
+  Helper: "Required to receive work 
+  order emails and job notifications"
+  
+  If email is missing, show a yellow 
+  warning in the Team Member list:
+  "⚠️ No email — SMS only"
+
+═══════════════════════════════
+TESTING CHECKLIST
+═══════════════════════════════
+- Onboarding step renders after 
+  customer reminder step (Sprint 20A)
+- Option 1 selected by default
+- Preview dims when Option 2 selected
+- Setting saves on Next tap
+- Assigning a cleaner to a job triggers 
+  immediate notification (email + SMS)
+- Day-before reminder sends correctly
+- Work order PDF generates with all fields
+- Work order email sends with PDF attached
+- "Send Work Order" button appears in job detail
+- Settings page shows correct configuration
+- Individual team member toggles work
+- Test notification button works per member
+- reminder_log prevents duplicate sends
+- No SMS between 9 PM and 8 AM
+
+Confirm with:
+1. Screenshot of onboarding step
+2. Screenshot of settings section
+3. Sample work order PDF
+4. Log showing assignment notification sent
+5. Log showing day-before reminder sent

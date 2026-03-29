@@ -9,6 +9,7 @@ import { processDripQueue } from "./dripEmails";
 import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
 import { sendPush } from "./pushNotifications";
 import { initNotificationTables, runNotificationScheduler } from "./notificationScheduler";
+import { runAppointmentReminderScheduler } from "./appointmentReminderScheduler";
 import { seedPristineHomeDemo } from "./seedPristineDemo";
 
 const app = express();
@@ -687,6 +688,13 @@ async function seedToDoDemo() {
   setInterval(() => {
     runNotificationScheduler().catch((e: any) => console.error("[notif-scheduler] Cron failed:", e.message));
   }, 5 * 60 * 1000);
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // ─── Appointment reminder scheduler: runs every hour ─────────────────────
+  runAppointmentReminderScheduler().catch((e: any) => console.error("[reminders] Initial run failed:", e.message));
+  setInterval(() => {
+    runAppointmentReminderScheduler().catch((e: any) => console.error("[reminders] Cron failed:", e.message));
+  }, 60 * 60 * 1000);
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

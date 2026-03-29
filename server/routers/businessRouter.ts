@@ -75,6 +75,7 @@ import {
 } from "../storage";
 import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
 import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "../mail";
+import { sendTestReminder } from "../appointmentReminderScheduler";
 import { trackEvent } from "../analytics";
 import { AnalyticsEvents } from "../../shared/analytics-events";
 
@@ -1472,6 +1473,56 @@ router.get("/api/geocode/city-suggestions", requireAuth, geocodeLimiter, async (
   } catch (error: any) {
     console.error("Geocode city-suggestions error:", error);
     return res.json([]);
+  }
+});
+
+// ── Reminder Preferences ─────────────────────────────────────────────────────
+
+router.get("/api/reminder-preferences", requireAuth, async (req: any, res: Response) => {
+  try {
+    const r = await pool.query(
+      `SELECT customer_email_reminder_days, customer_sms_reminder_days FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
+      [req.user.id]
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Business not found" });
+    const row = r.rows[0];
+    res.json({
+      emailReminderDays: row.customer_email_reminder_days,
+      smsReminderDays: row.customer_sms_reminder_days,
+    });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.put("/api/reminder-preferences", requireAuth, async (req: any, res: Response) => {
+  try {
+    const { emailReminderDays, smsReminderDays } = req.body;
+    await pool.query(
+      `UPDATE businesses SET customer_email_reminder_days=$1, customer_sms_reminder_days=$2, updated_at=NOW()
+       WHERE owner_user_id=$3`,
+      [
+        emailReminderDays === null || emailReminderDays === undefined ? null : Number(emailReminderDays),
+        smsReminderDays === null || smsReminderDays === undefined ? null : Number(smsReminderDays),
+        req.user.id,
+      ]
+    );
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.post("/api/reminder-preferences/test", requireAuth, async (req: any, res: Response) => {
+  try {
+    const bizRes = await pool.query(
+      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.user.id]
+    );
+    if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
+    const result = await sendTestReminder(bizRes.rows[0].id);
+    res.json({ success: true, ...result });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
   }
 });
 

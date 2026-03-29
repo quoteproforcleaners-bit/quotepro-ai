@@ -1,0 +1,213 @@
+SPRINT 21A — Onboarding Step: 
+"Grow" — Booking Form / Lead Link
+
+Add a "Grow" onboarding step that introduces 
+the Lead Link feature and either sends the 
+business owner an email with setup details 
+OR marks it for later.
+
+This is Step 3 in the onboarding sequence:
+✓ Business | ✓ Save Time | 3 Grow | 
+4 About You | 5 Activate Trial
+
+═══════════════════════════════
+ONBOARDING STEP DESIGN
+═══════════════════════════════
+
+Same header bar design as Sprints 20A/20B.
+
+FOUNDER AVATAR: Mike's photo, same style.
+
+HEADLINE:
+"Land more appointments by allowing your 
+website visitors to get a quote. They can 
+request an appointment entirely on their 
+own with your new QuotePro Lead Link!"
+
+Style: same as previous onboarding steps
+font-size: 24px, font-weight: 800, centered
+
+SUBTEXT:
+"Create a shareable link that captures 
+leads 24/7 — embed it on your website, 
+share it on social media, or put it in 
+your email signature. No technical 
+knowledge required! 🚀"
+
+TWO RADIO OPTIONS:
+
+OPTION 1:
+  Radio: empty circle (not default)
+  Text: "Send me an email with details 
+  and examples"
+  
+  When selected:
+    Highlight with teal border
+    On Next: trigger the email (see below)
+
+OPTION 2 (default selected):
+  Radio: teal filled
+  Text: "Maybe later"
+  
+  When selected:
+    Highlight with teal border
+    On Next: skip, no email sent
+
+Helper text:
+"You can set this up anytime from 
+your settings."
+
+EXAMPLE PREVIEW (phone mockup):
+Show a preview of the Lead Link form:
+
+Phone mockup (CSS only, same style 
+as previous steps):
+
+Inside the mockup show:
+  Step indicator: "Step 2: Your Home"
+  
+  Form fields (visual only — not functional):
+    "Service Address"
+    "Address Line 1" input: "Street 1"
+    "Address Line 2" input: "Street 2"
+    Row: City | State | ZIP
+    "Is this an empty home?" (cut off at bottom)
+  
+  Style: clean white form, 
+  subtle field borders,
+  looks like the Lead Link microsite
+
+Mockup should look partially cut off 
+at the bottom — suggests there's more 
+to see, creates curiosity.
+
+═══════════════════════════════
+EMAIL CONTENT (sent when Option 1 selected)
+═══════════════════════════════
+
+Trigger: User selects Option 1 and taps Next.
+Send immediately.
+
+FROM: mike@getquotepro.ai
+SUBJECT: "Your QuotePro Lead Link — 
+Get leads while you sleep 🔗"
+
+BODY:
+
+Hi [FirstName],
+
+Great news — you're one step away from 
+capturing cleaning leads 24/7 on autopilot.
+
+YOUR LEAD LINK IS READY:
+[Large button or styled link showing their 
+unique Lead Link URL]
+https://getquotepro.ai/l/[their-token]
+
+WHAT IS THE LEAD LINK?
+Your Lead Link is a personalized webpage 
+where potential customers can:
+  ✓ Enter their home details
+  ✓ See an instant price estimate
+  ✓ Submit their contact information
+  ✓ Request a quote — automatically
+
+You get notified instantly when a new 
+lead comes in, and QuotePro builds the 
+quote automatically.
+
+3 WAYS TO USE YOUR LEAD LINK:
+
+1. Add it to your website
+   Replace your "Contact Us" page with 
+   your Lead Link. Visitors become leads 
+   instead of just reading and leaving.
+
+2. Put it in your email signature
+   Every email you send becomes a 
+   potential lead source.
+   Example signature:
+   "Get a free cleaning quote in 60 
+   seconds: [your Lead Link]"
+
+3. Share it on social media
+   Post it on Facebook, Nextdoor, and 
+   Instagram with: "Get an instant 
+   cleaning quote for your home →"
+
+BEFORE YOU SHARE:
+Make sure your pricing is configured 
+so customers see accurate estimates.
+[Button: Configure My Pricing →]
+→ links to Price Settings
+
+[Button: Share My Lead Link →]
+→ links to Lead Link settings page
+
+Questions? Reply to this email — 
+I read every one.
+
+Mike
+Founder, QuotePro
+
+P.S. Businesses that share their Lead 
+Link on social media get an average of 
+3-5 new quote requests in their first week.
+
+═══════════════════════════════
+BACKEND
+═══════════════════════════════
+
+1. ENSURE Lead Link token exists for 
+   this user before this step renders.
+   If not: generate one automatically.
+   
+2. SAVE onboarding preference:
+   POST /api/user/onboarding-preferences
+   Body: { leadLinkEmailRequested: boolean }
+
+3. SEND EMAIL if Option 1 selected:
+   Use existing email infrastructure
+   Include their actual Lead Link URL
+   Log sent_at in user preferences
+
+4. TRACK engagement:
+   When user clicks "Share My Lead Link" 
+   in the email → log event:
+   leadlink_email_click
+   
+   When user clicks "Configure My Pricing":
+   pricing_from_onboarding_email_click
+
+═══════════════════════════════
+SETTINGS PAGE
+═══════════════════════════════
+
+In Lead Link settings, add a card:
+
+"📧 Get setup instructions by email"
+Button: "Send me the setup guide"
+  → triggers same email as above
+  → shows "Sent! Check your inbox" on click
+  
+Show this card only if the user has 
+never clicked it before OR if they 
+selected "Maybe later" during onboarding.
+
+═══════════════════════════════
+TESTING CHECKLIST
+═══════════════════════════════
+- Step renders as Step 3 in onboarding
+- Option 2 (Maybe later) selected by default
+- Selecting Option 1 highlights with teal border
+- Next saves the selection
+- Email sends when Option 1 was selected
+- Email contains correct Lead Link URL
+- Email buttons link to correct pages
+- "Maybe later" skips without sending email
+- Settings page shows "Send me the guide" card
+- Event tracking logs correctly
+
+Confirm with screenshot of:
+1. The onboarding step
+2. The email received in inbox
