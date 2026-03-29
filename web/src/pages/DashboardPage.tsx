@@ -78,31 +78,43 @@ function getCloseRateColor(rate: number): string {
 function CommandHeader({
   business,
   todayRevenue,
-  monthRevenue,
   weekJobs,
-  closeRate,
   followUpQueueCount,
   amountAtRisk,
   oldestQuoteDays,
   isInFreeTrial,
   freeTrialDaysLeft,
+  todayJobsCount,
+  acceptedCount,
+  totalSentCount,
   navigate,
 }: {
   business: any;
   todayRevenue: number;
-  monthRevenue: number;
   weekJobs: number;
-  closeRate: number;
   followUpQueueCount: number;
   amountAtRisk: number;
   oldestQuoteDays: number;
   isInFreeTrial: boolean;
   freeTrialDaysLeft: number;
+  todayJobsCount: number;
+  acceptedCount: number;
+  totalSentCount: number;
   navigate: (path: string) => void;
 }) {
   const hasRisk = followUpQueueCount > 0;
-  const closeRateColor = getCloseRateColor(closeRate);
   const dayStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
+
+  const contextLine = (() => {
+    if (todayJobsCount > 0) {
+      const base = `You have ${todayJobsCount} job${todayJobsCount !== 1 ? "s" : ""} today`;
+      return todayRevenue > 0 ? `${base} · ${fmt(todayRevenue)} earned so far` : base;
+    }
+    return todayRevenue > 0 ? `No new jobs scheduled · ${fmt(todayRevenue)} earned today` : "No jobs scheduled today";
+  })();
+
+  const quotesWonValue = totalSentCount > 0 ? `${acceptedCount} of ${totalSentCount}` : "—";
+  const quotesWonSub = totalSentCount > 0 ? "quotes won" : "send quotes to track";
 
   return (
     <div className="mb-6">
@@ -136,28 +148,22 @@ function CommandHeader({
         <div className="relative z-10 px-6 pt-6 pb-5">
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
-              {/* Fix 3: Date label — 11px, 600 weight, 1.5px letter-spacing */}
               <p
                 className="mb-2"
                 style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "1.5px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}
               >
                 {dayStr}
               </p>
-              {/* Fix 3: Greeting — 32px, 400 weight + company name 32px, 700 weight */}
               <h1 style={{ fontSize: "32px", lineHeight: 1.1, letterSpacing: "-0.02em" }}>
-                <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.7)" }}>{greeting()}</span>
+                <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.7)" }}>{greeting()},</span>
                 {business?.companyName ? (
                   <><br /><span style={{ fontWeight: 700, color: "#ffffff" }}>{business.companyName}</span></>
                 ) : null}
               </h1>
-              {/* Fix 3: Subtext — 15px, rgba(255,255,255,0.55) */}
-              <p className="mt-2" style={{ fontSize: "15px", color: "rgba(255,255,255,0.55)" }}>
-                {monthRevenue > 0
-                  ? `${fmt(monthRevenue)} recognized this month — keep pushing`
-                  : "Your revenue operations command center"}
+              <p className="mt-2" style={{ fontSize: "14px", color: "rgba(255,255,255,0.5)" }}>
+                {contextLine}
               </p>
             </div>
-            {/* Fix 3: Remove "+ New Quote" button — only show trial badge */}
             {isInFreeTrial ? (
               <div className="shrink-0 mt-0.5">
                 <button
@@ -171,7 +177,7 @@ function CommandHeader({
             ) : null}
           </div>
 
-          {/* Fix 2 + Fix 3: Stat strip — today's snapshot metrics */}
+          {/* Stat strip — plain language */}
           <div
             className="grid grid-cols-2 sm:grid-cols-4 gap-0 rounded-xl overflow-hidden"
             style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.04)" }}
@@ -180,9 +186,12 @@ function CommandHeader({
               {
                 icon: DollarSign,
                 label: "Today's Revenue",
-                value: fmt(todayRevenue),
-                valueColor: todayRevenue > 0 ? "#4ade80" : "rgba(255,255,255,0.6)",
+                value: todayRevenue > 0 ? fmt(todayRevenue) : "None yet",
+                subValue: quotesWonSub === "quotes won" ? undefined : undefined,
+                valueColor: todayRevenue > 0 ? "#4ade80" : "rgba(255,255,255,0.35)",
                 iconColor: "#4ade80",
+                clickable: false,
+                path: "",
               },
               {
                 icon: Briefcase,
@@ -190,26 +199,31 @@ function CommandHeader({
                 value: String(weekJobs),
                 valueColor: "white",
                 iconColor: "#93c5fd",
+                clickable: false,
+                path: "",
               },
               {
                 icon: Target,
-                label: "Close Rate",
-                value: closeRate > 0 ? `${Math.round(closeRate)}%` : "—",
-                valueColor: closeRateColor,
+                label: "Quotes Won",
+                value: quotesWonValue,
+                valueColor: acceptedCount > 0 ? "#c4b5fd" : "rgba(255,255,255,0.35)",
                 iconColor: "#c4b5fd",
+                clickable: totalSentCount > 0,
+                path: "/quotes",
               },
               {
                 icon: followUpQueueCount > 0 ? PhoneMissed : CheckCircle,
-                label: "Follow-Ups Due Today",
+                label: "Need Follow-Up",
                 value: followUpQueueCount > 0 ? String(followUpQueueCount) : "Clear",
                 valueColor: followUpQueueCount > 0 ? "#fbbf24" : "#4ade80",
                 iconColor: followUpQueueCount > 0 ? "#fbbf24" : "#4ade80",
                 clickable: followUpQueueCount > 0,
+                path: "/follow-ups",
               },
             ].map((stat, i) => (
               <div
                 key={i}
-                onClick={stat.clickable ? () => navigate("/follow-ups") : undefined}
+                onClick={stat.clickable ? () => navigate(stat.path) : undefined}
                 className={`px-5 py-4 flex items-start gap-3 ${i > 0 ? "border-l" : ""} ${stat.clickable ? "cursor-pointer hover:bg-white/5 transition-colors" : ""}`}
                 style={{ borderLeftColor: "rgba(255,255,255,0.1)" }}
               >
@@ -218,14 +232,12 @@ function CommandHeader({
                   style={{ width: "14px", height: "14px", color: stat.iconColor, opacity: 0.85 }}
                 />
                 <div className="min-w-0">
-                  {/* Fix 3: Stat labels — 11px, uppercase, 0.8px letter-spacing, rgba(255,255,255,0.45) */}
                   <p
                     className="mb-1 font-medium uppercase"
                     style={{ fontSize: "11px", letterSpacing: "0.8px", color: "rgba(255,255,255,0.45)" }}
                   >
                     {stat.label}
                   </p>
-                  {/* Fix 3: Stat values — 24px, 700 weight */}
                   <p
                     className="leading-none stat-number"
                     style={{ fontSize: "24px", fontWeight: 700, color: stat.valueColor }}
@@ -238,7 +250,7 @@ function CommandHeader({
           </div>
         </div>
 
-        {/* Alert ribbon */}
+        {/* Alert ribbon — only shows when there's follow-up risk */}
         {hasRisk ? (
           <button
             onClick={() => navigate("/follow-ups")}
@@ -709,30 +721,9 @@ function StartHereChecklist({
   const allDone = completedCount === steps.length;
   const pct = Math.round((completedCount / steps.length) * 100);
 
-  // Fix 4: Celebratory complete state — don't return null
+  // Setup complete — don't show any card on the dashboard (belongs to onboarding only)
   if (allDone) {
-    return (
-      <div
-        className="rounded-2xl overflow-hidden mb-6 setup-complete-animation"
-        style={{ border: "2px solid #10b981", background: "linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(5,150,105,0.04) 100%)" }}
-      >
-        <div className="px-5 py-5 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-            <CheckCircle className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div className="flex-1">
-            <h2 className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">QuotePro is fully set up</h2>
-            <p className="text-xs text-emerald-700 dark:text-emerald-500 mt-0.5">All systems active — automation is running, quotes are live.</p>
-          </div>
-          <button
-            onClick={() => navigate("/growth")}
-            className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 shrink-0"
-          >
-            View Growth Hub <ChevronRight className="w-3 h-3" />
-          </button>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // Fix 4: Urgent incomplete state — amber warning treatment
@@ -868,6 +859,88 @@ function AIGrowthTools({ navigate }: { navigate: (path: string) => void }) {
             </div>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Today's Focus ────────────────────────────────────────────────────────────
+
+interface FocusItem {
+  priority: "red" | "amber" | "blue";
+  topLine: string;
+  bottomLine: string;
+  cta: string;
+  path: string;
+}
+
+const PRIORITY_STYLES = {
+  red: { dot: "bg-red-500", bg: "hover:bg-red-50/60", border: "border-red-100", ctaColor: "text-red-600" },
+  amber: { dot: "bg-amber-400", bg: "hover:bg-amber-50/60", border: "border-amber-100", ctaColor: "text-amber-600" },
+  blue: { dot: "bg-blue-400", bg: "hover:bg-blue-50/50", border: "border-blue-100", ctaColor: "text-blue-600" },
+};
+
+function TodaysFocus({
+  items,
+  navigate,
+}: {
+  items: FocusItem[];
+  navigate: (path: string) => void;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-slate-100 bg-white mb-6 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+          </div>
+          <h2 className="font-bold text-slate-800 text-sm">Today's Focus</h2>
+          <span className="ml-auto text-[11px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">All clear</span>
+        </div>
+        <div className="px-5 py-6 text-center">
+          <p className="text-sm text-slate-500">No urgent actions right now — great work.</p>
+          <button
+            onClick={() => navigate("/quotes/new")}
+            className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-primary-600 hover:text-primary-700"
+          >
+            <Plus className="w-3.5 h-3.5" /> Create a new quote
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white mb-6 shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2.5">
+        <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
+          <Zap className="w-3.5 h-3.5 text-slate-500" />
+        </div>
+        <h2 className="font-bold text-slate-800 text-sm">Today's Focus</h2>
+        <span className="ml-auto text-[11px] text-slate-400">{items.length} action{items.length !== 1 ? "s" : ""}</span>
+      </div>
+      <div className="divide-y divide-slate-50">
+        {items.map((item, i) => {
+          const s = PRIORITY_STYLES[item.priority];
+          return (
+            <button
+              key={i}
+              onClick={() => navigate(item.path)}
+              className={`w-full text-left flex items-center gap-4 px-5 py-3.5 transition-colors ${s.bg} group`}
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-slate-800 leading-snug">{item.topLine}</p>
+                {item.bottomLine ? (
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">{item.bottomLine}</p>
+                ) : null}
+              </div>
+              <span className={`text-[11px] font-bold shrink-0 flex items-center gap-1 group-hover:gap-1.5 transition-all ${s.ctaColor}`}>
+                {item.cta} <ChevronRight className="w-3 h-3" />
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -1104,8 +1177,18 @@ export default function DashboardPage() {
   const hasQuotes = quotes.length > 0;
   const hasCustomers = customers.length > 0;
   const hasFollowUpActivity = currentStreak > 0 || followUpQueueCount > 0;
-  // Fix 4: Always show checklist — component handles incomplete (urgent) vs complete (celebratory)
   const showChecklist = true;
+
+  // Total sent = all non-draft quotes
+  const totalSentCount = quotes.filter((q: any) => q.status !== "draft").length;
+
+  // Weekly revenue (accepted quotes this week)
+  const weekRevenue = useMemo(() => {
+    const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return acceptedQuotes
+      .filter((q: any) => new Date(q.createdAt).getTime() >= weekStart)
+      .reduce((s: number, q: any) => s + (Number(q.total) || 0), 0);
+  }, [acceptedQuotes]);
 
   const weekDays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   const streakDaysToShow = Math.min(currentStreak, 7);
@@ -1277,6 +1360,99 @@ export default function DashboardPage() {
     return actions.slice(0, 3);
   }, [hasQuotes, followUpQueueCount, amountAtRisk, draftQuotes, closeRate, hasFollowUpActivity, hasCustomers, ratingSummary]);
 
+  // ── Today's Focus items ────────────────────────────────────────────────────
+  const focusItems = useMemo<FocusItem[]>(() => {
+    const items: FocusItem[] = [];
+
+    // Red: overdue follow-ups (up to 2)
+    const overdueQueue = [...followUpQueue].sort((a: any, b: any) => {
+      const aDate = a.sentAt ? new Date(a.sentAt).getTime() : new Date(a.createdAt).getTime();
+      const bDate = b.sentAt ? new Date(b.sentAt).getTime() : new Date(b.createdAt).getTime();
+      return aDate - bDate; // oldest first
+    });
+    overdueQueue.slice(0, 2).forEach((q: any) => {
+      const name = q.customerName || [q.firstName, q.lastName].filter(Boolean).join(" ") || "Client";
+      const sent = q.sentAt ? new Date(q.sentAt) : new Date(q.createdAt);
+      const days = Math.floor((Date.now() - sent.getTime()) / (1000 * 60 * 60 * 24));
+      items.push({
+        priority: "red",
+        topLine: `Follow up with ${name}`,
+        bottomLine: `Quote sent ${days} day${days !== 1 ? "s" : ""} ago · ${fmt(Number(q.total) || 0)} at risk`,
+        cta: "Follow Up",
+        path: "/follow-ups",
+      });
+    });
+
+    // Amber: accepted quotes needing scheduling (first one)
+    if (items.length < 5 && unscheduledAccepted > 0) {
+      const scheduledQuoteIds = new Set(jobs.map((j: any) => j.quoteId).filter(Boolean));
+      const pending = acceptedQuotes.filter((q: any) => !scheduledQuoteIds.has(q.id));
+      if (pending.length > 0) {
+        const q: any = pending[0];
+        const name = q.customerName || [q.firstName, q.lastName].filter(Boolean).join(" ") || "Client";
+        items.push({
+          priority: "amber",
+          topLine: `Schedule ${name}`,
+          bottomLine: `Accepted quote for ${fmt(Number(q.total) || 0)} — needs a date`,
+          cta: "Schedule",
+          path: "/quotes?filter=accepted",
+        });
+      }
+    }
+
+    // Amber: drafts sitting unsent
+    if (items.length < 5 && draftQuotes.length > 0) {
+      items.push({
+        priority: "amber",
+        topLine: `Send ${draftQuotes.length} draft quote${draftQuotes.length !== 1 ? "s" : ""}`,
+        bottomLine: "Unsent quotes can't win. Send them today.",
+        cta: "View Drafts",
+        path: "/quotes",
+      });
+    }
+
+    // Blue: tomorrow's jobs
+    if (items.length < 5) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowJobs = jobs.filter(
+        (j: any) => j.startDatetime && new Date(j.startDatetime).toDateString() === tomorrow.toDateString()
+      );
+      if (tomorrowJobs.length > 0) {
+        const j: any = tomorrowJobs[0];
+        const name = j.customerName || [j.firstName, j.lastName].filter(Boolean).join(" ") || "Client";
+        const time = new Date(j.startDatetime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        items.push({
+          priority: "blue",
+          topLine: `${name} — ${tomorrowJobs.length > 1 ? `${tomorrowJobs.length} jobs` : "job"} tomorrow at ${time}`,
+          bottomLine: j.address || "Check your schedule for details",
+          cta: "View Schedule",
+          path: "/schedule",
+        });
+      }
+    }
+
+    // Blue: review opportunity (completed jobs from 2-4 days ago with no review)
+    if (items.length < 5) {
+      const completedRecent = jobs.filter((j: any) => {
+        if (j.status !== "completed" || !j.startDatetime) return false;
+        const daysAgo = Math.floor((Date.now() - new Date(j.startDatetime).getTime()) / (1000 * 60 * 60 * 24));
+        return daysAgo >= 2 && daysAgo <= 5;
+      });
+      if (completedRecent.length > 0 && (ratingSummary?.total || 0) === 0) {
+        items.push({
+          priority: "blue",
+          topLine: "Request a client review",
+          bottomLine: `${completedRecent.length} job${completedRecent.length !== 1 ? "s" : ""} recently completed — strike while it's fresh`,
+          cta: "Get Reviews",
+          path: "/reviews",
+        });
+      }
+    }
+
+    return items.slice(0, 5);
+  }, [followUpQueue, unscheduledAccepted, acceptedQuotes, jobs, draftQuotes, ratingSummary]);
+
   const recentQuotes = useMemo(() =>
     [...quotes]
       .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -1291,18 +1467,19 @@ export default function DashboardPage() {
       <CommandHeader
         business={business}
         todayRevenue={todayRevenue}
-        monthRevenue={monthlyRevenue}
         weekJobs={weekJobs}
-        closeRate={closeRate}
         followUpQueueCount={followUpQueueCount}
         amountAtRisk={amountAtRisk}
         oldestQuoteDays={oldestQuoteDays}
         isInFreeTrial={isInFreeTrial}
         freeTrialDaysLeft={freeTrialDaysLeft}
+        todayJobsCount={todayJobs.length}
+        acceptedCount={acceptedQuotes.length}
+        totalSentCount={totalSentCount}
         navigate={navigate}
       />
 
-      {/* 2. Setup checklist for new users */}
+      {/* 2. Setup checklist — only shows when setup is incomplete */}
       {showChecklist ? (
         <StartHereChecklist
           hasPricing={hasPricing || hasQuotes}
@@ -1355,62 +1532,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* 3. KPI Momentum Row — Fix 2: differentiated monthly view */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {/* Fix 2: Revenue Won This Month */}
-        <KPICard
-          label="Revenue Won This Month"
-          value={fmt(monthlyRevenue)}
-          subtitle={lastMonthRevenue > 0
-            ? `${monthlyRevenue >= lastMonthRevenue ? "↑" : "↓"} ${Math.abs(Math.round(((monthlyRevenue - lastMonthRevenue) / Math.max(lastMonthRevenue, 1)) * 100))}% vs ${fmt(lastMonthRevenue)} last mo`
-            : "vs $0 last month"}
-          icon={DollarSign}
-          color="emerald"
-          badge="Live"
-          badgePositive
-          onClick={() => navigate("/opportunities")}
-        />
-        {/* Fix 2: Active Jobs with next job */}
-        <KPICard
-          label="Active Jobs"
-          value={activeJobs.length}
-          subtitle={nextScheduledJob
-            ? `Next: ${new Date(nextScheduledJob.startDatetime).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-            : `${jobs.length} total scheduled`}
-          icon={Briefcase}
-          color="blue"
-          onClick={() => navigate("/jobs")}
-        />
-        {/* Fix 7: Close Rate with 3-tier badge */}
-        <KPICard
-          label="Close Rate"
-          value={closeRate > 0 ? `${Math.round(closeRate)}%` : "—"}
-          subtitle={
-            closeRate > 50 ? "Strong close rate" :
-            closeRate >= 25 ? "Room to improve" :
-            closeRate > 0 ? "Needs attention" :
-            "Send quotes to start tracking"
-          }
-          icon={Target}
-          color={closeRateColor}
-          badge={closeRate > 50 ? "Strong" : closeRate >= 25 ? "Improving" : closeRate > 0 ? "Needs Attention" : undefined}
-          badgePositive={closeRate > 50}
-          onClick={() => navigate("/quotes")}
-        />
-        {/* Fix 2: Pipeline Value */}
-        <KPICard
-          label="Pipeline Value"
-          value={fmt(pipelineValue)}
-          subtitle={`${unscheduledAccepted} accepted, need scheduling`}
-          icon={TrendingUp}
-          color={unscheduledAccepted > 0 ? "amber" : "violet"}
-          badge={unscheduledAccepted > 0 ? `${unscheduledAccepted} Pending` : undefined}
-          badgePositive={false}
-          onClick={() => navigate("/quotes?filter=accepted")}
-        />
-      </div>
-
-      {/* 4a. Quote Requests Banner */}
+      {/* 3. New Quote Requests banner */}
       {(intakeCountData?.newCount ?? 0) > 0 ? (
         <button
           onClick={() => navigate("/intake-requests")}
@@ -1441,7 +1563,10 @@ export default function DashboardPage() {
         </button>
       ) : null}
 
-      {/* 4. Today Operations */}
+      {/* 4. Today's Focus */}
+      <TodaysFocus items={focusItems} navigate={navigate} />
+
+      {/* 5. Today Operations */}
       <TodayOperations
         todayJobs={todayJobs}
         todayRevenue={todayRevenue}

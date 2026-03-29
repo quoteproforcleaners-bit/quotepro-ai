@@ -114,3 +114,24 @@ The system uses session-based authentication supporting email/password, Apple, a
 - **Price calc**: Client-side using `hourlyRate`, `minimumTicket`, `sqftFactor` from config; multipliers for service type, condition, pet count
 - **Analytics strip**: Added to `LeadCapturePage.tsx` — shows Visits (30d), Requests, Conv. Rate with color-coded badges
 - **Old intake flow**: `/intake/:businessId` → `IntakePage.tsx` still works for backward compatibility
+
+### Sprint 22 — Dashboard Simplification & Nav Restructure (Web)
+- **Dashboard Changes** (`web/src/pages/DashboardPage.tsx`):
+  - `CommandHeader` stat strip updated: "Close Rate" → "Quotes Won" (shows "X of Y" format), "Follow-Ups Due Today" → "Need Follow-Up"; hero subtext now shows contextual jobs/earnings text instead of "revenue operations command center"
+  - "Quotes Won" stat shows `acceptedCount of totalSentCount` format; "Today's Revenue" shows "None yet" when $0
+  - `StartHereChecklist` "fully set up" green card removed — component returns `null` when `allDone=true` (card belonged in onboarding, not dashboard)
+  - New `TodaysFocus` component added — max 5 prioritized action items with colored priority dots (red=overdue follow-ups, amber=needs scheduling/drafts, blue=tomorrow's jobs/reviews)
+  - Old 4 KPI cards row (Revenue Won This Month, Active Jobs, Close Rate, Pipeline Value) removed
+  - Layout order: CommandHeader → Setup checklist (incomplete users only) → Pricing banner → Quote Requests banner → Today's Focus → Today Operations → Revenue Moves → Pipeline + Attention → AI Tools → remaining
+  - New props on `CommandHeader`: `todayJobsCount`, `acceptedCount`, `totalSentCount` (removed: `monthRevenue`, `closeRate`)
+  - `weekRevenue` computed value added for weekly revenue tracking
+- **Navigation Changes** (`web/src/components/Layout.tsx`):
+  - "GROWTH" section renamed to "BUSINESS"
+  - `CORE_NAV_ITEMS` restructured: Dashboard, Quotes, Customers, Jobs, Schedule (removed: Lead Capture, Quote Requests, Follow-Ups, Opportunities from core)
+  - New `BUSINESS_NAV_ITEMS`: Follow-Ups, Win-Back (/opportunities), Revenue, Reviews & Referrals
+  - `TOOLS_NAV_ITEMS` restructured: Quote Doctor, Lead Capture (moved from CORE), Commercial Quote, Automations, Automated Emails, Sales Assistant, Handle Objections, Voice-to-Quote, Toolkit
+  - TOOLS section now **collapsible, collapsed by default** (persisted in localStorage as `quotepro_nav_tools_open`)
+  - SETTINGS section remains collapsible
+  - Renamed labels: "Opportunities" → "Win-Back", "Email Sequences" → "Automated Emails", "Objection Assistant" → "Handle Objections", "Quote from Notes" → "Voice-to-Quote"
+  - `ROUTE_TITLES`, `ALL_CMD_ITEMS` updated to reflect new labels
+  - Schedule removed from SETTINGS (moved to CORE nav)

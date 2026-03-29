@@ -47,37 +47,32 @@ const SETTINGS_NAV_KEY = "quotepro_nav_settings_open";
 
 // CORE — unlabeled, always visible
 const CORE_NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — revenue at a glance, pipeline health, recent quotes, and team activity." },
+  { to: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — jobs today, pipeline health, and the most important actions." },
   { to: "/quotes",       label: "Quotes",       icon: FileText,        shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
-  { to: "/lead-capture",    label: "Lead Capture",   icon: Link2,                        description: "Share your branded quote request link — customers submit details, you get instant leads." },
-  { to: "/intake-requests", label: "Quote Requests", icon: Inbox,                        description: "Leads submitted through your website intake form — review, respond, or convert them to quotes." },
-  { to: "/customers",       label: "Customers",      icon: Users,        pro: true,      description: "Full contact history, quote history, job records, and notes for every client in one place." },
-  { to: "/jobs",         label: "Jobs",         icon: Briefcase,       pro: true,        description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
-  { to: "/follow-ups",   label: "Follow-Ups",   icon: Bell,                              description: "Every quote that needs a follow-up, ranked by priority. Never let a lead go cold." },
-  { to: "/opportunities",label: "Opportunities",icon: TrendingUp,      pro: true,        description: "Upsell and re-engage existing customers — AI surfaces the best opportunities automatically." },
+  { to: "/customers",    label: "Customers",    icon: Users,           pro: true,       description: "Full contact history, quote history, job records, and notes for every client in one place." },
+  { to: "/jobs",         label: "Jobs",         icon: Briefcase,       pro: true,       description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
+  { to: "/calendar",     label: "Schedule",     icon: CalendarDays,    pro: true,       description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
 ];
 
-// GROWTH — labeled section
-const GROWTH_NAV_ITEMS: NavItem[] = [
-  { to: "/growth",           label: "Growth Dashboard",   icon: BarChart2,  pro: true, description: "Track growth metrics, win rate trends, revenue benchmarks, and your pipeline health over time." },
-  { to: "/revenue",          label: "Revenue",            icon: DollarSign, pro: true, description: "Full revenue reporting — monthly totals, job type breakdown, and trends vs. prior periods." },
-  { to: "/lead-finder",      label: "Lead Finder",        icon: Search,     pro: true, description: "AI-powered local lead discovery — find homeowners in your area who are likely to need cleaning." },
-  { to: "/reactivation",     label: "Win-Back",           icon: Repeat2,    pro: true, description: "Automatically identify and re-engage past customers who haven't booked in 60+ days." },
-  { to: "/weekly-recap",     label: "Weekly Recap",       icon: BookOpen,   pro: true, description: "AI-generated weekly summary of your quotes, jobs, revenue, and follow-up priorities." },
-  { to: "/reviews-referrals",label: "Reviews & Referrals",icon: Star,       pro: true, description: "Automate Google review requests and track referrals from your best customers." },
+// BUSINESS — labeled section (was GROWTH)
+const BUSINESS_NAV_ITEMS: NavItem[] = [
+  { to: "/follow-ups",       label: "Follow-Ups",       icon: Bell,       description: "Every quote that needs a follow-up, ranked by priority. Never let a lead go cold." },
+  { to: "/opportunities",    label: "Win-Back",          icon: Repeat2,    pro: true, description: "Re-engage past customers who went quiet — AI surfaces the best win-back opportunities." },
+  { to: "/revenue",          label: "Revenue",           icon: DollarSign, pro: true, description: "Full revenue reporting — monthly totals, job type breakdown, and trends vs. prior periods." },
+  { to: "/reviews-referrals",label: "Reviews & Referrals",icon: Star,      pro: true, description: "Automate Google review requests and track referrals from your best customers." },
 ];
 
-// TOOLS — labeled section
+// TOOLS — labeled section (collapsed by default)
 const TOOLS_NAV_ITEMS: NavItem[] = [
   { to: "/quote-doctor",      label: "Quote Doctor",       icon: Zap,         description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
+  { to: "/lead-capture",      label: "Lead Capture",       icon: Link2,       description: "Share your branded quote request link — customers submit details, you get instant leads." },
   { to: "/commercial-quote",  label: "Commercial Quote",   icon: Building2,   pro: true, description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
-  { to: "/walkthrough-ai",    label: "Quote from Notes",   icon: Wand2,                  description: "Paste your walkthrough notes and let AI generate a complete, ready-to-send quote instantly." },
-  { to: "/closing-assistant", label: "Objection Assistant",icon: Target,      pro: true, description: "AI coach that gives you word-for-word responses to price pushback and sales objections." },
-  { to: "/ai-assistant",      label: "Sales Assistant",    icon: Bot,         pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
   { to: "/automations",       label: "Automations",        icon: Cpu,         pro: true, description: "Set up automated follow-ups, review requests, and customer sequences that run on autopilot." },
-  { to: "/email-sequences",   label: "Email Sequences",    icon: MailOpen,    pro: true, description: "Drip campaigns and one-off emails — automated sequences that nurture leads into booked jobs." },
-  { to: "/tasks-queue",       label: "Task Queue",         icon: CheckSquare, pro: true, description: "AI-generated action items prioritized by impact — your daily to-do list for growing faster." },
-  { to: "/toolkit",           label: "Toolkit",            icon: Wrench,                 description: "Calculators, scripts, templates, and reference tools for running a professional cleaning business." },
+  { to: "/email-sequences",   label: "Automated Emails",   icon: MailOpen,    pro: true, description: "Drip campaigns and one-off emails — automated sequences that nurture leads into booked jobs." },
+  { to: "/ai-assistant",      label: "Sales Assistant",    icon: Bot,         pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
+  { to: "/closing-assistant", label: "Handle Objections",  icon: Target,      pro: true, description: "AI coach that gives you word-for-word responses to price pushback and sales objections." },
+  { to: "/walkthrough-ai",    label: "Voice-to-Quote",     icon: Wand2,       description: "Paste your walkthrough notes and let AI generate a complete, ready-to-send quote instantly." },
+  { to: "/toolkit",           label: "Toolkit",            icon: Wrench,      description: "Calculators, scripts, templates, and reference tools for running a professional cleaning business." },
 ];
 
 // SETTINGS — collapsible labeled section
@@ -86,18 +81,17 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { to: "/quote-preferences", label: "Quote Settings",    icon: Sliders,     description: "Control what appears on your quotes — service lines, terms, branding, and layout preferences." },
   { to: "/pricing-logic",     label: "Pricing Engine",    icon: Brain,       description: "AI-powered pricing logic based on your market, home size, and service type. Set your rates here." },
   { to: "/sales-strategy",    label: "Sales Strategy",    icon: Layers,      pro: true, description: "Personalized playbooks and talking points to help you close more jobs at higher prices." },
-  { to: "/calendar",          label: "Schedule",          icon: CalendarDays,pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
-  { to: "/employees",         label: "Team Members",      icon: UserCog,                description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
-  { to: "/file-library",      label: "File Library",      icon: FolderOpen,             description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
-  { to: "/qbo-settings",      label: "QuickBooks",        icon: PlugZap,                description: "Sync your quotes, invoices, and payments directly to QuickBooks Online." },
-  { to: "/jobber",            label: "Jobber",            icon: Clipboard,              description: "Connect your Jobber account to sync jobs, customers, and scheduling automatically." },
-  { to: "/account-settings",  label: "Account",           icon: CircleUser,             description: "Manage your profile, password, notification preferences, and billing information." },
+  { to: "/employees",         label: "Team Members",      icon: UserCog,     description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
+  { to: "/file-library",      label: "File Library",      icon: FolderOpen,  description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
+  { to: "/qbo-settings",      label: "QuickBooks",        icon: PlugZap,     description: "Sync your quotes, invoices, and payments directly to QuickBooks Online." },
+  { to: "/jobber",            label: "Jobber",            icon: Clipboard,   description: "Connect your Jobber account to sync jobs, customers, and scheduling automatically." },
+  { to: "/account-settings",  label: "Account",           icon: CircleUser,  description: "Manage your profile, password, notification preferences, and billing information." },
 ];
 
 // All nav items for command palette
 const navSections: NavSection[] = [
   { label: null,       items: CORE_NAV_ITEMS },
-  { label: "GROWTH",   items: GROWTH_NAV_ITEMS },
+  { label: "BUSINESS", items: BUSINESS_NAV_ITEMS },
   { label: "TOOLS",    items: TOOLS_NAV_ITEMS },
   { label: "SETTINGS", items: SETTINGS_NAV_ITEMS },
 ];
@@ -256,15 +250,16 @@ const ALL_CMD_ITEMS = [
   { label: "Jobs", icon: Briefcase, path: "/jobs", group: "Navigate" },
   { label: "Team Members", icon: UserCog, path: "/employees", group: "Navigate" },
   { label: "Schedule", icon: CalendarDays, path: "/calendar", group: "Navigate" },
-  { label: "Pricing Engine", icon: Brain, path: "/pricing-logic", group: "Navigate" },
-  { label: "Follow-ups", icon: Bell, path: "/follow-ups", group: "Navigate" },
+  { label: "Follow-Ups", icon: Bell, path: "/follow-ups", group: "Navigate" },
+  { label: "Win-Back", icon: Repeat2, path: "/opportunities", group: "Navigate" },
   { label: "Revenue", icon: DollarSign, path: "/revenue", group: "Navigate" },
-  { label: "Growth Hub", icon: TrendingUp, path: "/growth", group: "Navigate" },
-  { label: "Lead Radar", icon: Radio, path: "/lead-finder", group: "Navigate" },
-  { label: "Opportunities", icon: Target, path: "/opportunities", group: "Navigate" },
+  { label: "Reviews & Referrals", icon: Star, path: "/reviews-referrals", group: "Navigate" },
+  { label: "Lead Capture", icon: Link2, path: "/lead-capture", group: "Navigate" },
   { label: "Automations", icon: Cpu, path: "/automations", group: "Navigate" },
   { label: "Sales Assistant", icon: Bot, path: "/ai-assistant", group: "Navigate" },
-  { label: "Quote from Notes", icon: Wand2, path: "/walkthrough-ai", group: "Navigate" },
+  { label: "Handle Objections", icon: Target, path: "/closing-assistant", group: "Navigate" },
+  { label: "Voice-to-Quote", icon: Wand2, path: "/walkthrough-ai", group: "Navigate" },
+  { label: "Pricing Engine", icon: Brain, path: "/pricing-logic", group: "Navigate" },
   { label: "Account Settings", icon: Settings, path: "/account-settings", group: "Navigate" },
 ];
 
@@ -385,14 +380,14 @@ const ROUTE_TITLES: Record<string, string> = {
   "/customers": "Customers", "/jobs": "Jobs", "/employees": "Team Members",
   "/calendar": "Schedule", "/pricing-logic": "Pricing Engine",
   "/settings": "Price Settings", "/quote-preferences": "Quote Settings",
-  "/follow-ups": "Follow-ups", "/revenue": "Revenue", "/growth": "Growth Hub",
-  "/opportunities": "Opportunities", "/lead-finder": "Lead Radar",
-  "/lead-capture": "Lead Capture", "/reactivation": "Reactivation",
-  "/email-sequences": "Email Sequences", "/reviews-referrals": "Reviews & Referrals",
+  "/follow-ups": "Follow-Ups", "/revenue": "Revenue", "/growth": "Growth Hub",
+  "/opportunities": "Win-Back", "/lead-finder": "Lead Finder",
+  "/lead-capture": "Lead Capture", "/reactivation": "Win-Back",
+  "/email-sequences": "Automated Emails", "/reviews-referrals": "Reviews & Referrals",
   "/weekly-recap": "Weekly Recap", "/tasks-queue": "Tasks Queue",
   "/automations": "Automations", "/ai-assistant": "Sales Assistant",
-  "/walkthrough-ai": "Quote from Notes", "/intake-requests": "Quote Requests",
-  "/closing-assistant": "Objection Assistant", "/sales-strategy": "Sales Strategy",
+  "/walkthrough-ai": "Voice-to-Quote", "/intake-requests": "Quote Requests",
+  "/closing-assistant": "Handle Objections", "/sales-strategy": "Sales Strategy",
   "/commercial-quote": "Commercial Quote", "/file-library": "File Library",
   "/toolkit": "Toolkit", "/pro-setup": "Setup Checklist",
   "/account-settings": "Account Settings", "/qbo-settings": "QuickBooks",
@@ -469,6 +464,9 @@ export function Layout() {
   const [settingsOpen, setSettingsOpen] = useState(() => {
     try { return localStorage.getItem(SETTINGS_NAV_KEY) === "true"; } catch { return false; }
   });
+  const [toolsOpen, setToolsOpen] = useState(() => {
+    try { return localStorage.getItem("quotepro_nav_tools_open") === "true"; } catch { return false; }
+  });
   const [navTooltipsEnabled, setNavTooltipsEnabled] = useState(() => {
     try { return localStorage.getItem(NAV_TOOLTIPS_KEY) !== "false"; } catch { return true; }
   });
@@ -477,6 +475,14 @@ export function Layout() {
     setSettingsOpen((prev) => {
       const next = !prev;
       try { localStorage.setItem(SETTINGS_NAV_KEY, String(next)); } catch {}
+      return next;
+    });
+  };
+
+  const toggleToolsNav = () => {
+    setToolsOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("quotepro_nav_tools_open", String(next)); } catch {}
       return next;
     });
   };
@@ -662,16 +668,16 @@ export function Layout() {
             ))}
           </div>
 
-          {/* GROWTH */}
+          {/* BUSINESS */}
           <div style={{ marginTop: "24px" }}>
             <p
               className="px-3 mb-1"
               style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", color: "#a1a1aa" }}
             >
-              GROWTH
+              BUSINESS
             </p>
             <div className="space-y-0.5">
-              {GROWTH_NAV_ITEMS.map((item) => (
+              {BUSINESS_NAV_ITEMS.map((item) => (
                 <NavItemWithTooltip
                   key={item.to}
                   item={item}
@@ -686,28 +692,42 @@ export function Layout() {
             </div>
           </div>
 
-          {/* TOOLS */}
+          {/* TOOLS — collapsible, closed by default */}
           <div style={{ marginTop: "24px" }}>
-            <p
-              className="px-3 mb-1"
-              style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", color: "#a1a1aa" }}
+            <button
+              onClick={toggleToolsNav}
+              className="w-full px-3 mb-1 flex items-center gap-1.5 group"
+              style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 12px 4px" }}
             >
-              TOOLS
-            </p>
-            <div className="space-y-0.5">
-              {TOOLS_NAV_ITEMS.map((item) => (
-                <NavItemWithTooltip
-                  key={item.to}
-                  item={item}
-                  enabled={navTooltipsEnabled}
-                  intakeNewCount={intakeNewCount}
-                  quoteResponseCount={quoteResponseCount}
-                  isPro={isPro}
-                  setSidebarOpen={setSidebarOpen}
-                  t={t}
-                />
-              ))}
-            </div>
+              <span
+                style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", color: "#a1a1aa", flex: 1, textAlign: "left" }}
+              >
+                TOOLS
+              </span>
+              <ChevronDown
+                style={{
+                  width: "12px", height: "12px", color: "#a1a1aa",
+                  transform: toolsOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                  transition: "transform 0.18s ease",
+                }}
+              />
+            </button>
+            {toolsOpen && (
+              <div className="space-y-0.5">
+                {TOOLS_NAV_ITEMS.map((item) => (
+                  <NavItemWithTooltip
+                    key={item.to}
+                    item={item}
+                    enabled={navTooltipsEnabled}
+                    intakeNewCount={intakeNewCount}
+                    quoteResponseCount={quoteResponseCount}
+                    isPro={isPro}
+                    setSidebarOpen={setSidebarOpen}
+                    t={t}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* SETTINGS — collapsible */}
