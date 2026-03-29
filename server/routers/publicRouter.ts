@@ -2259,9 +2259,12 @@ Return ONLY valid JSON:
 
       // Build full pricing config for the client-side engine
       const pricingConfig = {
-        hourlyRate: Number(storedSettings.hourlyRate ?? 40),
+        hourlyRate: Number(storedSettings.hourlyRate ?? 45),
         minimumTicket: Number(storedSettings.minimumTicket ?? 100),
         taxRate: Number(storedSettings.taxRate ?? 0),
+        pricePerSqft: Number(storedSettings.pricePerSqft ?? 85),
+        pricePerBedroom: Number(storedSettings.pricePerBedroom ?? 15),
+        pricePerBathroom: Number(storedSettings.pricePerBathroom ?? 18),
         serviceTypes: (storedSettings.serviceTypes || []) as any[],
         goodOptionId: storedSettings.goodOptionId || null,
         betterOptionId: storedSettings.betterOptionId || null,

@@ -27,6 +27,10 @@ export interface LeadLinkPricingConfig {
   hourlyRate: number;
   minimumTicket: number;
   taxRate: number;
+  // Flat-rate pricing fields (aligned with main quoting engine)
+  pricePerSqft?: number;
+  pricePerBedroom?: number;
+  pricePerBathroom?: number;
   serviceTypes: ServiceType[];
   goodOptionId: string | null;
   betterOptionId: string | null;
@@ -110,45 +114,54 @@ export function calculateLeadLinkEstimate(
   let largeBedNote: string | undefined;
 
   // STEP 1: Determine service type
+  // Correct mapping: standard → better (Standard Clean), deep → best (Deep Clean)
+  // Previously mapped one tier too low (standard → good/Touch Up), causing underpricing.
   const serviceTypeMap: Record<CleaningType, string | null> = {
-    standard: config.goodOptionId,
-    deep: config.betterOptionId,
-    moveinout: config.bestOptionId ?? config.betterOptionId ?? config.goodOptionId,
-    recurring: config.goodOptionId,
+    standard:  config.betterOptionId ?? config.goodOptionId,
+    deep:      config.bestOptionId   ?? config.betterOptionId ?? config.goodOptionId,
+    moveinout: config.bestOptionId   ?? config.betterOptionId ?? config.goodOptionId,
+    recurring: config.betterOptionId ?? config.goodOptionId,
   };
 
   const targetId = serviceTypeMap[inputs.cleaningType];
   const serviceType =
     (targetId ? config.serviceTypes.find((st) => st.id === targetId) : null) ??
+    config.serviceTypes[1] ??   // prefer second tier (standard) over touch-up
     config.serviceTypes[0] ??
     null;
   const multiplier = serviceType?.multiplier ?? 1.0;
 
-  // STEP 2: Base labor hours
-  let estimatedHours: number;
+  // Flat-rate pricing params (aligned with main quoting engine defaults)
+  const pricePerSqft    = (config.pricePerSqft    ?? 85);
+  const pricePerBedroom = (config.pricePerBedroom  ?? 15);
+  const pricePerBathroom= (config.pricePerBathroom ?? 18);
+  const hourlyRate      = config.hourlyRate > 0 ? config.hourlyRate : 45;
+
   const cappedSqft = inputs.sqft && inputs.sqft > 5000 ? 5000 : (inputs.sqft ?? null);
-  if (cappedSqft && cappedSqft > 0) {
-    estimatedHours = cappedSqft / 400;
-    if (inputs.sqft && inputs.sqft > 5000) {
-      largeSqftNote = `For very large properties, exact pricing will be confirmed by the business.`;
-    }
-  } else {
-    const bedCapped = Math.min(inputs.bedrooms, 6);
-    if (inputs.bedrooms > 5) {
-      largeBedNote = `For larger homes, exact pricing will be confirmed.`;
-    }
-    const bedHours = BEDROOM_HOURS[bedCapped] ?? 2.0;
-    const bathKey = Math.min(inputs.bathrooms, 4);
-    const bathHours = BATHROOM_HOURS[bathKey] ?? 0.75;
-    estimatedHours = bedHours + bathHours;
+  if (inputs.sqft && inputs.sqft > 5000) {
+    largeSqftNote = `For very large properties, exact pricing will be confirmed by the business.`;
   }
 
-  // STEP 3: Apply service type multiplier
-  estimatedHours = estimatedHours * multiplier;
+  // STEP 2–4: Base price calculation
+  // When sqft is known: use same flat-rate formula as the main quoting engine
+  //   base = (sqft/1k × $/sqft) + (beds × $/bed) + (baths × $/bath)
+  // When sqft is unknown: fall back to bed/bath hour lookup × hourly rate
+  let rawBase: number;
+  if (cappedSqft && cappedSqft > 0) {
+    const sqftRaw = (cappedSqft / 1000) * pricePerSqft;
+    const bedRaw  = inputs.bedrooms  * pricePerBedroom;
+    const bathRaw = inputs.bathrooms * pricePerBathroom;
+    rawBase = (sqftRaw + bedRaw + bathRaw) * multiplier;
+  } else {
+    const bedCapped = Math.min(inputs.bedrooms, 6);
+    if (inputs.bedrooms > 5) largeBedNote = `For larger homes, exact pricing will be confirmed.`;
+    const bedHours  = BEDROOM_HOURS[bedCapped] ?? 2.0;
+    const bathKey   = Math.min(inputs.bathrooms, 4);
+    const bathHours = BATHROOM_HOURS[bathKey] ?? 0.75;
+    rawBase = (bedHours + bathHours) * multiplier * hourlyRate;
+  }
 
-  // STEP 4: Base labor cost — guard against zero hourly rate
-  const hourlyRate = config.hourlyRate > 0 ? config.hourlyRate : 40;
-  const baseLabor = estimatedHours * hourlyRate;
+  const baseLabor = rawBase;
 
   // STEP 5: Condition adjustment
   const condMult = CONDITION_MULTIPLIERS[inputs.conditionLevel] ?? 1.0;
