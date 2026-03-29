@@ -8,6 +8,7 @@ import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql, 
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import { callAI } from "../aiClient";
+import { getOrCreatePortalToken } from "./portalRouter";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -146,6 +147,7 @@ const router = Router();
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const c = await createCustomer({ ...req.body, businessId: business.id });
+      getOrCreatePortalToken(c.id, business.id).catch(() => {});
       return res.json(c);
     } catch (error: any) {
       console.error("Create customer error:", error);
