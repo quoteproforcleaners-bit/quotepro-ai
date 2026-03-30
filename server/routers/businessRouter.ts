@@ -1799,7 +1799,7 @@ router.get("/api/tip-settings", requireAuth, async (req: any, res: Response) => 
     const bizRes = await pool.query(
       `SELECT id, tips_enabled, tip_percentage_options, tip_distribution_percent, tip_request_delay
        FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
-      [req.user.id]
+      [req.session.userId]
     );
     if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
     const b = bizRes.rows[0];
@@ -1818,7 +1818,7 @@ router.get("/api/tip-settings", requireAuth, async (req: any, res: Response) => 
 router.put("/api/tip-settings", requireAuth, async (req: any, res: Response) => {
   try {
     const bizRes = await pool.query(
-      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.user.id]
+      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.session.userId]
     );
     if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
     const bizId = bizRes.rows[0].id;
@@ -1853,7 +1853,7 @@ router.put("/api/tip-settings", requireAuth, async (req: any, res: Response) => 
 router.get("/api/tips", requireAuth, async (req: any, res: Response) => {
   try {
     const bizRes = await pool.query(
-      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.user.id]
+      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.session.userId]
     );
     if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
     const bizId = bizRes.rows[0].id;
