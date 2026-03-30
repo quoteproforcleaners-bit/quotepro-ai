@@ -485,7 +485,11 @@ export default function SettingsPage() {
       refetchTipSettings();
       setTipsSaved(true);
       setTimeout(() => setTipsSaved(false), 3000);
-    } catch {}
+      showSaved("tips");
+    } catch (err: any) {
+      console.error("saveTipSettings error:", err);
+      alert(err?.message || "Failed to save tip settings. Please try again.");
+    }
   };
 
   useEffect(() => {

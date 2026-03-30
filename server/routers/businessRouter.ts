@@ -1835,7 +1835,7 @@ router.put("/api/tip-settings", requireAuth, async (req: any, res: Response) => 
        WHERE id = $5`,
       [
         tipsEnabled !== undefined ? tipsEnabled : null,
-        tipPercentageOptions ? JSON.stringify(tipPercentageOptions) : null,
+        tipPercentageOptions && tipPercentageOptions.length ? tipPercentageOptions : null,
         tipDistributionPercent !== undefined ? tipDistributionPercent : null,
         tipRequestDelay !== undefined ? tipRequestDelay : null,
         bizId,
