@@ -23,11 +23,8 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
     email: "",
     password: "",
-    companyName: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -171,11 +168,16 @@ export default function RegisterPage() {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={googleLoading}
-              className="w-full h-11 flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 transition-colors disabled:opacity-60 shadow-sm"
+              className="w-full h-[52px] flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl text-[15px] font-semibold text-white transition-colors disabled:opacity-60 shadow-md shadow-blue-600/30"
             >
-              {GOOGLE_SVG}
+              <span className="flex items-center justify-center w-7 h-7 bg-white rounded-md shrink-0">
+                {GOOGLE_SVG}
+              </span>
               {googleLoading ? "Redirecting..." : "Continue with Google"}
             </button>
+            <p className="text-center text-xs text-slate-500 mt-2.5">
+              Most users sign up with Google — it's faster
+            </p>
 
             <div className="relative my-5">
               <div className="absolute inset-0 flex items-center">
@@ -187,41 +189,6 @@ export default function RegisterPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3.5">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">First name</label>
-                  <input
-                    value={form.firstName}
-                    onChange={set("firstName")}
-                    required
-                    placeholder="Jane"
-                    autoComplete="given-name"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Last name</label>
-                  <input
-                    value={form.lastName}
-                    onChange={set("lastName")}
-                    required
-                    placeholder="Smith"
-                    autoComplete="family-name"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Company name</label>
-                <input
-                  value={form.companyName}
-                  onChange={set("companyName")}
-                  required
-                  placeholder="Sparkle Cleaners"
-                  autoComplete="organization"
-                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
                 <input
@@ -279,7 +246,7 @@ export default function RegisterPage() {
               >
                 Privacy Policy
               </a>
-              . AI-powered features process data via OpenAI — consent is
+              . AI-powered features use Anthropic Claude — consent is
               requested on first use.
             </p>
           </div>

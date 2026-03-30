@@ -305,12 +305,12 @@ export default function LoginPage() {
             {/* Header hierarchy */}
             <div className="mb-7">
               <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-2">
-                Welcome back
+                For cleaning businesses
               </p>
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight leading-snug">
-                Close more jobs in minutes
+                Start Closing More Jobs
               </h1>
-              <p className="text-slate-500 text-sm mt-1.5">Sign in to continue</p>
+              <p className="text-slate-500 text-sm mt-1.5">Sign in or start your free trial</p>
             </div>
 
             {error ? (
@@ -320,16 +320,21 @@ export default function LoginPage() {
               </div>
             ) : null}
 
-            {/* Google — full width, matches input width */}
+            {/* Google — primary CTA, full width */}
             <button
               type="button"
               onClick={handleGoogleSignIn}
               disabled={googleLoading}
-              className="w-full h-[44px] flex items-center justify-center gap-2.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-700 transition-colors disabled:opacity-60 shadow-sm"
+              className="w-full h-[52px] flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-xl text-[15px] font-semibold text-white transition-colors disabled:opacity-60 shadow-md shadow-blue-600/30"
             >
-              {GOOGLE_SVG}
+              <span className="flex items-center justify-center w-7 h-7 bg-white rounded-md shrink-0">
+                {GOOGLE_SVG}
+              </span>
               {googleLoading ? "Redirecting..." : "Continue with Google"}
             </button>
+            <p className="text-center text-xs text-slate-500 mt-2.5">
+              Most users sign up with Google — it's faster
+            </p>
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">

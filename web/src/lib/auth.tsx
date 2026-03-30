@@ -43,11 +43,11 @@ interface AuthContextType {
 }
 
 interface RegisterData {
-  firstName: string;
-  lastName: string;
   email: string;
   password: string;
-  companyName: string;
+  firstName?: string;
+  lastName?: string;
+  companyName?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
