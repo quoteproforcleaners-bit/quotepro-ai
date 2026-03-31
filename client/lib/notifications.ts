@@ -286,7 +286,7 @@ export async function scheduleFirstWinCelebration() {
         title: "Your quote is working for you",
         body: "Check the Growth tab for follow-up tips to close the deal.",
         sound: true,
-        data: { screen: "GrowthTab" },
+        data: { screen: "GrowthDashboard" },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

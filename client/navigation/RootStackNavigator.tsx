@@ -42,6 +42,8 @@ import LeadFinderSettingsScreen from "@/screens/LeadFinderSettingsScreen";
 import LeadCaptureSettingsScreen from "@/screens/LeadCaptureSettingsScreen";
 import AIAgentIntroScreen from "@/screens/AIAgentIntroScreen";
 import NPSSurveyModal from "@/screens/NPSSurveyModal";
+import QuoteDoctorScreen from "@/screens/QuoteDoctorScreen";
+import GrowthDashboardScreen from "@/screens/GrowthDashboardScreen";
 
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
@@ -92,7 +94,8 @@ export type RootStackParamList = {
   LeadFinderSettings: undefined;
   LeadCaptureSettings: undefined;
   AIAgentIntro: undefined;
-
+  QuoteDoctor: undefined;
+  GrowthDashboard: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -505,6 +508,20 @@ export default function RootStackNavigator() {
             component={LeadCaptureSettingsScreen}
             options={{
               headerTitle: "Lead Capture Link",
+            }}
+          />
+          <Stack.Screen
+            name="QuoteDoctor"
+            component={QuoteDoctorScreen}
+            options={{
+              headerTitle: "Quote Doctor",
+            }}
+          />
+          <Stack.Screen
+            name="GrowthDashboard"
+            component={GrowthDashboardScreen}
+            options={{
+              headerTitle: "Reports",
             }}
           />
           <Stack.Screen

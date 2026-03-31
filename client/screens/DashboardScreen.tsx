@@ -426,7 +426,7 @@ export default function DashboardScreen() {
           <SectionLabel
             title="Pipeline"
             action="Reports"
-            onAction={() => nav("Main", { screen: "GrowthTab" })}
+            onAction={() => nav("GrowthDashboard" as any)}
             theme={theme}
             isDark={isDark}
           />
@@ -457,7 +457,7 @@ export default function DashboardScreen() {
                 value: stats?.closeRate != null ? `${Math.round(stats.closeRate)}%` : "—",
                 label: "Close Rate",
                 urgent: false,
-                onPress: () => nav("Main", { screen: "GrowthTab" }),
+                onPress: () => nav("GrowthDashboard" as any),
                 testID: "pipeline-close-rate",
               },
             ].map((stat, i) => (

@@ -30,10 +30,7 @@ import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
 import QuotesScreen from "@/screens/QuotesScreen";
 import CalendarScreen from "@/screens/CalendarScreen";
-import GrowthDashboardScreen from "@/screens/GrowthDashboardScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
-import LeadFinderScreen from "@/screens/LeadFinderScreen";
-import QuoteDoctorScreen from "@/screens/QuoteDoctorScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
@@ -41,13 +38,10 @@ import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useLanguage } from "@/context/LanguageContext";
 
 export type MainTabParamList = {
-  QuoteDoctorTab: undefined;
   HomeTab: undefined;
   CustomersTab: undefined;
   QuotesTab: undefined;
   JobsTab: undefined;
-  GrowthTab: undefined;
-  LeadRadarTab: undefined;
   SettingsTab: undefined;
 };
 
@@ -211,6 +205,22 @@ function QuotesHeaderRight() {
           ) : null}
         </View>
       </HeaderButton>
+      <HeaderButton onPress={() => navigation.navigate("QuoteDoctor")}>
+        <View style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 5,
+          backgroundColor: "#10b98118",
+          paddingHorizontal: 11,
+          paddingVertical: 6,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: "#10b98130",
+        }}>
+          <Feather name="zap" size={14} color="#10b981" />
+          <Text style={{ fontSize: 13, color: "#10b981", fontWeight: "700" }}>AI</Text>
+        </View>
+      </HeaderButton>
       <HeaderButton onPress={() => navigation.navigate("QuotePreferences")}>
         <View style={{
           flexDirection: "row",
@@ -225,7 +235,6 @@ function QuotesHeaderRight() {
         }}>
           <Feather name="sliders" size={15} color={theme.primary} />
           <Text style={{ fontSize: 13, color: theme.primary, fontWeight: "700" }}>Settings</Text>
-          <Feather name="chevron-right" size={14} color={theme.primary} />
         </View>
       </HeaderButton>
     </View>
@@ -325,28 +334,6 @@ export default function MainTabNavigator() {
       }}
     >
       <Tab.Screen
-        name="QuoteDoctorTab"
-        component={QuoteDoctorScreen}
-        options={{
-          title: "Quote Doctor",
-          headerTitle: "Quote Doctor ⚡",
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="zap" color={focused ? "#10b981" : color} size={size} focused={focused} />
-          ),
-          tabBarLabel: ({ color, focused }) => (
-            <View style={{ alignItems: "center" }}>
-              <Text style={{ fontSize: 10, fontWeight: focused ? "700" : "500", color: focused ? "#10b981" : color, marginTop: -2 }}>
-                Quote Dr.
-              </Text>
-              <View style={{ backgroundColor: "#10b981", borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, marginTop: 1 }}>
-                <Text style={{ fontSize: 7, fontWeight: "800", color: "#fff", letterSpacing: 0.5 }}>FREE</Text>
-              </View>
-            </View>
-          ),
-        }}
-        listeners={{ tabPress: handleTabPress }}
-      />
-      <Tab.Screen
         name="HomeTab"
         component={DashboardScreen}
         options={{
@@ -354,18 +341,6 @@ export default function MainTabNavigator() {
           headerTitle: () => <HeaderTitle title="QuotePro" />,
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="home" color={color} size={size} focused={focused} isHome />
-          ),
-        }}
-        listeners={{ tabPress: handleTabPress }}
-      />
-      <Tab.Screen
-        name="CustomersTab"
-        component={CustomersScreen}
-        options={{
-          title: t.tabs.customers,
-          headerTitle: t.tabs.customers,
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="users" color={color} size={size} focused={focused} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
@@ -384,6 +359,18 @@ export default function MainTabNavigator() {
         listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
+        name="CustomersTab"
+        component={CustomersScreen}
+        options={{
+          title: t.tabs.customers,
+          headerTitle: t.tabs.customers,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="users" color={color} size={size} focused={focused} />
+          ),
+        }}
+        listeners={{ tabPress: handleTabPress }}
+      />
+      <Tab.Screen
         name="JobsTab"
         component={CalendarScreen}
         options={{
@@ -397,37 +384,13 @@ export default function MainTabNavigator() {
         listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
-        name="GrowthTab"
-        component={GrowthDashboardScreen}
-        options={{
-          title: "Reports",
-          headerTitle: "Reports",
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="bar-chart-2" color={color} size={size} focused={focused} badgeCount={pendingTaskCount} />
-          ),
-        }}
-        listeners={{ tabPress: handleTabPress }}
-      />
-      <Tab.Screen
-        name="LeadRadarTab"
-        component={LeadFinderScreen}
-        options={{
-          title: "Lead Radar",
-          headerTitle: "Lead Radar",
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="radio" color={color} size={size} focused={focused} />
-          ),
-        }}
-        listeners={{ tabPress: handleTabPress }}
-      />
-      <Tab.Screen
         name="SettingsTab"
         component={WrappedSettings}
         options={{
           title: t.tabs.settings,
           headerTitle: t.tabs.settings,
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="settings" color={color} size={size} focused={focused} />
+            <TabIcon name="settings" color={color} size={size} focused={focused} badgeCount={pendingTaskCount} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
