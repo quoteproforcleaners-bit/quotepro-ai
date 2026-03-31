@@ -521,7 +521,8 @@ const router = Router();
         publicDomain = req.get("x-forwarded-host") || req.get("host") || "localhost";
       }
       const redirectUri = `https://${publicDomain}/api/auth/google/callback`;
-      console.log("[google-auth/start] publicDomain:", publicDomain, "redirectUri:", redirectUri);
+      const clientIdHint = (process.env.GOOGLE_CLIENT_ID || "").substring(0, 20) + "...";
+      console.log("[google-auth/start] clientId prefix:", clientIdHint, "| redirectUri:", redirectUri);
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
@@ -533,6 +534,10 @@ const router = Router();
         prompt: "select_account",
         state: platform,
       });
+      const parsedUrl = new URL(url);
+      const urlClientId = parsedUrl.searchParams.get("client_id") || "";
+      const urlRedirectUri = parsedUrl.searchParams.get("redirect_uri") || "";
+      console.log("[google-auth/start] FINAL client_id:", urlClientId, "| redirect_uri:", urlRedirectUri);
       res.set("Cache-Control", "no-store, no-cache, must-revalidate");
       res.set("Pragma", "no-cache");
       return res.json({ url });
