@@ -24,3 +24,15 @@ id = "S20Kqbue18NvDWy33X5CD"
 uri = "file://commercial_calculator_audit.txt"
 type = "text"
 title = "Commercial Calculator — Full Code (1,884 lines)"
+
+[[outputs]]
+id = "XMWyb6anfKw5L6OwdQBrL"
+uri = "file://quotepro-source-audit.zip"
+type = "unspecified"
+title = "QuotePro AI — Full Source Code (v1.2.1)"
+
+[[outputs]]
+id = "_p7T9SmwX8Dv9k21kc2OW"
+uri = "file://quotepro-source-audit.tar.gz"
+type = "unspecified"
+title = "QuotePro AI — Full Source Code v1.2.1"
