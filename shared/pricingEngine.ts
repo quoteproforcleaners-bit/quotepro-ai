@@ -427,6 +427,7 @@ export type GlassLevel = "None" | "Some" | "Lots";
 export type CommercialFrequency = "1x" | "2x" | "3x" | "5x" | "daily" | "custom";
 export type RoundingRule = "none" | "5" | "10" | "25";
 export type SuppliesSurchargeType = "fixed" | "percent";
+export type TrafficLevel = "Low" | "Medium" | "High" | "VeryHigh";
 
 export interface CommercialWalkthrough {
   facilityType: FacilityType;
@@ -451,6 +452,10 @@ export interface CommercialWalkthrough {
   preferredTimeWindow: string;
   accessConstraints: string;
   notes: string;
+  buildingAge: number;
+  elevatorCount: number;
+  parkingLotSqFt?: number;
+  trafficLevel: TrafficLevel;
 }
 
 export interface CommercialLaborEstimate {
@@ -467,6 +472,7 @@ export interface CommercialPricingConfig {
   suppliesSurcharge: number;
   suppliesSurchargeType: SuppliesSurchargeType;
   roundingRule: RoundingRule;
+  afterHoursPremiumPct: number;
 }
 
 export interface CommercialLineItem {
@@ -521,8 +527,20 @@ export function applyRounding(price: number, rule: RoundingRule): number {
   return Math.ceil(price / inc) * inc;
 }
 
-export function computeCommercialLaborEstimate(w: CommercialWalkthrough): Omit<CommercialLaborEstimate, "overrideHours"> {
-  let mins = (w.totalSqFt / 1000) * BASE_MINUTES_PER_1000_SQFT[w.facilityType];
+export const TRAFFIC_LEVEL_MULTIPLIER: Record<TrafficLevel, number> = {
+  Low: 0.9, Medium: 1.0, High: 1.15, VeryHigh: 1.3,
+};
+
+export function computeCommercialLaborEstimate(
+  w: CommercialWalkthrough,
+  baseMinutesOverride?: Partial<Record<FacilityType, number>>,
+): Omit<CommercialLaborEstimate, "overrideHours"> {
+  const baseMinutes = baseMinutesOverride
+    ? { ...BASE_MINUTES_PER_1000_SQFT, ...baseMinutesOverride }
+    : BASE_MINUTES_PER_1000_SQFT;
+
+  // Interior base + addons
+  let mins = (w.totalSqFt / 1000) * baseMinutes[w.facilityType];
   mins += w.bathroomCount * ADDON_MINUTES.perBathroom;
   mins += w.breakroomCount * ADDON_MINUTES.perBreakroom;
   mins += w.trashPointCount * ADDON_MINUTES.perTrashPoint;
@@ -532,10 +550,28 @@ export function computeCommercialLaborEstimate(w: CommercialWalkthrough): Omit<C
   mins += w.entryLobbyCount * ADDON_MINUTES.perEntryLobby;
   mins += GLASS_LEVEL_MINUTES[w.glassLevel];
   if (w.highTouchFocus) mins += 15;
+
+  // Surface mix
   const carpet = w.carpetPercent / 100;
   const hard = w.hardFloorPercent / 100;
   mins *= carpet * 1.1 + hard * 0.95;
+
+  // Multi-floor travel
   if (w.floors > 1) mins *= 1 + (w.floors - 1) * 0.05;
+
+  // Elevator transport (8 min per elevator when multi-story)
+  if (w.floors > 1) mins += w.elevatorCount * 8;
+
+  // Building age complexity
+  if (w.buildingAge > 40) mins *= 1.25;
+  else if (w.buildingAge > 20) mins *= 1.15;
+
+  // Traffic level
+  mins *= TRAFFIC_LEVEL_MULTIPLIER[w.trafficLevel];
+
+  // Exterior parking lot (0.02 min per sq ft)
+  if (w.parkingLotSqFt) mins += w.parkingLotSqFt * 0.02;
+
   const rawMinutes = Math.round(mins);
   const rawHours = Math.round((rawMinutes / 60) * 100) / 100;
   const recommendedCleaners = Math.max(1, Math.ceil(rawMinutes / 120));
@@ -558,7 +594,15 @@ export function computeCommercialQuote(
   const totalBeforeMargin = baseCost + suppliesAmount;
   const marginMultiplier = 1 / (1 - config.targetMarginPct / 100);
   const rawPerVisit = totalBeforeMargin * marginMultiplier;
-  const perVisit = applyRounding(rawPerVisit, config.roundingRule);
+
+  // After-hours premium (applied after margin)
+  let afterHoursPremiumAmount = 0;
+  if (walkthrough?.afterHoursRequired && (config.afterHoursPremiumPct ?? 0) > 0) {
+    afterHoursPremiumAmount = rawPerVisit * (config.afterHoursPremiumPct / 100);
+  }
+  const finalRawPerVisit = rawPerVisit + afterHoursPremiumAmount;
+
+  const perVisit = applyRounding(finalRawPerVisit, config.roundingRule);
   const visitsPerMonth = FREQUENCY_VISITS_PER_MONTH[frequency];
   const monthly = applyRounding(perVisit * visitsPerMonth, config.roundingRule);
   const annual = applyRounding(monthly * 12, config.roundingRule);
@@ -570,12 +614,12 @@ export function computeCommercialQuote(
     { label: `Supplies surcharge ${config.suppliesSurchargeType === "fixed" ? `($${config.suppliesSurcharge} fixed)` : `(${config.suppliesSurcharge}%)`}`, amount: suppliesAmount, type: "supplies" },
     { label: `Target margin (${config.targetMarginPct}%)`, amount: rawPerVisit - totalBeforeMargin, type: "margin" },
   ];
+  if (afterHoursPremiumAmount > 0) {
+    lineItems.push({ label: `After-hours premium (${config.afterHoursPremiumPct}%)`, amount: afterHoursPremiumAmount, type: "surcharge" });
+  }
 
   // Applied rules
   const appliedRules: CommercialAppliedRule[] = [];
-  if (walkthrough?.afterHoursRequired) {
-    appliedRules.push({ label: "After-hours requirement noted", impact: 0 });
-  }
   if (walkthrough?.highTouchFocus) {
     appliedRules.push({ label: "High-touch point disinfection protocol applied (+15 min)", impact: 15 / 60 * config.hourlyRate });
   }
@@ -597,8 +641,8 @@ export function computeCommercialQuote(
   if (perVisit > 5000) {
     warnings.push({ type: "high_estimate", message: "Per-visit estimate is unusually high — review inputs." });
   }
-  if (walkthrough?.afterHoursRequired) {
-    warnings.push({ type: "after_hours", message: "After-hours cleaning may require a premium — consider adding a surcharge." });
+  if (walkthrough?.afterHoursRequired && (config.afterHoursPremiumPct ?? 0) === 0) {
+    warnings.push({ type: "after_hours", message: "After-hours service is enabled but the premium is set to 0% — consider adding a premium in Pricing settings." });
   }
 
   return { perVisit, monthly, annual, hours, recommendedCleaners: laborEst.recommendedCleaners, visitsPerMonth, lineItems, appliedRules, warnings, laborCost, baseCost };

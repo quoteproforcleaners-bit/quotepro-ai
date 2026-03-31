@@ -43,6 +43,7 @@ import LeadFinderSettingsPage from "./pages/LeadFinderSettingsPage";
 import RevenuePage from "./pages/RevenuePage";
 import ClosingAssistantPage from "./pages/ClosingAssistantPage";
 import CommercialQuotePage from "./pages/CommercialQuotePage";
+import CommercialSettingsPage from "./pages/CommercialSettingsPage";
 import ReactivationPage from "./pages/ReactivationPage";
 import AutomationsHubPage from "./pages/AutomationsHubPage";
 import SalesStrategyPage from "./pages/SalesStrategyPage";
@@ -173,6 +174,7 @@ export default function App() {
           <Route path="/revenue" element={<ProGate feature="Revenue Intelligence"><RevenuePage /></ProGate>} />
           <Route path="/closing-assistant" element={<ClosingAssistantPage />} />
           <Route path="/commercial-quote" element={<ProGate feature="Commercial Quoting"><CommercialQuotePage /></ProGate>} />
+          <Route path="/commercial-settings" element={<ProGate feature="Commercial Quoting"><CommercialSettingsPage /></ProGate>} />
           <Route path="/reactivation" element={<ProGate feature="Reactivation Campaigns"><ReactivationPage /></ProGate>} />
           <Route path="/automations" element={<ProGate feature="Automations"><AutomationsHubPage /></ProGate>} />
           <Route path="/sales-strategy" element={<ProGate feature="Sales Strategy"><SalesStrategyPage /></ProGate>} />

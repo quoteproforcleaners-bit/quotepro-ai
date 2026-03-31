@@ -18,6 +18,8 @@ import {
   type SuppliesSurchargeType,
   type FacilityType,
   type GlassLevel,
+  type TrafficLevel,
+  TRAFFIC_LEVEL_MULTIPLIER,
 } from "../lib/pricingEngine";
 import { CommercialLivePreview, LivePreviewPanel } from "../components/LiveQuotePreview";
 import type { ManualAdjustment } from "../components/LiveQuotePreview";
@@ -40,6 +42,7 @@ import {
   Settings,
   Star,
   Pencil,
+  ExternalLink,
 } from "lucide-react";
 import {
   PageHeader,
@@ -252,6 +255,7 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
           <NumInput label="Open Work Areas" value={data.openAreaCount} onChange={(v) => set("openAreaCount", v)} placeholder="0" />
           <NumInput label="Entry Lobbies" value={data.entryLobbyCount} onChange={(v) => set("entryLobbyCount", v)} placeholder="0" />
           <NumInput label="Trash Collection Points" value={data.trashPointCount} onChange={(v) => set("trashPointCount", v)} placeholder="0" />
+          <NumInput label="Elevators (if multi-floor)" value={data.elevatorCount} onChange={(v) => set("elevatorCount", v)} placeholder="0" />
         </div>
       </Card>
 
@@ -307,6 +311,49 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
             <p className="text-[11px] text-slate-400 mt-1">
               None = +0 min · Some = +10 min · Lots = +25 min per visit
             </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <NumInput
+              label="Building Age (years)"
+              value={data.buildingAge}
+              onChange={(v) => set("buildingAge", v)}
+              placeholder="0"
+            />
+            <NumInput
+              label="Parking Lot (sq ft)"
+              value={data.parkingLotSqFt ?? 0}
+              onChange={(v) => set("parkingLotSqFt", v > 0 ? v : undefined)}
+              placeholder="0"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <label className="text-xs font-medium text-slate-600">Foot Traffic Level</label>
+              <span className="text-[10px] text-slate-400">— affects cleaning time multiplier</span>
+            </div>
+            <div className="flex gap-2">
+              {([
+                ["Low", "Low", "×0.9"],
+                ["Medium", "Medium", "×1.0"],
+                ["High", "High", "×1.15"],
+                ["VeryHigh", "Very High", "×1.3"],
+              ] as [TrafficLevel, string, string][]).map(([v, label, mult]) => (
+                <button
+                  key={v}
+                  onClick={() => set("trafficLevel", v)}
+                  className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-colors text-center ${
+                    data.trafficLevel === v
+                      ? "border-primary-500 bg-primary-50 text-primary-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <div>{label}</div>
+                  <div className="text-[10px] font-normal opacity-70">{mult}</div>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -394,28 +441,41 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
 
 // ─── Step 3: Labor ────────────────────────────────────────────────────────────
 
-function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack }: {
+function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack, customBaseMinutes }: {
   walkthrough: CommercialWalkthrough;
   laborEst: CommercialLaborEstimate;
   setLaborEst: (l: CommercialLaborEstimate) => void;
   onNext: () => void;
   onBack: () => void;
+  customBaseMinutes?: Partial<Record<FacilityType, number>>;
 }) {
-  const auto = useMemo(() => computeCommercialLaborEstimate(walkthrough), [walkthrough]);
+  const auto = useMemo(() => computeCommercialLaborEstimate(walkthrough, customBaseMinutes), [walkthrough, customBaseMinutes]);
   const effectiveHours = laborEst.overrideHours ?? auto.rawHours;
 
+  const effectiveBaseMin = customBaseMinutes?.[walkthrough.facilityType] ?? BASE_MINUTES_PER_1000_SQFT[walkthrough.facilityType];
   const breakdown = [
-    { label: "Base time (sq ft + facility type)", mins: Math.round((walkthrough.totalSqFt / 1000) * BASE_MINUTES_PER_1000_SQFT[walkthrough.facilityType]) },
-    walkthrough.bathroomCount > 0 && { label: `Bathrooms (${walkthrough.bathroomCount} × 15 min)`, mins: walkthrough.bathroomCount * 15 },
-    walkthrough.breakroomCount > 0 && { label: `Breakrooms (${walkthrough.breakroomCount} × 10 min)`, mins: walkthrough.breakroomCount * 10 },
-    walkthrough.conferenceRoomCount > 0 && { label: `Conference rooms (${walkthrough.conferenceRoomCount} × 5 min)`, mins: walkthrough.conferenceRoomCount * 5 },
-    walkthrough.privateOfficeCount > 0 && { label: `Private offices (${walkthrough.privateOfficeCount} × 5 min)`, mins: walkthrough.privateOfficeCount * 5 },
-    walkthrough.openAreaCount > 0 && { label: `Open areas (${walkthrough.openAreaCount} × 8 min)`, mins: walkthrough.openAreaCount * 8 },
-    walkthrough.entryLobbyCount > 0 && { label: `Entry lobbies (${walkthrough.entryLobbyCount} × 10 min)`, mins: walkthrough.entryLobbyCount * 10 },
-    walkthrough.trashPointCount > 0 && { label: `Trash points (${walkthrough.trashPointCount} × 3 min)`, mins: walkthrough.trashPointCount * 3 },
+    { label: `Base time (sq ft × ${effectiveBaseMin} min/1,000 sqft)`, mins: Math.round((walkthrough.totalSqFt / 1000) * effectiveBaseMin) },
+    walkthrough.bathroomCount > 0 && { label: `Bathrooms (${walkthrough.bathroomCount} × ${ADDON_MINUTES.perBathroom} min)`, mins: walkthrough.bathroomCount * ADDON_MINUTES.perBathroom },
+    walkthrough.breakroomCount > 0 && { label: `Breakrooms (${walkthrough.breakroomCount} × ${ADDON_MINUTES.perBreakroom} min)`, mins: walkthrough.breakroomCount * ADDON_MINUTES.perBreakroom },
+    walkthrough.conferenceRoomCount > 0 && { label: `Conference rooms (${walkthrough.conferenceRoomCount} × ${ADDON_MINUTES.perConferenceRoom} min)`, mins: walkthrough.conferenceRoomCount * ADDON_MINUTES.perConferenceRoom },
+    walkthrough.privateOfficeCount > 0 && { label: `Private offices (${walkthrough.privateOfficeCount} × ${ADDON_MINUTES.perPrivateOffice} min)`, mins: walkthrough.privateOfficeCount * ADDON_MINUTES.perPrivateOffice },
+    walkthrough.openAreaCount > 0 && { label: `Open areas (${walkthrough.openAreaCount} × ${ADDON_MINUTES.perOpenArea} min)`, mins: walkthrough.openAreaCount * ADDON_MINUTES.perOpenArea },
+    walkthrough.entryLobbyCount > 0 && { label: `Entry lobbies (${walkthrough.entryLobbyCount} × ${ADDON_MINUTES.perEntryLobby} min)`, mins: walkthrough.entryLobbyCount * ADDON_MINUTES.perEntryLobby },
+    walkthrough.trashPointCount > 0 && { label: `Trash points (${walkthrough.trashPointCount} × ${ADDON_MINUTES.perTrashPoint} min)`, mins: walkthrough.trashPointCount * ADDON_MINUTES.perTrashPoint },
     walkthrough.glassLevel !== "None" && { label: `Glass level: ${walkthrough.glassLevel}`, mins: GLASS_LEVEL_MINUTES[walkthrough.glassLevel] },
     walkthrough.highTouchFocus && { label: "High-touch focus", mins: 15 },
+    walkthrough.floors > 1 && walkthrough.elevatorCount > 0 && {
+      label: `Elevator access (${walkthrough.elevatorCount} × 8 min, multi-floor)`,
+      mins: walkthrough.elevatorCount * 8,
+    },
+    (walkthrough.parkingLotSqFt ?? 0) > 0 && {
+      label: `Parking lot exterior (${walkthrough.parkingLotSqFt?.toLocaleString()} sq ft × 0.02)`,
+      mins: Math.round((walkthrough.parkingLotSqFt ?? 0) * 0.02),
+    },
   ].filter(Boolean) as { label: string; mins: number }[];
+
+  const ageMultiplier = walkthrough.buildingAge > 40 ? 1.25 : walkthrough.buildingAge > 20 ? 1.15 : 1.0;
+  const trafficMultiplier = TRAFFIC_LEVEL_MULTIPLIER[walkthrough.trafficLevel];
 
   return (
     <div className="space-y-4">
@@ -432,11 +492,30 @@ function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack }: {
                 </div>
               ))}
               <div className="border-t border-primary-200 pt-2 flex justify-between text-sm font-semibold text-primary-800 mt-1">
-                <span>Total (before surface & floor adjustment)</span>
-                <span>{auto.rawMinutes} min</span>
+                <span>Subtotal (before surface &amp; floor multipliers)</span>
+                <span>{auto.rawMinutes} min (final)</span>
               </div>
             </div>
           </div>
+
+          {/* Adjustment factors */}
+          {(ageMultiplier !== 1.0 || trafficMultiplier !== 1.0) && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 space-y-1.5">
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Applied Multipliers</p>
+              {ageMultiplier !== 1.0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-amber-700">Building age &gt;{walkthrough.buildingAge > 40 ? "40" : "20"} yrs complexity</span>
+                  <span className="font-semibold text-amber-800">×{ageMultiplier.toFixed(2)}</span>
+                </div>
+              )}
+              {trafficMultiplier !== 1.0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-amber-700">Traffic level: {walkthrough.trafficLevel}</span>
+                  <span className="font-semibold text-amber-800">×{trafficMultiplier.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
@@ -525,6 +604,18 @@ function PricingStep({ config, onChange, laborEst, walkthrough, onNext, onBack }
           <NumInput label="Hourly Rate (per cleaner)" value={config.hourlyRate} onChange={(v) => set("hourlyRate", v)} placeholder="55" prefix="$" />
           <NumInput label="Overhead %" value={config.overheadPct} onChange={(v) => set("overheadPct", v)} placeholder="15" suffix="%" />
           <NumInput label="Target Margin %" value={config.targetMarginPct} onChange={(v) => set("targetMarginPct", Math.min(v, 99))} placeholder="20" suffix="%" />
+          {walkthrough.afterHoursRequired && (
+            <div>
+              <NumInput
+                label="After-Hours Premium %"
+                value={config.afterHoursPremiumPct}
+                onChange={(v) => set("afterHoursPremiumPct", Math.max(0, v))}
+                placeholder="25"
+                suffix="%"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Added on top of margin — shown as a separate line item on the quote.</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Supplies Surcharge</label>
@@ -958,10 +1049,27 @@ const DEFAULT_WALKTHROUGH: CommercialWalkthrough = {
   preferredTimeWindow: "",
   accessConstraints: "",
   notes: "",
+  buildingAge: 0,
+  elevatorCount: 0,
+  parkingLotSqFt: undefined,
+  trafficLevel: "Medium",
 };
+
+const COMMERCIAL_SETTINGS_KEY = "commercialBaseMinutes";
+
+function useCustomBaseMinutes(): Partial<Record<FacilityType, number>> | undefined {
+  const [overrides, setOverrides] = useState<Partial<Record<FacilityType, number>> | undefined>(() => {
+    try {
+      const stored = localStorage.getItem(COMMERCIAL_SETTINGS_KEY);
+      return stored ? JSON.parse(stored) : undefined;
+    } catch { return undefined; }
+  });
+  return overrides;
+}
 
 function CommercialQuoteContent() {
   const { data: pricing } = useQuery<any>({ queryKey: ["/api/pricing"] });
+  const customBaseMinutes = useCustomBaseMinutes();
 
   const defaultHourlyRate = pricing?.laborRate || 55;
   const defaultOverhead = pricing?.overheadPct || 15;
@@ -983,6 +1091,7 @@ function CommercialQuoteContent() {
     suppliesSurcharge: 0,
     suppliesSurchargeType: "fixed",
     roundingRule: "none",
+    afterHoursPremiumPct: 25,
   });
   const [adjustment, setAdjustment] = useState<ManualAdjustment>({ amount: 0, note: "" });
 
@@ -997,9 +1106,9 @@ function CommercialQuoteContent() {
     if (laborEst.rawHours === 0 && laborEst.overrideHours === null && facility.totalSqFt === 0) return null;
     const est = laborEst.rawHours > 0
       ? laborEst
-      : { ...computeCommercialLaborEstimate(walkthrough), overrideHours: null };
+      : { ...computeCommercialLaborEstimate(walkthrough, customBaseMinutes), overrideHours: null };
     return computeCommercialQuote(est, pricingConfig, walkthrough.frequency, walkthrough);
-  }, [laborEst, pricingConfig, walkthrough, facility.totalSqFt]);
+  }, [laborEst, pricingConfig, walkthrough, facility.totalSqFt, customBaseMinutes]);
 
   return (
     <div className="flex gap-6 items-start">
@@ -1024,6 +1133,7 @@ function CommercialQuoteContent() {
           setLaborEst={setLaborEst}
           onNext={() => setStep("pricing")}
           onBack={() => setStep("walkthrough")}
+          customBaseMinutes={customBaseMinutes}
         />
       )}
       {step === "pricing" && (
@@ -1065,12 +1175,23 @@ function CommercialQuoteContent() {
 }
 
 export default function CommercialQuotePage() {
+  const navigate = useNavigate();
   return (
     <div>
-      <PageHeader
-        title="Commercial Quote"
-        subtitle="Site walkthrough to tiered proposal — powered by the same engine as the mobile app"
-      />
+      <div className="flex items-start justify-between mb-2">
+        <PageHeader
+          title="Commercial Quote"
+          subtitle="Site walkthrough to tiered proposal — powered by the same engine as the mobile app"
+        />
+        <button
+          onClick={() => navigate("/commercial-settings")}
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary-600 font-medium transition-colors mt-1 shrink-0"
+        >
+          <Settings className="w-3.5 h-3.5" />
+          Labor Settings
+          <ExternalLink className="w-3 h-3" />
+        </button>
+      </div>
       <ProGate feature="Commercial Quoting">
         <CommercialQuoteContent />
       </ProGate>
