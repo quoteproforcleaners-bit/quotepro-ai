@@ -32,7 +32,16 @@ import {
   BadgeCheck,
   Info,
   AlertTriangle,
+  ChevronDown,
+  Calculator,
+  Copy,
 } from "lucide-react";
+import {
+  BASE_MINUTES_PER_1000_SQFT,
+  ADDON_MINUTES,
+  GLASS_LEVEL_MINUTES,
+  TRAFFIC_LEVEL_MULTIPLIER,
+} from "../lib/pricingEngine";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -500,12 +509,11 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
 }) {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const [mathOpen, setMathOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  // Build full walkthrough for engine
+  // Build full walkthrough for engine (only valid CommercialWalkthrough fields)
   const walkthrough: CommercialWalkthrough = useMemo(() => ({
-    facilityName: "",
-    siteAddress: "",
     facilityType: state.facilityType,
     totalSqFt: state.totalSqFt,
     floors: state.floors,
@@ -530,12 +538,9 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
     accessConstraints: "",
     suppliesByClient: false,
     restroomConsumablesIncluded: true,
-    specialChemicals: "",
     preferredDays: "",
     preferredTimeWindow: "",
-    durationPerVisitConstraint: 0,
     notes: "",
-    photos: [],
   }), [state]);
 
   const laborEst = useMemo(() => computeCommercialLaborEstimate(walkthrough), [walkthrough]);
@@ -563,6 +568,22 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
       : enhancedTier.monthlyPrice > natMonthlyHigh
       ? "above"
       : "within";
+
+  // Transparent math formula values
+  const baseMinutesPer1k = BASE_MINUTES_PER_1000_SQFT[state.facilityType];
+  const baseMins = (state.totalSqFt / 1000) * baseMinutesPer1k;
+  const bathroomMins = state.bathroomCount * ADDON_MINUTES.perBathroom;
+  const breakroomMins = state.breakroomCount * ADDON_MINUTES.perBreakroom;
+  const confMins = state.conferenceRoomCount * ADDON_MINUTES.perConferenceRoom;
+  const openAreaMins = state.openAreaCount * ADDON_MINUTES.perOpenArea;
+  const glassMins = GLASS_LEVEL_MINUTES[state.glassLevel];
+  const highTouchMins = state.highTouchFocus ? 15 : 0;
+  const trafficMult = TRAFFIC_LEVEL_MULTIPLIER[state.trafficLevel];
+  const floorMult = state.floors > 1 ? 1 + (state.floors - 1) * 0.05 : 1;
+  const surfaceMult = 0.4 * 1.1 + 0.6 * 0.95; // 40% carpet, 60% hard floor
+
+  // QR code URL for branded PDF
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(shareUrl)}&bgcolor=ffffff&color=1e293b&margin=4`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -740,9 +761,108 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
           </div>
         </div>
         <p className="text-[11px] text-slate-400 mt-3">
-          Pricing assumes ${DEFAULT_PRICING.hourlyRate}/hr labor, {DEFAULT_PRICING.overheadPct}% overhead, {DEFAULT_PRICING.targetMarginPct}% margin.
-          Adjust these in the full proposal tool after signing in.
+          Based on 2026 ISSA/BSCAI production rate standards. Assumes ${DEFAULT_PRICING.hourlyRate}/hr labor,{" "}
+          {DEFAULT_PRICING.overheadPct}% overhead, {DEFAULT_PRICING.targetMarginPct}% margin.
+          Adjust in full proposal tool after sign-in.
         </p>
+
+        {/* Transparent math formula breakdown */}
+        <button
+          onClick={() => setMathOpen((v) => !v)}
+          className="mt-4 w-full flex items-center justify-between text-xs font-semibold text-blue-700 hover:text-blue-800 transition-colors"
+        >
+          <span className="flex items-center gap-1.5">
+            <Calculator className="w-3.5 h-3.5" /> How we calculated the {laborEst.rawHours.toFixed(1)} hours
+          </span>
+          <ChevronDown className={`w-4 h-4 transition-transform ${mathOpen ? "rotate-180" : ""}`} />
+        </button>
+
+        {mathOpen && (
+          <div className="mt-3 bg-slate-50 rounded-xl p-4 space-y-2 text-[12px]">
+            <p className="font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 text-blue-500" />
+              Step-by-step using 2026 ISSA production rates
+            </p>
+
+            {/* Base rate row */}
+            <div className="flex justify-between">
+              <span className="text-slate-600">
+                Base rate — {facilityLabel} ({baseMinutesPer1k} min/1,000 sqft × {(state.totalSqFt / 1000).toFixed(1)}k sqft)
+              </span>
+              <span className="font-semibold text-slate-800">{baseMins.toFixed(1)} min</span>
+            </div>
+
+            {/* Room add-ons */}
+            {state.bathroomCount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-600">Restrooms ({state.bathroomCount} × 15 min — ISSA std)</span>
+                <span className="font-semibold text-slate-800">+{bathroomMins.toFixed(0)} min</span>
+              </div>
+            )}
+            {state.breakroomCount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-600">Breakrooms ({state.breakroomCount} × 10 min)</span>
+                <span className="font-semibold text-slate-800">+{breakroomMins.toFixed(0)} min</span>
+              </div>
+            )}
+            {state.conferenceRoomCount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-600">Conference rooms ({state.conferenceRoomCount} × 5 min)</span>
+                <span className="font-semibold text-slate-800">+{confMins.toFixed(0)} min</span>
+              </div>
+            )}
+            {state.openAreaCount > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-600">Open work areas ({state.openAreaCount} × 8 min)</span>
+                <span className="font-semibold text-slate-800">+{openAreaMins.toFixed(0)} min</span>
+              </div>
+            )}
+            {glassMins > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-600">Glass / windows ({state.glassLevel})</span>
+                <span className="font-semibold text-slate-800">+{glassMins} min</span>
+              </div>
+            )}
+            {highTouchMins > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-600">High-touch disinfection add-on</span>
+                <span className="font-semibold text-slate-800">+{highTouchMins} min</span>
+              </div>
+            )}
+
+            {/* Multipliers */}
+            <div className="border-t border-slate-200 pt-2 space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">
+                  Surface mix adjustment (40% carpet ×1.1 + 60% hard floor ×0.95)
+                </span>
+                <span className="font-semibold text-slate-700">×{surfaceMult.toFixed(3)}</span>
+              </div>
+              {state.floors > 1 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Multi-floor travel ({state.floors} floors)</span>
+                  <span className="font-semibold text-slate-700">×{floorMult.toFixed(2)}</span>
+                </div>
+              )}
+              {trafficMult !== 1.0 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Foot traffic: {state.trafficLevel}</span>
+                  <span className="font-semibold text-slate-700">×{trafficMult.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-slate-800">
+              <span>Total cleaning time per visit</span>
+              <span>{laborEst.rawMinutes} min ({laborEst.rawHours.toFixed(1)}h)</span>
+            </div>
+
+            <p className="text-slate-400 text-[11px] pt-1 border-t border-slate-100">
+              Source: ISSA Cleaning Times &amp; Production Rates 2026 · BSCAI Benchmarking Survey 2024.
+              Production rates reflect trained crews with proper equipment.
+            </p>
+          </div>
+        )}
       </SectionCard>
 
       {/* Share & Print */}
@@ -753,15 +873,19 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
         >
           {copied
             ? <><CheckCircle className="w-4 h-4 text-emerald-500" /> Link Copied!</>
-            : <><Share2 className="w-4 h-4" /> Share Quote</>}
+            : <><Copy className="w-4 h-4" /> Copy Share Link</>}
         </button>
         <button
           onClick={handlePrint}
-          className="flex items-center justify-center gap-2 py-3 px-4 border-2 border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-50 transition-colors"
+          className="flex items-center justify-center gap-2 py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl transition-colors"
         >
-          <Printer className="w-4 h-4" /> Download PDF
+          <Printer className="w-4 h-4" /> Download Branded PDF
         </button>
       </div>
+      <p className="text-[11px] text-slate-400 text-center print:hidden flex items-center justify-center gap-1.5">
+        <Share2 className="w-3 h-3" />
+        PDF includes QR code linking back to this estimate so recipients can recalculate
+      </p>
 
       {/* CTA */}
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white print:hidden">
@@ -792,6 +916,134 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
       >
         <ChevronLeft className="w-4 h-4" /> Recalculate with different inputs
       </button>
+
+      {/* ── Branded PDF layout — hidden on screen, shown only during print ── */}
+      <div
+        id="calc-pdf-root"
+        style={{
+          display: "none",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+          color: "#0f172a",
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, borderBottom: "2px solid #1e40af", paddingBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#1e40af", letterSpacing: -0.5 }}>QuotePro AI</div>
+            <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Commercial Cleaning Cost Estimate</div>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+              Generated {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+              &nbsp;·&nbsp;Based on 2026 ISSA/BSCAI Production Rate Standards
+            </div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <img src={qrUrl} alt="Scan to recalculate" style={{ width: 72, height: 72, display: "block" }} />
+            <div style={{ fontSize: 9, color: "#94a3b8", marginTop: 3 }}>Scan to recalculate</div>
+          </div>
+        </div>
+
+        {/* Facility summary */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+          {[
+            { label: "Facility Type", value: facilityLabel },
+            { label: "Square Footage", value: `${state.totalSqFt.toLocaleString()} sq ft` },
+            { label: "Floors", value: String(state.floors) },
+            { label: "Frequency", value: freq?.label ?? state.frequency },
+          ].map((item) => (
+            <div key={item.label} style={{ background: "#f8fafc", borderRadius: 8, padding: "10px 12px", border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{item.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{item.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Hero price */}
+        <div style={{ background: "linear-gradient(135deg, #1d4ed8, #1e40af)", borderRadius: 12, padding: "20px 24px", marginBottom: 20, color: "white" }}>
+          <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 4 }}>Estimated Monthly Cost (Enhanced Tier)</div>
+          <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: -1 }}>
+            ${enhancedTier.monthlyPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span style={{ fontSize: 16, fontWeight: 400, opacity: 0.7 }}>/mo</span>
+          </div>
+          <div style={{ display: "flex", gap: 24, marginTop: 12, fontSize: 12, opacity: 0.85 }}>
+            <span>Est. {laborEst.rawHours.toFixed(1)}h / visit</span>
+            <span>{laborEst.recommendedCleaners} cleaners recommended</span>
+            <span>{quoteResult.visitsPerMonth} visits / month</span>
+            <span>${sqftPerMonth.toFixed(2)}/sqft/mo</span>
+          </div>
+        </div>
+
+        {/* 3-tier table */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Service Tiers</div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#f1f5f9" }}>
+                {["Tier", "Includes", "Per Visit", "Monthly", "Annual"].map((h) => (
+                  <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 700, color: "#374151", borderBottom: "1px solid #e2e8f0" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tiers.map((t, i) => (
+                <tr key={t.name} style={{ background: i % 2 === 0 ? "white" : "#f8fafc" }}>
+                  <td style={{ padding: "8px 10px", fontWeight: 700, color: i === 1 ? "#1d4ed8" : "#0f172a" }}>
+                    {t.name}{i === 1 ? " ★" : ""}
+                  </td>
+                  <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 11 }}>{t.scopeText}</td>
+                  <td style={{ padding: "8px 10px", fontWeight: 600 }}>${t.pricePerVisit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style={{ padding: "8px 10px", fontWeight: 700, color: i === 1 ? "#1d4ed8" : "#0f172a" }}>${t.monthlyPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style={{ padding: "8px 10px", color: "#374151" }}>${(t.monthlyPrice * 12).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* National benchmark */}
+        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 12 }}>
+          <div style={{ fontWeight: 700, color: "#166534", marginBottom: 4 }}>National Benchmark Comparison — {facilityLabel}</div>
+          <div style={{ color: "#15803d" }}>
+            National range: ${natMonthlyLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}–${natMonthlyHigh.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo
+            &nbsp;·&nbsp; Your estimate: ${enhancedTier.monthlyPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo
+            &nbsp;·&nbsp; Status: <strong>{vsNational === "within" ? "Within national range" : vsNational === "below" ? "Below national range" : "Above national range"}</strong>
+          </div>
+          <div style={{ color: "#86efac", marginTop: 2, fontSize: 10 }}>Source: {nat.source}</div>
+        </div>
+
+        {/* Cost formula */}
+        <div style={{ marginBottom: 20, fontSize: 11 }}>
+          <div style={{ fontWeight: 700, color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5, fontSize: 10 }}>How this estimate was calculated</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {quoteResult.lineItems.map((item) => (
+              <div key={item.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f1f5f9" }}>
+                <span style={{ color: "#64748b" }}>{item.label}</span>
+                <span style={{ fontWeight: 600, color: item.type === "surcharge" ? "#92400e" : "#0f172a" }}>
+                  {item.type === "deduction" ? "−" : "+"}${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, padding: "6px 0", borderTop: "2px solid #e2e8f0", marginTop: 4 }}>
+            <span>Total per Visit</span>
+            <span style={{ color: "#1d4ed8" }}>${quoteResult.perVisit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 12, fontSize: 10, color: "#94a3b8", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <div>
+            <div>QuotePro AI Commercial Cleaning Cost Calculator</div>
+            <div style={{ marginTop: 2 }}>
+              Estimates based on ISSA Cleaning Times &amp; Production Rates 2026 and BSCAI Benchmarking Survey 2024.
+            </div>
+            <div style={{ marginTop: 1 }}>Not a substitute for an on-site assessment. Final pricing varies by local market and contract terms.</div>
+          </div>
+          <div style={{ textAlign: "right", fontSize: 9 }}>
+            <div>Scan QR to recalculate</div>
+            <div>quotepro.ai</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -864,11 +1116,15 @@ function FAQSection() {
 const PRINT_STYLE = `
 @media print {
   body * { visibility: hidden !important; }
-  #calc-print-root, #calc-print-root * { visibility: visible !important; }
-  #calc-print-root { position: fixed !important; top: 0; left: 0; right: 0; padding: 24px; }
-  .print\\:hidden { display: none !important; }
-  nav, header, footer, aside { display: none !important; }
-  @page { margin: 1.5cm; }
+  #calc-pdf-root, #calc-pdf-root * { visibility: visible !important; }
+  #calc-pdf-root {
+    position: fixed !important;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: white;
+    padding: 32px;
+    font-family: system-ui, sans-serif;
+  }
+  @page { margin: 1cm; size: A4 portrait; }
 }
 `;
 
