@@ -12,6 +12,11 @@ import {
   computeCommercialLaborEstimate,
   computeCommercialQuote,
   computeCommercialTiers,
+  DEFAULT_COMMERCIAL_PRICING,
+  BASE_MINUTES_PER_1000_SQFT,
+  ADDON_MINUTES,
+  GLASS_LEVEL_MINUTES,
+  TRAFFIC_LEVEL_MULTIPLIER,
   type CommercialWalkthrough,
   type FacilityType,
   type CommercialFrequency,
@@ -36,13 +41,6 @@ import {
   Calculator,
   Copy,
 } from "lucide-react";
-import {
-  BASE_MINUTES_PER_1000_SQFT,
-  ADDON_MINUTES,
-  GLASS_LEVEL_MINUTES,
-  TRAFFIC_LEVEL_MULTIPLIER,
-} from "../lib/pricingEngine";
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const FACILITY_TYPES: { value: FacilityType; label: string; icon: string }[] = [
@@ -139,18 +137,6 @@ const FAQ_DATA = [
     a: "Basic tier covers core janitorial tasks: floors, trash, and restrooms. Enhanced adds detailed dusting, restroom deep-clean, high-touch disinfection, and entry area care. Premium includes everything in Enhanced plus window and glass cleaning, breakroom deep-clean, supply restocking, and supervisory quality checks after each visit.",
   },
 ];
-
-// ─── Default pricing config for public calculator ─────────────────────────────
-
-const DEFAULT_PRICING = {
-  hourlyRate: 55,
-  overheadPct: 15,
-  targetMarginPct: 20,
-  afterHoursPremiumPct: 25,
-  suppliesSurcharge: 0,
-  suppliesSurchargeType: "percent" as const,
-  roundingRule: "5" as const,
-};
 
 // ─── State shape for URL encoding ─────────────────────────────────────────────
 
@@ -543,15 +529,15 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
     notes: "",
   }), [state]);
 
-  const laborEst = useMemo(() => computeCommercialLaborEstimate(walkthrough), [walkthrough]);
+  const laborEst = useMemo(() => ({ ...computeCommercialLaborEstimate(walkthrough), overrideHours: null as null }), [walkthrough]);
 
   const quoteResult = useMemo(
-    () => computeCommercialQuote(laborEst, DEFAULT_PRICING, state.frequency, walkthrough),
+    () => computeCommercialQuote(laborEst, DEFAULT_COMMERCIAL_PRICING, state.frequency, walkthrough),
     [laborEst, state.frequency, walkthrough],
   );
 
   const tiers = useMemo(
-    () => computeCommercialTiers("", quoteResult.perVisit, state.frequency, DEFAULT_PRICING.roundingRule),
+    () => computeCommercialTiers("", quoteResult.perVisit, state.frequency, DEFAULT_COMMERCIAL_PRICING.roundingRule),
     [quoteResult.perVisit, state.frequency],
   );
 
@@ -750,8 +736,8 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
           {quoteResult.lineItems.map((item) => (
             <div key={item.label} className="flex justify-between items-center text-sm">
               <span className="text-slate-600">{item.label}</span>
-              <span className={`font-semibold ${item.type === "surcharge" ? "text-amber-700" : item.type === "deduction" ? "text-emerald-600" : "text-slate-800"}`}>
-                {item.type === "deduction" ? "−" : "+"}${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span className={`font-semibold ${item.type === "surcharge" ? "text-amber-700" : item.amount < 0 ? "text-emerald-600" : "text-slate-800"}`}>
+                {item.amount < 0 ? "−" : "+"}${Math.abs(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           ))}
@@ -761,8 +747,8 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
           </div>
         </div>
         <p className="text-[11px] text-slate-400 mt-3">
-          Based on 2026 ISSA/BSCAI production rate standards. Assumes ${DEFAULT_PRICING.hourlyRate}/hr labor,{" "}
-          {DEFAULT_PRICING.overheadPct}% overhead, {DEFAULT_PRICING.targetMarginPct}% margin.
+          Based on 2026 ISSA/BSCAI production rate standards. Assumes ${DEFAULT_COMMERCIAL_PRICING.hourlyRate}/hr labor,{" "}
+          {DEFAULT_COMMERCIAL_PRICING.overheadPct}% overhead, {DEFAULT_COMMERCIAL_PRICING.targetMarginPct}% margin.
           Adjust in full proposal tool after sign-in.
         </p>
 
@@ -1018,7 +1004,7 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
               <div key={item.label} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #f1f5f9" }}>
                 <span style={{ color: "#64748b" }}>{item.label}</span>
                 <span style={{ fontWeight: 600, color: item.type === "surcharge" ? "#92400e" : "#0f172a" }}>
-                  {item.type === "deduction" ? "−" : "+"}${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {item.amount < 0 ? "−" : "+"}${Math.abs(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             ))}

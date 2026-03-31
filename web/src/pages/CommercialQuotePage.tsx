@@ -26,9 +26,10 @@ import type { ManualAdjustment } from "../components/LiveQuotePreview";
 import { Tooltip, LabelWithTooltip } from "../components/Tooltip";
 import {
   readPricingDefaults,
+  readTrafficMultipliers,
+  readTierMultipliers,
   COMMERCIAL_SETTINGS_KEY,
   COMMERCIAL_TRAFFIC_KEY,
-  readTrafficMultipliers,
 } from "./CommercialSettingsPage";
 import {
   Building2,
@@ -516,15 +517,19 @@ function WalkthroughStep({ data, onChange, onNext, onBack, hiddenFields, onToggl
 
 // ─── Step 3: Labor ────────────────────────────────────────────────────────────
 
-function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack, customBaseMinutes }: {
+function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack, customBaseMinutes, customTrafficMultipliers }: {
   walkthrough: CommercialWalkthrough;
   laborEst: CommercialLaborEstimate;
   setLaborEst: (l: CommercialLaborEstimate) => void;
   onNext: () => void;
   onBack: () => void;
   customBaseMinutes?: Partial<Record<FacilityType, number>>;
+  customTrafficMultipliers?: Partial<Record<TrafficLevel, number>>;
 }) {
-  const auto = useMemo(() => computeCommercialLaborEstimate(walkthrough, customBaseMinutes), [walkthrough, customBaseMinutes]);
+  const auto = useMemo(
+    () => computeCommercialLaborEstimate(walkthrough, customBaseMinutes, customTrafficMultipliers),
+    [walkthrough, customBaseMinutes, customTrafficMultipliers],
+  );
   const effectiveHours = laborEst.overrideHours ?? auto.rawHours;
 
   const effectiveBaseMin = customBaseMinutes?.[walkthrough.facilityType] ?? BASE_MINUTES_PER_1000_SQFT[walkthrough.facilityType];
@@ -1043,11 +1048,12 @@ function ensurePrintStyle() {
 
 // ─── Step 5: Tiers / Proposal ─────────────────────────────────────────────────
 
-function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
+function TiersStep({ facility, walkthrough, laborEst, pricingConfig, tierMultipliers, onBack }: {
   facility: FacilityInfo;
   walkthrough: CommercialWalkthrough;
   laborEst: CommercialLaborEstimate;
   pricingConfig: CommercialPricingConfig;
+  tierMultipliers?: { basic?: number; enhanced?: number; premium?: number };
   onBack: () => void;
 }) {
   const navigate = useNavigate();
@@ -1074,7 +1080,10 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
   }, []);
 
   const calc = useMemo(() => computeCommercialQuote(laborEst, pricingConfig, walkthrough.frequency), [laborEst, pricingConfig, walkthrough.frequency]);
-  const tiers = useMemo(() => computeCommercialTiers(facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule), [facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule]);
+  const tiers = useMemo(
+    () => computeCommercialTiers(facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule, tierMultipliers),
+    [facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule, tierMultipliers],
+  );
   const freq = FREQUENCY_OPTIONS.find((f) => f.value === walkthrough.frequency);
 
   // Effective prices: use overrides if set, else computed
@@ -1545,6 +1554,8 @@ function CommercialQuoteContent() {
   // Admin defaults from settings page take priority over hardcoded values;
   // server pricing (if set) takes priority over both.
   const adminDefaults = readPricingDefaults();
+  const customTrafficMultipliers = readTrafficMultipliers();
+  const adminTierMultipliers = readTierMultipliers();
   const defaultHourlyRate = pricing?.laborRate || adminDefaults.hourlyRate;
   const defaultOverhead = pricing?.overheadPct || adminDefaults.overheadPct;
   const defaultMargin = pricing?.targetMarginPct || adminDefaults.targetMarginPct;
@@ -1581,9 +1592,9 @@ function CommercialQuoteContent() {
     if (laborEst.rawHours === 0 && laborEst.overrideHours === null && facility.totalSqFt === 0) return null;
     const est = laborEst.rawHours > 0
       ? laborEst
-      : { ...computeCommercialLaborEstimate(walkthrough, customBaseMinutes), overrideHours: null };
+      : { ...computeCommercialLaborEstimate(walkthrough, customBaseMinutes, customTrafficMultipliers), overrideHours: null };
     return computeCommercialQuote(est, pricingConfig, walkthrough.frequency, walkthrough);
-  }, [laborEst, pricingConfig, walkthrough, facility.totalSqFt, customBaseMinutes]);
+  }, [laborEst, pricingConfig, walkthrough, facility.totalSqFt, customBaseMinutes, customTrafficMultipliers]);
 
   return (
     <div className="flex gap-6 items-start">
@@ -1611,6 +1622,7 @@ function CommercialQuoteContent() {
           onNext={() => setStep("pricing")}
           onBack={() => setStep("walkthrough")}
           customBaseMinutes={customBaseMinutes}
+          customTrafficMultipliers={customTrafficMultipliers}
         />
       )}
       {step === "pricing" && (
@@ -1629,6 +1641,7 @@ function CommercialQuoteContent() {
           walkthrough={walkthrough}
           laborEst={laborEst}
           pricingConfig={pricingConfig}
+          tierMultipliers={adminTierMultipliers}
           onBack={() => setStep("pricing")}
         />
       )}

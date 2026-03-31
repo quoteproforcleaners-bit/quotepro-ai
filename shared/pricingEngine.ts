@@ -532,13 +532,35 @@ export const TRAFFIC_LEVEL_MULTIPLIER: Record<TrafficLevel, number> = {
   Low: 0.9, Medium: 1.0, High: 1.15, VeryHigh: 1.3,
 };
 
+// ─── Default commercial pricing config ───────────────────────────────────────
+// Use this constant anywhere a CommercialPricingConfig is needed without
+// user-specific overrides (e.g. public calculators, server-side previews).
+export const DEFAULT_COMMERCIAL_PRICING: CommercialPricingConfig = {
+  hourlyRate: 55,
+  overheadPct: 15,
+  targetMarginPct: 20,
+  afterHoursPremiumPct: 25,
+  suppliesSurcharge: 0,
+  suppliesSurchargeType: "percent",
+  roundingRule: "5",
+};
+
+// ─── Default tier multipliers (Basic/Enhanced/Premium spread) ─────────────────
+export const DEFAULT_TIER_MULTIPLIERS = { basic: 0.85, enhanced: 1.0, premium: 1.20 };
+
 export function computeCommercialLaborEstimate(
   w: CommercialWalkthrough,
   baseMinutesOverride?: Partial<Record<FacilityType, number>>,
+  trafficMultipliersOverride?: Partial<Record<TrafficLevel, number>>,
 ): Omit<CommercialLaborEstimate, "overrideHours"> {
   const baseMinutes = baseMinutesOverride
     ? { ...BASE_MINUTES_PER_1000_SQFT, ...baseMinutesOverride }
     : BASE_MINUTES_PER_1000_SQFT;
+
+  // Merge traffic multipliers: admin overrides take priority over ISSA defaults
+  const trafficMultipliers = trafficMultipliersOverride
+    ? { ...TRAFFIC_LEVEL_MULTIPLIER, ...trafficMultipliersOverride }
+    : TRAFFIC_LEVEL_MULTIPLIER;
 
   // Interior base + addons
   let mins = (w.totalSqFt / 1000) * baseMinutes[w.facilityType];
@@ -569,8 +591,8 @@ export function computeCommercialLaborEstimate(
   if (age > 40) mins *= 1.25;
   else if (age > 20) mins *= 1.15;
 
-  // Traffic level (default Medium = ×1.0 if not set)
-  mins *= TRAFFIC_LEVEL_MULTIPLIER[w.trafficLevel ?? "Medium"];
+  // Traffic level (default Medium = ×1.0 if not set); admin overrides take priority
+  mins *= trafficMultipliers[w.trafficLevel ?? "Medium"];
 
   // Exterior parking lot (0.02 min per sq ft)
   if (w.parkingLotSqFt) mins += w.parkingLotSqFt * 0.02;
@@ -667,11 +689,13 @@ export function computeCommercialTiers(
   basePerVisit: number,
   frequency: CommercialFrequency,
   roundingRule: RoundingRule,
+  tierMultipliers?: { basic?: number; enhanced?: number; premium?: number },
 ): CommercialTier[] {
   const visits = FREQUENCY_VISITS_PER_MONTH[frequency];
-  const basic    = applyRounding(basePerVisit * 0.75, roundingRule);
-  const enhanced = applyRounding(basePerVisit,        roundingRule);
-  const premium  = applyRounding(basePerVisit * 1.3,  roundingRule);
+  const tm = { ...DEFAULT_TIER_MULTIPLIERS, ...tierMultipliers };
+  const basic    = applyRounding(basePerVisit * tm.basic,    roundingRule);
+  const enhanced = applyRounding(basePerVisit * tm.enhanced, roundingRule);
+  const premium  = applyRounding(basePerVisit * tm.premium,  roundingRule);
   const name = facilityName || "the facility";
   return [
     {
