@@ -72,27 +72,66 @@ function LineItemRow({ item }: { item: LineItem & { label: string; amount: numbe
 
 // ─── Warning chip ─────────────────────────────────────────────────────────────
 
-const HELPFUL_WARNINGS: Record<string, string> = {
-  after_hours:      "After-hours service is on — add a 20–30% premium in Pricing config to cover overtime and access logistics.",
-  very_low_estimate:"Per-visit price is unusually low. Check your hourly rate (typical: $45–$75/hr) and ensure your margin target is set.",
-  high_estimate:    "Estimate is very high. Double-check square footage, room counts, and hourly rate. Large facilities may need multi-crew pricing.",
-  low_sqft:         "Facility size is under 500 sq ft — verify you entered the correct square footage for accurate benchmarking.",
-  missing_sqft:     "Enter the total square footage to generate a full estimate.",
+interface ActionableWarning {
+  message: string;
+  action?: { label: string; href: string };
+  isInfo?: boolean;
+}
+
+const HELPFUL_WARNINGS: Record<string, ActionableWarning> = {
+  after_hours: {
+    message: "After-hours service is on. Add a 20–30% premium in the Pricing step to cover overtime and access logistics.",
+    action: { label: "Go to Pricing step", href: "#pricing-step" },
+  },
+  very_low_estimate: {
+    message: "Per-visit price is unusually low. Check your hourly rate — typical commercial rate is $45–$75/hr.",
+    action: { label: "Adjust in Settings", href: "/commercial-settings" },
+  },
+  high_estimate: {
+    message: "Estimate is very high. Double-check square footage, room counts, and hourly rate. Large facilities may benefit from multi-crew pricing.",
+  },
+  low_sqft: {
+    message: "Facility size is under 500 sq ft — verify square footage for accurate benchmarking.",
+  },
+  missing_sqft: {
+    message: "Enter the total square footage to generate a full estimate.",
+    isInfo: true,
+  },
+  low_rate: {
+    message: "Your hourly rate appears low for commercial work. BSCAI 2024 median is $48–$72/hr for commercial crews.",
+    action: { label: "Change in Settings", href: "/commercial-settings" },
+  },
+  low_margin: {
+    message: "Gross margin is below 15%. BSCAI 2024 median for commercial contractors is 18–25%.",
+    action: { label: "Adjust margin", href: "/commercial-settings" },
+  },
 };
 
 function WarningChip({ w }: { w: Warning & { type?: string } }) {
-  const isInfo = w.type === "missing_sqft";
-  const message = HELPFUL_WARNINGS[w.type ?? ""] ?? w.message;
+  const config = HELPFUL_WARNINGS[w.type ?? ""] ?? { message: w.message };
+  const isInfo = config.isInfo ?? false;
   return (
-    <div className={`flex items-start gap-2 rounded-lg px-3 py-2 text-xs leading-relaxed ${
+    <div className={`rounded-lg px-3 py-2 text-xs leading-relaxed ${
       isInfo
         ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
         : "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300"
     }`}>
-      {isInfo
-        ? <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-        : <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
-      {message}
+      <div className="flex items-start gap-2">
+        {isInfo
+          ? <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          : <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
+        <span>{config.message}</span>
+      </div>
+      {config.action && (
+        <a
+          href={config.action.href}
+          className={`block mt-1.5 ml-5 text-[11px] font-semibold underline underline-offset-2 ${
+            isInfo ? "text-blue-600 dark:text-blue-400" : "text-amber-700 dark:text-amber-400"
+          }`}
+        >
+          {config.action.label} →
+        </a>
+      )}
     </div>
   );
 }

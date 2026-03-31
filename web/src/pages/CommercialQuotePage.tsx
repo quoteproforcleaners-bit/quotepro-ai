@@ -25,6 +25,12 @@ import { CommercialLivePreview, LivePreviewPanel } from "../components/LiveQuote
 import type { ManualAdjustment } from "../components/LiveQuotePreview";
 import { Tooltip, LabelWithTooltip } from "../components/Tooltip";
 import {
+  readPricingDefaults,
+  COMMERCIAL_SETTINGS_KEY,
+  COMMERCIAL_TRAFFIC_KEY,
+  readTrafficMultipliers,
+} from "./CommercialSettingsPage";
+import {
   Building2,
   ChevronRight,
   ChevronLeft,
@@ -63,6 +69,7 @@ import {
 } from "../components/ui";
 import { ProGate } from "../components/ProGate";
 import { apiRequest } from "../lib/api";
+import { compareToBenchmark, benchmarkBadgeText, NATIONAL_AVERAGES } from "../lib/benchmarks";
 
 // ─── UI-only types ─────────────────────────────────────────────────────────────
 
@@ -125,13 +132,19 @@ function StepIndicator({ current }: { current: Step }) {
 
 // ─── Number Input helper ──────────────────────────────────────────────────────
 
-function NumInput({ label, value, onChange, placeholder, prefix, suffix, min }: {
+function NumInput({ label, value, onChange, placeholder, prefix, suffix, min, tooltip, tooltipSource }: {
   label: string; value: number; onChange: (v: number) => void;
   placeholder?: string; prefix?: string; suffix?: string; min?: number;
+  tooltip?: string; tooltipSource?: string;
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      {label ? (
+        <div className="flex items-center gap-1 mb-1">
+          <label className="block text-xs font-medium text-slate-600">{label}</label>
+          {tooltip && <Tooltip text={tooltip} source={tooltipSource} side="right" />}
+        </div>
+      ) : null}
       <div className="relative">
         {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{prefix}</span>}
         <input
@@ -283,15 +296,31 @@ function WalkthroughStep({ data, onChange, onNext, onBack, hiddenFields, onToggl
       <Card>
         <CardHeader title="Room Counts" icon={Layers} />
         <div className="px-5 pb-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <NumInput label="Bathrooms / Restrooms" value={data.bathroomCount} onChange={(v) => set("bathroomCount", v)} placeholder="0" />
-          <NumInput label="Breakrooms / Kitchens" value={data.breakroomCount} onChange={(v) => set("breakroomCount", v)} placeholder="0" />
-          <NumInput label="Conference Rooms" value={data.conferenceRoomCount} onChange={(v) => set("conferenceRoomCount", v)} placeholder="0" />
-          <NumInput label="Private Offices" value={data.privateOfficeCount} onChange={(v) => set("privateOfficeCount", v)} placeholder="0" />
-          <NumInput label="Open Work Areas" value={data.openAreaCount} onChange={(v) => set("openAreaCount", v)} placeholder="0" />
-          <NumInput label="Entry Lobbies" value={data.entryLobbyCount} onChange={(v) => set("entryLobbyCount", v)} placeholder="0" />
-          <NumInput label="Trash Collection Points" value={data.trashPointCount} onChange={(v) => set("trashPointCount", v)} placeholder="0" />
+          <NumInput label="Bathrooms / Restrooms" value={data.bathroomCount} onChange={(v) => set("bathroomCount", v)} placeholder="0"
+            tooltip="ISSA 2026: Restrooms add ~15 min each for toilet scrubbing, sink disinfection, floor mopping, and trash. High-touch areas — always time-consuming regardless of facility size."
+            tooltipSource="ISSA 2026 Cleaning Times & Production Rates" />
+          <NumInput label="Breakrooms / Kitchens" value={data.breakroomCount} onChange={(v) => set("breakroomCount", v)} placeholder="0"
+            tooltip="ISSA 2026: Breakrooms add ~10 min each. Includes appliance wipe-down, sink, counters, floor, and trash. Full kitchens with grease may need extra time."
+            tooltipSource="ISSA 2026 Cleaning Times & Production Rates" />
+          <NumInput label="Conference Rooms" value={data.conferenceRoomCount} onChange={(v) => set("conferenceRoomCount", v)} placeholder="0"
+            tooltip="ISSA 2026: Conference rooms add ~5 min each. Includes table wipe, chair push-in, board/projector screen clean, floor vacuum or mop, and trash."
+            tooltipSource="ISSA 2026 Cleaning Times & Production Rates" />
+          <NumInput label="Private Offices" value={data.privateOfficeCount} onChange={(v) => set("privateOfficeCount", v)} placeholder="0"
+            tooltip="ISSA 2026: Private offices add ~3 min each — desk surface wipe, trash, floor. Less intensive than restrooms but add up quickly in large office buildings."
+            tooltipSource="ISSA 2026 Cleaning Times & Production Rates" />
+          <NumInput label="Open Work Areas" value={data.openAreaCount} onChange={(v) => set("openAreaCount", v)} placeholder="0"
+            tooltip="ISSA 2026: Open areas add ~8 min each. Includes vacuuming or mopping the zone, wiping workstations, and emptying trash at shared stations."
+            tooltipSource="ISSA 2026 Cleaning Times & Production Rates" />
+          <NumInput label="Entry Lobbies" value={data.entryLobbyCount} onChange={(v) => set("entryLobbyCount", v)} placeholder="0"
+            tooltip="ISSA 2026: Lobbies add ~8 min each. High-impression area — includes floor polish/mop, glass doors, reception desk wipe-down, signage, and trash."
+            tooltipSource="ISSA 2026 Cleaning Times & Production Rates" />
+          <NumInput label="Trash Collection Points" value={data.trashPointCount} onChange={(v) => set("trashPointCount", v)} placeholder="0"
+            tooltip="Dedicated trash/recycling stations. Each adds ~2 min for liner replacement, wipe-down, and consolidation. Common in kitchens, copy rooms, and hallways."
+            tooltipSource="ISSA 2026 Cleaning Times & Production Rates" />
           {!h("elevators") && (
-            <NumInput label="Elevators (if multi-floor)" value={data.elevatorCount ?? 0} onChange={(v) => set("elevatorCount", v)} placeholder="0" />
+            <NumInput label="Elevators (if multi-floor)" value={data.elevatorCount ?? 0} onChange={(v) => set("elevatorCount", v)} placeholder="0"
+              tooltip="ISSA 2026: Elevators add ~5 min each per visit. Includes floor, walls, buttons (high-touch disinfection), and door tracks. Required inspection on multi-floor buildings."
+              tooltipSource="ISSA 2026 Cleaning Times & Production Rates" />
           )}
         </div>
       </Card>
@@ -933,6 +962,39 @@ function PDFContent({ facility, walkthrough, laborEst, calc, tiers, selectedTier
         </table>
       </div>
 
+      {/* National benchmark comparison */}
+      {(() => {
+        const monthly = calc.perVisit * (FREQUENCY_VISITS_PER_MONTH[walkthrough.frequency] ?? 4);
+        const bm = compareToBenchmark(monthly, facility.facilityType, facility.totalSqFt);
+        if (!bm) return null;
+        const pctAbs = Math.abs(Math.round(bm.pctVsMedian));
+        const direction = bm.pctVsMedian < 0 ? "below" : "above";
+        const natRange = NATIONAL_AVERAGES[facility.facilityType];
+        return (
+          <div style={{ marginBottom: 16, padding: "10px 14px", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 6 }}>Industry Benchmark Comparison</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+              {[
+                ["National Low",   `$${bm.nationalMonthlyLow.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo`],
+                ["National Median",`$${bm.nationalMonthlyMid.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo`],
+                ["National High",  `$${bm.nationalMonthlyHigh.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo`],
+              ].map(([label, value]) => (
+                <div key={label} style={{ textAlign: "center", padding: "6px 4px", backgroundColor: "white", borderRadius: 6 }}>
+                  <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 10, color: "#166534", margin: 0 }}>
+              Your Enhanced estimate (${monthly.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo) is{" "}
+              <strong>{pctAbs}% {direction}</strong> the national median for {facility.facilityType} facilities
+              ({natRange ? `$${natRange.low.toFixed(2)}–$${natRange.high.toFixed(2)}/sqft/mo` : ""}).
+              Source: {bm.source} {bm.year}.
+            </p>
+          </div>
+        );
+      })()}
+
       {/* Tier scope */}
       {tier && (
         <div style={{ marginBottom: 16 }}>
@@ -1367,7 +1429,6 @@ const DEFAULT_WALKTHROUGH: CommercialWalkthrough = {
   trafficLevel: "Medium",
 };
 
-const COMMERCIAL_SETTINGS_KEY = "commercialBaseMinutes";
 const HIDDEN_FIELDS_KEY = "commercialHiddenFields";
 
 // ─── Admin field visibility ────────────────────────────────────────────────────
@@ -1481,9 +1542,13 @@ function CommercialQuoteContent() {
   const customBaseMinutes = useCustomBaseMinutes();
   const [hiddenFields, onToggleField] = useHiddenFields();
 
-  const defaultHourlyRate = pricing?.laborRate || 55;
-  const defaultOverhead = pricing?.overheadPct || 15;
-  const defaultMargin = pricing?.targetMarginPct || 20;
+  // Admin defaults from settings page take priority over hardcoded values;
+  // server pricing (if set) takes priority over both.
+  const adminDefaults = readPricingDefaults();
+  const defaultHourlyRate = pricing?.laborRate || adminDefaults.hourlyRate;
+  const defaultOverhead = pricing?.overheadPct || adminDefaults.overheadPct;
+  const defaultMargin = pricing?.targetMarginPct || adminDefaults.targetMarginPct;
+  const defaultAfterHours = adminDefaults.afterHoursPremiumPct;
 
   const [step, setStep] = useState<Step>("facility");
   const [facility, setFacility] = useState<FacilityInfo>({
@@ -1501,7 +1566,7 @@ function CommercialQuoteContent() {
     suppliesSurcharge: 0,
     suppliesSurchargeType: "fixed",
     roundingRule: "none",
-    afterHoursPremiumPct: 25,
+    afterHoursPremiumPct: defaultAfterHours,
   });
   const [adjustment, setAdjustment] = useState<ManualAdjustment>({ amount: 0, note: "" });
 
