@@ -36,3 +36,9 @@ id = "_p7T9SmwX8Dv9k21kc2OW"
 uri = "file://quotepro-source-audit.tar.gz"
 type = "unspecified"
 title = "QuotePro AI — Full Source Code v1.2.1"
+
+[[outputs]]
+id = "Sw7qzTwB3DMkGyADkqMDs"
+uri = "file://FULL_CODEBASE_FOR_AUDIT.md"
+type = "text"
+title = "QuotePro AI — Full Codebase for Grok Audit"
