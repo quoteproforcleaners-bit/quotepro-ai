@@ -82,6 +82,18 @@ import { pendingAuthTokens, generateAuthToken } from "../clients";
 
 const router = Router();
 
+  router.get("/api/auth/debug-host", async (req: Request, res: Response) => {
+    res.set("Cache-Control", "no-store");
+    return res.json({
+      host: req.get("host"),
+      xForwardedHost: req.get("x-forwarded-host"),
+      xForwardedProto: req.get("x-forwarded-proto"),
+      origin: req.get("origin"),
+      referer: req.get("referer"),
+      computedRedirectUri: `https://${req.get("x-forwarded-host") || req.get("host")}/api/auth/google/callback`,
+    });
+  });
+
   router.post("/api/crash-report", async (req: Request, res: Response) => {
     try {
       const { error, stack, componentStack, source } = req.body;
@@ -495,7 +507,21 @@ const router = Router();
         return res.status(500).json({ message: "Google OAuth not configured" });
       }
       const platform = req.query.platform === "web" ? "web" : "mobile";
-      const redirectUri = `https://${req.get("host")}/api/auth/google/callback`;
+      // Determine the canonical public-facing domain in order of reliability:
+      // 1. EXPO_PUBLIC_DOMAIN env var (explicitly set production domain)
+      // 2. REPLIT_DOMAINS env var (Replit sets this in deployment)
+      // 3. x-forwarded-host header (from proxy)
+      // 4. host header
+      let publicDomain: string;
+      if (process.env.EXPO_PUBLIC_DOMAIN) {
+        publicDomain = process.env.EXPO_PUBLIC_DOMAIN.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      } else if (process.env.REPLIT_DOMAINS) {
+        publicDomain = process.env.REPLIT_DOMAINS.split(",")[0].trim();
+      } else {
+        publicDomain = req.get("x-forwarded-host") || req.get("host") || "localhost";
+      }
+      const redirectUri = `https://${publicDomain}/api/auth/google/callback`;
+      console.log("[google-auth/start] publicDomain:", publicDomain, "redirectUri:", redirectUri);
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
@@ -523,7 +549,16 @@ const router = Router();
       if (!code) {
         return res.status(400).send("Missing authorization code");
       }
-      const redirectUri = `https://${req.get("host")}/api/auth/google/callback`;
+      let publicDomain: string;
+      if (process.env.EXPO_PUBLIC_DOMAIN) {
+        publicDomain = process.env.EXPO_PUBLIC_DOMAIN.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      } else if (process.env.REPLIT_DOMAINS) {
+        publicDomain = process.env.REPLIT_DOMAINS.split(",")[0].trim();
+      } else {
+        publicDomain = req.get("x-forwarded-host") || req.get("host") || "localhost";
+      }
+      const redirectUri = `https://${publicDomain}/api/auth/google/callback`;
+      console.log("[google-auth/callback] publicDomain:", publicDomain, "redirectUri:", redirectUri);
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
