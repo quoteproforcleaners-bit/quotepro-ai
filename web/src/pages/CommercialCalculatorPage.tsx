@@ -519,6 +519,7 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
     trashPointCount: Math.max(1, Math.round(state.totalSqFt / 2000)),
     elevatorCount: state.floors > 3 ? 1 : 0,
     buildingAge: 10,
+    buildingAgeYears: 10,
     parkingLotSqFt: undefined,
     carpetPercent: 40,
     hardFloorPercent: 60,

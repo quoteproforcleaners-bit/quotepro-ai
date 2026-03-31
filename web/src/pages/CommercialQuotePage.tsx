@@ -291,7 +291,7 @@ function WalkthroughStep({ data, onChange, onNext, onBack, hiddenFields, onToggl
           <NumInput label="Entry Lobbies" value={data.entryLobbyCount} onChange={(v) => set("entryLobbyCount", v)} placeholder="0" />
           <NumInput label="Trash Collection Points" value={data.trashPointCount} onChange={(v) => set("trashPointCount", v)} placeholder="0" />
           {!h("elevators") && (
-            <NumInput label="Elevators (if multi-floor)" value={data.elevatorCount} onChange={(v) => set("elevatorCount", v)} placeholder="0" />
+            <NumInput label="Elevators (if multi-floor)" value={data.elevatorCount ?? 0} onChange={(v) => set("elevatorCount", v)} placeholder="0" />
           )}
         </div>
       </Card>
@@ -350,7 +350,7 @@ function WalkthroughStep({ data, onChange, onNext, onBack, hiddenFields, onToggl
                   <label className="text-xs font-medium text-slate-600">Building Age (years)</label>
                   <Tooltip text="Older buildings take longer to clean. &gt;20 yrs: ×1.15 multiplier. &gt;40 yrs: ×1.25 multiplier on total labor time." source="ISSA 2025" />
                 </div>
-                <NumInput label="" value={data.buildingAge} onChange={(v) => set("buildingAge", v)} placeholder="0" />
+                <NumInput label="" value={data.buildingAgeYears ?? data.buildingAge} onChange={(v) => { set("buildingAgeYears", v); set("buildingAge", v); }} placeholder="0" />
               </div>
             )}
             {!h("parkingLot") && (
@@ -510,9 +510,9 @@ function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack, customB
     walkthrough.trashPointCount > 0 && { label: `Trash points (${walkthrough.trashPointCount} × ${ADDON_MINUTES.perTrashPoint} min)`, mins: walkthrough.trashPointCount * ADDON_MINUTES.perTrashPoint },
     walkthrough.glassLevel !== "None" && { label: `Glass level: ${walkthrough.glassLevel}`, mins: GLASS_LEVEL_MINUTES[walkthrough.glassLevel] },
     walkthrough.highTouchFocus && { label: "High-touch focus", mins: 15 },
-    walkthrough.floors > 1 && walkthrough.elevatorCount > 0 && {
-      label: `Elevator access (${walkthrough.elevatorCount} × 8 min, multi-floor)`,
-      mins: walkthrough.elevatorCount * 8,
+    (walkthrough.elevatorCount ?? 0) > 0 && {
+      label: `Elevator transport (${walkthrough.elevatorCount ?? 0} × 8 min × ${walkthrough.floors} floor${walkthrough.floors !== 1 ? "s" : ""})`,
+      mins: (walkthrough.elevatorCount ?? 0) * 8 * walkthrough.floors,
     },
     (walkthrough.parkingLotSqFt ?? 0) > 0 && {
       label: `Parking lot exterior (${walkthrough.parkingLotSqFt?.toLocaleString()} sq ft × 0.02)`,
@@ -520,8 +520,9 @@ function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack, customB
     },
   ].filter(Boolean) as { label: string; mins: number }[];
 
-  const ageMultiplier = walkthrough.buildingAge > 40 ? 1.25 : walkthrough.buildingAge > 20 ? 1.15 : 1.0;
-  const trafficMultiplier = TRAFFIC_LEVEL_MULTIPLIER[walkthrough.trafficLevel];
+  const effectiveAge = walkthrough.buildingAgeYears ?? walkthrough.buildingAge ?? 0;
+  const ageMultiplier = effectiveAge > 40 ? 1.25 : effectiveAge > 20 ? 1.15 : 1.0;
+  const trafficMultiplier = TRAFFIC_LEVEL_MULTIPLIER[walkthrough.trafficLevel ?? "Medium"];
 
   return (
     <div className="space-y-4">
@@ -550,7 +551,7 @@ function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack, customB
               <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Applied Multipliers</p>
               {ageMultiplier !== 1.0 && (
                 <div className="flex justify-between text-xs">
-                  <span className="text-amber-700">Building age &gt;{walkthrough.buildingAge > 40 ? "40" : "20"} yrs complexity</span>
+                  <span className="text-amber-700">Building age &gt;{effectiveAge > 40 ? "40" : "20"} yrs complexity ({effectiveAge} yrs)</span>
                   <span className="font-semibold text-amber-800">×{ageMultiplier.toFixed(2)}</span>
                 </div>
               )}
@@ -1360,6 +1361,7 @@ const DEFAULT_WALKTHROUGH: CommercialWalkthrough = {
   accessConstraints: "",
   notes: "",
   buildingAge: 0,
+  buildingAgeYears: 0,
   elevatorCount: 0,
   parkingLotSqFt: undefined,
   trafficLevel: "Medium",

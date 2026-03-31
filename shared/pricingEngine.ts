@@ -453,9 +453,10 @@ export interface CommercialWalkthrough {
   accessConstraints: string;
   notes: string;
   buildingAge: number;
-  elevatorCount: number;
+  buildingAgeYears?: number;
+  elevatorCount?: number;
   parkingLotSqFt?: number;
-  trafficLevel: TrafficLevel;
+  trafficLevel?: TrafficLevel;
 }
 
 export interface CommercialLaborEstimate {
@@ -559,15 +560,17 @@ export function computeCommercialLaborEstimate(
   // Multi-floor travel
   if (w.floors > 1) mins *= 1 + (w.floors - 1) * 0.05;
 
-  // Elevator transport (8 min per elevator when multi-story)
-  if (w.floors > 1) mins += w.elevatorCount * 8;
+  // Elevator vertical transport (8 min × elevators × floors)
+  const elevators = w.elevatorCount ?? 0;
+  if (elevators > 0) mins += elevators * 8 * w.floors;
 
-  // Building age complexity
-  if (w.buildingAge > 40) mins *= 1.25;
-  else if (w.buildingAge > 20) mins *= 1.15;
+  // Building age complexity (buildingAgeYears takes precedence over buildingAge)
+  const age = w.buildingAgeYears ?? w.buildingAge ?? 0;
+  if (age > 40) mins *= 1.25;
+  else if (age > 20) mins *= 1.15;
 
-  // Traffic level
-  mins *= TRAFFIC_LEVEL_MULTIPLIER[w.trafficLevel];
+  // Traffic level (default Medium = ×1.0 if not set)
+  mins *= TRAFFIC_LEVEL_MULTIPLIER[w.trafficLevel ?? "Medium"];
 
   // Exterior parking lot (0.02 min per sq ft)
   if (w.parkingLotSqFt) mins += w.parkingLotSqFt * 0.02;
