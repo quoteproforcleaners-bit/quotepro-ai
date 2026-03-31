@@ -488,7 +488,7 @@ export interface CommercialAppliedRule {
 }
 
 export interface CommercialWarning {
-  type: "low_sqft" | "very_low_estimate" | "high_estimate" | "after_hours";
+  type: "low_sqft" | "very_low_estimate" | "high_estimate" | "after_hours" | "low_rate" | "low_margin";
   message: string;
 }
 
@@ -668,6 +668,13 @@ export function computeCommercialQuote(
   }
   if (walkthrough?.afterHoursRequired && (config.afterHoursPremiumPct ?? 0) === 0) {
     warnings.push({ type: "after_hours", message: "After-hours service is enabled but the premium is set to 0% — consider adding a premium in Pricing settings." });
+  }
+  // BSCAI 2024 benchmarks — flag rates/margins that are likely to undercut profitability
+  if (config.hourlyRate < 40) {
+    warnings.push({ type: "low_rate", message: `Hourly rate ($${config.hourlyRate}) is below typical commercial range. BSCAI 2024 median: $48–$72/hr for commercial crews.` });
+  }
+  if (config.targetMarginPct < 15) {
+    warnings.push({ type: "low_margin", message: `Gross margin (${config.targetMarginPct}%) is below the sustainable threshold. BSCAI 2024 median for commercial contractors: 18–25%.` });
   }
 
   return { perVisit, monthly, annual, hours, recommendedCleaners: laborEst.recommendedCleaners, visitsPerMonth, lineItems, appliedRules, warnings, laborCost, baseCost };
