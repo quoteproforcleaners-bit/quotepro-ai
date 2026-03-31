@@ -495,7 +495,7 @@ const router = Router();
         return res.status(500).json({ message: "Google OAuth not configured" });
       }
       const platform = req.query.platform === "web" ? "web" : "mobile";
-      const redirectUri = `${getPublicBaseUrl(req)}/api/auth/google/callback`;
+      const redirectUri = `https://${req.get("host")}/api/auth/google/callback`;
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
@@ -521,7 +521,7 @@ const router = Router();
       if (!code) {
         return res.status(400).send("Missing authorization code");
       }
-      const redirectUri = `${getPublicBaseUrl(req)}/api/auth/google/callback`;
+      const redirectUri = `https://${req.get("host")}/api/auth/google/callback`;
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
