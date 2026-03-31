@@ -499,23 +499,23 @@ export interface CommercialQuoteResult {
   baseCost: number;
 }
 
-const BASE_MINUTES_PER_1000_SQFT: Record<FacilityType, number> = {
+export const BASE_MINUTES_PER_1000_SQFT: Record<FacilityType, number> = {
   Office: 25, Retail: 20, Medical: 35, Gym: 30,
   School: 28, Warehouse: 15, Restaurant: 40, Other: 25,
 };
 
-const ADDON_MINUTES = {
+export const ADDON_MINUTES = {
   perBathroom: 15, perBreakroom: 10, perTrashPoint: 3,
   perConferenceRoom: 5, perPrivateOffice: 5, perOpenArea: 8, perEntryLobby: 10,
 };
 
-const GLASS_LEVEL_MINUTES: Record<GlassLevel, number> = { None: 0, Some: 10, Lots: 25 };
+export const GLASS_LEVEL_MINUTES: Record<GlassLevel, number> = { None: 0, Some: 10, Lots: 25 };
 
 export const FREQUENCY_VISITS_PER_MONTH: Record<CommercialFrequency, number> = {
   "1x": 4, "2x": 8, "3x": 12, "5x": 20, daily: 22, custom: 4,
 };
 
-function applyRounding(price: number, rule: RoundingRule): number {
+export function applyRounding(price: number, rule: RoundingRule): number {
   if (rule === "none") return Math.round(price * 100) / 100;
   const inc = parseInt(rule, 10);
   return Math.ceil(price / inc) * inc;
@@ -602,4 +602,90 @@ export function computeCommercialQuote(
   }
 
   return { perVisit, monthly, annual, hours, recommendedCleaners: laborEst.recommendedCleaners, visitsPerMonth, lineItems, appliedRules, warnings, laborCost, baseCost };
+}
+
+// ─── Commercial Tier Generator ────────────────────────────────────────────────
+
+export interface CommercialTier {
+  name: string;
+  scopeText: string;
+  includedBullets: string[];
+  excludedBullets: string[];
+  pricePerVisit: number;
+  monthlyPrice: number;
+}
+
+export function computeCommercialTiers(
+  facilityName: string,
+  basePerVisit: number,
+  frequency: CommercialFrequency,
+  roundingRule: RoundingRule,
+): CommercialTier[] {
+  const visits = FREQUENCY_VISITS_PER_MONTH[frequency];
+  const basic    = applyRounding(basePerVisit * 0.75, roundingRule);
+  const enhanced = applyRounding(basePerVisit,        roundingRule);
+  const premium  = applyRounding(basePerVisit * 1.3,  roundingRule);
+  const name = facilityName || "the facility";
+  return [
+    {
+      name: "Basic Janitorial",
+      scopeText: `Standard janitorial service for ${name}`,
+      includedBullets: [
+        "Trash removal and liner replacement",
+        "Restroom cleaning and restocking",
+        "Floor sweeping and mopping (hard surfaces)",
+        "Surface wiping (desks, counters, tables)",
+        "Entrance and lobby tidying",
+      ],
+      excludedBullets: [
+        "Full carpet vacuuming",
+        "Deep sanitization",
+        "Window and glass cleaning",
+        "High-touch point disinfection",
+        "Breakroom appliance cleaning",
+      ],
+      pricePerVisit: basic,
+      monthlyPrice: applyRounding(basic * visits, roundingRule),
+    },
+    {
+      name: "Enhanced Sanitation",
+      scopeText: `Comprehensive cleaning with enhanced sanitation for ${name}`,
+      includedBullets: [
+        "All Basic Janitorial services",
+        "Full carpet vacuuming",
+        "High-touch point disinfection (handles, switches, railings)",
+        "Breakroom and kitchen cleaning",
+        "Conference room reset and cleaning",
+        "Glass and mirror cleaning",
+      ],
+      excludedBullets: [
+        "Deep carpet extraction",
+        "Floor stripping and waxing",
+        "Exterior window cleaning",
+        "Specialty chemical treatments",
+      ],
+      pricePerVisit: enhanced,
+      monthlyPrice: applyRounding(enhanced * visits, roundingRule),
+    },
+    {
+      name: "Premium Maintenance",
+      scopeText: `Full-service premium maintenance for ${name}`,
+      includedBullets: [
+        "All Enhanced Sanitation services",
+        "Deep carpet care (monthly extraction)",
+        "Hard floor maintenance (buffing / polishing)",
+        "Interior window and partition cleaning",
+        "Detailed dusting (vents, blinds, fixtures)",
+        "Quarterly deep clean included",
+        "Priority scheduling and dedicated team",
+      ],
+      excludedBullets: [
+        "Exterior window cleaning",
+        "Pressure washing",
+        "Specialty hazmat cleaning",
+      ],
+      pricePerVisit: premium,
+      monthlyPrice: applyRounding(premium * visits, roundingRule),
+    },
+  ];
 }

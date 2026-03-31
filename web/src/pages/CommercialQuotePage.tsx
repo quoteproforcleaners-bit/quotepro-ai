@@ -1,7 +1,24 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { computeCommercialQuote, computeCommercialLaborEstimate } from "../lib/pricingEngine";
+import {
+  computeCommercialQuote,
+  computeCommercialLaborEstimate,
+  computeCommercialTiers,
+  BASE_MINUTES_PER_1000_SQFT,
+  ADDON_MINUTES,
+  GLASS_LEVEL_MINUTES,
+  FREQUENCY_VISITS_PER_MONTH,
+  type CommercialWalkthrough,
+  type CommercialLaborEstimate,
+  type CommercialPricingConfig,
+  type CommercialTier,
+  type CommercialFrequency,
+  type RoundingRule,
+  type SuppliesSurchargeType,
+  type FacilityType,
+  type GlassLevel,
+} from "../lib/pricingEngine";
 import { CommercialLivePreview, LivePreviewPanel } from "../components/LiveQuotePreview";
 import type { ManualAdjustment } from "../components/LiveQuotePreview";
 import {
@@ -38,13 +55,8 @@ import {
 import { ProGate } from "../components/ProGate";
 import { apiRequest } from "../lib/api";
 
-// ─── Types (mirrored from iOS client/features/commercial/types.ts) ────────────
+// ─── UI-only types ─────────────────────────────────────────────────────────────
 
-type FacilityType = "Office" | "Retail" | "Medical" | "Gym" | "School" | "Warehouse" | "Restaurant" | "Other";
-type GlassLevel = "None" | "Some" | "Lots";
-type CommercialFrequency = "1x" | "2x" | "3x" | "5x" | "daily" | "custom";
-type RoundingRule = "none" | "5" | "10" | "25";
-type SuppliesSurchargeType = "fixed" | "percent";
 type Step = "facility" | "walkthrough" | "labor" | "pricing" | "tiers";
 
 const STEPS: { key: Step; label: string; icon: typeof Building2 }[] = [
@@ -75,180 +87,6 @@ const FREQUENCY_OPTIONS: { value: CommercialFrequency; label: string; visitsPerM
   { value: "custom", label: "Custom / On-Demand", visitsPerMonth: 4 },
 ];
 
-// ─── Labor Model (ported from iOS client/features/commercial/laborModel.ts) ──
-
-const BASE_MINUTES_PER_1000_SQFT: Record<FacilityType, number> = {
-  Office: 25, Retail: 20, Medical: 35, Gym: 30,
-  School: 28, Warehouse: 15, Restaurant: 40, Other: 25,
-};
-const ADDON_MINUTES = {
-  perBathroom: 15, perBreakroom: 10, perTrashPoint: 3,
-  perConferenceRoom: 5, perPrivateOffice: 5, perOpenArea: 8, perEntryLobby: 10,
-};
-const GLASS_LEVEL_MINUTES: Record<GlassLevel, number> = { None: 0, Some: 10, Lots: 25 };
-const FREQUENCY_VISITS_PER_MONTH: Record<CommercialFrequency, number> = {
-  "1x": 4, "2x": 8, "3x": 12, "5x": 20, daily: 22, custom: 4,
-};
-
-interface Walkthrough {
-  facilityType: FacilityType;
-  totalSqFt: number;
-  floors: number;
-  bathroomCount: number;
-  breakroomCount: number;
-  conferenceRoomCount: number;
-  privateOfficeCount: number;
-  openAreaCount: number;
-  entryLobbyCount: number;
-  trashPointCount: number;
-  carpetPercent: number;
-  hardFloorPercent: number;
-  glassLevel: GlassLevel;
-  highTouchFocus: boolean;
-  afterHoursRequired: boolean;
-  suppliesByClient: boolean;
-  restroomConsumablesIncluded: boolean;
-  frequency: CommercialFrequency;
-  preferredDays: string;
-  preferredTimeWindow: string;
-  accessConstraints: string;
-  notes: string;
-}
-
-interface LaborEstimate {
-  rawMinutes: number;
-  rawHours: number;
-  recommendedCleaners: number;
-  overrideHours: number | null;
-}
-
-interface PricingConfig {
-  hourlyRate: number;
-  overheadPct: number;
-  targetMarginPct: number;
-  suppliesSurcharge: number;
-  suppliesSurchargeType: SuppliesSurchargeType;
-  roundingRule: RoundingRule;
-}
-
-interface CommercialTier {
-  name: string;
-  scopeText: string;
-  includedBullets: string[];
-  excludedBullets: string[];
-  pricePerVisit: number;
-  monthlyPrice: number;
-}
-
-function calculateLaborEstimate(w: Walkthrough): Omit<LaborEstimate, "overrideHours"> {
-  let mins = (w.totalSqFt / 1000) * BASE_MINUTES_PER_1000_SQFT[w.facilityType];
-  mins += w.bathroomCount * ADDON_MINUTES.perBathroom;
-  mins += w.breakroomCount * ADDON_MINUTES.perBreakroom;
-  mins += w.trashPointCount * ADDON_MINUTES.perTrashPoint;
-  mins += w.conferenceRoomCount * ADDON_MINUTES.perConferenceRoom;
-  mins += w.privateOfficeCount * ADDON_MINUTES.perPrivateOffice;
-  mins += w.openAreaCount * ADDON_MINUTES.perOpenArea;
-  mins += w.entryLobbyCount * ADDON_MINUTES.perEntryLobby;
-  mins += GLASS_LEVEL_MINUTES[w.glassLevel];
-  if (w.highTouchFocus) mins += 15;
-  const carpet = w.carpetPercent / 100;
-  const hard = w.hardFloorPercent / 100;
-  mins *= carpet * 1.1 + hard * 0.95;
-  if (w.floors > 1) mins *= 1 + (w.floors - 1) * 0.05;
-  const rawMinutes = Math.round(mins);
-  const rawHours = Math.round((rawMinutes / 60) * 100) / 100;
-  const recommendedCleaners = Math.max(1, Math.ceil(rawMinutes / 120));
-  return { rawMinutes, rawHours, recommendedCleaners };
-}
-
-function applyRounding(price: number, rule: RoundingRule): number {
-  if (rule === "none") return Math.round(price * 100) / 100;
-  const inc = parseInt(rule, 10);
-  return Math.ceil(price / inc) * inc;
-}
-
-function calculatePricing(laborEst: LaborEstimate, config: PricingConfig, frequency: CommercialFrequency) {
-  const hours = laborEst.overrideHours ?? laborEst.rawHours;
-  const labor = hours * config.hourlyRate;
-  const baseCost = labor * (1 + config.overheadPct / 100);
-  const supplies = config.suppliesSurchargeType === "fixed"
-    ? config.suppliesSurcharge
-    : baseCost * (config.suppliesSurcharge / 100);
-  const total = baseCost + supplies;
-  const perVisit = applyRounding(total / (1 - config.targetMarginPct / 100), config.roundingRule);
-  const visitsPerMonth = FREQUENCY_VISITS_PER_MONTH[frequency];
-  const monthly = applyRounding(perVisit * visitsPerMonth, config.roundingRule);
-  return { perVisit, monthly, labor, baseCost, hours, visitsPerMonth };
-}
-
-function generateTiers(facilityName: string, perVisit: number, frequency: CommercialFrequency, rule: RoundingRule): CommercialTier[] {
-  const visits = FREQUENCY_VISITS_PER_MONTH[frequency];
-  const basic = applyRounding(perVisit * 0.75, rule);
-  const enhanced = applyRounding(perVisit, rule);
-  const premium = applyRounding(perVisit * 1.3, rule);
-  return [
-    {
-      name: "Basic Janitorial",
-      scopeText: `Standard janitorial service for ${facilityName || "the facility"}`,
-      includedBullets: [
-        "Trash removal and liner replacement",
-        "Restroom cleaning and restocking",
-        "Floor sweeping and mopping (hard surfaces)",
-        "Surface wiping (desks, counters, tables)",
-        "Entrance and lobby tidying",
-      ],
-      excludedBullets: [
-        "Full carpet vacuuming",
-        "Deep sanitization",
-        "Window and glass cleaning",
-        "High-touch point disinfection",
-        "Breakroom appliance cleaning",
-      ],
-      pricePerVisit: basic,
-      monthlyPrice: applyRounding(basic * visits, rule),
-    },
-    {
-      name: "Enhanced Sanitation",
-      scopeText: `Comprehensive cleaning with enhanced sanitation for ${facilityName || "the facility"}`,
-      includedBullets: [
-        "All Basic Janitorial services",
-        "Full carpet vacuuming",
-        "High-touch point disinfection (handles, switches, railings)",
-        "Breakroom and kitchen cleaning",
-        "Conference room reset and cleaning",
-        "Glass and mirror cleaning",
-      ],
-      excludedBullets: [
-        "Deep carpet extraction",
-        "Floor stripping and waxing",
-        "Exterior window cleaning",
-        "Specialty chemical treatments",
-      ],
-      pricePerVisit: enhanced,
-      monthlyPrice: applyRounding(enhanced * visits, rule),
-    },
-    {
-      name: "Premium Maintenance",
-      scopeText: `Full-service premium maintenance for ${facilityName || "the facility"}`,
-      includedBullets: [
-        "All Enhanced Sanitation services",
-        "Deep carpet care (monthly extraction)",
-        "Hard floor maintenance (buffing / polishing)",
-        "Interior window and partition cleaning",
-        "Detailed dusting (vents, blinds, fixtures)",
-        "Quarterly deep clean included",
-        "Priority scheduling and dedicated team",
-      ],
-      excludedBullets: [
-        "Exterior window cleaning",
-        "Pressure washing",
-        "Specialty hazmat cleaning",
-      ],
-      pricePerVisit: premium,
-      monthlyPrice: applyRounding(premium * visits, rule),
-    },
-  ];
-}
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
@@ -392,9 +230,9 @@ function FacilityStep({ data, onChange, onNext }: {
 // ─── Step 2: Walkthrough ──────────────────────────────────────────────────────
 
 function WalkthroughStep({ data, onChange, onNext, onBack }: {
-  data: Walkthrough; onChange: (d: Walkthrough) => void; onNext: () => void; onBack: () => void;
+  data: CommercialWalkthrough; onChange: (d: CommercialWalkthrough) => void; onNext: () => void; onBack: () => void;
 }) {
-  const set = <K extends keyof Walkthrough>(k: K, v: Walkthrough[K]) => onChange({ ...data, [k]: v });
+  const set = <K extends keyof CommercialWalkthrough>(k: K, v: CommercialWalkthrough[K]) => onChange({ ...data, [k]: v });
 
   const handleCarpetChange = (v: number) => {
     const clamped = Math.min(100, Math.max(0, v));
@@ -557,13 +395,13 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
 // ─── Step 3: Labor ────────────────────────────────────────────────────────────
 
 function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack }: {
-  walkthrough: Walkthrough;
-  laborEst: LaborEstimate;
-  setLaborEst: (l: LaborEstimate) => void;
+  walkthrough: CommercialWalkthrough;
+  laborEst: CommercialLaborEstimate;
+  setLaborEst: (l: CommercialLaborEstimate) => void;
   onNext: () => void;
   onBack: () => void;
 }) {
-  const auto = useMemo(() => calculateLaborEstimate(walkthrough), [walkthrough]);
+  const auto = useMemo(() => computeCommercialLaborEstimate(walkthrough), [walkthrough]);
   const effectiveHours = laborEst.overrideHours ?? auto.rawHours;
 
   const breakdown = [
@@ -668,15 +506,15 @@ function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack }: {
 // ─── Step 4: Pricing ──────────────────────────────────────────────────────────
 
 function PricingStep({ config, onChange, laborEst, walkthrough, onNext, onBack }: {
-  config: PricingConfig;
-  onChange: (c: PricingConfig) => void;
-  laborEst: LaborEstimate;
-  walkthrough: Walkthrough;
+  config: CommercialPricingConfig;
+  onChange: (c: CommercialPricingConfig) => void;
+  laborEst: CommercialLaborEstimate;
+  walkthrough: CommercialWalkthrough;
   onNext: () => void;
   onBack: () => void;
 }) {
-  const set = <K extends keyof PricingConfig>(k: K, v: PricingConfig[K]) => onChange({ ...config, [k]: v });
-  const calc = useMemo(() => calculatePricing(laborEst, config, walkthrough.frequency), [laborEst, config, walkthrough.frequency]);
+  const set = <K extends keyof CommercialPricingConfig>(k: K, v: CommercialPricingConfig[K]) => onChange({ ...config, [k]: v });
+  const calc = useMemo(() => computeCommercialQuote(laborEst, config, walkthrough.frequency), [laborEst, config, walkthrough.frequency]);
   const canProceed = config.hourlyRate > 0;
 
   return (
@@ -743,7 +581,7 @@ function PricingStep({ config, onChange, laborEst, walkthrough, onNext, onBack }
         <div className="px-5 pb-5 space-y-2">
           {[
             { label: `Hours per visit (${laborEst.overrideHours ? "override" : "auto"})`, value: `${calc.hours} hrs` },
-            { label: "Labor cost per visit", value: `$${calc.labor.toFixed(2)}` },
+            { label: "Labor cost per visit", value: `$${calc.laborCost.toFixed(2)}` },
             { label: `With overhead (${config.overheadPct}%)`, value: `$${calc.baseCost.toFixed(2)}` },
           ].map((row) => (
             <div key={row.label} className="flex justify-between items-center py-1.5">
@@ -780,9 +618,9 @@ function PricingStep({ config, onChange, laborEst, walkthrough, onNext, onBack }
 
 function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
   facility: FacilityInfo;
-  walkthrough: Walkthrough;
-  laborEst: LaborEstimate;
-  pricingConfig: PricingConfig;
+  walkthrough: CommercialWalkthrough;
+  laborEst: CommercialLaborEstimate;
+  pricingConfig: CommercialPricingConfig;
   onBack: () => void;
 }) {
   const navigate = useNavigate();
@@ -797,8 +635,8 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
   ]);
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
 
-  const calc = useMemo(() => calculatePricing(laborEst, pricingConfig, walkthrough.frequency), [laborEst, pricingConfig, walkthrough.frequency]);
-  const tiers = useMemo(() => generateTiers(facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule), [facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule]);
+  const calc = useMemo(() => computeCommercialQuote(laborEst, pricingConfig, walkthrough.frequency), [laborEst, pricingConfig, walkthrough.frequency]);
+  const tiers = useMemo(() => computeCommercialTiers(facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule), [facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule]);
   const freq = FREQUENCY_OPTIONS.find((f) => f.value === walkthrough.frequency);
 
   // Effective prices: use overrides if set, else computed
@@ -1097,7 +935,7 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const DEFAULT_WALKTHROUGH: Walkthrough = {
+const DEFAULT_WALKTHROUGH: CommercialWalkthrough = {
   facilityType: "Office",
   totalSqFt: 0,
   floors: 1,
@@ -1134,11 +972,11 @@ function CommercialQuoteContent() {
     facilityName: "", contactName: "", contactEmail: "", contactPhone: "", siteAddress: "",
     facilityType: "Office", totalSqFt: 0, floors: 1,
   });
-  const [walkthrough, setWalkthrough] = useState<Walkthrough>({ ...DEFAULT_WALKTHROUGH });
-  const [laborEst, setLaborEst] = useState<LaborEstimate>({
+  const [walkthrough, setWalkthrough] = useState<CommercialWalkthrough>({ ...DEFAULT_WALKTHROUGH });
+  const [laborEst, setLaborEst] = useState<CommercialLaborEstimate>({
     rawMinutes: 0, rawHours: 0, recommendedCleaners: 1, overrideHours: null,
   });
-  const [pricingConfig, setPricingConfig] = useState<PricingConfig>({
+  const [pricingConfig, setPricingConfig] = useState<CommercialPricingConfig>({
     hourlyRate: defaultHourlyRate,
     overheadPct: defaultOverhead,
     targetMarginPct: defaultMargin,
