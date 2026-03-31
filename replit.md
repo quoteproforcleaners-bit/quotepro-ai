@@ -32,6 +32,9 @@ Session-based authentication supports email/password, Apple, and Google SSO.
     - **AI Dynamic Pricing Suggestions**: Recommends optimal pricing based on property details.
 - **Job Management**: Detailed job scheduling, status tracking, and customer-facing updates.
 - **AI Follow-Up Automation**: Automatically schedules and sends AI-generated follow-up messages for unaccepted quotes.
+- **Public SEO Calculator Pages**:
+  - `/commercial-cleaning-calculator` — `CommercialCalculatorPage.tsx`: 3-step public wizard (Facility → Walkthrough → Instant Quote), ISSA 2026 + BSCAI 2024 national benchmarks, FAQ JSON-LD schema, HowTo schema, shareable ?q= URL (base64 state), branded PDF export with QR code, "Get Full Pro Proposal" CTA → /register.
+  - `/residential-cleaning-cost-calculator` — `ResidentialCalculatorPage.tsx`: 2-step public wizard (Property → Results), Good/Better/Best tiers via `computeResidentialQuote`, HomeAdvisor/Angi 2026 benchmark comparisons, FAQ JSON-LD schema, HowTo schema, shareable ?q= URL, branded PDF export with QR code, mutual cross-links between commercial and residential.
 - **Scalable Calculator Engine**: A data-driven engine dynamically generates calculator pages based on `CalcDefinition` objects.
 - **Lead Link Microsite**: A 4-step progressive disclosure quote request page (`/request/:slug`) for customers.
 - **Smart Push Notification Trigger System**: Server-side push notifications for various triggers (activation reminders, quote expiry, dormant customer digest) with user preferences and cron-based scheduling.

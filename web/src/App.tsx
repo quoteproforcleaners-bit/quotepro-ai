@@ -45,6 +45,7 @@ import ClosingAssistantPage from "./pages/ClosingAssistantPage";
 import CommercialQuotePage from "./pages/CommercialQuotePage";
 import CommercialSettingsPage from "./pages/CommercialSettingsPage";
 import CommercialCalculatorPage from "./pages/CommercialCalculatorPage";
+import ResidentialCalculatorPage from "./pages/ResidentialCalculatorPage";
 import ReactivationPage from "./pages/ReactivationPage";
 import AutomationsHubPage from "./pages/AutomationsHubPage";
 import SalesStrategyPage from "./pages/SalesStrategyPage";
@@ -195,6 +196,7 @@ export default function App() {
 
         {/* Public commercial cleaning cost calculator — no auth required */}
         <Route path="/commercial-cleaning-calculator" element={<CommercialCalculatorPage />} />
+        <Route path="/residential-cleaning-cost-calculator" element={<ResidentialCalculatorPage />} />
 
         {/* Public intake form — no auth required */}
         <Route path="/intake/:businessId" element={<IntakePage />} />

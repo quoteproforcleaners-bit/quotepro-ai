@@ -40,6 +40,7 @@ import {
   ChevronDown,
   Calculator,
   Copy,
+  Home,
 } from "lucide-react";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -66,11 +67,11 @@ const FREQUENCY_OPTIONS: { value: CommercialFrequency; label: string; visitsPerM
 const NATIONAL_AVERAGES: Record<FacilityType, { low: number; high: number; source: string }> = {
   Office:     { low: 0.28, high: 0.48, source: "BSCAI 2024" },
   Retail:     { low: 0.24, high: 0.40, source: "ISSA 2024"  },
-  Medical:    { low: 0.48, high: 0.72, source: "ISSA 2025"  },
-  Gym:        { low: 0.40, high: 0.60, source: "ISSA 2025"  },
+  Medical:    { low: 0.48, high: 0.72, source: "ISSA 2026"  },
+  Gym:        { low: 0.40, high: 0.60, source: "ISSA 2026"  },
   School:     { low: 0.32, high: 0.52, source: "BSCAI 2024" },
   Warehouse:  { low: 0.16, high: 0.28, source: "ISSA 2024"  },
-  Restaurant: { low: 0.52, high: 0.80, source: "ISSA 2025"  },
+  Restaurant: { low: 0.52, high: 0.80, source: "ISSA 2026"  },
   Other:      { low: 0.28, high: 0.48, source: "ISSA 2024"  },
 };
 
@@ -98,7 +99,7 @@ const TESTIMONIALS = [
 const FAQ_DATA = [
   {
     q: "How accurate is the commercial cleaning cost calculator?",
-    a: "The calculator uses ISSA 2025 production rate standards — the same benchmarks used by professional janitorial contractors and facility managers worldwide. Results are typically within 10–15% of actual market rates, varying by local labor costs, building conditions, and service scope.",
+    a: "The calculator uses ISSA 2026 production rate standards — the same benchmarks used by professional janitorial contractors and facility managers worldwide. Results are typically within 10–15% of actual market rates, varying by local labor costs, building conditions, and service scope.",
   },
   {
     q: "What does commercial cleaning cost per square foot?",
@@ -186,10 +187,10 @@ function useSEO() {
     document.title = "Commercial Cleaning Cost Calculator 2026 | Free Janitorial Quote Tool";
 
     const metas: [string, string, string][] = [
-      ["name", "description", "Free commercial cleaning cost calculator. Get instant janitorial quotes based on ISSA 2025 production rates. Covers offices, medical, retail, gyms, schools, restaurants, and warehouses. Compare to national averages."],
+      ["name", "description", "Free commercial cleaning cost calculator. Get instant janitorial quotes based on ISSA 2026 production rates. Covers offices, medical, retail, gyms, schools, restaurants, and warehouses. Compare to national averages."],
       ["name", "keywords", "commercial cleaning cost calculator, janitorial quote calculator, office cleaning prices, commercial cleaning rates per square foot, ISSA production rates, janitorial bid calculator, cleaning cost estimator 2026"],
       ["property", "og:title", "Commercial Cleaning Cost Calculator 2026 | Free Janitorial Quote Tool"],
-      ["property", "og:description", "Instant commercial cleaning quotes powered by ISSA 2025 benchmarks. Get Basic, Enhanced, and Premium pricing tiers in seconds."],
+      ["property", "og:description", "Instant commercial cleaning quotes powered by ISSA 2026 benchmarks. Get Basic, Enhanced, and Premium pricing tiers in seconds."],
       ["property", "og:type", "website"],
       ["name", "robots", "index, follow"],
     ];
@@ -608,7 +609,7 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <span className="bg-blue-500/50 text-white text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1.5">
-              <BadgeCheck className="w-3.5 h-3.5" /> ISSA 2025 Benchmarks
+              <BadgeCheck className="w-3.5 h-3.5" /> ISSA 2026 Benchmarks
             </span>
             <span className="text-blue-300 text-xs">
               ${sqftPerMonth.toFixed(2)}/sqft/mo
@@ -873,25 +874,44 @@ function Step3Results({ state, onBack, onShare, shareUrl }: {
         PDF includes QR code linking back to this estimate so recipients can recalculate
       </p>
 
-      {/* CTA */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white print:hidden">
+      {/* CTA — Get Full Pro Proposal */}
+      <div className="bg-gradient-to-br from-slate-900 to-blue-950 rounded-2xl p-6 text-white print:hidden">
         <div className="flex items-start gap-4">
           <div className="p-2.5 bg-blue-500 rounded-xl shrink-0">
             <Users className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1">
-            <h3 className="font-bold text-base mb-1">Get a Full Branded Proposal</h3>
-            <p className="text-slate-300 text-sm mb-4">
-              Turn this estimate into a professional, client-ready proposal with all 3 tiers,
-              your company branding, custom line items, and one-click email delivery.
-              Free 14-day trial — no credit card required.
-            </p>
-            <button
-              onClick={() => navigate("/register")}
-              className="bg-blue-500 hover:bg-blue-400 text-white font-semibold px-5 py-2.5 rounded-xl flex items-center gap-2 transition-colors text-sm"
-            >
-              Get Full Proposal Free <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="inline-flex items-center gap-1.5 bg-blue-500/20 text-blue-300 text-[10px] font-bold px-2.5 py-1 rounded-full mb-2">
+              <Star className="w-3 h-3" /> 14-DAY FREE TRIAL — NO CREDIT CARD
+            </div>
+            <h3 className="font-bold text-base mb-2">Turn This Into a Full Pro Proposal</h3>
+            <ul className="space-y-1 mb-4">
+              {[
+                "Branded PDF with your logo, photo, and license number",
+                "All 3 service tiers with custom add-on line items",
+                "One-click email delivery with digital acceptance",
+                "ISSA/BSCAI benchmark badges on every proposal",
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2 text-xs text-slate-300">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => navigate("/register")}
+                className="bg-blue-500 hover:bg-blue-400 text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition-colors text-sm shadow-md"
+              >
+                Get Full Pro Proposal <ArrowRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => navigate("/login")}
+                className="bg-white/10 hover:bg-white/20 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors"
+              >
+                Sign In
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1186,7 +1206,7 @@ export default function CommercialCalculatorPage() {
             </p>
             <div className="flex flex-wrap gap-4 mt-5">
               {[
-                ["ISSA 2025", "Production Rate Standards"],
+                ["ISSA 2026", "Production Rate Standards"],
                 ["3 Service Tiers", "Basic / Enhanced / Premium"],
                 ["National Benchmarks", "Compare to market rates"],
               ].map(([title, sub]) => (
@@ -1211,7 +1231,7 @@ export default function CommercialCalculatorPage() {
               <div className="hidden print:block mb-6">
                 <h1 className="text-2xl font-bold text-slate-900">Commercial Cleaning Cost Estimate</h1>
                 <p className="text-sm text-slate-500 mt-1">
-                  Generated by QuotePro AI · Based on ISSA 2025 production rate standards
+                  Generated by QuotePro AI · Based on ISSA 2026 production rate standards
                 </p>
                 <hr className="mt-3" />
               </div>
@@ -1247,7 +1267,7 @@ export default function CommercialCalculatorPage() {
                 <h3 className="text-sm font-bold text-slate-800 mb-3">Why trust these numbers?</h3>
                 <div className="space-y-3">
                   {[
-                    { icon: BadgeCheck, title: "ISSA 2025 Standards", body: "Same production rates used by BSC industry leaders and facility managers worldwide." },
+                    { icon: BadgeCheck, title: "ISSA 2026 Standards", body: "Same production rates used by BSC industry leaders and facility managers worldwide." },
                     { icon: BarChart3, title: "National Benchmarks", body: "Compare your quote against BSCAI and ISSA 2024 survey data from 1,000+ US facilities." },
                     { icon: Users, title: "Contractor-Tested", body: "Built by cleaning professionals who've bid millions in commercial contracts." },
                   ].map((item) => {
@@ -1303,11 +1323,26 @@ export default function CommercialCalculatorPage() {
                 </div>
               </SectionCard>
 
+              {/* Cross-link to residential */}
+              <SectionCard className="p-5">
+                <div className="flex items-start gap-3">
+                  <Home className="w-5 h-5 text-slate-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 mb-1">Need residential pricing?</h3>
+                    <p className="text-xs text-slate-500 mb-3">Get instant pricing for house cleaning — by bedrooms, bathrooms, and square footage.</p>
+                    <a href="/residential-cleaning-cost-calculator"
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                      Residential Calculator <ArrowRight className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              </SectionCard>
+
               <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-700">
-                    <span className="font-semibold">Disclaimer:</span> Estimates are based on ISSA 2025 benchmarks and industry averages.
+                    <span className="font-semibold">Disclaimer:</span> Estimates are based on ISSA 2026 benchmarks and industry averages.
                     Local labor costs, building conditions, and contract terms affect final pricing. Always get an on-site quote for large contracts.
                   </p>
                 </div>
@@ -1322,7 +1357,7 @@ export default function CommercialCalculatorPage() {
           <footer className="mt-16 pb-8 text-center text-xs text-slate-400 print:hidden">
             <p>
               Commercial Cleaning Cost Calculator — powered by QuotePro AI.
-              Estimates use ISSA 2025 production rates and BSCAI 2024 market benchmarks.
+              Estimates use ISSA 2026 production rates and BSCAI 2024 market benchmarks.
               Not a substitute for an on-site assessment.
             </p>
             <p className="mt-1">
