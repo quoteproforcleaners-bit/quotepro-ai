@@ -18,3 +18,9 @@ id = "LzTRjSzrjX_PPWH-ndBky"
 uri = "file://quotepro-audit.md"
 type = "text"
 title = "QuotePro AI — Full Product Audit Document"
+
+[[outputs]]
+id = "S20Kqbue18NvDWy33X5CD"
+uri = "file://commercial_calculator_audit.txt"
+type = "text"
+title = "Commercial Calculator — Full Code (1,884 lines)"
