@@ -44,3 +44,14 @@ app-example
 
 # Web app build
 web/dist/
+
+# Large asset/build directories
+attached_assets/
+static-build/
+server_dist/
+uploads/
+coverage/
+
+# Audit exports
+*.tar.gz
+quotepro-source-audit.zip
