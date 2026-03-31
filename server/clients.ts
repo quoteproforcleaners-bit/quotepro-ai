@@ -65,6 +65,9 @@ export function generateAuthToken(userId: string, needsOnboarding: boolean): str
 
 /** Returns the public-facing base URL for the current request environment. */
 export function getPublicBaseUrl(req: Request): string {
+  if (process.env.CUSTOM_DOMAIN) {
+    return `https://${process.env.CUSTOM_DOMAIN}`;
+  }
   if (process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT) {
     const forwardedHost = req.header("x-forwarded-host");
     const host = forwardedHost || req.get("host") || "localhost";

@@ -1197,9 +1197,7 @@ const router = Router();
       // Auto-generate slug if not yet set
       let slug = row.public_quote_slug;
       if (!slug) slug = await ensurePublicSlug(business.id, business.companyName);
-      const reqHost = req.headers.host || req.hostname;
-      const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-      const publicUrl = `${reqProto}://${reqHost}/request/${slug}`;
+      const publicUrl = `${getPublicBaseUrl(req)}/request/${slug}`;
       res.json({
         slug,
         enabled: row.public_quote_enabled ?? true,
@@ -1233,9 +1231,7 @@ const router = Router();
         [business.id]
       );
       const row = updated.rows[0];
-      const reqHost = req.headers.host || req.hostname;
-      const reqProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
-      const publicUrl = `${reqProto}://${reqHost}/request/${row.public_quote_slug}`;
+      const publicUrl = `${getPublicBaseUrl(req)}/request/${row.public_quote_slug}`;
       res.json({
         slug: row.public_quote_slug,
         enabled: row.public_quote_enabled,
@@ -1314,11 +1310,10 @@ const router = Router();
       const slug = await ensurePublicSlug(business.id, business.companyName || "my-cleaning-co");
 
       // Build URL
-      const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
-      const host = req.headers["x-forwarded-host"] || req.headers.host || "app.getquotepro.ai";
-      const leadLinkUrl = `${proto}://${host}/request/${slug}`;
-      const pricingUrl = `${proto}://${host}/settings?tab=payments`;
-      const shareUrl = `${proto}://${host}/lead-link`;
+      const baseUrl = getPublicBaseUrl(req);
+      const leadLinkUrl = `${baseUrl}/request/${slug}`;
+      const pricingUrl = `${baseUrl}/settings?tab=payments`;
+      const shareUrl = `${baseUrl}/lead-link`;
 
       // Get owner name and email
       const ownerFullName: string = (business as any).senderName || "";
