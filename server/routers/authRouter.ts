@@ -507,6 +507,8 @@ const router = Router();
         prompt: "select_account",
         state: platform,
       });
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.set("Pragma", "no-cache");
       return res.json({ url });
     } catch (error: any) {
       console.error("Google auth start error:", error);
