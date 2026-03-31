@@ -1,5 +1,21 @@
 import { useState, useRef } from "react";
-import { Zap, Copy, Download, Upload, FileText, Loader2, X, Check, ArrowRight, Share2, ChevronRight, Star } from "lucide-react";
+import { Zap, Copy, Download, Upload, FileText, Loader2, X, Check, ArrowRight, Share2, ChevronRight, Star, Wand2, ChevronDown, BookOpen } from "lucide-react";
+
+const FACILITY_TYPES_SCOPE = [
+  "Office Building", "Retail Store", "Medical / Dental", "Gym / Fitness Center",
+  "School / University", "Warehouse / Industrial", "Restaurant / Food Service",
+  "House / Residential", "Apartment Complex", "Hotel / Hospitality", "Church / Religious",
+];
+
+const FREQUENCY_OPTIONS_SCOPE = [
+  { value: "daily", label: "Daily" },
+  { value: "5x/week", label: "5× per week" },
+  { value: "3x/week", label: "3× per week" },
+  { value: "weekly", label: "Weekly" },
+  { value: "biweekly", label: "Every 2 weeks" },
+  { value: "monthly", label: "Monthly" },
+  { value: "one-time", label: "One-time / Move-in-out" },
+];
 
 // ─── Proposal Parser ───────────────────────────────────────────────────────────
 interface PricingTier {
@@ -469,6 +485,10 @@ function generatePdfHtml(parsed: ParsedProposal): string {
 
 // ─── Main Page ──────────────────────────────────────────────────────────────────
 export default function QuoteDoctorPage() {
+  // ── Mode selector ──
+  const [mode, setMode] = useState<"optimize" | "scope">("optimize");
+
+  // ── Optimize-quote state ──
   const [tab, setTab] = useState<"paste" | "upload">("paste");
   const [quoteText, setQuoteText] = useState("");
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -482,6 +502,24 @@ export default function QuoteDoctorPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+
+  // ── AI Adjust state ──
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustText, setAdjustText] = useState("");
+  const [adjustLoading, setAdjustLoading] = useState(false);
+  const [adjustError, setAdjustError] = useState<string | null>(null);
+
+  // ── Scope generator state ──
+  const [scopeFacility, setScopeFacility] = useState("Office Building");
+  const [scopeSqFt, setScopeSqFt] = useState("");
+  const [scopeFloors, setScopeFloors] = useState("1");
+  const [scopeFrequency, setScopeFrequency] = useState("weekly");
+  const [scopeNotes, setScopeNotes] = useState("");
+  const [scopeLoading, setScopeLoading] = useState(false);
+  const [scopeResult, setScopeResult] = useState<string | null>(null);
+  const [scopeError, setScopeError] = useState<string | null>(null);
+  const [scopeCopied, setScopeCopied] = useState(false);
+  const scopeRef = useRef<HTMLDivElement>(null);
 
   const compressImage = (dataUrl: string): Promise<{ base64: string; mimeType: string; preview: string }> =>
     new Promise((resolve) => {
@@ -564,6 +602,55 @@ export default function QuoteDoctorPage() {
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleAdjust = async () => {
+    if (!optimized || !adjustText.trim()) return;
+    setAdjustLoading(true); setAdjustError(null);
+    try {
+      const res = await fetch("/api/quote-doctor/adjust", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentProposal: optimized, instructions: adjustText.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Adjustment failed");
+      const p = parseProposal(data.adjusted);
+      setOptimized(data.adjusted);
+      setParsed(p);
+      setAdjustText("");
+      setAdjustOpen(false);
+    } catch (err: any) {
+      setAdjustError(err?.message || "Could not apply changes. Please try again.");
+    } finally {
+      setAdjustLoading(false);
+    }
+  };
+
+  const handleScope = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setScopeLoading(true); setScopeError(null); setScopeResult(null);
+    try {
+      const res = await fetch("/api/quote-doctor/scope", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          facilityType: scopeFacility,
+          sqft: scopeSqFt ? Number(scopeSqFt) : undefined,
+          floors: scopeFloors ? Number(scopeFloors) : undefined,
+          frequency: scopeFrequency,
+          specialRequirements: scopeNotes || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Scope generation failed");
+      setScopeResult(data.scope);
+      setTimeout(() => scopeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    } catch (err: any) {
+      setScopeError(err?.message || "Could not generate scope. Please try again.");
+    } finally {
+      setScopeLoading(false);
+    }
+  };
+
   const copyShareLink = () => {
     navigator.clipboard.writeText("https://getquotepro.ai/quote-doctor");
     setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000);
@@ -609,8 +696,107 @@ export default function QuoteDoctorPage() {
         <p style={{ fontSize: "13px", color: "#94a3b8", marginBottom: 0 }}>No credit card. No sign up. Instant results.</p>
       </div>
 
+      {/* Mode selector */}
+      <div style={{ maxWidth: "760px", margin: "0 auto", padding: "0 20px 16px", display: "flex", gap: "10px", justifyContent: "center" }}>
+        {(["optimize", "scope"] as const).map((m) => (
+          <button key={m} type="button" onClick={() => setMode(m)} style={{
+            display: "flex", alignItems: "center", gap: "7px",
+            padding: "9px 22px", borderRadius: "100px", border: "none", cursor: "pointer",
+            fontWeight: 700, fontSize: "13.5px", transition: "all 0.15s",
+            background: mode === m ? "#0f172a" : "#fff",
+            color: mode === m ? "#fff" : "#64748b",
+            boxShadow: mode === m ? "0 2px 12px rgba(15,23,42,0.2)" : "0 0 0 1.5px #e2e8f0",
+          }}>
+            {m === "optimize"
+              ? <><Wand2 style={{ width: "14px", height: "14px" }} />Optimize Quote</>
+              : <><BookOpen style={{ width: "14px", height: "14px" }} />Generate Scope</>}
+          </button>
+        ))}
+      </div>
+
       {/* Input Card */}
       <div style={{ maxWidth: "760px", margin: "0 auto", padding: "0 20px 40px" }}>
+        {mode === "scope" ? (
+          /* ── Scope Generator Form ── */
+          <form onSubmit={handleScope} style={{
+            background: "#fff", borderRadius: "24px",
+            border: "1px solid #e2e8f0", boxShadow: "0 4px 32px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+            overflow: "hidden",
+          }}>
+            <div style={{ padding: "8px 0 0", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: "10px", paddingLeft: "24px" }}>
+              <BookOpen style={{ width: "16px", height: "16px", color: "#2563eb" }} />
+              <span style={{ fontWeight: 700, fontSize: "14px", color: "#1e293b", padding: "14px 0" }}>Scope of Work Generator</span>
+              <span style={{ fontSize: "12px", color: "#94a3b8", marginLeft: "4px" }}>— free, ISSA 2026 standards</span>
+            </div>
+            <div style={{ padding: "24px", display: "grid", gap: "16px" }}>
+              {/* Facility type */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Facility Type</label>
+                <div style={{ position: "relative" }}>
+                  <select value={scopeFacility} onChange={e => setScopeFacility(e.target.value)}
+                    style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: "12px", padding: "12px 36px 12px 14px", fontSize: "14px", color: "#1e293b", appearance: "none", background: "#f8fafc", fontFamily: "inherit", outline: "none", cursor: "pointer" }}>
+                    {FACILITY_TYPES_SCOPE.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                  <ChevronDown style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", width: "15px", height: "15px", color: "#94a3b8", pointerEvents: "none" }} />
+                </div>
+              </div>
+              {/* Sq ft + Floors row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Square Footage</label>
+                  <input type="number" min="100" max="500000" placeholder="e.g. 5000" value={scopeSqFt} onChange={e => setScopeSqFt(e.target.value)}
+                    style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: "12px", padding: "12px 14px", fontSize: "14px", color: "#1e293b", background: "#f8fafc", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Floors</label>
+                  <input type="number" min="1" max="50" placeholder="1" value={scopeFloors} onChange={e => setScopeFloors(e.target.value)}
+                    style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: "12px", padding: "12px 14px", fontSize: "14px", color: "#1e293b", background: "#f8fafc", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </div>
+              {/* Frequency */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Cleaning Frequency</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {FREQUENCY_OPTIONS_SCOPE.map(f => (
+                    <button key={f.value} type="button" onClick={() => setScopeFrequency(f.value)}
+                      style={{
+                        padding: "7px 16px", borderRadius: "100px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 600, transition: "all 0.12s",
+                        background: scopeFrequency === f.value ? "#2563eb" : "#f1f5f9",
+                        color: scopeFrequency === f.value ? "#fff" : "#64748b",
+                      }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Special notes */}
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Special Requirements <span style={{ fontWeight: 400, textTransform: "none", color: "#94a3b8" }}>(optional)</span></label>
+                <textarea value={scopeNotes} onChange={e => setScopeNotes(e.target.value)} rows={3}
+                  placeholder="e.g. High-traffic lobby, medical waste handling, after-hours only, floor waxing quarterly..."
+                  style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: "12px", padding: "12px 14px", fontSize: "14px", color: "#1e293b", lineHeight: 1.6, resize: "vertical", outline: "none", background: "#f8fafc", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+              {scopeError && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px", padding: "12px 16px", fontSize: "13.5px", color: "#dc2626" }}>
+                  <X style={{ width: "15px", height: "15px", flexShrink: 0, marginTop: "1px" }} />
+                  {scopeError}
+                </div>
+              )}
+              <button type="submit" disabled={scopeLoading} style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                background: scopeLoading ? "#94a3b8" : "linear-gradient(135deg, #2563eb, #7c3aed)",
+                color: "#fff", fontWeight: 800, fontSize: "15px", padding: "16px",
+                borderRadius: "14px", border: "none", cursor: scopeLoading ? "not-allowed" : "pointer",
+                boxShadow: scopeLoading ? "none" : "0 4px 16px rgba(37,99,235,0.35)", transition: "all 0.15s",
+              }}>
+                {scopeLoading
+                  ? <><Loader2 style={{ width: "18px", height: "18px" }} className="animate-spin" />Generating scope...</>
+                  : <><BookOpen style={{ width: "18px", height: "18px" }} />Generate Scope of Work — Free</>}
+              </button>
+              <p style={{ textAlign: "center", fontSize: "12px", color: "#94a3b8", margin: "-4px 0 0" }}>Takes about 10 seconds · ISSA 2026 standards</p>
+            </div>
+          </form>
+        ) : (
         <form onSubmit={handleSubmit} style={{
           background: "#fff", borderRadius: "24px",
           border: "1px solid #e2e8f0", boxShadow: "0 4px 32px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
@@ -715,7 +901,48 @@ export default function QuoteDoctorPage() {
             <p style={{ textAlign: "center", fontSize: "12px", color: "#94a3b8", margin: "10px 0 0" }}>Takes about 10 seconds</p>
           </div>
         </form>
+        )} {/* end mode === "optimize" ternary */}
       </div>
+
+      {/* ─── Scope Results ─── */}
+      {mode === "scope" && scopeResult && (
+        <div ref={scopeRef} style={{ maxWidth: "760px", margin: "0 auto", padding: "0 20px 60px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "linear-gradient(135deg, #eff6ff, #dbeafe)", border: "1.5px solid #93c5fd", borderRadius: "16px", padding: "14px 20px", marginBottom: "20px" }}>
+            <div style={{ width: "40px", height: "40px", borderRadius: "12px", flexShrink: 0, background: "linear-gradient(135deg, #2563eb, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Check style={{ width: "20px", height: "20px", color: "#fff" }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: "14px", fontWeight: 800, color: "#1e3a8a", margin: "0 0 2px" }}>Scope Generated</p>
+              <p style={{ fontSize: "12.5px", color: "#1d4ed8", margin: 0 }}>ISSA 2026 standards · Ready to attach to your proposal</p>
+            </div>
+          </div>
+          <div style={{ background: "#fff", borderRadius: "20px", border: "1px solid #e2e8f0", padding: "28px 32px", marginBottom: "20px", whiteSpace: "pre-wrap", fontFamily: "ui-monospace, monospace", fontSize: "13px", lineHeight: 1.75, color: "#1e293b", boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}>
+            {scopeResult}
+          </div>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "28px" }}>
+            <button onClick={async () => { await navigator.clipboard.writeText(scopeResult); setScopeCopied(true); setTimeout(() => setScopeCopied(false), 2000); }}
+              style={{ flex: 1, minWidth: "140px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "14px 20px", borderRadius: "14px", border: "none", cursor: "pointer", background: "#0f172a", color: "#fff", fontSize: "14px", fontWeight: 700, transition: "all 0.15s" }}>
+              {scopeCopied ? <><Check style={{ width: "15px", height: "15px", color: "#4ade80" }} />Copied!</> : <><Copy style={{ width: "15px", height: "15px" }} />Copy Scope</>}
+            </button>
+            <button onClick={() => { setScopeResult(null); setScopeNotes(""); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              style={{ flex: 1, minWidth: "140px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "14px 20px", borderRadius: "14px", cursor: "pointer", background: "#fff", border: "2px solid #e2e8f0", color: "#374151", fontSize: "14px", fontWeight: 700, transition: "all 0.15s" }}>
+              <X style={{ width: "15px", height: "15px" }} />Generate Another
+            </button>
+          </div>
+          {/* Scope upsell */}
+          <div style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)", borderRadius: "20px", padding: "36px 40px", textAlign: "center", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", inset: 0, opacity: 0.05, backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+            <div style={{ position: "relative" }}>
+              <p style={{ fontSize: "20px", fontWeight: 800, color: "#fff", marginBottom: "10px", lineHeight: 1.3 }}>Attach this scope to a winning proposal</p>
+              <p style={{ fontSize: "14px", color: "rgba(147,197,253,0.9)", maxWidth: "400px", margin: "0 auto 24px", lineHeight: 1.65 }}>QuotePro generates branded proposals with a scope, pricing tiers, and e-signature — in 60 seconds.</p>
+              <a href="/register" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg, #16a34a, #059669)", color: "#fff", fontWeight: 800, padding: "14px 32px", borderRadius: "14px", textDecoration: "none", fontSize: "15px", boxShadow: "0 4px 20px rgba(22,163,74,0.4)" }}>
+                Start My Free 7-Day Trial <ArrowRight style={{ width: "18px", height: "18px" }} />
+              </a>
+              <p style={{ fontSize: "12px", color: "rgba(148,163,184,0.8)", marginTop: "12px" }}>No credit card required. Cancel anytime.</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Results ─── */}
       {optimized && parsed && (
@@ -749,10 +976,48 @@ export default function QuoteDoctorPage() {
             borderRadius: "24px",
             boxShadow: "0 8px 48px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.05)",
             overflow: "hidden",
-            marginBottom: "20px",
+            marginBottom: "16px",
             border: "1px solid rgba(0,0,0,0.06)",
           }}>
             <ProposalCard parsed={parsed} />
+          </div>
+
+          {/* AI Adjust panel */}
+          <div style={{ background: "#f8fafc", borderRadius: "16px", border: "1px solid #e2e8f0", marginBottom: "16px", overflow: "hidden" }}>
+            <button type="button" onClick={() => setAdjustOpen(o => !o)}
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: "none", border: "none", cursor: "pointer", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Wand2 style={{ width: "15px", height: "15px", color: "#7c3aed" }} />
+                <span style={{ fontSize: "13.5px", fontWeight: 700, color: "#1e293b" }}>AI Adjust</span>
+                <span style={{ fontSize: "12px", color: "#94a3b8" }}>— tweak tone, pricing, expiry, or anything else</span>
+              </div>
+              <ChevronDown style={{ width: "15px", height: "15px", color: "#94a3b8", transform: adjustOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+            </button>
+            {adjustOpen && (
+              <div style={{ padding: "0 18px 18px", display: "grid", gap: "10px" }}>
+                <textarea value={adjustText} onChange={e => setAdjustText(e.target.value)} rows={3}
+                  placeholder="e.g. 'Make it sound warmer and less formal' · 'Change the price to $320' · 'Remove the 7-day expiry'"
+                  style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: "12px", padding: "12px 14px", fontSize: "13.5px", color: "#1e293b", lineHeight: 1.6, resize: "vertical", outline: "none", background: "#fff", fontFamily: "inherit", boxSizing: "border-box" }} />
+                {adjustError && (
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#dc2626" }}>
+                    <X style={{ width: "14px", height: "14px", flexShrink: 0, marginTop: "1px" }} />
+                    {adjustError}
+                  </div>
+                )}
+                <button type="button" onClick={handleAdjust} disabled={adjustLoading || !adjustText.trim()}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                    padding: "12px 20px", borderRadius: "12px", border: "none", cursor: adjustLoading || !adjustText.trim() ? "not-allowed" : "pointer",
+                    background: adjustLoading || !adjustText.trim() ? "#94a3b8" : "linear-gradient(135deg, #7c3aed, #a855f7)",
+                    color: "#fff", fontSize: "14px", fontWeight: 700, transition: "all 0.15s",
+                    boxShadow: adjustLoading || !adjustText.trim() ? "none" : "0 4px 14px rgba(124,58,237,0.35)",
+                  }}>
+                  {adjustLoading
+                    ? <><Loader2 style={{ width: "16px", height: "16px" }} className="animate-spin" />Applying changes...</>
+                    : <><Wand2 style={{ width: "16px", height: "16px" }} />Apply Changes</>}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

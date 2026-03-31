@@ -7,6 +7,7 @@ import { useSubscription } from "../lib/subscription";
 import SendQuoteModal from "../components/SendQuoteModal";
 import EditQuoteModal from "../components/EditQuoteModal";
 import DispatchCard from "../components/DispatchCard";
+import { CommercialBenchmarkBadge } from "../components/BenchmarkBadge";
 import {
   ExternalLink,
   Copy,
@@ -1040,7 +1041,9 @@ export default function QuoteDetailPage() {
             <CardHeader title="Summary" />
             <div className="space-y-3 text-sm">
               <div className="flex justify-between items-end">
-                <span className="text-slate-500">Total</span>
+                <span className="text-slate-500">
+                  {details?.quoteType === "commercial" ? "Monthly Total" : "Total"}
+                </span>
                 <span className="text-2xl font-bold text-slate-900 tracking-tight">
                   ${Number(quote.total || 0).toLocaleString()}
                 </span>
@@ -1050,6 +1053,31 @@ export default function QuoteDetailPage() {
                   <Clock className="w-3.5 h-3.5" />
                   Expires {new Date(quote.expiresAt).toLocaleDateString()}
                 </div>
+              ) : null}
+
+              {/* Industry benchmark badge for commercial quotes */}
+              {details?.quoteType === "commercial" && details?.facilityType && details?.totalSqFt ? (
+                <CommercialBenchmarkBadge
+                  monthlyPrice={Number(quote.total || 0)}
+                  facilityType={details.facilityType}
+                  totalSqFt={Number(details.totalSqFt)}
+                  size="compact"
+                />
+              ) : null}
+
+              {/* Prominent Send Quote CTA for draft quotes */}
+              {quote.status === "draft" ? (
+                <button
+                  onClick={sendQuote}
+                  className="w-full flex items-center justify-center gap-2 mt-2 px-4 py-3 rounded-xl text-sm font-bold text-white transition-all"
+                  style={{
+                    background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                    boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
+                  }}
+                >
+                  <Send className="w-4 h-4" />
+                  Send Quote to Customer
+                </button>
               ) : null}
             </div>
           </Card>

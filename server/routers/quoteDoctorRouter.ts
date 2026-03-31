@@ -3,6 +3,8 @@ import { openai } from "../clients";
 
 export const quoteDoctorRouter = Router();
 
+// ─── System prompts ───────────────────────────────────────────────────────────
+
 const QUOTE_DOCTOR_SYSTEM = `You are Quote Doctor, an expert in helping cleaning business owners win more jobs through better quoting. You have 15 years of experience in the cleaning industry and know exactly what makes a client choose one cleaning company over another.
 
 When given a cleaning business quote, you will:
@@ -43,6 +45,52 @@ FORMAT:
 - Keep it under 400 words
 - Make it feel human and personal, not templated`;
 
+const SCOPE_GENERATOR_SYSTEM = `You are a professional cleaning scope-of-work writer for the cleaning industry. You write clear, detailed, client-ready cleaning scope documents that define exactly what will be cleaned, how often, and to what standard.
+
+Your scope documents:
+- Are structured by area (reception, offices, restrooms, kitchen/break room, common areas, etc.)
+- List specific tasks for each area (wipe surfaces, empty trash, mop, vacuum, disinfect, etc.)
+- Specify frequency for each task where relevant (daily, weekly, monthly)
+- Use professional but clear language
+- Follow ISSA 2026 cleaning standards
+- Include quality control and verification language
+- Are formatted as a professional document with sections and bullet points
+
+FORMAT:
+## Scope of Work — [Facility Type] Cleaning Services
+
+### Service Overview
+[Brief overview of the engagement]
+
+### Included Areas & Tasks
+For each area:
+**[Area Name]**
+- Task 1 (frequency)
+- Task 2 (frequency)
+...
+
+### Frequency Schedule
+[Summary table or list]
+
+### Quality Standards
+[Inspection and quality language]
+
+### What Is Not Included
+[Explicit exclusions to set expectations]
+
+Return ONLY the scope document. No preamble or explanations.`;
+
+const ADJUST_SYSTEM = `You are Quote Doctor, a cleaning industry proposal expert. The user has an optimized cleaning quote and wants to make specific changes to it.
+
+Apply the requested changes precisely:
+- Keep the overall structure and quality of the proposal
+- Only modify what the user asks to change
+- Maintain professional tone throughout
+- Do not add explanations or commentary
+- Return ONLY the revised proposal`;
+
+// ─── Optimize existing quote ──────────────────────────────────────────────────
+
 quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: Response) => {
   try {
     const { quoteText, imageBase64, imageMimeType } = req.body as {
@@ -58,7 +106,6 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: R
       return res.status(400).json({ error: "Quote text or image required" });
     }
 
-    // For image requests, use gpt-4o for better vision quality
     const model = imageBase64 ? "gpt-4o" : "gpt-4o-mini";
 
     const messages: any[] = imageBase64
@@ -83,18 +130,10 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: R
         ]
       : [
           { role: "system", content: QUOTE_DOCTOR_SYSTEM },
-          {
-            role: "user",
-            content: `Optimize this cleaning quote:\n\n${quoteText}`,
-          },
+          { role: "user", content: `Optimize this cleaning quote:\n\n${quoteText}` },
         ];
 
-    const completion = await openai.chat.completions.create({
-      model,
-      messages,
-      max_tokens: 900,
-    });
-
+    const completion = await openai.chat.completions.create({ model, messages, max_tokens: 900 });
     const optimized = completion.choices[0]?.message?.content?.trim() ?? "";
     console.log("[QuoteDoctor] success — output length:", optimized.length);
     return res.json({ optimized });
@@ -104,5 +143,93 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: R
       ? "Could not read the image. Please try a clearer screenshot or paste the quote as text."
       : "Failed to optimize quote. Please try again.";
     return res.status(500).json({ error: msg });
+  }
+});
+
+// ─── Generate scope of work ───────────────────────────────────────────────────
+
+quoteDoctorRouter.post("/api/quote-doctor/scope", async (req: Request, res: Response) => {
+  try {
+    const {
+      facilityType,
+      sqft,
+      floors,
+      frequency,
+      specialRequirements,
+      clientName,
+      companyName,
+    } = req.body as {
+      facilityType?: string;
+      sqft?: number;
+      floors?: number;
+      frequency?: string;
+      specialRequirements?: string;
+      clientName?: string;
+      companyName?: string;
+    };
+
+    if (!facilityType) {
+      return res.status(400).json({ error: "Facility type is required" });
+    }
+
+    const contextParts = [
+      `Facility type: ${facilityType}`,
+      sqft ? `Size: ${sqft.toLocaleString()} sq ft` : null,
+      floors ? `Floors: ${floors}` : null,
+      frequency ? `Cleaning frequency: ${frequency}` : null,
+      clientName ? `Client name: ${clientName}` : null,
+      companyName ? `Cleaning company: ${companyName}` : null,
+      specialRequirements ? `Special requirements or notes: ${specialRequirements}` : null,
+    ].filter(Boolean).join("\n");
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: SCOPE_GENERATOR_SYSTEM },
+        { role: "user", content: `Generate a professional cleaning scope of work for:\n\n${contextParts}` },
+      ],
+      max_tokens: 1200,
+    });
+
+    const scope = completion.choices[0]?.message?.content?.trim() ?? "";
+    console.log("[QuoteDoctor/scope] success — output length:", scope.length);
+    return res.json({ scope });
+  } catch (err: any) {
+    console.error("[QuoteDoctor/scope] error:", err?.message || err);
+    return res.status(500).json({ error: "Failed to generate scope. Please try again." });
+  }
+});
+
+// ─── AI adjust existing proposal ──────────────────────────────────────────────
+
+quoteDoctorRouter.post("/api/quote-doctor/adjust", async (req: Request, res: Response) => {
+  try {
+    const { currentProposal, instructions } = req.body as {
+      currentProposal?: string;
+      instructions?: string;
+    };
+
+    if (!currentProposal || !instructions) {
+      return res.status(400).json({ error: "Proposal and adjustment instructions required" });
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: ADJUST_SYSTEM },
+        {
+          role: "user",
+          content: `Here is the current proposal:\n\n${currentProposal}\n\n---\n\nPlease make these specific changes:\n${instructions}`,
+        },
+      ],
+      max_tokens: 900,
+    });
+
+    const adjusted = completion.choices[0]?.message?.content?.trim() ?? "";
+    console.log("[QuoteDoctor/adjust] success — output length:", adjusted.length);
+    return res.json({ adjusted });
+  } catch (err: any) {
+    console.error("[QuoteDoctor/adjust] error:", err?.message || err);
+    return res.status(500).json({ error: "Failed to adjust proposal. Please try again." });
   }
 });

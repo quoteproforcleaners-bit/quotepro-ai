@@ -10,6 +10,7 @@ import type {
 import type { FacilityType } from "../lib/pricingEngine";
 import { compareToBenchmark, benchmarkBadgeText, BENCHMARK_CITATIONS, NATIONAL_AVERAGES } from "../lib/benchmarks";
 import { Tooltip, LabelWithTooltip } from "./Tooltip";
+import { CommercialBenchmarkBadge } from "./BenchmarkBadge";
 
 // ─── Animated Number ──────────────────────────────────────────────────────────
 
@@ -138,77 +139,9 @@ function WarningChip({ w }: { w: Warning & { type?: string } }) {
 
 // ─── Industry Benchmark Badge ─────────────────────────────────────────────────
 
-function IndustryBenchmarkBadge({
-  monthlyPrice, facilityType, totalSqFt,
-}: {
-  monthlyPrice: number;
-  facilityType?: FacilityType;
-  totalSqFt?: number;
-}) {
-  if (!facilityType || !totalSqFt || totalSqFt <= 0) return null;
-  const bm = compareToBenchmark(monthlyPrice, facilityType, totalSqFt);
-  if (!bm) return null;
-
-  const abs = Math.abs(Math.round(bm.pctVsMedian));
-  const text = benchmarkBadgeText(bm);
-
-  const config: Record<string, { bg: string; border: string; text: string; icon: typeof BadgeCheck }> = {
-    well_below: { bg: "bg-amber-50 dark:bg-amber-900/20", border: "border-amber-200 dark:border-amber-800", text: "text-amber-700 dark:text-amber-400", icon: AlertTriangle },
-    below:      { bg: "bg-blue-50 dark:bg-blue-900/20",   border: "border-blue-200 dark:border-blue-800",   text: "text-blue-700 dark:text-blue-400",   icon: TrendingDown },
-    within:     { bg: "bg-emerald-50 dark:bg-emerald-900/20", border: "border-emerald-200 dark:border-emerald-800", text: "text-emerald-700 dark:text-emerald-400", icon: BadgeCheck },
-    above:      { bg: "bg-violet-50 dark:bg-violet-900/20",   border: "border-violet-200 dark:border-violet-800",   text: "text-violet-700 dark:text-violet-400",   icon: TrendingUp },
-    well_above: { bg: "bg-red-50 dark:bg-red-900/20",         border: "border-red-200 dark:border-red-800",         text: "text-red-700 dark:text-red-400",         icon: AlertTriangle },
-  };
-
-  const c = config[bm.position];
-  const Icon = c.icon;
-
-  return (
-    <div className={`rounded-xl border px-3 py-2.5 ${c.bg} ${c.border}`}>
-      <div className={`flex items-start gap-2 ${c.text}`}>
-        <Icon className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold leading-tight">Industry Benchmark</p>
-          <p className="text-[11px] mt-0.5 leading-relaxed">{text}</p>
-        </div>
-        <Tooltip
-          text={`National range for ${facilityType} buildings: $${bm.nationalMonthlyLow.toLocaleString(undefined,{maximumFractionDigits:0})}–$${bm.nationalMonthlyHigh.toLocaleString(undefined,{maximumFractionDigits:0})}/mo (${totalSqFt.toLocaleString()} sq ft × $${NATIONAL_AVERAGES_RANGE(facilityType)}/sqft/mo). Median: $${bm.nationalMonthlyMid.toLocaleString(undefined,{maximumFractionDigits:0})}/mo.`}
-          source={`${bm.source} ${bm.year}`}
-          side="left"
-        />
-      </div>
-
-      {/* Mini bar */}
-      <div className="mt-2.5 relative h-2 bg-white dark:bg-zinc-800 rounded-full overflow-hidden border border-slate-100 dark:border-zinc-700">
-        {/* National range */}
-        {(() => {
-          const maxVal = Math.max(bm.nationalMonthlyHigh * 1.25, monthlyPrice * 1.1);
-          const lowPct  = Math.min(100, (bm.nationalMonthlyLow  / maxVal) * 100);
-          const highPct = Math.min(100, (bm.nationalMonthlyHigh / maxVal) * 100);
-          const yourPct = Math.min(100, (monthlyPrice           / maxVal) * 100);
-          return (
-            <>
-              <div className="absolute h-full bg-slate-200 dark:bg-zinc-600 rounded-full" style={{ left: `${lowPct}%`, width: `${highPct - lowPct}%` }} />
-              <div className="absolute h-full w-0.5 bg-current rounded-full" style={{ left: `${yourPct}%` }} />
-            </>
-          );
-        })()}
-      </div>
-      <div className="flex justify-between text-[10px] mt-1 opacity-60">
-        <span>${bm.nationalMonthlyLow.toLocaleString(undefined, { maximumFractionDigits: 0 })} low</span>
-        <span>Your estimate</span>
-        <span>${bm.nationalMonthlyHigh.toLocaleString(undefined, { maximumFractionDigits: 0 })} high</span>
-      </div>
-      <p className={`text-[10px] mt-1 opacity-50`}>Source: {bm.source} {bm.year}</p>
-    </div>
-  );
-}
-
-function NATIONAL_AVERAGES_RANGE(facilityType: FacilityType): string {
-  const n = NATIONAL_AVERAGES[facilityType];
-  if (!n) return "?";
-  return `${n.low.toFixed(2)}–${n.high.toFixed(2)}`;
-}
+// IndustryBenchmarkBadge is now the shared CommercialBenchmarkBadge from BenchmarkBadge.tsx
+// kept as alias so existing JSX references (<IndustryBenchmarkBadge ...>) continue to work
+const IndustryBenchmarkBadge = CommercialBenchmarkBadge;
 
 // ─── Manual Adjustment ────────────────────────────────────────────────────────
 

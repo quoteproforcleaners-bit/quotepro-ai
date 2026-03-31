@@ -1,6 +1,35 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Save } from "lucide-react";
+import { Check, Save, DollarSign, RefreshCw } from "lucide-react";
+
+// ─── Residential add-on defaults stored in localStorage ──────────────────────
+
+export const ADDON_DEFAULTS_KEY = "residentialAddonDefaults";
+
+export interface ResidentialAddonConfig {
+  name: string;
+  defaultPrice: number;
+  enabled: boolean;
+}
+
+export const ADDON_DEFAULTS: ResidentialAddonConfig[] = [
+  { name: "Inside Refrigerator",   defaultPrice: 35,  enabled: true  },
+  { name: "Inside Oven",           defaultPrice: 35,  enabled: true  },
+  { name: "Interior Windows",      defaultPrice: 40,  enabled: true  },
+  { name: "Laundry (wash & fold)", defaultPrice: 25,  enabled: true  },
+  { name: "Garage Sweep",          defaultPrice: 30,  enabled: false },
+  { name: "Patio / Balcony",       defaultPrice: 25,  enabled: false },
+  { name: "Inside Cabinets",       defaultPrice: 45,  enabled: true  },
+  { name: "Wall Spot Cleaning",    defaultPrice: 30,  enabled: false },
+];
+
+export function readAddonDefaults(): ResidentialAddonConfig[] {
+  try {
+    const s = localStorage.getItem(ADDON_DEFAULTS_KEY);
+    return s ? JSON.parse(s) : ADDON_DEFAULTS.map(a => ({ ...a }));
+  } catch { return ADDON_DEFAULTS.map(a => ({ ...a })); }
+}
+
 import {
   PageHeader,
   Card,
@@ -92,6 +121,23 @@ export default function QuotePreferencesPage() {
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+
+  // Add-on config (localStorage, not server)
+  const [addonConfigs, setAddonConfigs] = useState<ResidentialAddonConfig[]>(() => readAddonDefaults());
+
+  const saveAddon = (idx: number, patch: Partial<ResidentialAddonConfig>) => {
+    setAddonConfigs((prev) => {
+      const next = prev.map((a, i) => (i === idx ? { ...a, ...patch } : a));
+      localStorage.setItem(ADDON_DEFAULTS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const resetAddons = () => {
+    const fresh = ADDON_DEFAULTS.map(a => ({ ...a }));
+    setAddonConfigs(fresh);
+    localStorage.removeItem(ADDON_DEFAULTS_KEY);
+  };
 
   useEffect(() => {
     if (serverPrefs) {
@@ -253,6 +299,65 @@ export default function QuotePreferencesPage() {
               />
             </div>
           ))}
+        </Card>
+      </div>
+
+      {/* ── Residential Add-On Defaults ───────────────────────────────── */}
+      <div>
+        <SectionLabel>Residential Add-On Services</SectionLabel>
+        <Card className="mt-3">
+          <CardHeader title="Default Add-On Prices" icon={DollarSign} />
+          <div className="px-5 pb-5 space-y-4">
+            <p className="text-sm text-slate-500">
+              Set the default name and price for each optional add-on shown in residential quotes. Toggle to enable or disable each add-on for new quotes.
+            </p>
+            <div className="space-y-3">
+              {addonConfigs.map((addon, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => saveAddon(idx, { enabled: !addon.enabled })}
+                    className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      addon.enabled
+                        ? "border-primary-500 bg-primary-500"
+                        : "border-slate-300 bg-white"
+                    }`}
+                  >
+                    {addon.enabled && <Check className="w-3 h-3 text-white" />}
+                  </button>
+                  <input
+                    type="text"
+                    value={addon.name}
+                    maxLength={32}
+                    onChange={(e) => saveAddon(idx, { name: e.target.value })}
+                    className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Add-on name"
+                  />
+                  <div className="relative shrink-0">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={999}
+                      step={5}
+                      value={addon.defaultPrice}
+                      onChange={(e) => saveAddon(idx, { defaultPrice: Math.max(0, parseInt(e.target.value) || 0) })}
+                      className="w-20 pl-6 pr-2 py-1.5 text-sm text-center border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-semibold"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <button
+                onClick={resetAddons}
+                className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-primary-600 font-medium transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Reset to defaults
+              </button>
+              <span className="text-xs text-slate-400">Stored locally per device</span>
+            </div>
+          </div>
         </Card>
       </div>
 

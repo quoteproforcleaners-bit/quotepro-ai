@@ -15,10 +15,11 @@ import { Tooltip } from "../components/Tooltip";
 
 // ─── Storage keys (also used by CommercialQuotePage) ────────────────────────
 
-export const COMMERCIAL_SETTINGS_KEY   = "commercialBaseMinutes";
-export const COMMERCIAL_DEFAULTS_KEY   = "commercialPricingDefaults";
-export const COMMERCIAL_TRAFFIC_KEY    = "commercialTrafficMultipliers";
-export const COMMERCIAL_TIER_KEY       = "commercialTierMultipliers";
+export const COMMERCIAL_SETTINGS_KEY    = "commercialBaseMinutes";
+export const COMMERCIAL_DEFAULTS_KEY    = "commercialPricingDefaults";
+export const COMMERCIAL_TRAFFIC_KEY     = "commercialTrafficMultipliers";
+export const COMMERCIAL_TIER_KEY        = "commercialTierMultipliers";
+export const COMMERCIAL_TIER_LABELS_KEY = "commercialTierLabels";
 
 // ─── Default values ──────────────────────────────────────────────────────────
 
@@ -39,6 +40,12 @@ export const TIER_MULTIPLIER_DEFAULTS = {
   basic: 0.85,
   enhanced: 1.0,
   premium: 1.20,
+};
+
+export const TIER_LABEL_DEFAULTS = {
+  basic: "Basic",
+  enhanced: "Enhanced",
+  premium: "Premium",
 };
 
 // ─── Helpers to read from localStorage ───────────────────────────────────────
@@ -62,6 +69,13 @@ export function readTierMultipliers() {
     const s = localStorage.getItem(COMMERCIAL_TIER_KEY);
     return s ? { ...TIER_MULTIPLIER_DEFAULTS, ...JSON.parse(s) } : { ...TIER_MULTIPLIER_DEFAULTS };
   } catch { return { ...TIER_MULTIPLIER_DEFAULTS }; }
+}
+
+export function readTierLabels(): { basic: string; enhanced: string; premium: string } {
+  try {
+    const s = localStorage.getItem(COMMERCIAL_TIER_LABELS_KEY);
+    return s ? { ...TIER_LABEL_DEFAULTS, ...JSON.parse(s) } : { ...TIER_LABEL_DEFAULTS };
+  } catch { return { ...TIER_LABEL_DEFAULTS }; }
 }
 
 // ─── Facility info ────────────────────────────────────────────────────────────
@@ -206,6 +220,22 @@ export default function CommercialSettingsPage() {
 
   // ── Tier multipliers ────────────────────────────────────────────────────────
   const [tierMult, setTierMult] = useState(() => readTierMultipliers());
+  const [tierLabels, setTierLabels] = useState<{ basic: string; enhanced: string; premium: string }>(() => readTierLabels());
+
+  const saveTierLabel = (k: "basic" | "enhanced" | "premium", v: string) => {
+    const next = { ...tierLabels, [k]: v };
+    setTierLabels(next);
+    localStorage.setItem(COMMERCIAL_TIER_LABELS_KEY, JSON.stringify(next));
+  };
+
+  const resetTierLabels = () => {
+    setTierLabels({ ...TIER_LABEL_DEFAULTS });
+    localStorage.removeItem(COMMERCIAL_TIER_LABELS_KEY);
+  };
+
+  const hasCustomLabels = Object.entries(TIER_LABEL_DEFAULTS).some(
+    ([k, v]) => tierLabels[k as keyof typeof TIER_LABEL_DEFAULTS] !== v
+  );
 
   const saveTierMult = <K extends keyof typeof TIER_MULTIPLIER_DEFAULTS>(k: K, v: number) => {
     const next = { ...tierMult, [k]: v };
@@ -528,6 +558,68 @@ export default function CommercialSettingsPage() {
                 <RefreshCw className="w-3.5 h-3.5" /> Reset to system defaults
               </button>
               <span className="text-xs text-amber-600 font-medium">Custom tier structure active</span>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* ── Section 5: Tier name labels ──────────────────────────────────── */}
+      <Card>
+        <CardHeader title="Service Tier Names" icon={Settings} />
+        <div className="px-5 pb-5 space-y-4">
+          <p className="text-sm text-slate-500">
+            Customize the display names shown to customers for each service tier. Changes apply to all new commercial quotes.
+          </p>
+          <div className="space-y-3">
+            {([
+              { key: "basic" as const,    color: "bg-slate-400",  badge: "text-slate-600 bg-slate-100" },
+              { key: "enhanced" as const, color: "bg-primary-500", badge: "text-primary-700 bg-primary-50" },
+              { key: "premium" as const,  color: "bg-violet-500",  badge: "text-violet-700 bg-violet-50" },
+            ]).map(({ key, color, badge }) => {
+              const defaultLabel = TIER_LABEL_DEFAULTS[key];
+              const current = tierLabels[key];
+              const isModified = current !== defaultLabel;
+              return (
+                <div key={key} className="flex items-center gap-3">
+                  <div className={`w-2.5 h-2.5 rounded-full ${color} shrink-0`} />
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={current}
+                      maxLength={24}
+                      onChange={(e) => saveTierLabel(key, e.target.value || defaultLabel)}
+                      className={`w-full px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium ${
+                        isModified ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"
+                      }`}
+                      placeholder={defaultLabel}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge}`}>
+                      {isModified ? "modified" : "default"}
+                    </span>
+                    {isModified && (
+                      <button
+                        onClick={() => saveTierLabel(key, defaultLabel)}
+                        className="text-xs text-slate-400 hover:text-primary-600 underline transition-colors"
+                      >
+                        reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {hasCustomLabels && (
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <button
+                onClick={resetTierLabels}
+                className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-primary-600 font-medium transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Reset all to defaults
+              </button>
+              <span className="text-xs text-amber-600 font-medium">Custom tier names active</span>
             </div>
           )}
         </div>
