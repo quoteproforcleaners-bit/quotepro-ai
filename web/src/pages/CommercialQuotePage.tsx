@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -23,6 +23,7 @@ import {
 } from "../lib/pricingEngine";
 import { CommercialLivePreview, LivePreviewPanel } from "../components/LiveQuotePreview";
 import type { ManualAdjustment } from "../components/LiveQuotePreview";
+import { Tooltip, LabelWithTooltip } from "../components/Tooltip";
 import {
   Building2,
   ChevronRight,
@@ -43,6 +44,11 @@ import {
   Star,
   Pencil,
   ExternalLink,
+  Printer,
+  Eye,
+  EyeOff,
+  BarChart3,
+  X,
 } from "lucide-react";
 import {
   PageHeader,
@@ -232,18 +238,47 @@ function FacilityStep({ data, onChange, onNext }: {
 
 // ─── Step 2: Walkthrough ──────────────────────────────────────────────────────
 
-function WalkthroughStep({ data, onChange, onNext, onBack }: {
-  data: CommercialWalkthrough; onChange: (d: CommercialWalkthrough) => void; onNext: () => void; onBack: () => void;
+function WalkthroughStep({ data, onChange, onNext, onBack, hiddenFields, onToggleField }: {
+  data: CommercialWalkthrough;
+  onChange: (d: CommercialWalkthrough) => void;
+  onNext: () => void;
+  onBack: () => void;
+  hiddenFields: Set<HiddenFieldId>;
+  onToggleField: (id: HiddenFieldId, hide: boolean) => void;
 }) {
   const set = <K extends keyof CommercialWalkthrough>(k: K, v: CommercialWalkthrough[K]) => onChange({ ...data, [k]: v });
+  const [fieldPanelOpen, setFieldPanelOpen] = useState(false);
+  const h = (id: HiddenFieldId) => hiddenFields.has(id);
 
   const handleCarpetChange = (v: number) => {
     const clamped = Math.min(100, Math.max(0, v));
     onChange({ ...data, carpetPercent: clamped, hardFloorPercent: 100 - clamped });
   };
 
+  const hiddenCount = hiddenFields.size;
+
   return (
     <div className="space-y-4">
+      {/* Admin header strip */}
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={() => setFieldPanelOpen(true)}
+          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+            hiddenCount > 0
+              ? "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+              : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+          }`}
+        >
+          <Eye className="w-3.5 h-3.5" />
+          {hiddenCount > 0 ? `${hiddenCount} field${hiddenCount > 1 ? "s" : ""} hidden` : "Customize fields"}
+        </button>
+      </div>
+
+      {fieldPanelOpen && (
+        <FieldTogglePanel hidden={hiddenFields} onToggle={onToggleField} onClose={() => setFieldPanelOpen(false)} />
+      )}
+
       {/* Room counts */}
       <Card>
         <CardHeader title="Room Counts" icon={Layers} />
@@ -255,7 +290,9 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
           <NumInput label="Open Work Areas" value={data.openAreaCount} onChange={(v) => set("openAreaCount", v)} placeholder="0" />
           <NumInput label="Entry Lobbies" value={data.entryLobbyCount} onChange={(v) => set("entryLobbyCount", v)} placeholder="0" />
           <NumInput label="Trash Collection Points" value={data.trashPointCount} onChange={(v) => set("trashPointCount", v)} placeholder="0" />
-          <NumInput label="Elevators (if multi-floor)" value={data.elevatorCount} onChange={(v) => set("elevatorCount", v)} placeholder="0" />
+          {!h("elevators") && (
+            <NumInput label="Elevators (if multi-floor)" value={data.elevatorCount} onChange={(v) => set("elevatorCount", v)} placeholder="0" />
+          )}
         </div>
       </Card>
 
@@ -280,8 +317,7 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
                   className="w-full h-2 rounded-lg appearance-none bg-slate-200 accent-primary-600 cursor-pointer"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                  <span>0% carpet</span>
-                  <span>100% carpet</span>
+                  <span>0% carpet</span><span>100% carpet</span>
                 </div>
               </div>
               <div className="flex flex-col items-center gap-0.5 w-20 text-center shrink-0">
@@ -292,46 +328,40 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-2">Glass / Windows Level</label>
+            <div className="flex items-center gap-1.5 mb-2">
+              <label className="block text-xs font-medium text-slate-600">Glass / Windows Level</label>
+              <Tooltip text="Adds cleaning time for glass surfaces. None = 0 min, Some = +10 min, Lots = +25 min per visit." source="ISSA 2025 Production Rates" />
+            </div>
             <div className="flex gap-2">
               {(["None", "Some", "Lots"] as GlassLevel[]).map((g) => (
-                <button
-                  key={g}
-                  onClick={() => set("glassLevel", g)}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-colors ${
-                    data.glassLevel === g
-                      ? "border-primary-500 bg-primary-50 text-primary-700"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
+                <button key={g} onClick={() => set("glassLevel", g)}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-colors ${data.glassLevel === g ? "border-primary-500 bg-primary-50 text-primary-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
                   {g}
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
-              None = +0 min · Some = +10 min · Lots = +25 min per visit
-            </p>
+            <p className="text-[11px] text-slate-400 mt-1">None = +0 min · Some = +10 min · Lots = +25 min per visit</p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <NumInput
-              label="Building Age (years)"
-              value={data.buildingAge}
-              onChange={(v) => set("buildingAge", v)}
-              placeholder="0"
-            />
-            <NumInput
-              label="Parking Lot (sq ft)"
-              value={data.parkingLotSqFt ?? 0}
-              onChange={(v) => set("parkingLotSqFt", v > 0 ? v : undefined)}
-              placeholder="0"
-            />
+            {!h("buildingAge") && (
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs font-medium text-slate-600">Building Age (years)</label>
+                  <Tooltip text="Older buildings take longer to clean. &gt;20 yrs: ×1.15 multiplier. &gt;40 yrs: ×1.25 multiplier on total labor time." source="ISSA 2025" />
+                </div>
+                <NumInput label="" value={data.buildingAge} onChange={(v) => set("buildingAge", v)} placeholder="0" />
+              </div>
+            )}
+            {!h("parkingLot") && (
+              <NumInput label="Parking Lot (sq ft)" value={data.parkingLotSqFt ?? 0} onChange={(v) => set("parkingLotSqFt", v > 0 ? v : undefined)} placeholder="0" />
+            )}
           </div>
 
           <div>
             <div className="flex items-center gap-1.5 mb-2">
               <label className="text-xs font-medium text-slate-600">Foot Traffic Level</label>
-              <span className="text-[10px] text-slate-400">— affects cleaning time multiplier</span>
+              <Tooltip text="High foot traffic means faster re-soiling, requiring more cleaning time. Low=×0.9, Medium=×1.0, High=×1.15, Very High=×1.3." source="BSCAI 2024" />
             </div>
             <div className="flex gap-2">
               {([
@@ -340,15 +370,8 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
                 ["High", "High", "×1.15"],
                 ["VeryHigh", "Very High", "×1.3"],
               ] as [TrafficLevel, string, string][]).map(([v, label, mult]) => (
-                <button
-                  key={v}
-                  onClick={() => set("trafficLevel", v)}
-                  className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-colors text-center ${
-                    data.trafficLevel === v
-                      ? "border-primary-500 bg-primary-50 text-primary-700"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
+                <button key={v} onClick={() => set("trafficLevel", v)}
+                  className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-colors text-center ${data.trafficLevel === v ? "border-primary-500 bg-primary-50 text-primary-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
                   <div>{label}</div>
                   <div className="text-[10px] font-normal opacity-70">{mult}</div>
                 </button>
@@ -357,20 +380,31 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-              <div>
-                <p className="text-sm font-medium text-slate-800">High-Touch Focus</p>
-                <p className="text-xs text-slate-500">Disinfect handles, switches, railings (+15 min)</p>
+            {!h("highTouch") && (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">High-Touch Focus</p>
+                  <p className="text-xs text-slate-500">Disinfect handles, switches, railings (+15 min)</p>
+                </div>
+                <Toggle checked={data.highTouchFocus} onChange={(v) => set("highTouchFocus", v)} />
               </div>
-              <Toggle checked={data.highTouchFocus} onChange={(v) => set("highTouchFocus", v)} />
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
-              <div>
-                <p className="text-sm font-medium text-slate-800">After-Hours Service</p>
-                <p className="text-xs text-slate-500">Cleaning performed after business hours</p>
+            )}
+            {!h("afterHours") && (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">After-Hours Service</p>
+                  <p className="text-xs text-slate-500">
+                    Cleaning after business hours
+                    {data.afterHoursRequired && (
+                      <span className="block text-amber-600 font-medium mt-0.5">
+                        After-hours typically adds 25% — set premium in Pricing step.
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <Toggle checked={data.afterHoursRequired} onChange={(v) => set("afterHoursRequired", v)} />
               </div>
-              <Toggle checked={data.afterHoursRequired} onChange={(v) => set("afterHoursRequired", v)} />
-            </div>
+            )}
           </div>
         </div>
       </Card>
@@ -387,48 +421,60 @@ function WalkthroughStep({ data, onChange, onNext, onBack }: {
               options={FREQUENCY_OPTIONS.map((f) => ({ value: f.value, label: f.label }))}
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Preferred Days</label>
-            <Input value={data.preferredDays} onChange={(e) => set("preferredDays", e.target.value)} placeholder="e.g. Mon, Wed, Fri" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Preferred Time Window</label>
-            <Input value={data.preferredTimeWindow} onChange={(e) => set("preferredTimeWindow", e.target.value)} placeholder="e.g. 6pm – 9pm" />
-          </div>
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+          {!h("preferredDays") && (
             <div>
-              <p className="text-sm font-medium text-slate-800">Client Provides Supplies</p>
-              <p className="text-xs text-slate-500">Client supplies chemicals and equipment</p>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Preferred Days</label>
+              <Input value={data.preferredDays} onChange={(e) => set("preferredDays", e.target.value)} placeholder="e.g. Mon, Wed, Fri" />
             </div>
-            <Toggle checked={data.suppliesByClient} onChange={(v) => set("suppliesByClient", v)} />
-          </div>
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+          )}
+          {!h("preferredTime") && (
             <div>
-              <p className="text-sm font-medium text-slate-800">Restroom Consumables</p>
-              <p className="text-xs text-slate-500">Include soap, paper products in quote</p>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Preferred Time Window</label>
+              <Input value={data.preferredTimeWindow} onChange={(e) => set("preferredTimeWindow", e.target.value)} placeholder="e.g. 6pm – 9pm" />
             </div>
-            <Toggle checked={data.restroomConsumablesIncluded} onChange={(v) => set("restroomConsumablesIncluded", v)} />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 mb-1">Access Constraints / Special Instructions</label>
-            <textarea
-              value={data.accessConstraints}
-              onChange={(e) => set("accessConstraints", e.target.value)}
-              placeholder="e.g. Badge access required, server room off-limits"
-              rows={2}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
-            <textarea
-              value={data.notes}
-              onChange={(e) => set("notes", e.target.value)}
-              placeholder="Additional notes about the facility or scope"
-              rows={2}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-            />
-          </div>
+          )}
+          {!h("suppliesByClient") && (
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <div>
+                <p className="text-sm font-medium text-slate-800">Client Provides Supplies</p>
+                <p className="text-xs text-slate-500">Client supplies chemicals and equipment</p>
+              </div>
+              <Toggle checked={data.suppliesByClient} onChange={(v) => set("suppliesByClient", v)} />
+            </div>
+          )}
+          {!h("consumables") && (
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <div>
+                <p className="text-sm font-medium text-slate-800">Restroom Consumables</p>
+                <p className="text-xs text-slate-500">Include soap, paper products in quote</p>
+              </div>
+              <Toggle checked={data.restroomConsumablesIncluded} onChange={(v) => set("restroomConsumablesIncluded", v)} />
+            </div>
+          )}
+          {!h("accessConstraints") && (
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Access Constraints / Special Instructions</label>
+              <textarea
+                value={data.accessConstraints}
+                onChange={(e) => set("accessConstraints", e.target.value)}
+                placeholder="e.g. Badge access required, server room off-limits"
+                rows={2}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+            </div>
+          )}
+          {!h("notes") && (
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
+              <textarea
+                value={data.notes}
+                onChange={(e) => set("notes", e.target.value)}
+                placeholder="Additional notes about the facility or scope"
+                rows={2}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+            </div>
+          )}
           <div className="sm:col-span-2 flex justify-between pt-1">
             <Button variant="secondary" icon={ChevronLeft} onClick={onBack}>Back</Button>
             <Button variant="primary" icon={ChevronRight} onClick={onNext}>Next: Labor Estimate</Button>
@@ -707,6 +753,233 @@ function PricingStep({ config, onChange, laborEst, walkthrough, onNext, onBack }
 
 // ─── Step 5: Tiers / Proposal ─────────────────────────────────────────────────
 
+// ─── Tier bar chart ───────────────────────────────────────────────────────────
+
+function TierComparisonChart({ tiers, selectedTier }: { tiers: CommercialTier[]; selectedTier: number }) {
+  const maxMonthly = Math.max(...tiers.map((t) => t.monthlyPrice));
+  const tierColors = [
+    { bar: "bg-slate-400", text: "text-slate-600", label: "Basic" },
+    { bar: "bg-primary-500", text: "text-primary-700", label: "Enhanced" },
+    { bar: "bg-violet-500", text: "text-violet-700", label: "Premium" },
+  ];
+
+  return (
+    <Card>
+      <div className="px-5 pt-4 pb-5">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 className="w-4 h-4 text-slate-500" />
+          <span className="text-sm font-semibold text-slate-700">Tier Price Comparison</span>
+          <Tooltip
+            text="Visual comparison of all three service tiers. The Enhanced tier is our recommended starting point — priced at 1× the base rate. Basic = 0.82×, Premium = 1.25×."
+            source="ISSA 2025 tiering guidelines"
+          />
+        </div>
+        <div className="space-y-3">
+          {tiers.map((tier, i) => {
+            const pct = maxMonthly > 0 ? (tier.monthlyPrice / maxMonthly) * 100 : 0;
+            const isSelected = i === selectedTier;
+            const c = tierColors[i];
+            return (
+              <div key={tier.name}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-xs font-semibold ${isSelected ? c.text : "text-slate-500"}`}>
+                    {tier.name}
+                    {isSelected && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">Selected</span>}
+                  </span>
+                  <div className="text-right">
+                    <span className={`text-sm font-bold tabular-nums ${isSelected ? c.text : "text-slate-600"}`}>
+                      ${tier.monthlyPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}<span className="text-xs font-normal text-slate-400">/mo</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 ml-2">${tier.pricePerVisit.toLocaleString(undefined, { maximumFractionDigits: 0 })}/visit</span>
+                  </div>
+                </div>
+                <div className="h-6 bg-slate-100 rounded-lg overflow-hidden">
+                  <div
+                    className={`h-full ${c.bar} rounded-lg transition-all duration-500 flex items-center justify-end pr-2`}
+                    style={{ width: `${pct}%` }}
+                  >
+                    {pct > 30 && <span className="text-[10px] text-white font-bold">{pct.toFixed(0)}%</span>}
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">{tier.scopeText}</p>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-1.5">
+          <span className="text-[10px] text-slate-400">Pricing based on ISSA 2025 production rates</span>
+          <Tooltip text="ISSA (International Sanitary Supply Association) 2025 Cleaning Industry Production Rate standards are the industry benchmark for calculating commercial cleaning labor times and costs." source="ISSA 2025" side="right" />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── PDF Export ───────────────────────────────────────────────────────────────
+
+function usePDFExport() {
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const exportPDF = useCallback(() => {
+    const el = printRef.current;
+    if (!el) return;
+    // Temporarily show the hidden print area, trigger print, then hide
+    el.style.display = "block";
+    window.print();
+    el.style.display = "none";
+  }, []);
+
+  return { printRef, exportPDF };
+}
+
+interface PDFContentProps {
+  facility: FacilityInfo;
+  walkthrough: CommercialWalkthrough;
+  laborEst: CommercialLaborEstimate;
+  calc: ReturnType<typeof computeCommercialQuote>;
+  tiers: CommercialTier[];
+  selectedTier: number;
+  recommendedTier: number;
+}
+
+function PDFContent({ facility, walkthrough, laborEst, calc, tiers, selectedTier, recommendedTier }: PDFContentProps) {
+  const tier = tiers[selectedTier];
+  const freq = FREQUENCY_OPTIONS.find((f) => f.value === walkthrough.frequency);
+  const calcUrl = `${window.location.origin}/commercial-cleaning-calculator`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(calcUrl)}&bgcolor=ffffff&color=1e293b&margin=4`;
+
+  return (
+    <div style={{ fontFamily: "Georgia, serif", color: "#1e293b", fontSize: 12 }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #e2e8f0", paddingBottom: 16, marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#6d28d9" }}>QuotePro AI</div>
+          <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>Commercial Cleaning Proposal</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 11, color: "#94a3b8" }}>Generated {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>Powered by ISSA 2025 production rates</div>
+        </div>
+      </div>
+
+      {/* Facility */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Facility Information</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, backgroundColor: "#f8fafc", padding: 12, borderRadius: 8 }}>
+          {[
+            ["Facility Name", facility.facilityName],
+            ["Contact", facility.contactName || "—"],
+            ["Type", facility.facilityType],
+            ["Square Footage", `${facility.totalSqFt.toLocaleString()} sq ft`],
+            ["Frequency", freq?.label || walkthrough.frequency],
+            ["Est. Hours/Visit", `${laborEst.overrideHours ?? laborEst.rawHours} hrs`],
+            ["After-Hours", walkthrough.afterHoursRequired ? "Yes" : "No"],
+            ["Est. Cleaners", laborEst.recommendedCleaners.toString()],
+          ].map(([label, value]) => (
+            <div key={label} style={{ padding: "4px 0" }}>
+              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b" }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tier comparison */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Service Tier Options</div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          <thead>
+            <tr style={{ backgroundColor: "#6d28d9", color: "white" }}>
+              <th style={{ padding: "8px 12px", textAlign: "left", borderRadius: "4px 0 0 0" }}>Tier</th>
+              <th style={{ padding: "8px 12px", textAlign: "right" }}>Per Visit</th>
+              <th style={{ padding: "8px 12px", textAlign: "right" }}>Monthly</th>
+              <th style={{ padding: "8px 12px", textAlign: "right", borderRadius: "0 4px 0 0" }}>Annual Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tiers.map((t, i) => (
+              <tr key={t.name} style={{ backgroundColor: i === selectedTier ? "#ede9fe" : i % 2 === 0 ? "#f8fafc" : "white", fontWeight: i === selectedTier ? 700 : 400 }}>
+                <td style={{ padding: "8px 12px" }}>
+                  {t.name}
+                  {i === selectedTier && <span style={{ marginLeft: 6, fontSize: 9, backgroundColor: "#6d28d9", color: "white", padding: "2px 6px", borderRadius: 4 }}>SELECTED</span>}
+                  {i === recommendedTier && i !== selectedTier && <span style={{ marginLeft: 6, fontSize: 9, backgroundColor: "#0ea5e9", color: "white", padding: "2px 6px", borderRadius: 4 }}>RECOMMENDED</span>}
+                </td>
+                <td style={{ padding: "8px 12px", textAlign: "right" }}>${t.pricePerVisit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style={{ padding: "8px 12px", textAlign: "right" }}>${t.monthlyPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style={{ padding: "8px 12px", textAlign: "right" }}>${(t.monthlyPrice * 12).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Cost breakdown */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Cost Breakdown — Enhanced Tier</div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          <tbody>
+            {calc.lineItems.map((item) => (
+              <tr key={item.label} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <td style={{ padding: "6px 12px", color: "#475569" }}>{item.label}</td>
+                <td style={{ padding: "6px 12px", textAlign: "right", fontWeight: 600 }}>${Math.round(item.amount).toLocaleString()}</td>
+              </tr>
+            ))}
+            <tr style={{ borderTop: "2px solid #e2e8f0", fontWeight: 700 }}>
+              <td style={{ padding: "8px 12px" }}>Per Visit Total</td>
+              <td style={{ padding: "8px 12px", textAlign: "right", color: "#6d28d9", fontSize: 13 }}>${calc.perVisit.toLocaleString()}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Tier scope */}
+      {tier && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Selected Scope — {tier.name}</div>
+          <p style={{ color: "#64748b", fontSize: 11, marginBottom: 8 }}>{tier.scopeText}</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+            {tier.includedBullets.map((b) => (
+              <div key={b} style={{ fontSize: 10, color: "#166534" }}>✓ {b}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <p style={{ fontSize: 9, color: "#94a3b8" }}>Pricing calculated using ISSA 2025 Cleaning Industry Production Rate standards</p>
+          <p style={{ fontSize: 9, color: "#94a3b8" }}>and BSCAI 2024 Building Service Contractors Market Survey benchmarks.</p>
+          <p style={{ fontSize: 9, color: "#94a3b8", marginTop: 4 }}>This proposal was generated by QuotePro AI · quotepro.ai</p>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <img src={qrUrl} alt="QR Code" style={{ width: 60, height: 60 }} />
+          <p style={{ fontSize: 8, color: "#94a3b8", marginTop: 2 }}>Scan for online calculator</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Print stylesheet (injected into <head> once) ─────────────────────────────
+const PRINT_STYLE = `
+@media print {
+  body > *:not(#quotepro-print-root) { display: none !important; }
+  #quotepro-print-root { display: block !important; }
+  @page { margin: 20mm; size: A4 portrait; }
+}
+`;
+
+function ensurePrintStyle() {
+  if (document.getElementById("quotepro-print-style")) return;
+  const s = document.createElement("style");
+  s.id = "quotepro-print-style";
+  s.textContent = PRINT_STYLE;
+  document.head.appendChild(s);
+}
+
+// ─── Step 5: Tiers / Proposal ─────────────────────────────────────────────────
+
 function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
   facility: FacilityInfo;
   walkthrough: CommercialWalkthrough;
@@ -725,6 +998,17 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
     { monthly: "", perVisit: "" },
   ]);
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const exportPDF = useCallback(() => {
+    ensurePrintStyle();
+    const el = printRef.current;
+    if (!el) return;
+    el.style.display = "block";
+    el.id = "quotepro-print-root";
+    window.print();
+    el.style.display = "none";
+  }, []);
 
   const calc = useMemo(() => computeCommercialQuote(laborEst, pricingConfig, walkthrough.frequency), [laborEst, pricingConfig, walkthrough.frequency]);
   const tiers = useMemo(() => computeCommercialTiers(facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule), [facility.facilityName, calc.perVisit, walkthrough.frequency, pricingConfig.roundingRule]);
@@ -854,6 +1138,9 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
 
   return (
     <div className="space-y-4">
+      {/* Tier comparison chart */}
+      <TierComparisonChart tiers={effectiveTiers} selectedTier={selectedTier} />
+
       {/* Tier selector */}
       <Card>
         <CardHeader title="Service Tiers — Select One to Save" icon={FileText} />
@@ -1014,11 +1301,34 @@ function TiersStep({ facility, walkthrough, laborEst, pricingConfig, onBack }: {
         <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>
       )}
 
-      <div className="flex justify-between">
+      <div className="flex justify-between items-center">
         <Button variant="secondary" icon={ChevronLeft} onClick={onBack}>Back</Button>
-        <Button variant="primary" icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : `Save "${tier.name}" as Draft`}
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportPDF}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+          >
+            <Printer className="w-4 h-4" />
+            Export PDF
+          </button>
+          <Button variant="primary" icon={saving ? Loader2 : Save} onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : `Save "${tier.name}" as Draft`}
+          </Button>
+        </div>
+      </div>
+
+      {/* Hidden print area — shown only during window.print() */}
+      <div ref={printRef} style={{ display: "none" }}>
+        <PDFContent
+          facility={facility}
+          walkthrough={walkthrough}
+          laborEst={laborEst}
+          calc={calc}
+          tiers={effectiveTiers}
+          selectedTier={selectedTier}
+          recommendedTier={recommendedTier}
+        />
       </div>
     </div>
   );
@@ -1056,6 +1366,103 @@ const DEFAULT_WALKTHROUGH: CommercialWalkthrough = {
 };
 
 const COMMERCIAL_SETTINGS_KEY = "commercialBaseMinutes";
+const HIDDEN_FIELDS_KEY = "commercialHiddenFields";
+
+// ─── Admin field visibility ────────────────────────────────────────────────────
+
+type HiddenFieldId =
+  | "elevators" | "buildingAge" | "parkingLot" | "highTouch"
+  | "afterHours" | "suppliesByClient" | "consumables"
+  | "accessConstraints" | "notes" | "preferredDays" | "preferredTime";
+
+const FIELD_LABELS: Record<HiddenFieldId, string> = {
+  elevators: "Elevators",
+  buildingAge: "Building Age",
+  parkingLot: "Parking Lot (sq ft)",
+  highTouch: "High-Touch Focus toggle",
+  afterHours: "After-Hours Service toggle",
+  suppliesByClient: "Client Provides Supplies toggle",
+  consumables: "Restroom Consumables toggle",
+  accessConstraints: "Access Constraints notes",
+  notes: "Additional Notes",
+  preferredDays: "Preferred Days",
+  preferredTime: "Preferred Time Window",
+};
+
+function useHiddenFields(): [Set<HiddenFieldId>, (id: HiddenFieldId, hidden: boolean) => void] {
+  const [hidden, setHidden] = useState<Set<HiddenFieldId>>(() => {
+    try {
+      const stored = localStorage.getItem(HIDDEN_FIELDS_KEY);
+      return stored ? new Set(JSON.parse(stored) as HiddenFieldId[]) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const toggle = useCallback((id: HiddenFieldId, shouldHide: boolean) => {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (shouldHide) next.add(id); else next.delete(id);
+      try { localStorage.setItem(HIDDEN_FIELDS_KEY, JSON.stringify([...next])); } catch { /* */ }
+      return next;
+    });
+  }, []);
+
+  return [hidden, toggle];
+}
+
+function FieldTogglePanel({ hidden, onToggle, onClose }: {
+  hidden: Set<HiddenFieldId>;
+  onToggle: (id: HiddenFieldId, hide: boolean) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-start justify-end" onClick={onClose}>
+      <div
+        className="mt-16 mr-4 w-72 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-zinc-700 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-800">
+          <div className="flex items-center gap-2">
+            <Eye className="w-4 h-4 text-slate-500" />
+            <span className="text-sm font-semibold text-slate-700 dark:text-zinc-200">Field Visibility</span>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-xs text-slate-400 px-4 pt-3 pb-1">Toggle optional fields on/off. Saved to your browser.</p>
+        <div className="px-4 pb-4 space-y-2 max-h-96 overflow-y-auto mt-2">
+          {(Object.entries(FIELD_LABELS) as [HiddenFieldId, string][]).map(([id, label]) => {
+            const isHidden = hidden.has(id);
+            return (
+              <label key={id} className="flex items-center justify-between gap-3 cursor-pointer group">
+                <span className={`text-xs ${isHidden ? "text-slate-400 line-through" : "text-slate-600 dark:text-zinc-300"}`}>{label}</span>
+                <button
+                  type="button"
+                  onClick={() => onToggle(id, !isHidden)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors border ${
+                    isHidden
+                      ? "bg-slate-100 text-slate-400 border-slate-200"
+                      : "bg-primary-50 text-primary-700 border-primary-200"
+                  }`}
+                >
+                  {isHidden ? <><EyeOff className="w-3 h-3" />Hidden</> : <><Eye className="w-3 h-3" />Visible</>}
+                </button>
+              </label>
+            );
+          })}
+        </div>
+        <div className="px-4 pb-3">
+          <button
+            onClick={() => (Object.keys(FIELD_LABELS) as HiddenFieldId[]).forEach((id) => onToggle(id, false))}
+            className="w-full text-xs text-center text-primary-600 hover:text-primary-700 font-semibold py-1.5 rounded-lg hover:bg-primary-50 transition-colors"
+          >
+            Show all fields
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function useCustomBaseMinutes(): Partial<Record<FacilityType, number>> | undefined {
   const [overrides, setOverrides] = useState<Partial<Record<FacilityType, number>> | undefined>(() => {
@@ -1070,6 +1477,7 @@ function useCustomBaseMinutes(): Partial<Record<FacilityType, number>> | undefin
 function CommercialQuoteContent() {
   const { data: pricing } = useQuery<any>({ queryKey: ["/api/pricing"] });
   const customBaseMinutes = useCustomBaseMinutes();
+  const [hiddenFields, onToggleField] = useHiddenFields();
 
   const defaultHourlyRate = pricing?.laborRate || 55;
   const defaultOverhead = pricing?.overheadPct || 15;
@@ -1124,6 +1532,8 @@ function CommercialQuoteContent() {
           onChange={setWalkthrough}
           onNext={() => setStep("labor")}
           onBack={() => setStep("facility")}
+          hiddenFields={hiddenFields}
+          onToggleField={onToggleField}
         />
       )}
       {step === "labor" && (
@@ -1164,6 +1574,8 @@ function CommercialQuoteContent() {
             <CommercialLivePreview
               result={liveQuote}
               facilityName={facility.facilityName || undefined}
+              facilityType={facility.facilityType}
+              totalSqFt={facility.totalSqFt || undefined}
               adjustment={adjustment}
               onAdjustmentChange={setAdjustment}
             />
