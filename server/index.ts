@@ -805,7 +805,6 @@ async function seedToDoDemo() {
     },
     () => {
       log(`express server serving on port ${port}`);
-      log(`[google-oauth] REPLIT_DOMAINS=${process.env.REPLIT_DOMAINS || "(not set)"} EXPO_PUBLIC_DOMAIN=${process.env.EXPO_PUBLIC_DOMAIN || "(not set)"}`);
     },
   );
 })();

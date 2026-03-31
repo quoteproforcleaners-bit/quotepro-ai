@@ -82,18 +82,6 @@ import { pendingAuthTokens, generateAuthToken } from "../clients";
 
 const router = Router();
 
-  router.get("/api/auth/debug-host", async (req: Request, res: Response) => {
-    res.set("Cache-Control", "no-store");
-    return res.json({
-      host: req.get("host"),
-      xForwardedHost: req.get("x-forwarded-host"),
-      xForwardedProto: req.get("x-forwarded-proto"),
-      origin: req.get("origin"),
-      referer: req.get("referer"),
-      computedRedirectUri: `https://${req.get("x-forwarded-host") || req.get("host")}/api/auth/google/callback`,
-    });
-  });
-
   router.post("/api/crash-report", async (req: Request, res: Response) => {
     try {
       const { error, stack, componentStack, source } = req.body;
@@ -521,8 +509,6 @@ const router = Router();
         publicDomain = req.get("x-forwarded-host") || req.get("host") || "localhost";
       }
       const redirectUri = `https://${publicDomain}/api/auth/google/callback`;
-      const clientIdHint = (process.env.GOOGLE_CLIENT_ID || "").substring(0, 20) + "...";
-      console.log("[google-auth/start] clientId prefix:", clientIdHint, "| redirectUri:", redirectUri);
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
@@ -534,10 +520,6 @@ const router = Router();
         prompt: "select_account",
         state: platform,
       });
-      const parsedUrl = new URL(url);
-      const urlClientId = parsedUrl.searchParams.get("client_id") || "";
-      const urlRedirectUri = parsedUrl.searchParams.get("redirect_uri") || "";
-      console.log("[google-auth/start] FINAL client_id:", urlClientId, "| redirect_uri:", urlRedirectUri);
       res.set("Cache-Control", "no-store, no-cache, must-revalidate");
       res.set("Pragma", "no-cache");
       return res.json({ url });
