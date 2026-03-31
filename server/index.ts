@@ -339,6 +339,27 @@ function configureExpoAndLanding(app: express.Application) {
       });
     }
 
+    // Public commercial cleaning calculator — inject SEO meta tags server-side
+    app.get("/commercial-cleaning-calculator", (_req: Request, res: Response) => {
+      const indexPath = path.join(webDistPath, "index.html");
+      if (!fs.existsSync(indexPath)) return res.status(404).send("Not found");
+      let html = fs.readFileSync(indexPath, "utf8");
+      const title = "Commercial Cleaning Cost Calculator 2026 | Free Janitorial Quote Tool";
+      const desc  = "Free commercial cleaning cost calculator. Instant janitorial quotes based on ISSA 2025 production rates. Compare to national averages. Covers offices, medical, retail, gyms, schools & warehouses.";
+      html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
+      // Inject canonical + og meta before </head>
+      const seoTags = [
+        `<meta name="description" content="${desc}">`,
+        `<meta property="og:title" content="${title}">`,
+        `<meta property="og:description" content="${desc}">`,
+        `<meta property="og:type" content="website">`,
+        `<meta name="robots" content="index, follow">`,
+        `<link rel="canonical" href="https://quotepro.ai/commercial-cleaning-calculator">`,
+      ].join("\n    ");
+      html = html.replace("</head>", `    ${seoTags}\n</head>`);
+      res.type("html").send(html);
+    });
+
     app.use(async (req: Request, res: Response, next: NextFunction) => {
       if (req.path.startsWith("/app") || req.path.startsWith("/intake/")) {
         const indexPath = path.join(webDistPath, "index.html");
