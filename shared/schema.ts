@@ -190,6 +190,9 @@ export const quotes = pgTable("quotes", {
   nudgeSentAt: timestamp("nudge_sent_at"),
   reviewRequestSentAt: timestamp("review_request_sent_at"),
   deletedAt: timestamp("deleted_at"),
+  stripeInvoiceId: text("stripe_invoice_id"),
+  stripeInvoiceStatus: text("stripe_invoice_status"),
+  stripeInvoiceSentAt: timestamp("stripe_invoice_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

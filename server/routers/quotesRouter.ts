@@ -1903,4 +1903,100 @@ The email should:
     }
   });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Stripe invoice — POST /api/quotes/:id/invoice
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post("/api/quotes/:id/invoice", requireAuth, async (req: any, res: Response) => {
+  try {
+    const userId    = req.session.userId as string;
+    const quoteId   = req.params.id;
+    const business  = await getBusinessByOwner(userId);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+
+    // ── Fetch quote + customer ───────────────────────────────────────────────
+    const { rows } = await pool.query(
+      `SELECT q.id, q.total, q.stripe_invoice_id, q.stripe_invoice_status,
+              q.status AS quote_status, q.business_id,
+              c.email AS customer_email, c.first_name, c.last_name
+       FROM quotes q
+       LEFT JOIN customers c ON q.customer_id = c.id
+       WHERE q.id = $1 AND q.business_id = $2 AND q.deleted_at IS NULL`,
+      [quoteId, business.id]
+    );
+    if (!rows.length) return res.status(404).json({ message: "Quote not found" });
+    const q = rows[0];
+
+    const customerEmail = q.customer_email;
+    if (!customerEmail) return res.status(400).json({ message: "Customer has no email address on file" });
+
+    const total = Number(q.total || 0);
+    if (total <= 0) return res.status(400).json({ message: "Quote total must be greater than $0" });
+
+    const { getUncachableStripeClient } = await import("../stripeClient");
+    const stripe = await getUncachableStripeClient();
+
+    // ── Get or create Stripe customer ────────────────────────────────────────
+    let stripeCustomerId: string;
+    const existing = await stripe.customers.list({ email: customerEmail, limit: 1 });
+    if (existing.data.length > 0) {
+      stripeCustomerId = existing.data[0].id;
+    } else {
+      const customerName = q.first_name
+        ? `${q.first_name} ${q.last_name || ""}`.trim()
+        : customerEmail;
+      const created = await stripe.customers.create({
+        email: customerEmail,
+        name: customerName,
+        metadata: { businessId: business.id },
+      });
+      stripeCustomerId = created.id;
+    }
+
+    // ── Create invoice ───────────────────────────────────────────────────────
+    const invoice = await stripe.invoices.create({
+      customer: stripeCustomerId,
+      collection_method: "send_invoice",
+      days_until_due: 30,
+      metadata: { quoteId, businessId: business.id },
+      description: `Cleaning service quote #${quoteId.slice(0, 8).toUpperCase()}`,
+    });
+
+    // ── Add invoice item ─────────────────────────────────────────────────────
+    await stripe.invoiceItems.create({
+      customer: stripeCustomerId,
+      invoice: invoice.id,
+      amount: Math.round(total * 100), // cents
+      currency: "usd",
+      description: `Cleaning Service — ${business.name || "QuotePro"}`,
+    });
+
+    // ── Finalize + send ──────────────────────────────────────────────────────
+    await stripe.invoices.finalizeInvoice(invoice.id);
+    const sent = await stripe.invoices.sendInvoice(invoice.id);
+
+    // ── Persist to DB ────────────────────────────────────────────────────────
+    await pool.query(
+      `UPDATE quotes
+       SET stripe_invoice_id = $1, stripe_invoice_status = 'sent',
+           stripe_invoice_sent_at = NOW(), updated_at = NOW()
+       WHERE id = $2`,
+      [sent.id, quoteId]
+    );
+
+    return res.json({
+      invoiceId:  sent.id,
+      invoiceUrl: sent.hosted_invoice_url,
+      status:     "sent",
+      email:      customerEmail,
+    });
+  } catch (err: any) {
+    console.error("[stripe-invoice] error:", err);
+    if (err?.raw?.message) {
+      return res.status(400).json({ message: err.raw.message });
+    }
+    return res.status(500).json({ message: err.message || "Failed to send invoice" });
+  }
+});
+
 export default router;
