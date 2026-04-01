@@ -105,6 +105,8 @@ export default function QuoteDetailPage() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [acceptedUpgradeOpen, setAcceptedUpgradeOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" | "info" } | null>(null);
+  const [stripeInvoiceSending, setStripeInvoiceSending] = useState(false);
+  const [stripeInvoiceSuccess, setStripeInvoiceSuccess] = useState<string | null>(null);
 
   const showToast = (message: string, variant: "success" | "error" | "info" = "success") => {
     setToast({ message, variant });
@@ -220,6 +222,18 @@ export default function QuoteDetailPage() {
       apiPut(`/api/recommendations/${recId}`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}/recommendations`] });
+    },
+  });
+
+  const sendStripeInvoiceMutation = useMutation({
+    mutationFn: () => apiPost(`/api/quotes/${id}/invoice`, {}),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
+      setStripeInvoiceSuccess(`Invoice sent to ${data.email}`);
+      showToast(`Invoice sent to ${data.email}`, "success");
+    },
+    onError: (err: any) => {
+      showToast(err?.message || "Failed to send invoice", "error");
     },
   });
 
@@ -1056,6 +1070,32 @@ export default function QuoteDetailPage() {
                   Send Quote to Customer
                 </button>
               ) : null}
+
+              {quote.stripeInvoiceStatus ? (
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <span className="text-slate-500">Invoice</span>
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    quote.stripeInvoiceStatus === "paid"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : quote.stripeInvoiceStatus === "sent"
+                        ? "bg-blue-50 text-blue-700"
+                        : quote.stripeInvoiceStatus === "overdue"
+                          ? "bg-red-50 text-red-700"
+                          : "bg-slate-100 text-slate-600"
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      quote.stripeInvoiceStatus === "paid" ? "bg-emerald-500"
+                        : quote.stripeInvoiceStatus === "sent" ? "bg-blue-500"
+                        : quote.stripeInvoiceStatus === "overdue" ? "bg-red-500"
+                        : "bg-slate-400"
+                    }`} />
+                    {quote.stripeInvoiceStatus === "paid" ? "Paid"
+                      : quote.stripeInvoiceStatus === "sent" ? "Invoice Sent"
+                      : quote.stripeInvoiceStatus === "overdue" ? "Overdue"
+                      : quote.stripeInvoiceStatus}
+                  </span>
+                </div>
+              ) : null}
             </div>
           </Card>
 
@@ -1376,6 +1416,26 @@ export default function QuoteDetailPage() {
           <Card>
             <CardHeader title="Actions" />
             <div className="space-y-2">
+              {quote.status === "accepted" && quote.stripeInvoiceStatus !== "paid" ? (
+                <div className="flex flex-col gap-1.5">
+                  <Button
+                    variant="primary"
+                    icon={Send}
+                    onClick={() => sendStripeInvoiceMutation.mutate()}
+                    loading={sendStripeInvoiceMutation.isPending}
+                    className="w-full justify-start"
+                    size="sm"
+                  >
+                    {quote.stripeInvoiceStatus === "sent" || quote.stripeInvoiceStatus === "overdue"
+                      ? "Resend Invoice"
+                      : "Send Invoice"}
+                  </Button>
+                  {stripeInvoiceSuccess ? (
+                    <p className="text-xs text-emerald-600 pl-1">{stripeInvoiceSuccess}</p>
+                  ) : null}
+                </div>
+              ) : null}
+
               {quote.status === "accepted" && !linkedJob ? (
                 <Button
                   variant="primary"

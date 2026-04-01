@@ -13,7 +13,7 @@ import {
   Spinner,
 } from "../components/ui";
 
-const tabs = ["all", "draft", "sent", "viewed", "accepted", "declined", "expired"];
+const tabs = ["all", "draft", "sent", "viewed", "accepted", "awaiting-payment", "declined", "expired"];
 
 function AIQuotesNudge({ quotesCount }: { quotesCount: number }) {
   const navigate = useNavigate();
@@ -74,11 +74,19 @@ export default function QuotesListPage() {
     counts[t] =
       t === "all"
         ? quotes.length
-        : quotes.filter((q: any) => q.status === t).length;
+        : t === "awaiting-payment"
+          ? quotes.filter((q: any) => q.status === "accepted" && q.stripeInvoiceStatus && q.stripeInvoiceStatus !== "paid").length
+          : quotes.filter((q: any) => q.status === t).length;
   }
 
   const filtered = quotes
-    .filter((q: any) => filter === "all" || q.status === filter)
+    .filter((q: any) =>
+      filter === "all"
+        ? true
+        : filter === "awaiting-payment"
+          ? q.status === "accepted" && q.stripeInvoiceStatus && q.stripeInvoiceStatus !== "paid"
+          : q.status === filter
+    )
     .filter(
       (q: any) =>
         !search ||
@@ -178,6 +186,9 @@ export default function QuotesListPage() {
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Status
                   </th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden lg:table-cell">
+                    Invoice
+                  </th>
                   <th
                     onClick={() => toggleSort("date")}
                     className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell cursor-pointer hover:text-slate-700 select-none"
@@ -212,6 +223,32 @@ export default function QuotesListPage() {
                     </td>
                     <td className="px-5 py-3.5">
                       <Badge status={q.status} dot />
+                    </td>
+                    <td className="px-5 py-3.5 hidden lg:table-cell">
+                      {q.stripeInvoiceStatus ? (
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          q.stripeInvoiceStatus === "paid"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : q.stripeInvoiceStatus === "sent"
+                              ? "bg-blue-50 text-blue-700"
+                              : q.stripeInvoiceStatus === "overdue"
+                                ? "bg-red-50 text-red-700"
+                                : "bg-slate-100 text-slate-600"
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            q.stripeInvoiceStatus === "paid" ? "bg-emerald-500"
+                              : q.stripeInvoiceStatus === "sent" ? "bg-blue-500"
+                              : q.stripeInvoiceStatus === "overdue" ? "bg-red-500"
+                              : "bg-slate-400"
+                          }`} />
+                          {q.stripeInvoiceStatus === "paid" ? "Paid"
+                            : q.stripeInvoiceStatus === "sent" ? "Sent"
+                            : q.stripeInvoiceStatus === "overdue" ? "Overdue"
+                            : q.stripeInvoiceStatus}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-xs">—</span>
+                      )}
                     </td>
                     <td className="px-5 lg:px-6 py-3.5 text-right text-slate-500 hidden md:table-cell">
                       {new Date(q.createdAt).toLocaleDateString()}

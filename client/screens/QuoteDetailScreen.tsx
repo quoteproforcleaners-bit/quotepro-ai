@@ -117,6 +117,7 @@ export default function QuoteDetailScreen() {
 
   const [qboCreating, setQboCreating] = useState(false);
   const [jobberSyncing, setJobberSyncing] = useState(false);
+  const [stripeInvoiceSending, setStripeInvoiceSending] = useState(false);
   const { data: jobberStatus } = useQuery<{ connected: boolean; status?: string }>({
     queryKey: ["/api/integrations/jobber/status"],
   });
@@ -742,6 +743,24 @@ export default function QuoteDetailScreen() {
     }
   };
 
+
+  const handleSendStripeInvoice = async () => {
+    if (!quote || stripeInvoiceSending) return;
+    setStripeInvoiceSending(true);
+    try {
+      const res = await apiRequest("POST", `/api/quotes/${quote.id}/invoice`, {});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to send invoice");
+      setSendSuccess(`Invoice sent to ${data.email}`);
+      setTimeout(() => setSendSuccess(null), 4000);
+      queryClient.invalidateQueries({ queryKey: [`/api/quotes/${route.params.quoteId}`] });
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert("Invoice Error", e.message || "Could not send invoice. Please try again.");
+    } finally {
+      setStripeInvoiceSending(false);
+    }
+  };
 
   const handleGenerateInvoicePacket = async () => {
     if (!quote) return;
@@ -2156,6 +2175,25 @@ export default function QuoteDetailScreen() {
             <Feather name="file-text" size={20} color={theme.primary} />
             <ThemedText type="small" style={{ marginTop: 4 }}>Invoice</ThemedText>
           </Pressable>
+
+          {status === "accepted" && quote?.stripeInvoiceStatus !== "paid" ? (
+            <Pressable
+              onPress={handleSendStripeInvoice}
+              style={[styles.actionButton, { backgroundColor: `${theme.primary}15` }]}
+              testID="send-stripe-invoice-btn"
+            >
+              {stripeInvoiceSending ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <Feather name="send" size={20} color={theme.primary} />
+              )}
+              <ThemedText type="small" style={{ marginTop: 4, color: theme.primary, fontWeight: "700" }}>
+                {quote?.stripeInvoiceStatus === "sent" || quote?.stripeInvoiceStatus === "overdue"
+                  ? "Resend Inv."
+                  : "Send Inv."}
+              </ThemedText>
+            </Pressable>
+          ) : null}
 
           <Pressable
             onPress={handleOpenCalendarModal}

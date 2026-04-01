@@ -983,8 +983,40 @@ const router = Router();
           }
           break;
         }
+        case "invoice.paid": {
+          const paidInvoice = event.data.object as any;
+          const paidQuoteId = paidInvoice.metadata?.quoteId as string | undefined;
+          if (paidQuoteId) {
+            try {
+              await pool.query(
+                `UPDATE quotes SET stripe_invoice_status = 'paid', updated_at = NOW() WHERE id = $1`,
+                [paidQuoteId]
+              );
+              console.log(`[stripe-invoice] invoice.paid → quote ${paidQuoteId} marked paid`);
+            } catch (e: any) {
+              console.error("[stripe-invoice] invoice.paid update error:", e.message);
+            }
+          }
+          break;
+        }
+
         case "invoice.payment_failed": {
           const invoice = event.data.object as any;
+          // ── Quote invoice payment failed ─────────────────────────────────
+          const failedQuoteId = invoice.metadata?.quoteId as string | undefined;
+          if (failedQuoteId) {
+            try {
+              await pool.query(
+                `UPDATE quotes SET stripe_invoice_status = 'overdue', updated_at = NOW() WHERE id = $1`,
+                [failedQuoteId]
+              );
+              console.log(`[stripe-invoice] invoice.payment_failed → quote ${failedQuoteId} marked overdue`);
+            } catch (e: any) {
+              console.error("[stripe-invoice] payment_failed update error:", e.message);
+            }
+            break;
+          }
+          // ── Subscription invoice payment failed (existing logic) ──────────
           const stripeCustomerId = invoice.customer as string;
           if (stripeCustomerId) {
             try {
