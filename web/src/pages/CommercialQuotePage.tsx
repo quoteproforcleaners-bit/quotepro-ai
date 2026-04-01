@@ -380,11 +380,8 @@ function WalkthroughStep({ data, onChange, onNext, onBack, hiddenFields, onToggl
                   <label className="text-xs font-medium text-slate-600">Building Age (years)</label>
                   <Tooltip text="Older buildings take longer to clean. &gt;20 yrs: ×1.15 multiplier. &gt;40 yrs: ×1.25 multiplier on total labor time." source="ISSA 2025" />
                 </div>
-                <NumInput label="" value={data.buildingAgeYears ?? data.buildingAge} onChange={(v) => { set("buildingAgeYears", v); set("buildingAge", v); }} placeholder="0" />
+                <NumInput label="" value={data.buildingAge} onChange={(v) => set("buildingAge", v)} placeholder="0" />
               </div>
-            )}
-            {!h("parkingLot") && (
-              <NumInput label="Parking Lot (sq ft)" value={data.parkingLotSqFt ?? 0} onChange={(v) => set("parkingLotSqFt", v > 0 ? v : undefined)} placeholder="0" />
             )}
           </div>
 
@@ -554,7 +551,7 @@ function LaborStep({ walkthrough, laborEst, setLaborEst, onNext, onBack, customB
     },
   ].filter(Boolean) as { label: string; mins: number }[];
 
-  const effectiveAge = walkthrough.buildingAgeYears ?? walkthrough.buildingAge ?? 0;
+  const effectiveAge = walkthrough.buildingAge ?? 0;
   const ageMultiplier = effectiveAge > 40 ? 1.25 : effectiveAge > 20 ? 1.15 : 1.0;
   const trafficMultiplier = TRAFFIC_LEVEL_MULTIPLIER[walkthrough.trafficLevel ?? "Medium"];
 
@@ -1443,14 +1440,13 @@ const HIDDEN_FIELDS_KEY = "commercialHiddenFields";
 // ─── Admin field visibility ────────────────────────────────────────────────────
 
 type HiddenFieldId =
-  | "elevators" | "buildingAge" | "parkingLot" | "highTouch"
+  | "elevators" | "buildingAge" | "highTouch"
   | "afterHours" | "suppliesByClient" | "consumables"
   | "accessConstraints" | "notes" | "preferredDays" | "preferredTime";
 
 const FIELD_LABELS: Record<HiddenFieldId, string> = {
   elevators: "Elevators",
   buildingAge: "Building Age",
-  parkingLot: "Parking Lot (sq ft)",
   highTouch: "High-Touch Focus toggle",
   afterHours: "After-Hours Service toggle",
   suppliesByClient: "Client Provides Supplies toggle",
