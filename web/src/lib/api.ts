@@ -26,13 +26,18 @@ export async function apiRequest(
   if (!res.ok) {
     const text = await res.text();
     let message: string;
+    let data: Record<string, unknown> | null = null;
     try {
       const json = JSON.parse(text);
+      data = json;
       message = json.message || json.error || `Request failed (${res.status})`;
     } catch {
       message = text || `Request failed (${res.status})`;
     }
-    throw new Error(message);
+    const err = new Error(message);
+    (err as any).status = res.status;
+    (err as any).data = data;
+    throw err;
   }
 
   return res;

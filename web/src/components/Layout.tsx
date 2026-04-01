@@ -22,6 +22,8 @@ import {
   Repeat2, type LucideIcon,
 } from "lucide-react";
 import { SupportModal } from "./SupportModal";
+import UpgradeModal from "./UpgradeModal";
+import QuoteUsageBanner from "./QuoteUsageBanner";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -964,6 +966,7 @@ export function Layout() {
         {/* Content */}
         <main ref={mainRef} className="flex-1 overflow-y-auto" style={{ padding: "28px 24px 40px" }}>
           <TrialCountdownBanner />
+          <QuoteUsageBanner />
           <div className="max-w-7xl mx-auto animate-fade-in">
             <Outlet />
           </div>
@@ -979,6 +982,7 @@ export function Layout() {
       {location.pathname !== "/ai-assistant" && <AIChatBubble />}
       <NPSSurvey />
       {supportOpen && <SupportModal onClose={() => setSupportOpen(false)} />}
+      <UpgradeModal />
     </div>
     </AIToastProvider>
   );

@@ -78,7 +78,7 @@ import {
   updateRecurringSeries, cancelRecurringSeries, skipSeriesOccurrence, generateSeriesJobs,
 } from "../storage";
 import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
-import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage, getMoveInOutCleaningCalculatorPage, getCleaningQuoteGeneratorPage } from "../seo-pages";
+import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage, getMoveInOutCleaningCalculatorPage, getCleaningQuoteGeneratorPage, getUltimateCleaningPricingGuidePage } from "../seo-pages";
 import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "../calculator-engine";
 import { sendEmail, getBusinessSendParams } from "../mail";
 import { syncQuoteToJobber } from "../jobber-client";
@@ -696,6 +696,10 @@ const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>(
 
   router.get("/cleaning-quote-generator", (_req: Request, res: Response) => {
     res.send(getCleaningQuoteGeneratorPage());
+  });
+
+  router.get("/guides/cleaning-business-pricing-guide", (_req: Request, res: Response) => {
+    res.send(getUltimateCleaningPricingGuidePage());
   });
 
   router.post("/api/public/rate/:token", async (req: Request, res: Response) => {

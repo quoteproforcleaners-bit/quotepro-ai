@@ -1516,3 +1516,239 @@ function submitSignup() {
 </body>
 </html>`;
 }
+
+export function getUltimateCleaningPricingGuidePage(): string {
+  return renderSEOPage({
+    slug: "guides/cleaning-business-pricing-guide",
+    title: "Ultimate Cleaning Business Pricing & Quoting Guide 2026 | QuotePro AI",
+    metaDescription: "The complete 2026 guide to pricing cleaning services: residential rates, commercial formulas, Good/Better/Best quoting, add-on pricing, follow-up scripts, and tools to close more jobs.",
+    h1: "The Ultimate Cleaning Business Pricing & Quoting Guide 2026",
+    introParagraph: "Pricing is the single biggest lever in your cleaning business. Charge too little and you burn out; charge too much and phones go quiet. This guide covers everything — residential and commercial rate-setting, the Good/Better/Best quoting framework, add-on pricing, industry benchmarks, and the follow-up cadence that closes 40% more jobs.",
+    sections: [
+      {
+        id: "pricing-fundamentals",
+        heading: "Pricing Fundamentals: Know Your Numbers First",
+        level: "h2",
+        content: `
+          <p>Before you quote a single job, you need to understand your true cost of service. Most cleaning businesses undercharge because they only account for product cost and labor — missing overhead, insurance, marketing, and their own unpaid time.</p>
+          <h3>Calculate Your Fully-Loaded Hourly Cost</h3>
+          <ul>
+            <li><strong>Direct labor:</strong> Hourly wage + payroll taxes + benefits (multiply wages by 1.25–1.35 to get true labor cost)</li>
+            <li><strong>Supplies:</strong> $0.03–0.07 per square foot depending on service type</li>
+            <li><strong>Equipment:</strong> Amortize vacuums, steamers, and other tools over their useful life</li>
+            <li><strong>Insurance:</strong> General liability + bonding + workers' comp (typically $150–400/month for a small operation)</li>
+            <li><strong>Transportation:</strong> Fuel, vehicle wear, and time between jobs</li>
+            <li><strong>Overhead:</strong> Software, phone, website, marketing — roughly 12–18% of revenue</li>
+          </ul>
+          <p>Add all of these up, divide by your productive hours per month, and you have your true minimum hourly rate. Most solo cleaners find this is $28–38/hour — significantly higher than they expected.</p>
+          <h3>Your Minimum Profitable Ticket</h3>
+          <p>Set a floor price below which you will not go, regardless of pressure. For most residential markets in 2026, this is $110–150 for a standard clean. Anything below this and you are likely losing money once you account for drive time and setup.</p>
+        `,
+      },
+      {
+        id: "residential-pricing",
+        heading: "Residential Cleaning Rates: 2026 Market Data",
+        level: "h2",
+        content: `
+          <p>Residential cleaning rates vary significantly by market, but 2026 national data from HomeAdvisor and Angi shows the following ranges:</p>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;margin:12px 0">
+            <thead>
+              <tr style="background:#f1f5f9">
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">Service Type</th>
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">National Low</th>
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">National High</th>
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">Avg. Per Visit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Standard Clean (1,200 sq ft)</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$120</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$175</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$148</td></tr>
+              <tr style="background:#f8fafc"><td style="padding:8px 12px;border:1px solid #e2e8f0">Standard Clean (2,000 sq ft)</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$165</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$240</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$199</td></tr>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Deep Clean</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$200</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$400</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$285</td></tr>
+              <tr style="background:#f8fafc"><td style="padding:8px 12px;border:1px solid #e2e8f0">Move-In / Move-Out</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$250</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$500</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$340</td></tr>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Post-Construction</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$300</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$700</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$450</td></tr>
+            </tbody>
+          </table>
+          <h3>Frequency Discounts That Maximize Lifetime Value</h3>
+          <p>Recurring clients are the foundation of a profitable cleaning business. Use these standard frequency discounts to convert one-time clients into recurring accounts:</p>
+          <ul>
+            <li><strong>Weekly:</strong> 15–20% discount — homes stay cleaner, jobs take less time, route efficiency improves</li>
+            <li><strong>Bi-weekly:</strong> 10–12% discount — the most popular frequency for residential clients</li>
+            <li><strong>Monthly:</strong> 5% discount — minimal; homes require a near-deep clean each visit</li>
+            <li><strong>One-time:</strong> No discount — price at full rate or slight premium</li>
+          </ul>
+          <p>Frame the discount as a savings amount, not a percentage: "Save $24 per visit with weekly service" lands better than "20% off."</p>
+        `,
+      },
+      {
+        id: "good-better-best",
+        heading: "The Good / Better / Best Quoting Framework",
+        level: "h2",
+        content: `
+          <p>The single biggest upgrade most cleaning businesses can make to their quoting process is switching from a single flat price to a tiered Good/Better/Best offer. This approach consistently increases average ticket by 22–35%.</p>
+          <h3>Why Tiered Quoting Works</h3>
+          <p>When you give a prospect one price, they make a yes/no decision. When you give three options, they choose between your packages — a fundamentally different psychological frame. Most clients will choose the middle option, which should be your target service level.</p>
+          <h3>How to Structure Your Three Tiers</h3>
+          <ul>
+            <li><strong>Good (Standard):</strong> Core service only — surfaces, floors, bathrooms, kitchen. Your standard recurring rate.</li>
+            <li><strong>Better (Enhanced):</strong> Everything in Good plus 3–4 add-ons: inside microwave, inside oven, baseboards, ceiling fans. Price 25–35% above Good.</li>
+            <li><strong>Best (Premium):</strong> Everything in Better plus premium add-ons: inside fridge, window sills, cabinet fronts, organizing, laundry fold. Price 50–70% above Good.</li>
+          </ul>
+          <h3>Real-World Example</h3>
+          <p>For a 2,000 sq ft, 3-bed/2-bath home, a strong three-tier offer looks like:</p>
+          <ul>
+            <li><strong>Essential ($165):</strong> Standard clean — all rooms, kitchen, bathrooms, floors vacuumed and mopped</li>
+            <li><strong>Signature ($215):</strong> Everything + inside microwave + inside oven + baseboards + ceiling fans</li>
+            <li><strong>Premier ($265):</strong> Everything + inside fridge + window sills + cabinet fronts + 1 load of laundry</li>
+          </ul>
+          <p>When presented this way, roughly 55% of prospects choose Signature, 25% choose Premier, and only 20% choose Essential.</p>
+        `,
+      },
+      {
+        id: "add-on-pricing",
+        heading: "Add-On Pricing: Where the Margin Lives",
+        level: "h2",
+        content: `
+          <p>Add-ons are the highest-margin services in your business. They take marginal extra time but command disproportionate revenue.</p>
+          <h3>Recommended Add-On Prices (2026 National Averages)</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;margin:12px 0">
+            <thead>
+              <tr style="background:#f1f5f9">
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">Add-On</th>
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">Suggested Price</th>
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">Typical Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Inside Oven</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$30–50</td><td style="padding:8px 12px;border:1px solid #e2e8f0">20–30 min</td></tr>
+              <tr style="background:#f8fafc"><td style="padding:8px 12px;border:1px solid #e2e8f0">Inside Refrigerator</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$35–55</td><td style="padding:8px 12px;border:1px solid #e2e8f0">20–35 min</td></tr>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Inside Microwave</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$15–25</td><td style="padding:8px 12px;border:1px solid #e2e8f0">10 min</td></tr>
+              <tr style="background:#f8fafc"><td style="padding:8px 12px;border:1px solid #e2e8f0">Baseboards</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$25–40</td><td style="padding:8px 12px;border:1px solid #e2e8f0">20–40 min</td></tr>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Window Sills / Tracks</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$20–35</td><td style="padding:8px 12px;border:1px solid #e2e8f0">15–25 min</td></tr>
+              <tr style="background:#f8fafc"><td style="padding:8px 12px;border:1px solid #e2e8f0">Ceiling Fans</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$10–20/fan</td><td style="padding:8px 12px;border:1px solid #e2e8f0">5–8 min/fan</td></tr>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Laundry (wash + fold)</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$30–50/load</td><td style="padding:8px 12px;border:1px solid #e2e8f0">Passive time</td></tr>
+              <tr style="background:#f8fafc"><td style="padding:8px 12px;border:1px solid #e2e8f0">Pet Hair Treatment</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$25–40</td><td style="padding:8px 12px;border:1px solid #e2e8f0">15–30 min</td></tr>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Sanitizing / Disinfecting</td><td style="padding:8px 12px;border:1px solid #e2e8f0">$30–60</td><td style="padding:8px 12px;border:1px solid #e2e8f0">20–40 min</td></tr>
+            </tbody>
+          </table>
+          <p>Pre-package 2–3 add-ons into your Better and Best tiers. Attachment rates for pre-packaged add-ons run 3–4x higher than verbally offered ones.</p>
+        `,
+      },
+      {
+        id: "commercial-pricing",
+        heading: "Commercial Cleaning: A Different Pricing Model",
+        level: "h2",
+        content: `
+          <p>Commercial cleaning requires a fundamentally different approach than residential. You are quoting square footage, frequency, and scope — not rooms. Your labor planning must be precise because commercial contracts have thin margins and high volume.</p>
+          <h3>Commercial Pricing Methods</h3>
+          <ul>
+            <li><strong>Square footage rate:</strong> Most common. Typical ranges: $0.07–0.15/sq ft for nightly standard office cleaning; $0.12–0.25/sq ft for medical or specialty facilities.</li>
+            <li><strong>Per-room or per-station:</strong> Used for restrooms and break rooms. Typical: $18–35 per restroom per service.</li>
+            <li><strong>Hourly:</strong> Used for janitorial contracts. Typical: $22–38/hour per worker depending on market.</li>
+          </ul>
+          <h3>Building Type Multipliers (ISSA / BSCAI Benchmarks)</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;margin:12px 0">
+            <thead>
+              <tr style="background:#f1f5f9">
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">Building Type</th>
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">Cleanable Area Factor</th>
+                <th style="padding:8px 12px;text-align:left;border:1px solid #e2e8f0">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Standard Office</td><td style="padding:8px 12px;border:1px solid #e2e8f0">85%</td><td style="padding:8px 12px;border:1px solid #e2e8f0">Corridors, storage areas reduce cleanable %</td></tr>
+              <tr style="background:#f8fafc"><td style="padding:8px 12px;border:1px solid #e2e8f0">Medical / Healthcare</td><td style="padding:8px 12px;border:1px solid #e2e8f0">90%</td><td style="padding:8px 12px;border:1px solid #e2e8f0">High-touch + infection control adds time</td></tr>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Retail</td><td style="padding:8px 12px;border:1px solid #e2e8f0">80%</td><td style="padding:8px 12px;border:1px solid #e2e8f0">Display fixtures increase complexity</td></tr>
+              <tr style="background:#f8fafc"><td style="padding:8px 12px;border:1px solid #e2e8f0">Warehouse / Industrial</td><td style="padding:8px 12px;border:1px solid #e2e8f0">65%</td><td style="padding:8px 12px;border:1px solid #e2e8f0">Large open areas offset by equipment</td></tr>
+              <tr><td style="padding:8px 12px;border:1px solid #e2e8f0">Educational</td><td style="padding:8px 12px;border:1px solid #e2e8f0">88%</td><td style="padding:8px 12px;border:1px solid #e2e8f0">Seasonal fluctuation; summer deep cleans</td></tr>
+            </tbody>
+          </table>
+        `,
+      },
+      {
+        id: "follow-up-system",
+        heading: "The Quote Follow-Up System That Closes 40% More Jobs",
+        level: "h2",
+        content: `
+          <p>Most cleaning businesses send a quote and wait. Research from cleaning industry CRMs shows that 60–70% of booked jobs required at least one follow-up.</p>
+          <h3>The 3-Touch Follow-Up Sequence</h3>
+          <ul>
+            <li><strong>Day 1 (quote sent):</strong> Text message — "Hi [Name], I just sent your cleaning quote to [email]. Let me know if you have any questions — I'm happy to walk you through the options."</li>
+            <li><strong>Day 3:</strong> Email — Reference a specific detail from the intake: "I noticed you have pets — our Enhanced Clean includes a pet hair treatment that makes a huge difference." Personalization triples response rates.</li>
+            <li><strong>Day 7:</strong> Final text — "Hi [Name], just wanted to check in on your quote. No pressure at all — if the timing isn't right, I'd love to schedule something for next month." This low-pressure close converts 15–20% of previously unresponsive leads.</li>
+          </ul>
+          <h3>Expiration Dates Drive Action</h3>
+          <p>Quotes with a 14-day expiration date close 28% faster than open-ended quotes. Add "This quote is valid through [date]" to every proposal.</p>
+        `,
+      },
+      {
+        id: "industry-benchmarks",
+        heading: "Industry Benchmarks Every Cleaning Business Should Know",
+        level: "h2",
+        content: `
+          <p>These benchmarks, drawn from ISSA, BSCAI, and HomeAdvisor data, give you a calibration point for your own business performance.</p>
+          <h3>Residential Benchmarks</h3>
+          <ul>
+            <li><strong>Average revenue per cleaner per day:</strong> $350–550 (2 crew) or $250–350 (solo)</li>
+            <li><strong>Client retention rate (annual):</strong> Top-quartile businesses retain 85%+ of recurring clients</li>
+            <li><strong>Quote close rate:</strong> Industry average 35–45%; top performers close 55–65% with tiered quoting</li>
+            <li><strong>Average lifetime value of a recurring client:</strong> $2,200–4,800 depending on frequency and tenure</li>
+          </ul>
+          <h3>Commercial Benchmarks (ISSA Standards)</h3>
+          <ul>
+            <li><strong>Cleanable sq ft per worker per hour:</strong> 2,500–3,500 (general office); 1,500–2,000 (medical)</li>
+            <li><strong>Contract renewal rate:</strong> 80%+ for businesses delivering consistent QC audits</li>
+            <li><strong>Gross margin target:</strong> 45–55% for well-run commercial operations</li>
+          </ul>
+          <h3>Pricing Health Check</h3>
+          <p>Calculate: (Revenue − Direct Labor − Supplies) / Revenue. Target 45–55%. If you are below 35%, a 10% price increase across all accounts is almost always the right move — you will lose fewer clients than you expect and recover significant margin.</p>
+        `,
+      },
+    ],
+    calculatorHTML: `
+      <div style="background:linear-gradient(135deg,#6366f1,#7c3aed);border-radius:16px;padding:32px;text-align:center;color:white;margin:32px 0">
+        <div style="font-size:28px;font-weight:800;margin-bottom:8px">Build Your First Quote in 3 Minutes</div>
+        <p style="opacity:0.9;margin-bottom:24px;font-size:16px">Good/Better/Best quoting, AI pricing suggestions, automatic follow-ups — free to try.</p>
+        <a href="/register" style="display:inline-flex;align-items:center;gap:8px;background:white;color:#6366f1;font-weight:700;font-size:15px;padding:14px 28px;border-radius:10px;text-decoration:none;box-shadow:0 4px 16px rgba(0,0,0,0.2)">
+          Try QuotePro AI Free
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <p style="opacity:0.7;font-size:13px;margin-top:16px">No credit card required. 14-day free trial.</p>
+      </div>
+    `,
+    faq: [
+      {
+        question: "What is the average price for house cleaning in 2026?",
+        answer: "The national average for a standard house cleaning in 2026 is $148 for a home under 1,500 sq ft and $199 for a 2,000 sq ft home. Deep cleans average $285 and move-in/move-out cleans average $340 nationally. Prices vary significantly by market — major metro areas can run 20–40% higher.",
+      },
+      {
+        question: "Should I charge by the hour or by the job?",
+        answer: "Charge by the job, not by the hour. Hourly pricing creates a perverse incentive where being faster costs you money. Per-job pricing rewards your efficiency and makes budgeting easier for clients. Quote by the job, track your time internally to verify profitability.",
+      },
+      {
+        question: "How do I price a deep cleaning?",
+        answer: "Price deep cleans at 1.4–1.6x your standard rate. A home that you clean regularly for $175 should be quoted at $245–280 for a deep clean. For new clients, always start with a deep clean — it sets the baseline and gives you margin to work with.",
+      },
+      {
+        question: "What is Good/Better/Best quoting?",
+        answer: "Good/Better/Best (also called tiered quoting) means presenting three service options at different price points in every quote. The Good tier covers core services, Better adds popular add-ons, and Best includes premium extras. This approach consistently increases average ticket by 22–35% compared to single-price quoting.",
+      },
+      {
+        question: "How should I handle clients who ask for a discount?",
+        answer: "Never discount without getting something in return. Offer a discount only if the client upgrades frequency, prepays for 3+ months, or refers a friend. Unconditional discounts train clients to expect them and devalue your work.",
+      },
+      {
+        question: "What is a good quote close rate for a cleaning business?",
+        answer: "The industry average close rate is 35–45%. Top-performing cleaning businesses using tiered quoting and systematic follow-ups close 55–65% of quotes. If you are closing below 30%, the issue is usually pricing perception or a weak follow-up process, not price level.",
+      },
+      {
+        question: "How do I price commercial cleaning?",
+        answer: "Commercial cleaning is typically priced by square footage ($0.07–0.15/sq ft for offices), by restroom ($18–35 per service), or hourly ($22–38/hour). Start by calculating your labor time using ISSA production rate benchmarks (2,500–3,500 cleanable sq ft per worker per hour for standard offices), then build in your overhead and target margin.",
+      },
+      {
+        question: "When should I raise my prices?",
+        answer: "Raise prices annually at a minimum — cleaning costs inflate every year. If you are booked more than 85% of your available slots, raise prices immediately. A 10–15% increase typically causes 5–8% client attrition, which usually results in higher net revenue per hour worked.",
+      },
+    ],
+    toolkitCTA: "Start sending professional Good/Better/Best quotes today — QuotePro AI handles the pricing math, the follow-ups, and the CRM so you can focus on cleaning.",
+  });
+}

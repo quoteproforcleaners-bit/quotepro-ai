@@ -128,7 +128,7 @@ export default function QuoteCreatePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { quotesPerMonth, startCheckout } = useSubscription();
+  const { quotesPerMonth, startCheckout, showPaywall } = useSubscription();
   const [step, setStep] = useState(0);
   const [dismissedNudge, setDismissedNudge] = useState(false);
   const [intakeId, setIntakeId] = useState<string | null>(null);
@@ -255,6 +255,10 @@ export default function QuoteCreatePage() {
       navigate(`/quotes/${data.id}`);
     },
     onError: (err: any) => {
+      if (err?.data?.quoteLimitReached) {
+        showPaywall();
+        return;
+      }
       setSubmitError(err?.message || "Failed to create quote. Please try again.");
     },
   });
