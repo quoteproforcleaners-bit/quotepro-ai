@@ -235,6 +235,11 @@ export default function QuoteCreatePage() {
     queryKey: ["/api/customers"],
   });
   const { data: pricing } = useQuery<any>({ queryKey: ["/api/pricing"] });
+  const { data: quotaData } = useQuery<{ count: number; limit: number | null; isPro: boolean; isInFreeTrial: boolean }>({
+    queryKey: ["/api/quotes/count"],
+    staleTime: 10_000,
+  });
+  const isAtQuotaLimit = !!quotaData && quotaData.limit !== null && !quotaData.isPro && quotaData.count >= quotaData.limit;
 
   const createCustomerMutation = useMutation({
     mutationFn: (data: any) => apiPost("/api/customers", data),
@@ -1467,6 +1472,14 @@ export default function QuoteCreatePage() {
             disabled={!canAdvance()}
           >
             Next
+          </Button>
+        ) : isAtQuotaLimit ? (
+          <Button
+            icon={Zap}
+            onClick={() => showPaywall()}
+            className="bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
+          >
+            Upgrade to Unlock
           </Button>
         ) : (
           <Button

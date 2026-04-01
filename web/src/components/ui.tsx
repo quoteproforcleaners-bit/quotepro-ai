@@ -231,7 +231,7 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
-      className={`inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${glow ? "animate-pulse-glow" : ""} ${className}`}
+      className={`inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 active:scale-[0.96] active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${variants[variant]} ${sizes[size]} ${glow ? "animate-pulse-glow" : ""} ${className}`}
     >
       {loading ? (
         <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
