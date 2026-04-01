@@ -104,6 +104,51 @@ const router = Router();
     }
   });
 
+  // Returns count of quotes that became accepted or declined after a given timestamp
+  // MUST be before /:id to avoid "response-count" being matched as an ID
+  router.get("/api/quotes/response-count", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const sinceRaw = req.query.since as string | undefined;
+      const since = sinceRaw ? new Date(sinceRaw) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const result = await pool.query(
+        `SELECT COUNT(*) AS c FROM quotes
+         WHERE business_id = $1
+           AND deleted_at IS NULL
+           AND (
+             (status = 'accepted' AND accepted_at > $2)
+             OR (status = 'declined' AND declined_at > $2)
+           )`,
+        [business.id, since]
+      );
+      return res.json({ count: parseInt(result.rows[0]?.c ?? "0", 10) });
+    } catch {
+      return res.status(500).json({ message: "Failed to get response count" });
+    }
+  });
+
+  // MUST be before /:id to avoid "count" being matched as an ID
+  router.get("/api/quotes/count", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const allQuotes = await getQuotesByBusiness(business.id);
+      const user = await getUserById(req.session.userId!);
+      const tier = user?.subscriptionTier || "free";
+      const isPaid = isGrowthOrAbove(tier);
+      const isStarter = tier === "starter";
+      const FREE_TRIAL_DAYS = 14;
+      const trialRef = (user as any)?.trialStartedAt ?? user?.createdAt;
+      const userAgeDays = trialRef ? Math.floor((Date.now() - new Date(trialRef).getTime()) / 86_400_000) : 999;
+      const isInFreeTrial = tier === "free" && userAgeDays < FREE_TRIAL_DAYS;
+      const limit = isStarter ? 20 : (isPaid ? Infinity : (isInFreeTrial ? 20 : 3));
+      return res.json({ count: allQuotes.length, limit: limit === Infinity ? null : limit, isPro: isPaid, isInFreeTrial });
+    } catch (error: any) {
+      return res.status(500).json({ message: "Failed to get quote count" });
+    }
+  });
+
   router.get("/api/quotes/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const q = await getQuoteById(req.params.id);
@@ -136,45 +181,6 @@ const router = Router();
       });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get quote" });
-    }
-  });
-
-  // Returns count of quotes that became accepted or declined after a given timestamp
-  router.get("/api/quotes/response-count", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const business = await getBusinessByOwner(req.session.userId!);
-      if (!business) return res.status(404).json({ message: "Business not found" });
-      const sinceRaw = req.query.since as string | undefined;
-      const since = sinceRaw ? new Date(sinceRaw) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const result = await pool.query(
-        `SELECT COUNT(*) AS c FROM quotes
-         WHERE business_id = $1
-           AND deleted_at IS NULL
-           AND (
-             (status = 'accepted' AND accepted_at > $2)
-             OR (status = 'declined' AND declined_at > $2)
-           )`,
-        [business.id, since]
-      );
-      return res.json({ count: parseInt(result.rows[0]?.c ?? "0", 10) });
-    } catch {
-      return res.status(500).json({ message: "Failed to get response count" });
-    }
-  });
-
-  router.get("/api/quotes/count", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const business = await getBusinessByOwner(req.session.userId!);
-      if (!business) return res.status(404).json({ message: "Business not found" });
-      const allQuotes = await getQuotesByBusiness(business.id);
-      const user = await getUserById(req.session.userId!);
-      const tier = user?.subscriptionTier || "free";
-      const isPaid = isGrowthOrAbove(tier);
-      const isStarter = tier === "starter";
-      const limit = isStarter ? 20 : (isPaid ? Infinity : 3);
-      return res.json({ count: allQuotes.length, limit: limit === Infinity ? null : limit, isPro: isPaid });
-    } catch (error: any) {
-      return res.status(500).json({ message: "Failed to get quote count" });
     }
   });
 
