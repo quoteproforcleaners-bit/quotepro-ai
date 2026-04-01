@@ -309,6 +309,8 @@ export const jobs = pgTable("jobs", {
   detailedStatus: text("detailed_status").notNull().default("scheduled"),
   teamMembers: jsonb("team_members").$type<string[]>().default([]),
   cleanerNotes: text("cleaner_notes").notNull().default(""),
+  checkinToken: varchar("checkin_token").unique().default(sql`gen_random_uuid()`),
+  invoiced: boolean("invoiced").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

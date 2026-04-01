@@ -959,6 +959,49 @@ function ProgressTab({
       </div>
 
       <div className="border-t border-slate-100 pt-5">
+        <p className="text-sm font-medium text-slate-700 mb-1">
+          Staff Check-In Link
+        </p>
+        <p className="text-xs text-slate-500 mb-3">
+          Send this link to your cleaner so they can start the job, add photos, and trigger the invoice when done.
+        </p>
+        {job.checkinToken ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-3">
+              <Link2 className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="text-xs text-slate-600 truncate flex-1">
+                {window.location.origin}/checkin/{job.checkinToken}
+              </span>
+              <button
+                onClick={() =>
+                  copyToClipboard(
+                    `${window.location.origin}/checkin/${job.checkinToken}`
+                  )
+                }
+                className="p-1.5 rounded-md bg-white shadow-sm hover:bg-slate-100 transition-colors shrink-0"
+                title="Copy link"
+              >
+                <Copy className="w-3.5 h-3.5 text-slate-500" />
+              </button>
+            </div>
+            {job.customer?.phone ? (
+              <a
+                href={`sms:${job.customer.phone}?body=${encodeURIComponent(`Your cleaner check-in link: ${window.location.origin}/checkin/${job.checkinToken}`)}`}
+                className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-xs font-semibold hover:bg-green-100 transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                Send via SMS
+              </a>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 italic">No check-in token — re-save the job to generate one.</p>
+        )}
+      </div>
+
+      <div className="border-t border-slate-100 pt-5">
         <p className="text-sm font-medium text-slate-700 mb-3">
           Live Update Page
         </p>

@@ -1403,4 +1403,215 @@ const router = Router();
     }
   });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Public check-in routes — authenticated via checkin_token, no session needed
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.get("/api/jobs/checkin/:token", async (req: Request, res: Response) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT j.id, j.status, j.address, j.start_datetime, j.end_datetime,
+              j.internal_notes, j.cleaner_notes, j.total, j.started_at,
+              j.completed_at, j.invoiced, j.business_id,
+              c.first_name, c.last_name, c.email AS customer_email, c.phone AS customer_phone
+       FROM jobs j
+       LEFT JOIN customers c ON j.customer_id = c.id
+       WHERE j.checkin_token = $1`,
+      [req.params.token]
+    );
+    if (!rows.length) return res.status(404).json({ message: "Job not found" });
+    const r = rows[0];
+    return res.json({
+      id: r.id,
+      status: r.status,
+      address: r.address,
+      startDatetime: r.start_datetime,
+      endDatetime: r.end_datetime,
+      internalNotes: r.internal_notes,
+      cleanerNotes: r.cleaner_notes,
+      total: r.total,
+      startedAt: r.started_at,
+      completedAt: r.completed_at,
+      invoiced: r.invoiced,
+      customerName: r.first_name ? `${r.first_name} ${r.last_name}`.trim() : null,
+      customerEmail: r.customer_email,
+      customerPhone: r.customer_phone,
+    });
+  } catch (err: any) {
+    console.error("[checkin] GET error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/api/jobs/checkin/:token/start", async (req: Request, res: Response) => {
+  try {
+    const { rows } = await pool.query(
+      `UPDATE jobs SET status = 'in_progress', started_at = COALESCE(started_at, NOW()),
+              updated_at = NOW()
+       WHERE checkin_token = $1 AND status NOT IN ('completed','canceled')
+       RETURNING id, status, started_at`,
+      [req.params.token]
+    );
+    if (!rows.length) {
+      const check = await pool.query(
+        `SELECT id, status, started_at FROM jobs WHERE checkin_token = $1`,
+        [req.params.token]
+      );
+      if (!check.rows.length) return res.status(404).json({ message: "Job not found" });
+      const r = check.rows[0];
+      return res.json({ id: r.id, status: r.status, startedAt: r.started_at });
+    }
+    return res.json({ id: rows[0].id, status: rows[0].status, startedAt: rows[0].started_at });
+  } catch (err: any) {
+    console.error("[checkin] start error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/api/jobs/checkin/:token/complete", async (req: Request, res: Response) => {
+  try {
+    const { notes, photoUrls } = req.body as { notes?: string; photoUrls?: string[] };
+
+    const { rows } = await pool.query(
+      `SELECT j.id, j.status, j.address, j.total, j.business_id,
+              j.customer_id, j.invoiced,
+              c.first_name, c.last_name, c.email AS customer_email,
+              b.name AS business_name, b.email AS business_email
+       FROM jobs j
+       LEFT JOIN customers c ON j.customer_id = c.id
+       LEFT JOIN businesses b ON j.business_id = b.id
+       WHERE j.checkin_token = $1`,
+      [req.params.token]
+    );
+    if (!rows.length) return res.status(404).json({ message: "Job not found" });
+    const job = rows[0];
+
+    if (job.status === "completed") {
+      return res.json({ message: "Already complete", invoiceSent: job.invoiced });
+    }
+
+    await pool.query(
+      `UPDATE jobs
+       SET status = 'completed', completed_at = NOW(), updated_at = NOW(),
+           invoiced = TRUE,
+           cleaner_notes = CASE WHEN $2::text IS NOT NULL THEN $2::text ELSE cleaner_notes END
+       WHERE checkin_token = $1`,
+      [req.params.token, notes || null]
+    );
+
+    if (Array.isArray(photoUrls) && photoUrls.length > 0) {
+      for (const url of photoUrls) {
+        try {
+          await pool.query(
+            `INSERT INTO photos (id, job_id, photo_url, photo_type, caption, created_at)
+             VALUES (gen_random_uuid(), $1, $2, 'after', 'Check-in photo', NOW())
+             ON CONFLICT DO NOTHING`,
+            [job.id, url]
+          );
+        } catch { /* ignore individual photo failures */ }
+      }
+    }
+
+    // ── Send invoice email ───────────────────────────────────────────────────
+    const customerEmail = job.customer_email;
+    const customerName  = job.first_name ? `${job.first_name} ${job.last_name}`.trim() : "Customer";
+    const total         = Number(job.total || 0);
+    const businessName  = job.business_name || "Your Cleaning Service";
+    let invoiceSent = false;
+
+    if (customerEmail) {
+      try {
+        const invoiceHtml = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:40px 20px}
+  .card{max-width:500px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1)}
+  .hdr{background:linear-gradient(135deg,#1e40af,#3b82f6);padding:32px 36px;color:#fff}
+  .hdr h1{margin:0 0 4px;font-size:22px;font-weight:700}
+  .hdr p{margin:0;opacity:.85;font-size:14px}
+  .body{padding:32px 36px}
+  .row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:15px}
+  .row:last-child{border-bottom:none}
+  .lbl{color:#64748b}
+  .val{font-weight:600;color:#1e293b}
+  .total-box{margin-top:20px;background:#eff6ff;border-radius:12px;padding:18px 24px;display:flex;justify-content:space-between;align-items:center}
+  .amount{font-size:28px;font-weight:800;color:#1e40af}
+  .foot{padding:20px 36px 28px;text-align:center;font-size:12px;color:#94a3b8}
+</style>
+</head><body>
+<div class="card">
+  <div class="hdr">
+    <h1>Invoice from ${businessName.replace(/</g,"&lt;")}</h1>
+    <p>Your cleaning service is complete — thank you!</p>
+  </div>
+  <div class="body">
+    <p style="font-size:15px;color:#374151;margin:0 0 20px">Hi ${customerName.replace(/</g,"&lt;")},<br>Here is your invoice summary for today's cleaning service.</p>
+    <div class="row"><span class="lbl">Service</span><span class="val">Cleaning Service</span></div>
+    <div class="row"><span class="lbl">Date</span><span class="val">${new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</span></div>
+    <div class="row"><span class="lbl">Address</span><span class="val">${(job.address||"—").replace(/</g,"&lt;")}</span></div>
+    ${notes ? `<div class="row"><span class="lbl">Notes</span><span class="val">${notes.replace(/</g,"&lt;")}</span></div>` : ""}
+    <div class="total-box">
+      <span style="font-size:16px;font-weight:700;color:#374151">Total Due</span>
+      <span class="amount">$${total.toFixed(2)}</span>
+    </div>
+    <p style="margin-top:16px;font-size:13px;color:#64748b;text-align:center">Please arrange payment with ${businessName.replace(/</g,"&lt;")}.</p>
+  </div>
+  <div class="foot">${businessName.replace(/</g,"&lt;")} &nbsp;·&nbsp; Invoice powered by QuotePro AI</div>
+</div>
+</body></html>`;
+
+        await sendEmail({
+          to: customerEmail,
+          subject: `Invoice from ${businessName} — $${total.toFixed(2)}`,
+          html: invoiceHtml,
+        });
+        invoiceSent = true;
+      } catch (emailErr) {
+        console.error("[checkin] invoice email error:", emailErr);
+      }
+    }
+
+    return res.json({ message: "Job marked complete", invoiceSent });
+  } catch (err: any) {
+    console.error("[checkin] complete error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/api/jobs/checkin/:token/photos", async (req: Request, res: Response) => {
+  try {
+    const { photoData, caption } = req.body as { photoData?: string; caption?: string };
+    if (!photoData) return res.status(400).json({ message: "photoData required" });
+
+    const { rows } = await pool.query(
+      `SELECT id FROM jobs WHERE checkin_token = $1`,
+      [req.params.token]
+    );
+    if (!rows.length) return res.status(404).json({ message: "Job not found" });
+    const jobId = rows[0].id;
+
+    const fs   = await import("fs");
+    const path = await import("path");
+    const uploadsDir = path.join(process.cwd(), "uploads", "job-photos");
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+    const fileName  = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+    const filePath  = path.join(uploadsDir, fileName);
+    const base64Data = photoData.replace(/^data:image\/\w+;base64,/, "");
+    fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+
+    const photoUrl = `/uploads/job-photos/${fileName}`;
+    await pool.query(
+      `INSERT INTO photos (id, job_id, photo_url, photo_type, caption, created_at)
+       VALUES (gen_random_uuid(), $1, $2, 'after', $3, NOW())`,
+      [jobId, photoUrl, caption || "Check-in photo"]
+    );
+
+    return res.json({ url: photoUrl });
+  } catch (err: any) {
+    console.error("[checkin] photo upload error:", err);
+    return res.status(500).json({ message: "Failed to upload photo" });
+  }
+});
+
 export default router;

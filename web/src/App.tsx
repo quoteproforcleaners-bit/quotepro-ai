@@ -66,6 +66,7 @@ import ScheduleAckPage from "./pages/ScheduleAckPage";
 import TipPage from "./pages/TipPage";
 import OnboardingWizardPage from "./pages/OnboardingWizardPage";
 import QuoteDoctorPage from "./pages/QuoteDoctorPage";
+import JobCheckinPage from "./pages/JobCheckinPage";
 import CustomerPortalPage from "./pages/CustomerPortalPage";
 import PreferencesPage from "./pages/portal/PreferencesPage";
 import ReschedulePage from "./pages/portal/ReschedulePage";
@@ -117,6 +118,7 @@ export default function App() {
             )
           }
         />
+        <Route path="/checkin/:token" element={<JobCheckinPage />} />
         <Route path="/quote-doctor" element={<QuoteDoctorPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/upgrade" element={<Navigate to="/pricing" replace />} />
