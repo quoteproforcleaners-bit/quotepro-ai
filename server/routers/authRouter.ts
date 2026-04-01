@@ -795,4 +795,19 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
+  // Hidden admin utility: expire a user's trial for testing
+  // Usage: POST /api/admin/expire-trial { email, key }
+  router.post("/api/admin/expire-trial", async (req: Request, res: Response) => {
+    const { email, key } = req.body;
+    const ADMIN_KEY = process.env.ADMIN_TEST_KEY || "qp-admin-test-2024";
+    if (key !== ADMIN_KEY) return res.status(403).json({ message: "Forbidden" });
+    if (!email) return res.status(400).json({ message: "email required" });
+    const result = await pool.query(
+      `UPDATE users SET trial_started_at = NOW() - INTERVAL '30 days', created_at = NOW() - INTERVAL '30 days' WHERE email = $1 RETURNING id, email, trial_started_at`,
+      [email.toLowerCase().trim()]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ message: "User not found" });
+    return res.json({ ok: true, user: result.rows[0] });
+  });
+
 export default router;
