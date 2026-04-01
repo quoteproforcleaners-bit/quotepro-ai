@@ -96,7 +96,7 @@ export default function QuoteDetailPage() {
   const [reviewGenerating, setReviewGenerating] = useState(false);
   const [reviewSending, setReviewSending] = useState(false);
   const [expandedRec, setExpandedRec] = useState<number | null>(null);
-  const [msgChannel, setMsgChannel] = useState<MessageChannel>("sms");
+  const [msgChannel, setMsgChannel] = useState<MessageChannel>("email");
   const [msgPurpose, setMsgPurpose] = useState<MessagePurpose>("follow_up");
   const [followUpEditOpen, setFollowUpEditOpen] = useState(false);
   const [followUpEditText, setFollowUpEditText] = useState("");
@@ -941,29 +941,6 @@ export default function QuoteDetailPage() {
           <Card>
             <CardHeader title="AI Communications" icon={Sparkles} />
             <div className="space-y-4">
-              <div className="flex flex-wrap gap-2 items-center">
-                <div className="inline-flex items-center bg-slate-100 rounded-lg p-0.5">
-                  <button
-                    onClick={() => setMsgChannel("sms")}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      msgChannel === "sms" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                    }`}
-                  >
-                    <Phone className="w-3 h-3" />
-                    SMS
-                  </button>
-                  <button
-                    onClick={() => setMsgChannel("email")}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      msgChannel === "email" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
-                    }`}
-                  >
-                    <Mail className="w-3 h-3" />
-                    Email
-                  </button>
-                </div>
-              </div>
-
               <div className="flex flex-wrap gap-1.5">
                 {messagePurposes.map((mp) => (
                   <button

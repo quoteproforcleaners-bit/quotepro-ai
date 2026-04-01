@@ -349,12 +349,7 @@ export default function DispatchCard({ data, onToast }: Props) {
         ) : null}
 
         {/* Send row */}
-        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
-          <ActionBtn
-            icon={Phone}
-            label="Text Details"
-            onClick={() => openSendModal("sms")}
-          />
+        <div className="border-t border-slate-100 pt-3">
           <ActionBtn
             icon={Mail}
             label="Email Details"
