@@ -206,38 +206,6 @@ export default function SettingsScreen() {
 
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
-  const { data: jobberStatus, refetch: refetchJobberStatus } = useQuery<{ connected: boolean; status?: string }>({
-    queryKey: ["/api/integrations/jobber/status"],
-  });
-
-  const handleConnectJobber = async () => {
-    try {
-      const res = await apiRequest("GET", "/api/integrations/jobber/connect");
-      const data = await res.json();
-      if (!data.url) throw new Error("No OAuth URL returned");
-      await WebBrowser.openAuthSessionAsync(data.url, undefined, { showInRecents: true });
-      refetchJobberStatus();
-    } catch (e: any) {
-      Alert.alert("Error", e.message || "Failed to open Jobber connection");
-    }
-  };
-
-  const handleDisconnectJobber = async () => {
-    Alert.alert("Disconnect Jobber", "Are you sure you want to disconnect Jobber?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Disconnect", style: "destructive", onPress: async () => {
-          try {
-            await apiRequest("POST", "/api/integrations/jobber/disconnect", {});
-            refetchJobberStatus();
-          } catch (e: any) {
-            Alert.alert("Error", e.message || "Failed to disconnect Jobber");
-          }
-        }
-      }
-    ]);
-  };
-
   const [showVenmoModal, setShowVenmoModal] = useState(false);
   const [showCashappModal, setShowCashappModal] = useState(false);
   const [venmoInput, setVenmoInput] = useState(profile.venmoHandle || "");
@@ -877,50 +845,6 @@ export default function SettingsScreen() {
           </ThemedText>
         </View>
       ) : null}
-
-      {jobberStatus?.connected ? (
-        <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-          <View style={styles.settingsLinkContent}>
-            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.success}15` }]}>
-              <Feather name="check-circle" size={20} color={theme.success} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
-                <View style={{ backgroundColor: "#FEE2E2", borderColor: "#FECACA", borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                  <ThemedText style={{ fontSize: 9, fontWeight: "800", color: "#DC2626", letterSpacing: 0.5 }}>BETA</ThemedText>
-                </View>
-              </View>
-              <ThemedText type="small" style={{ color: theme.success }}>{t.common.connected}</ThemedText>
-            </View>
-            <Pressable onPress={handleDisconnectJobber} testID="button-disconnect-jobber">
-              <ThemedText type="small" style={{ color: theme.error }}>{t.settings.disconnect}</ThemedText>
-            </Pressable>
-          </View>
-        </View>
-      ) : (
-        <Pressable
-          onPress={handleConnectJobber}
-          style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
-          testID="button-connect-jobber"
-        >
-          <View style={styles.settingsLinkContent}>
-            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
-              <Feather name="upload-cloud" size={20} color={theme.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <ThemedText type="body" style={{ fontWeight: "600" }}>Jobber</ThemedText>
-                <View style={{ backgroundColor: "#FEE2E2", borderColor: "#FECACA", borderWidth: 1, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                  <ThemedText style={{ fontSize: 9, fontWeight: "800", color: "#DC2626", letterSpacing: 0.5 }}>BETA</ThemedText>
-                </View>
-              </View>
-              <ThemedText type="small" style={{ color: theme.textSecondary }}>Sync quotes as scheduled jobs</ThemedText>
-            </View>
-            <Feather name="chevron-right" size={20} color={theme.textSecondary} />
-          </View>
-        </Pressable>
-      )}
 
       {stripeStatus?.connected ? (
         <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>

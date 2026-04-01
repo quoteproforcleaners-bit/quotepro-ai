@@ -53,7 +53,6 @@ import WeeklyRecapPage from "./pages/WeeklyRecapPage";
 import TasksQueuePage from "./pages/TasksQueuePage";
 import ReviewsReferralsPage from "./pages/ReviewsReferralsPage";
 import QBOSettingsPage from "./pages/QBOSettingsPage";
-import JobberPage from "./pages/JobberPage";
 import QuotePreferencesPage from "./pages/QuotePreferencesPage";
 import ProSetupChecklistPage from "./pages/ProSetupChecklistPage";
 import AccountSettingsPage from "./pages/AccountSettingsPage";
@@ -186,7 +185,6 @@ export default function App() {
           <Route path="/tasks-queue" element={<ProGate feature="Growth Tasks"><TasksQueuePage /></ProGate>} />
           <Route path="/reviews-referrals" element={<ProGate feature="Reviews &amp; Referrals"><ReviewsReferralsPage /></ProGate>} />
           <Route path="/qbo-settings" element={<ProGate feature="QuickBooks Integration"><QBOSettingsPage /></ProGate>} />
-          <Route path="/jobber" element={<ProGate feature="Jobber Integration"><JobberPage /></ProGate>} />
           <Route path="/quote-preferences" element={<QuotePreferencesPage />} />
           <Route path="/pro-setup" element={<ProSetupChecklistPage />} />
           <Route path="/file-library" element={<FileLibraryPage />} />

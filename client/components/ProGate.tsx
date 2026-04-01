@@ -48,7 +48,6 @@ const FEATURE_TAGLINES: Record<string, string> = {
   "Lead Finder": "Find homeowners actively looking for cleaning services near you.",
   "Automations Hub": "Set triggers and rules that run your business while you're on jobs.",
   "Advanced Integrations": "Connect to Zapier, Make, and webhooks to automate anything.",
-  "Jobber Integration": "Sync clients and jobs directly with your Jobber account.",
   "Social Leads": "Turn social media comments into booked appointments.",
 };
 
@@ -73,7 +72,7 @@ const TIER_FEATURES: Record<PlanTier, { icon: string; label: string }[]> = {
     { icon: "activity", label: "Revenue intelligence & analytics" },
     { icon: "search", label: "Lead finder & outreach tools" },
     { icon: "briefcase", label: "Commercial quote builder" },
-    { icon: "link", label: "Jobber & QBO integrations" },
+    { icon: "link", label: "QBO integrations" },
   ],
   free: [],
 };

@@ -978,74 +978,6 @@ export const qboSyncLog = pgTable("qbo_sync_log", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const jobberConnections = pgTable("jobber_connections", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar("user_id")
-    .notNull()
-    .unique()
-    .references(() => users.id),
-  accessTokenEncrypted: text("access_token_encrypted"),
-  refreshTokenEncrypted: text("refresh_token_encrypted"),
-  accessTokenExpiresAt: timestamp("access_token_expires_at"),
-  connectedAt: timestamp("connected_at"),
-  disconnectedAt: timestamp("disconnected_at"),
-  scopes: text("scopes"),
-  status: text("status").notNull().default("disconnected"),
-  lastError: text("last_error"),
-  autoCreateJobOnQuoteAccept: boolean("auto_create_job_on_quote_accept").notNull().default(false),
-});
-
-export const jobberClientMappings = pgTable("jobber_client_mappings", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id),
-  qpCustomerId: varchar("qp_customer_id")
-    .notNull()
-    .references(() => customers.id),
-  jobberClientId: text("jobber_client_id").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const jobberJobLinks = pgTable("jobber_job_links", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id),
-  quoteId: varchar("quote_id")
-    .notNull()
-    .references(() => quotes.id),
-  jobberClientId: text("jobber_client_id").notNull(),
-  jobberJobId: text("jobber_job_id").notNull(),
-  jobberJobNumber: text("jobber_job_number"),
-  syncStatus: text("sync_status").notNull().default("success"),
-  syncTrigger: text("sync_trigger").notNull().default("manual"),
-  errorMessage: text("error_message"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const jobberSyncLog = pgTable("jobber_sync_log", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id),
-  quoteId: varchar("quote_id"),
-  action: text("action").notNull(),
-  requestSummary: jsonb("request_summary"),
-  responseSummary: jsonb("response_summary"),
-  status: text("status").notNull(),
-  errorMessage: text("error_message"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 export type InvoicePacket = typeof invoicePackets.$inferSelect;
 export type CalendarEventStub = typeof calendarEventStubs.$inferSelect;
 export type ApiKey = typeof apiKeys.$inferSelect;
@@ -1056,11 +988,6 @@ export type QboConnection = typeof qboConnections.$inferSelect;
 export type QboCustomerMapping = typeof qboCustomerMappings.$inferSelect;
 export type QboInvoiceLink = typeof qboInvoiceLinks.$inferSelect;
 export type QboSyncLogEntry = typeof qboSyncLog.$inferSelect;
-export type JobberConnection = typeof jobberConnections.$inferSelect;
-export type JobberClientMapping = typeof jobberClientMappings.$inferSelect;
-export type JobberJobLink = typeof jobberJobLinks.$inferSelect;
-export type JobberSyncLogEntry = typeof jobberSyncLog.$inferSelect;
-
 // ─── Local Lead Finder ───────────────────────────────────────────────────────
 
 export const leadFinderSettings = pgTable("lead_finder_settings", {

@@ -59,7 +59,7 @@ const PLANS: Array<{
       "Revenue intelligence & analytics",
       "Lead finder & outreach tools",
       "Commercial quote builder",
-      "Jobber & QBO integrations",
+      "QBO integrations",
     ],
   },
 ];

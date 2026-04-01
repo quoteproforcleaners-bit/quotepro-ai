@@ -84,7 +84,6 @@ export default function QuoteDetailPage() {
   const [generatedPacket, setGeneratedPacket] = useState<{ id: string; invoiceNumber: string } | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [syncingQbo, setSyncingQbo] = useState(false);
-  const [syncingJobber, setSyncingJobber] = useState(false);
   const [playChannels, setPlayChannels] = useState<Record<number, "sms" | "email">>({});
   const [playDrafts, setPlayDrafts] = useState<Record<number, string>>({});
   const [playGenerating, setPlayGenerating] = useState<Record<number, boolean>>({});
@@ -235,10 +234,6 @@ export default function QuoteDetailPage() {
     onError: (err: any) => {
       showToast(err?.message || "Failed to send invoice", "error");
     },
-  });
-
-  const { data: jobberStatus } = useQuery<{ connected: boolean }>({
-    queryKey: ["/api/integrations/jobber/status"],
   });
 
   if (isLoading) return <Spinner />;
@@ -482,21 +477,6 @@ export default function QuoteDetailPage() {
     }
   };
 
-  const syncJobber = async () => {
-    if (!jobberStatus?.connected) {
-      navigate("/settings?tab=integrations");
-      return;
-    }
-    setSyncingJobber(true);
-    try {
-      const result: any = await apiPost(`/api/integrations/jobber/sync-quote/${id}`, {});
-      showToast(result?.message || "Job created in Jobber.", "success");
-    } catch (e: any) {
-      showToast(e?.message || "Failed to sync to Jobber", "error");
-    } finally {
-      setSyncingJobber(false);
-    }
-  };
 
   const syncQbo = async () => {
     setSyncingQbo(true);
@@ -1640,16 +1620,6 @@ export default function QuoteDetailPage() {
           <Card>
             <CardHeader title="Integrations" icon={Link2} />
             <div className="space-y-2">
-              <Button
-                variant="secondary"
-                icon={RefreshCw}
-                onClick={syncJobber}
-                disabled={syncingJobber}
-                className="w-full justify-start"
-                size="sm"
-              >
-                {syncingJobber ? "Syncing..." : jobberStatus?.connected ? "Sync to Jobber" : "Connect Jobber"}
-              </Button>
               <Button
                 variant="secondary"
                 icon={RefreshCw}

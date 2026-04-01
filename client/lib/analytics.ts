@@ -89,12 +89,6 @@ type EventName =
   | "offerings_load_failed"
   | "revenuecat_init_failed"
   | "premium_feature_blocked"
-  | "jobber_sync_manual_clicked"
-  | "jobber_sync_success"
-  | "jobber_sync_failed"
-  | "jobber_import_started"
-  | "jobber_import_completed"
-  | "jobber_connect_cta_clicked"
   // Funnel events
   | "account_created"
   | "trial_started"

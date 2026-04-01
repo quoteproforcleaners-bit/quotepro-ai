@@ -16,12 +16,12 @@ import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
   generateQuotePdfHtml, generateFollowUpMessage, sendFollowUpNow,
-  createShortLink, jobberGQL, jobberGetOrCreateClient, jobberGetOrCreateProperty,
+  createShortLink,
   generateIntakeCode, ensureIntakeCode, getOrCreateShortUrl,
   slugify, ensurePublicSlug, lookupIntakeBusiness,
   processPendingFollowUps, sendStaleQuoteNudges, sendWeeklyDigestEmails,
   dispatchWebhook, deliverWebhook,
-  initQBOTables, initJobberTables, initOAuthStatesTable,
+  initQBOTables, initOAuthStatesTable,
   createQBOInvoiceForQuote, generateICS, buildGoogleCalendarUrl,
   generateInvoicePdfHtml, db_getBusinessById, formatUser, formatBusiness,
   getQuickQuoteHTML, getPrivacyPolicyHTML, getTermsOfServiceHTML, getDeleteAccountHTML,
@@ -81,7 +81,6 @@ import { businessFiles, sequenceEnrollments, employees, schedulePublications, cl
 import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage, getMoveInOutCleaningCalculatorPage, getCleaningQuoteGeneratorPage, getUltimateCleaningPricingGuidePage } from "../seo-pages";
 import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "../calculator-engine";
 import { sendEmail, getBusinessSendParams } from "../mail";
-import { syncQuoteToJobber } from "../jobber-client";
 import { sendPush } from "../pushNotifications";
 
 const router = Router();
@@ -1758,17 +1757,6 @@ loadMonth(nextMo);
       try {
         const business = q.businessId ? await db_getBusinessById(q.businessId) : null;
         if (business?.userId) {
-          pool.query(
-            `SELECT auto_create_job_on_quote_accept FROM jobber_connections WHERE user_id = $1 AND status = 'connected'`,
-            [business.userId]
-          ).then((jobberResult) => {
-            if (jobberResult.rows.length > 0 && jobberResult.rows[0].auto_create_job_on_quote_accept) {
-              syncQuoteToJobber(business.userId, q.id, "automatic").catch((err) => {
-                console.error("Auto Jobber sync (public accept) failed:", err.message);
-              });
-            }
-          }).catch(() => {});
-
           pool.query(
             `SELECT auto_create_invoice FROM qbo_connections WHERE user_id = $1 AND status = 'connected'`,
             [business.userId]

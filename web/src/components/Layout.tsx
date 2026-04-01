@@ -87,7 +87,6 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { to: "/employees",         label: "Team Members",      icon: UserCog,     description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
   { to: "/file-library",      label: "File Library",      icon: FolderOpen,  description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
   { to: "/qbo-settings",      label: "QuickBooks",        icon: PlugZap,     description: "Sync your quotes, invoices, and payments directly to QuickBooks Online." },
-  { to: "/jobber",            label: "Jobber",            icon: Clipboard,   description: "Connect your Jobber account to sync jobs, customers, and scheduling automatically." },
   { to: "/account-settings",  label: "Account",           icon: CircleUser,  description: "Manage your profile, password, notification preferences, and billing information." },
 ];
 
@@ -133,7 +132,6 @@ const NAV_LABEL_KEYS: Record<string, string> = {
   "/toolkit":           "nav.toolkit",
   "/pro-setup":         "nav.setupChecklist",
   "/qbo-settings":      "nav.quickbooks",
-  "/jobber":            "nav.jobber",
 };
 
 const SECTION_LABEL_KEYS: Record<string, string> = {
@@ -394,14 +392,13 @@ const ROUTE_TITLES: Record<string, string> = {
   "/commercial-quote": "Commercial Quote", "/file-library": "File Library",
   "/toolkit": "Toolkit", "/pro-setup": "Setup Checklist",
   "/account-settings": "Account Settings", "/qbo-settings": "QuickBooks",
-  "/jobber": "Jobber",
 };
 
 const PRO_ROUTES = [
   "/customers", "/jobs", "/calendar", "/growth", "/opportunities", "/ai-assistant",
   "/lead-finder", "/lead-capture", "/revenue", "/closing-assistant",
   "/commercial-quote", "/reactivation", "/automations", "/sales-strategy",
-  "/weekly-recap", "/tasks-queue", "/reviews-referrals", "/qbo-settings", "/jobber",
+  "/weekly-recap", "/tasks-queue", "/reviews-referrals", "/qbo-settings",
 ];
 
 /* ─── Trial Countdown Banner ─────────────────────────────────────────────── */

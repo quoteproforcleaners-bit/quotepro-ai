@@ -44,7 +44,7 @@ const TIER_CONTENT: Record<string, { icon: typeof Zap; color: string; title: str
       "Revenue intelligence & analytics",
       "Lead finder & outreach tools",
       "Commercial quote builder",
-      "Jobber & QuickBooks integrations",
+      "QuickBooks integrations",
       "Priority phone & chat support",
       "Early access to new features",
     ],

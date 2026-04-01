@@ -116,11 +116,7 @@ export default function QuoteDetailScreen() {
   const [showScheduleJobModal, setShowScheduleJobModal] = useState(false);
 
   const [qboCreating, setQboCreating] = useState(false);
-  const [jobberSyncing, setJobberSyncing] = useState(false);
   const [stripeInvoiceSending, setStripeInvoiceSending] = useState(false);
-  const { data: jobberStatus } = useQuery<{ connected: boolean; status?: string }>({
-    queryKey: ["/api/integrations/jobber/status"],
-  });
   const [showFollowUpEdit, setShowFollowUpEdit] = useState(false);
   const [followUpEditText, setFollowUpEditText] = useState("");
   const [followUpEditLoading, setFollowUpEditLoading] = useState(false);
@@ -716,32 +712,6 @@ export default function QuoteDetailScreen() {
     }
   };
 
-  const handleSyncToJobber = async () => {
-    if (!quote || jobberSyncing) return;
-    if (!jobberStatus?.connected) {
-      Alert.alert(
-        "Jobber Not Connected",
-        "Connect your Jobber account in Settings to sync quotes.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: () => navigation.navigate("Settings" as any) },
-        ]
-      );
-      return;
-    }
-    setJobberSyncing(true);
-    try {
-      const res = await apiRequest("POST", `/api/integrations/jobber/sync-quote/${quote.id}`, {});
-      const data = await res.json();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Synced to Jobber", data.message || `Job created in Jobber`);
-    } catch (e: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", e.message || "Failed to sync to Jobber");
-    } finally {
-      setJobberSyncing(false);
-    }
-  };
 
 
   const handleSendStripeInvoice = async () => {
@@ -2240,20 +2210,6 @@ export default function QuoteDetailScreen() {
               </Pressable>
             )
           ) : null}
-
-          <Pressable
-            onPress={handleSyncToJobber}
-            style={[styles.actionButton, { backgroundColor: theme.backgroundSecondary }]}
-            testID="jobber-sync-btn"
-            disabled={jobberSyncing}
-          >
-            {jobberSyncing ? (
-              <ActivityIndicator size={20} color={theme.primary} />
-            ) : (
-              <Feather name="upload-cloud" size={20} color={theme.primary} />
-            )}
-            <ThemedText type="small" style={{ marginTop: 4 }}>Jobber</ThemedText>
-          </Pressable>
 
           <Pressable
             onPress={handleDelete}

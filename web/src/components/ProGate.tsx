@@ -29,7 +29,7 @@ const TIER_CONFIG: Record<"growth" | "pro", {
       "Commercial quote builder",
       "Lead finder & outreach",
       "Advanced automation rules",
-      "Jobber & QuickBooks integrations",
+      "QuickBooks integrations",
     ],
   },
 };

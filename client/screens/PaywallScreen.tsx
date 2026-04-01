@@ -92,7 +92,7 @@ const PLAN_FEATURES: PlanDefinition[] = [
     supportsAnnual: true,
     features: [
       { icon: "check-circle", label: "Everything in Growth" },
-      { icon: "link", label: "Jobber & QuickBooks sync" },
+      { icon: "link", label: "QuickBooks sync" },
       { icon: "briefcase", label: "Commercial quote builder" },
       { icon: "search", label: "Lead finder & outreach tools" },
       { icon: "activity", label: "Revenue intelligence analytics" },

@@ -11,12 +11,12 @@ import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
   generateQuotePdfHtml, generateFollowUpMessage, sendFollowUpNow,
-  createShortLink, jobberGQL, jobberGetOrCreateClient, jobberGetOrCreateProperty,
+  createShortLink,
   generateIntakeCode, ensureIntakeCode, getOrCreateShortUrl,
   slugify, ensurePublicSlug, lookupIntakeBusiness,
   processPendingFollowUps, sendStaleQuoteNudges, sendWeeklyDigestEmails,
   dispatchWebhook, deliverWebhook,
-  initQBOTables, initJobberTables, initOAuthStatesTable,
+  initQBOTables, initOAuthStatesTable,
   createQBOInvoiceForQuote, generateICS, buildGoogleCalendarUrl,
   generateInvoicePdfHtml, db_getBusinessById, formatUser, formatBusiness,
   getQuickQuoteHTML, getPrivacyPolicyHTML, getTermsOfServiceHTML, getDeleteAccountHTML,
@@ -78,7 +78,6 @@ import {
 } from "../storage";
 import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
 import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "../mail";
-import { syncQuoteToJobber } from "../jobber-client";
 
 const router = Router();
 
@@ -276,17 +275,6 @@ const router = Router();
               createQBOInvoiceForQuote(req.session.userId!, q.id).catch((err) => {
                 console.error("Auto QBO invoice creation failed:", err.message);
                 logSync(req.session.userId!, q.id, "create_invoice", { auto: true }, { error: err.message }, "failed", err.message);
-              });
-            }
-          }).catch(() => {});
-
-          pool.query(
-            `SELECT auto_create_job_on_quote_accept FROM jobber_connections WHERE user_id = $1 AND status = 'connected'`,
-            [req.session.userId]
-          ).then((jobberResult) => {
-            if (jobberResult.rows.length > 0 && jobberResult.rows[0].auto_create_job_on_quote_accept) {
-              syncQuoteToJobber(req.session.userId!, q.id, "automatic").catch((err) => {
-                console.error("Auto Jobber sync failed:", err.message);
               });
             }
           }).catch(() => {});

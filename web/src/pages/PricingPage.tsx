@@ -29,7 +29,7 @@ const FEATURES = {
     "Revenue intelligence & analytics",
     "Lead finder & outreach tools",
     "Commercial quote builder",
-    "Jobber & QBO integrations",
+    "QBO integrations",
     "Priority phone & chat support",
     "Early access to new features",
   ],
@@ -129,7 +129,7 @@ const COMPARISON = [
   { label: "Advanced automation rules", starter: false, growth: false, pro: true },
   { label: "Revenue intelligence", starter: false, growth: false, pro: true },
   { label: "Commercial quote builder", starter: false, growth: false, pro: true },
-  { label: "Jobber & QBO integrations", starter: false, growth: false, pro: true },
+  { label: "QBO integrations", starter: false, growth: false, pro: true },
   { label: "Priority support", starter: false, growth: false, pro: true },
 ];
 

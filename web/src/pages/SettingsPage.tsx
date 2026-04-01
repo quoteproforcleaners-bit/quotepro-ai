@@ -342,8 +342,6 @@ export default function SettingsPage() {
   const [tab, setTab] = useState(() => searchParams.get("tab") || "business");
   const [saved, setSaved] = useState(false);
   const [savedSection, setSavedSection] = useState("");
-  const [jobberJustConnected] = useState(() => searchParams.get("jobber") === "connected");
-
   const showSaved = (section: string) => {
     setSaved(true);
     setSavedSection(section);
@@ -2227,12 +2225,6 @@ export default function SettingsPage() {
 
       {tab === "integrations" ? (
         <div className="max-w-2xl space-y-6">
-          {jobberJustConnected ? (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">
-              <CheckCircle size={16} className="text-emerald-600 shrink-0" />
-              Jobber connected successfully — your quotes will now sync as jobs.
-            </div>
-          ) : null}
           <Card>
             <CardHeader title="Payment & Accounting" icon={CreditCard} />
             <IntegrationCard
@@ -2253,20 +2245,6 @@ export default function SettingsPage() {
               connectUrl="/api/integrations/qbo/connect"
               connectMethod="GET"
               disconnectUrl="/api/integrations/qbo/disconnect"
-              color="green"
-              beta
-            />
-          </Card>
-          <Card>
-            <CardHeader title="Jobber" icon={Zap} />
-            <IntegrationCard
-              name="Jobber"
-              description="Sync accepted quotes directly to Jobber as scheduled jobs"
-              icon={Zap}
-              statusUrl="/api/integrations/jobber/status"
-              connectUrl="/api/integrations/jobber/connect"
-              disconnectUrl="/api/integrations/jobber/disconnect"
-              disconnectMethod="POST"
               color="green"
               beta
             />

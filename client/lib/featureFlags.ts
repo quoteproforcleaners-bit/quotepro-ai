@@ -4,5 +4,4 @@ export const FeatureFlags = {
   aiLaunchEtaDays: 14,
   growthSuiteEnabled: true,
   commercialQuotingEnabled: true,
-  jobberIntegrationEnabled: true,
 };

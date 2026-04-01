@@ -505,17 +505,7 @@ export const GROWTH_TASK_LIBRARY: LibraryTask[] = [
     stage: "scaling",
     category: "revenue",
   },
-  {
-    id: "sc-jobber-integration",
-    title: "Connect Jobber to sync jobs automatically",
-    description: "If you run field teams, Jobber integration auto-syncs accepted quotes to jobs and dispatches your crew — saving hours per week.",
-    actionUrl: "/app/integrations",
-    estimatedTime: "20 minutes",
-    impact: "medium",
-    stage: "scaling",
-    category: "operations",
-    requiresTier: "pro",
-  },
+
   {
     id: "sc-api-access",
     title: "Use the QuotePro API to connect your website",
