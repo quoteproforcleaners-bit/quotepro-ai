@@ -103,7 +103,7 @@ function CommandHeader({
   navigate: (path: string) => void;
 }) {
   const hasRisk = followUpQueueCount > 0;
-  const dayStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase();
+  const dayStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   const contextLine = (() => {
     if (todayJobsCount > 0) {
@@ -122,8 +122,8 @@ function CommandHeader({
       <div
         className="rounded-2xl overflow-hidden relative"
         style={{
-          background: "linear-gradient(145deg, #06070d 0%, #0d1225 45%, #0f1e3d 100%)",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.12)",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1e3a5f 100%)",
+          boxShadow: "0 4px 32px rgba(0,0,0,0.22), 0 1px 6px rgba(15,23,42,0.18)",
         }}
       >
         {/* Grid overlay */}
@@ -149,8 +149,8 @@ function CommandHeader({
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
               <p
-                className="mb-2"
-                style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "1.5px", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}
+                className="mb-2 text-slate-400"
+                style={{ fontSize: "12px", fontWeight: 500, letterSpacing: "0.2px", color: "rgba(255,255,255,0.45)" }}
               >
                 {dayStr}
               </p>
@@ -233,8 +233,8 @@ function CommandHeader({
                 />
                 <div className="min-w-0">
                   <p
-                    className="mb-1 font-medium uppercase"
-                    style={{ fontSize: "11px", letterSpacing: "0.8px", color: "rgba(255,255,255,0.45)" }}
+                    className="mb-1 font-medium"
+                    style={{ fontSize: "11px", letterSpacing: "0.2px", color: "rgba(255,255,255,0.45)" }}
                   >
                     {stat.label}
                   </p>
@@ -302,19 +302,11 @@ function KPICard({ label, value, subtitle, icon: Icon, color, badge, badgePositi
   return (
     <div
       onClick={onClick}
-      className={`rounded-xl bg-white p-5 ${onClick ? "cursor-pointer active:scale-[0.99]" : ""} transition-all duration-150`}
+      className={`rounded-xl bg-white p-5 ${onClick ? "cursor-pointer active:scale-[0.99] hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-900/10" : ""} transition-all duration-200 ease-in-out`}
       style={{
         border: "1px solid rgba(0,0,0,0.07)",
         boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
       }}
-      onMouseEnter={onClick ? (e) => {
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)";
-        (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
-      } : undefined}
-      onMouseLeave={onClick ? (e) => {
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
-        (e.currentTarget as HTMLElement).style.transform = "";
-      } : undefined}
     >
       <div className="flex items-start justify-between gap-2 mb-4">
         <div
@@ -372,7 +364,7 @@ function TodayOperations({
   const nextJob = todayJobs.find((j: any) => j.status !== "completed") || todayJobs[0];
 
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/40 overflow-hidden mb-6 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-800/40 overflow-hidden mb-6 shadow-sm transition-all duration-200 ease-in-out hover:shadow-md hover:border-slate-300">
       {/* Fix 9: TODAY header — pulsing green dot, uppercase tracking */}
       <div
         className="flex items-center justify-between px-5 py-3.5 border-b dark:border-slate-700/60"
@@ -497,13 +489,13 @@ interface AttentionItem {
 function AttentionPanel({ items, navigate }: { items: AttentionItem[]; navigate: (path: string) => void }) {
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 flex items-start gap-3">
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 flex items-start gap-3 transition-all duration-200">
         <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 mt-0.5">
           <CheckCircle className="w-4 h-4 text-white" />
         </div>
         <div>
-          <p className="font-bold text-emerald-800 text-sm">All clear — great job</p>
-          <p className="text-xs text-emerald-600 mt-0.5">No urgent items. Your pipeline is healthy and you're caught up on follow-ups.</p>
+          <p className="font-bold text-emerald-800 text-sm leading-snug">All clear — great job</p>
+          <p className="text-xs text-emerald-600 mt-0.5 leading-relaxed">No urgent items. Your pipeline is healthy and you're caught up on follow-ups.</p>
         </div>
       </div>
     );
@@ -517,7 +509,7 @@ function AttentionPanel({ items, navigate }: { items: AttentionItem[]; navigate:
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Needs Attention</p>
+      <p className="text-xs font-semibold text-slate-400 px-1 tracking-wide">Needs Attention</p>
       {items.map((item, i) => {
         const s = SEVERITY[item.severity];
         return (
@@ -565,10 +557,10 @@ function TodaysRevenueMoves({ actions, navigate }: { actions: RevenueAction[]; n
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center">
-          <Zap className="w-3.5 h-3.5 text-amber-600" />
+        <div className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center">
+          <Zap className="w-3.5 h-3.5 text-indigo-600" />
         </div>
-        <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Revenue Moves</h2>
+        <h2 className="text-sm font-bold text-slate-800">Revenue Moves</h2>
         <span className="text-xs text-slate-400">— highest-impact actions right now</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -576,7 +568,7 @@ function TodaysRevenueMoves({ actions, navigate }: { actions: RevenueAction[]; n
           <button
             key={i}
             onClick={() => navigate(action.path)}
-            className="text-left rounded-2xl border border-slate-200 bg-white p-4 hover:border-primary-300 hover:shadow-md transition-all group active:scale-[0.99]"
+            className="text-left rounded-2xl border border-slate-200 bg-white p-4 hover:border-indigo-200 hover:shadow-md hover:scale-[1.01] hover:shadow-indigo-900/10 transition-all duration-200 ease-in-out group active:scale-[0.99]"
           >
             <div className="flex items-start gap-3 mb-3">
               <div className={`w-10 h-10 rounded-xl ${action.iconBg} flex items-center justify-center shrink-0`}>
@@ -732,36 +724,42 @@ function StartHereChecklist({
 
   return (
     <div
-      className="rounded-2xl overflow-hidden mb-6"
+      className="rounded-2xl overflow-hidden mb-6 transition-all duration-200 ease-in-out hover:shadow-lg"
       style={{
-        border: "2px solid #f59e0b",
-        background: "linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(217,119,6,0.03) 100%)",
+        border: "1px solid rgba(99,102,241,0.4)",
+        background: "linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(79,70,229,0.03) 100%)",
+        boxShadow: "0 0 0 1px rgba(99,102,241,0.1)",
       }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 1px rgba(99,102,241,0.2), 0 8px 24px rgba(99,102,241,0.08)"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 1px rgba(99,102,241,0.1)"; }}
     >
-      {/* Amber accent bar */}
-      <div style={{ height: "3px", background: "linear-gradient(90deg, #f59e0b, #fbbf24)" }} />
+      {/* Indigo accent bar */}
+      <div style={{ height: "3px", background: "linear-gradient(90deg, #6366f1, #a78bfa)" }} />
 
       <div className="px-5 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
+          <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+            <Sparkles className="w-4 h-4 text-indigo-600" />
           </div>
           <div>
-            <h2 className="font-bold text-amber-900 dark:text-amber-200 text-sm">Complete setup to unlock full automation</h2>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{completedCount} of {steps.length} steps done · {steps.length - completedCount} remaining</p>
+            <h2 className="font-bold text-slate-800 dark:text-indigo-200 text-sm">Complete setup to unlock full automation</h2>
+            <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">{completedCount} of {steps.length} steps done · {steps.length - completedCount} remaining</p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <div className="w-24 h-1.5 rounded-full bg-amber-100 overflow-hidden">
-            <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+          <div className="w-24 h-1.5 rounded-full bg-indigo-100/60 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${pct}%`, background: "linear-gradient(90deg, #6366f1, #a78bfa)" }}
+            />
           </div>
-          <span className="text-xs font-bold text-amber-600">{pct}%</span>
+          <span className="text-xs font-bold text-indigo-500">{pct}%</span>
         </div>
       </div>
 
       {/* Completed steps (greyed) */}
       <div className="px-5 pb-1">
-        <div className="divide-y divide-amber-100">
+        <div className="divide-y divide-indigo-100/40">
           {steps.filter((s) => s.done).map((step) => (
             <div key={step.id} className="flex items-center gap-3 py-2.5 opacity-50">
               <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
@@ -771,20 +769,20 @@ function StartHereChecklist({
             </div>
           ))}
 
-          {/* Next step — prominent amber CTA */}
+          {/* Next step — prominent indigo CTA */}
           {nextStep ? (
             <div className="flex items-center gap-3 py-3">
               <div
                 className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-                style={{ background: "#f59e0b" }}
+                style={{ background: "#6366f1" }}
               >
                 <nextStep.icon className="w-3 h-3 text-white" />
               </div>
-              <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 flex-1">{nextStep.label}</p>
+              <p className="text-sm font-semibold text-slate-800 dark:text-indigo-100 flex-1">{nextStep.label}</p>
               <button
                 onClick={() => navigate(nextStep.path)}
-                className="flex items-center gap-1 text-xs font-bold text-white px-3 py-1.5 rounded-lg shrink-0"
-                style={{ background: "#f59e0b" }}
+                className="flex items-center gap-1 text-xs font-bold text-white px-3 py-1.5 rounded-lg shrink-0 active:scale-95 transition-all duration-200"
+                style={{ background: "#6366f1" }}
               >
                 Complete <ChevronRight className="w-3 h-3" />
               </button>
@@ -794,13 +792,13 @@ function StartHereChecklist({
           {/* Other remaining steps (dimmer) */}
           {remainingSteps.slice(1).map((step) => (
             <div key={step.id} className="flex items-center gap-3 py-2.5 opacity-60">
-              <div className="w-6 h-6 rounded-full border-2 border-amber-200 flex items-center justify-center shrink-0">
-                <step.icon className="w-3 h-3 text-amber-400" />
+              <div className="w-6 h-6 rounded-full border-2 border-indigo-200 flex items-center justify-center shrink-0">
+                <step.icon className="w-3 h-3 text-indigo-400" />
               </div>
               <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{step.label}</p>
               <button
                 onClick={() => navigate(step.path)}
-                className="text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-1 shrink-0 ml-auto"
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0 ml-auto transition-colors"
               >
                 {step.cta} <ChevronRight className="w-3 h-3" />
               </button>
@@ -825,7 +823,7 @@ function AIGrowthTools({ navigate }: { navigate: (path: string) => void }) {
   ];
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden mb-6 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden mb-6 shadow-sm transition-all duration-200 ease-in-out hover:shadow-md">
       <div className="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-primary-900 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
@@ -917,7 +915,7 @@ function TodaysFocus({
           <Zap className="w-3.5 h-3.5 text-slate-500" />
         </div>
         <h2 className="font-bold text-slate-800 text-sm">Today's Focus</h2>
-        <span className="ml-auto text-[11px] text-slate-400">{items.length} action{items.length !== 1 ? "s" : ""}</span>
+        <span className="ml-auto text-[12px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">{items.length} action{items.length !== 1 ? "s" : ""}</span>
       </div>
       <div className="divide-y divide-slate-50">
         {items.map((item, i) => {
@@ -1270,11 +1268,11 @@ export default function DashboardPage() {
     if (followUpQueueCount > 0) {
       actions.push({
         icon: PhoneMissed,
-        iconBg: "bg-amber-100",
-        iconColor: "text-amber-600",
+        iconBg: "bg-indigo-100",
+        iconColor: "text-indigo-600",
         tag: "Revenue Risk",
-        tagBg: "bg-amber-100",
-        tagColor: "text-amber-700",
+        tagBg: "bg-indigo-100",
+        tagColor: "text-indigo-700",
         title: `Follow up with ${followUpQueueCount} lead${followUpQueueCount > 1 ? "s" : ""}`,
         description: `${fmt(amountAtRisk)} is waiting for your response. Most deals close within 48 hours.`,
         cta: "Review Follow-Ups",
@@ -1330,11 +1328,11 @@ export default function DashboardPage() {
     if (hasQuotes && hasCustomers && ratingSummary && (ratingSummary.total || 0) === 0) {
       actions.push({
         icon: Star,
-        iconBg: "bg-amber-100",
-        iconColor: "text-amber-500",
+        iconBg: "bg-violet-100",
+        iconColor: "text-violet-500",
         tag: "Reputation",
-        tagBg: "bg-amber-100",
-        tagColor: "text-amber-700",
+        tagBg: "bg-violet-100",
+        tagColor: "text-violet-700",
         title: "Request your first client review",
         description: "Reviews build trust and win more cleans. One review can pay for itself 10x.",
         cta: "Get Reviews",
@@ -1492,38 +1490,42 @@ export default function DashboardPage() {
 
       {/* 2b. Pricing not configured banner */}
       {pricingStatus && !pricingStatus.configured && !pricingBannerDismissed && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 mb-6 flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+        <div
+          className="rounded-2xl p-4 mb-6 flex items-start gap-3 transition-all duration-200"
+          style={{ border: "1px solid rgba(99,102,241,0.35)", background: "linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(79,70,229,0.03) 100%)" }}
+        >
+          <div className="w-9 h-9 rounded-xl bg-indigo-500 flex items-center justify-center shrink-0 mt-0.5">
             <Link2 className="w-4 h-4 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-amber-900">
+            <p className="text-sm font-bold text-slate-800">
               Your Lead Link is showing approximate pricing
             </p>
-            <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
               Customers visiting your quote link see ballpark estimates — not your real rates.
               Finish pricing setup to show accurate prices and win more cleans.
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <div className="flex-1 h-1.5 rounded-full bg-amber-200 overflow-hidden max-w-[140px]">
+              <div className="flex-1 h-1.5 rounded-full bg-indigo-100/60 overflow-hidden max-w-[140px]">
                 <div
-                  className="h-full bg-amber-500 rounded-full transition-all"
-                  style={{ width: `${pricingStatus.completionPercent}%` }}
+                  className="h-full rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${pricingStatus.completionPercent}%`, background: "linear-gradient(90deg, #6366f1, #a78bfa)" }}
                 />
               </div>
-              <span className="text-xs font-bold text-amber-600">{pricingStatus.completionPercent}% set up</span>
+              <span className="text-xs font-bold text-indigo-500">{pricingStatus.completionPercent}% set up</span>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => navigate("/lead-capture")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-white active:scale-95 transition-all duration-200"
+              style={{ background: "#6366f1" }}
             >
               Fix Now <ChevronRight className="w-3 h-3" />
             </button>
             <button
               onClick={dismissPricingBanner}
-              className="p-1.5 rounded-lg text-amber-400 hover:text-amber-600 hover:bg-amber-100 transition-colors"
+              className="p-1.5 rounded-lg text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors"
               title="Dismiss for 7 days"
             >
               <X className="w-4 h-4" />
@@ -1738,7 +1740,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 9. Revenue Chart */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm mb-6">
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm mb-6 transition-all duration-200 ease-in-out hover:shadow-md">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
@@ -1754,7 +1756,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 10. Recent Quotes */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-all duration-200 ease-in-out hover:shadow-md">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
@@ -1781,7 +1783,7 @@ export default function DashboardPage() {
             </p>
             <button
               onClick={() => navigate("/quotes/new")}
-              className="mt-4 flex items-center gap-2 mx-auto px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-bold transition-colors"
+              className="mt-4 flex items-center gap-2 mx-auto px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-bold transition-all duration-200 active:scale-95"
             >
               <Plus className="w-4 h-4" />
               Create Your First Quote
