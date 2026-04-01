@@ -17,6 +17,8 @@ import {
   Sparkles,
   FileText,
   Pencil,
+  Zap,
+  Lock,
 } from "lucide-react";
 import { PageHeader, Card, CardHeader, Button, Badge, Alert } from "../components/ui";
 import { computeResidentialQuote } from "../lib/pricingEngine";
@@ -130,6 +132,7 @@ export default function QuoteCreatePage() {
   const { user } = useAuth();
   const { quotesPerMonth, startCheckout, showPaywall } = useSubscription();
   const [step, setStep] = useState(0);
+  const [quotaError, setQuotaError] = useState(false);
   const [dismissedNudge, setDismissedNudge] = useState(false);
   const [intakeId, setIntakeId] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState("");
@@ -255,7 +258,9 @@ export default function QuoteCreatePage() {
       navigate(`/quotes/${data.id}`);
     },
     onError: (err: any) => {
-      if (err?.data?.quoteLimitReached) {
+      const isQuotaHit = err?.data?.quoteLimitReached || err?.message?.toLowerCase().includes("free quotes") || err?.message?.toLowerCase().includes("quote limit");
+      if (isQuotaHit) {
+        setQuotaError(true);
         showPaywall();
         return;
       }
@@ -1417,7 +1422,33 @@ export default function QuoteCreatePage() {
         ) : null}
       </Card>
 
-      {submitError ? (
+      {quotaError ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100">
+              <Lock className="h-4 w-4 text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-900">You've used all your free quotes</p>
+              <p className="mt-1 text-sm text-amber-700">
+                Upgrade to Growth to create unlimited quotes, unlock AI tools, and send branded proposals.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Button
+                  onClick={() => showPaywall()}
+                  icon={Zap}
+                  className="bg-amber-600 hover:bg-amber-700 text-white border-amber-600"
+                >
+                  Upgrade to Growth — $49/mo
+                </Button>
+                <Button variant="secondary" onClick={() => startCheckout("starter")}>
+                  Try Starter — $19/mo
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : submitError ? (
         <Alert variant="error" title="Could not create quote" description={submitError} />
       ) : null}
 
