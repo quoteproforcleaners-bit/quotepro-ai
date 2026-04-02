@@ -223,7 +223,11 @@ export async function getPricingByBusiness(
     .from(pricingSettings)
     .where(eq(pricingSettings.businessId, businessId));
   if (row) {
-    parseJsonbField(PricingSettingsSchema, row.settings, "settings", row.id);
+    try {
+      parseJsonbField(PricingSettingsSchema, row.settings, "settings", row.id);
+    } catch (e: any) {
+      console.warn(`[schema] Invalid pricing settings on record ${row.id}: ${e.message}`);
+    }
   }
   return row;
 }

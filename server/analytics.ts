@@ -120,6 +120,7 @@ async function processInactiveTrialSignals(): Promise<void> {
   );
 
   for (const user of result.rows) {
+    if (!user.email) continue;
     try {
       const alreadySent = await hasChurnEmailSentRecently(
         user.id,
@@ -200,6 +201,7 @@ async function processPaidInactiveSignals(): Promise<void> {
 
   for (const user of result.rows) {
     try {
+      if (!user.email) { continue; }
       const alreadySent = await hasChurnEmailSentRecently(
         user.id,
         AnalyticsEvents.CHURN_RISK_PAID_INACTIVE,
@@ -497,6 +499,7 @@ export async function computeAndUpdateChurnScores(): Promise<void> {
 
       // ── Interventions ───────────────────────────────────────────
       if (!isPaid) continue; // only intervene on paid users
+      if (!user.email) continue; // skip users with no email address
 
       const lastIntervention = user.churn_intervention_sent_at
         ? (Date.now() - new Date(user.churn_intervention_sent_at).getTime()) / 86_400_000

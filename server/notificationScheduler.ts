@@ -44,9 +44,10 @@ async function notifsSentToday(userId: string): Promise<number> {
 
 async function isUserActive(userId: string): Promise<boolean> {
   const r = await pool.query(
-    `SELECT 1 FROM analytics_events
-     WHERE user_id = $1
-       AND created_at >= NOW() - INTERVAL '${INACTIVITY_DAYS} days'
+    `SELECT 1 FROM analytics_events ae
+     JOIN businesses b ON b.id = ae.business_id
+     WHERE b.owner_user_id = $1
+       AND ae.created_at >= NOW() - INTERVAL '${INACTIVITY_DAYS} days'
      LIMIT 1`,
     [userId],
   );
