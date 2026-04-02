@@ -47,7 +47,9 @@ router.post("/api/webhooks/revenuecat", async (req: Request, res: Response) => {
     const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
     if (webhookSecret) {
       const authHeader = req.headers["authorization"] as string | undefined;
-      if (!authHeader || authHeader !== `Bearer ${webhookSecret}`) {
+      // RC sends the exact value set in the dashboard — accept both raw and Bearer-prefixed formats
+      const valid = authHeader === webhookSecret || authHeader === `Bearer ${webhookSecret}`;
+      if (!authHeader || !valid) {
         console.warn("RevenueCat webhook: invalid authorization header");
         return res.status(401).json({ message: "Unauthorized" });
       }
