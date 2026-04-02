@@ -31,7 +31,7 @@ import { ProBadge } from "@/components/ProBadge";
 import { trackEvent } from "@/lib/analytics";
 import FounderModal from "@/components/FounderModal";
 import ReviewPromptModal from "@/components/ReviewPromptModal";
-import { shouldShowFounderModal, shouldPromptReview, triggerNativeReview, markReviewPrompted } from "@/lib/growthLoop";
+import { shouldShowFounderModal, shouldPromptReview, triggerNativeReview, markReviewPrompted, markHasEverMadeQuote } from "@/lib/growthLoop";
 import { useTutorial } from "@/context/TutorialContext";
 import { QUOTE_DETAIL_TOUR } from "@/lib/tourDefinitions";
 import { QuickAddCleanModal } from "@/components/QuickAddCleanModal";
@@ -205,6 +205,10 @@ export default function QuoteDetailScreen() {
       if (isDemo) return;
 
       (async () => {
+        // Persist a device-level flag so we never re-show the founder modal
+        // to an established user after a tier downgrade or quote-counter reset.
+        await markHasEverMadeQuote();
+
         if (totalQuotes === 1) {
           const showFounder = await shouldShowFounderModal();
           if (showFounder) {

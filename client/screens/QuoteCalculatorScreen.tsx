@@ -477,6 +477,36 @@ export default function QuoteCalculatorScreen() {
           </Pressable>
         ) : null}
 
+        {!isEditMode && !isGuestMode && pricingSettings && !pricingSettings.hourlyRate ? (
+          <Pressable
+            onPress={() => navigation.navigate("PricingSettings" as any)}
+            style={[
+              styles.quoteCounter,
+              {
+                backgroundColor: `${theme.warning}18`,
+                borderColor: `${theme.warning}55`,
+              },
+            ]}
+            testID="banner-pricing-setup-warning"
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Feather name="alert-triangle" size={13} color={theme.warning} />
+              <ThemedText
+                type="caption"
+                style={{ color: theme.warning, fontWeight: "600" }}
+              >
+                Hourly rate not set — quotes will show $0
+              </ThemedText>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <ThemedText type="caption" style={{ color: theme.warning, fontWeight: "600" }}>
+                Fix pricing
+              </ThemedText>
+              <Feather name="chevron-right" size={12} color={theme.warning} />
+            </View>
+          </Pressable>
+        ) : null}
+
         <View style={styles.typeCardsContainer}>
           {typeCards.map((card) => {
             const isSelected = quoteType === card.key;

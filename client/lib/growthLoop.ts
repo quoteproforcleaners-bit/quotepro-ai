@@ -17,6 +17,7 @@ const KEYS = {
   lastReviewPromptAt: "@qp_last_review_prompt_at",
   installDate: "@qp_install_date",
   sessionCount: "@qp_session_count",
+  hasEverMadeQuote: "@qp_has_ever_made_quote",
 };
 
 const DAYS_MS = 24 * 60 * 60 * 1000;
@@ -40,8 +41,28 @@ export async function getSessionCount(): Promise<number> {
   return parseInt(val || "0", 10) || 0;
 }
 
+export async function markHasEverMadeQuote(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(KEYS.hasEverMadeQuote, "true");
+  } catch {}
+}
+
+export async function getHasEverMadeQuote(): Promise<boolean> {
+  try {
+    const val = await AsyncStorage.getItem(KEYS.hasEverMadeQuote);
+    return val === "true";
+  } catch {
+    return false;
+  }
+}
+
 export async function shouldShowFounderModal(): Promise<boolean> {
   try {
+    // Never show to users who have previously made a quote — prevents
+    // re-triggering after a tier downgrade or quote-counter reset.
+    const madeQuote = await AsyncStorage.getItem(KEYS.hasEverMadeQuote);
+    if (madeQuote === "true") return false;
+
     const seen = await AsyncStorage.getItem(KEYS.hasSeenFounderModal);
     if (seen === "true") {
       const dismissedAt = await AsyncStorage.getItem(KEYS.founderModalDismissedAt);

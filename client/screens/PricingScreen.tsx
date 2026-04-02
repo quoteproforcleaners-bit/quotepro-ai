@@ -207,6 +207,28 @@ export default function PricingScreen() {
         ]}
         scrollIndicatorInsets={{ bottom: insets.bottom }}
       >
+        {!settings.hourlyRate ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+              backgroundColor: theme.warningSoft,
+              borderColor: theme.warningBorder,
+              borderWidth: 1,
+              borderRadius: 10,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              marginBottom: Spacing.md,
+            }}
+          >
+            <Feather name="alert-triangle" size={16} color={theme.warning} />
+            <ThemedText type="caption" style={{ flex: 1, color: theme.warning, fontWeight: "600", lineHeight: 18 }}>
+              Set your hourly rate below — without it, all residential quotes will calculate as $0.
+            </ThemedText>
+          </View>
+        ) : null}
+
         <SectionHeader
           title="Base Rates"
           subtitle="Your standard pricing configuration"

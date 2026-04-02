@@ -79,6 +79,7 @@ export default function OnboardingWizardPage() {
 
   // Step 5 fields — pricing
   const [minimumTicket, setMinimumTicket] = useState(150);
+  const [hourlyRate, setHourlyRate] = useState(55);
 
   const uploadLogo = async (file: File) => {
     setLogoUploading(true);
@@ -147,7 +148,7 @@ export default function OnboardingWizardPage() {
   const handleStep5Next = async () => {
     setSaving(true);
     try {
-      await apiPut("/api/pricing", { minimumTicket });
+      await apiPut("/api/pricing", { minimumTicket, hourlyRate });
       queryClient.invalidateQueries({ queryKey: ["/api/pricing"] });
     } finally {
       setSaving(false);
@@ -663,13 +664,14 @@ export default function OnboardingWizardPage() {
                 <DollarSign className="w-5 h-5 text-green-400" />
               </div>
               <div>
-                <h2 className="text-white font-bold text-lg">What's your minimum for a standard house clean?</h2>
-                <p className="text-slate-400 text-sm">We'll use this as your baseline pricing</p>
+                <h2 className="text-white font-bold text-lg">Set your pricing rates</h2>
+                <p className="text-slate-400 text-sm">These drive the quote calculator — you can refine them later</p>
               </div>
             </div>
 
             <div className="mb-6">
-              <div className="flex items-center justify-center mb-4">
+              <p className="text-slate-300 font-semibold text-sm mb-3">What's your minimum for a standard house clean?</p>
+              <div className="flex items-center justify-center mb-3">
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-green-400 font-bold text-xl">$</span>
                   <input
@@ -690,8 +692,33 @@ export default function OnboardingWizardPage() {
               </div>
             </div>
 
+            <div className="mb-6">
+              <p className="text-slate-300 font-semibold text-sm mb-3">What's your hourly labor rate?</p>
+              <div className="flex items-center justify-center mb-3">
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-green-400 font-bold text-xl">$</span>
+                  <input
+                    type="number"
+                    value={hourlyRate}
+                    onChange={(e) => setHourlyRate(Math.max(10, Math.min(500, Number(e.target.value))))}
+                    className="w-40 pl-10 pr-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white font-bold text-2xl text-center focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">/hr</span>
+                </div>
+              </div>
+              <input type="range" min={20} max={150} step={5} value={hourlyRate}
+                onChange={(e) => setHourlyRate(Number(e.target.value))}
+                className="w-full accent-green-500" />
+              <div className="flex justify-between mt-1 text-xs text-slate-500">
+                <span>$20/hr</span>
+                <span className="text-green-400 font-medium">Industry avg: $45–$75/hr</span>
+                <span>$150/hr</span>
+              </div>
+              <p className="text-slate-500 text-xs mt-2">This drives the Good / Better / Best quote calculator. You can update it anytime in Settings.</p>
+            </div>
+
             <div className="bg-slate-800/60 rounded-xl p-4 mb-6 text-sm text-slate-400">
-              <p>QuotePro AI generates <span className="text-white font-medium">Good / Better / Best</span> quotes from this baseline. You can always refine your rates later.</p>
+              <p>QuotePro AI generates <span className="text-white font-medium">Good / Better / Best</span> quotes from these rates. You can always refine them later.</p>
             </div>
 
             <div className="flex gap-3">
