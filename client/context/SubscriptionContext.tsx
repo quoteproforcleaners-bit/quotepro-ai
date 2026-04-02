@@ -224,7 +224,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   const syncToServer = useCallback(async (newTier: PlanTier) => {
     try {
-      await apiRequest("POST", "/api/subscription/sync", { tier: newTier });
+      let appUserId: string | undefined;
+      if (Platform.OS !== "web") {
+        try {
+          const RC = getPurchases();
+          if (RC) appUserId = await RC.getAppUserID();
+        } catch (_) {}
+      }
+      await apiRequest("POST", "/api/subscription/sync", { tier: newTier, appUserId });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     } catch (error) {
       console.warn("[RC] Sync to server failed:", error);

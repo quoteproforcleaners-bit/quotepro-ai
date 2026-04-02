@@ -655,7 +655,9 @@ const router = Router();
         console.warn("REVENUECAT_SECRET_KEY not set — subscription sync proceeding without server-side verification");
       }
 
-      const user = await updateUser(req.session.userId!, { subscriptionTier: tier });
+      const updatePayload: Record<string, any> = { subscriptionTier: tier, subscriptionPlatform: "revenuecat" };
+      if (appUserId) updatePayload.revenuecatUserId = appUserId;
+      const user = await updateUser(req.session.userId!, updatePayload as any);
       return res.json({ tier: user.subscriptionTier });
     } catch {
       return res.status(500).json({ message: "Sync failed" });

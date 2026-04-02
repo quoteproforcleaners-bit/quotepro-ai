@@ -249,14 +249,28 @@ const router = Router();
         }
       }
 
+      // When line items are provided, the server is the authority on total/subtotal.
+      // Strip any client-sent values so they cannot overwrite with 0 or stale data.
+      if (lineItems) {
+        delete data.total;
+        delete data.subtotal;
+      }
+
       const oldQuote = await getQuoteById(req.params.id);
-      const q = await updateQuote(req.params.id, data);
+      let q = await updateQuote(req.params.id, data);
 
       if (lineItems) {
         await deleteLineItemsByQuote(q.id);
+        const createdItems = [];
         for (const li of lineItems) {
-          await createLineItem({ ...li, quoteId: q.id });
+          const created = await createLineItem({ ...li, quoteId: q.id });
+          createdItems.push(created);
         }
+        // Recalculate totals from the actual line items stored in DB
+        const subtotal = createdItems.reduce((sum, li) => sum + (li.totalPrice || 0), 0);
+        const taxAmount = typeof (req.body.tax ?? data.tax) === "number" ? (req.body.tax ?? data.tax) : 0;
+        const total = subtotal + taxAmount;
+        q = await updateQuote(req.params.id, { subtotal, total });
       }
 
       if (data.status && oldQuote && data.status !== oldQuote.status) {
