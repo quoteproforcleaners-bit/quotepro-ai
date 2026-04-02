@@ -6,8 +6,8 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
-run = ["bash", "-c", "NODE_ENV=production npx tsx server/index.ts"]
+build = ["bash", "-c", "cd web && npx vite build && npm run server:build"]
+run = ["bash", "-c", "NODE_ENV=production node server_dist/index.js"]
 publicDir = "dist"
 
 [[ports]]
