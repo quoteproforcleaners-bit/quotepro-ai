@@ -27,6 +27,7 @@ import {
 import { enrollUserInDrip } from "../dripEmails";
 import { trackEvent } from "../analytics";
 import { AnalyticsEvents } from "../../shared/analytics-events";
+import { syncRcUserTier } from "./revenuecatRouter";
 import {
   getUserById, getUserByEmail, getUserByProviderId, createUser, updateUser,
   getBusinessByOwner, createBusiness, updateBusiness,
@@ -651,10 +652,24 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
 
     try {
-      const user = await getUserById(req.session.userId);
+      let user = await getUserById(req.session.userId);
       if (!user) {
         req.session.destroy(() => {});
         return res.status(401).json({ message: "User not found" });
+      }
+
+      // Auto-sync RC subscription so web access always reflects the latest mobile purchase.
+      // Fires only when: user is on the revenuecat platform, has an RC user ID,
+      // and their sync is stale (> 4 hours). Non-blocking on failure.
+      const rcUserId = (user as any).revenuecatUserId ?? (user as any).revenuecat_user_id ?? null;
+      const subscriptionPlatform = (user as any).subscriptionPlatform ?? (user as any).subscription_platform ?? null;
+      if (rcUserId && subscriptionPlatform === "revenuecat") {
+        try {
+          const verifiedTier = await syncRcUserTier(user.id, rcUserId);
+          if (verifiedTier !== "unknown" && verifiedTier !== (user as any).subscriptionTier) {
+            user = (await getUserById(req.session.userId)) ?? user;
+          }
+        } catch (_) {}
       }
 
       const business = await getBusinessByOwner(user.id);

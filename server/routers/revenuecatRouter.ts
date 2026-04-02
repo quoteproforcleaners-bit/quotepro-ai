@@ -239,6 +239,74 @@ export async function grantRevenueCatEntitlement(
 }
 
 /**
+ * Verify a user's RC subscription against the RC API and update the DB.
+ * Safe to call on every web login — skips if synced within the last 4 hours.
+ * Returns the verified tier string.
+ */
+export async function syncRcUserTier(userId: string, rcUserId: string, force = false): Promise<string> {
+  const rcSecretKey = process.env.REVENUECAT_SECRET_KEY;
+  if (!rcSecretKey || !rcUserId) return "unknown";
+
+  // Skip if recently synced (unless forced)
+  if (!force) {
+    const check = await pool.query(
+      `SELECT subscription_synced_at FROM users WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    const syncedAt = check.rows[0]?.subscription_synced_at;
+    if (syncedAt && Date.now() - new Date(syncedAt).getTime() < 4 * 60 * 60 * 1000) {
+      return check.rows[0]?.subscription_tier ?? "free";
+    }
+  }
+
+  try {
+    const tier = await getRevenueCatTier(rcUserId);
+    await pool.query(
+      `UPDATE users SET subscription_tier = $1, subscription_synced_at = NOW() WHERE id = $2`,
+      [tier, userId]
+    );
+    console.log(`[RC sync] user=${userId} rcUser=${rcUserId} → tier=${tier}`);
+    return tier;
+  } catch (err: any) {
+    console.error(`[RC sync] Failed for user=${userId}:`, err.message);
+    return "unknown";
+  }
+}
+
+/**
+ * Bulk-sync all RC users whose subscription_synced_at is stale (> 23 hours).
+ * Called by the daily cron job.
+ */
+export async function bulkSyncRcUsers(): Promise<void> {
+  const rcSecretKey = process.env.REVENUECAT_SECRET_KEY;
+  if (!rcSecretKey) {
+    console.warn("[RC bulk sync] REVENUECAT_SECRET_KEY not set — skipping");
+    return;
+  }
+
+  const result = await pool.query(
+    `SELECT id, revenuecat_user_id FROM users
+     WHERE subscription_platform = 'revenuecat'
+       AND revenuecat_user_id IS NOT NULL
+       AND (subscription_synced_at IS NULL OR subscription_synced_at < NOW() - INTERVAL '23 hours')`
+  );
+
+  console.log(`[RC bulk sync] Syncing ${result.rows.length} RC users`);
+
+  for (const row of result.rows) {
+    try {
+      await syncRcUserTier(row.id, row.revenuecat_user_id, true);
+      // Small delay to avoid hammering RC API
+      await new Promise(r => setTimeout(r, 200));
+    } catch (err: any) {
+      console.error(`[RC bulk sync] Error for user ${row.id}:`, err.message);
+    }
+  }
+
+  console.log("[RC bulk sync] Complete");
+}
+
+/**
  * Get or create a RevenueCat subscriber and return their active tier.
  */
 export async function getRevenueCatTier(appUserId: string): Promise<string> {

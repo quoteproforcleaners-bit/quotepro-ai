@@ -6,6 +6,7 @@ import * as path from "path";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
 import { processDripQueue } from "./dripEmails";
+import { bulkSyncRcUsers } from "./routers/revenuecatRouter";
 import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
 import { sendPush } from "./pushNotifications";
 import { initNotificationTables, runNotificationScheduler } from "./notificationScheduler";
@@ -606,6 +607,25 @@ async function seedToDoDemo() {
     }, msUntil6am);
   }
   scheduleChurnScoringCron();
+
+  // ─── RevenueCat bulk subscription sync: fires daily at 3am ───────────────
+  // Ensures every mobile (Apple/Google) subscriber has the correct tier in the
+  // DB so web access is always in parity — even without webhook delivery.
+  function scheduleRcBulkSync() {
+    const now = new Date();
+    const next3am = new Date(now);
+    next3am.setHours(3, 0, 0, 0);
+    if (next3am <= now) next3am.setDate(next3am.getDate() + 1);
+    const msUntil3am = next3am.getTime() - now.getTime();
+    setTimeout(() => {
+      bulkSyncRcUsers().catch((e: any) => console.error("[RC bulk sync] Cron error:", e.message));
+      setInterval(() => {
+        bulkSyncRcUsers().catch((e: any) => console.error("[RC bulk sync] Cron error:", e.message));
+      }, 24 * 60 * 60 * 1000);
+    }, msUntil3am);
+  }
+  scheduleRcBulkSync();
+
 
   // ─── Follow-up queue push: daily 8:30am, once per day if queue > 0 ────────
   function scheduleFollowUpQueuePushCron() {
