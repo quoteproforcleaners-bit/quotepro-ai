@@ -1711,7 +1711,7 @@ router.get("/api/cleaner-notification-preferences", requireAuth, async (req: any
               cleaner_notification_email, cleaner_notification_sms,
               cleaner_notification_timing
        FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
-      [req.user.id]
+      [req.session.userId]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Business not found" });
     const row = r.rows[0];
@@ -1745,7 +1745,7 @@ router.put("/api/cleaner-notification-preferences", requireAuth, async (req: any
         email !== undefined ? Boolean(email) : true,
         sms !== undefined ? Boolean(sms) : true,
         timing || "both",
-        req.user.id,
+        req.session.userId,
       ]
     );
     res.json({ success: true });
@@ -1757,7 +1757,7 @@ router.put("/api/cleaner-notification-preferences", requireAuth, async (req: any
 router.post("/api/cleaner-notification-preferences/test", requireAuth, async (req: any, res: Response) => {
   try {
     const bizRes = await pool.query(
-      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.user.id]
+      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.session.userId]
     );
     if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
     const { employeeId } = req.body;
@@ -1775,7 +1775,7 @@ router.get("/api/reminder-preferences", requireAuth, async (req: any, res: Respo
   try {
     const r = await pool.query(
       `SELECT customer_email_reminder_days, customer_sms_reminder_days FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
-      [req.user.id]
+      [req.session.userId]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Business not found" });
     const row = r.rows[0];
@@ -1797,7 +1797,7 @@ router.put("/api/reminder-preferences", requireAuth, async (req: any, res: Respo
       [
         emailReminderDays === null || emailReminderDays === undefined ? null : Number(emailReminderDays),
         smsReminderDays === null || smsReminderDays === undefined ? null : Number(smsReminderDays),
-        req.user.id,
+        req.session.userId,
       ]
     );
     res.json({ success: true });
@@ -1809,7 +1809,7 @@ router.put("/api/reminder-preferences", requireAuth, async (req: any, res: Respo
 router.post("/api/reminder-preferences/test", requireAuth, async (req: any, res: Response) => {
   try {
     const bizRes = await pool.query(
-      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.user.id]
+      `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.session.userId]
     );
     if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
     const result = await sendTestReminder(bizRes.rows[0].id);

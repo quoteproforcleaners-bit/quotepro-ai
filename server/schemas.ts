@@ -36,11 +36,16 @@ export type QuoteTier = z.infer<typeof QuoteTierSchema>;
 
 // ─── Quote Add-Ons ────────────────────────────────────────────────────────────
 // The add_ons JSONB column maps add-on keys to their selection state and price.
+// Legacy format stored plain booleans; current format stores {selected, price}.
+// Both are accepted for backward compatibility.
 
-export const QuoteAddOnItemSchema = z.object({
-  selected: z.boolean(),
-  price: z.number().nonnegative(),
-});
+export const QuoteAddOnItemSchema = z.union([
+  z.object({
+    selected: z.boolean(),
+    price: z.number().nonnegative(),
+  }),
+  z.boolean().transform((b) => ({ selected: b, price: 0 })),
+]);
 
 export const QuoteAddOnsSchema = z.record(z.string(), QuoteAddOnItemSchema);
 

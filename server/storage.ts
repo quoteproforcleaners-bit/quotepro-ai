@@ -381,8 +381,14 @@ export async function getQuotesByBusiness(
 export async function getQuoteById(id: string): Promise<QuoteRow | undefined> {
   const [q] = await db.select().from(quotes).where(and(eq(quotes.id, id), isNull(quotes.deletedAt)));
   if (!q) return undefined;
-  parseJsonbField(QuoteOptionsSchema, q.options, "options", q.id);
-  parseJsonbField(QuoteAddOnsSchema, q.addOns, "addOns", q.id);
+  try { parseJsonbField(QuoteOptionsSchema, q.options, "options", q.id); } catch (e: any) {
+    console.warn(`[getQuoteById] Skipping malformed options on quote ${q.id}: ${e.message}`);
+    (q as any).options = {};
+  }
+  try { parseJsonbField(QuoteAddOnsSchema, q.addOns, "addOns", q.id); } catch (e: any) {
+    console.warn(`[getQuoteById] Skipping malformed addOns on quote ${q.id}: ${e.message}`);
+    (q as any).addOns = {};
+  }
   return q;
 }
 
@@ -391,8 +397,14 @@ export async function getQuoteByToken(token: string): Promise<QuoteRow | undefin
   // (so customers can still view a quote they received, but it won't appear in business lists)
   const [q] = await db.select().from(quotes).where(eq(quotes.publicToken, token));
   if (!q) return undefined;
-  parseJsonbField(QuoteOptionsSchema, q.options, "options", q.id);
-  parseJsonbField(QuoteAddOnsSchema, q.addOns, "addOns", q.id);
+  try { parseJsonbField(QuoteOptionsSchema, q.options, "options", q.id); } catch (e: any) {
+    console.warn(`[getQuoteByToken] Skipping malformed options on quote ${q.id}: ${e.message}`);
+    (q as any).options = {};
+  }
+  try { parseJsonbField(QuoteAddOnsSchema, q.addOns, "addOns", q.id); } catch (e: any) {
+    console.warn(`[getQuoteByToken] Skipping malformed addOns on quote ${q.id}: ${e.message}`);
+    (q as any).addOns = {};
+  }
   return q;
 }
 
