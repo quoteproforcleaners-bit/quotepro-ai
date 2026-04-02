@@ -118,7 +118,6 @@ export default function App() {
           }
         />
         <Route path="/checkin/:token" element={<JobCheckinPage />} />
-        <Route path="/quote-doctor" element={<QuoteDoctorPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/upgrade" element={<Navigate to="/pricing" replace />} />
         <Route path="/pricing/success" element={
@@ -175,6 +174,7 @@ export default function App() {
           <Route path="/lead-finder/settings" element={<ProGate feature="Local Lead Finder"><LeadFinderSettingsPage /></ProGate>} />
           <Route path="/lead-finder/:id" element={<ProGate feature="Local Lead Finder"><LeadFinderDetailPage /></ProGate>} />
           <Route path="/revenue" element={<ProGate feature="Revenue Intelligence"><RevenuePage /></ProGate>} />
+          <Route path="/quote-doctor" element={<QuoteDoctorPage />} />
           <Route path="/closing-assistant" element={<ClosingAssistantPage />} />
           <Route path="/commercial-quote" element={<ProGate feature="Commercial Quoting"><CommercialQuotePage /></ProGate>} />
           <Route path="/commercial-settings" element={<ProGate feature="Commercial Quoting"><CommercialSettingsPage /></ProGate>} />

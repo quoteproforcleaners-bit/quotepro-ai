@@ -7,6 +7,7 @@ import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { sanitizeForPrompt } from "../promptSanitizer";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -294,8 +295,9 @@ const router = Router();
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
-      const { message, channel, senderName } = req.body;
-      if (!message) return res.status(400).json({ message: "message is required" });
+      const { message: rawMessage, channel, senderName } = req.body;
+      if (!rawMessage) return res.status(400).json({ message: "message is required" });
+      const message = sanitizeForPrompt(String(rawMessage));
 
       const dmChannel = channel || "instagram";
       const dmSender = senderName || "Test User";

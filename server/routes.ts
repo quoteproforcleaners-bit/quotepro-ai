@@ -66,7 +66,17 @@ function setupSession(app: Express) {
         pool: pool as any,
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET || "quotepro-dev-secret",
+      secret: (() => {
+        const s = process.env.SESSION_SECRET;
+        if (!s) {
+          const isProduction = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1";
+          if (isProduction) {
+            console.error("[SECURITY] SESSION_SECRET env var is not set in production — sessions are insecure. Set this immediately.");
+          }
+          return "quotepro-dev-secret";
+        }
+        return s;
+      })(),
       resave: false,
       saveUninitialized: false,
       cookie: {

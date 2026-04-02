@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { apiGet, apiPost } from "./api";
+import { queryClient } from "./queryClient";
 
 interface User {
   id: string;
@@ -91,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await apiPost("/api/auth/logout");
+    queryClient.clear();
     setUser(null);
     setBusiness(null);
   }, []);

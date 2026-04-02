@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { openai } from "../clients";
+import { requireAuth } from "../middleware";
+import { sanitizeForPrompt } from "../promptSanitizer";
 
 export const quoteDoctorRouter = Router();
 
@@ -91,13 +93,14 @@ Apply the requested changes precisely:
 
 // ─── Optimize existing quote ──────────────────────────────────────────────────
 
-quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: Response) => {
+quoteDoctorRouter.post("/api/quote-doctor/optimize", requireAuth, async (req: Request, res: Response) => {
   try {
-    const { quoteText, imageBase64, imageMimeType } = req.body as {
+    const { quoteText: rawQuoteText, imageBase64, imageMimeType } = req.body as {
       quoteText?: string;
       imageBase64?: string;
       imageMimeType?: string;
     };
+    const quoteText = rawQuoteText ? sanitizeForPrompt(rawQuoteText) : undefined;
 
     console.log("[QuoteDoctor] request — hasText:", !!quoteText, "hasImage:", !!imageBase64,
       imageBase64 ? `(~${Math.round(imageBase64.length * 0.75 / 1024)}KB)` : "");
@@ -148,7 +151,7 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", async (req: Request, res: R
 
 // ─── Generate scope of work ───────────────────────────────────────────────────
 
-quoteDoctorRouter.post("/api/quote-doctor/scope", async (req: Request, res: Response) => {
+quoteDoctorRouter.post("/api/quote-doctor/scope", requireAuth, async (req: Request, res: Response) => {
   try {
     const {
       facilityType,
@@ -202,16 +205,18 @@ quoteDoctorRouter.post("/api/quote-doctor/scope", async (req: Request, res: Resp
 
 // ─── AI adjust existing proposal ──────────────────────────────────────────────
 
-quoteDoctorRouter.post("/api/quote-doctor/adjust", async (req: Request, res: Response) => {
+quoteDoctorRouter.post("/api/quote-doctor/adjust", requireAuth, async (req: Request, res: Response) => {
   try {
-    const { currentProposal, instructions } = req.body as {
+    const { currentProposal: rawProposal, instructions: rawInstructions } = req.body as {
       currentProposal?: string;
       instructions?: string;
     };
 
-    if (!currentProposal || !instructions) {
+    if (!rawProposal || !rawInstructions) {
       return res.status(400).json({ error: "Proposal and adjustment instructions required" });
     }
+    const currentProposal = sanitizeForPrompt(rawProposal);
+    const instructions = sanitizeForPrompt(rawInstructions);
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",

@@ -77,7 +77,8 @@ const router = Router();
 
   router.get("/api/admin/grant-pro", async (req: Request, res: Response) => {
     const { email, secret } = req.query as { email?: string; secret?: string };
-    if (secret !== "qp-admin-2024-xK9m") {
+    const GRANT_PRO_SECRET = process.env.ADMIN_GRANT_PRO_SECRET;
+    if (!GRANT_PRO_SECRET || secret !== GRANT_PRO_SECRET) {
       return res.status(403).send("Forbidden");
     }
     if (!email) {
@@ -274,13 +275,18 @@ const router = Router();
         "first_job_completed",
         "upgrade_completed",
       ];
+      const stepParams = steps.map((s, i) => `$${i + 1}`).join(",");
+      const batchResult = await pool.query(
+        `SELECT event_name, COUNT(DISTINCT business_id) AS cnt
+         FROM analytics_events
+         WHERE event_name = ANY(ARRAY[${stepParams}]::text[])
+         GROUP BY event_name`,
+        steps
+      );
       const rows: Record<string, number> = {};
-      for (const step of steps) {
-        const r = await pool.query(
-          `SELECT COUNT(DISTINCT business_id) AS cnt FROM analytics_events WHERE event_name = $1`,
-          [step]
-        );
-        rows[step] = parseInt(r.rows[0]?.cnt ?? "0", 10);
+      for (const step of steps) rows[step] = 0;
+      for (const r of batchResult.rows) {
+        rows[r.event_name] = parseInt(r.cnt ?? "0", 10);
       }
       const dropOff = steps.map((step, i) => ({
         step,
