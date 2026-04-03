@@ -138,11 +138,11 @@ function buildWelcomeEmailHtml(name: string | null): string {
         <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:4px 14px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:16px;">
           Welcome to QuotePro
         </div>
-        <h1 style="font-size:26px;font-weight:800;color:#fff;margin:0 0 10px;line-height:1.2;">
-          Hey ${firstName}, you're in!
+        <h1 style="font-size:26px;font-weight:800;color:#ffffff;margin:0 0 10px;line-height:1.2;">
+          <span style="color:#ffffff;">Hey ${firstName}, you're in!</span>
         </h1>
-        <p style="font-size:15px;color:rgba(186,213,253,0.9);margin:0;line-height:1.6;">
-          Thanks for signing up. QuotePro is built to help your cleaning business win more jobs and run smoother — starting today.
+        <p style="font-size:15px;color:#c7ddff;margin:0;line-height:1.6;">
+          <span style="color:#c7ddff;">Thanks for signing up. QuotePro is built to help your cleaning business win more jobs and run smoother — starting today.</span>
         </p>
       </div>
     </div>
