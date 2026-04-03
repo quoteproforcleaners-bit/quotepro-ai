@@ -21,6 +21,7 @@ interface Props {
 }
 
 export default function OnboardingPricingScreen({ onNext, onBack }: Props) {
+  const [hourlyRate, setHourlyRate] = useState(55);
   const [minimumTicket, setMinimumTicket] = useState(150);
   const [saving, setSaving] = useState(false);
 
@@ -28,16 +29,22 @@ export default function OnboardingPricingScreen({ onNext, onBack }: Props) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
-      await apiRequest("PUT", "/api/pricing", { minimumTicket }).catch(() => {});
+      await apiRequest("PUT", "/api/pricing", { hourlyRate, minimumTicket }).catch(() => {});
     } finally {
       setSaving(false);
     }
     onNext(minimumTicket);
   };
 
-  const handleSliderChange = (value: number) => {
+  const handleMinTicketSlider = (value: number) => {
     const snapped = Math.round(value / 5) * 5;
     setMinimumTicket(snapped);
+    Haptics.selectionAsync();
+  };
+
+  const handleHourlySlider = (value: number) => {
+    const snapped = Math.round(value / 5) * 5;
+    setHourlyRate(snapped);
     Haptics.selectionAsync();
   };
 
@@ -55,10 +62,47 @@ export default function OnboardingPricingScreen({ onNext, onBack }: Props) {
           <View style={styles.iconWrap}>
             <Feather name="dollar-sign" size={28} color="#4ade80" />
           </View>
-          <Text style={styles.heading}>What do you charge for a standard house clean?</Text>
-          <Text style={styles.subheading}>This sets your minimum ticket — we generate Good/Better/Best quotes from here</Text>
+          <Text style={styles.heading}>Set your pricing</Text>
+          <Text style={styles.subheading}>
+            QuotePro AI uses these to generate Good / Better / Best quotes. You can refine everything in Settings anytime.
+          </Text>
 
-          {/* Price display */}
+          {/* Hourly Rate */}
+          <Text style={styles.fieldLabel}>Hourly Rate</Text>
+          <View style={styles.priceCard}>
+            <Text style={styles.currencySign}>$</Text>
+            <TextInput
+              style={styles.priceInput}
+              value={String(hourlyRate)}
+              onChangeText={(t) => {
+                const n = parseInt(t, 10);
+                if (!isNaN(n)) setHourlyRate(Math.max(15, Math.min(500, n)));
+              }}
+              keyboardType="number-pad"
+              selectTextOnFocus
+              testID="input-hourly-rate"
+            />
+            <Text style={styles.perLabel}>/hr</Text>
+          </View>
+          <Slider
+            style={{ width: "100%", height: 40 }}
+            minimumValue={15}
+            maximumValue={200}
+            step={5}
+            value={hourlyRate}
+            onValueChange={handleHourlySlider}
+            minimumTrackTintColor="#4ade80"
+            maximumTrackTintColor="#1e293b"
+            thumbTintColor="#4ade80"
+          />
+          <View style={styles.sliderLabels}>
+            <Text style={styles.sliderLabel}>$15</Text>
+            <Text style={[styles.sliderLabel, { color: "#4ade80" }]}>Industry avg: $40–$65/hr</Text>
+            <Text style={styles.sliderLabel}>$200</Text>
+          </View>
+
+          {/* Minimum Ticket */}
+          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Minimum Job Price</Text>
           <View style={styles.priceCard}>
             <Text style={styles.currencySign}>$</Text>
             <TextInput
@@ -70,22 +114,21 @@ export default function OnboardingPricingScreen({ onNext, onBack }: Props) {
               }}
               keyboardType="number-pad"
               selectTextOnFocus
+              testID="input-minimum-ticket"
             />
           </View>
-
-          {/* Slider */}
           <Slider
             style={{ width: "100%", height: 40 }}
             minimumValue={50}
             maximumValue={500}
             step={5}
             value={minimumTicket}
-            onValueChange={handleSliderChange}
+            onValueChange={handleMinTicketSlider}
             minimumTrackTintColor="#4ade80"
             maximumTrackTintColor="#1e293b"
             thumbTintColor="#4ade80"
           />
-          <View style={styles.sliderLabels}>
+          <View style={[styles.sliderLabels, { marginBottom: 28 }]}>
             <Text style={styles.sliderLabel}>$50</Text>
             <Text style={[styles.sliderLabel, { color: "#4ade80" }]}>Industry avg: $120–$180</Text>
             <Text style={styles.sliderLabel}>$500+</Text>
@@ -95,7 +138,8 @@ export default function OnboardingPricingScreen({ onNext, onBack }: Props) {
           <View style={styles.infoCard}>
             <Feather name="info" size={14} color="#94a3b8" style={{ marginTop: 2 }} />
             <Text style={styles.infoText}>
-              QuotePro AI generates <Text style={{ color: "#f1f5f9", fontWeight: "700" }}>Good / Better / Best</Text> options from this price. You can refine all rates in Settings anytime.
+              Your hourly rate drives all quote calculations.{" "}
+              <Text style={{ color: "#f1f5f9", fontWeight: "700" }}>This is the most important field</Text> — you can always adjust it later in Settings.
             </Text>
           </View>
 
@@ -109,6 +153,7 @@ export default function OnboardingPricingScreen({ onNext, onBack }: Props) {
               onPress={handleNext}
               disabled={saving}
               activeOpacity={0.8}
+              testID="button-onboarding-pricing-continue"
             >
               <LinearGradient colors={["#16a34a", "#15803d"]} style={styles.buttonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -138,6 +183,7 @@ const styles = StyleSheet.create({
   },
   heading: { fontSize: 24, fontWeight: "700", color: "#f1f5f9", marginBottom: 10 },
   subheading: { fontSize: 14, color: "#94a3b8", marginBottom: 32, lineHeight: 20 },
+  fieldLabel: { fontSize: 13, fontWeight: "600", color: "#64748b", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
   priceCard: {
     flexDirection: "row", alignItems: "center", justifyContent: "center",
     backgroundColor: "#1e293b", borderRadius: 20, padding: 20, marginBottom: 16,
@@ -145,7 +191,8 @@ const styles = StyleSheet.create({
   },
   currencySign: { fontSize: 36, fontWeight: "700", color: "#4ade80", marginRight: 4 },
   priceInput: { fontSize: 52, fontWeight: "800", color: "#f1f5f9", minWidth: 120, textAlign: "center" },
-  sliderLabels: { flexDirection: "row", justifyContent: "space-between", marginBottom: 28 },
+  perLabel: { fontSize: 18, color: "#64748b", marginLeft: 6, alignSelf: "flex-end", paddingBottom: 8 },
+  sliderLabels: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
   sliderLabel: { fontSize: 12, color: "#475569" },
   infoCard: {
     flexDirection: "row", gap: 10, backgroundColor: "rgba(30,41,59,0.8)",
