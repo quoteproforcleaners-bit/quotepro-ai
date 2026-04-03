@@ -1349,11 +1349,12 @@ const router = Router();
       const pricingUrl = `${baseUrl}/settings?tab=payments`;
       const shareUrl = `${baseUrl}/lead-link`;
 
-      // Get owner name and email
-      const ownerFullName: string = (business as any).senderName || "";
-      const ownerFirstName = ownerFullName.split(" ")[0] || "there";
-      const toEmail: string = (business as any).email || "";
+      // Get owner name and email — email lives on the users table, not businesses
+      const owner = await getUserById(req.session.userId!);
+      const toEmail: string = owner?.email || (business as any).email || "";
       if (!toEmail) return res.status(400).json({ message: "No email address on file" });
+      const ownerFullName: string = (business as any).senderName || owner?.firstName || "";
+      const ownerFirstName = ownerFullName.split(" ")[0] || "there";
 
       const html = buildLeadLinkGuideEmail({ ownerFirstName, leadLinkUrl, pricingUrl, shareUrl });
 

@@ -10,7 +10,7 @@ import type {
 import type { FacilityType } from "../lib/pricingEngine";
 import { compareToBenchmark, benchmarkBadgeText, BENCHMARK_CITATIONS, NATIONAL_AVERAGES } from "../lib/benchmarks";
 import { Tooltip, LabelWithTooltip } from "./Tooltip";
-import { CommercialBenchmarkBadge } from "./BenchmarkBadge";
+import { CommercialBenchmarkBadge, ResidentialBenchmarkBadge } from "./BenchmarkBadge";
 
 // ─── Animated Number ──────────────────────────────────────────────────────────
 
@@ -232,9 +232,10 @@ interface ResidentialPreviewProps {
   adjustment: ManualAdjustment;
   onAdjustmentChange: (a: ManualAdjustment) => void;
   frequency: string;
+  beds?: number;
 }
 
-export function ResidentialLivePreview({ result, selectedTier, priceOverride, adjustment, onAdjustmentChange, frequency }: ResidentialPreviewProps) {
+export function ResidentialLivePreview({ result, selectedTier, priceOverride, adjustment, onAdjustmentChange, frequency, beds }: ResidentialPreviewProps) {
   const tier = result[selectedTier];
   const basePrice = priceOverride ?? tier.price;
   const total = basePrice + adjustment.amount;
@@ -267,6 +268,10 @@ export function ResidentialLivePreview({ result, selectedTier, priceOverride, ad
         <div className="space-y-2">
           {result[selectedTier].warnings.map((w, i) => <WarningChip key={i} w={w} />)}
         </div>
+      )}
+
+      {beds && beds > 0 && total > 0 && (
+        <ResidentialBenchmarkBadge visitPrice={total} beds={beds} frequency={frequency} />
       )}
 
       <Section title="Price Breakdown" defaultOpen>

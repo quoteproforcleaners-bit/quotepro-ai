@@ -59,6 +59,7 @@ export default function LeadCapturePage() {
 
   const [guideSent, setGuideSent] = useState(false);
   const [guideSending, setGuideSending] = useState(false);
+  const [guideError, setGuideError] = useState<string | null>(null);
 
   const { data: guideStatus } = useQuery<{ sentAt: string | null; hasSlug: boolean }>({
     queryKey: ["/api/lead-link/guide-status"],
@@ -66,6 +67,7 @@ export default function LeadCapturePage() {
 
   const handleSendGuide = async () => {
     setGuideSending(true);
+    setGuideError(null);
     try {
       const res = await fetch("/api/lead-link/send-guide-email", {
         method: "POST",
@@ -76,9 +78,12 @@ export default function LeadCapturePage() {
       if (res.ok) {
         setGuideSent(true);
         queryClient.invalidateQueries({ queryKey: ["/api/lead-link/guide-status"] });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setGuideError(data.message || "Failed to send. Please try again.");
       }
     } catch {
-      // fail silently
+      setGuideError("Failed to send. Please check your connection and try again.");
     } finally {
       setGuideSending(false);
     }
@@ -232,22 +237,27 @@ export default function LeadCapturePage() {
 
       {/* Guide email card — shown if guide has not been sent yet */}
       {showGuideCard ? (
-        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
-            <Mail className="w-4 h-4 text-teal-600" />
+        <>
+          <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-xl p-4 flex items-center gap-4">
+            <div className="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+              <Mail className="w-4 h-4 text-teal-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-teal-900">Get setup instructions by email</p>
+              <p className="text-xs text-teal-700 mt-0.5">We'll send you examples and tips for sharing your Lead Link effectively.</p>
+            </div>
+            <button
+              onClick={handleSendGuide}
+              disabled={guideSending}
+              className="flex-shrink-0 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+            >
+              {guideSending ? "Sending..." : "Send me the setup guide"}
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-teal-900">Get setup instructions by email</p>
-            <p className="text-xs text-teal-700 mt-0.5">We'll send you examples and tips for sharing your Lead Link effectively.</p>
-          </div>
-          <button
-            onClick={handleSendGuide}
-            disabled={guideSending}
-            className="flex-shrink-0 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-          >
-            {guideSending ? "Sending..." : "Send me the setup guide"}
-          </button>
-        </div>
+          {guideError ? (
+            <p className="text-xs text-red-600 mt-2 px-1">{guideError}</p>
+          ) : null}
+        </>
       ) : guideSent ? (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />

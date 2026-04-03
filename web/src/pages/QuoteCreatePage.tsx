@@ -1502,6 +1502,7 @@ export default function QuoteCreatePage() {
             adjustment={adjustment}
             onAdjustmentChange={setAdjustment}
             frequency={services.frequency}
+            beds={property.beds}
           />
         </LivePreviewPanel>
       </div>

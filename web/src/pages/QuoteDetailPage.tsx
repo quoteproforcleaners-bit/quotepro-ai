@@ -7,7 +7,7 @@ import { useSubscription } from "../lib/subscription";
 import SendQuoteModal from "../components/SendQuoteModal";
 import EditQuoteModal from "../components/EditQuoteModal";
 import DispatchCard from "../components/DispatchCard";
-import { CommercialBenchmarkBadge } from "../components/BenchmarkBadge";
+import { CommercialBenchmarkBadge, ResidentialBenchmarkBadge } from "../components/BenchmarkBadge";
 import {
   ExternalLink,
   Copy,
@@ -1011,6 +1011,22 @@ export default function QuoteDetailPage() {
           <Card>
             <CardHeader title="Summary" />
             <div className="space-y-3 text-sm">
+
+              {/* Send Quote CTA — top of card for draft quotes */}
+              {quote.status === "draft" ? (
+                <button
+                  onClick={sendQuote}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98]"
+                  style={{
+                    background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                    boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
+                  }}
+                >
+                  <Send className="w-4 h-4" />
+                  Send Quote to Customer
+                </button>
+              ) : null}
+
               <div className="flex justify-between items-end">
                 <span className="text-slate-500">
                   {details?.quoteType === "commercial" ? "Monthly Total" : "Total"}
@@ -1036,19 +1052,14 @@ export default function QuoteDetailPage() {
                 />
               ) : null}
 
-              {/* Prominent Send Quote CTA for draft quotes */}
-              {quote.status === "draft" ? (
-                <button
-                  onClick={sendQuote}
-                  className="w-full flex items-center justify-center gap-2 mt-2 px-4 py-3 rounded-xl text-sm font-bold text-white transition-all"
-                  style={{
-                    background: "linear-gradient(135deg, #2563eb, #4f46e5)",
-                    boxShadow: "0 4px 14px rgba(37,99,235,0.35)",
-                  }}
-                >
-                  <Send className="w-4 h-4" />
-                  Send Quote to Customer
-                </button>
+              {/* National benchmark badge for residential quotes */}
+              {details?.quoteType !== "commercial" && details?.beds && Number(quote.total || 0) > 0 ? (
+                <ResidentialBenchmarkBadge
+                  visitPrice={Number(quote.total || 0)}
+                  beds={Number(details.beds)}
+                  frequency={quote.frequencySelected ?? undefined}
+                  size="compact"
+                />
               ) : null}
 
               {quote.stripeInvoiceStatus ? (
