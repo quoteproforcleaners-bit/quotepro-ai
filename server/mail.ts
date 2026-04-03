@@ -227,7 +227,6 @@ export function sendWelcomeEmail(email: string, name: string | null): void {
     subject: "Welcome to QuotePro — let's get you set up",
     html: buildWelcomeEmailHtml(name),
     fromName: "Mike from QuotePro",
-    fromEmail: MIKE_EMAIL,
     replyTo: MIKE_EMAIL,
   }).catch((err) => {
     console.error("[welcome-email] failed to send to", email, "—", err?.message || err);
