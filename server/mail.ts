@@ -141,8 +141,8 @@ function buildWelcomeEmailHtml(name: string | null): string {
         <table width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr>
             <td>
-              <div style="display:inline-block;background-color:#334d88;border:1px solid #4a6ab5;border-radius:100px;padding:5px 14px;font-size:11px;font-weight:700;color:#c7ddff;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:16px;">
-                Welcome to QuotePro
+              <div style="display:inline-block;background-color:#334d88;border:1px solid #4a6ab5;border-radius:100px;padding:5px 14px;font-size:11px;font-weight:700;color:#00cfff;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:16px;">
+                <span style="color:#00cfff;">Welcome to QuotePro</span>
               </div>
             </td>
           </tr>
