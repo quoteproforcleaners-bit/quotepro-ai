@@ -128,91 +128,146 @@ function buildWelcomeEmailHtml(name: string | null): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Welcome to QuotePro</title>
 </head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,'Inter','Helvetica Neue',Arial,sans-serif;">
-  <div style="max-width:580px;margin:40px auto;padding:0 16px 60px;">
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;">
+<tr><td align="center" style="padding:40px 16px 60px;">
+
+  <table width="580" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
 
     <!-- Header -->
-    <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 55%,#2563eb 100%);border-radius:20px 20px 0 0;padding:36px 40px 32px;position:relative;overflow:hidden;">
-      <div style="position:absolute;inset:0;opacity:0.05;background-image:radial-gradient(circle,white 1px,transparent 1px);background-size:22px 22px;"></div>
-      <div style="position:relative;">
-        <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:4px 14px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:16px;">
-          Welcome to QuotePro
-        </div>
-        <h1 style="font-size:26px;font-weight:800;color:#ffffff;margin:0 0 10px;line-height:1.2;">
-          <span style="color:#ffffff;">Hey ${firstName}, you're in!</span>
-        </h1>
-        <p style="font-size:15px;color:#c7ddff;margin:0;line-height:1.6;">
-          <span style="color:#c7ddff;">Thanks for signing up. QuotePro is built to help your cleaning business win more jobs and run smoother — starting today.</span>
-        </p>
-      </div>
-    </div>
+    <tr>
+      <td style="background-color:#1e3a8a;background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 55%,#2563eb 100%);border-radius:16px 16px 0 0;padding:36px 40px 32px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td>
+              <div style="display:inline-block;background-color:#334d88;border:1px solid #4a6ab5;border-radius:100px;padding:5px 14px;font-size:11px;font-weight:700;color:#c7ddff;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:16px;">
+                Welcome to QuotePro
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-bottom:10px;">
+              <h1 style="font-size:26px;font-weight:800;color:#ffffff;margin:0;line-height:1.2;">Hey ${firstName}, you're in!</h1>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <p style="font-size:15px;color:#c7ddff;margin:0;line-height:1.6;">Thanks for signing up. QuotePro is built to help your cleaning business win more jobs and run smoother &mdash; starting today.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
 
     <!-- Body -->
-    <div style="background:#fff;padding:36px 40px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+    <tr>
+      <td style="background-color:#ffffff;padding:36px 40px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
 
-      <!-- Benefits -->
-      <p style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 16px;">Here's what you can do right now</p>
+        <!-- Section label -->
+        <p style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 20px;">Here&rsquo;s what you can do right now</p>
 
-      <!-- Benefit 1 -->
-      <div style="display:flex;gap:16px;margin-bottom:20px;align-items:flex-start;">
-        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#dbeafe,#bfdbfe);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="18" height="18" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13,2 13,9 20,9"/></svg>
-        </div>
-        <div>
-          <p style="font-size:15px;font-weight:700;color:#0f172a;margin:0 0 4px;">Fast, professional quotes</p>
-          <p style="font-size:14px;color:#64748b;margin:0;line-height:1.6;">Create a branded residential or commercial quote in under 60 seconds — right from your phone or browser. No more back-and-forth guessing on price.</p>
-        </div>
-      </div>
+        <!-- Benefit 1 -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+          <tr>
+            <td width="52" valign="top" style="padding-right:16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="40" height="40" align="center" valign="middle" style="background-color:#dbeafe;border-radius:10px;width:40px;height:40px;">
+                    <img src="https://img.icons8.com/ios/40/2563eb/contract.png" width="20" height="20" alt="" style="display:block;border:0;" />
+                  </td>
+                </tr>
+              </table>
+            </td>
+            <td valign="top">
+              <p style="font-size:15px;font-weight:700;color:#0f172a;margin:0 0 4px;">Fast, professional quotes</p>
+              <p style="font-size:14px;color:#64748b;margin:0;line-height:1.6;">Create a branded residential or commercial quote in under 60 seconds &mdash; right from your phone or browser. No more back-and-forth guessing on price.</p>
+            </td>
+          </tr>
+        </table>
 
-      <!-- Benefit 2 -->
-      <div style="display:flex;gap:16px;margin-bottom:20px;align-items:flex-start;">
-        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#dcfce7,#bbf7d0);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="18" height="18" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        </div>
-        <div>
-          <p style="font-size:15px;font-weight:700;color:#0f172a;margin:0 0 4px;">Capture leads from your website</p>
-          <p style="font-size:14px;color:#64748b;margin:0;line-height:1.6;">Embed a QuotePro lead capture form on your website. Visitors fill it out, and new leads land directly in your dashboard — ready to quote.</p>
-        </div>
-      </div>
+        <!-- Benefit 2 -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+          <tr>
+            <td width="52" valign="top" style="padding-right:16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="40" height="40" align="center" valign="middle" style="background-color:#dcfce7;border-radius:10px;width:40px;height:40px;">
+                    <img src="https://img.icons8.com/ios/40/16a34a/conference-call.png" width="20" height="20" alt="" style="display:block;border:0;" />
+                  </td>
+                </tr>
+              </table>
+            </td>
+            <td valign="top">
+              <p style="font-size:15px;font-weight:700;color:#0f172a;margin:0 0 4px;">Capture leads from your website</p>
+              <p style="font-size:14px;color:#64748b;margin:0;line-height:1.6;">Embed a QuotePro lead capture form on your website. Visitors fill it out, and new leads land directly in your dashboard &mdash; ready to quote.</p>
+            </td>
+          </tr>
+        </table>
 
-      <!-- Benefit 3 -->
-      <div style="display:flex;gap:16px;margin-bottom:32px;align-items:flex-start;">
-        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#ede9fe,#ddd6fe);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="18" height="18" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        </div>
-        <div>
-          <p style="font-size:15px;font-weight:700;color:#0f172a;margin:0 0 4px;">Customer-facing appointment managing</p>
-          <p style="font-size:14px;color:#64748b;margin:0;line-height:1.6;">Your customers get their own portal to view quotes, accept bookings, and track upcoming appointments — reducing back-and-forth calls and no-shows.</p>
-        </div>
-      </div>
+        <!-- Benefit 3 -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
+          <tr>
+            <td width="52" valign="top" style="padding-right:16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="40" height="40" align="center" valign="middle" style="background-color:#ede9fe;border-radius:10px;width:40px;height:40px;">
+                    <img src="https://img.icons8.com/ios/40/7c3aed/calendar.png" width="20" height="20" alt="" style="display:block;border:0;" />
+                  </td>
+                </tr>
+              </table>
+            </td>
+            <td valign="top">
+              <p style="font-size:15px;font-weight:700;color:#0f172a;margin:0 0 4px;">Customer-facing appointment managing</p>
+              <p style="font-size:14px;color:#64748b;margin:0;line-height:1.6;">Your customers get their own portal to view quotes, accept bookings, and track upcoming appointments &mdash; reducing back-and-forth calls and no-shows.</p>
+            </td>
+          </tr>
+        </table>
 
-      <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 28px;">
+        <!-- Divider -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+          <tr><td style="border-top:1px solid #f1f5f9;font-size:0;line-height:0;">&nbsp;</td></tr>
+        </table>
 
-      <!-- Calendly CTA -->
-      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;border-radius:16px;padding:24px 28px;text-align:center;">
-        <p style="font-size:16px;font-weight:800;color:#14532d;margin:0 0 8px;">Book a free 30-min onboarding call</p>
-        <p style="font-size:14px;color:#15803d;margin:0 0 20px;line-height:1.6;">I'll walk you through everything and make sure you're set up to win. No charge, no pitch — just a quick hands-on session with me.</p>
-        <a href="${CALENDLY_LINK}" style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#16a34a,#059669);color:#fff;font-weight:800;font-size:15px;padding:14px 32px;border-radius:12px;text-decoration:none;box-shadow:0 4px 16px rgba(22,163,74,0.35);">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          Pick a Time — It's Free
-        </a>
-        <p style="font-size:12px;color:#4ade80;margin:12px 0 0;">30 minutes · Zoom or phone · No prep needed</p>
-      </div>
+        <!-- Calendly CTA box -->
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0fdf4;border:2px solid #86efac;border-radius:14px;">
+          <tr>
+            <td align="center" style="padding:28px 28px 8px;">
+              <p style="font-size:17px;font-weight:800;color:#14532d;margin:0 0 8px;">Book a free 30-min onboarding call</p>
+              <p style="font-size:14px;color:#15803d;margin:0 0 20px;line-height:1.6;">I'll walk you through everything and make sure you're set up to win.<br>No charge, no pitch &mdash; just a quick hands-on session with me.</p>
+              <a href="${CALENDLY_LINK}" style="display:inline-block;background-color:#16a34a;color:#ffffff;font-weight:800;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;">
+                Pick a Time &mdash; It's Free
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:12px 28px 24px;">
+              <p style="font-size:12px;color:#4ade80;margin:0;">30 minutes &middot; Zoom or phone &middot; No prep needed</p>
+            </td>
+          </tr>
+        </table>
 
-    </div>
+      </td>
+    </tr>
 
     <!-- Footer -->
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 20px 20px;padding:24px 40px;text-align:center;">
-      <p style="font-size:14px;color:#374151;margin:0 0 4px;font-weight:600;">Mike — Founder, QuotePro</p>
-      <p style="font-size:13px;color:#94a3b8;margin:0;">Reply to this email anytime. I read every message.</p>
-      <p style="font-size:12px;color:#cbd5e1;margin:16px 0 0;">
-        <a href="https://app.getquotepro.ai" style="color:#94a3b8;text-decoration:none;">app.getquotepro.ai</a>
-        &nbsp;·&nbsp;
-        <a href="https://app.getquotepro.ai/settings" style="color:#94a3b8;text-decoration:none;">Manage preferences</a>
-      </p>
-    </div>
+    <tr>
+      <td align="center" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 16px 16px;padding:24px 40px;">
+        <p style="font-size:14px;color:#374151;margin:0 0 4px;font-weight:600;">Mike &mdash; Founder, QuotePro</p>
+        <p style="font-size:13px;color:#94a3b8;margin:0 0 16px;">Reply to this email anytime. I read every message.</p>
+        <p style="font-size:12px;color:#cbd5e1;margin:0;">
+          <a href="https://app.getquotepro.ai" style="color:#94a3b8;text-decoration:none;">app.getquotepro.ai</a>
+          &nbsp;&middot;&nbsp;
+          <a href="https://app.getquotepro.ai/settings" style="color:#94a3b8;text-decoration:none;">Manage preferences</a>
+        </p>
+      </td>
+    </tr>
 
-  </div>
+  </table>
+
+</td></tr>
+</table>
+
 </body>
 </html>`;
 }
