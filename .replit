@@ -87,3 +87,6 @@ SENDGRID_FROM_EMAIL = "quote@getquotepro.ai"
 CUSTOM_DOMAIN = "app.getquotepro.ai"
 ADMIN_GRANT_PRO_SECRET = "qp-admin-2024-xK9m"
 ADMIN_TEST_KEY = "qp-admin-test-2024"
+
+[userenv.production]
+EXPO_PUBLIC_DOMAIN = "app.getquotepro.ai"
