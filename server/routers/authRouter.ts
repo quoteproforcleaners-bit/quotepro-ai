@@ -25,6 +25,7 @@ import {
   syncJobToGoogleCalendar,
 } from "../helpers";
 import { enrollUserInDrip } from "../dripEmails";
+import { sendWelcomeEmail } from "../mail";
 import { trackEvent } from "../analytics";
 import { AnalyticsEvents } from "../../shared/analytics-events";
 import { syncRcUserTier } from "./revenuecatRouter";
@@ -144,6 +145,7 @@ const router = Router();
 
       const business = await createBusiness(user.id);
       enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
+      sendWelcomeEmail(email, user.name);
       trackEvent(user.id, AnalyticsEvents.ACCOUNT_CREATED, { authProvider: "email" }).catch(() => {});
       trackEvent(user.id, AnalyticsEvents.TRIAL_STARTED, { plan: "free" }).catch(() => {});
 
@@ -307,6 +309,7 @@ const router = Router();
         user = await createUser({ email, name, authProvider: "apple", providerId });
         await createBusiness(user.id);
         enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
+        sendWelcomeEmail(email, user.name);
       }
 
       await new Promise<void>((resolve, reject) => {
@@ -379,6 +382,7 @@ const router = Router();
 
         const business = await createBusiness(user.id);
         enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
+        sendWelcomeEmail(email, user.name);
         await new Promise<void>((resolve, reject) => {
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
@@ -459,6 +463,7 @@ const router = Router();
 
         const business = await createBusiness(user.id);
         enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
+        sendWelcomeEmail(email, user.name);
         await new Promise<void>((resolve, reject) => {
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
@@ -581,6 +586,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         user = await createUser({ email, name, authProvider: "google", providerId });
         await createBusiness(user.id);
         enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
+        sendWelcomeEmail(email, user.name);
         needsOnboarding = true;
       } else {
         const business = await getBusinessByOwner(user.id);
