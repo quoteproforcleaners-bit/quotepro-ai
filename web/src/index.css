@@ -1,6 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
+/* Force dark: classes to only apply when .dark is explicitly set on an ancestor.
+   Since ThemeProvider always removes .dark from <html>, dark mode is permanently
+   disabled regardless of OS preference. */
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary-50: #eff6ff;
   --color-primary-100: #dbeafe;
