@@ -261,6 +261,103 @@ function buildWelcomeEmailHtml(name: string | null): string {
 }
 
 /**
+ * Send Mike a notification whenever a new trial user signs up.
+ * Fire-and-forget — never throws.
+ */
+export function sendSignupNotification(
+  userEmail: string,
+  userName: string | null | undefined,
+  authProvider: "email" | "apple" | "google",
+): void {
+  const providerLabel =
+    authProvider === "apple"  ? "Apple Sign-In" :
+    authProvider === "google" ? "Google" :
+    "Email / Password";
+
+  const platformLabel =
+    authProvider === "apple"  ? "iOS" :
+    authProvider === "google" ? "Web / iOS" :
+    "Web";
+
+  const displayName = userName || "(no name)";
+  const now = new Date().toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>New QuotePro Signup</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;">
+<tr><td align="center" style="padding:40px 16px;">
+  <table width="520" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;width:100%;">
+    <tr>
+      <td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 55%,#2563eb 100%);border-radius:14px 14px 0 0;padding:28px 32px;">
+        <p style="font-size:11px;font-weight:700;color:#00cfff;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">New Trial Signup</p>
+        <h1 style="font-size:22px;font-weight:800;color:#ffffff;margin:0;line-height:1.2;">You have a new user!</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+              <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Name</span><br>
+              <span style="font-size:16px;font-weight:700;color:#0f172a;">${displayName}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+              <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Email</span><br>
+              <span style="font-size:16px;color:#0f172a;">${userEmail}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+              <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Sign-up Method</span><br>
+              <span style="font-size:16px;color:#0f172a;">${providerLabel}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+              <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Platform</span><br>
+              <span style="font-size:16px;color:#0f172a;">${platformLabel}</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0;">
+              <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Time (ET)</span><br>
+              <span style="font-size:16px;color:#0f172a;">${now}</span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;padding:16px 32px;text-align:center;">
+        <p style="font-size:12px;color:#94a3b8;margin:0;">QuotePro &mdash; app.getquotepro.ai</p>
+      </td>
+    </tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`;
+
+  sendEmail({
+    to: MIKE_EMAIL,
+    subject: `New signup: ${displayName} (${userEmail})`,
+    html,
+    fromName: "QuotePro Alerts",
+    replyTo: null,
+  }).catch((err) => {
+    console.error("[signup-notification] failed —", err?.message || err);
+  });
+}
+
+/**
  * Send a welcome email to a newly signed-up user.
  * Fire-and-forget — never throws. Logs errors only.
  */
