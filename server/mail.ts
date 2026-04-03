@@ -1,31 +1,24 @@
 /**
  * Centralized mail service for QuotePro.
  *
- * All outbound email sends from the platform address (quote@getquotepro.ai)
- * via Zoho SMTP. The tenant's company name appears as the sender display
- * name; their business email is set as Reply-To so customer replies land
- * in their inbox.
+ * All outbound email sends via SendGrid HTTP API from the verified sender
+ * mike@getquotepro.ai. The tenant's company name appears as the sender
+ * display name; their business email is set as Reply-To so customer replies
+ * land in their inbox.
  *
  * Required environment variables:
- *   ZOHO_SMTP_USER  – platform sending address (e.g. quote@getquotepro.ai)
- *   ZOHO_SMTP_PASS  – Zoho account password or app-specific password
- *
- * Optional:
- *   ZOHO_SMTP_HOST  – defaults to smtp.zoho.com
- *   ZOHO_SMTP_PORT  – defaults to 587 (STARTTLS); use 465 for SSL
+ *   SENDGRID_API_KEY – SendGrid API key with Mail Send permission
  */
-import nodemailer from "nodemailer";
 
-export const PLATFORM_FROM_EMAIL =
-  process.env.ZOHO_SMTP_USER || "quote@getquotepro.ai";
+export const PLATFORM_FROM_EMAIL = "mike@getquotepro.ai";
+export const PLATFORM_FROM_NAME  = "QuotePro";
+export const MIKE_EMAIL          = "mike@getquotepro.ai";
 
-export const PLATFORM_FROM_NAME = "QuotePro";
-
-export const MIKE_EMAIL = "mike@getquotepro.ai";
+const SENDGRID_SEND_URL = "https://api.sendgrid.com/v3/mail/send";
 
 export interface MailAttachment {
   filename: string;
-  content: Buffer | string; // Buffer OR a base64-encoded string
+  content: Buffer | string;
   contentType?: string;
 }
 
@@ -35,7 +28,7 @@ export interface SendEmailOptions {
   html: string;
   text?: string;
   fromName?: string;
-  fromEmail?: string; // optional override of the SMTP from address
+  fromEmail?: string;
   replyTo?: string | null;
   cc?: string | string[];
   attachments?: MailAttachment[];
@@ -52,67 +45,63 @@ export function getBusinessSendParams(business: any): {
   };
 }
 
-let _transporter: nodemailer.Transporter | null = null;
-
-function getTransporter(): nodemailer.Transporter {
-  if (_transporter) return _transporter;
-
-  const host = process.env.ZOHO_SMTP_HOST || "smtp.zoho.com";
-  const port = parseInt(process.env.ZOHO_SMTP_PORT || "587", 10);
-  const user = process.env.ZOHO_SMTP_USER;
-  const pass = process.env.ZOHO_SMTP_PASS;
-
-  if (!user || !pass) {
-    throw new Error(
-      "ZOHO_SMTP_USER and ZOHO_SMTP_PASS must be set to enable email delivery."
-    );
-  }
-
-  _transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465, // true = SSL, false = STARTTLS
-    auth: { user, pass },
-  });
-
-  return _transporter;
-}
-
 /**
- * Send an email through the platform Zoho SMTP account.
+ * Send an email through SendGrid.
  * Throws on delivery failure — callers catch and return appropriate responses.
  */
 export async function sendEmail(opts: SendEmailOptions): Promise<void> {
-  const { to, subject, html, text, fromName, fromEmail, replyTo, cc, attachments } = opts;
-  const displayName = fromName || PLATFORM_FROM_NAME;
-  const senderAddress = fromEmail || PLATFORM_FROM_EMAIL;
+  const key = process.env.SENDGRID_API_KEY;
+  if (!key) {
+    throw new Error("SENDGRID_API_KEY must be set to enable email delivery.");
+  }
 
-  const mailOpts: nodemailer.SendMailOptions = {
-    from: `"${displayName}" <${senderAddress}>`,
-    to: Array.isArray(to) ? to.join(", ") : to,
+  const { to, subject, html, text, fromName, fromEmail, replyTo, cc, attachments } = opts;
+
+  const toList = (Array.isArray(to) ? to : [to]).map((e) => ({ email: e }));
+  const ccList = cc ? (Array.isArray(cc) ? cc : [cc]).map((e) => ({ email: e })) : undefined;
+
+  const body: Record<string, any> = {
+    personalizations: [{ to: toList, ...(ccList ? { cc: ccList } : {}) }],
+    from: {
+      email: fromEmail || PLATFORM_FROM_EMAIL,
+      name:  fromName  || PLATFORM_FROM_NAME,
+    },
     subject,
-    html,
-    text: text || "",
+    content: [{ type: "text/html", value: html }],
   };
 
-  if (replyTo) mailOpts.replyTo = replyTo;
+  if (text) {
+    body.content.unshift({ type: "text/plain", value: text });
+  }
 
-  if (cc) {
-    mailOpts.cc = Array.isArray(cc) ? cc.join(", ") : cc;
+  if (replyTo) {
+    body.reply_to = { email: replyTo };
   }
 
   if (attachments && attachments.length > 0) {
-    mailOpts.attachments = attachments.map((a) => ({
+    body.attachments = attachments.map((a) => ({
       filename: a.filename,
-      content:
-        typeof a.content === "string"
-          ? Buffer.from(a.content, "base64")
-          : a.content,
-      contentType: a.contentType,
+      type: a.contentType || "application/octet-stream",
+      content: typeof a.content === "string"
+        ? a.content
+        : a.content.toString("base64"),
+      disposition: "attachment",
     }));
   }
 
-  await getTransporter().sendMail(mailOpts);
+  const resp = await fetch(SENDGRID_SEND_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (resp.status !== 202) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`SendGrid error ${resp.status}: ${errText.substring(0, 200)}`);
+  }
 }
 
 // ─── Welcome email ────────────────────────────────────────────────────────────
@@ -164,7 +153,6 @@ function buildWelcomeEmailHtml(name: string | null): string {
     <tr>
       <td style="background-color:#ffffff;padding:36px 40px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
 
-        <!-- Section label -->
         <p style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 20px;">Here&rsquo;s what you can do right now</p>
 
         <!-- Benefit 1 -->
@@ -229,7 +217,7 @@ function buildWelcomeEmailHtml(name: string | null): string {
           <tr><td style="border-top:1px solid #f1f5f9;font-size:0;line-height:0;">&nbsp;</td></tr>
         </table>
 
-        <!-- Calendly CTA box -->
+        <!-- Calendly CTA -->
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0fdf4;border:2px solid #86efac;border-radius:14px;">
           <tr>
             <td align="center" style="padding:28px 28px 8px;">
@@ -274,7 +262,7 @@ function buildWelcomeEmailHtml(name: string | null): string {
 
 /**
  * Send a welcome email to a newly signed-up user.
- * Fire-and-forget — never throws. Log errors only.
+ * Fire-and-forget — never throws. Logs errors only.
  */
 export function sendWelcomeEmail(email: string, name: string | null): void {
   sendEmail({
