@@ -7,7 +7,6 @@ import { useTranslation } from "react-i18next";
 import AppStoreQR from "./AppStoreQR";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
-import { useTheme } from "../lib/theme";
 import { useWalkthrough } from "../lib/walkthrough";
 import { WalkthroughOverlay } from "./WalkthroughOverlay";
 import AIChatBubble from "./AIChatBubble";
@@ -17,7 +16,7 @@ import {
   Menu, X, Zap, Bell, Bot, TrendingUp, Target, Wand2, Crown, Lock,
   ArrowUpRight, Wrench, Inbox, Radio, Cpu, Link2, DollarSign, Building2,
   RefreshCw, CheckSquare, BarChart2, Star, Layers, BookOpen, Sliders,
-  Clipboard, PlugZap, Moon, Sun, FolderOpen, MailOpen, Brain, UserCog,
+  Clipboard, PlugZap, FolderOpen, MailOpen, Brain, UserCog,
   Search, Plus, ChevronRight, ChevronDown, LifeBuoy, CircleUser,
   Repeat2, type LucideIcon,
 } from "lucide-react";
@@ -453,7 +452,6 @@ function TrialCountdownBanner() {
 export function Layout() {
   const { user, business } = useAuth();
   const { isPro } = useSubscription();
-  const { theme, toggleTheme } = useTheme();
   const { isCompleted, isDismissed, startTour, resetTour } = useWalkthrough();
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -566,7 +564,7 @@ export function Layout() {
 
   return (
     <AIToastProvider>
-    <div className="min-h-screen flex bg-[#F5F4F1] dark:bg-[#0A0A0F]">
+    <div className="min-h-screen flex bg-[#F5F4F1]">
       {/* Mobile overlay */}
       {sidebarOpen ? (
         <div
@@ -579,7 +577,7 @@ export function Layout() {
       {/* ── Sidebar ── */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 flex flex-col bg-white dark:bg-zinc-900
+          fixed inset-y-0 left-0 z-50 flex flex-col bg-white
           transform transition-transform duration-200 ease-out
           lg:translate-x-0 lg:static lg:z-auto
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
@@ -597,7 +595,7 @@ export function Layout() {
           >
             <Zap className="w-3.5 h-3.5 text-white" />
           </div>
-          <span className="font-bold text-[15px] tracking-tight text-zinc-900 dark:text-white">
+          <span className="font-bold text-[15px] tracking-tight text-zinc-900">
             QuotePro
           </span>
           <span
@@ -615,16 +613,6 @@ export function Layout() {
                 Pro
               </span>
             ) : null}
-            <button
-              onClick={toggleTheme}
-              className="p-1.5 rounded-md transition-colors"
-              style={{ color: "#a1a1aa" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#52525b"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#a1a1aa"; }}
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            </button>
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden p-1 rounded-md text-zinc-400 hover:text-zinc-600 transition-colors"
@@ -889,7 +877,7 @@ export function Layout() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <header
-          className="flex items-center px-4 lg:px-6 shrink-0 sticky top-0 z-30 gap-3 dark:bg-[rgba(9,9,15,0.8)]"
+          className="flex items-center px-4 lg:px-6 shrink-0 sticky top-0 z-30 gap-3"
           style={{
             height: "56px",
             background: "rgba(245,244,241,0.85)",
