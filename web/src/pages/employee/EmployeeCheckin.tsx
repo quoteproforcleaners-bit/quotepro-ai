@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Camera, MapPin, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Camera, MapPin, AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { getJobDetail, checkIn, type EmployeeJob } from "../../lib/employeeApi";
 
-// ── Haversine distance (meters) ──────────────────────────────────────────────
 function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -13,28 +12,19 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
     Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+function metersToFeet(m: number): number { return Math.round(m * 3.28084); }
 
-function metersToFeet(m: number): number {
-  return Math.round(m * 3.28084);
-}
-
-// ── Geocode address via Nominatim (free, no key) ─────────────────────────────
 async function geocodeAddress(address: string): Promise<{ lat: number; lon: number } | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "QuoteProAI-EmployeeApp/1.0" },
-      signal: AbortSignal.timeout(6000),
-    });
+    const res = await fetch(url, { headers: { "User-Agent": "QuoteProAI-EmployeeApp/1.0" }, signal: AbortSignal.timeout(6000) });
     const data = await res.json();
-    if (data.length === 0) return null;
+    if (!data.length) return null;
     return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-const PROXIMITY_THRESHOLD_M = 152; // ~500 feet
+const PROXIMITY_THRESHOLD_M = 152;
 
 export default function EmployeeCheckin() {
   const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -46,50 +36,40 @@ export default function EmployeeCheckin() {
   const [error, setError] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [checkmark, setCheckmark] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  // Proximity warning modal state
+  const [now, setNow] = useState(new Date());
   const [proximityWarning, setProximityWarning] = useState<{
-    visible: boolean;
-    distanceFt: number;
-    userLat: number;
-    userLng: number;
+    visible: boolean; distanceFt: number; userLat: number; userLng: number;
   } | null>(null);
 
   useEffect(() => {
     if (!assignmentId) return;
     getJobDetail(assignmentId)
       .then(setJob)
-      .catch((e) => setError(e.message))
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [assignmentId]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setPhotoFile(f);
-    const url = URL.createObjectURL(f);
-    setPhotoPreview(url);
+    setPhotoPreview(URL.createObjectURL(f));
   };
 
-  // Core checkin — runs after proximity check is resolved
-  const doCheckin = async (opts: {
-    lat?: number;
-    lng?: number;
-    proximityWarning?: boolean;
-    distanceFt?: number;
-  }) => {
+  const doCheckin = async (opts: { lat?: number; lng?: number; proximityWarning?: boolean; distanceFt?: number }) => {
     if (!assignmentId) return;
     setSubmitting(true);
     setError(null);
     try {
       await checkIn(assignmentId, opts);
       setSuccess(true);
-      setCheckmark(true);
-      setTimeout(() => {
-        navigate(`/employee/jobs/${assignmentId}`, { replace: true });
-      }, 2200);
+      setTimeout(() => navigate(`/employee/jobs/${assignmentId}`, { replace: true }), 2400);
     } catch (err: any) {
       setError(err.message || "Check-in failed. Please try again.");
     } finally {
@@ -101,11 +81,7 @@ export default function EmployeeCheckin() {
     if (!assignmentId || !job) return;
     setSubmitting(true);
     setError(null);
-
-    let lat: number | undefined;
-    let lng: number | undefined;
-
-    // Step 1 — get user GPS
+    let lat: number | undefined, lng: number | undefined;
     try {
       const pos = await new Promise<GeolocationPosition>((res, rej) =>
         navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 })
@@ -113,271 +89,281 @@ export default function EmployeeCheckin() {
       lat = pos.coords.latitude;
       lng = pos.coords.longitude;
     } catch {
-      // GPS unavailable — proceed without proximity check
       setSubmitting(false);
       doCheckin({});
       return;
     }
-
-    // Step 2 — geocode job address and check proximity
     const jobCoords = await geocodeAddress(job.address);
     if (jobCoords && lat !== undefined && lng !== undefined) {
       const distM = haversineMeters(lat, lng, jobCoords.lat, jobCoords.lon);
       if (distM > PROXIMITY_THRESHOLD_M) {
-        // Show warning modal — don't submit yet
         setSubmitting(false);
         setProximityWarning({ visible: true, distanceFt: metersToFeet(distM), userLat: lat, userLng: lng });
         return;
       }
     }
-
-    // Passed proximity check (or geocoding failed) — proceed
     setSubmitting(false);
     doCheckin({ lat, lng });
   };
 
-  const handleProximityDismiss = () => {
-    setProximityWarning(null);
-  };
-
-  const handleProximityContinue = () => {
-    if (!proximityWarning) return;
-    const { userLat, userLng, distanceFt } = proximityWarning;
-    setProximityWarning(null);
-    doCheckin({ lat: userLat, lng: userLng, proximityWarning: true, distanceFt });
-  };
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 
   if (loading) {
     return (
-      <div style={styles.page}>
-        <div style={{ padding: "80px 24px", textAlign: "center" as const, color: "#888780" }}>Loading...</div>
+      <div style={S.page}>
+        <div style={S.nav}>
+          <button onClick={() => navigate(-1)} style={S.backBtn}><ArrowLeft size={20} /></button>
+          <span style={S.navTitle}>Check In</span>
+          <span style={{ width: 40 }} />
+        </div>
+        <div style={{ padding: 40, textAlign: "center" as const, color: "#94a3b8" }}>Loading job details...</div>
       </div>
     );
   }
 
   if (success) {
     return (
-      <div style={styles.successPage}>
-        <div style={{ ...styles.checkCircle, animation: checkmark ? "popin 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards" : "none" }}>
-          ✓
+      <div style={S.successPage}>
+        <style>{`@keyframes popin{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}} @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
+        <div style={S.successRing}>
+          <div style={S.successInner}>
+            <CheckCircle2 size={48} color="#fff" strokeWidth={2.5} />
+          </div>
         </div>
-        <h2 style={styles.successTitle}>Checked In!</h2>
-        <p style={styles.successSub}>
-          You're now checked in at<br />
-          <strong>{job?.customerName}</strong>
+        <h2 style={{ fontSize: 30, fontWeight: 800, color: "#fff", margin: "24px 0 8px", animation: "fadeUp 0.4s 0.3s both" }}>Checked In!</h2>
+        <p style={{ fontSize: 17, color: "rgba(255,255,255,0.8)", textAlign: "center" as const, lineHeight: 1.5, margin: "0 0 8px", animation: "fadeUp 0.4s 0.45s both" }}>
+          You're now at<br /><strong style={{ color: "#fff" }}>{job?.customerName}</strong>
         </p>
-        <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>
-          {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
-        </p>
-        <style>{`
-          @keyframes popin { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        `}</style>
+        <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 15, fontWeight: 600, animation: "fadeUp 0.4s 0.6s both" }}>{timeStr}</p>
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
-      {/* Nav */}
-      <div style={styles.navBar}>
-        <button onClick={() => navigate(-1)} style={styles.backBtn}><ArrowLeft size={20} /></button>
-        <span style={styles.navTitle}>Check In</span>
-        <span style={{ width: 44 }} />
+    <div style={S.page}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        button:active { opacity: 0.82; transform: scale(0.98); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+
+      <div style={S.nav}>
+        <button onClick={() => navigate(-1)} style={S.backBtn}><ArrowLeft size={20} /></button>
+        <span style={S.navTitle}>Check In</span>
+        <span style={{ width: 40 }} />
       </div>
 
-      <div style={styles.body}>
-        {/* Job summary */}
-        <div style={styles.card}>
-          <div style={styles.bigName}>{job?.customerName}</div>
-          <div style={styles.address}>{job?.address}</div>
-          <div style={{ fontSize: 15, color: "#888780", marginTop: 4 }}>
-            {job?.scheduledTime
-              ? new Date(job.scheduledTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
-              : ""}
+      <div style={S.body}>
+        {/* Time spotlight */}
+        <div style={S.timeBanner}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.55)", textTransform: "uppercase" as const, letterSpacing: "0.08em", margin: "0 0 6px" }}>Checking in at</p>
+          <p style={{ fontSize: 44, fontWeight: 800, color: "#fff", fontFamily: "'JetBrains Mono', monospace", margin: 0, lineHeight: 1 }}>{timeStr}</p>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", margin: "8px 0 0", display: "flex", alignItems: "center", gap: 5 }}>
+            <MapPin size={12} color="rgba(255,255,255,0.5)" />
+            Your location will be recorded
+          </p>
+        </div>
+
+        {/* Job card */}
+        {job && (
+          <div style={S.card}>
+            <p style={S.cardLabel}>Job</p>
+            <p style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", margin: "0 0 4px" }}>{job.customerName}</p>
+            <p style={{ fontSize: 13, color: "#64748b", margin: 0, lineHeight: 1.5 }}>{job.address}</p>
+            {job.scheduledTime && (
+              <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 6 }}>
+                Scheduled {new Date(job.scheduledTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+              </p>
+            )}
           </div>
-        </div>
+        )}
 
-        <div style={styles.nowCard}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <MapPin size={16} color="#0F6E56" />
-            <span style={styles.nowLabel}>Checking in at</span>
-          </div>
-          <span style={styles.nowTime}>
-            {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
-          </span>
-        </div>
-
-        <div style={styles.proximityNote}>
-          <MapPin size={13} color="#888780" />
-          <span>Your location will be recorded with check-in</span>
-        </div>
-
-        {/* Optional photo */}
-        <div style={styles.card}>
-          <div style={styles.sectionLabel}>Arrival Photo (optional)</div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            style={{ display: "none" }}
-            onChange={handlePhotoChange}
-          />
+        {/* Photo section */}
+        <div style={S.card}>
+          <p style={S.cardLabel}>Arrival Photo <span style={{ color: "#cbd5e1", fontWeight: 400 }}>(optional)</span></p>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
           {photoPreview ? (
-            <div style={{ position: "relative" as const }}>
-              <img src={photoPreview} alt="Arrival" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 12 }} />
+            <div style={{ position: "relative" as const, borderRadius: 14, overflow: "hidden" as const }}>
+              <img src={photoPreview} alt="Arrival" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }} />
               <button
                 onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
-                style={{ position: "absolute" as const, top: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 16 }}
+                style={{ position: "absolute" as const, top: 10, right: 10, background: "rgba(0,0,0,0.65)", color: "white", border: "none", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
-                ×
+                <X size={16} />
               </button>
             </div>
           ) : (
-            <button onClick={() => fileRef.current?.click()} style={styles.photoBtn}>
-              <Camera size={20} color="#0F6E56" />
-              <span>Take Arrival Photo</span>
+            <button onClick={() => fileRef.current?.click()} style={S.photoBtn}>
+              <div style={S.photoBtnIcon}><Camera size={22} color="#0F6E56" /></div>
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0 }}>Take Arrival Photo</p>
+                <p style={{ fontSize: 12, color: "#94a3b8", margin: "2px 0 0" }}>Documents your arrival time & condition</p>
+              </div>
             </button>
           )}
         </div>
 
-        {error && <div style={styles.errorBox}>{error}</div>}
+        {error && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <AlertTriangle size={16} color="#dc2626" style={{ flexShrink: 0, marginTop: 1 }} />
+            <p style={{ fontSize: 14, color: "#dc2626", margin: 0, fontWeight: 500 }}>{error}</p>
+          </div>
+        )}
+
+        <div style={{ height: 24 }} />
       </div>
 
-      {/* Bottom CTA */}
-      <div style={styles.bottomAction}>
+      {/* CTA */}
+      <div style={S.bottomBar}>
         <button
-          style={{ ...styles.confirmBtn, opacity: submitting ? 0.7 : 1 }}
+          style={{ ...S.confirmBtn, opacity: submitting ? 0.75 : 1 }}
           onClick={handleCheckin}
           disabled={submitting}
         >
-          {submitting ? "Verifying location..." : "Confirm Check In"}
+          {submitting ? (
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={S.spinner} />
+              Verifying location...
+            </span>
+          ) : (
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <CheckCircle2 size={20} strokeWidth={2.5} />
+              Confirm Check In
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Proximity Warning Modal */}
+      {/* Proximity warning sheet */}
       {proximityWarning?.visible && (
-        <div style={styles.modalOverlay} onClick={handleProximityDismiss}>
-          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.warningIcon}>
-              <AlertTriangle size={28} color="#B57C0A" />
+        <div style={S.overlay} onClick={() => setProximityWarning(null)}>
+          <div style={S.sheet} onClick={(e) => e.stopPropagation()}>
+            <div style={S.sheetHandle} />
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: "#fffbeb", border: "1px solid #fde68a", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
+              <AlertTriangle size={26} color="#d97706" />
             </div>
-            <h3 style={styles.warningTitle}>Away from job site</h3>
-            <p style={styles.warningBody}>
-              You appear to be <strong>{proximityWarning.distanceFt.toLocaleString()} ft</strong> from the job location. Your manager will be notified.
+            <h3 style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: "0 0 10px" }}>Away from job site</h3>
+            <p style={{ fontSize: 15, color: "#475569", lineHeight: 1.6, margin: "0 0 24px" }}>
+              You appear to be <strong style={{ color: "#0f172a" }}>{proximityWarning.distanceFt.toLocaleString()} ft</strong> from the job address. Your manager will be notified if you continue.
             </p>
-            <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
-              <button style={styles.continueAnywayBtn} onClick={handleProximityContinue}>
-                Continue Check-In Anyway
-              </button>
-              <button style={styles.goBackBtn} onClick={handleProximityDismiss}>
-                Go Back
-              </button>
-            </div>
+            <button
+              style={{ width: "100%", height: 54, background: "linear-gradient(135deg, #d97706, #b45309)", border: "none", borderRadius: 15, fontSize: 15, fontWeight: 700, color: "white", cursor: "pointer", fontFamily: "inherit", marginBottom: 10 }}
+              onClick={() => {
+                const { userLat, userLng, distanceFt } = proximityWarning!;
+                setProximityWarning(null);
+                doCheckin({ lat: userLat, lng: userLng, proximityWarning: true, distanceFt });
+              }}
+            >
+              Check In Anyway
+            </button>
+            <button
+              style={{ width: "100%", height: 50, background: "#f1f5f9", border: "none", borderRadius: 15, fontSize: 15, fontWeight: 600, color: "#475569", cursor: "pointer", fontFamily: "inherit" }}
+              onClick={() => setProximityWarning(null)}
+            >
+              Go Back
+            </button>
           </div>
         </div>
       )}
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-      `}</style>
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: "100svh", background: "#F8F8F6", fontFamily: "'DM Sans', system-ui, sans-serif", paddingBottom: 100 },
+const S: Record<string, React.CSSProperties> = {
+  page: { minHeight: "100svh", background: "#f8fafc", fontFamily: "'Inter', system-ui, -apple-system, sans-serif", paddingBottom: 100 },
   successPage: {
-    minHeight: "100svh", background: "linear-gradient(135deg, #0F6E56, #085041)",
+    minHeight: "100svh",
+    background: "linear-gradient(160deg, #0d4f3a 0%, #0F6E56 60%, #1a9070 100%)",
     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-    fontFamily: "'DM Sans', system-ui, sans-serif", padding: 24,
+    fontFamily: "'Inter', system-ui, sans-serif", padding: 32,
   },
-  checkCircle: {
-    width: 100, height: 100, borderRadius: "50%",
-    background: "rgba(255,255,255,0.2)", border: "3px solid white",
+  successRing: {
+    width: 110, height: 110, borderRadius: "50%",
+    background: "rgba(255,255,255,0.12)", border: "2px solid rgba(255,255,255,0.25)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: 48, color: "white", marginBottom: 24,
+    animation: "popin 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards",
   },
-  successTitle: { fontSize: 32, fontWeight: 700, color: "white", margin: "0 0 8px" },
-  successSub: { fontSize: 18, color: "rgba(255,255,255,0.85)", textAlign: "center" as const, lineHeight: 1.4, margin: "0 0 8px" },
-  navBar: {
-    position: "sticky" as const, top: 0, zIndex: 10,
+  successInner: {
+    width: 80, height: 80, borderRadius: "50%",
+    background: "rgba(255,255,255,0.18)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  nav: {
+    position: "sticky" as const, top: 0, zIndex: 20,
     display: "flex", alignItems: "center", justifyContent: "space-between",
-    background: "white", padding: "16px", paddingTop: "calc(16px + env(safe-area-inset-top, 0px))",
-    borderBottom: "1px solid #F1EFE8",
+    background: "rgba(255,255,255,0.92)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+    padding: "14px 16px", paddingTop: "calc(14px + env(safe-area-inset-top, 0px))",
+    borderBottom: "1px solid rgba(0,0,0,0.06)",
   },
   backBtn: {
-    width: 44, height: 44, border: "none", background: "#F1EFE8",
+    width: 40, height: 40, border: "none", background: "#f1f5f9",
     borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-    cursor: "pointer", color: "#0F6E56",
+    cursor: "pointer", color: "#475569",
   },
-  navTitle: { fontSize: 17, fontWeight: 700, color: "#1a1a18" },
-  body: { padding: 16 },
-  card: { background: "white", borderRadius: 18, padding: 18, marginBottom: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
-  bigName: { fontSize: 22, fontWeight: 700, color: "#1a1a18" },
-  address: { fontSize: 14, color: "#888780", fontFamily: "'DM Mono', monospace", marginTop: 4 },
-  nowCard: {
-    background: "#E1F5EE", borderRadius: 18, padding: "16px 20px", marginBottom: 8,
-    display: "flex", alignItems: "center", justifyContent: "space-between",
+  navTitle: { fontSize: 16, fontWeight: 700, color: "#0f172a" },
+  body: { padding: "0 16px 0" },
+  timeBanner: {
+    background: "linear-gradient(160deg, #0d4f3a 0%, #0F6E56 100%)",
+    borderRadius: "0 0 24px 24px",
+    padding: "28px 24px 32px",
+    marginBottom: 16,
+    marginLeft: -16,
+    marginRight: -16,
   },
-  nowLabel: { fontSize: 14, color: "#0F6E56", fontWeight: 600 },
-  nowTime: { fontSize: 22, fontWeight: 700, color: "#0F6E56", fontFamily: "'DM Mono', monospace" },
-  proximityNote: {
-    display: "flex", alignItems: "center", gap: 6,
-    fontSize: 12, color: "#888780", padding: "0 4px", marginBottom: 12,
+  card: {
+    background: "#fff", borderRadius: 18, padding: 18, marginBottom: 12,
+    boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04)",
+    border: "1px solid rgba(0,0,0,0.04)",
   },
-  sectionLabel: { fontSize: 13, fontWeight: 700, color: "#888780", textTransform: "uppercase" as const, letterSpacing: 0.5, marginBottom: 12 },
+  cardLabel: {
+    fontSize: 11, fontWeight: 700, color: "#94a3b8",
+    textTransform: "uppercase" as const, letterSpacing: "0.07em", margin: "0 0 12px",
+  },
   photoBtn: {
-    width: "100%", height: 52, border: "2px dashed #C4C2BB", borderRadius: 12,
-    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-    background: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#0F6E56",
-    fontFamily: "'DM Sans', system-ui, sans-serif",
+    width: "100%", border: "2px dashed #e2e8f0", borderRadius: 14,
+    background: "none", cursor: "pointer", padding: "16px 14px",
+    display: "flex", alignItems: "center", gap: 14,
+    fontFamily: "inherit", transition: "border-color 0.15s",
   },
-  errorBox: {
-    background: "#FCEBEB", border: "1px solid #F2B5B5", borderRadius: 12,
-    padding: "12px 16px", color: "#E24B4A", fontSize: 14, fontWeight: 500, marginBottom: 12,
+  photoBtnIcon: {
+    width: 46, height: 46, borderRadius: 12, background: "#f0fdf4",
+    border: "1px solid #bbf7d0", display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0,
   },
-  bottomAction: {
+  bottomBar: {
     position: "fixed" as const, bottom: 0, left: "50%", transform: "translateX(-50%)",
-    width: "100%", maxWidth: 430,
-    background: "white", borderTop: "1px solid #F1EFE8",
+    width: "100%", maxWidth: 480,
+    background: "rgba(255,255,255,0.95)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+    borderTop: "1px solid rgba(0,0,0,0.07)",
     padding: "12px 16px", paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
   },
   confirmBtn: {
-    width: "100%", height: 56, background: "#0F6E56",
-    border: "none", borderRadius: 14, fontSize: 17, fontWeight: 700,
-    color: "white", cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif",
-    touchAction: "manipulation",
+    width: "100%", height: 56,
+    background: "linear-gradient(135deg, #059669, #0F6E56)",
+    border: "none", borderRadius: 16, fontSize: 16, fontWeight: 700,
+    color: "white", cursor: "pointer", fontFamily: "inherit",
+    touchAction: "manipulation", display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: "0 4px 14px rgba(15,110,86,0.3)",
+    transition: "opacity 0.15s",
   },
-  // Modal
-  modalOverlay: {
+  spinner: {
+    width: 18, height: 18, borderRadius: "50%",
+    border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white",
+    display: "inline-block", animation: "spin 0.7s linear infinite",
+  },
+  overlay: {
     position: "fixed" as const, inset: 0, zIndex: 100,
-    background: "rgba(0,0,0,0.5)", display: "flex",
-    alignItems: "flex-end", justifyContent: "center",
-    backdropFilter: "blur(4px)",
+    background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+    display: "flex", alignItems: "flex-end", justifyContent: "center",
   },
-  modalCard: {
+  sheet: {
     background: "white", borderRadius: "24px 24px 0 0",
-    padding: "28px 24px", paddingBottom: "calc(28px + env(safe-area-inset-bottom, 0px))",
-    width: "100%", maxWidth: 430,
+    padding: "20px 24px 28px", paddingBottom: "calc(28px + env(safe-area-inset-bottom, 0px))",
+    width: "100%", maxWidth: 480,
   },
-  warningIcon: {
-    width: 56, height: 56, borderRadius: "50%",
-    background: "#FAEEDA", display: "flex", alignItems: "center", justifyContent: "center",
-    marginBottom: 16,
-  },
-  warningTitle: { fontSize: 20, fontWeight: 700, color: "#1a1a18", margin: "0 0 10px" },
-  warningBody: { fontSize: 15, color: "#444441", lineHeight: 1.55, margin: "0 0 24px" },
-  continueAnywayBtn: {
-    width: "100%", height: 54, background: "#EF9F27", border: "none",
-    borderRadius: 14, fontSize: 16, fontWeight: 700, color: "white",
-    cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif",
-    touchAction: "manipulation",
-  },
-  goBackBtn: {
-    width: "100%", height: 50, background: "#F1EFE8", border: "none",
-    borderRadius: 14, fontSize: 15, fontWeight: 600, color: "#444441",
-    cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif",
-    touchAction: "manipulation",
+  sheetHandle: {
+    width: 40, height: 4, borderRadius: 2, background: "#e2e8f0",
+    margin: "0 auto 24px",
   },
 };

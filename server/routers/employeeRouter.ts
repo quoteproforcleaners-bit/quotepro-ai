@@ -523,17 +523,22 @@ backfillJobAssignmentsFromTeamMembers().catch(() => {});
 
 export const sseClients = new Map<string, Set<Response>>();
 
-export function notifyAdmin(businessId: string, event: Record<string, any>) {
-  const clients = sseClients.get(businessId);
-  if (!clients || clients.size === 0) return;
-  const data = JSON.stringify({ ...event, timestamp: new Date().toISOString() });
-  for (const client of clients) {
-    try {
-      client.write(`data: ${data}\n\n`);
-    } catch {
-      clients.delete(client);
+export function notifyAdmin(businessId: string, event: Record<string, any>): Promise<void> {
+  try {
+    const clients = sseClients.get(businessId);
+    if (!clients || clients.size === 0) return Promise.resolve();
+    const data = JSON.stringify({ ...event, timestamp: new Date().toISOString() });
+    for (const client of clients) {
+      try {
+        client.write(`data: ${data}\n\n`);
+      } catch {
+        clients.delete(client);
+      }
     }
+  } catch {
+    // ignore SSE errors
   }
+  return Promise.resolve();
 }
 
 export default router;
