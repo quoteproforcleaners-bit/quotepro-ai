@@ -21,6 +21,7 @@ const TOP_LEVEL_PATHS = [
   "/intake/", "/request/", "/schedule-ack/", "/q/", "/home/", "/tip/",
   "/pricing", "/subscription", "/register",
   "/login", "/dashboard", "/onboarding", "/upgrade", "/quote-doctor",
+  "/employee", "/checkin/",
 ];
 const isTopLevelPath = TOP_LEVEL_PATHS.some((p) =>
   window.location.pathname === p || window.location.pathname.startsWith(p + "/") || window.location.pathname.startsWith(p)
