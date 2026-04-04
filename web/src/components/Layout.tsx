@@ -84,6 +84,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { to: "/pricing-logic",     label: "Pricing Engine",    icon: Brain,       description: "AI-powered pricing logic based on your market, home size, and service type. Set your rates here." },
   { to: "/sales-strategy",    label: "Sales Strategy",    icon: Layers,      pro: true, description: "Personalized playbooks and talking points to help you close more jobs at higher prices." },
   { to: "/employees",         label: "Team Members",      icon: UserCog,     description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
+  { to: "/team",              label: "Field Status",      icon: Radio,       description: "Live kanban view of today's field assignments — see who's checked in, en route, or completed." },
   { to: "/file-library",      label: "File Library",      icon: FolderOpen,  description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
   { to: "/qbo-settings",      label: "QuickBooks",        icon: PlugZap,     description: "Sync your quotes, invoices, and payments directly to QuickBooks Online." },
   { to: "/account-settings",  label: "Account",           icon: CircleUser,  description: "Manage your profile, password, notification preferences, and billing information." },

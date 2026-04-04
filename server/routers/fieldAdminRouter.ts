@@ -342,6 +342,79 @@ router.get("/api/admin/dashboard/field-status", requireAuth, async (req: Request
   }
 });
 
+// ─── Notification log (last 20 checkin/checkout events) ─────────────────────
+
+router.get("/api/admin/events/log", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const businessId = await getBusinessId(req.session.userId!);
+    if (!businessId) return res.status(404).json({ message: "Business not found" });
+
+    // Fetch last 20 assignments that have been checked in or completed
+    const rows = await db
+      .select({
+        assignmentId: jobAssignments.id,
+        status: jobAssignments.status,
+        checkinTime: jobAssignments.checkinTime,
+        checkoutTime: jobAssignments.checkoutTime,
+        durationMinutes: jobAssignments.durationMinutes,
+        employeeName: employees.name,
+        employeeColor: employees.avatarColor,
+        customerFirstName: customers.firstName,
+        customerLastName: customers.lastName,
+        jobAddress: jobs.address,
+      })
+      .from(jobAssignments)
+      .innerJoin(employees, eq(jobAssignments.employeeId, employees.id))
+      .innerJoin(jobs, eq(jobAssignments.jobId, jobs.id))
+      .innerJoin(customers, eq(jobs.customerId, customers.id))
+      .where(
+        and(
+          eq(employees.businessId, businessId),
+          sql`${jobAssignments.status} IN ('checked_in', 'completed')`
+        )
+      )
+      .orderBy(desc(jobAssignments.checkinTime))
+      .limit(20);
+
+    const events = rows.flatMap(row => {
+      const items: any[] = [];
+      if (row.checkinTime) {
+        items.push({
+          type: "checkin",
+          assignmentId: row.assignmentId,
+          employeeName: row.employeeName,
+          employeeColor: row.employeeColor,
+          customerName: `${row.customerFirstName} ${row.customerLastName}`.trim(),
+          address: row.jobAddress,
+          timestamp: row.checkinTime,
+          durationMinutes: null,
+        });
+      }
+      if (row.checkoutTime) {
+        items.push({
+          type: "checkout",
+          assignmentId: row.assignmentId,
+          employeeName: row.employeeName,
+          employeeColor: row.employeeColor,
+          customerName: `${row.customerFirstName} ${row.customerLastName}`.trim(),
+          address: row.jobAddress,
+          timestamp: row.checkoutTime,
+          durationMinutes: row.durationMinutes,
+        });
+      }
+      return items;
+    });
+
+    // Sort by timestamp desc and take 20
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return res.json(events.slice(0, 20));
+  } catch (err) {
+    console.error("[admin/events/log]", err);
+    return res.status(500).json({ message: "Failed to load event log" });
+  }
+});
+
 // ─── SSE Stream ──────────────────────────────────────────────────────────────
 
 router.get("/api/admin/events/stream", requireAuth, async (req: Request, res: Response) => {

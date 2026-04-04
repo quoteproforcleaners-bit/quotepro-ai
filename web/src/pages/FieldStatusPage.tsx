@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../lib/api";
 import { PageHeader } from "../components/ui";
-import { Users, RefreshCw } from "lucide-react";
+import { Users, RefreshCw, LogIn, LogOut, Clock } from "lucide-react";
 
 type AssignmentStatus = "assigned" | "en_route" | "checked_in" | "completed" | "no_show";
 
@@ -75,6 +75,17 @@ function AssignmentCard({ a, emp }: { a: Assignment; emp: EmployeeField["employe
   );
 }
 
+interface EventLogItem {
+  type: "checkin" | "checkout";
+  assignmentId: string;
+  employeeName: string;
+  employeeColor: string | null;
+  customerName: string;
+  address: string | null;
+  timestamp: string;
+  durationMinutes: number | null;
+}
+
 export default function FieldStatusPage() {
   const [lastEvent, setLastEvent] = useState<string | null>(null);
   const evtRef = useRef<EventSource | null>(null);
@@ -83,6 +94,12 @@ export default function FieldStatusPage() {
     queryKey: ["/api/admin/dashboard/field-status"],
     queryFn: () => apiGet("/api/admin/dashboard/field-status"),
     refetchInterval: 30000, // polling fallback every 30s
+  });
+
+  const { data: eventLog = [], refetch: refetchLog } = useQuery<EventLogItem[]>({
+    queryKey: ["/api/admin/events/log"],
+    queryFn: () => apiGet("/api/admin/events/log"),
+    refetchInterval: 60000,
   });
 
   // SSE live updates
@@ -96,12 +113,13 @@ export default function FieldStatusPage() {
         if (event.type !== "connected") {
           setLastEvent(`${event.employeeName || "Employee"} ${event.type.replace("employee_", "").replace("_", " ")} · ${new Date(event.timestamp).toLocaleTimeString()}`);
           refetch();
+          refetchLog();
         }
       } catch { /* ignore */ }
     };
 
     return () => es.close();
-  }, [refetch]);
+  }, [refetch, refetchLog]);
 
   // Build column assignments
   const columns: Record<AssignmentStatus, { assignment: Assignment; employee: EmployeeField["employee"] }[]> = {
@@ -207,6 +225,65 @@ export default function FieldStatusPage() {
           </div>
         </div>
       )}
+
+      {/* Notification log — last 20 events */}
+      <div>
+        <h3 className="text-sm font-semibold text-slate-500 mb-3 flex items-center gap-2">
+          <Clock className="w-4 h-4" />
+          Recent Activity
+        </h3>
+        {eventLog.length === 0 ? (
+          <div className="px-4 py-6 bg-white rounded-2xl border border-slate-100 text-center text-sm text-slate-400">
+            No check-in or check-out events yet today.
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-50 overflow-hidden">
+            {eventLog.map((ev, i) => {
+              const isCheckin = ev.type === "checkin";
+              return (
+                <div key={`${ev.assignmentId}-${ev.type}-${i}`} className="flex items-center gap-4 px-4 py-3">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                      isCheckin ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isCheckin ? <LogIn className="w-4 h-4" /> : <LogOut className="w-4 h-4" />}
+                  </div>
+
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                    style={{ background: ev.employeeColor ?? "#0F6E56" }}
+                  >
+                    {initials(ev.employeeName)}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-slate-800 truncate">
+                      {ev.employeeName}
+                      <span className="font-normal text-slate-500">
+                        {" "}{isCheckin ? "checked in at" : "completed"}{" "}
+                      </span>
+                      {ev.customerName}
+                    </div>
+                    {ev.address && (
+                      <div className="text-xs text-slate-400 truncate font-mono">{ev.address}</div>
+                    )}
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="text-xs font-medium text-slate-600">
+                      {new Date(ev.timestamp).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+                    </div>
+                    {ev.durationMinutes !== null && ev.durationMinutes > 0 && (
+                      <div className="text-xs text-slate-400">{formatDuration(ev.durationMinutes)}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
