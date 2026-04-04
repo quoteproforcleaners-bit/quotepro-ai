@@ -6,6 +6,8 @@ import * as path from "path";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
 import { processDripQueue } from "./dripEmails";
+import { processSentQuoteFollowUps } from "./quoteFollowUpScheduler";
+import { processDraftQuoteNudges } from "./draftQuoteNudge";
 import { bulkSyncRcUsers } from "./routers/revenuecatRouter";
 import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
 import { sendPush } from "./pushNotifications";
@@ -821,6 +823,39 @@ async function seedToDoDemo() {
   setInterval(() => {
     runTipRequestScheduler().catch((e: any) => console.error("[tips] Cron failed:", e.message));
   }, 60 * 60 * 1000);
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // ─── Sent quote follow-up: daily at 10am ─────────────────────────────────
+  // Emails customers who received a quote ≥ 3 days ago with no response.
+  function scheduleSentQuoteFollowUpCron() {
+    setInterval(async () => {
+      const d = new Date();
+      if (d.getHours() !== 10 || d.getMinutes() > 30) return;
+      try {
+        await processSentQuoteFollowUps();
+      } catch (e: any) {
+        console.error("[quote-followup] Cron failed:", e.message);
+      }
+    }, 60 * 60 * 1000); // check every hour
+  }
+  scheduleSentQuoteFollowUpCron();
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // ─── Draft quote nudge: Mondays at 7am ───────────────────────────────────
+  // Emails business owners who have draft quotes > 2 days old.
+  function scheduleDraftQuoteNudgeCron() {
+    setInterval(async () => {
+      const d = new Date();
+      if (d.getDay() !== 1) return;          // Monday only
+      if (d.getHours() !== 7 || d.getMinutes() > 30) return;
+      try {
+        await processDraftQuoteNudges();
+      } catch (e: any) {
+        console.error("[draft-nudge] Cron failed:", e.message);
+      }
+    }, 60 * 60 * 1000); // check every hour
+  }
+  scheduleDraftQuoteNudgeCron();
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

@@ -44,6 +44,7 @@ import {
  Zap,
  Receipt,
  Pencil,
+ Wand2,
 } from"lucide-react";
 import { useState } from"react";
 import {
@@ -1107,6 +1108,53 @@ export default function QuoteDetailPage() {
  ) : null}
  </div>
  </Card>
+
+ {/* QuoteDoctor CTA — visible for draft and sent quotes */}
+ {(quote.status === "draft" || quote.status === "sent") ? (
+ <div
+ style={{
+ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)",
+ borderRadius: 14,
+ padding: "18px 20px",
+ position: "relative",
+ overflow: "hidden",
+ }}
+ >
+ {/* Subtle glow blob */}
+ <div style={{
+ position: "absolute", top: -20, right: -20,
+ width: 120, height: 120,
+ background: "radial-gradient(circle, rgba(99,102,241,0.35) 0%, transparent 70%)",
+ borderRadius: "50%", pointerEvents: "none",
+ }} />
+ <div className="flex items-start gap-3">
+ <div style={{
+ background: "rgba(99,102,241,0.25)",
+ borderRadius: 10, padding: 8, flexShrink: 0,
+ }}>
+ <Wand2 className="w-4 h-4 text-indigo-300" />
+ </div>
+ <div className="flex-1 min-w-0">
+ <p className="text-white font-semibold text-sm leading-tight">
+ QuoteDoctor
+ </p>
+ <p className="text-slate-300 text-xs mt-0.5 leading-snug">
+ {quote.status === "draft"
+ ? "AI-optimize your price before sending — see how you compare to the market."
+ : "Your quote is out. Use QuoteDoctor to refine your next one and close more."}
+ </p>
+ <button
+ onClick={() => navigate("/quote-doctor")}
+ className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-white rounded-lg px-3 py-1.5 transition-all hover:opacity-90 active:scale-[0.97]"
+ style={{ background: "rgba(99,102,241,0.55)", border: "1px solid rgba(99,102,241,0.7)" }}
+ >
+ <Zap className="w-3.5 h-3.5" />
+ Open QuoteDoctor
+ </button>
+ </div>
+ </div>
+ </div>
+ ) : null}
 
  {(details.customerAddress || quote.customerName) ? (
  <DispatchCard
