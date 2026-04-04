@@ -182,7 +182,7 @@ export default function EmployeeCheckin() {
         {/* Photo section */}
         <div style={S.card}>
           <p style={S.cardLabel}>Arrival Photo <span style={{ color: "#cbd5e1", fontWeight: 400 }}>(optional)</span></p>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={handlePhotoChange} />
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
           {photoPreview ? (
             <div style={{ position: "relative" as const, borderRadius: 14, overflow: "hidden" as const }}>
               <img src={photoPreview} alt="Arrival" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }} />

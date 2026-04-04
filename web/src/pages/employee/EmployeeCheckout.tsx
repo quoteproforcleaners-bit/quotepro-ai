@@ -170,7 +170,6 @@ export default function EmployeeCheckout() {
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
             style={{ display: "none" }}
             onChange={handlePhotoChange}
           />
