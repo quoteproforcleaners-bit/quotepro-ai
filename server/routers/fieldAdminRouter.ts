@@ -5,6 +5,7 @@ import { employees, jobs, jobAssignments, customers, businesses } from "../../sh
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware";
 import { sseClients } from "./employeeRouter";
+import { sendEmployeeWelcomeEmail, sendEmployeePortalReminderEmail } from "../lib/employeeNotify";
 
 const router = Router();
 
@@ -88,6 +89,7 @@ router.post("/api/admin/employees", requireAuth, async (req: Request, res: Respo
     const existing = await db.select().from(employees).where(eq(employees.businessId, businessId));
     const color = AVATAR_COLORS[existing.length % AVATAR_COLORS.length];
 
+    const plainPin = pin; // keep plain before hashing for the invite email
     const hashedPin = await bcrypt.hash(pin, 12);
 
     const [created] = await db
@@ -105,6 +107,16 @@ router.post("/api/admin/employees", requireAuth, async (req: Request, res: Respo
       })
       .returning();
 
+    // Send welcome email with credentials — fire and forget
+    const origin = (req.headers.origin as string) || `${req.protocol}://${req.get("host")}`;
+    sendEmployeeWelcomeEmail({
+      businessId,
+      employeeName: name.trim(),
+      employeeEmail: email.toLowerCase().trim(),
+      pin: plainPin,
+      portalUrl: `${origin}/employee/login`,
+    }).catch((e) => console.error("[employee invite email]", e));
+
     return res.json({ ...created, pin: undefined });
   } catch (err: any) {
     console.error("[admin/employees POST]", err);
@@ -112,6 +124,37 @@ router.post("/api/admin/employees", requireAuth, async (req: Request, res: Respo
       return res.status(409).json({ message: "An employee with that email already exists" });
     }
     return res.status(500).json({ message: "Failed to create employee" });
+  }
+});
+
+// ─── Resend portal invite ─────────────────────────────────────────────────────
+
+router.post("/api/admin/employees/:id/invite", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const businessId = await getBusinessId(req.session.userId!);
+    if (!businessId) return res.status(404).json({ message: "Business not found" });
+
+    const { id } = req.params;
+    const [emp] = await db
+      .select()
+      .from(employees)
+      .where(and(eq(employees.id, id), eq(employees.businessId, businessId)))
+      .limit(1);
+
+    if (!emp) return res.status(404).json({ message: "Employee not found" });
+
+    const origin = (req.headers.origin as string) || `${req.protocol}://${req.get("host")}`;
+    await sendEmployeePortalReminderEmail({
+      businessId,
+      employeeName: emp.name,
+      employeeEmail: emp.email,
+      portalUrl: `${origin}/employee/login`,
+    });
+
+    return res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[admin/employees/:id/invite]", err);
+    return res.status(500).json({ message: "Failed to send invite" });
   }
 });
 

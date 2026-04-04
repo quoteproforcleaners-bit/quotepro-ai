@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Phone, Mail, Tag, Users, ExternalLink, Eye, EyeOff, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Pencil, Phone, Mail, Tag, Users, ExternalLink, Eye, EyeOff, ToggleLeft, ToggleRight, Send } from "lucide-react";
 import { apiGet, apiPost, apiPatch } from "../lib/api";
 import { Card, Button, Modal, Input, Toast, EmptyState, PageHeader } from "../components/ui";
 
@@ -49,11 +49,11 @@ export default function EmployeesPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: FormShape) => apiPost("/api/admin/employees", data),
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/employees"] });
       setModal(false);
       setForm(EMPTY_FORM);
-      setToast({ message: "Team member added and can now log in with their PIN", variant: "success" });
+      setToast({ message: `Team member added — invite with login details sent to ${vars.email}`, variant: "success" });
     },
     onError: (e: any) => setToast({ message: e?.message || "Failed to add team member", variant: "error" }),
   });
@@ -79,6 +79,20 @@ export default function EmployeesPage() {
     },
     onError: (e: any) => setToast({ message: e?.message || "Failed to update status", variant: "error" }),
   });
+
+  const [sendingInvite, setSendingInvite] = useState<string | null>(null);
+
+  const resendInvite = async (emp: Employee) => {
+    setSendingInvite(emp.id);
+    try {
+      await apiPost(`/api/admin/employees/${emp.id}/invite`, {});
+      setToast({ message: `Portal invite sent to ${emp.email}`, variant: "success" });
+    } catch (e: any) {
+      setToast({ message: e?.message || "Failed to send invite", variant: "error" });
+    } finally {
+      setSendingInvite(null);
+    }
+  };
 
   function openAdd() {
     setEditing(null);
@@ -200,6 +214,14 @@ export default function EmployeesPage() {
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => resendInvite(emp)}
+                      disabled={sendingInvite === emp.id}
+                      className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-40"
+                      title="Send portal invite email"
+                    >
+                      <Send className={`w-4 h-4 ${sendingInvite === emp.id ? "animate-pulse" : ""}`} />
+                    </button>
                     <button
                       onClick={() => toggleActiveMutation.mutate(emp)}
                       className={`p-2 rounded-lg transition-colors ${isInactive ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50" : "text-emerald-600 hover:text-slate-500 hover:bg-slate-100"}`}
