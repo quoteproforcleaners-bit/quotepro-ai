@@ -281,7 +281,6 @@ export function QuickAddCleanPanel({
 
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [teamInput, setTeamInput] = useState("");
-  const [showTeamDropdown, setShowTeamDropdown] = useState(false);
   const [notes, setNotes] = useState("");
 
   const { data: employeeList = [] } = useQuery<{ id: string; name: string; role: string; color: string; isActive: boolean }[]>({
@@ -291,8 +290,7 @@ export function QuickAddCleanPanel({
 
   const activeEmployees = employeeList.filter(e => e.isActive !== false);
   const filteredEmployees = activeEmployees.filter(e =>
-    !teamMembers.includes(e.name) &&
-    (teamInput.trim() === "" || e.name.toLowerCase().includes(teamInput.toLowerCase()))
+    teamInput.trim() === "" || e.name.toLowerCase().includes(teamInput.toLowerCase())
   );
   const [error, setError] = useState("");
 
@@ -879,19 +877,62 @@ export function QuickAddCleanPanel({
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
                   <Users className="w-3.5 h-3.5" /> Team Members
                 </label>
-                {teamMembers.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {teamMembers.map((m) => (
-                      <span key={m} className="flex items-center gap-1 bg-primary-50 text-primary-700 border border-primary-200 rounded-full px-2.5 py-1 text-xs font-semibold">
-                        {m}
-                        <button onClick={() => setTeamMembers((p) => p.filter((x) => x !== m))} className="text-primary-400 hover:text-primary-700 ml-0.5">
-                          <X className="w-3 h-3" />
+
+                {/* Employee roster — always visible, tap to assign */}
+                {activeEmployees.length > 0 ? (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    {activeEmployees.length > 4 && (
+                      <div className="px-3 pt-2.5 pb-1.5 border-b border-slate-100">
+                        <input
+                          type="text"
+                          placeholder="Search roster…"
+                          value={teamInput}
+                          onChange={(e) => setTeamInput(e.target.value)}
+                          className="w-full text-sm outline-none placeholder-slate-400"
+                          autoComplete="off"
+                        />
+                      </div>
+                    )}
+                    {filteredEmployees.map((emp) => {
+                      const selected = teamMembers.includes(emp.name);
+                      return (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          data-testid={`btn-employee-${emp.id}`}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-slate-100 last:border-0 ${selected ? "bg-primary-50" : "hover:bg-slate-50"}`}
+                          onClick={() => {
+                            setTeamMembers(p =>
+                              selected ? p.filter(x => x !== emp.name) : [...p, emp.name]
+                            );
+                          }}
+                        >
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                            style={{ backgroundColor: emp.color || "#0F6E56" }}
+                          >
+                            {emp.name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-slate-800">{emp.name}</div>
+                            {emp.role ? <div className="text-xs text-slate-400">{emp.role}</div> : null}
+                          </div>
+                          {selected ? (
+                            <div className="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center shrink-0">
+                              <CheckCircle className="w-3.5 h-3.5 text-white" />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded-full border-2 border-slate-300 shrink-0" />
+                          )}
                         </button>
-                      </span>
-                    ))}
+                      );
+                    })}
+                    {filteredEmployees.length === 0 && (
+                      <div className="px-3 py-3 text-sm text-slate-400">No match for "{teamInput}"</div>
+                    )}
                   </div>
-                ) : null}
-                <div className="relative">
+                ) : (
+                  /* No employees yet — free-text fallback */
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -899,10 +940,8 @@ export function QuickAddCleanPanel({
                       className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500"
                       placeholder="Add team member name…"
                       value={teamInput}
-                      onChange={(e) => { setTeamInput(e.target.value); setShowTeamDropdown(true); }}
-                      onFocus={() => setShowTeamDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowTeamDropdown(false), 150)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTeamMember(); } if (e.key === "Escape") setShowTeamDropdown(false); }}
+                      onChange={(e) => setTeamInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTeamMember(); } }}
                       autoComplete="off"
                     />
                     <button
@@ -914,40 +953,21 @@ export function QuickAddCleanPanel({
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  {showTeamDropdown && filteredEmployees.length > 0 && (
-                    <div className="mt-1 border border-slate-200 rounded-xl bg-white overflow-hidden">
-                      {filteredEmployees.map((emp) => (
-                        <button
-                          key={emp.id}
-                          type="button"
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 text-left transition-colors border-b border-slate-100 last:border-0"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setTeamMembers(p => [...p, emp.name]);
-                            setTeamInput("");
-                            setShowTeamDropdown(false);
-                          }}
-                        >
-                          <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                            style={{ backgroundColor: emp.color || "#0F6E56" }}
-                          >
-                            {emp.name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-slate-800">{emp.name}</div>
-                            {emp.role && <div className="text-xs text-slate-400">{emp.role}</div>}
-                          </div>
+                )}
+
+                {/* Selected members summary chips */}
+                {teamMembers.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {teamMembers.map((m) => (
+                      <span key={m} className="flex items-center gap-1 bg-primary-50 text-primary-700 border border-primary-200 rounded-full px-2.5 py-1 text-xs font-semibold">
+                        {m}
+                        <button onClick={() => setTeamMembers((p) => p.filter((x) => x !== m))} className="text-primary-400 hover:text-primary-700 ml-0.5">
+                          <X className="w-3 h-3" />
                         </button>
-                      ))}
-                    </div>
-                  )}
-                  {showTeamDropdown && filteredEmployees.length === 0 && teamInput.trim() !== "" && activeEmployees.length > 0 && (
-                    <div className="mt-1 border border-slate-200 rounded-xl bg-white px-3 py-2.5">
-                      <p className="text-sm text-slate-400">No match — press Enter or + to add "{teamInput}"</p>
-                    </div>
-                  )}
-                </div>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2">
