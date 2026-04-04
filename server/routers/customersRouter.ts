@@ -112,7 +112,28 @@ const router = Router();
       }
 
       const list = await getCustomersByBusiness(business.id, { search, status });
-      return res.json(list);
+
+      // Attach lifetime value (sum of accepted quotes) to each customer
+      const { quotes: quotesTable } = await import("../schema");
+      const ltvRows = await db
+        .select({
+          customerId: quotesTable.customerId,
+          lifetimeValue: sql<number>`COALESCE(SUM(CASE WHEN ${quotesTable.status} = 'accepted' THEN ${quotesTable.total} ELSE 0 END), 0)`,
+          quoteCount: sql<number>`COUNT(*)::int`,
+        })
+        .from(quotesTable)
+        .where(and(eq(quotesTable.businessId, business.id), isNull(quotesTable.deletedAt)))
+        .groupBy(quotesTable.customerId);
+
+      const ltvMap = new Map(ltvRows.map((r) => [r.customerId, { lifetimeValue: Number(r.lifetimeValue), quoteCount: r.quoteCount }]));
+
+      const enriched = list.map((c: any) => ({
+        ...c,
+        lifetimeValue: ltvMap.get(c.id)?.lifetimeValue ?? 0,
+        quoteCount: ltvMap.get(c.id)?.quoteCount ?? 0,
+      }));
+
+      return res.json(enriched);
     } catch (error: any) {
       console.error("Get customers error:", error);
       return res.status(500).json({ message: "Failed to get customers" });

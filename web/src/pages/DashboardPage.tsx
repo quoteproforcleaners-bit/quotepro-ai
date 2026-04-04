@@ -561,6 +561,9 @@ function PipelineCard({
  acceptedCount,
  closeRate,
  avgValue,
+ avgDaysToAccept,
+ thisMonthCloseRate,
+ lastMonthCloseRate,
  navigate,
 }: {
  sentCount: number;
@@ -568,6 +571,9 @@ function PipelineCard({
  acceptedCount: number;
  closeRate: number;
  avgValue: number;
+ avgDaysToAccept: number | null;
+ thisMonthCloseRate: number | null;
+ lastMonthCloseRate: number | null;
  navigate: (path: string) => void;
 }) {
  const max = Math.max(sentCount, viewedCount, acceptedCount, 1);
@@ -629,7 +635,11 @@ function PipelineCard({
  {Math.round(closeRate)}%
  </p>
  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Close Rate</p>
- {closeRate < 40 && closeRate > 0 ? (
+ {thisMonthCloseRate !== null && lastMonthCloseRate !== null ? (
+ <p className={`text-[10px] mt-0.5 font-semibold ${thisMonthCloseRate >= lastMonthCloseRate ? "text-emerald-500" : "text-red-400"}`}>
+ {thisMonthCloseRate >= lastMonthCloseRate ? "▲" : "▼"} vs last mo
+ </p>
+ ) : closeRate < 40 && closeRate > 0 ? (
  <p className="text-[10px] text-amber-500 mt-0.5">below avg</p>
  ) : closeRate >= 50 ? (
  <p className="text-[10px] text-emerald-500 mt-0.5">excellent</p>
@@ -637,9 +647,20 @@ function PipelineCard({
  </div>
  <div className="bg-slate-50 rounded-xl p-3 text-center">
  <p className="text-xl font-black text-slate-900">{fmt(avgValue)}</p>
- <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Avg Value</p>
+ <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Avg Quote</p>
  </div>
  </div>
+ {avgDaysToAccept !== null && (
+ <div className="mt-2 bg-blue-50 rounded-xl p-2.5 flex items-center justify-between">
+ <div className="flex items-center gap-1.5">
+ <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+ <span className="text-xs text-blue-700 font-semibold">Avg days to close</span>
+ </div>
+ <span className="text-sm font-black text-blue-700">
+ {avgDaysToAccept < 1 ? "Same day" : `${avgDaysToAccept.toFixed(1)}d`}
+ </span>
+ </div>
+ )}
 
  <button
  onClick={() => navigate("/quotes")}
@@ -1198,8 +1219,20 @@ export default function DashboardPage() {
  });
  }
 
+ const ghostCount = stats?.ghostQuoteCount || 0;
+ if (ghostCount > 0) {
+ items.push({
+ icon: Eye,
+ label:"Ghost quotes (never opened)",
+ count: ghostCount,
+ description:`${ghostCount} quote${ghostCount !== 1 ? "s" : ""} sent 48h+ ago with no view. Time to call.`,
+ path:"/quotes?filter=sent",
+ severity:"warning",
+ });
+ }
+
  return items.slice(0, 4);
- }, [followUpQueueCount, amountAtRisk, draftQuotes, unscheduledAccepted, pipelineValue, closeRate, oldestQuoteDays]);
+ }, [followUpQueueCount, amountAtRisk, draftQuotes, unscheduledAccepted, pipelineValue, closeRate, oldestQuoteDays, stats]);
 
  // ── Today's Revenue Moves ──────────────────────────────────────────────────
  const revenueActions = useMemo<RevenueAction[]>(() => {
@@ -1553,6 +1586,9 @@ export default function DashboardPage() {
  acceptedCount={stats?.acceptedQuotes || acceptedQuotes.length}
  closeRate={closeRate}
  avgValue={stats?.avgQuoteValue || 0}
+ avgDaysToAccept={stats?.avgDaysToAccept ?? null}
+ thisMonthCloseRate={stats?.thisMonthCloseRate ?? null}
+ lastMonthCloseRate={stats?.lastMonthCloseRate ?? null}
  navigate={navigate}
  />
  </div>

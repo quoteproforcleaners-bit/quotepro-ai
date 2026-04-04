@@ -1200,6 +1200,12 @@ export async function getQuoteStats(businessId: string): Promise<{
   totalRevenue: number;
   avgQuoteValue: number;
   closeRate: number;
+  avgDaysToAccept: number | null;
+  thisMonthCloseRate: number | null;
+  lastMonthCloseRate: number | null;
+  thisMonthRevenue: number;
+  lastMonthRevenue: number;
+  ghostQuoteCount: number;
 }> {
   const allQuotes = await db
     .select()
@@ -1219,6 +1225,64 @@ export async function getQuoteStats(businessId: string): Promise<{
       : 0;
   const closeRate = allQuotes.length > 0 ? (accepted / allQuotes.length) * 100 : 0;
 
+  // Avg days from sent → accepted
+  const acceptedWithDates = allQuotes.filter(
+    (q) => q.status === "accepted" && q.acceptedAt && (q.sentAt || q.createdAt)
+  );
+  const avgDaysToAccept =
+    acceptedWithDates.length > 0
+      ? acceptedWithDates.reduce((sum, q) => {
+          const start = (q.sentAt || q.createdAt).getTime();
+          const end = q.acceptedAt!.getTime();
+          return sum + Math.max(0, (end - start) / (1000 * 60 * 60 * 24));
+        }, 0) / acceptedWithDates.length
+      : null;
+
+  // Month-over-month close rate
+  const now = new Date();
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+  const thisMonthQuotes = allQuotes.filter(
+    (q) => q.status !== "draft" && new Date(q.createdAt) >= thisMonthStart
+  );
+  const lastMonthQuotes = allQuotes.filter((q) => {
+    const d = new Date(q.createdAt);
+    return q.status !== "draft" && d >= lastMonthStart && d <= lastMonthEnd;
+  });
+
+  const thisMonthAccepted = thisMonthQuotes.filter((q) => q.status === "accepted").length;
+  const lastMonthAccepted = lastMonthQuotes.filter((q) => q.status === "accepted").length;
+
+  const thisMonthCloseRate =
+    thisMonthQuotes.length > 0
+      ? Math.round((thisMonthAccepted / thisMonthQuotes.length) * 1000) / 10
+      : null;
+  const lastMonthCloseRate =
+    lastMonthQuotes.length > 0
+      ? Math.round((lastMonthAccepted / lastMonthQuotes.length) * 1000) / 10
+      : null;
+
+  const thisMonthRevenue = allQuotes
+    .filter((q) => q.status === "accepted" && q.acceptedAt && new Date(q.acceptedAt) >= thisMonthStart)
+    .reduce((sum, q) => sum + q.total, 0);
+  const lastMonthRevenue = allQuotes
+    .filter((q) => {
+      if (q.status !== "accepted" || !q.acceptedAt) return false;
+      const d = new Date(q.acceptedAt);
+      return d >= lastMonthStart && d <= lastMonthEnd;
+    })
+    .reduce((sum, q) => sum + q.total, 0);
+
+  // Ghost quotes: sent >48h ago, never viewed (status still "sent")
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const ghostQuoteCount = allQuotes.filter((q) => {
+    if (q.status !== "sent") return false;
+    const sentTime = q.sentAt || q.createdAt;
+    return sentTime < fortyEightHoursAgo;
+  }).length;
+
   return {
     totalQuotes: allQuotes.length,
     sentQuotes: sent,
@@ -1228,6 +1292,12 @@ export async function getQuoteStats(businessId: string): Promise<{
     totalRevenue: Math.round(totalRevenue * 100) / 100,
     avgQuoteValue: Math.round(avgQuoteValue * 100) / 100,
     closeRate: Math.round(closeRate * 10) / 10,
+    avgDaysToAccept: avgDaysToAccept !== null ? Math.round(avgDaysToAccept * 10) / 10 : null,
+    thisMonthCloseRate,
+    lastMonthCloseRate,
+    thisMonthRevenue: Math.round(thisMonthRevenue * 100) / 100,
+    lastMonthRevenue: Math.round(lastMonthRevenue * 100) / 100,
+    ghostQuoteCount,
   };
 }
 
