@@ -72,7 +72,7 @@ import {
   createRecurringSeries, getRecurringSeriesByBusiness, getRecurringSeriesById,
   updateRecurringSeries, cancelRecurringSeries, skipSeriesOccurrence, generateSeriesJobs,
 } from "../storage";
-import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
+import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens, jobAssignments } from "../../shared/schema";
 import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "../mail";
 import { trackEvent } from "../analytics";
 import { maybeAwardBadge } from "../badgeRewards";
@@ -557,6 +557,43 @@ const router = Router();
       const { employeeIds } = req.body;
       if (!Array.isArray(employeeIds)) return res.status(400).json({ message: "employeeIds must be array" });
       const j = await updateJob(req.params.id, { teamMembers: employeeIds });
+
+      // Sync the jobAssignments table so the employee portal reflects this assignment
+      try {
+        const business = await getBusinessByOwner((req as any).session?.userId);
+        const fullJob = await getJobById(req.params.id);
+        if (business && fullJob && fullJob.startDatetime) {
+          const assignedDate = new Date(fullJob.startDatetime).toISOString().slice(0, 10);
+
+          // Fetch existing assignments for this job
+          const existing = await db.select().from(jobAssignments).where(eq(jobAssignments.jobId, req.params.id));
+          const existingEmpIds = existing.map((a) => a.employeeId);
+
+          // Remove assignments for employees no longer in the list
+          for (const a of existing) {
+            if (!employeeIds.includes(a.employeeId)) {
+              await db.delete(jobAssignments).where(eq(jobAssignments.id, a.id));
+            }
+          }
+
+          // Insert assignments for newly added employees
+          for (const empId of employeeIds) {
+            if (!existingEmpIds.includes(empId)) {
+              await db.insert(jobAssignments).values({
+                jobId: req.params.id,
+                employeeId: empId,
+                businessId: business.id,
+                assignedDate,
+                status: "assigned",
+              });
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.error("[assign] jobAssignments sync error:", syncErr);
+        // non-fatal — job is still assigned via teamMembers
+      }
+
       // Trigger assignment notifications if cleaners were added
       if (employeeIds.length > 0) {
         try {

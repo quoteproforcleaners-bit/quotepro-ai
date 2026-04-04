@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "../db";
 import { employees, jobs, jobAssignments, customers, businesses } from "../../shared/schema";
-import { eq, and, gte, lt, lte, desc, asc } from "drizzle-orm";
+import { eq, and, gte, lt, lte, desc, asc, sql } from "drizzle-orm";
 import { employeeAuthMiddleware, signEmployeeToken, type EmployeeTokenPayload } from "../lib/employeeAuth";
 import { sendCheckinEmail, sendCheckoutEmail } from "../lib/employeeNotify";
 
@@ -444,6 +444,64 @@ router.post("/api/employee/jobs/:assignmentId/checkout", employeeAuthMiddleware,
     return res.status(500).json({ message: "Check-out failed" });
   }
 });
+
+// ─── Backfill: sync jobs.teamMembers → jobAssignments ────────────────────────
+// Runs once on startup to create jobAssignments rows for jobs that were
+// assigned via the teamMembers JSON array before this explicit sync existed.
+
+async function backfillJobAssignmentsFromTeamMembers() {
+  try {
+    const jobsWithMembers = await db
+      .select({
+        id: jobs.id,
+        businessId: jobs.businessId,
+        teamMembers: jobs.teamMembers,
+        startDatetime: jobs.startDatetime,
+      })
+      .from(jobs)
+      .where(sql`jsonb_array_length(COALESCE(team_members, '[]'::jsonb)) > 0`);
+
+    let created = 0;
+    for (const job of jobsWithMembers) {
+      const memberIds = (job.teamMembers as string[] | null) ?? [];
+      if (!memberIds.length || !job.startDatetime) continue;
+
+      const assignedDate = new Date(job.startDatetime).toISOString().slice(0, 10);
+
+      const existingRows = await db
+        .select({ employeeId: jobAssignments.employeeId })
+        .from(jobAssignments)
+        .where(eq(jobAssignments.jobId, job.id));
+
+      const existingSet = new Set(existingRows.map((r) => r.employeeId));
+
+      for (const empId of memberIds) {
+        if (existingSet.has(empId)) continue;
+        try {
+          await db.insert(jobAssignments).values({
+            jobId: job.id,
+            employeeId: empId,
+            businessId: job.businessId ?? "",
+            assignedDate,
+            status: "assigned",
+          });
+          created++;
+        } catch {
+          // Skip if employee doesn't exist or other constraint issue
+        }
+      }
+    }
+
+    if (created > 0) {
+      console.log(`[backfill] Created ${created} missing jobAssignment row(s) from teamMembers`);
+    }
+  } catch (err) {
+    console.error("[backfill] jobAssignments sync error:", err);
+  }
+}
+
+// Run non-blocking on startup
+backfillJobAssignmentsFromTeamMembers().catch(() => {});
 
 // ─── SSE notification helper ─────────────────────────────────────────────────
 
