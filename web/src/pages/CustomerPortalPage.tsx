@@ -53,6 +53,22 @@ interface PortalData {
     photoCount: number;
     satisfactionRating: number | null;
   }[];
+  pendingQuotes: {
+    id: string;
+    total: number;
+    subtotal: number;
+    frequency: string;
+    serviceName: string;
+    includes: string[];
+    propertyBeds: number;
+    propertyBaths: number;
+    propertySqft: number;
+    expiresAt: string | null;
+    sentAt: string;
+    depositRequired: boolean;
+    depositAmount: number | null;
+    alreadySigned: boolean;
+  }[];
   recurrence: string | null;
   portalToken: string;
   viewCount: number;
@@ -208,6 +224,12 @@ export default function CustomerPortalPage() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const photoStripRef = useRef<HTMLDivElement>(null);
+  const [approvingQuoteId, setApprovingQuoteId] = useState<string | null>(null);
+  const [signature, setSignature] = useState("");
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [approvedQuoteIds, setApprovedQuoteIds] = useState<Set<string>>(new Set());
+  const [decliningQuoteId, setDecliningQuoteId] = useState<string | null>(null);
+  const [declinedQuoteIds, setDeclinedQuoteIds] = useState<Set<string>>(new Set());
 
   const { data, isLoading, error } = useQuery<PortalData>({
     queryKey: ["/api/portal", token],
@@ -233,6 +255,45 @@ export default function CustomerPortalPage() {
     onSuccess: () => {
       setRatingSubmitted(true);
       queryClient.invalidateQueries({ queryKey: ["/api/portal", token] });
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async ({ quoteId, sig }: { quoteId: string; sig: string }) => {
+      const res = await fetch(`/api/portal/${token}/approve-quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quoteId, signature: sig }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to approve");
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      setApprovedQuoteIds(prev => new Set([...prev, vars.quoteId]));
+      setApprovingQuoteId(null);
+      setSignature("");
+      setApproveError(null);
+    },
+    onError: (err: any) => {
+      setApproveError(err.message || "Something went wrong");
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: async (quoteId: string) => {
+      const res = await fetch(`/api/portal/${token}/decline-quote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quoteId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to decline");
+      return data;
+    },
+    onSuccess: (_, quoteId) => {
+      setDeclinedQuoteIds(prev => new Set([...prev, quoteId]));
+      setDecliningQuoteId(null);
     },
   });
 
@@ -307,7 +368,7 @@ export default function CustomerPortalPage() {
     );
   }
 
-  const { customer, business, nextJob, lastJob, upcomingJobs, jobHistory, recurrence } = data;
+  const { customer, business, nextJob, lastJob, upcomingJobs, jobHistory, recurrence, pendingQuotes } = data;
   const accentColor = business.primaryColor || "#2563EB";
   const freq = recurrenceLabel(recurrence);
   const today = nextJob && isToday(nextJob.startDatetime);
@@ -426,6 +487,184 @@ export default function CustomerPortalPage() {
             </p>
           )}
         </div>
+
+        {/* ── SECTION 2b: Pending Quotes ── */}
+        {pendingQuotes && pendingQuotes
+          .filter(q => !approvedQuoteIds.has(q.id) && !declinedQuoteIds.has(q.id))
+          .map(quote => (
+          <div key={quote.id}>
+            <p style={sectionLabel}>Action Required · Quote Awaiting Your Approval</p>
+            <div style={{
+              ...card,
+              border: `2px solid ${accentColor}40`,
+              background: `linear-gradient(135deg, #fff, ${accentColor}08)`,
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              {/* Accent stripe */}
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: accentColor }} />
+
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, paddingTop: 6 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#0f172a" }}>
+                    {quote.serviceName}
+                  </p>
+                  <p style={{ margin: "3px 0 0", fontSize: 13, color: "#64748b" }}>
+                    {quote.frequency}
+                    {quote.propertyBeds > 0 ? ` · ${quote.propertyBeds}BR/${quote.propertyBaths}BA` : ""}
+                    {quote.propertySqft > 0 ? ` · ${quote.propertySqft.toLocaleString()} sqft` : ""}
+                  </p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ margin: 0, fontSize: 24, fontWeight: 800, color: accentColor }}>
+                    ${quote.total?.toFixed(2)}
+                  </p>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "#94a3b8" }}>
+                    {quote.frequency === "One-Time" ? "total" : "per visit"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Includes */}
+              {quote.includes.length > 0 && (
+                <div style={{ borderTop: "1px solid #f1f5f9", borderBottom: "1px solid #f1f5f9", padding: "12px 0", marginBottom: 14 }}>
+                  <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    What's Included
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 8px" }}>
+                    {quote.includes.map((item, i) => (
+                      <p key={i} style={{ margin: 0, fontSize: 12, color: "#334155", display: "flex", alignItems: "flex-start", gap: 4 }}>
+                        <span style={{ color: "#22c55e", fontWeight: 700, flexShrink: 0 }}>✓</span> {item}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Deposit notice */}
+              {quote.depositRequired && quote.depositAmount && (
+                <div style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 13, color: "#92400e" }}>
+                  Deposit required: <strong>${quote.depositAmount.toFixed(2)}</strong> due on signing
+                </div>
+              )}
+
+              {/* Expiry */}
+              {quote.expiresAt && (
+                <p style={{ fontSize: 12, color: "#f59e0b", margin: "0 0 14px", fontWeight: 500 }}>
+                  Expires {new Date(quote.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </p>
+              )}
+
+              {/* Signature flow */}
+              {approvingQuoteId === quote.id ? (
+                <div>
+                  <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
+                    Type your full name to sign & approve:
+                  </p>
+                  <input
+                    type="text"
+                    value={signature}
+                    onChange={e => { setSignature(e.target.value); setApproveError(null); }}
+                    placeholder="Your full name"
+                    style={{
+                      width: "100%", padding: "11px 14px", borderRadius: 10,
+                      border: `1.5px solid ${approveError ? "#ef4444" : "#cbd5e1"}`,
+                      fontSize: 15, outline: "none", marginBottom: 8,
+                      fontFamily: "Georgia, serif", color: "#0f172a",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  {approveError && (
+                    <p style={{ margin: "0 0 8px", fontSize: 12, color: "#ef4444" }}>{approveError}</p>
+                  )}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => { setApprovingQuoteId(null); setSignature(""); setApproveError(null); }}
+                      style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#64748b" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => approveMutation.mutate({ quoteId: quote.id, sig: signature })}
+                      disabled={approveMutation.isPending || signature.trim().length < 2}
+                      style={{
+                        flex: 2, padding: "11px", borderRadius: 10, border: "none",
+                        background: signature.trim().length >= 2 ? accentColor : "#e2e8f0",
+                        color: signature.trim().length >= 2 ? "#fff" : "#94a3b8",
+                        fontSize: 14, fontWeight: 700, cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {approveMutation.isPending ? "Signing…" : "Confirm & Approve"}
+                    </button>
+                  </div>
+                  <p style={{ margin: "8px 0 0", fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
+                    By signing, you agree to the services and pricing listed above.
+                  </p>
+                </div>
+              ) : decliningQuoteId === quote.id ? (
+                <div>
+                  <p style={{ margin: "0 0 10px", fontSize: 14, color: "#334155" }}>
+                    Are you sure you want to decline this quote?
+                  </p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => setDecliningQuoteId(null)}
+                      style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#64748b" }}
+                    >
+                      Go Back
+                    </button>
+                    <button
+                      onClick={() => declineMutation.mutate(quote.id)}
+                      disabled={declineMutation.isPending}
+                      style={{ flex: 1, padding: "11px", borderRadius: 10, border: "none", background: "#fee2e2", color: "#dc2626", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      {declineMutation.isPending ? "…" : "Yes, Decline"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => setDecliningQuoteId(quote.id)}
+                    style={{ flex: 1, padding: "13px", borderRadius: 12, border: "1.5px solid #e2e8f0", background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", color: "#64748b" }}
+                  >
+                    Not Interested
+                  </button>
+                  <button
+                    onClick={() => { setApprovingQuoteId(quote.id); setApproveError(null); }}
+                    style={{ flex: 2, padding: "13px", borderRadius: 12, border: "none", background: accentColor, color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Approve & Sign
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {/* approved state */}
+        {pendingQuotes && pendingQuotes
+          .filter(q => approvedQuoteIds.has(q.id))
+          .map(quote => (
+          <div key={`approved-${quote.id}`}>
+            <p style={sectionLabel}>Quote</p>
+            <div style={{ ...card, border: "2px solid #22c55e30", background: "linear-gradient(135deg, #f0fdf4, #fff)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ color: "#fff", fontSize: 20, lineHeight: 1 }}>✓</span>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#166534" }}>Quote Approved!</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 13, color: "#16a34a" }}>
+                    We'll be in touch to confirm your first appointment.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
 
         {/* ── SECTION 3: Next Clean Card ── */}
         {nextJob && (

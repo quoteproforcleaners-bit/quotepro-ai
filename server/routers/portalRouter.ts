@@ -61,6 +61,9 @@ export async function initPortalTables() {
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tips_job_id ON tips(job_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_jobs_tip_token ON jobs(tip_token)`);
+    // Quote e-signature
+    await pool.query(`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS customer_signature TEXT`);
+    await pool.query(`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS signed_at TIMESTAMPTZ`);
     console.log("[portal] Tables ready");
   } catch (e: any) {
     console.error("[portal] initPortalTables error:", e.message);
@@ -152,8 +155,8 @@ router.get("/api/portal/:token", async (req: Request, res: Response) => {
     const { customer_id: customerId, business_id: businessId } = p;
     const nowIso = new Date().toISOString();
 
-    // Fetch next job, upcoming, last job, history in parallel
-    const [nextJobResult, upcomingJobsResult, lastJobResult, historyResult, recurrenceResult] =
+    // Fetch next job, upcoming, last job, history, pending quotes in parallel
+    const [nextJobResult, upcomingJobsResult, lastJobResult, historyResult, recurrenceResult, pendingQuotesResult] =
       await Promise.all([
         pool.query(
           `SELECT j.id, j.job_type, j.status, j.detailed_status, j.start_datetime, j.end_datetime,
@@ -204,6 +207,16 @@ router.get("/api/portal/:token", async (req: Request, res: Response) => {
           `SELECT recurrence FROM jobs
            WHERE customer_id = $1 AND business_id = $2 AND recurrence != 'none'
            ORDER BY created_at DESC LIMIT 1`,
+          [customerId, businessId]
+        ),
+        pool.query(
+          `SELECT id, total, subtotal, frequency_selected, selected_option, options, add_ons,
+                  property_beds, property_baths, property_sqft, expires_at, sent_at,
+                  deposit_required, deposit_amount, customer_signature, signed_at, status
+           FROM quotes
+           WHERE customer_id = $1 AND business_id = $2
+             AND status IN ('sent', 'viewed')
+           ORDER BY sent_at DESC LIMIT 5`,
           [customerId, businessId]
         ),
       ]);
@@ -321,12 +334,125 @@ router.get("/api/portal/:token", async (req: Request, res: Response) => {
         tipAmount: j.tip_amount,
       })),
       recurrence: recurrenceResult.rows[0]?.recurrence || null,
+      pendingQuotes: pendingQuotesResult.rows.map((q: any) => {
+        // Resolve the selected option details for customer display
+        const opts = q.options || {};
+        const selectedKey = q.selected_option || "better";
+        const selectedOpt = opts[selectedKey] || Object.values(opts)[0] || {};
+        const includes: string[] = selectedOpt.includes || selectedOpt.checklist || [];
+        const freqLabel: Record<string, string> = {
+          "one-time": "One-Time",
+          "weekly": "Weekly",
+          "biweekly": "Every 2 Weeks",
+          "monthly": "Monthly",
+        };
+        return {
+          id: q.id,
+          total: q.total,
+          subtotal: q.subtotal,
+          frequency: freqLabel[q.frequency_selected] || q.frequency_selected || "One-Time",
+          serviceName: selectedOpt.name || selectedKey.charAt(0).toUpperCase() + selectedKey.slice(1),
+          includes: includes.slice(0, 6),
+          propertyBeds: q.property_beds,
+          propertyBaths: q.property_baths,
+          propertySqft: q.property_sqft,
+          expiresAt: q.expires_at || null,
+          sentAt: q.sent_at,
+          depositRequired: q.deposit_required,
+          depositAmount: q.deposit_amount,
+          alreadySigned: !!(q.customer_signature || q.signed_at),
+        };
+      }),
       portalToken: token,
       viewCount: (p.view_count || 0) + 1,
     });
   } catch (e: any) {
     console.error("[portal] GET /api/portal/:token error:", e.message);
     return res.status(500).json({ message: "Failed to load portal" });
+  }
+});
+
+// ─── POST /api/portal/:token/approve-quote ────────────────────────────────────
+
+router.post("/api/portal/:token/approve-quote", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { quoteId, signature } = req.body;
+
+    if (!quoteId) return res.status(400).json({ message: "quoteId required" });
+    if (!signature || signature.trim().length < 2) {
+      return res.status(400).json({ message: "Please type your full name to sign" });
+    }
+
+    const portal = await pool.query(
+      `SELECT cp.customer_id, cp.business_id
+       FROM customer_portals cp WHERE cp.token = $1 LIMIT 1`,
+      [token]
+    );
+    if (!portal.rows[0]) return res.status(404).json({ message: "Portal not found" });
+
+    const { customer_id: customerId, business_id: businessId } = portal.rows[0];
+
+    // Verify quote belongs to this customer
+    const quote = await pool.query(
+      `SELECT id, status FROM quotes WHERE id = $1 AND customer_id = $2 AND business_id = $3 LIMIT 1`,
+      [quoteId, customerId, businessId]
+    );
+    if (!quote.rows[0]) return res.status(403).json({ message: "Quote not found" });
+    if (!["sent", "viewed"].includes(quote.rows[0].status)) {
+      return res.status(409).json({ message: "Quote has already been responded to" });
+    }
+
+    await pool.query(
+      `UPDATE quotes
+       SET status = 'accepted', accepted_at = NOW(),
+           customer_signature = $1, signed_at = NOW()
+       WHERE id = $2`,
+      [signature.trim(), quoteId]
+    );
+
+    return res.json({ success: true, message: "Quote approved!" });
+  } catch (e: any) {
+    console.error("[portal] approve-quote error:", e.message);
+    return res.status(500).json({ message: "Failed to approve quote" });
+  }
+});
+
+// ─── POST /api/portal/:token/decline-quote ────────────────────────────────────
+
+router.post("/api/portal/:token/decline-quote", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { quoteId } = req.body;
+
+    if (!quoteId) return res.status(400).json({ message: "quoteId required" });
+
+    const portal = await pool.query(
+      `SELECT customer_id, business_id FROM customer_portals WHERE token = $1 LIMIT 1`,
+      [token]
+    );
+    if (!portal.rows[0]) return res.status(404).json({ message: "Portal not found" });
+
+    const { customer_id: customerId, business_id: businessId } = portal.rows[0];
+
+    const quote = await pool.query(
+      `SELECT id, status FROM quotes WHERE id = $1 AND customer_id = $2 AND business_id = $3 LIMIT 1`,
+      [quoteId, customerId, businessId]
+    );
+    if (!quote.rows[0]) return res.status(403).json({ message: "Quote not found" });
+    if (!["sent", "viewed"].includes(quote.rows[0].status)) {
+      return res.status(409).json({ message: "Quote has already been responded to" });
+    }
+
+    await pool.query(
+      `UPDATE quotes SET status = 'declined', declined_at = NOW() WHERE id = $1`,
+      [quoteId]
+    );
+
+    return res.json({ success: true, message: "Quote declined" });
+  } catch (e: any) {
+    console.error("[portal] decline-quote error:", e.message);
+    return res.status(500).json({ message: "Failed to decline quote" });
   }
 });
 

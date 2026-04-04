@@ -72,6 +72,8 @@ export default function QuoteDetailPage() {
  const { business } = useAuth();
  const { isFree, isStarter, startCheckout } = useSubscription();
  const [copied, setCopied] = useState(false);
+ const [portalLinkCopied, setPortalLinkCopied] = useState(false);
+ const [portalLinkLoading, setPortalLinkLoading] = useState(false);
  const [sendModalOpen, setSendModalOpen] = useState(false);
  const [deleteOpen, setDeleteOpen] = useState(false);
  const [aiDrafts, setAiDrafts] = useState<Record<string, string>>({});
@@ -266,6 +268,22 @@ export default function QuoteDetailPage() {
  };
 
  const previewQuote = () => window.open(quoteUrl,"_blank");
+
+ const copyPortalLink = async () => {
+   if (!quote?.customerId) return;
+   setPortalLinkLoading(true);
+   try {
+     const res = await apiGet(`/api/portal/customer/${quote.customerId}/preferences`) as any;
+     const portalToken = res?.token;
+     if (portalToken) {
+       const url = `${window.location.origin}/home/${portalToken}`;
+       await navigator.clipboard.writeText(url);
+       setPortalLinkCopied(true);
+       setTimeout(() => setPortalLinkCopied(false), 2500);
+     }
+   } catch { /* ignore */ }
+   setPortalLinkLoading(false);
+ };
 
  const sendQuote = () => setSendModalOpen(true);
 
@@ -1665,6 +1683,18 @@ export default function QuoteDetailPage() {
  >
  {copied ?"Link Copied!":"Copy Link"}
  </Button>
+ {quote.customerId ? (
+   <Button
+     variant="secondary"
+     icon={Link2}
+     onClick={copyPortalLink}
+     disabled={portalLinkLoading}
+     className="w-full justify-start"
+     size="sm"
+   >
+     {portalLinkLoading ? "Getting link…" : portalLinkCopied ? "Portal Link Copied!" : "Copy Customer Portal Link"}
+   </Button>
+ ) : null}
  </div>
  <p className="text-[11px] text-slate-400 mt-3 break-all leading-relaxed">
  {quoteUrl}
