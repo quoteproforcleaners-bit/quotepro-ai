@@ -915,12 +915,12 @@ export function QuickAddCleanPanel({
                     </button>
                   </div>
                   {showTeamDropdown && filteredEmployees.length > 0 && (
-                    <div className="absolute z-50 top-full mt-1 left-0 right-10 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                    <div className="mt-1 border border-slate-200 rounded-xl bg-white overflow-hidden">
                       {filteredEmployees.map((emp) => (
                         <button
                           key={emp.id}
                           type="button"
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 text-left transition-colors"
+                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 text-left transition-colors border-b border-slate-100 last:border-0"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             setTeamMembers(p => [...p, emp.name]);
@@ -943,7 +943,7 @@ export function QuickAddCleanPanel({
                     </div>
                   )}
                   {showTeamDropdown && filteredEmployees.length === 0 && teamInput.trim() !== "" && activeEmployees.length > 0 && (
-                    <div className="absolute z-50 top-full mt-1 left-0 right-10 bg-white border border-slate-200 rounded-xl shadow-lg px-3 py-2.5">
+                    <div className="mt-1 border border-slate-200 rounded-xl bg-white px-3 py-2.5">
                       <p className="text-sm text-slate-400">No match — press Enter or + to add "{teamInput}"</p>
                     </div>
                   )}
