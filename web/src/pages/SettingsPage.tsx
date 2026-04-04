@@ -27,7 +27,6 @@ import {
   User,
   Award,
   Mail,
-  MessageSquare,
   Edit3,
   Clock,
   Moon,
@@ -361,7 +360,6 @@ export default function SettingsPage() {
     senderTitle: "",
     bookingLink: "",
     emailSignature: "",
-    smsSignature: "",
   });
 
   const [paymentForm, setPaymentForm] = useState({
@@ -422,7 +420,6 @@ export default function SettingsPage() {
 
   // Reminder preferences state
   const [reminderEmailDays, setReminderEmailDays] = useState<string>("3");
-  const [reminderSmsDays, setReminderSmsDays] = useState<string>("1");
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderTestSending, setReminderTestSending] = useState(false);
   const [reminderTestSent, setReminderTestSent] = useState(false);
@@ -456,7 +453,6 @@ export default function SettingsPage() {
   // Cleaner notification preferences state
   const [cleanerEnabled, setCleanerEnabled] = useState(true);
   const [cleanerEmail, setCleanerEmail] = useState(true);
-  const [cleanerSms, setCleanerSms] = useState(true);
   const [cleanerTiming, setCleanerTiming] = useState("both");
   const [cleanerSaving, setCleanerSaving] = useState(false);
   const [cleanerTestSending, setCleanerTestSending] = useState(false);
@@ -493,14 +489,12 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!reminderPrefs) return;
     setReminderEmailDays(reminderPrefs.emailReminderDays === null ? "null" : String(reminderPrefs.emailReminderDays ?? 3));
-    setReminderSmsDays(reminderPrefs.smsReminderDays === null ? "null" : String(reminderPrefs.smsReminderDays ?? 1));
   }, [reminderPrefs]);
 
   useEffect(() => {
     if (!cleanerPrefs) return;
     setCleanerEnabled(cleanerPrefs.enabled ?? true);
     setCleanerEmail(cleanerPrefs.email ?? true);
-    setCleanerSms(cleanerPrefs.sms ?? true);
     setCleanerTiming(cleanerPrefs.timing ?? "both");
   }, [cleanerPrefs]);
 
@@ -509,7 +503,6 @@ export default function SettingsPage() {
     try {
       await apiPut("/api/reminder-preferences", {
         emailReminderDays: reminderEmailDays === "null" ? null : Number(reminderEmailDays),
-        smsReminderDays: reminderSmsDays === "null" ? null : Number(reminderSmsDays),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/reminder-preferences"] });
       showSaved("reminders");
@@ -533,7 +526,6 @@ export default function SettingsPage() {
       await apiPut("/api/cleaner-notification-preferences", {
         enabled: cleanerEnabled,
         email: cleanerEmail,
-        sms: cleanerSms,
         timing: cleanerTiming,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/cleaner-notification-preferences"] });
@@ -662,7 +654,6 @@ export default function SettingsPage() {
         senderTitle: (business as any).senderTitle || "",
         bookingLink: (business as any).bookingLink || "",
         emailSignature: (business as any).emailSignature || "",
-        smsSignature: (business as any).smsSignature || "",
       });
       setPaymentForm({
         venmoHandle: (business as any).venmoHandle || "",
@@ -791,7 +782,6 @@ export default function SettingsPage() {
       senderTitle: brandingForm.senderTitle || "",
       bookingLink: brandingForm.bookingLink || "",
       emailSignature: brandingForm.emailSignature || "",
-      smsSignature: brandingForm.smsSignature || "",
     });
   };
 
@@ -1184,7 +1174,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader title="Sender Identity" icon={User} />
             <p className="text-sm text-slate-500 mb-4">
-              How your name and title appear on quotes, emails, and SMS messages.
+              How your name and title appear on quotes and emails.
             </p>
             <div className="space-y-4">
               <Input
@@ -1212,7 +1202,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader title="Signatures" icon={Edit3} />
             <p className="text-sm text-slate-500 mb-4">
-              Custom signatures appended to your outgoing emails and SMS messages.
+              Custom signature appended to your outgoing emails.
             </p>
             <div className="space-y-4">
               <div>
@@ -1227,12 +1217,6 @@ export default function SettingsPage() {
                   className="w-full px-3.5 py-3 rounded-lg border border-slate-200 hover:border-slate-300 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 resize-none"
                 />
               </div>
-              <Input
-                label="SMS Signature"
-                value={brandingForm.smsSignature}
-                onChange={(e) => setBrandingForm((p) => ({ ...p, smsSignature: e.target.value }))}
-                placeholder="- Sarah, Sparkle Clean"
-              />
             </div>
           </Card>
 
@@ -1477,26 +1461,6 @@ export default function SettingsPage() {
               </select>
             </div>
 
-            {/* SMS */}
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <MessageSquare className="w-4 h-4 text-cyan-500" />
-                <span className="text-sm font-semibold text-slate-800">SMS Reminder</span>
-              </div>
-              <select
-                value={reminderSmsDays}
-                onChange={(e) => setReminderSmsDays(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="0">Text them morning of appointment</option>
-                <option value="1">Text them one day before appointment</option>
-                <option value="2">Text them two days before appointment</option>
-                <option value="3">Text them three days before appointment</option>
-                <option value="null">Don't send text reminders</option>
-              </select>
-              <p className="text-xs text-slate-400 mt-1.5">SMS is never sent between 9 PM and 8 AM.</p>
-            </div>
-
             <div className="flex items-center gap-3">
               <Button icon={Save} onClick={handleSaveReminders} loading={reminderSaving} size="sm">
                 Save Reminder Settings
@@ -1505,41 +1469,25 @@ export default function SettingsPage() {
           </Card>
 
           {/* Preview card */}
-          {(reminderEmailDays !== "null" || reminderSmsDays !== "null") && (
+          {reminderEmailDays !== "null" && (
             <Card>
-              <CardHeader title="Message Preview" icon={MessageSquare} />
+              <CardHeader title="Message Preview" icon={Mail} />
               <p className="text-sm text-slate-500 mb-4">This is what your customers will receive:</p>
-              <div className="space-y-3">
-                {reminderEmailDays !== "null" && (
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Mail className="w-3.5 h-3.5 text-blue-500" />
-                      <span className="text-blue-600 text-xs font-bold uppercase tracking-wider">Email</span>
-                    </div>
-                    <p className="text-sm font-semibold text-slate-800 mb-1">
-                      {reminderEmailDays === "0"
-                        ? "Reminder: Your cleaning is TODAY"
-                        : reminderEmailDays === "1"
-                        ? "You've got a cleaning appointment scheduled for tomorrow"
-                        : `Your cleaning appointment is in ${reminderEmailDays} days`}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      Your cleaning is scheduled {reminderEmailDays === "0" ? "TODAY" : reminderEmailDays === "1" ? "tomorrow at 09:00 AM" : `in ${reminderEmailDays} days at 09:00 AM`}. Contact us to cancel or reschedule.
-                    </p>
-                  </div>
-                )}
-                {reminderSmsDays !== "null" && (
-                  <div className="bg-cyan-50 border border-cyan-100 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <MessageSquare className="w-3.5 h-3.5 text-cyan-500" />
-                      <span className="text-cyan-600 text-xs font-bold uppercase tracking-wider">Text</span>
-                    </div>
-                    <p className="text-xs text-slate-500 mb-1">From: your business phone</p>
-                    <p className="text-sm text-slate-700">
-                      Hi [Customer]! Reminder: [Business] is cleaning your home {reminderSmsDays === "0" ? "TODAY" : reminderSmsDays === "1" ? "tomorrow" : `in ${reminderSmsDays} days`}{reminderSmsDays !== "0" ? " at 09:00 AM" : ""}. To reschedule call [Phone]. Reply STOP to opt out.
-                    </p>
-                  </div>
-                )}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Mail className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-blue-600 text-xs font-bold uppercase tracking-wider">Email</span>
+                </div>
+                <p className="text-sm font-semibold text-slate-800 mb-1">
+                  {reminderEmailDays === "0"
+                    ? "Reminder: Your cleaning is TODAY"
+                    : reminderEmailDays === "1"
+                    ? "You've got a cleaning appointment scheduled for tomorrow"
+                    : `Your cleaning appointment is in ${reminderEmailDays} days`}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Your cleaning is scheduled {reminderEmailDays === "0" ? "TODAY" : reminderEmailDays === "1" ? "tomorrow at 09:00 AM" : `in ${reminderEmailDays} days at 09:00 AM`}. Contact us to cancel or reschedule.
+                </p>
               </div>
             </Card>
           )}
@@ -1604,20 +1552,6 @@ export default function SettingsPage() {
                   </button>
                 </div>
 
-                {/* SMS sub-toggle */}
-                <div className="flex items-center justify-between py-2.5 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-cyan-500" />
-                    <span className="text-sm text-slate-700">Send text notifications</span>
-                  </div>
-                  <button
-                    onClick={() => setCleanerSms(!cleanerSms)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${cleanerSms ? "bg-cyan-500" : "bg-slate-200"}`}
-                  >
-                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${cleanerSms ? "translate-x-4" : "translate-x-1"}`} />
-                  </button>
-                </div>
-
                 {/* Timing */}
                 <div className="py-2.5 border-t border-slate-100">
                   <p className="text-sm font-medium text-slate-700 mb-2">Notify cleaners:</p>
@@ -1661,7 +1595,7 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-3 text-xs text-slate-500">
                           {emp.phone ? <span>{emp.phone}</span> : null}
                           {emp.email ? <span>{emp.email}</span> : (
-                            <span className="text-amber-600 font-medium">No email — SMS only</span>
+                            <span className="text-amber-600 font-medium">No email on file</span>
                           )}
                         </div>
                       </div>
@@ -1679,7 +1613,7 @@ export default function SettingsPage() {
               </div>
               {cleanerTestSent ? (
                 <div className="mt-4 flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium">
-                  <CheckCircle className="w-4 h-4" /> Test sent! Check their email and phone.
+                  <CheckCircle className="w-4 h-4" /> Test sent! Check their email.
                 </div>
               ) : null}
             </Card>
@@ -1900,7 +1834,7 @@ export default function SettingsPage() {
               <Divider />
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Communication Language</label>
-                <p className="text-xs text-slate-500 mb-2">Language used for AI-generated quotes, emails, and SMS messages sent to customers</p>
+                <p className="text-xs text-slate-500 mb-2">Language used for AI-generated quotes and emails sent to customers</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {LANGUAGE_OPTIONS.map((lang) => (
                     <button
@@ -2181,7 +2115,7 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Customer Messaging" icon={MessageSquare} />
+            <CardHeader title="Customer Messaging" icon={Mail} />
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Confirmation message</label>

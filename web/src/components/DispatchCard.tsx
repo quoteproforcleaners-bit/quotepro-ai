@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../lib/api";
 import {
-  MapPin, Copy, Navigation, Phone, Mail, CheckCircle,
+  MapPin, Copy, Navigation, Mail, CheckCircle,
   ExternalLink, ClipboardList, Send, UserCheck,
   Users, AlertCircle,
 } from "lucide-react";
@@ -35,37 +35,11 @@ interface Employee {
 }
 
 type RecipientTab = "customer" | "employee" | "custom";
-type Channel = "sms" | "email";
 
 function initials(name: string) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
-function formatSmsText(d: DispatchData): string {
-  const lines: string[] = ["Job details from your cleaning service:"];
-  if (d.customerName) lines.push(`Customer: ${d.customerName}`);
-  if (d.address) lines.push(`Address: ${d.address}`);
-  if (d.serviceType) lines.push(`Service: ${d.serviceType}`);
-  if (d.scheduledDate) {
-    const date = new Date(d.scheduledDate).toLocaleDateString("en-US", {
-      weekday: "short", month: "short", day: "numeric",
-    });
-    if (d.startTime && d.endTime) {
-      const fmt = (t: string) =>
-        new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      lines.push(`When: ${date}, ${fmt(d.startTime)}–${fmt(d.endTime)}`);
-    } else if (d.startTime) {
-      const fmt = (t: string) =>
-        new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      lines.push(`When: ${date}, ${fmt(d.startTime)}`);
-    } else {
-      lines.push(`When: ${date}`);
-    }
-  }
-  if (d.total) lines.push(`Pay: $${Number(d.total).toLocaleString()}`);
-  if (d.notes) lines.push(`Notes: ${d.notes}`);
-  return lines.join("\n");
-}
 
 function formatEmailText(d: DispatchData): string {
   const lines: string[] = ["Here are the details for your upcoming job:"];
@@ -128,10 +102,8 @@ export default function DispatchCard({ data, onToast }: Props) {
   const navigate = useNavigate();
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [sendModal, setSendModal] = useState(false);
-  const [channel, setChannel] = useState<Channel>("sms");
   const [recipientTab, setRecipientTab] = useState<RecipientTab>("employee");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [customPhone, setCustomPhone] = useState("");
   const [customEmail, setCustomEmail] = useState("");
   const [messageText, setMessageText] = useState("");
   const [assignEmployee, setAssignEmployee] = useState(false);
@@ -149,16 +121,12 @@ export default function DispatchCard({ data, onToast }: Props) {
 
   const activeEmployees = employees.filter(e => e.status === "active");
 
-  function openSendModal(ch: Channel) {
-    setChannel(ch);
+  function openSendModal() {
     setSuccessMsg("");
     setSelectedEmployee(null);
-    setCustomPhone("");
     setCustomEmail("");
     setAssignEmployee(false);
-    const msg = ch === "sms" ? formatSmsText(data) : formatEmailText(data);
-    setMessageText(msg);
-    // Default to employee tab if employees exist, else customer/custom
+    setMessageText(formatEmailText(data));
     if (activeEmployees.length > 0) {
       setRecipientTab("employee");
     } else if (data.customerId) {
@@ -169,27 +137,19 @@ export default function DispatchCard({ data, onToast }: Props) {
     setSendModal(true);
   }
 
-  function getRecipientInfo(): { name: string; phone?: string; email?: string; valid: boolean; reason?: string } {
+  function getRecipientInfo(): { name: string; email?: string; valid: boolean; reason?: string } {
     if (recipientTab === "customer") {
       if (!data.customerId) return { name: "", valid: false, reason: "No customer linked to this job" };
-      if (channel === "sms" && !data.phone) return { name: data.customerName || "Customer", valid: false, reason: "No phone number on customer record" };
-      if (channel === "email" && !data.email) return { name: data.customerName || "Customer", valid: false, reason: "No email on customer record" };
-      return { name: data.customerName || "Customer", phone: data.phone, email: data.email, valid: true };
+      if (!data.email) return { name: data.customerName || "Customer", valid: false, reason: "No email on customer record" };
+      return { name: data.customerName || "Customer", email: data.email, valid: true };
     }
     if (recipientTab === "employee") {
       if (!selectedEmployee) return { name: "", valid: false, reason: "Select a team member" };
-      if (channel === "sms" && !selectedEmployee.phone) return { name: selectedEmployee.name, valid: false, reason: `${selectedEmployee.name} has no phone number saved` };
-      if (channel === "email" && !selectedEmployee.email) return { name: selectedEmployee.name, valid: false, reason: `${selectedEmployee.name} has no email saved` };
-      return { name: selectedEmployee.name, phone: selectedEmployee.phone, email: selectedEmployee.email, valid: true };
+      if (!selectedEmployee.email) return { name: selectedEmployee.name, valid: false, reason: `${selectedEmployee.name} has no email saved` };
+      return { name: selectedEmployee.name, email: selectedEmployee.email, valid: true };
     }
-    // custom
-    if (channel === "sms") {
-      if (!customPhone.trim()) return { name: "", valid: false, reason: "Enter a phone number" };
-      return { name: customPhone.trim(), phone: customPhone.trim(), valid: true };
-    } else {
-      if (!customEmail.trim()) return { name: "", valid: false, reason: "Enter an email address" };
-      return { name: customEmail.trim(), email: customEmail.trim(), valid: true };
-    }
+    if (!customEmail.trim()) return { name: "", valid: false, reason: "Enter an email address" };
+    return { name: customEmail.trim(), email: customEmail.trim(), valid: true };
   }
 
   async function handleSend() {
@@ -198,31 +158,22 @@ export default function DispatchCard({ data, onToast }: Props) {
     setSending(true);
     setSuccessMsg("");
     try {
-      const payload: any = {
-        channel,
+      await apiPost("/api/dispatch/send", {
+        channel: "email",
         toName: recipient.name,
+        toEmail: recipient.email,
         message: messageText,
         subject: `Job Details — ${data.customerName || "Your Cleaning"}`,
-      };
-      if (channel === "sms") payload.toPhone = recipient.phone;
-      else payload.toEmail = recipient.email;
-      await apiPost("/api/dispatch/send", payload);
+      });
 
-      // Assign employee to job if requested
       if (assignEmployee && selectedEmployee && data.jobId) {
         try {
-          await apiPost(`/api/jobs/${data.jobId}/assign`, {
-            employeeIds: [selectedEmployee.id],
-          });
+          await apiPost(`/api/jobs/${data.jobId}/assign`, { employeeIds: [selectedEmployee.id] });
           queryClient.invalidateQueries({ queryKey: ["/api/jobs", data.jobId] });
-        } catch {
-          // non-fatal
-        }
+        } catch { /* non-fatal */ }
       }
 
-      const label = channel === "sms"
-        ? `Text sent to ${recipient.name}${recipient.phone ? ` at ${recipient.phone}` : ""}`
-        : `Email sent to ${recipient.name}${recipient.email ? ` at ${recipient.email}` : ""}`;
+      const label = `Email sent to ${recipient.name}${recipient.email ? ` at ${recipient.email}` : ""}`;
       setSuccessMsg(label);
       toast(label);
     } catch (e: any) {
@@ -353,7 +304,7 @@ export default function DispatchCard({ data, onToast }: Props) {
           <ActionBtn
             icon={Mail}
             label="Email Details"
-            onClick={() => openSendModal("email")}
+            onClick={() => openSendModal()}
           />
         </div>
       </Card>
@@ -362,7 +313,7 @@ export default function DispatchCard({ data, onToast }: Props) {
       <Modal
         open={sendModal}
         onClose={() => { setSendModal(false); setSuccessMsg(""); }}
-        title={channel === "sms" ? "Text Job Details" : "Email Job Details"}
+        title="Email Job Details"
         size="md"
       >
         {successMsg ? (
@@ -383,26 +334,6 @@ export default function DispatchCard({ data, onToast }: Props) {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Channel toggle */}
-            <div className="flex rounded-lg bg-slate-100 p-1 gap-1">
-              {(["sms", "email"] as Channel[]).map(ch => (
-                <button
-                  key={ch}
-                  onClick={() => {
-                    setChannel(ch);
-                    setMessageText(ch === "sms" ? formatSmsText(data) : formatEmailText(data));
-                    setSuccessMsg("");
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    channel === ch ? "bg-white shadow text-slate-900" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {ch === "sms" ? <Phone className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />}
-                  {ch === "sms" ? "Text Message" : "Email"}
-                </button>
-              ))}
-            </div>
-
             {/* Recipient tabs */}
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Send to</p>
@@ -410,7 +341,7 @@ export default function DispatchCard({ data, onToast }: Props) {
                 {[
                   { id: "employee" as RecipientTab, label: "Team Member", icon: Users },
                   { id: "customer" as RecipientTab, label: "Customer", icon: UserCheck },
-                  { id: "custom" as RecipientTab, label: "Custom", icon: Phone },
+                  { id: "custom" as RecipientTab, label: "Custom", icon: Mail },
                 ].map(({ id, label, icon: Icon }) => (
                   <button
                     key={id}
@@ -462,7 +393,7 @@ export default function DispatchCard({ data, onToast }: Props) {
                           <p className="text-sm font-medium text-slate-900">{emp.name}</p>
                           <p className="text-xs text-slate-500 truncate">
                             {emp.role ? `${emp.role} · ` : ""}
-                            {channel === "sms" ? (emp.phone || "No phone") : (emp.email || "No email")}
+                            {emp.email || "No email"}
                           </p>
                         </div>
                         {selectedEmployee?.id === emp.id ? (
@@ -492,9 +423,7 @@ export default function DispatchCard({ data, onToast }: Props) {
                   <div>
                     <p className="text-sm font-medium text-slate-900">{data.customerName || "Customer"}</p>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {channel === "sms"
-                        ? (data.phone ? data.phone : "No phone number on record")
-                        : (data.email ? data.email : "No email on record")}
+                      {data.email ? data.email : "No email on record"}
                     </p>
                   </div>
                 ) : (
@@ -503,29 +432,14 @@ export default function DispatchCard({ data, onToast }: Props) {
               </div>
             ) : (
               <div>
-                {channel === "sms" ? (
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1.5">Phone Number</label>
-                    <input
-                      type="tel"
-                      value={customPhone}
-                      onChange={e => setCustomPhone(e.target.value)}
-                      placeholder="(484) 555-1212"
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1.5">Email Address</label>
-                    <input
-                      type="email"
-                      value={customEmail}
-                      onChange={e => setCustomEmail(e.target.value)}
-                      placeholder="cleaner@company.com"
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
-                    />
-                  </div>
-                )}
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">Email Address</label>
+                <input
+                  type="email"
+                  value={customEmail}
+                  onChange={e => setCustomEmail(e.target.value)}
+                  placeholder="cleaner@company.com"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
               </div>
             )}
 
@@ -557,7 +471,7 @@ export default function DispatchCard({ data, onToast }: Props) {
                 disabled={!recipient?.valid || !messageText.trim()}
                 className="flex-1"
               >
-                {sending ? "Sending…" : `Send ${channel === "sms" ? "Text" : "Email"}`}
+                {sending ? "Sending…" : "Send Email"}
               </Button>
               <Button
                 variant="ghost"

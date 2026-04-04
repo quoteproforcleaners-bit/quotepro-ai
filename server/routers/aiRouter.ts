@@ -812,63 +812,6 @@ SALES & MARKETING:
     }
   });
 
-  router.post("/api/send/sms", requireAuth, requireGrowth, async (req: Request, res: Response) => {
-    try {
-      const { to, body, customerId, quoteId } = req.body;
-      if (!to || !body) {
-        return res.status(400).json({ message: "to and body are required" });
-      }
-
-      const business = await getBusinessByOwner(req.session.userId!);
-      if (!business) return res.status(404).json({ message: "Business not found" });
-
-      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-      const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-
-      if (!twilioSid || !twilioToken || !twilioFrom) {
-        return res.status(503).json({ message: "SMS service not configured. Please connect Twilio in settings." });
-      }
-
-      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
-      const twilioRes = await fetch(twilioUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          To: to,
-          From: twilioFrom,
-          Body: body,
-        }).toString(),
-      });
-
-      if (!twilioRes.ok) {
-        const errText = await twilioRes.text();
-        console.error("Twilio error:", errText);
-        return res.status(502).json({ message: "Failed to send SMS" });
-      }
-
-      const twilioData = await twilioRes.json() as any;
-
-      await createCommunication({
-        businessId: business.id,
-        customerId: customerId || undefined,
-        quoteId: quoteId || undefined,
-        channel: "sms",
-        direction: "outbound",
-        content: body,
-        status: "sent",
-      });
-
-      return res.json({ success: true, message: "SMS sent successfully", sid: twilioData.sid });
-    } catch (error: any) {
-      console.error("Send SMS error:", error);
-      return res.status(500).json({ message: "Failed to send SMS" });
-    }
-  });
-
   router.post("/api/ai/quote-descriptions", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { homeDetails, serviceTypes, addOns, companyName } = req.body;

@@ -317,7 +317,7 @@ const router = Router();
 
       const { customerId, channel, content, subject, quoteId } = req.body as {
         customerId: string;
-        channel: "email" | "sms";
+        channel: "email";
         content: string;
         subject?: string;
         quoteId?: string;
@@ -379,26 +379,7 @@ const router = Router();
         const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${content.split("\n").map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join("")}</td></tr>${optionCardsHtml}<tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
         await sendEmail({ to: toEmail, subject: emailSubject, html: htmlBody, text: content, fromName, replyTo });
       } else {
-        const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-        const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-        const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-        if (!twilioSid || !twilioToken || !twilioFrom) return res.status(400).json({ message: "SMS service not configured" });
-        const toPhone = cust.phone;
-        if (!toPhone) return res.status(400).json({ message: "Customer has no phone number on file" });
-        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
-        const twilioRes = await fetch(twilioUrl, {
-          method: "POST",
-          headers: {
-            Authorization: "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({ From: twilioFrom, To: toPhone, Body: content }).toString(),
-        });
-        if (!twilioRes.ok) {
-          const errText = await twilioRes.text();
-          console.error("Direct SMS error:", twilioRes.status, errText);
-          return res.status(500).json({ message: "Failed to send SMS" });
-        }
+        return res.status(400).json({ message: "Only email channel is supported" });
       }
 
       // Record the sent communication
@@ -412,7 +393,7 @@ const router = Router();
         sentAt: new Date(),
       });
 
-      return res.json({ success: true, message: `${channel === "email" ? "Email" : "SMS"} sent successfully` });
+      return res.json({ success: true, message: "Email sent successfully" });
     } catch (error: any) {
       console.error("send-direct error:", error);
       const msg = error?.message || "";

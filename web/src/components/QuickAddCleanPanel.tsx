@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiPost, apiGet } from "../lib/api";
 import {
   AlertCircle, CheckCircle, Plus, Search, Users, X, Zap,
-  MessageSquare, Mail, Send, CalendarDays, MapPin, SkipForward, Repeat,
+  Mail, Send, CalendarDays, MapPin, SkipForward, Repeat,
 } from "lucide-react";
 import { Button } from "./ui";
 
@@ -42,7 +42,6 @@ export interface QuickAddPrefill {
 }
 
 interface NotifyResult {
-  sms?: { success: boolean; message: string };
   email?: { success: boolean; message: string };
 }
 
@@ -91,12 +90,9 @@ function NotifyStep({
   displayAddress: string;
   onDone: () => void;
 }) {
-  const hasPhone = !!customerPhone.trim();
   const hasEmail = !!customerEmail.trim();
-  const hasBoth = hasPhone && hasEmail;
-  const hasNeither = !hasPhone && !hasEmail;
+  const hasNeither = !hasEmail;
 
-  const [sendSms, setSendSms] = useState(hasPhone);
   const [sendEmail, setSendEmail] = useState(hasEmail);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<NotifyResult | null>(null);
@@ -107,7 +103,6 @@ function NotifyStep({
 
   const handleSend = async () => {
     const channels: string[] = [];
-    if (sendSms) channels.push("sms");
     if (sendEmail) channels.push("email");
     if (channels.length === 0) { onDone(); return; }
 
@@ -116,7 +111,7 @@ function NotifyStep({
       const res = await apiPost(`/api/jobs/${savedJobId}/send-confirmation`, { channels });
       setResults((res as any).results || {});
     } catch {
-      setResults({ sms: sendSms ? { success: false, message: "Failed to send" } : undefined, email: sendEmail ? { success: false, message: "Failed to send" } : undefined });
+      setResults({ email: sendEmail ? { success: false, message: "Failed to send" } : undefined });
     } finally {
       setLoading(false);
     }
@@ -125,7 +120,7 @@ function NotifyStep({
   const sentCount = results
     ? Object.values(results).filter((r) => r?.success).length
     : 0;
-  const allSent = results !== null && ((!sendSms || results.sms?.success) && (!sendEmail || results.email?.success));
+  const allSent = results !== null && (!sendEmail || results.email?.success);
 
   return (
     <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
@@ -161,12 +156,6 @@ function NotifyStep({
           <p className="text-sm font-bold text-slate-700">
             {sentCount > 0 ? "Confirmation sent" : "Could not send confirmation"}
           </p>
-          {results.sms ? (
-            <div className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${results.sms.success ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
-              <MessageSquare className="w-4 h-4 shrink-0" />
-              <span>SMS — {results.sms.success ? "Sent" : results.sms.message}</span>
-            </div>
-          ) : null}
           {results.email ? (
             <div className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${results.email.success ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
               <Mail className="w-4 h-4 shrink-0" />
@@ -181,39 +170,18 @@ function NotifyStep({
             <p className="text-sm font-bold text-slate-800 mb-0.5">Notify the customer?</p>
             <p className="text-xs text-slate-500">
               {hasNeither
-                ? "No contact info available for this customer."
-                : hasBoth
-                ? "Both SMS and email are ready to send."
-                : hasPhone
-                ? "Only a phone number is available."
-                : "Only an email address is available."}
+                ? "No email address on file for this customer."
+                : "Send an appointment confirmation email."}
             </p>
           </div>
 
           {hasNeither ? (
             <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>Add a phone or email to the customer's profile to send appointment confirmations.</span>
+              <span>Add an email address to the customer's profile to send appointment confirmations.</span>
             </div>
           ) : (
             <div className="space-y-2">
-              {hasPhone ? (
-                <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer hover:border-primary-300 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={sendSms}
-                    onChange={(e) => setSendSms(e.target.checked)}
-                    className="w-4 h-4 rounded accent-primary-600"
-                    data-testid="checkbox-send-sms"
-                  />
-                  <MessageSquare className="w-4 h-4 text-primary-500 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800">Text message</p>
-                    <p className="text-xs text-slate-500 truncate">{customerPhone}</p>
-                  </div>
-                </label>
-              ) : null}
-
               {hasEmail ? (
                 <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer hover:border-primary-300 transition-colors">
                   <input
@@ -305,7 +273,6 @@ export function QuickAddCleanPanel({
   // ── Notify step state ───────────────────────────────────────────────────────
   const [step, setStep] = useState<PanelStep>("form");
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
-  const [notifyPhone, setNotifyPhone] = useState("");
   const [notifyEmail, setNotifyEmail] = useState("");
   const [notifyCustomerName, setNotifyCustomerName] = useState("");
   const [notifyDate, setNotifyDate] = useState("");
@@ -314,7 +281,6 @@ export function QuickAddCleanPanel({
   const [notifyAddress, setNotifyAddress] = useState("");
   const [notifyResults, setNotifyResults] = useState<NotifyResult | null>(null);
   const [notifyLoading, setNotifyLoading] = useState(false);
-  const [notifySms, setNotifySms] = useState(true);
   const [notifyEmailChecked, setNotifyEmailChecked] = useState(true);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -422,7 +388,6 @@ export function QuickAddCleanPanel({
   const handleSend = async () => {
     if (!savedJobId) return;
     const channels: string[] = [];
-    if (notifySms) channels.push("sms");
     if (notifyEmailChecked) channels.push("email");
     if (channels.length === 0) { onClose(); return; }
 
@@ -432,7 +397,6 @@ export function QuickAddCleanPanel({
       setNotifyResults((res as any).results || {});
     } catch {
       setNotifyResults({
-        ...(notifySms ? { sms: { success: false, message: "Failed to send" } } : {}),
         ...(notifyEmailChecked ? { email: { success: false, message: "Failed to send" } } : {}),
       });
     } finally {
@@ -518,12 +482,9 @@ export function QuickAddCleanPanel({
     }
 
     // Stash contact info for the notify step
-    setNotifyPhone(phone);
     setNotifyEmail(email);
     setNotifyCustomerName(customerName);
     setNotifyAddress(address);
-    // Pre-check both if both exist (as per UX spec)
-    setNotifySms(!!phone);
     setNotifyEmailChecked(!!email);
 
     setNotifyDate(startDt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }));
@@ -555,13 +516,10 @@ export function QuickAddCleanPanel({
     custom: "text-slate-500 bg-slate-100",
   };
 
-  const hasPhone = !!notifyPhone.trim();
   const hasEmail = !!notifyEmail.trim();
-  const hasNeither = !hasPhone && !hasEmail;
+  const hasNeither = !hasEmail;
   const arrivalWindow = notifyEndTime ? `${notifyTime} – ${notifyEndTime}` : notifyTime;
-  const allSent = notifyResults !== null &&
-    (!notifySms || notifyResults.sms?.success) &&
-    (!notifyEmailChecked || notifyResults.email?.success);
+  const allSent = notifyResults !== null && (!notifyEmailChecked || notifyResults.email?.success);
 
   return (
     <>
@@ -1039,12 +997,6 @@ export function QuickAddCleanPanel({
                       ? "Confirmation sent"
                       : "Could not send confirmation"}
                   </p>
-                  {notifyResults.sms ? (
-                    <div className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${notifyResults.sms.success ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
-                      <MessageSquare className="w-4 h-4 shrink-0" />
-                      <span>SMS — {notifyResults.sms.success ? "Sent" : notifyResults.sms.message}</span>
-                    </div>
-                  ) : null}
                   {notifyResults.email ? (
                     <div className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium ${notifyResults.email.success ? "bg-emerald-50 border border-emerald-200 text-emerald-800" : "bg-red-50 border border-red-200 text-red-700"}`}>
                       <Mail className="w-4 h-4 shrink-0" />
@@ -1058,39 +1010,18 @@ export function QuickAddCleanPanel({
                     <p className="text-sm font-bold text-slate-800 mb-0.5">Notify the customer?</p>
                     <p className="text-xs text-slate-500">
                       {hasNeither
-                        ? "No contact info is on file for this customer."
-                        : hasPhone && hasEmail
-                        ? "Send an appointment confirmation via text and email."
-                        : hasPhone
-                        ? "Send an appointment confirmation via text message."
-                        : "Send an appointment confirmation via email."}
+                        ? "No email address is on file for this customer."
+                        : "Send an appointment confirmation email."}
                     </p>
                   </div>
 
                   {hasNeither ? (
                     <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
                       <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>Add a phone number or email to this customer's profile to send confirmations in the future.</span>
+                      <span>Add an email address to this customer's profile to send confirmations in the future.</span>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {hasPhone ? (
-                        <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer hover:border-primary-300 transition-colors has-[:checked]:border-primary-400 has-[:checked]:bg-primary-50">
-                          <input
-                            type="checkbox"
-                            checked={notifySms}
-                            onChange={(e) => setNotifySms(e.target.checked)}
-                            className="w-4 h-4 rounded accent-primary-600"
-                            data-testid="checkbox-send-sms"
-                          />
-                          <MessageSquare className="w-4 h-4 text-primary-500 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-800">Text message</p>
-                            <p className="text-xs text-slate-500 truncate">{notifyPhone}</p>
-                          </div>
-                        </label>
-                      ) : null}
-
                       {hasEmail ? (
                         <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 cursor-pointer hover:border-primary-300 transition-colors has-[:checked]:border-primary-400 has-[:checked]:bg-primary-50">
                           <input
@@ -1129,7 +1060,7 @@ export function QuickAddCleanPanel({
                     icon={Send}
                     onClick={handleSend}
                     loading={notifyLoading}
-                    disabled={!notifySms && !notifyEmailChecked}
+                    disabled={!notifyEmailChecked}
                     className="w-full justify-center"
                     data-testid="btn-send-confirmation"
                   >
