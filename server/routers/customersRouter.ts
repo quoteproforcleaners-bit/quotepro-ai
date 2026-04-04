@@ -114,16 +114,15 @@ const router = Router();
       const list = await getCustomersByBusiness(business.id, { search, status });
 
       // Attach lifetime value (sum of accepted quotes) to each customer
-      const { quotes: quotesTable } = await import("../schema");
       const ltvRows = await db
         .select({
-          customerId: quotesTable.customerId,
-          lifetimeValue: sql<number>`COALESCE(SUM(CASE WHEN ${quotesTable.status} = 'accepted' THEN ${quotesTable.total} ELSE 0 END), 0)`,
+          customerId: quotes.customerId,
+          lifetimeValue: sql<number>`COALESCE(SUM(CASE WHEN ${quotes.status} = 'accepted' THEN ${quotes.total} ELSE 0 END), 0)`,
           quoteCount: sql<number>`COUNT(*)::int`,
         })
-        .from(quotesTable)
-        .where(and(eq(quotesTable.businessId, business.id), isNull(quotesTable.deletedAt)))
-        .groupBy(quotesTable.customerId);
+        .from(quotes)
+        .where(and(eq(quotes.businessId, business.id), isNull(quotes.deletedAt)))
+        .groupBy(quotes.customerId);
 
       const ltvMap = new Map(ltvRows.map((r) => [r.customerId, { lifetimeValue: Number(r.lifetimeValue), quoteCount: r.quoteCount }]));
 
