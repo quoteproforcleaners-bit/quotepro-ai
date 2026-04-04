@@ -1051,7 +1051,7 @@ const router = Router();
 
   router.post("/api/jobs/:jobId/photos", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { photoData, photoType, caption } = req.body;
+      const { photoData, photoType, caption, customerVisible } = req.body;
       if (!photoData) return res.status(400).json({ message: "Photo data required" });
 
       const fs = await import("fs");
@@ -1073,6 +1073,7 @@ const router = Router();
         photoUrl,
         photoType: photoType || "after",
         caption: caption || "",
+        customerVisible: customerVisible !== false,
       });
       return res.json(photo);
     } catch (error: any) {
@@ -1083,10 +1084,91 @@ const router = Router();
 
   router.delete("/api/photos/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const fs = await import("fs");
+      const path = await import("path");
+      // Try to delete the file too
+      try {
+        const r = await pool.query(`SELECT photo_url FROM job_photos WHERE id = $1`, [req.params.id]);
+        if (r.rows[0]?.photo_url) {
+          const filePath = path.join(process.cwd(), r.rows[0].photo_url);
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+      } catch { /* ignore file deletion errors */ }
       await deleteJobPhoto(req.params.id);
       return res.json({ message: "Deleted" });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to delete photo" });
+    }
+  });
+
+  // ── Email before/after photos to customer ─────────────────────────────────
+  router.post("/api/jobs/:id/email-photos", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const job = await getJobById(req.params.id);
+      if (!job) return res.status(404).json({ message: "Job not found" });
+
+      const customer = (job as any).customerId ? await getCustomerById((job as any).customerId) : null;
+      const customerEmail = customer?.email || req.body.email;
+      if (!customerEmail) return res.status(400).json({ message: "No customer email on file" });
+
+      const allPhotos = await getPhotosByJob(req.params.id);
+      const visiblePhotos = allPhotos.filter((p: any) => p.customerVisible !== false);
+      if (visiblePhotos.length === 0) return res.status(400).json({ message: "No photos marked as customer-visible" });
+
+      const business = await db_getBusinessById((job as any).businessId);
+      const { fromName, fromEmail, replyTo } = getBusinessSendParams(business);
+      const baseUrl = getPublicBaseUrl(req);
+
+      const beforePhotos = visiblePhotos.filter((p: any) => p.photoType === "before");
+      const afterPhotos = visiblePhotos.filter((p: any) => p.photoType === "after");
+      const customerName = customer ? `${customer.firstName || ""} ${customer.lastName || ""}`.trim() : "there";
+
+      const photoCard = (p: any, tag: string, color: string) => `
+        <div style="break-inside:avoid;margin-bottom:16px;">
+          <div style="position:relative;border-radius:12px;overflow:hidden;border:2px solid ${color}20;">
+            <img src="${baseUrl}${p.photoUrl}" alt="${p.photoType}" style="width:100%;display:block;max-height:320px;object-fit:cover;" />
+            <div style="position:absolute;top:10px;left:10px;background:${color};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;letter-spacing:.04em;text-transform:uppercase;">${tag}</div>
+            ${p.caption ? `<div style="padding:10px 12px;background:#f8fafc;font-size:13px;color:#475569;">${p.caption}</div>` : ""}
+          </div>
+        </div>`;
+
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:32px 16px;">
+  <div style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg,#0f172a,#1e40af);padding:32px 36px;">
+      <p style="font-size:12px;font-weight:700;color:rgba(255,255,255,.6);letter-spacing:.08em;text-transform:uppercase;margin:0 0 10px;">${fromName}</p>
+      <h1 style="font-size:26px;font-weight:800;color:#fff;margin:0 0 8px;line-height:1.2;">Your Cleaning Photos</h1>
+      <p style="font-size:15px;color:rgba(255,255,255,.8);margin:0;">Here's a look at how your space transformed today.</p>
+    </div>
+    <div style="padding:32px 36px;">
+      <p style="font-size:15px;color:#374151;margin:0 0 24px;line-height:1.7;">Hi ${customerName},<br><br>We wanted to share photos from your recent cleaning. See the before and after results below — we're proud of the work!</p>
+      ${beforePhotos.length > 0 ? `<h2 style="font-size:14px;font-weight:700;color:#64748b;letter-spacing:.08em;text-transform:uppercase;margin:0 0 14px;">Before</h2><div style="column-count:2;column-gap:12px;margin-bottom:28px;">${beforePhotos.map((p: any) => photoCard(p, "Before", "#3b82f6")).join("")}</div>` : ""}
+      ${afterPhotos.length > 0 ? `<h2 style="font-size:14px;font-weight:700;color:#64748b;letter-spacing:.08em;text-transform:uppercase;margin:0 0 14px;">After</h2><div style="column-count:2;column-gap:12px;margin-bottom:28px;">${afterPhotos.map((p: any) => photoCard(p, "After", "#10b981")).join("")}</div>` : ""}
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:20px 24px;margin-top:8px;">
+        <p style="font-size:14px;color:#15803d;font-weight:600;margin:0 0 4px;">Thank you for choosing ${fromName}!</p>
+        <p style="font-size:13px;color:#16a34a;margin:0;">We appreciate your business and look forward to keeping your space spotless.</p>
+      </div>
+    </div>
+    <div style="border-top:1px solid #f1f5f9;padding:20px 36px;text-align:center;">
+      <p style="font-size:12px;color:#94a3b8;margin:0;">${fromName} · Sent via QuotePro</p>
+    </div>
+  </div>
+</div></body></html>`;
+
+      await sendEmail({
+        to: customerEmail,
+        subject: `Your cleaning photos from ${fromName}`,
+        html,
+        fromEmail,
+        fromName,
+        replyTo,
+      });
+
+      return res.json({ message: "Photos sent!", count: visiblePhotos.length });
+    } catch (error: any) {
+      console.error("Email photos error:", error);
+      return res.status(500).json({ message: "Failed to send photos" });
     }
   });
 

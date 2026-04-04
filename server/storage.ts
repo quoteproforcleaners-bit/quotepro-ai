@@ -924,12 +924,13 @@ export async function getPhotosByJob(jobId: string): Promise<JobPhoto[]> {
   return db.select().from(jobPhotos).where(eq(jobPhotos.jobId, jobId)).orderBy(desc(jobPhotos.createdAt));
 }
 
-export async function createJobPhoto(data: { jobId: string; photoUrl: string; photoType?: string; caption?: string }): Promise<JobPhoto> {
+export async function createJobPhoto(data: { jobId: string; photoUrl: string; photoType?: string; caption?: string; customerVisible?: boolean }): Promise<JobPhoto> {
   const [photo] = await db.insert(jobPhotos).values({
     jobId: data.jobId,
     photoUrl: data.photoUrl,
     photoType: data.photoType || "after",
     caption: data.caption || "",
+    customerVisible: data.customerVisible ?? true,
   }).returning();
   return photo;
 }

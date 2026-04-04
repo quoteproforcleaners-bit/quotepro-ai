@@ -15,6 +15,7 @@ import {
   FileText,
   Camera,
   ChevronRight,
+  ChevronLeft,
   Truck,
   Wrench,
   Sparkles,
@@ -31,6 +32,11 @@ import {
   Repeat,
   SkipForward,
   AlertCircle,
+  X,
+  Mail,
+  Upload,
+  ArrowLeftRight,
+  ZoomIn,
 } from "lucide-react";
 import { apiPost, apiPut, apiGet, apiDelete } from "../lib/api";
 import DispatchCard from "../components/DispatchCard";
@@ -332,6 +338,9 @@ export default function JobDetailPage() {
               beforePhotos={beforePhotos}
               afterPhotos={afterPhotos}
               photos={photos}
+              jobId={id!}
+              jobCustomer={jobCustomer}
+              onRefetch={() => queryClient.invalidateQueries({ queryKey: ["/api/jobs", id, "photos"] })}
             />
           )}
         </div>
@@ -1137,77 +1146,365 @@ function ChecklistTab({
   );
 }
 
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1200;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function PhotosTab({
   beforePhotos,
   afterPhotos,
   photos,
+  jobId,
+  jobCustomer,
+  onRefetch,
 }: any) {
+  const [viewMode, setViewMode] = useState<"grid" | "compare">("grid");
   const [photoFilter, setPhotoFilter] = useState("all");
+  const [lightbox, setLightbox] = useState<{ photos: any[]; idx: number } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadType, setUploadType] = useState<"before" | "after">("before");
+  const [caption, setCaption] = useState("");
+  const [customerVisible, setCustomerVisible] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [overrideEmail, setOverrideEmail] = useState("");
 
-  const displayPhotos =
-    photoFilter === "before"
-      ? beforePhotos
-      : photoFilter === "after"
-      ? afterPhotos
-      : photos;
+  const displayPhotos = photoFilter === "before" ? beforePhotos
+    : photoFilter === "after" ? afterPhotos : photos;
+
+  const openLightbox = (photo: any) => {
+    const idx = displayPhotos.findIndex((p: any) => p.id === photo.id);
+    setLightbox({ photos: displayPhotos, idx: Math.max(0, idx) });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingFile(file);
+    setUploadError(null);
+    try {
+      const compressed = await compressImage(file);
+      setPreview(compressed);
+    } catch {
+      setUploadError("Could not read image. Please try another file.");
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!preview || !pendingFile) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      await apiPost(`/api/jobs/${jobId}/photos`, {
+        photoData: preview,
+        photoType: uploadType,
+        caption: caption.trim(),
+        customerVisible,
+      });
+      setPreview(null);
+      setPendingFile(null);
+      setCaption("");
+      setCustomerVisible(true);
+      onRefetch();
+    } catch (err: any) {
+      setUploadError(err?.message || "Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (photoId: string) => {
+    setDeletingId(photoId);
+    try {
+      await apiDelete(`/api/photos/${photoId}`);
+      onRefetch();
+    } catch { /* ignore */ }
+    setDeletingId(null);
+  };
+
+  const handleSendEmail = async (emailOverride?: string) => {
+    setSendingEmail(true);
+    setEmailError(null);
+    setEmailSuccess(null);
+    try {
+      const res = await apiPost(`/api/jobs/${jobId}/email-photos`, emailOverride ? { email: emailOverride } : {}) as any;
+      setEmailSuccess(res?.message || `Photos sent!`);
+      setEmailModalOpen(false);
+      setOverrideEmail("");
+    } catch (err: any) {
+      const msg = err?.message || "Failed to send email";
+      if (msg.includes("No customer email")) {
+        setEmailModalOpen(true);
+        setEmailError(null);
+      } else {
+        setEmailError(msg);
+      }
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const visibleCount = photos.filter((p: any) => p.customerVisible !== false).length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-slate-700">
-          {photos.length} photos
-        </p>
-        <div className="flex gap-1">
-          {["all", "before", "after"].map((f) => (
-            <button
-              key={f}
-              onClick={() => setPhotoFilter(f)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-colors ${
-                photoFilter === f
-                  ? "bg-primary-50 text-primary-700"
-                  : "text-slate-500 hover:bg-slate-100"
-              }`}
-            >
-              {f} {f === "before" ? `(${beforePhotos.length})` : f === "after" ? `(${afterPhotos.length})` : `(${photos.length})`}
-            </button>
-          ))}
+    <div className="space-y-5">
+      {/* ── Upload Panel ───────────────────────────────────────── */}
+      <div className="border-2 border-dashed border-slate-200 rounded-2xl p-5 space-y-4 bg-slate-50/50">
+        <div className="flex items-center gap-2">
+          <Upload className="w-4 h-4 text-slate-400" />
+          <span className="text-sm font-semibold text-slate-700">Add Photo</span>
         </div>
+
+        {preview ? (
+          <div className="space-y-4">
+            <div className="relative rounded-xl overflow-hidden bg-slate-100 max-h-64 flex items-center justify-center">
+              <img src={preview} alt="Preview" className="max-h-64 w-full object-contain" />
+              <button
+                onClick={() => { setPreview(null); setPendingFile(null); }}
+                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              {(["before", "after"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setUploadType(t)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-all capitalize ${
+                    uploadType === t
+                      ? t === "before"
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-emerald-500 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            <input
+              type="text"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="Caption (optional)…"
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <div
+                  onClick={() => setCustomerVisible(!customerVisible)}
+                  className={`w-9 h-5 rounded-full transition-colors relative ${customerVisible ? "bg-primary-500" : "bg-slate-200"}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${customerVisible ? "left-4" : "left-0.5"}`} />
+                </div>
+                <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                  {customerVisible ? <Eye className="w-3.5 h-3.5 text-primary-500" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
+                  {customerVisible ? "Send to customer" : "Internal only"}
+                </span>
+              </label>
+              <Button
+                onClick={handleUpload}
+                disabled={uploading}
+                size="sm"
+                icon={uploading ? undefined : Camera}
+              >
+                {uploading ? "Uploading…" : "Upload"}
+              </Button>
+            </div>
+
+            {uploadError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{uploadError}</p>
+            )}
+          </div>
+        ) : (
+          <label className="flex flex-col items-center gap-2 cursor-pointer py-4">
+            <div className="w-12 h-12 bg-white border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center">
+              <Camera className="w-5 h-5 text-slate-400" />
+            </div>
+            <span className="text-sm text-slate-500">Click to select a photo</span>
+            <span className="text-xs text-slate-400">JPEG, PNG, WebP · Max ~10MB</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </label>
+        )}
       </div>
 
-      {displayPhotos.length === 0 ? (
+      {/* ── Toolbar ─────────────────────────────────────────────── */}
+      {photos.length > 0 && (
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+            {["all", "before", "after"].map((f) => (
+              <button
+                key={f}
+                onClick={() => setPhotoFilter(f)}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold capitalize transition-all ${
+                  photoFilter === f ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {f} ({f === "before" ? beforePhotos.length : f === "after" ? afterPhotos.length : photos.length})
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            {beforePhotos.length > 0 && afterPhotos.length > 0 && (
+              <button
+                onClick={() => setViewMode(v => v === "grid" ? "compare" : "grid")}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  viewMode === "compare"
+                    ? "border-violet-400 bg-violet-50 text-violet-700"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+                Compare
+              </button>
+            )}
+            {visibleCount > 0 && (
+              <button
+                onClick={() => handleSendEmail()}
+                disabled={sendingEmail}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                {sendingEmail ? "Sending…" : "Send to Customer"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Email success/error ─────────────────────────────────── */}
+      {emailSuccess && (
+        <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+          <CheckCircle className="w-4 h-4 shrink-0" />
+          {emailSuccess}
+        </div>
+      )}
+      {emailError && (
+        <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">{emailError}</p>
+      )}
+
+      {/* ── Compare View ────────────────────────────────────────── */}
+      {viewMode === "compare" && beforePhotos.length > 0 && afterPhotos.length > 0 ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[11px] font-bold text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />Before ({beforePhotos.length})
+              </p>
+              <div className="space-y-2">
+                {beforePhotos.map((p: any) => (
+                  <div key={p.id} className="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square cursor-pointer" onClick={() => openLightbox(p)}>
+                    <img src={p.photoUrl} alt={p.caption || "before"} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />After ({afterPhotos.length})
+              </p>
+              <div className="space-y-2">
+                {afterPhotos.map((p: any) => (
+                  <div key={p.id} className="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square cursor-pointer" onClick={() => openLightbox(p)}>
+                    <img src={p.photoUrl} alt={p.caption || "after"} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : photos.length === 0 ? (
         <EmptyState
           icon={Camera}
-          title="No photos"
-          description="Photos are uploaded from the mobile app during jobs"
+          title="No photos yet"
+          description="Upload before and after photos to document your work"
         />
       ) : (
+        /* ── Grid View ─────────────────────────────────────────── */
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {displayPhotos.map((photo: any) => (
             <div
               key={photo.id}
-              className="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square"
+              className="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square cursor-pointer"
+              onClick={() => openLightbox(photo)}
             >
               <img
                 src={photo.photoUrl}
                 alt={photo.caption || "Job photo"}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="absolute bottom-0 left-0 right-0 p-2">
-                  <Badge
-                    status={photo.photoType === "before" ? "info" : "success"}
-                    label={photo.photoType}
-                    size="sm"
-                  />
+              {/* hover overlay */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all">
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <ZoomIn className="w-6 h-6 text-white drop-shadow-lg" />
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 p-2 translate-y-1 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                    photo.photoType === "before" ? "bg-blue-500 text-white" : "bg-emerald-500 text-white"
+                  }`}>
+                    {photo.photoType}
+                  </span>
                   {photo.caption ? (
-                    <p className="text-[10px] text-white/90 mt-1 truncate">
-                      {photo.caption}
-                    </p>
+                    <p className="text-[10px] text-white/90 mt-1 truncate">{photo.caption}</p>
                   ) : null}
                 </div>
+                {/* delete button */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(photo.id); }}
+                  className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all"
+                  disabled={deletingId === photo.id}
+                >
+                  {deletingId === photo.id
+                    ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    : <Trash2 className="w-3 h-3" />
+                  }
+                </button>
               </div>
+              {/* customer-visible badge */}
               {photo.customerVisible === false ? (
-                <div className="absolute top-2 right-2">
+                <div className="absolute top-2 left-2">
                   <div className="bg-black/50 rounded-full p-1">
                     <EyeOff className="w-3 h-3 text-white" />
                   </div>
@@ -1217,6 +1514,93 @@ function PhotosTab({
           ))}
         </div>
       )}
+
+      {/* ── Lightbox ────────────────────────────────────────────── */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors z-10"
+          >
+            <X className="w-7 h-7" />
+          </button>
+
+          {lightbox.photos.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightbox(l => l && l.idx > 0 ? { ...l, idx: l.idx - 1 } : l); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-colors z-10"
+                disabled={lightbox.idx === 0}
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightbox(l => l && l.idx < l.photos.length - 1 ? { ...l, idx: l.idx + 1 } : l); }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-colors z-10"
+                disabled={lightbox.idx === lightbox.photos.length - 1}
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+            </>
+          )}
+
+          <div className="flex flex-col items-center gap-3 max-w-3xl max-h-full" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={lightbox.photos[lightbox.idx]?.photoUrl}
+              alt={lightbox.photos[lightbox.idx]?.caption || "Job photo"}
+              className="max-h-[75vh] max-w-full rounded-xl object-contain shadow-2xl"
+            />
+            <div className="flex items-center gap-3">
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                lightbox.photos[lightbox.idx]?.photoType === "before"
+                  ? "bg-blue-500 text-white"
+                  : "bg-emerald-500 text-white"
+              }`}>
+                {lightbox.photos[lightbox.idx]?.photoType}
+              </span>
+              {lightbox.photos[lightbox.idx]?.caption && (
+                <p className="text-sm text-white/80">{lightbox.photos[lightbox.idx].caption}</p>
+              )}
+              {lightbox.photos.length > 1 && (
+                <span className="text-xs text-white/50">{lightbox.idx + 1} / {lightbox.photos.length}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Email override modal ─────────────────────────────────── */}
+      <Modal
+        open={emailModalOpen}
+        onClose={() => { setEmailModalOpen(false); setOverrideEmail(""); }}
+        title="Enter Customer Email"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">No email is on file for this customer. Enter an address to send the photos to.</p>
+          <input
+            type="email"
+            value={overrideEmail}
+            onChange={(e) => setOverrideEmail(e.target.value)}
+            placeholder="customer@example.com"
+            className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setEmailModalOpen(false)} size="sm">Cancel</Button>
+            <Button
+              icon={Mail}
+              onClick={() => handleSendEmail(overrideEmail)}
+              disabled={!overrideEmail.includes("@") || sendingEmail}
+              size="sm"
+            >
+              {sendingEmail ? "Sending…" : "Send Photos"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
