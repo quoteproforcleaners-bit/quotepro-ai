@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Camera, MapPin, AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { getJobDetail, checkIn, type EmployeeJob } from "../../lib/employeeApi";
+import InAppCamera from "../../components/InAppCamera";
 
 function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -34,9 +35,8 @@ export default function EmployeeCheckin() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [showCamera, setShowCamera] = useState(false);
   const [now, setNow] = useState(new Date());
   const [proximityWarning, setProximityWarning] = useState<{
     visible: boolean; distanceFt: number; userLat: number; userLng: number;
@@ -55,12 +55,6 @@ export default function EmployeeCheckin() {
     return () => clearInterval(t);
   }, []);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setPhotoFile(f);
-    setPhotoPreview(URL.createObjectURL(f));
-  };
 
   const doCheckin = async (opts: { lat?: number; lng?: number; proximityWarning?: boolean; distanceFt?: number }) => {
     if (!assignmentId) return;
@@ -148,6 +142,17 @@ export default function EmployeeCheckin() {
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
+      {/* In-app camera overlay */}
+      {showCamera && (
+        <InAppCamera
+          onCapture={(dataUrl) => {
+            setPhotoPreview(dataUrl);
+            setShowCamera(false);
+          }}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+
       <div style={S.nav}>
         <button onClick={() => navigate(-1)} style={S.backBtn}><ArrowLeft size={20} /></button>
         <span style={S.navTitle}>Check In</span>
@@ -182,23 +187,22 @@ export default function EmployeeCheckin() {
         {/* Photo section */}
         <div style={S.card}>
           <p style={S.cardLabel}>Arrival Photo <span style={{ color: "#cbd5e1", fontWeight: 400 }}>(optional)</span></p>
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
           {photoPreview ? (
             <div style={{ position: "relative" as const, borderRadius: 14, overflow: "hidden" as const }}>
               <img src={photoPreview} alt="Arrival" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }} />
               <button
-                onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                onClick={() => setPhotoPreview(null)}
                 style={{ position: "absolute" as const, top: 10, right: 10, background: "rgba(0,0,0,0.65)", color: "white", border: "none", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
                 <X size={16} />
               </button>
             </div>
           ) : (
-            <button onClick={() => fileRef.current?.click()} style={S.photoBtn}>
+            <button onClick={() => setShowCamera(true)} style={S.photoBtn}>
               <div style={S.photoBtnIcon}><Camera size={22} color="#0F6E56" /></div>
               <div>
                 <p style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0 }}>Take Arrival Photo</p>
-                <p style={{ fontSize: 12, color: "#94a3b8", margin: "2px 0 0" }}>Documents your arrival time & condition</p>
+                <p style={{ fontSize: 12, color: "#94a3b8", margin: "2px 0 0" }}>Photo or choose from library</p>
               </div>
             </button>
           )}

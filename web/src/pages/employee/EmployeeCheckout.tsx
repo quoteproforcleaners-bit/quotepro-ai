@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Camera } from "lucide-react";
+import { ArrowLeft, Camera, X, CheckCircle2 } from "lucide-react";
 import { getJobDetail, checkOut, type EmployeeJob } from "../../lib/employeeApi";
+import InAppCamera from "../../components/InAppCamera";
 
 function formatDuration(mins: number | null): string {
   if (!mins) return "—";
@@ -27,7 +28,7 @@ export default function EmployeeCheckout() {
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [showCamera, setShowCamera] = useState(false);
 
   useEffect(() => {
     if (!assignmentId) return;
@@ -43,7 +44,6 @@ export default function EmployeeCheckout() {
       .finally(() => setLoading(false));
   }, [assignmentId]);
 
-  // Live duration tick
   useEffect(() => {
     if (!job?.checkinTime) return;
     const interval = setInterval(() => {
@@ -52,12 +52,6 @@ export default function EmployeeCheckout() {
     }, 30000);
     return () => clearInterval(interval);
   }, [job?.checkinTime]);
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setPhotoPreview(URL.createObjectURL(f));
-  };
 
   const handleCheckout = async () => {
     if (!assignmentId) return;
@@ -72,15 +66,10 @@ export default function EmployeeCheckout() {
       );
       lat = pos.coords.latitude;
       lng = pos.coords.longitude;
-    } catch { /* proceed without */ }
+    } catch { /* proceed without location */ }
 
     try {
-      await checkOut(assignmentId, {
-        lat,
-        lng,
-        employeeNotes: notes.trim() || undefined,
-      });
-      // Compute final duration
+      await checkOut(assignmentId, { lat, lng, employeeNotes: notes.trim() || undefined });
       if (job?.checkinTime) {
         setDurationMinutes(Math.round((Date.now() - new Date(job.checkinTime).getTime()) / 60000));
       }
@@ -92,28 +81,43 @@ export default function EmployeeCheckout() {
     }
   };
 
-  if (loading) return <div style={styles.page}><div style={{ padding: 80, textAlign: "center" as const, color: "#888780" }}>Loading...</div></div>;
+  if (loading) {
+    return (
+      <div style={S.page}>
+        <div style={{ padding: "80px 24px", textAlign: "center" as const, color: "#94a3b8" }}>Loading...</div>
+      </div>
+    );
+  }
 
   if (success) {
     return (
-      <div style={styles.successPage}>
-        <div style={styles.checkCircle}>✓</div>
-        <h2 style={styles.successTitle}>Job Complete!</h2>
-        <p style={styles.successSub}>You cleaned for</p>
-        <div style={styles.durationBig}>{formatDuration(durationMinutes)}</div>
-        <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 15, marginBottom: 32 }}>
-          See you at the next one!
+      <div style={S.successPage}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@600&display=swap');
+          @keyframes popin{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+          @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        `}</style>
+        <div style={S.successRing}>
+          <CheckCircle2 size={52} color="#fff" strokeWidth={2} />
+        </div>
+        <h2 style={{ fontSize: 32, fontWeight: 800, color: "#fff", margin: "24px 0 6px", animation: "fadeUp 0.4s 0.3s both" }}>
+          Job Complete!
+        </h2>
+        <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 16, margin: "0 0 6px", animation: "fadeUp 0.4s 0.45s both" }}>
+          You cleaned for
+        </p>
+        <div style={{ fontSize: 44, fontWeight: 800, color: "#fff", fontFamily: "'JetBrains Mono', monospace", marginBottom: 8, animation: "fadeUp 0.4s 0.55s both" }}>
+          {formatDuration(durationMinutes)}
+        </div>
+        <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 15, marginBottom: 40, animation: "fadeUp 0.4s 0.65s both" }}>
+          Great work!
         </p>
         <button
-          style={styles.backToScheduleBtn}
+          style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 15, padding: "14px 36px", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", animation: "fadeUp 0.4s 0.75s both" }}
           onClick={() => navigate("/employee/home", { replace: true })}
         >
           Back to Schedule
         </button>
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
-          @keyframes popin { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
-        `}</style>
       </div>
     );
   }
@@ -121,163 +125,212 @@ export default function EmployeeCheckout() {
   const nowStr = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 
   return (
-    <div style={styles.page}>
-      <div style={styles.navBar}>
-        <button onClick={() => navigate(-1)} style={styles.backBtn}><ArrowLeft size={20} /></button>
-        <span style={styles.navTitle}>Check Out</span>
-        <span style={{ width: 44 }} />
+    <div style={S.page}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        button:active { opacity: 0.82; transform: scale(0.98); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+
+      {/* In-app camera overlay */}
+      {showCamera && (
+        <InAppCamera
+          onCapture={(dataUrl) => {
+            setPhotoPreview(dataUrl);
+            setShowCamera(false);
+          }}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+
+      {/* Nav */}
+      <div style={S.nav}>
+        <button onClick={() => navigate(-1)} style={S.backBtn}><ArrowLeft size={20} /></button>
+        <span style={S.navTitle}>Check Out</span>
+        <span style={{ width: 40 }} />
       </div>
 
-      <div style={styles.body}>
-        {/* Summary card */}
-        <div style={styles.summaryCard}>
-          <div style={styles.bigName}>{job?.customerName}</div>
-          <div style={{ display: "flex", gap: 24, marginTop: 14 }}>
-            <div>
-              <div style={styles.summaryLabel}>Started</div>
-              <div style={styles.summaryVal}>{formatTime(job?.checkinTime ?? null)}</div>
-            </div>
-            <div>
-              <div style={styles.summaryLabel}>Now</div>
-              <div style={styles.summaryVal}>{nowStr}</div>
-            </div>
-            <div>
-              <div style={styles.summaryLabel}>Duration</div>
-              <div style={{ ...styles.summaryVal, color: "#0F6E56" }}>{formatDuration(durationMinutes)}</div>
-            </div>
+      {/* Duration banner */}
+      <div style={S.timeBanner}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase" as const, letterSpacing: "0.08em", margin: "0 0 4px" }}>
+              {job?.customerName}
+            </p>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", margin: 0 }}>
+              Started {formatTime(job?.checkinTime ?? null)}
+            </p>
+          </div>
+          <div style={{ textAlign: "right" as const }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase" as const, letterSpacing: "0.08em", margin: "0 0 2px" }}>Duration</p>
+            <p style={{ fontSize: 36, fontWeight: 800, color: "#fff", fontFamily: "'JetBrains Mono', monospace", margin: 0, lineHeight: 1 }}>
+              {formatDuration(durationMinutes)}
+            </p>
           </div>
         </div>
+      </div>
 
+      <div style={S.body}>
         {/* Notes */}
-        <div style={styles.card}>
-          <div style={styles.sectionLabel}>How did the job go?</div>
+        <div style={S.card}>
+          <p style={S.cardLabel}>How did the job go?</p>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Any notes for your manager... (optional)"
             maxLength={1000}
-            style={styles.textarea}
+            style={S.textarea}
           />
-          <div style={{ fontSize: 12, color: "#888780", textAlign: "right" as const, marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "right" as const, marginTop: 4 }}>
             {notes.length}/1000
           </div>
         </div>
 
         {/* Photo */}
-        <div style={styles.card}>
-          <div style={styles.sectionLabel}>Completion Photo (optional)</div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={handlePhotoChange}
-          />
+        <div style={S.card}>
+          <p style={S.cardLabel}>
+            Completion Photo <span style={{ color: "#cbd5e1", fontWeight: 400 }}>(optional)</span>
+          </p>
           {photoPreview ? (
-            <div style={{ position: "relative" as const }}>
-              <img src={photoPreview} alt="Completion" style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 12 }} />
+            <div style={{ position: "relative" as const, borderRadius: 14, overflow: "hidden" as const }}>
+              <img
+                src={photoPreview}
+                alt="Completion"
+                style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}
+              />
               <button
                 onClick={() => setPhotoPreview(null)}
-                style={{ position: "absolute" as const, top: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 16 }}
+                style={{ position: "absolute" as const, top: 10, right: 10, background: "rgba(0,0,0,0.6)", color: "white", border: "none", borderRadius: "50%", width: 30, height: 30, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               >
-                ×
+                <X size={16} />
               </button>
             </div>
           ) : (
-            <button onClick={() => fileRef.current?.click()} style={styles.photoBtn}>
-              <Camera size={20} color="#D85A30" />
-              <span style={{ color: "#D85A30" }}>Take Completion Photo</span>
+            <button onClick={() => setShowCamera(true)} style={S.photoBtn}>
+              <div style={S.photoBtnIcon}>
+                <Camera size={22} color="#dc2626" />
+              </div>
+              <div style={{ textAlign: "left" as const }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", margin: 0 }}>Take Completion Photo</p>
+                <p style={{ fontSize: 12, color: "#94a3b8", margin: "2px 0 0" }}>Photo or choose from library</p>
+              </div>
             </button>
           )}
         </div>
 
-        {error && <div style={styles.errorBox}>{error}</div>}
+        {error && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 14, padding: "14px 16px", fontSize: 14, color: "#dc2626", fontWeight: 500 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ height: 24 }} />
       </div>
 
-      <div style={styles.bottomAction}>
+      {/* Bottom CTA */}
+      <div style={S.bottomBar}>
         <button
-          style={{ ...styles.confirmBtn, opacity: submitting ? 0.7 : 1 }}
+          style={{ ...S.confirmBtn, opacity: submitting ? 0.75 : 1 }}
           onClick={handleCheckout}
           disabled={submitting}
         >
-          {submitting ? "Checking out..." : "Confirm Check Out"}
+          {submitting ? (
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={S.spinner} />
+              Checking out...
+            </span>
+          ) : (
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <CheckCircle2 size={20} strokeWidth={2.5} />
+              Confirm Check Out
+            </span>
+          )}
         </button>
       </div>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-      `}</style>
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: "100svh", background: "#F8F8F6", fontFamily: "'DM Sans', system-ui, sans-serif", paddingBottom: 100 },
+const S: Record<string, React.CSSProperties> = {
+  page: { minHeight: "100svh", background: "#f8fafc", fontFamily: "'Inter', system-ui, -apple-system, sans-serif", paddingBottom: 100 },
   successPage: {
-    minHeight: "100svh", background: "linear-gradient(135deg, #1D9E75, #0F6E56)",
+    minHeight: "100svh",
+    background: "linear-gradient(160deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%)",
     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-    fontFamily: "'DM Sans', system-ui, sans-serif", padding: 32,
+    fontFamily: "'Inter', system-ui, sans-serif", padding: 32,
   },
-  checkCircle: {
-    width: 100, height: 100, borderRadius: "50%",
-    background: "rgba(255,255,255,0.2)", border: "3px solid white",
+  successRing: {
+    width: 110, height: 110, borderRadius: "50%",
+    background: "rgba(255,255,255,0.15)", border: "2px solid rgba(255,255,255,0.3)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: 52, color: "white", marginBottom: 24,
-    animation: "popin 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards",
+    animation: "popin 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards",
   },
-  successTitle: { fontSize: 34, fontWeight: 700, color: "white", margin: "0 0 6px" },
-  successSub: { color: "rgba(255,255,255,0.8)", fontSize: 16, margin: "0 0 4px" },
-  durationBig: { fontSize: 42, fontWeight: 700, color: "white", marginBottom: 8 },
-  backToScheduleBtn: {
-    background: "white", color: "#0F6E56", border: "none", borderRadius: 14,
-    padding: "14px 32px", fontSize: 16, fontWeight: 700, cursor: "pointer",
-    fontFamily: "'DM Sans', system-ui, sans-serif",
-  },
-  navBar: {
-    position: "sticky" as const, top: 0, zIndex: 10,
+  nav: {
+    position: "sticky" as const, top: 0, zIndex: 20,
     display: "flex", alignItems: "center", justifyContent: "space-between",
-    background: "white", padding: "16px", paddingTop: "calc(16px + env(safe-area-inset-top, 0px))",
-    borderBottom: "1px solid #F1EFE8",
+    background: "rgba(255,255,255,0.92)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+    padding: "14px 16px", paddingTop: "calc(14px + env(safe-area-inset-top, 0px))",
+    borderBottom: "1px solid rgba(0,0,0,0.06)",
   },
   backBtn: {
-    width: 44, height: 44, border: "none", background: "#FAECE7",
+    width: 40, height: 40, border: "none", background: "#f1f5f9",
     borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-    cursor: "pointer", color: "#D85A30",
+    cursor: "pointer", color: "#475569",
   },
-  navTitle: { fontSize: 17, fontWeight: 700, color: "#1a1a18" },
-  body: { padding: 16 },
-  summaryCard: { background: "white", borderRadius: 18, padding: 18, marginBottom: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
-  bigName: { fontSize: 20, fontWeight: 700, color: "#1a1a18" },
-  summaryLabel: { fontSize: 11, color: "#888780", fontWeight: 600, textTransform: "uppercase" as const, marginBottom: 2 },
-  summaryVal: { fontSize: 18, fontWeight: 700, color: "#1a1a18", fontFamily: "'DM Mono', monospace" },
-  card: { background: "white", borderRadius: 18, padding: 18, marginBottom: 12, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
-  sectionLabel: { fontSize: 13, fontWeight: 700, color: "#888780", textTransform: "uppercase" as const, letterSpacing: 0.5, marginBottom: 12 },
+  navTitle: { fontSize: 16, fontWeight: 700, color: "#0f172a" },
+  timeBanner: {
+    background: "linear-gradient(160deg, #1e1b4b 0%, #312e81 100%)",
+    borderRadius: "0 0 24px 24px",
+    padding: "24px 20px 28px",
+    marginBottom: 16,
+  },
+  body: { padding: "0 16px 0" },
+  card: {
+    background: "#fff", borderRadius: 18, padding: 18, marginBottom: 12,
+    boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.04)",
+    border: "1px solid rgba(0,0,0,0.04)",
+  },
+  cardLabel: {
+    fontSize: 11, fontWeight: 700, color: "#94a3b8",
+    textTransform: "uppercase" as const, letterSpacing: "0.07em", margin: "0 0 12px",
+  },
   textarea: {
-    width: "100%", minHeight: 120, border: "1.5px solid #E8E6DF", borderRadius: 12,
-    padding: "12px 14px", fontSize: 15, fontFamily: "'DM Sans', system-ui, sans-serif",
-    resize: "vertical" as const, outline: "none", background: "#F8F8F6", color: "#1a1a18",
-    boxSizing: "border-box" as const,
+    width: "100%", minHeight: 120, border: "1.5px solid #e2e8f0", borderRadius: 12,
+    padding: "12px 14px", fontSize: 15, fontFamily: "'Inter', system-ui, sans-serif",
+    resize: "vertical" as const, outline: "none", background: "#f8fafc", color: "#0f172a",
+    boxSizing: "border-box" as const, lineHeight: 1.5,
   },
   photoBtn: {
-    width: "100%", height: 52, border: "2px dashed #F2C4B0", borderRadius: 12,
-    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-    background: "none", cursor: "pointer", fontSize: 14, fontWeight: 600,
-    fontFamily: "'DM Sans', system-ui, sans-serif",
+    width: "100%", border: "2px dashed #e2e8f0", borderRadius: 14,
+    background: "none", cursor: "pointer", padding: "14px",
+    display: "flex", alignItems: "center", gap: 14,
+    fontFamily: "inherit",
   },
-  errorBox: {
-    background: "#FCEBEB", border: "1px solid #F2B5B5", borderRadius: 12,
-    padding: "12px 16px", color: "#E24B4A", fontSize: 14, marginBottom: 12,
+  photoBtnIcon: {
+    width: 46, height: 46, borderRadius: 12, background: "#fef2f2",
+    border: "1px solid #fecaca", display: "flex", alignItems: "center", justifyContent: "center",
+    flexShrink: 0,
   },
-  bottomAction: {
+  bottomBar: {
     position: "fixed" as const, bottom: 0, left: "50%", transform: "translateX(-50%)",
-    width: "100%", maxWidth: 430,
-    background: "white", borderTop: "1px solid #F1EFE8",
+    width: "100%", maxWidth: 480,
+    background: "rgba(255,255,255,0.95)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+    borderTop: "1px solid rgba(0,0,0,0.07)",
     padding: "12px 16px", paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
   },
   confirmBtn: {
-    width: "100%", height: 56, background: "#D85A30",
-    border: "none", borderRadius: 14, fontSize: 17, fontWeight: 700,
-    color: "white", cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif",
-    touchAction: "manipulation",
+    width: "100%", height: 56,
+    background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+    border: "none", borderRadius: 16, fontSize: 16, fontWeight: 700,
+    color: "white", cursor: "pointer", fontFamily: "inherit",
+    touchAction: "manipulation", display: "flex", alignItems: "center", justifyContent: "center",
+    boxShadow: "0 4px 14px rgba(109,40,217,0.3)",
+    transition: "opacity 0.15s",
+  },
+  spinner: {
+    width: 18, height: 18, borderRadius: "50%",
+    border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white",
+    display: "inline-block", animation: "spin 0.7s linear infinite",
   },
 };
