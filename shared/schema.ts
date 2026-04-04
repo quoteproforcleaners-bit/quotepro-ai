@@ -443,6 +443,7 @@ export const communications = pgTable("communications", {
   sentAt: timestamp("sent_at"),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   customerIdIdx: index("communications_customer_id_idx").on(table.customerId),
 }));
