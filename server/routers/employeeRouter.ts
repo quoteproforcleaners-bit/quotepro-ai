@@ -287,11 +287,19 @@ router.post("/api/employee/jobs/:assignmentId/checkin", employeeAuthMiddleware, 
   try {
     const { employeeId, businessId, name } = getEmployee(req);
     const { assignmentId } = req.params;
-    const { lat, lng, photoUrl } = req.body as {
+    const { lat, lng, photoUrl, proximityWarning, distanceFt } = req.body as {
       lat?: number;
       lng?: number;
       photoUrl?: string;
+      proximityWarning?: boolean;
+      distanceFt?: number;
     };
+
+    if (proximityWarning) {
+      console.warn(
+        `[PROXIMITY WARNING] Employee ${name} (${employeeId}) checked in ${distanceFt ?? "?"}ft from job site (assignment ${assignmentId})`
+      );
+    }
 
     const [assignment] = await db
       .select()

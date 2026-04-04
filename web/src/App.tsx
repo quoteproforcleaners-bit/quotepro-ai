@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./lib/auth";
+import { isLoggedIn } from "./lib/employeeApi";
 import i18n from "./lib/i18n";
 import { SubscriptionProvider } from "./lib/subscription";
 import { ThemeProvider } from "./lib/theme";
@@ -77,6 +78,11 @@ import EmployeeCheckout from "./pages/employee/EmployeeCheckout";
 import EmployeeSchedule from "./pages/employee/EmployeeSchedule";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import FieldStatusPage from "./pages/FieldStatusPage";
+
+function EmployeeGuard({ children }: { children: React.ReactNode }) {
+  if (!isLoggedIn()) return <Navigate to="/employee/login" replace />;
+  return <>{children}</>;
+}
 
 export default function App() {
   const { isAuthenticated, isLoading, business, needsOnboarding } = useAuth();
@@ -226,12 +232,12 @@ export default function App() {
 
         {/* Employee portal — separate auth (PIN-based JWT), no admin session required */}
         <Route path="/employee/login" element={<EmployeeLogin />} />
-        <Route path="/employee/home" element={<EmployeeHome />} />
-        <Route path="/employee/jobs/:assignmentId" element={<EmployeeJobDetail />} />
-        <Route path="/employee/jobs/:assignmentId/checkin" element={<EmployeeCheckin />} />
-        <Route path="/employee/jobs/:assignmentId/checkout" element={<EmployeeCheckout />} />
-        <Route path="/employee/schedule" element={<EmployeeSchedule />} />
-        <Route path="/employee/profile" element={<EmployeeProfile />} />
+        <Route path="/employee/home" element={<EmployeeGuard><EmployeeHome /></EmployeeGuard>} />
+        <Route path="/employee/jobs/:assignmentId" element={<EmployeeGuard><EmployeeJobDetail /></EmployeeGuard>} />
+        <Route path="/employee/jobs/:assignmentId/checkin" element={<EmployeeGuard><EmployeeCheckin /></EmployeeGuard>} />
+        <Route path="/employee/jobs/:assignmentId/checkout" element={<EmployeeGuard><EmployeeCheckout /></EmployeeGuard>} />
+        <Route path="/employee/schedule" element={<EmployeeGuard><EmployeeSchedule /></EmployeeGuard>} />
+        <Route path="/employee/profile" element={<EmployeeGuard><EmployeeProfile /></EmployeeGuard>} />
         <Route path="/employee" element={<Navigate to="/employee/login" replace />} />
 
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />

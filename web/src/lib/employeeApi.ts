@@ -129,7 +129,7 @@ export async function setEnRoute(assignmentId: string): Promise<void> {
 
 export async function checkIn(
   assignmentId: string,
-  opts: { lat?: number; lng?: number; photoUrl?: string }
+  opts: { lat?: number; lng?: number; photoUrl?: string; proximityWarning?: boolean; distanceFt?: number }
 ): Promise<void> {
   await empFetch(`/api/employee/jobs/${assignmentId}/checkin`, {
     method: "POST",

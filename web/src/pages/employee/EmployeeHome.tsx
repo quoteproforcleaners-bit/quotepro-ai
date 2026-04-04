@@ -87,6 +87,7 @@ export default function EmployeeHome() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -108,7 +109,8 @@ export default function EmployeeHome() {
         await setEnRoute(assignmentId);
         await load();
       } catch (e: any) {
-        alert(e.message);
+        setActionError(e.message || "Failed to update status. Please try again.");
+        setTimeout(() => setActionError(null), 4000);
       } finally {
         setActionLoading(false);
       }
@@ -161,6 +163,12 @@ export default function EmployeeHome() {
         {/* Body */}
         <div style={styles.body}>
           <h2 style={styles.sectionTitle}>Today's Schedule</h2>
+
+          {actionError && (
+            <div style={{ background: "#FCEBEB", border: "1px solid #F2B5B5", borderRadius: 12, padding: "12px 16px", color: "#E24B4A", fontSize: 14, fontWeight: 500, marginBottom: 12 }}>
+              {actionError}
+            </div>
+          )}
 
           {loading && (
             <div style={styles.loadingWrap}>

@@ -1,7 +1,40 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Camera } from "lucide-react";
+import { ArrowLeft, Camera, MapPin, AlertTriangle } from "lucide-react";
 import { getJobDetail, checkIn, type EmployeeJob } from "../../lib/employeeApi";
+
+// ── Haversine distance (meters) ──────────────────────────────────────────────
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function metersToFeet(m: number): number {
+  return Math.round(m * 3.28084);
+}
+
+// ── Geocode address via Nominatim (free, no key) ─────────────────────────────
+async function geocodeAddress(address: string): Promise<{ lat: number; lon: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "QuoteProAI-EmployeeApp/1.0" },
+      signal: AbortSignal.timeout(6000),
+    });
+    const data = await res.json();
+    if (data.length === 0) return null;
+    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  }
+}
+
+const PROXIMITY_THRESHOLD_M = 152; // ~500 feet
 
 export default function EmployeeCheckin() {
   const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -15,6 +48,14 @@ export default function EmployeeCheckin() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [checkmark, setCheckmark] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Proximity warning modal state
+  const [proximityWarning, setProximityWarning] = useState<{
+    visible: boolean;
+    distanceFt: number;
+    userLat: number;
+    userLng: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!assignmentId) return;
@@ -32,27 +73,18 @@ export default function EmployeeCheckin() {
     setPhotoPreview(url);
   };
 
-  const handleCheckin = async () => {
+  // Core checkin — runs after proximity check is resolved
+  const doCheckin = async (opts: {
+    lat?: number;
+    lng?: number;
+    proximityWarning?: boolean;
+    distanceFt?: number;
+  }) => {
     if (!assignmentId) return;
     setSubmitting(true);
     setError(null);
-
-    let lat: number | undefined;
-    let lng: number | undefined;
-
-    // Try to get geolocation — non-blocking
     try {
-      const pos = await new Promise<GeolocationPosition>((res, rej) =>
-        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 })
-      );
-      lat = pos.coords.latitude;
-      lng = pos.coords.longitude;
-    } catch {
-      // Proceed without location
-    }
-
-    try {
-      await checkIn(assignmentId, { lat, lng });
+      await checkIn(assignmentId, opts);
       setSuccess(true);
       setCheckmark(true);
       setTimeout(() => {
@@ -63,6 +95,56 @@ export default function EmployeeCheckin() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleCheckin = async () => {
+    if (!assignmentId || !job) return;
+    setSubmitting(true);
+    setError(null);
+
+    let lat: number | undefined;
+    let lng: number | undefined;
+
+    // Step 1 — get user GPS
+    try {
+      const pos = await new Promise<GeolocationPosition>((res, rej) =>
+        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 })
+      );
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    } catch {
+      // GPS unavailable — proceed without proximity check
+      setSubmitting(false);
+      doCheckin({});
+      return;
+    }
+
+    // Step 2 — geocode job address and check proximity
+    const jobCoords = await geocodeAddress(job.address);
+    if (jobCoords && lat !== undefined && lng !== undefined) {
+      const distM = haversineMeters(lat, lng, jobCoords.lat, jobCoords.lon);
+      if (distM > PROXIMITY_THRESHOLD_M) {
+        // Show warning modal — don't submit yet
+        setSubmitting(false);
+        setProximityWarning({ visible: true, distanceFt: metersToFeet(distM), userLat: lat, userLng: lng });
+        return;
+      }
+    }
+
+    // Passed proximity check (or geocoding failed) — proceed
+    setSubmitting(false);
+    doCheckin({ lat, lng });
+  };
+
+  const handleProximityDismiss = () => {
+    setProximityWarning(null);
+  };
+
+  const handleProximityContinue = () => {
+    if (!proximityWarning) return;
+    const { userLat, userLng, distanceFt } = proximityWarning;
+    setProximityWarning(null);
+    doCheckin({ lat: userLat, lng: userLng, proximityWarning: true, distanceFt });
   };
 
   if (loading) {
@@ -116,10 +198,18 @@ export default function EmployeeCheckin() {
         </div>
 
         <div style={styles.nowCard}>
-          <span style={styles.nowLabel}>Checking in at</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <MapPin size={16} color="#0F6E56" />
+            <span style={styles.nowLabel}>Checking in at</span>
+          </div>
           <span style={styles.nowTime}>
             {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
           </span>
+        </div>
+
+        <div style={styles.proximityNote}>
+          <MapPin size={13} color="#888780" />
+          <span>Your location will be recorded with check-in</span>
         </div>
 
         {/* Optional photo */}
@@ -161,9 +251,32 @@ export default function EmployeeCheckin() {
           onClick={handleCheckin}
           disabled={submitting}
         >
-          {submitting ? "Checking in..." : "Confirm Check In"}
+          {submitting ? "Verifying location..." : "Confirm Check In"}
         </button>
       </div>
+
+      {/* Proximity Warning Modal */}
+      {proximityWarning?.visible && (
+        <div style={styles.modalOverlay} onClick={handleProximityDismiss}>
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.warningIcon}>
+              <AlertTriangle size={28} color="#B57C0A" />
+            </div>
+            <h3 style={styles.warningTitle}>Away from job site</h3>
+            <p style={styles.warningBody}>
+              You appear to be <strong>{proximityWarning.distanceFt.toLocaleString()} ft</strong> from the job location. Your manager will be notified.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+              <button style={styles.continueAnywayBtn} onClick={handleProximityContinue}>
+                Continue Check-In Anyway
+              </button>
+              <button style={styles.goBackBtn} onClick={handleProximityDismiss}>
+                Go Back
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
@@ -204,11 +317,15 @@ const styles: Record<string, React.CSSProperties> = {
   bigName: { fontSize: 22, fontWeight: 700, color: "#1a1a18" },
   address: { fontSize: 14, color: "#888780", fontFamily: "'DM Mono', monospace", marginTop: 4 },
   nowCard: {
-    background: "#E1F5EE", borderRadius: 18, padding: "16px 20px", marginBottom: 12,
+    background: "#E1F5EE", borderRadius: 18, padding: "16px 20px", marginBottom: 8,
     display: "flex", alignItems: "center", justifyContent: "space-between",
   },
   nowLabel: { fontSize: 14, color: "#0F6E56", fontWeight: 600 },
   nowTime: { fontSize: 22, fontWeight: 700, color: "#0F6E56", fontFamily: "'DM Mono', monospace" },
+  proximityNote: {
+    display: "flex", alignItems: "center", gap: 6,
+    fontSize: 12, color: "#888780", padding: "0 4px", marginBottom: 12,
+  },
   sectionLabel: { fontSize: 13, fontWeight: 700, color: "#888780", textTransform: "uppercase" as const, letterSpacing: 0.5, marginBottom: 12 },
   photoBtn: {
     width: "100%", height: 52, border: "2px dashed #C4C2BB", borderRadius: 12,
@@ -230,6 +347,37 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%", height: 56, background: "#0F6E56",
     border: "none", borderRadius: 14, fontSize: 17, fontWeight: 700,
     color: "white", cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif",
+    touchAction: "manipulation",
+  },
+  // Modal
+  modalOverlay: {
+    position: "fixed" as const, inset: 0, zIndex: 100,
+    background: "rgba(0,0,0,0.5)", display: "flex",
+    alignItems: "flex-end", justifyContent: "center",
+    backdropFilter: "blur(4px)",
+  },
+  modalCard: {
+    background: "white", borderRadius: "24px 24px 0 0",
+    padding: "28px 24px", paddingBottom: "calc(28px + env(safe-area-inset-bottom, 0px))",
+    width: "100%", maxWidth: 430,
+  },
+  warningIcon: {
+    width: 56, height: 56, borderRadius: "50%",
+    background: "#FAEEDA", display: "flex", alignItems: "center", justifyContent: "center",
+    marginBottom: 16,
+  },
+  warningTitle: { fontSize: 20, fontWeight: 700, color: "#1a1a18", margin: "0 0 10px" },
+  warningBody: { fontSize: 15, color: "#444441", lineHeight: 1.55, margin: "0 0 24px" },
+  continueAnywayBtn: {
+    width: "100%", height: 54, background: "#EF9F27", border: "none",
+    borderRadius: 14, fontSize: 16, fontWeight: 700, color: "white",
+    cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif",
+    touchAction: "manipulation",
+  },
+  goBackBtn: {
+    width: "100%", height: 50, background: "#F1EFE8", border: "none",
+    borderRadius: 14, fontSize: 15, fontWeight: 600, color: "#444441",
+    cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif",
     touchAction: "manipulation",
   },
 };
