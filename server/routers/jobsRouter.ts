@@ -80,6 +80,20 @@ import { AnalyticsEvents } from "../../shared/analytics-events";
 
 const router = Router();
 
+// Resolves a team member reference (UUID or legacy name string) to an employee ID
+async function resolveEmployeeId(ref: string, businessId: string): Promise<string | null> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref);
+  if (isUuid) {
+    const [emp] = await db.select({ id: employees.id }).from(employees)
+      .where(and(eq(employees.id, ref), eq(employees.businessId, businessId))).limit(1);
+    return emp?.id ?? null;
+  }
+  // Legacy: ref is an employee name
+  const [emp] = await db.select({ id: employees.id }).from(employees)
+    .where(and(eq(employees.name, ref), eq(employees.businessId, businessId))).limit(1);
+  return emp?.id ?? null;
+}
+
   router.get("/api/schedule/week-jobs", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
@@ -734,6 +748,30 @@ const router = Router();
             label: req.body.checklist[i].label || req.body.checklist[i],
             sortOrder: i,
           });
+        }
+      }
+
+      // Sync job_assignments for any assigned team members (stored as employee IDs)
+      if (Array.isArray(req.body.teamMembers) && req.body.teamMembers.length > 0 && j.startDatetime) {
+        try {
+          const assignedDate = new Date(j.startDatetime).toISOString().slice(0, 10);
+          for (const ref of req.body.teamMembers as string[]) {
+            const resolvedId = await resolveEmployeeId(ref, business.id);
+            if (!resolvedId) continue;
+            const [existing] = await db.select({ id: jobAssignments.id }).from(jobAssignments)
+              .where(and(eq(jobAssignments.jobId, j.id), eq(jobAssignments.employeeId, resolvedId))).limit(1);
+            if (!existing) {
+              await db.insert(jobAssignments).values({
+                jobId: j.id,
+                employeeId: resolvedId,
+                businessId: business.id,
+                assignedDate,
+                status: "assigned",
+              });
+            }
+          }
+        } catch (assignErr) {
+          console.error("[create job] job_assignments sync error:", assignErr);
         }
       }
 

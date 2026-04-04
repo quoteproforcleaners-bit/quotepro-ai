@@ -449,6 +449,20 @@ router.post("/api/employee/jobs/:assignmentId/checkout", employeeAuthMiddleware,
 // Runs once on startup to create jobAssignments rows for jobs that were
 // assigned via the teamMembers JSON array before this explicit sync existed.
 
+// Resolves a team member reference (UUID or legacy name) to an employee record ID
+async function resolveEmpId(ref: string, businessId: string): Promise<string | null> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref);
+  if (isUuid) {
+    const [e] = await db.select({ id: employees.id }).from(employees)
+      .where(and(eq(employees.id, ref), eq(employees.businessId, businessId))).limit(1);
+    return e?.id ?? null;
+  }
+  // Legacy path: team_members stored the employee's display name, not ID
+  const [e] = await db.select({ id: employees.id }).from(employees)
+    .where(and(eq(employees.name, ref), eq(employees.businessId, businessId))).limit(1);
+  return e?.id ?? null;
+}
+
 async function backfillJobAssignmentsFromTeamMembers() {
   try {
     const jobsWithMembers = await db
@@ -463,8 +477,8 @@ async function backfillJobAssignmentsFromTeamMembers() {
 
     let created = 0;
     for (const job of jobsWithMembers) {
-      const memberIds = (job.teamMembers as string[] | null) ?? [];
-      if (!memberIds.length || !job.startDatetime) continue;
+      const memberRefs = (job.teamMembers as string[] | null) ?? [];
+      if (!memberRefs.length || !job.startDatetime || !job.businessId) continue;
 
       const assignedDate = new Date(job.startDatetime).toISOString().slice(0, 10);
 
@@ -475,19 +489,21 @@ async function backfillJobAssignmentsFromTeamMembers() {
 
       const existingSet = new Set(existingRows.map((r) => r.employeeId));
 
-      for (const empId of memberIds) {
-        if (existingSet.has(empId)) continue;
+      for (const ref of memberRefs) {
+        const empId = await resolveEmpId(ref, job.businessId);
+        if (!empId || existingSet.has(empId)) continue;
         try {
           await db.insert(jobAssignments).values({
             jobId: job.id,
             employeeId: empId,
-            businessId: job.businessId ?? "",
+            businessId: job.businessId,
             assignedDate,
             status: "assigned",
           });
           created++;
+          existingSet.add(empId); // avoid duplicates within same job
         } catch {
-          // Skip if employee doesn't exist or other constraint issue
+          // skip constraint errors (e.g. employee deleted)
         }
       }
     }

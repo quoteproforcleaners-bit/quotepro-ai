@@ -852,7 +852,7 @@ export function QuickAddCleanPanel({
                       </div>
                     )}
                     {filteredEmployees.map((emp) => {
-                      const selected = teamMembers.includes(emp.name);
+                      const selected = teamMembers.includes(emp.id);
                       return (
                         <button
                           key={emp.id}
@@ -861,7 +861,7 @@ export function QuickAddCleanPanel({
                           className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-slate-100 last:border-0 ${selected ? "bg-primary-50" : "hover:bg-slate-50"}`}
                           onClick={() => {
                             setTeamMembers(p =>
-                              selected ? p.filter(x => x !== emp.name) : [...p, emp.name]
+                              selected ? p.filter(x => x !== emp.id) : [...p, emp.id]
                             );
                           }}
                         >
@@ -916,14 +916,18 @@ export function QuickAddCleanPanel({
                 {/* Selected members summary chips */}
                 {teamMembers.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5 pt-1">
-                    {teamMembers.map((m) => (
-                      <span key={m} className="flex items-center gap-1 bg-primary-50 text-primary-700 border border-primary-200 rounded-full px-2.5 py-1 text-xs font-semibold">
-                        {m}
-                        <button onClick={() => setTeamMembers((p) => p.filter((x) => x !== m))} className="text-primary-400 hover:text-primary-700 ml-0.5">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
+                    {teamMembers.map((memberId) => {
+                      const emp = employeeList.find(e => e.id === memberId);
+                      const label = emp?.name ?? memberId;
+                      return (
+                        <span key={memberId} className="flex items-center gap-1 bg-primary-50 text-primary-700 border border-primary-200 rounded-full px-2.5 py-1 text-xs font-semibold">
+                          {label}
+                          <button onClick={() => setTeamMembers((p) => p.filter((x) => x !== memberId))} className="text-primary-400 hover:text-primary-700 ml-0.5">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 ) : null}
               </div>
