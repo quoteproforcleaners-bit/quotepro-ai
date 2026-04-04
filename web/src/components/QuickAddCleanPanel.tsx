@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiPost } from "../lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiPost, apiGet } from "../lib/api";
 import {
   AlertCircle, CheckCircle, Plus, Search, Users, X, Zap,
   MessageSquare, Mail, Send, CalendarDays, MapPin, SkipForward, Repeat,
@@ -281,7 +281,19 @@ export function QuickAddCleanPanel({
 
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [teamInput, setTeamInput] = useState("");
+  const [showTeamDropdown, setShowTeamDropdown] = useState(false);
   const [notes, setNotes] = useState("");
+
+  const { data: employeeList = [] } = useQuery<{ id: string; name: string; role: string; color: string; isActive: boolean }[]>({
+    queryKey: ["/api/admin/employees"],
+    queryFn: () => apiGet("/api/admin/employees"),
+  });
+
+  const activeEmployees = employeeList.filter(e => e.isActive !== false);
+  const filteredEmployees = activeEmployees.filter(e =>
+    !teamMembers.includes(e.name) &&
+    (teamInput.trim() === "" || e.name.toLowerCase().includes(teamInput.toLowerCase()))
+  );
   const [error, setError] = useState("");
 
   // ── Recurring state ─────────────────────────────────────────────────────────
@@ -879,24 +891,62 @@ export function QuickAddCleanPanel({
                     ))}
                   </div>
                 ) : null}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    data-testid="input-team-member"
-                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="Add team member name…"
-                    value={teamInput}
-                    onChange={(e) => setTeamInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTeamMember(); } }}
-                  />
-                  <button
-                    onClick={addTeamMember}
-                    disabled={!teamInput.trim()}
-                    data-testid="btn-add-team-member"
-                    className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-primary-700 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                <div className="relative">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      data-testid="input-team-member"
+                      className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="Add team member name…"
+                      value={teamInput}
+                      onChange={(e) => { setTeamInput(e.target.value); setShowTeamDropdown(true); }}
+                      onFocus={() => setShowTeamDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowTeamDropdown(false), 150)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTeamMember(); } if (e.key === "Escape") setShowTeamDropdown(false); }}
+                      autoComplete="off"
+                    />
+                    <button
+                      onClick={addTeamMember}
+                      disabled={!teamInput.trim()}
+                      data-testid="btn-add-team-member"
+                      className="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-primary-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {showTeamDropdown && filteredEmployees.length > 0 && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-10 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                      {filteredEmployees.map((emp) => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 text-left transition-colors"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setTeamMembers(p => [...p, emp.name]);
+                            setTeamInput("");
+                            setShowTeamDropdown(false);
+                          }}
+                        >
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                            style={{ backgroundColor: emp.color || "#0F6E56" }}
+                          >
+                            {emp.name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-slate-800">{emp.name}</div>
+                            {emp.role && <div className="text-xs text-slate-400">{emp.role}</div>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {showTeamDropdown && filteredEmployees.length === 0 && teamInput.trim() !== "" && activeEmployees.length > 0 && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-10 bg-white border border-slate-200 rounded-xl shadow-lg px-3 py-2.5">
+                      <p className="text-sm text-slate-400">No match — press Enter or + to add "{teamInput}"</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
