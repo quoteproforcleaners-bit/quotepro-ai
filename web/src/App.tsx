@@ -69,6 +69,14 @@ import JobCheckinPage from "./pages/JobCheckinPage";
 import CustomerPortalPage from "./pages/CustomerPortalPage";
 import PreferencesPage from "./pages/portal/PreferencesPage";
 import ReschedulePage from "./pages/portal/ReschedulePage";
+import EmployeeLogin from "./pages/employee/EmployeeLogin";
+import EmployeeHome from "./pages/employee/EmployeeHome";
+import EmployeeJobDetail from "./pages/employee/EmployeeJobDetail";
+import EmployeeCheckin from "./pages/employee/EmployeeCheckin";
+import EmployeeCheckout from "./pages/employee/EmployeeCheckout";
+import EmployeeSchedule from "./pages/employee/EmployeeSchedule";
+import EmployeeProfile from "./pages/employee/EmployeeProfile";
+import FieldStatusPage from "./pages/FieldStatusPage";
 
 export default function App() {
   const { isAuthenticated, isLoading, business, needsOnboarding } = useAuth();
@@ -160,6 +168,7 @@ export default function App() {
           <Route path="/jobs" element={<ProGate feature="Job Management"><JobsPage /></ProGate>} />
           <Route path="/jobs/:id" element={<ProGate feature="Job Management"><JobDetailPage /></ProGate>} />
           <Route path="/employees" element={<EmployeesPage />} />
+          <Route path="/team" element={<FieldStatusPage />} />
           <Route path="/calendar" element={<ProGate feature="Job Management"><CalendarPage /></ProGate>} />
           <Route path="/schedule-publish" element={<SchedulePublishPage />} />
           <Route path="/growth" element={<ProGate feature="Growth Dashboard"><GrowthDashboardPage /></ProGate>} />
@@ -214,6 +223,16 @@ export default function App() {
         <Route path="/home/:token" element={<CustomerPortalPage />} />
         <Route path="/home/:token/preferences" element={<PreferencesPage />} />
         <Route path="/home/:token/reschedule" element={<ReschedulePage />} />
+
+        {/* Employee portal — separate auth (PIN-based JWT), no admin session required */}
+        <Route path="/employee/login" element={<EmployeeLogin />} />
+        <Route path="/employee/home" element={<EmployeeHome />} />
+        <Route path="/employee/jobs/:assignmentId" element={<EmployeeJobDetail />} />
+        <Route path="/employee/jobs/:assignmentId/checkin" element={<EmployeeCheckin />} />
+        <Route path="/employee/jobs/:assignmentId/checkout" element={<EmployeeCheckout />} />
+        <Route path="/employee/schedule" element={<EmployeeSchedule />} />
+        <Route path="/employee/profile" element={<EmployeeProfile />} />
+        <Route path="/employee" element={<Navigate to="/employee/login" replace />} />
 
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>

@@ -314,6 +314,13 @@ export const jobs = pgTable("jobs", {
   cleanerNotes: text("cleaner_notes").notNull().default(""),
   checkinToken: varchar("checkin_token").unique().default(sql`gen_random_uuid()`),
   invoiced: boolean("invoiced").notNull().default(false),
+  specialRequests: text("special_requests"),
+  accessCode: varchar("access_code", { length: 100 }),
+  parkingNotes: varchar("parking_notes", { length: 255 }),
+  keyLocation: varchar("key_location", { length: 255 }),
+  estimatedDurationMinutes: integer("estimated_duration_minutes"),
+  roomCount: integer("room_count"),
+  squareFootage: integer("square_footage"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -336,6 +343,31 @@ export const employees = pgTable("employees", {
   status: text("status").notNull().default("active"),
   notes: text("notes").notNull().default(""),
   color: text("color").notNull().default("#6366f1"),
+  pin: text("pin").notNull().default(""),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const jobAssignments = pgTable("job_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  businessId: varchar("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  assignedDate: text("assigned_date").notNull(),
+  status: text("status").notNull().default("assigned"),
+  checkinTime: timestamp("checkin_time"),
+  checkoutTime: timestamp("checkout_time"),
+  checkinLat: real("checkin_lat"),
+  checkinLng: real("checkin_lng"),
+  checkoutLat: real("checkout_lat"),
+  checkoutLng: real("checkout_lng"),
+  employeeNotes: text("employee_notes"),
+  checkinPhotoUrl: varchar("checkin_photo_url"),
+  checkoutPhotoUrl: varchar("checkout_photo_url"),
+  durationMinutes: integer("duration_minutes"),
+  adminNotifiedCheckin: boolean("admin_notified_checkin").notNull().default(false),
+  adminNotifiedCheckout: boolean("admin_notified_checkout").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -797,6 +829,7 @@ export type QuoteFollowUp = typeof quoteFollowUps.$inferSelect;
 export type QuoteLineItem = typeof quoteLineItems.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
 export type Employee = typeof employees.$inferSelect;
+export type JobAssignment = typeof jobAssignments.$inferSelect;
 export type JobChecklistItem = typeof jobChecklistItems.$inferSelect;
 export type JobPhoto = typeof jobPhotos.$inferSelect;
 export type PushToken = typeof pushTokens.$inferSelect;

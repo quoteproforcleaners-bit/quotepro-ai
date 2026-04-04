@@ -39,6 +39,8 @@ import npsRouter from "./routers/npsRouter";
 import { quoteDoctorRouter } from "./routers/quoteDoctorRouter";
 import { supportRouter } from "./routers/supportRouter";
 import portalRouter from "./routers/portalRouter";
+import employeeRouter from "./routers/employeeRouter";
+import fieldAdminRouter from "./routers/fieldAdminRouter";
 
 // Session type extension
 declare module "express-session" {
@@ -115,6 +117,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(supportRouter);
   app.use(publicRouter);
   app.use(portalRouter);
+  app.use(employeeRouter);
+  app.use(fieldAdminRouter);
 
   // 4. HTTP server
   const httpServer = createServer(app);
