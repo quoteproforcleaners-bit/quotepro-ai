@@ -19,12 +19,12 @@ import {
 import { Button } from "../components/ui";
 
 const FEATURES = [
-  { icon: FileText, title: "Unlimited Quotes", desc: "Create unlimited quotes with Good/Better/Best tiers and smart pricing" },
-  { icon: Users, title: "Full CRM", desc: "Manage customers, track VIPs, and build lasting relationships" },
-  { icon: Bot, title: "AI Sales Assistant", desc: "Generate follow-ups, analyze quotes, and get AI-powered revenue recommendations" },
-  { icon: TrendingUp, title: "Growth Dashboard", desc: "Track your growth score, manage reviews, launch reactivation campaigns" },
-  { icon: Shield, title: "Revenue Protection", desc: "Follow-up streak tracking, revenue leak detection, and pipeline monitoring" },
-  { icon: Sparkles, title: "Smart Automations", desc: "Daily pulse emails, weekly recaps, and intelligent follow-up reminders" },
+  { icon: FileText, title: "Unlimited Quotes", desc: "Create unlimited quotes with Good/Better/Best tiers — no monthly cap" },
+  { icon: Sparkles, title: "AI Quote Builder", desc: "Describe the job in plain English; AI builds a professional proposal in seconds" },
+  { icon: TrendingUp, title: "Smart Upsell Recommendations", desc: "AI spots add-on opportunities so every quote earns more" },
+  { icon: Bot, title: "Automated Follow-Ups", desc: "AI follows up on unanswered quotes automatically — set it once, it runs forever" },
+  { icon: Users, title: "Full CRM & Customer Management", desc: "Track customers, VIPs, and build lasting client relationships" },
+  { icon: Shield, title: "Revenue Dashboard", desc: "See what's closing, what's leaking, and where your next dollar is coming from" },
 ];
 
 const TESTIMONIALS = [
@@ -65,7 +65,7 @@ export default function PaywallPage() {
           <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/30">
             <Check className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome to Pro!</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Welcome to Growth!</h1>
           <p className="text-slate-500">Activating your subscription...</p>
           <div className="w-6 h-6 mx-auto border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -76,7 +76,7 @@ export default function PaywallPage() {
   const headline = source === "quote_limit"
     ? "You've used your free quotes — ready to grow?"
     : source === "feature_gate"
-    ? "This feature is included in Pro"
+    ? "This feature is included in Growth"
     : "Close more jobs. Recover lost revenue. Grow.";
 
   return (
@@ -85,7 +85,7 @@ export default function PaywallPage() {
         <div className="text-center mb-12 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-100/80 text-primary-700 text-sm font-medium mb-6 backdrop-blur-sm">
             <Crown className="w-4 h-4" />
-            <span>QuotePro AI Pro</span>
+            <span>QuotePro AI Growth</span>
           </div>
 
           <h1 className="text-4xl lg:text-5xl font-bold text-slate-900 mb-4 tracking-tight">
@@ -125,13 +125,13 @@ export default function PaywallPage() {
                     <div className="w-14 h-14 mx-auto rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 shadow-lg shadow-black/10">
                       <Zap className="w-7 h-7 text-white" />
                     </div>
-                    <p className="text-primary-100 text-sm font-medium mb-2">Pro Plan</p>
+                    <p className="text-primary-100 text-sm font-medium mb-2">Growth Plan</p>
                     <div className="flex items-end justify-center gap-1 mb-1">
-                      <span className="text-5xl font-bold tracking-tight">$19</span>
-                      <span className="text-2xl font-bold text-primary-200">.99</span>
+                      <span className="text-5xl font-bold tracking-tight">$49</span>
                       <span className="text-primary-200 text-sm mb-1.5">/mo</span>
                     </div>
-                    <p className="text-primary-200 text-sm">14-day free trial included</p>
+                    <p className="text-primary-200 text-sm">or $41/mo billed annually</p>
+                    <p className="text-primary-200 text-xs mt-1 opacity-80">14-day free trial included</p>
                   </div>
                 </div>
 
@@ -140,15 +140,15 @@ export default function PaywallPage() {
                     variant="primary"
                     size="lg"
                     icon={ArrowRight}
-                    onClick={startCheckout}
+                    onClick={() => startCheckout("growth", "monthly")}
                     loading={checkoutLoading}
                     className="w-full justify-center text-base font-semibold py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 shadow-lg shadow-primary-600/25"
                   >
-                    Start Free Trial
+                    Start 14-Day Free Trial
                   </Button>
 
                   <div className="space-y-2.5">
-                    {["Unlimited quotes", "Full CRM & customer management", "AI follow-ups & sales assistant", "Growth dashboard & analytics", "Revenue protection tools", "All integrations"].map((item, i) => (
+                    {["Unlimited quotes", "AI quote builder", "Smart upsell recommendations", "Automated follow-ups", "Full CRM & customer management", "Revenue dashboard", "Public quote request page", "Weekly performance recap", "Priority email support"].map((item, i) => (
                       <div key={i} className="flex items-center gap-2.5 text-sm text-slate-600">
                         <div className="w-4.5 h-4.5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
                           <Check className="w-3 h-3 text-emerald-600" />
