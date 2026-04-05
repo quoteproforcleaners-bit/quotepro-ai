@@ -572,7 +572,7 @@ const router = Router();
           to: user.email,
           subject: `Action needed: complete your QuotePro ${planLabel} subscription`,
           fromName: "Mike at QuotePro",
-          replyTo: "quoteproforcleaners@gmail.com",
+          replyTo: "mike@getquotepro.ai",
           html: `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"/></head>
 <body style="margin:0;padding:0;background:#f4f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">

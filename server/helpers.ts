@@ -1642,7 +1642,7 @@ export function getPrivacyPolicyHTML(): string {
 <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.</p>
 
 <h2>Contact Us</h2>
-<p>If you have questions about this Privacy Policy, please contact us at <a href="mailto:quoteproforcleaners@gmail.com">quoteproforcleaners@gmail.com</a>.</p>
+<p>If you have questions about this Privacy Policy, please contact us at <a href="mailto:mike@getquotepro.ai">mike@getquotepro.ai</a>.</p>
 </div></body></html>`;
 }
 
@@ -1703,7 +1703,7 @@ export function getTermsOfServiceHTML(): string {
 <p>These Terms shall be governed by and construed in accordance with the laws of the United States, without regard to conflict of law provisions.</p>
 
 <h2>12. Contact</h2>
-<p>For questions about these Terms, please contact us at <a href="mailto:quoteproforcleaners@gmail.com">quoteproforcleaners@gmail.com</a>.</p>
+<p>For questions about these Terms, please contact us at <a href="mailto:mike@getquotepro.ai">mike@getquotepro.ai</a>.</p>
 </div></body></html>`;
 }
 
@@ -1717,7 +1717,7 @@ export function getDeleteAccountHTML(): string {
 <p class="updated">QuotePro for Cleaners</p>
 
 <h2>How to Request Account Deletion</h2>
-<p>To request deletion of your QuotePro account and all associated data, please email us at <a href="mailto:quoteproforcleaners@gmail.com">quoteproforcleaners@gmail.com</a> with the subject line "Account Deletion Request" and include the email address associated with your account.</p>
+<p>To request deletion of your QuotePro account and all associated data, please email us at <a href="mailto:mike@getquotepro.ai">mike@getquotepro.ai</a> with the subject line "Account Deletion Request" and include the email address associated with your account.</p>
 
 <h2>What Happens When You Delete Your Account</h2>
 <p>When you request account deletion, the following data will be permanently deleted within 30 days:</p>
@@ -1741,7 +1741,7 @@ export function getDeleteAccountHTML(): string {
 <p>Deleting your account does not automatically cancel your subscription. Before requesting account deletion, please cancel your subscription through the App Store or Google Play Store to avoid future charges.</p>
 
 <h2>Contact</h2>
-<p>If you have questions about the account deletion process, contact us at <a href="mailto:quoteproforcleaners@gmail.com">quoteproforcleaners@gmail.com</a>.</p>
+<p>If you have questions about the account deletion process, contact us at <a href="mailto:mike@getquotepro.ai">mike@getquotepro.ai</a>.</p>
 </div></body></html>`;
 }
 

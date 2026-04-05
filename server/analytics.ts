@@ -51,7 +51,7 @@ export async function trackEvent(
 
 /* ─── Churn signal helpers ───────────────────────────────────────────────────── */
 
-const DRIP_REPLY_TO = "quoteproforcleaners@gmail.com";
+const DRIP_REPLY_TO = "mike@getquotepro.ai";
 const CHURN_FROM_NAME = "Mike at QuotePro";
 const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://getquotepro.ai";
 
@@ -72,7 +72,7 @@ function churnLayout(body: string): string {
         <p style="margin:0;font-size:12px;color:#9ca3af;">
           <a href="${APP_BASE_URL}/app" style="color:#1d3557;text-decoration:none;">Open QuotePro</a>
           &nbsp;&bull;&nbsp;
-          <a href="mailto:quoteproforcleaners@gmail.com" style="color:#9ca3af;text-decoration:none;">Reply to this email</a>
+          <a href="mailto:mike@getquotepro.ai" style="color:#9ca3af;text-decoration:none;">Reply to this email</a>
         </p>
       </td></tr>
     </table>

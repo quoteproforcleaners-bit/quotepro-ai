@@ -11,7 +11,7 @@ import { sendEmail, PLATFORM_FROM_EMAIL } from "./mail";
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
 
 const DRIP_FROM_NAME = "Mike at QuotePro";
-const DRIP_REPLY_TO = "quoteproforcleaners@gmail.com";
+const DRIP_REPLY_TO = "mike@getquotepro.ai";
 const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
 
 /* ─── Token helpers ─────────────────────────────────────────────────────────── */
@@ -196,7 +196,7 @@ function divider(): string {
 function signOff(): string {
   return `${divider()}
 ${p("— Mike, founder of QuotePro &amp; cleaning franchise owner", "color:#6b7280;font-size:14px;font-style:italic;")}
-${p('<a href="mailto:quoteproforcleaners@gmail.com" style="color:#1d3557;font-size:14px;">quoteproforcleaners@gmail.com</a> &nbsp;·&nbsp; I personally read every reply.', "font-size:13px;color:#9ca3af;")}`;
+${p('<a href="mailto:mike@getquotepro.ai" style="color:#1d3557;font-size:14px;">mike@getquotepro.ai</a> &nbsp;·&nbsp; I personally read every reply.', "font-size:13px;color:#9ca3af;")}`;
 }
 
 function callout(text: string): string {
