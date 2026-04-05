@@ -25,6 +25,7 @@ export default function RegisterPage() {
   const [searchParams] = useSearchParams();
   const intent = searchParams.get("intent") || "";
   const [form, setForm] = useState({
+    firstName: "",
     email: "",
     password: "",
   });
@@ -192,6 +193,18 @@ export default function RegisterPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">First Name</label>
+                <input
+                  type="text"
+                  value={form.firstName}
+                  onChange={set("firstName")}
+                  required
+                  placeholder="Your first name"
+                  autoComplete="given-name"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
                 <input

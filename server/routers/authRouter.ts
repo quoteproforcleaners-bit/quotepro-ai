@@ -102,7 +102,7 @@ const router = Router();
 
   router.post("/api/auth/register", authLimiter, async (req: Request, res: Response) => {
     try {
-      const { email, password, name, ref } = req.body;
+      const { email, password, firstName, name, ref } = req.body;
 
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
@@ -132,9 +132,11 @@ const router = Router();
         (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
         req.socket.remoteAddress ||
         null;
+      // firstName takes precedence; fall back to legacy name param if present
+      const resolvedName = (firstName as string | undefined)?.trim() || (name as string | undefined)?.trim() || null;
       const user = await createUser({
         email,
-        name: name || null,
+        name: resolvedName,
         passwordHash,
         authProvider: "email",
         referralCode,
