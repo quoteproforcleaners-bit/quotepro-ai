@@ -565,16 +565,10 @@ const router = Router();
     }
   });
 
-  router.post("/api/subscription/upgrade", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = await updateUser(req.session.userId!, {
-        subscriptionTier: "pro",
-        subscriptionExpiresAt: null,
-      });
-      return res.json({ tier: user.subscriptionTier, message: "Upgraded to Pro" });
-    } catch {
-      return res.status(500).json({ message: "Upgrade failed" });
-    }
+  // DEPRECATED — free Pro upgrade removed. Use /api/subscription/create-checkout.
+  // Kept as 410 Gone so any cached clients get a clear signal.
+  router.post("/api/subscription/upgrade", (_req: Request, res: Response) => {
+    return res.status(410).json({ message: "This endpoint is no longer available. Use the checkout flow to upgrade." });
   });
 
   router.get("/api/subscription/config", requireAuth, async (_req: Request, res: Response) => {
@@ -765,17 +759,38 @@ const router = Router();
         return res.status(403).json({ message: "Session customer mismatch" });
       }
 
-      if (session.payment_status === "paid" || session.status === "complete") {
+      // Accept paid sessions or trialing sessions (card on file, trial active)
+      const isConfirmed =
+        session.payment_status === "paid" ||
+        session.payment_status === "no_payment_required" && session.status === "complete";
+
+      if (isConfirmed) {
         const planFromMeta = (session.metadata as any)?.plan || "growth";
         const intervalFromMeta = (session.metadata as any)?.interval || "monthly";
-        await updateUser(req.session.userId!, {
+
+        const updateData: Record<string, any> = {
           subscriptionTier: planFromMeta,
           subscriptionInterval: intervalFromMeta,
           subscriptionExpiresAt: null,
-        } as any);
+          subscriptionPlatform: "stripe",
+          subscriptionSyncedAt: new Date(),
+        };
+        // Save Stripe IDs so lifecycle webhooks can look the user up by customer
+        if (session.customer) updateData.stripeCustomerId = session.customer as string;
+        if (session.subscription) {
+          updateData.stripeSubscriptionId = session.subscription as string;
+          updateData.stripeSubscriptionStatus = session.payment_status === "paid" ? "active" : "trialing";
+        }
+
+        await pool.query(
+          "UPDATE users SET subscription_started_at = NOW() WHERE id = $1 AND subscription_started_at IS NULL",
+          [req.session.userId]
+        );
+        await updateUser(req.session.userId!, updateData as any);
+        console.log(`[verify-session] Activated ${planFromMeta} for user ${req.session.userId}`);
         return res.json({ success: true, tier: planFromMeta });
       }
-      return res.json({ success: false, status: session.status });
+      return res.json({ success: false, status: session.status, payment_status: session.payment_status });
     } catch (error: any) {
       console.error("Verify session error:", error);
       return res.status(500).json({ message: "Failed to verify session" });
@@ -805,6 +820,14 @@ const router = Router();
         trackEvent("system", "WEBHOOK_SIGNATURE_FAILED", { error: err.message }).catch(() => {});
         return res.status(400).send(`Webhook Error: ${err.message}`);
       }
+
+      // Log every incoming webhook event for audit purposes
+      pool.query(
+        `INSERT INTO stripe_webhook_log (event_id, event_type, payload, processed_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (event_id) DO NOTHING`,
+        [event.id, event.type, JSON.stringify(event.data.object)]
+      ).catch((e: any) => console.error("[webhook-log] Failed to log event:", e.message));
 
       switch (event.type) {
         case "checkout.session.completed": {

@@ -449,4 +449,180 @@ const router = Router();
     }
   });
 
+  // ── GET /api/admin/webhook-events — last 10 Stripe webhook events ────────
+  router.get("/api/admin/webhook-events", async (req: Request, res: Response) => {
+    const adminKey = req.headers["x-admin-key"] as string;
+    const ADMIN_KEY = process.env.ADMIN_API_KEY || process.env.ADMIN_GRANT_PRO_SECRET || "";
+    if (!adminKey || adminKey !== ADMIN_KEY) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    try {
+      const result = await pool.query(
+        `SELECT event_id, event_type, processed_at
+         FROM stripe_webhook_log
+         ORDER BY processed_at DESC
+         LIMIT 10`
+      );
+      return res.json({ events: result.rows, total: result.rowCount });
+    } catch (err: any) {
+      console.error("GET /api/admin/webhook-events error:", err.message);
+      return res.status(500).json({ message: "Failed to fetch webhook events" });
+    }
+  });
+
+  // ── POST /api/admin/billing-recovery — email real users with unpaid tiers ──
+  // Generates a fresh Stripe checkout session for each affected user and sends
+  // them a personalised email with a one-click payment link.
+  router.post("/api/admin/billing-recovery", async (req: Request, res: Response) => {
+    const adminKey = req.headers["x-admin-key"] as string;
+    const ADMIN_KEY = process.env.ADMIN_API_KEY || process.env.ADMIN_GRANT_PRO_SECRET || "";
+    if (!adminKey || adminKey !== ADMIN_KEY) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const stripe = getStripe();
+    if (!stripe) return res.status(503).json({ message: "Stripe not configured" });
+
+    const { sendEmail } = await import("../mail");
+    const APP_BASE = "https://app.getquotepro.ai";
+
+    // Real users on a paid tier with no active Stripe subscription
+    const affected = await pool.query<{
+      id: string;
+      email: string;
+      name: string | null;
+      subscription_tier: string;
+      stripe_customer_id: string | null;
+    }>(
+      `SELECT id, email, name, subscription_tier, stripe_customer_id
+       FROM users
+       WHERE subscription_tier IN ('starter', 'growth', 'pro')
+         AND stripe_subscription_id IS NULL
+         AND revenuecat_entitlement IS NULL
+         AND email NOT LIKE '%privaterelay.appleid.com'
+         AND email LIKE '%@%'
+         AND length(email) > 5
+         AND email NOT ILIKE '%mike%'
+         AND email NOT ILIKE '%quealy%'
+         AND email NOT ILIKE '%test%'
+         AND email NOT ILIKE '%demo%'
+         AND (name NOT ILIKE '%mike%' OR name IS NULL)
+         AND (name NOT ILIKE '%quealy%' OR name IS NULL)
+         AND email NOT IN (
+           'hi@hi.com','jake@buddy.com','help@help.com','jakejake@jake.com',
+           'jimmy@dog.com','jshshs@ghshsj.com','jake@jake.com','todo@quotepro.com',
+           'stella','jake','ar_user235@icloud.com','arnold@traitor.com',
+           'miem@mime.com','malvern@twomaodscleaning.com','mjq084@gmail.com',
+           'quoteproforcleaners@gmail.com'
+         )
+       ORDER BY created_at ASC`
+    );
+
+    const PLAN_PRICE: Record<string, number> = { starter: 1900, growth: 4900, pro: 9900 };
+
+    const results: Array<{ email: string; status: string; error?: string }> = [];
+
+    for (const user of affected.rows) {
+      try {
+        // Ensure Stripe customer exists
+        let customerId = user.stripe_customer_id;
+        if (!customerId) {
+          const customer = await stripe.customers.create({
+            email: user.email,
+            name: user.name || undefined,
+            metadata: { userId: user.id },
+          });
+          customerId = customer.id;
+          await pool.query(
+            `UPDATE users SET stripe_customer_id = $1 WHERE id = $2`,
+            [customerId, user.id]
+          );
+        }
+
+        const plan = user.subscription_tier as string;
+        const amount = PLAN_PRICE[plan] ?? 9900;
+
+        const session = await stripe.checkout.sessions.create({
+          customer: customerId,
+          mode: "subscription",
+          line_items: [{
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: `QuotePro ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
+                description: "Activate your QuotePro subscription",
+              },
+              recurring: { interval: "month" },
+              unit_amount: amount,
+            },
+            quantity: 1,
+          }],
+          success_url: `${APP_BASE}/app/pricing/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${APP_BASE}/app/dashboard`,
+          subscription_data: { metadata: { userId: user.id, plan, interval: "monthly" } },
+          metadata: { plan, interval: "monthly" },
+          allow_promotion_codes: true,
+        });
+
+        const firstName = user.name?.split(" ")[0] || "there";
+        const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+        const price = amount === 1900 ? "$19" : amount === 4900 ? "$49" : "$99";
+
+        await sendEmail({
+          to: user.email,
+          subject: `Action needed: complete your QuotePro ${planLabel} subscription`,
+          fromName: "Mike at QuotePro",
+          replyTo: "quoteproforcleaners@gmail.com",
+          html: `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f4f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f0;padding:32px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+<tr><td style="background:#1d3557;border-radius:12px 12px 0 0;padding:28px 40px;">
+  <span style="font-size:22px;font-weight:700;color:#ffffff;">QuotePro AI</span>
+  <span style="font-size:13px;color:rgba(255,255,255,0.6);margin-left:8px;">for cleaning pros</span>
+</td></tr>
+<tr><td style="background:#ffffff;padding:40px;border-left:1px solid #e8e8e0;border-right:1px solid #e8e8e0;">
+  <p style="margin:0 0 16px;font-size:16px;color:#0f172a;">Hey ${firstName},</p>
+  <p style="margin:0 0 16px;font-size:15px;color:#334155;line-height:1.6;">
+    Your QuotePro <strong>${planLabel}</strong> account is active and ready to go — but it looks like the payment step didn't finish when you signed up.
+  </p>
+  <p style="margin:0 0 24px;font-size:15px;color:#334155;line-height:1.6;">
+    To keep your account running and lock in your rate of <strong>${price}/month</strong>, just click the button below. It takes about 60 seconds.
+  </p>
+  <div style="text-align:center;margin-bottom:28px;">
+    <a href="${session.url}" style="display:inline-block;background:#2563eb;color:#ffffff;font-weight:700;font-size:16px;padding:14px 36px;border-radius:10px;text-decoration:none;">
+      Complete My Subscription
+    </a>
+  </div>
+  <p style="margin:0 0 8px;font-size:13px;color:#64748b;line-height:1.5;">
+    If you have any questions or need help, just reply to this email — I personally read every response.
+  </p>
+  <p style="margin:0;font-size:14px;color:#0f172a;">— Mike<br/><span style="color:#64748b;">Founder, QuotePro</span></p>
+</td></tr>
+<tr><td style="background:#f8fafc;border:1px solid #e8e8e0;border-top:none;border-radius:0 0 12px 12px;padding:20px 40px;">
+  <p style="margin:0;font-size:11px;color:#94a3b8;text-align:center;">
+    QuotePro AI · Built for residential cleaning companies<br/>
+    <a href="${APP_BASE}/app/unsubscribe" style="color:#94a3b8;">Unsubscribe</a>
+  </p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+          text: `Hey ${firstName}, your QuotePro ${planLabel} account is active but payment didn't complete. Click here to finish in 60 seconds: ${session.url}`,
+        });
+
+        results.push({ email: user.email, status: "sent" });
+        console.log(`[billing-recovery] Sent to ${user.email} — checkout: ${session.url}`);
+      } catch (err: any) {
+        console.error(`[billing-recovery] Failed for ${user.email}:`, err.message);
+        results.push({ email: user.email, status: "failed", error: err.message });
+      }
+    }
+
+    return res.json({ processed: results.length, results });
+  });
+
 export default router;
