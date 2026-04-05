@@ -1,10 +1,4 @@
-import OpenAI from "openai";
-
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  return _openai;
-}
+import { anthropic } from "../../clients";
 
 export interface GeneratedReply {
   tone: "professional" | "warm" | "concise";
@@ -46,17 +40,14 @@ warm: friendly, personal, relatable
 concise: 1-2 sentences, gets straight to the point`;
 
   try {
-    const completion = await getOpenAI().chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: context },
-      ],
-      max_completion_tokens: 400,
-      response_format: { type: "json_object" },
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      system: systemPrompt,
+      messages: [{ role: "user", content: context }],
+      max_tokens: 400,
     });
 
-    const raw = completion.choices[0]?.message?.content;
+    const raw = (completion.content[0] as any).text;
     if (!raw) throw new Error("Empty response");
 
     const parsed = JSON.parse(raw);

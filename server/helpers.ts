@@ -10,7 +10,7 @@ import { google } from "googleapis";
 import { pool, db } from "./db";
 import { QBOClient, encryptToken, decryptToken, logSync } from "./qbo-client";
 import { getUncachableGoogleCalendarClient } from "./googleCalendarClient";
-import { openai, getEffectiveLang, getLangInstruction } from "./clients";
+import { anthropic, getEffectiveLang, getLangInstruction } from "./clients";
 import {
   getPendingCommunications,
   getQuoteById,
@@ -564,21 +564,18 @@ export async function generateFollowUpMessage(quote: any, customer: any, busines
   const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
   const effectiveLang = await getEffectiveLang(customer?.id, business?.commLanguage);
   const followUpLangInstruction = getLangInstruction(effectiveLang);
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const completion = await anthropic.messages.create({
+    model: "claude-sonnet-4-5",
+    system: `Write a ${msgType} follow-up (under ${maxLen} chars for SMS) for "${business?.companyName || "our cleaning company"}". Quote is $${quote.total} sent ${ageDays} days ago. Quote link: ${quoteUrl}. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}". For email: start with "Subject: " then blank line then body. Do NOT put the raw URL in the email body; a button will be added automatically.${followUpLangInstruction}`,
     messages: [
       {
-        role: "system",
-        content: `Write a ${msgType} follow-up (under ${maxLen} chars for SMS) for "${business?.companyName || "our cleaning company"}". Quote is $${quote.total} sent ${ageDays} days ago. Quote link: ${quoteUrl}. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}". For email: start with "Subject: " then blank line then body. Do NOT put the raw URL in the email body; a button will be added automatically.${followUpLangInstruction}`
-      },
-      {
         role: "user",
-        content: `Write a friendly follow-up ${msgType} for ${customer?.firstName || "the customer"} asking if they had a chance to review their cleaning quote. Reply with ONLY the message text.`
+        content: `Write a friendly follow-up ${msgType} for ${customer?.firstName || "the customer"} asking if they had a chance to review their cleaning quote. Reply with ONLY the message text.`,
       },
     ],
-    max_completion_tokens: channel === "email" ? 250 : 100,
+    max_tokens: channel === "email" ? 250 : 100,
   });
-  return completion.choices[0]?.message?.content?.trim() || "";
+  return (completion.content[0] as any).text?.trim() || "";
 }
 
 // ─── sendFollowUpNow ────────────────────────────────────────────

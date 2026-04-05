@@ -6,7 +6,7 @@ import { Router, type Request, type Response } from "express";
 import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter, isGrowthOrAbove } from "../middleware";
-import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -521,22 +521,17 @@ const router = Router();
       const tierIncluded = tier?.includedBullets?.join(", ") || "";
       const tierExcluded = tier?.excludedBullets?.join(", ") || "";
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a professional commercial cleaning proposal writer. Generate a scope of work for a commercial cleaning contract. Respond with JSON: {"scopeParagraph": string, "includedTasks": string[], "excludedTasks": string[], "rotationTasks": [{"task": string, "frequency": string}]}. Keep the scope paragraph professional but concise (2-3 sentences). Include 5-8 included tasks and 3-5 excluded tasks. Rotation tasks are periodic tasks done weekly/monthly/quarterly.`,
-          },
-          {
-            role: "user",
-            content: `Facility: "${facilityName}" (${facilityType}), ${totalSqFt} sqft. Cleaning frequency: ${frequency}/week. ${bathroomCount} bathrooms, ${breakroomCount} breakrooms. Floors: ${carpetPercent}% carpet, ${hardFloorPercent}% hard floor. Glass level: ${glassLevel}. High-touch focus: ${highTouchFocus ? "yes" : "no"}. Tier: ${tierName}. Currently included: ${tierIncluded}. Currently excluded: ${tierExcluded}.`,
-          },
-        ],
-        response_format: { type: "json_object" },
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: `You are a professional commercial cleaning proposal writer. Generate a scope of work for a commercial cleaning contract. Respond with valid JSON only: {"scopeParagraph": string, "includedTasks": string[], "excludedTasks": string[], "rotationTasks": [{"task": string, "frequency": string}]}. Keep the scope paragraph professional but concise (2-3 sentences). Include 5-8 included tasks and 3-5 excluded tasks. Rotation tasks are periodic tasks done weekly/monthly/quarterly.`,
+        messages: [{
+          role: "user",
+          content: `Facility: "${facilityName}" (${facilityType}), ${totalSqFt} sqft. Cleaning frequency: ${frequency}/week. ${bathroomCount} bathrooms, ${breakroomCount} breakrooms. Floors: ${carpetPercent}% carpet, ${hardFloorPercent}% hard floor. Glass level: ${glassLevel}. High-touch focus: ${highTouchFocus ? "yes" : "no"}. Tier: ${tierName}. Currently included: ${tierIncluded}. Currently excluded: ${tierExcluded}.`,
+        }],
+        max_tokens: 600,
       });
 
-      const content = completion.choices[0]?.message?.content;
+      const content = (completion.content[0] as any).text;
       let parsed: any = {};
       try {
         parsed = JSON.parse(content || "{}");
@@ -574,22 +569,17 @@ const router = Router();
       const lowestTierPrice = tiers?.length > 0 ? Math.min(...tiers.map((t: any) => t.pricePerVisit || 0)) : 0;
       const highestTierPrice = tiers?.length > 0 ? Math.max(...tiers.map((t: any) => t.pricePerVisit || 0)) : 0;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a commercial cleaning business advisor. Analyze a commercial cleaning quote for potential risks and issues. Respond with JSON: {"warnings": [{"severity": "high"|"medium"|"low", "title": string, "description": string}], "suggestedClauses": string[], "overallAssessment": string}. Check for underpricing, unusual labor-to-sqft ratios, missing contract protections, facility-specific hazards, and margin concerns. Be specific and actionable.`,
-          },
-          {
-            role: "user",
-            content: `Facility: "${facilityName}" (${facilityType}), ${totalSqFt} sqft. Frequency: ${frequency}/week. Labor estimate: ${rawHours} hours/visit${overrideHours ? ` (overridden to ${overrideHours}h)` : ""}, ${recommendedCleaners} cleaners. Pricing: $${pricePerVisit}/visit, $${monthlyPrice}/month, $${hourlyRate}/hr rate, ${targetMargin}% target margin. ${tierCount} tiers priced from $${lowestTierPrice} to $${highestTierPrice}. Per-sqft rate: $${totalSqFt > 0 ? (pricePerVisit / (totalSqFt / 1000)).toFixed(2) : "N/A"}/1000sqft.`,
-          },
-        ],
-        response_format: { type: "json_object" },
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: `You are a commercial cleaning business advisor. Analyze a commercial cleaning quote for potential risks and issues. Respond with valid JSON only: {"warnings": [{"severity": "high"|"medium"|"low", "title": string, "description": string}], "suggestedClauses": string[], "overallAssessment": string}. Check for underpricing, unusual labor-to-sqft ratios, missing contract protections, facility-specific hazards, and margin concerns. Be specific and actionable.`,
+        messages: [{
+          role: "user",
+          content: `Facility: "${facilityName}" (${facilityType}), ${totalSqFt} sqft. Frequency: ${frequency}/week. Labor estimate: ${rawHours} hours/visit${overrideHours ? ` (overridden to ${overrideHours}h)` : ""}, ${recommendedCleaners} cleaners. Pricing: $${pricePerVisit}/visit, $${monthlyPrice}/month, $${hourlyRate}/hr rate, ${targetMargin}% target margin. ${tierCount} tiers priced from $${lowestTierPrice} to $${highestTierPrice}. Per-sqft rate: $${totalSqFt > 0 ? (pricePerVisit / (totalSqFt / 1000)).toFixed(2) : "N/A"}/1000sqft.`,
+        }],
+        max_tokens: 600,
       });
 
-      const content = completion.choices[0]?.message?.content;
+      const content = (completion.content[0] as any).text;
       let parsed: any = {};
       try {
         parsed = JSON.parse(content || "{}");
@@ -1111,17 +1101,14 @@ The email should:
 6. Sign off warmly from ${senderName}`;
 
       try {
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          response_format: { type: "json_object" },
-          max_completion_tokens: 400,
+        const completion = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+          max_tokens: 400,
         });
 
-        const content = completion.choices[0]?.message?.content;
+        const content = (completion.content[0] as any).text;
         if (!content) throw new Error("No AI response");
 
         const parsed = JSON.parse(content);

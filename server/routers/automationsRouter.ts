@@ -6,7 +6,7 @@ import { Router, type Request, type Response } from "express";
 import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
-import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import { sanitizeForPrompt } from "../promptSanitizer";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
@@ -317,18 +317,13 @@ const router = Router();
 
       let intentResult = { intent: false, confidence: 0, category: "general_question" };
       try {
-        const intentCompletion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `You are an AI intent classifier for a cleaning business. Classify the following DM message. Determine if it shows buying intent (asking about pricing, availability, booking, or services). Categories: pricing_request, booking_request, service_area, general_question, spam. Respond with JSON: {"intent": boolean, "confidence": 0-1, "category": string}`
-            },
-            { role: "user", content: message },
-          ],
-          response_format: { type: "json_object" },
+        const intentCompletion = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          system: `You are an AI intent classifier for a cleaning business. Classify the following DM message. Determine if it shows buying intent (asking about pricing, availability, booking, or services). Categories: pricing_request, booking_request, service_area, general_question, spam. Respond with valid JSON only: {"intent": boolean, "confidence": 0-1, "category": string}`,
+          messages: [{ role: "user", content: message }],
+          max_tokens: 150,
         });
-        const parsed = JSON.parse(intentCompletion.choices[0]?.message?.content || "{}");
+        const parsed = JSON.parse((intentCompletion.content[0] as any).text || "{}");
         intentResult = {
           intent: parsed.intent ?? false,
           confidence: parsed.confidence ?? 0,
@@ -350,24 +345,19 @@ const router = Router();
         quoteLink = `https://${domain}/q?u=${business.id}&ch=${dmChannel}&cid=${conversation.id}`;
 
         try {
-          const replyCompletion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content: `You are a friendly AI assistant for ${business.companyName || "a cleaning company"}. Generate a short, friendly auto-reply to a potential customer's DM. Rules:
+          const replyCompletion = await anthropic.messages.create({
+            model: "claude-sonnet-4-5",
+            system: `You are a friendly AI assistant for ${business.companyName || "a cleaning company"}. Generate a short, friendly auto-reply to a potential customer's DM. Rules:
 - Under 320 characters
 - At most 1 question
 - Include this quote link: ${quoteLink}
 - Be warm and professional
 - Don't mention pricing numbers
-Respond with JSON: {"reply": string}`
-              },
-              { role: "user", content: message },
-            ],
-            response_format: { type: "json_object" },
+Respond with valid JSON only: {"reply": string}`,
+            messages: [{ role: "user", content: message }],
+            max_tokens: 200,
           });
-          const parsed = JSON.parse(replyCompletion.choices[0]?.message?.content || "{}");
+          const parsed = JSON.parse((replyCompletion.content[0] as any).text || "{}");
           autoReplyContent = parsed.reply || `Thanks for reaching out! Get an instant quote here: ${quoteLink}`;
         } catch (e) {
           console.error("Reply generation error:", e);
@@ -440,18 +430,13 @@ Respond with JSON: {"reply": string}`
 
       let extractedFields: any = {};
       try {
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `Extract relevant cleaning lead information from a TikTok DM. Return JSON with: {"name": string, "serviceType": "regular"|"deep_clean"|"move_in_out"|"other", "bedrooms": number|null, "bathrooms": number|null, "sqft": number|null, "notes": string}`
-            },
-            { role: "user", content: dmText },
-          ],
-          response_format: { type: "json_object" },
+        const completion = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          system: `Extract relevant cleaning lead information from a TikTok DM. Return valid JSON only: {"name": string, "serviceType": "regular"|"deep_clean"|"move_in_out"|"other", "bedrooms": number|null, "bathrooms": number|null, "sqft": number|null, "notes": string}`,
+          messages: [{ role: "user", content: dmText }],
+          max_tokens: 200,
         });
-        extractedFields = JSON.parse(completion.choices[0]?.message?.content || "{}");
+        extractedFields = JSON.parse((completion.content[0] as any).text || "{}");
       } catch (e) {
         console.error("TikTok field extraction error:", e);
       }
@@ -627,13 +612,13 @@ Respond with JSON: {"reply": string}`
           const systemPrompt = `You are a business growth coach for cleaning companies. Generate ONE specific, actionable growth task for this business. Return a JSON object with exactly these fields: title (string, max 80 chars), description (string, 1-2 sentences with specific numbers), actionUrl (string, must start with /app/), estimatedTime (string like "5 minutes"), category (one of: revenue, operations, growth). No markdown, no explanation — just the JSON object.`;
           const userPrompt = `Business: ${companyName}. Stage: ${stage}. Total quotes: ${totalQuotes}. Open/unanswered quotes: ${openCount} worth $${openValue.toFixed(0)}. Subscription: ${tier}. Create a highly personalized task based on their specific situation.`;
 
-          const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
-            max_completion_tokens: 200,
-            response_format: { type: "json_object" },
+          const completion = await anthropic.messages.create({
+            model: "claude-sonnet-4-5",
+            system: systemPrompt,
+            messages: [{ role: "user", content: userPrompt }],
+            max_tokens: 200,
           });
-          const raw = JSON.parse(completion.choices[0]?.message?.content || "{}");
+          const raw = JSON.parse((completion.content[0] as any).text || "{}");
           if (raw.title && raw.description) {
             aiTask = { id: "ai-personalized", ...raw, stage, isAiGenerated: true };
           }

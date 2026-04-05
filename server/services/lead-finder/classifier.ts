@@ -1,10 +1,4 @@
-import OpenAI from "openai";
-
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  return _openai;
-}
+import { anthropic } from "../../clients";
 
 export interface ClassificationResult {
   classification: "yes" | "maybe" | "no";
@@ -128,16 +122,13 @@ export async function classifyLead(
     const urgency = detectUrgency(title, body);
     try {
       const content = `Subreddit: r/${subreddit}\nTitle: ${title}\n\n${body.slice(0, 600)}`;
-      const completion = await getOpenAI().chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content },
-        ],
-        max_completion_tokens: 200,
-        response_format: { type: "json_object" },
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content }],
+        max_tokens: 200,
       });
-      const raw = completion.choices[0]?.message?.content;
+      const raw = (completion.content[0] as any).text;
       if (!raw) {
         return {
           classification: "yes",
@@ -172,17 +163,14 @@ export async function classifyLead(
   // needs_ai: call OpenAI for full classification
   const content = `Subreddit: r/${subreddit}\nTitle: ${title}\n\n${body.slice(0, 800)}`;
   try {
-    const completion = await getOpenAI().chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content },
-      ],
-      max_completion_tokens: 200,
-      response_format: { type: "json_object" },
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content }],
+      max_tokens: 200,
     });
 
-    const raw = completion.choices[0]?.message?.content;
+    const raw = (completion.content[0] as any).text;
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);

@@ -1,6 +1,6 @@
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { pool } from "./db";
-import { openai } from "./clients";
+import { anthropic } from "./clients";
 
 /* ─── Typed Error ─────────────────────────────────────────────────────────── */
 
@@ -50,12 +50,16 @@ async function logUsage(params: {
       ]
     );
   } catch (err: any) {
-    // Never crash on logging failure
     console.warn("[aiClient] Log write failed:", err.message);
   }
 }
 
 /* ─── Main callAI function ────────────────────────────────────────────────── */
+
+export interface SimpleMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
 
 export interface CallAIOptions {
   model?: string;
@@ -66,24 +70,33 @@ export interface CallAIOptions {
 }
 
 export async function callAI(
-  messages: OpenAI.Chat.ChatCompletionMessageParam[],
+  messages: SimpleMessage[],
   options: CallAIOptions = {}
 ): Promise<{ content: string; tokensUsed: number }> {
   const {
-    model = "gpt-4o-mini",
-    maxTokens,
+    model = "claude-sonnet-4-5",
+    maxTokens = 1024,
     responseFormat,
     userId,
     route = "unknown",
   } = options;
 
+  // Anthropic requires system prompt at top level, not in messages array
+  const systemMsg = messages.find((m) => m.role === "system");
+  const baseSystem = systemMsg?.content ?? "";
+  const systemPrompt = responseFormat === "json_object"
+    ? `${baseSystem}\n\nRespond with valid JSON only — no markdown, no preamble.`.trim()
+    : baseSystem || undefined;
+
+  const anthropicMessages: Anthropic.MessageParam[] = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
   let lastError: AIError | null = null;
-  const startMs = Date.now();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const attemptStart = Date.now();
 
-    // Exponential backoff (skip on first attempt)
     if (attempt > 0) {
       await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt - 1]));
     }
@@ -92,21 +105,20 @@ export async function callAI(
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     try {
-      const params: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
-        model,
-        messages,
-        ...(maxTokens ? { max_completion_tokens: maxTokens } : {}),
-        ...(responseFormat ? { response_format: { type: responseFormat } } : {}),
-      };
-
-      const completion = await openai.chat.completions.create(params, {
-        signal: controller.signal,
-      });
+      const response = await anthropic.messages.create(
+        {
+          model,
+          max_tokens: maxTokens,
+          ...(systemPrompt ? { system: systemPrompt } : {}),
+          messages: anthropicMessages,
+        },
+        { signal: controller.signal }
+      );
 
       clearTimeout(timeoutId);
       const responseTimeMs = Date.now() - attemptStart;
-      const tokensUsed = completion.usage?.total_tokens ?? 0;
-      const content = completion.choices[0]?.message?.content?.trim() ?? "";
+      const tokensUsed = response.usage.input_tokens + response.usage.output_tokens;
+      const content = (response.content[0] as Anthropic.TextBlock).text?.trim() ?? "";
 
       await logUsage({ userId, route, tokensUsed, responseTimeMs, success: true });
 
@@ -132,7 +144,10 @@ export async function callAI(
         statusCode = err.status;
         code = `http_${err.status}`;
         message = err.message || `HTTP ${err.status}`;
-        retryable = RETRYABLE_STATUS.has(err.status) && !NON_RETRYABLE_STATUS.has(err.status) && attempt < MAX_RETRIES;
+        retryable =
+          RETRYABLE_STATUS.has(err.status) &&
+          !NON_RETRYABLE_STATUS.has(err.status) &&
+          attempt < MAX_RETRIES;
       } else {
         code = err.code || "unknown";
         message = err.message || "Unknown AI error";

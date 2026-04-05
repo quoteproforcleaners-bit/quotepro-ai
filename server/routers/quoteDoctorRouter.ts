@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { openai } from "../clients";
+import { anthropic } from "../clients";
 import { requireAuth } from "../middleware";
 import { sanitizeForPrompt } from "../promptSanitizer";
 
@@ -109,35 +109,30 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", requireAuth, async (req: Re
       return res.status(400).json({ error: "Quote text or image required" });
     }
 
-    const model = imageBase64 ? "gpt-4o" : "gpt-4o-mini";
-
-    const messages: any[] = imageBase64
+    const userContent: any = imageBase64
       ? [
-          { role: "system", content: QUOTE_DOCTOR_SYSTEM },
           {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${imageMimeType || "image/jpeg"};base64,${imageBase64}`,
-                  detail: "low",
-                },
-              },
-              {
-                type: "text",
-                text: "Read this cleaning quote image carefully. DO NOT reproduce the extracted text. Write ONLY the optimized rewritten quote.",
-              },
-            ],
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: (imageMimeType || "image/jpeg") as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+              data: imageBase64,
+            },
+          },
+          {
+            type: "text",
+            text: "Read this cleaning quote image carefully. DO NOT reproduce the extracted text. Write ONLY the optimized rewritten quote.",
           },
         ]
-      : [
-          { role: "system", content: QUOTE_DOCTOR_SYSTEM },
-          { role: "user", content: `Optimize this cleaning quote:\n\n${quoteText}` },
-        ];
+      : `Optimize this cleaning quote:\n\n${quoteText}`;
 
-    const completion = await openai.chat.completions.create({ model, messages, max_tokens: 900 });
-    const optimized = completion.choices[0]?.message?.content?.trim() ?? "";
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      system: QUOTE_DOCTOR_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+      max_tokens: 900,
+    });
+    const optimized = (completion.content[0] as any).text?.trim() ?? "";
     console.log("[QuoteDoctor] success — output length:", optimized.length);
     return res.json({ optimized });
   } catch (err: any) {
@@ -185,16 +180,14 @@ quoteDoctorRouter.post("/api/quote-doctor/scope", requireAuth, async (req: Reque
       specialRequirements ? `Special requirements or notes: ${specialRequirements}` : null,
     ].filter(Boolean).join("\n");
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: SCOPE_GENERATOR_SYSTEM },
-        { role: "user", content: `Generate a professional cleaning scope of work for:\n\n${contextParts}` },
-      ],
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      system: SCOPE_GENERATOR_SYSTEM,
+      messages: [{ role: "user", content: `Generate a professional cleaning scope of work for:\n\n${contextParts}` }],
       max_tokens: 1200,
     });
 
-    const scope = completion.choices[0]?.message?.content?.trim() ?? "";
+    const scope = (completion.content[0] as any).text?.trim() ?? "";
     console.log("[QuoteDoctor/scope] success — output length:", scope.length);
     return res.json({ scope });
   } catch (err: any) {
@@ -218,19 +211,17 @@ quoteDoctorRouter.post("/api/quote-doctor/adjust", requireAuth, async (req: Requ
     const currentProposal = sanitizeForPrompt(rawProposal);
     const instructions = sanitizeForPrompt(rawInstructions);
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: ADJUST_SYSTEM },
-        {
-          role: "user",
-          content: `Here is the current proposal:\n\n${currentProposal}\n\n---\n\nPlease make these specific changes:\n${instructions}`,
-        },
-      ],
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      system: ADJUST_SYSTEM,
+      messages: [{
+        role: "user",
+        content: `Here is the current proposal:\n\n${currentProposal}\n\n---\n\nPlease make these specific changes:\n${instructions}`,
+      }],
       max_tokens: 900,
     });
 
-    const adjusted = completion.choices[0]?.message?.content?.trim() ?? "";
+    const adjusted = (completion.content[0] as any).text?.trim() ?? "";
     console.log("[QuoteDoctor/adjust] success — output length:", adjusted.length);
     return res.json({ adjusted });
   } catch (err: any) {

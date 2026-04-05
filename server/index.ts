@@ -768,7 +768,7 @@ async function seedToDoDemo() {
           // Try AI-personalized insight, fall back to template
           let recapBody: string;
           try {
-            const { openai } = await import("./clients");
+            const { anthropic } = await import("./clients");
             const [jobsRes, followUpsRes] = await Promise.all([
               pool.query(
                 `SELECT COUNT(*) AS c FROM jobs WHERE business_id = $1 AND status = 'completed' AND updated_at > NOW() - INTERVAL '7 days'`,
@@ -782,15 +782,15 @@ async function seedToDoDemo() {
             const jobsCompleted = Number(jobsRes.rows[0]?.c) || 0;
             const followUpsSent = Number(followUpsRes.rows[0]?.c) || 0;
 
-            const completion = await openai.chat.completions.create({
-              model: "gpt-4o-mini",
+            const completion = await anthropic.messages.create({
+              model: "claude-sonnet-4-5",
               messages: [{
                 role: "user",
                 content: `Write a 1-sentence motivational weekly recap for a cleaning business. Stats: ${quotesSent} quotes sent, $${revenueWon.toFixed(0)} revenue won, ${jobsCompleted} jobs completed, ${followUpsSent} follow-ups sent. Be specific to the numbers. Max 120 chars.`,
               }],
-              max_completion_tokens: 60,
+              max_tokens: 60,
             });
-            recapBody = completion.choices[0]?.message?.content?.trim() ||
+            recapBody = (completion.content[0] as any).text?.trim() ||
               (quotesSent > 0
                 ? `You sent ${quotesSent} quote${quotesSent !== 1 ? "s" : ""} and earned $${revenueWon.toFixed(0)} this week.`
                 : "Ready to review your week and plan the next one?");

@@ -6,7 +6,7 @@ import { Router, type Request, type Response } from "express";
 import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
-import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import { callAI, AIError } from "../aiClient";
 import { trackEvent } from "../analytics";
 import { sanitizeAndLog } from "../promptSanitizer";
@@ -110,16 +110,14 @@ const router = Router();
 
       const userPrompt = `Customer update: ${statusDetail} Reply with ONLY the message text, nothing else.`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_completion_tokens: 150,
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        max_tokens: 150,
       });
 
-      const content = completion.choices[0]?.message?.content;
+      const content = (completion.content[0] as any).text;
       if (!content) return res.status(500).json({ message: "No response from AI" });
       return res.json({ message: content.trim() });
     } catch (error: any) {
@@ -142,22 +140,17 @@ const router = Router();
       const ageDays = Math.round(((Date.now() - (quote.sentAt?.getTime() || quote.createdAt.getTime())) / (1000 * 60 * 60 * 24)) * 10) / 10;
       const lastComm = comms.length > 0 ? comms[0] : null;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are an AI sales assistant for a residential cleaning company. Analyze a quote and provide actionable insights. Respond with JSON: {"closeProbability": number 0-100, "suggestedAction": string, "followUpMessage": string, "notes": string}`
-          },
-          {
-            role: "user",
-            content: `Quote: $${quote.total}, sent ${ageDays} days ago, status: ${quote.status}, ${comms.length} communications sent. Customer: ${customer ? `${customer.firstName} ${customer.lastName}, status: ${customer.status}` : "Unknown"}. Last contact: ${lastComm ? `${lastComm.channel} ${lastComm.createdAt}` : "None"}.`
-          },
-        ],
-        response_format: { type: "json_object" },
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: `You are an AI sales assistant for a residential cleaning company. Analyze a quote and provide actionable insights. Respond with valid JSON only: {"closeProbability": number 0-100, "suggestedAction": string, "followUpMessage": string, "notes": string}`,
+        messages: [{
+          role: "user",
+          content: `Quote: $${quote.total}, sent ${ageDays} days ago, status: ${quote.status}, ${comms.length} communications sent. Customer: ${customer ? `${customer.firstName} ${customer.lastName}, status: ${customer.status}` : "Unknown"}. Last contact: ${lastComm ? `${lastComm.channel} ${lastComm.createdAt}` : "None"}.`,
+        }],
+        max_tokens: 400,
       });
 
-      const content = completion.choices[0]?.message?.content;
+      const content = (completion.content[0] as any).text;
       let parsed: any = {};
       try { parsed = JSON.parse(content || "{}"); } catch {}
 
@@ -196,22 +189,17 @@ const router = Router();
       const effectiveLang = commLang || await getEffectiveLang(customer?.id, (business as any)?.commLanguage);
       const langInstruction = getLangInstruction(effectiveLang);
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `Write a ${msgType} follow-up message (under ${maxLen} chars for SMS) for "${business?.companyName || "our company"}". The quote is $${quote.total} sent ${ageDays} days ago. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}".${context ? ` Context: ${context}` : ""}${langInstruction}`
-          },
-          {
-            role: "user",
-            content: `Generate a follow-up ${msgType} for ${customer ? `${customer.firstName}` : "the customer"}. Reply with ONLY the message text.`
-          },
-        ],
-        max_completion_tokens: channel === "email" ? 250 : 100,
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: `Write a ${msgType} follow-up message (under ${maxLen} chars for SMS) for "${business?.companyName || "our company"}". The quote is $${quote.total} sent ${ageDays} days ago. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}".${context ? ` Context: ${context}` : ""}${langInstruction}`,
+        messages: [{
+          role: "user",
+          content: `Generate a follow-up ${msgType} for ${customer ? `${customer.firstName}` : "the customer"}. Reply with ONLY the message text.`,
+        }],
+        max_tokens: channel === "email" ? 250 : 100,
       });
 
-      const draft = completion.choices[0]?.message?.content?.trim() || "";
+      const draft = (completion.content[0] as any).text?.trim() || "";
       trackEvent(req.session.userId!, AnalyticsEvents.AI_FOLLOWUP_SENT, { quoteId, channel }).catch(() => {});
       return res.json({ draft });
     } catch (error: any) {
@@ -323,7 +311,7 @@ RULES:
 BUSINESS DATA:
 ${contextStr}`;
 
-      const chatMessages: any[] = [{ role: "system", content: systemPrompt }];
+      const chatMessages: { role: "user" | "assistant"; content: string }[] = [];
 
       if (conversationHistory && Array.isArray(conversationHistory)) {
         for (const msg of conversationHistory.slice(-4)) {
@@ -332,14 +320,14 @@ ${contextStr}`;
       }
       chatMessages.push({ role: "user", content: message });
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: systemPrompt,
         messages: chatMessages,
-        max_completion_tokens: 800,
-        response_format: { type: "json_object" },
+        max_tokens: 800,
       });
 
-      const rawContent = completion.choices[0]?.message?.content?.trim() || "";
+      const rawContent = (completion.content[0] as any).text?.trim() || "";
       if (!rawContent) {
         return res.json({ reply: "I'm having trouble generating a response right now. Please try again.", mode: "coaching", quickTakeaway: "", approach: "", scripts: [], alternateVersions: [], nextStep: "" });
       }
@@ -855,16 +843,14 @@ Better tier: ${serviceTypes.better || "Standard Cleaning"}
 Best tier: ${serviceTypes.best || "Deep Clean"}
 ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` : ""}`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        max_tokens: 400,
       });
 
-      const content = completion.choices[0]?.message?.content;
+      const content = (completion.content[0] as any).text;
       if (!content) {
         return res.status(500).json({ message: "No response from AI" });
       }
@@ -937,17 +923,14 @@ BASE PRICES (your formula minimum — never go below these):
 
 ${historyContext}`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 400,
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        max_tokens: 400,
       });
 
-      const content = completion.choices[0]?.message?.content;
+      const content = (completion.content[0] as any).text;
       if (!content) return res.status(500).json({ message: "No response from AI" });
 
       let parsed: any;
@@ -1220,17 +1203,14 @@ Return exactly this JSON structure:
         ? `Generate an objection response with a ${tone} tone:\n\n${contextParts.join("\n")}`
         : `Generate a sample price objection response with a ${tone} tone for a cleaning business. Example objection: "That's more than I expected."`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-        max_completion_tokens: 800,
-        response_format: { type: "json_object" },
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+        max_tokens: 800,
       });
 
-      const content = completion.choices[0]?.message?.content;
+      const content = (completion.content[0] as any).text;
       if (!content) return res.status(500).json({ message: "No response from AI" });
 
       let parsed: any = {};
@@ -1258,29 +1238,29 @@ Return exactly this JSON structure:
       const { imageBase64, mimeType } = req.body;
       if (!imageBase64) return res.status(400).json({ message: "Image is required" });
 
-      const dataUrl = `data:${mimeType || "image/jpeg"};base64,${imageBase64}`;
-
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Extract the visible text from this screenshot of a text message or chat conversation. Return ONLY the extracted text, preserving the conversation flow. Focus especially on the customer's most recent message or objection. Do not add any commentary.",
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: (mimeType || "image/jpeg") as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                data: imageBase64,
               },
-              {
-                type: "image_url",
-                image_url: { url: dataUrl },
-              },
-            ] as any,
-          },
-        ],
-        max_completion_tokens: 400,
+            },
+            {
+              type: "text",
+              text: "Extract the visible text from this screenshot of a text message or chat conversation. Return ONLY the extracted text, preserving the conversation flow. Focus especially on the customer's most recent message or objection. Do not add any commentary.",
+            },
+          ],
+        }],
+        max_tokens: 400,
       });
 
-      const extractedText = completion.choices[0]?.message?.content?.trim() || "";
+      const extractedText = (completion.content[0] as any).text?.trim() || "";
       return res.json({ text: extractedText });
     } catch (error: any) {
       console.error("Objection extract error:", error);
@@ -1321,16 +1301,14 @@ Return exactly this JSON structure:
         userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
       }
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_completion_tokens: type === "sms" ? 100 : 250,
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        max_tokens: type === "sms" ? 100 : 250,
       });
 
-      const content = completion.choices[0]?.message?.content;
+      const content = (completion.content[0] as any).text;
       if (!content) {
         return res.status(500).json({ message: "No response from AI" });
       }

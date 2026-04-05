@@ -11,7 +11,7 @@ import { AnalyticsEvents } from "../../shared/analytics-events";
 import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter, isGrowthOrAbove } from "../middleware";
-import { openai, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -2032,12 +2032,9 @@ loadMonth(nextMo);
       if (!owner || !isGrowthOrAbove(owner.subscriptionTier)) {
         return res.status(403).json({ message: "This feature requires a Growth or Pro subscription", requiresUpgrade: true });
       }
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a cleaning quote intake assistant. Extract structured fields from a customer's description of their cleaning job.
+      const completion = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: `You are a cleaning quote intake assistant. Extract structured fields from a customer's description of their cleaning job.
 
 EXTRACTION RULES:
 - Only extract what is explicitly mentioned or strongly implied. Never invent data.
@@ -2053,7 +2050,7 @@ EXTRACTION RULES:
 - confidence: "high" if beds, baths, serviceType, and frequency are all known; "medium" if 2-3 are known; "low" if fewer than 2 are known
 - clarificationQuestions: up to 2 specific questions to ask the customer to fill in critical gaps
 
-Return ONLY valid JSON:
+Return ONLY valid JSON — no markdown, no preamble:
 {
   "serviceType": "standard_cleaning" | "deep_clean" | "move_in_out" | "recurring" | "airbnb" | "post_construction" | null,
   "beds": number | null,
@@ -2079,13 +2076,10 @@ Return ONLY valid JSON:
   "missingFields": string[],
   "clarificationQuestions": string[]
 }`,
-          },
-          { role: "user", content: text },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.1,
+        messages: [{ role: "user", content: text }],
+        max_tokens: 800,
       });
-      const extracted = JSON.parse(completion.choices[0].message.content || "{}");
+      const extracted = JSON.parse((completion.content[0] as any).text || "{}");
       res.json({ extracted });
     } catch (e: any) {
       console.error("Intake extract error:", e);
