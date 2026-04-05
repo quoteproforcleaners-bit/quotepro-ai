@@ -76,6 +76,16 @@ export async function enrollUserInDrip(
   email: string,
   name: string | null | undefined
 ): Promise<void> {
+  // Skip enrollment silently for Apple relay addresses — they cannot receive external email
+  const check = await pool.query(
+    `SELECT email_unreachable FROM users WHERE id = $1`,
+    [userId]
+  );
+  if (check.rows[0]?.email_unreachable) {
+    console.log(`[drip] Skipping enrollment — unreachable address: ${email}`);
+    return;
+  }
+
   await pool.query(
     `UPDATE users
      SET trial_drip_enrolled_at = NOW(),
@@ -449,12 +459,14 @@ export async function processDripQueue(): Promise<void> {
     const result = await pool.query<{
       id: string;
       email: string;
+      contact_email: string | null;
+      email_unreachable: boolean;
       name: string | null;
       trial_drip_enrolled_at: Date;
       trial_drip_last_sent_day: number;
       subscription_tier: string;
     }>(
-      `SELECT id, email, name, trial_drip_enrolled_at, trial_drip_last_sent_day, subscription_tier
+      `SELECT id, email, contact_email, email_unreachable, name, trial_drip_enrolled_at, trial_drip_last_sent_day, subscription_tier
        FROM users
        WHERE trial_drip_enrolled_at IS NOT NULL
          AND trial_drip_completed = FALSE
@@ -464,6 +476,12 @@ export async function processDripQueue(): Promise<void> {
 
     for (const user of result.rows) {
       try {
+        // Skip users with unreachable addresses (Apple relay with no fallback provided)
+        if (user.email_unreachable) {
+          skipped++;
+          continue;
+        }
+
         // Skip users who have upgraded
         if (user.subscription_tier !== "free") {
           await pool.query(
@@ -498,7 +516,8 @@ export async function processDripQueue(): Promise<void> {
         }
 
         if (nextDay !== null) {
-          await sendDripDay(user.id, user.email, user.name, nextDay);
+          const effectiveEmail = user.contact_email || user.email;
+          await sendDripDay(user.id, effectiveEmail, user.name, nextDay);
           processed++;
         }
       } catch (userErr: any) {

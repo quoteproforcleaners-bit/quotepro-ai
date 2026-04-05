@@ -61,6 +61,8 @@ export const users = pgTable("users", {
   npsSurveyedAt: timestamp("nps_surveyed_at"),
   npsResponse: text("nps_response"),
   subscriptionStartedAt: timestamp("subscription_started_at"),
+  emailUnreachable: boolean("email_unreachable").notNull().default(false),
+  contactEmail: text("contact_email"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

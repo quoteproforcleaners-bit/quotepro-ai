@@ -77,6 +77,8 @@ export default function OnboardingWizardPage() {
   const [logoUri, setLogoUri] = useState<string | undefined>(business?.logoUri as string | undefined);
   const [logoUploading, setLogoUploading] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
+  const [contactEmail, setContactEmail] = useState("");
+  const isRelayEmail = (user?.email || "").endsWith("@privaterelay.appleid.com");
 
   // Step 2 fields — customer reminder preferences
   const [emailDays, setEmailDays] = useState("3");
@@ -124,6 +126,9 @@ export default function OnboardingWizardPage() {
       const payload: any = { companyName: companyName.trim() };
       if (logoUri && logoUri.startsWith("data:")) payload.logoUri = logoUri;
       await apiPatch("/api/business", payload).catch(() => {});
+      if (isRelayEmail && contactEmail.trim() && contactEmail.includes("@")) {
+        await apiPatch("/api/auth/contact-email", { contactEmail: contactEmail.trim() }).catch(() => {});
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     } finally {
       setSaving(false);
@@ -258,6 +263,23 @@ export default function OnboardingWizardPage() {
               onKeyDown={(e) => e.key === "Enter" && handleStep1Next()}
               autoFocus
             />
+
+            {/* Contact email — only shown when Apple hides the user's real address */}
+            {isRelayEmail && (
+              <div className="mb-5">
+                <label className="block text-slate-400 text-xs font-medium mb-1.5 uppercase tracking-wide">
+                  Your email address
+                </label>
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+                <p className="text-slate-500 text-xs mt-1.5">Apple hid your email. Add one so we can send you tips and updates.</p>
+              </div>
+            )}
 
             {/* Logo upload */}
             <div className="mb-6">

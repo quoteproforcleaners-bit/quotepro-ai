@@ -316,6 +316,10 @@ const router = Router();
         }
         user = await createUser({ email, name, authProvider: "apple", providerId });
         await createBusiness(user.id);
+        const isRelayEmail = email.endsWith("@privaterelay.appleid.com");
+        if (isRelayEmail) {
+          await pool.query(`UPDATE users SET email_unreachable = TRUE WHERE id = $1`, [user.id]).catch(() => {});
+        }
         enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
         sendWelcomeEmail(email, user.name);
         sendSignupNotification(email, user.name, "apple");
@@ -390,6 +394,10 @@ const router = Router();
         });
 
         const business = await createBusiness(user.id);
+        const isRelayEmail = email.endsWith("@privaterelay.appleid.com");
+        if (isRelayEmail) {
+          await pool.query(`UPDATE users SET email_unreachable = TRUE WHERE id = $1`, [user.id]).catch(() => {});
+        }
         enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
         sendWelcomeEmail(email, user.name);
         sendSignupNotification(email, user.name, "apple");
@@ -853,6 +861,23 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     delete (req.session as any).pendingPlanIntent;
     req.session.save(() => {});
     return res.json({ pendingPlanIntent: intent });
+  });
+
+  router.patch("/api/auth/contact-email", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { contactEmail } = req.body;
+      if (!contactEmail || typeof contactEmail !== "string" || !contactEmail.includes("@")) {
+        return res.status(400).json({ message: "Valid email required" });
+      }
+      await pool.query(
+        `UPDATE users SET contact_email = $1, email_unreachable = FALSE WHERE id = $2`,
+        [contactEmail.trim().toLowerCase(), req.session.userId]
+      );
+      return res.json({ ok: true });
+    } catch (error: any) {
+      console.error("contact-email update error:", error);
+      return res.status(500).json({ message: "Failed to save email" });
+    }
   });
 
   // Hidden admin utility: expire a user's trial for testing
