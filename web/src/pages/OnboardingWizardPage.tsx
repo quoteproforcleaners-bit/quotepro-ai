@@ -22,7 +22,7 @@ const STEPS = [
   { id: 3, label: "Grow" },
   { id: 4, label: "Tips" },
   { id: 5, label: "Pricing" },
-  { id: 6, label: "Activate Trial" },
+  { id: 6, label: "You're all set — unlock everything" },
 ];
 
 const EMAIL_OPTIONS = [
@@ -69,6 +69,7 @@ export default function OnboardingWizardPage() {
   const [showAIIntro, setShowAIIntro] = useState(false);
   const [showIntentModal, setShowIntentModal] = useState(false);
   const [capturedIntent, setCapturedIntent] = useState<string | null>(null);
+  const [upgradeNudgeDismissed, setUpgradeNudgeDismissed] = useState(false);
   const intentConsumedRef = useRef(false);
 
   // Step 1 fields
@@ -795,7 +796,34 @@ export default function OnboardingWizardPage() {
                 : <><Sparkles className="w-4 h-4" /> Build my first quote</>}
             </button>
 
-            <button onClick={() => setStep(5)} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
+            {/* ── Upgrade nudge card ── */}
+            {!upgradeNudgeDismissed && (
+              <div className="mt-5 rounded-xl border border-violet-500/30 bg-violet-500/10 p-5 text-left">
+                <p className="text-white font-bold text-sm mb-1">
+                  Upgrade to Growth and get more from day one
+                </p>
+                <p className="text-slate-400 text-xs leading-relaxed mb-4">
+                  Unlimited quotes, AI follow-up, Lead Link, and appointment reminders — $49/mo or $41/mo annual.
+                </p>
+                <button
+                  onClick={() => startCheckout("growth", "monthly")}
+                  disabled={checkoutLoading}
+                  className="w-full py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all mb-3"
+                >
+                  {checkoutLoading
+                    ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                    : "Upgrade to Growth"}
+                </button>
+                <button
+                  onClick={() => setUpgradeNudgeDismissed(true)}
+                  className="w-full text-slate-500 hover:text-slate-300 text-xs transition-colors text-center"
+                >
+                  Continue on free trial
+                </button>
+              </div>
+            )}
+
+            <button onClick={() => setStep(5)} className="text-slate-500 hover:text-slate-300 text-sm transition-colors mt-4">
               Back
             </button>
           </div>
