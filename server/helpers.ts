@@ -1349,11 +1349,18 @@ export async function db_getBusinessById(businessId: string) {
 // ─── formatUser ────────────────────────────────────────────
 
 export function formatUser(u: any) {
+  const subscriptionTier = u.subscriptionTier || u.subscription_tier || "free";
+  const trialStartedAt = u.trialStartedAt || u.trial_started_at;
+  const trialExpired =
+    subscriptionTier === "free" &&
+    trialStartedAt != null &&
+    Date.now() > new Date(trialStartedAt).getTime() + 14 * 24 * 60 * 60 * 1000;
   return {
     id: u.id,
     email: u.email,
     name: u.name,
-    subscriptionTier: u.subscriptionTier || "free",
+    subscriptionTier,
+    trialExpired,
     createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
   };
 }

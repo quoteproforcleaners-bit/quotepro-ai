@@ -129,8 +129,12 @@ function StepperButton({
 export default function QuoteCreatePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, trialExpired } = useAuth();
   const { quotesPerMonth, startCheckout, showPaywall } = useSubscription();
+
+  useEffect(() => {
+    if (trialExpired) navigate("/paywall", { replace: true });
+  }, [trialExpired, navigate]);
   const [step, setStep] = useState(0);
   const [quotaError, setQuotaError] = useState(false);
   const [dismissedNudge, setDismissedNudge] = useState(false);

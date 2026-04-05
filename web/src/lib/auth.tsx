@@ -15,6 +15,7 @@ interface User {
   firstName: string;
   lastName: string;
   subscriptionTier?: string;
+  trialExpired?: boolean;
   name?: string;
 }
 
@@ -36,6 +37,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   needsOnboarding: boolean;
+  trialExpired: boolean;
   pendingPlanIntent: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
@@ -127,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         needsOnboarding: !!user && !business?.onboardingComplete,
+        trialExpired: user?.trialExpired ?? false,
         pendingPlanIntent,
         login,
         register,
