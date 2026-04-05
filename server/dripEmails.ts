@@ -12,7 +12,7 @@ import { sendEmail, PLATFORM_FROM_EMAIL } from "./mail";
 
 const DRIP_FROM_NAME = "Mike at QuotePro";
 const DRIP_REPLY_TO = "quoteproforcleaners@gmail.com";
-const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://getquotepro.ai";
+const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
 
 /* ─── Token helpers ─────────────────────────────────────────────────────────── */
 
