@@ -592,7 +592,7 @@ const router = Router();
       const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf8"));
       const email = payload.email;
       const providerId = payload.sub;
-      const name = payload.name;
+      const name = payload.given_name || payload.name || null;
       if (!email || !providerId) {
         return res.status(400).send("Could not extract user info");
       }
