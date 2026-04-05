@@ -13,7 +13,7 @@
 export const PLATFORM_FROM_EMAIL = "mike@getquotepro.ai";
 export const PLATFORM_FROM_NAME  = "QuotePro";
 export const MIKE_EMAIL          = "mike@getquotepro.ai";
-export const MIKE_ALERTS_EMAIL   = "mike@getquotepro.ai";
+export const MIKE_ALERTS_EMAIL   = "mike+alerts@getquotepro.ai";
 
 const SENDGRID_SEND_URL = "https://api.sendgrid.com/v3/mail/send";
 
