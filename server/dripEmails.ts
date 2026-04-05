@@ -215,6 +215,19 @@ ${signOff()}`;
   return { subject, html: layout({ preheader: "Your 14-day free trial starts now", body, unsubscribeUrl }) };
 }
 
+function templateDay1(firstName: string, unsubscribeUrl: string): { subject: string; html: string } {
+  const ctaUrl = "https://app.getquotepro.ai/quotes/new";
+  const subject = `Your account is live — send your first quote in 3 minutes`;
+  const body = `
+${h1(`Your account is ready, ${firstName}.`)}
+${p("Everything is set up. The fastest way to see what QuotePro does is to send a real quote right now — it takes under 3 minutes.")}
+${p("You don't need a customer lined up. Just enter a name, describe the job, and hit send. You'll see immediately how Good / Better / Best proposals look to your clients.")}
+${btn("Send My First Quote →", ctaUrl)}
+${p("Questions? Just reply to this email.", "color:#6b7280;font-size:14px;")}
+${signOff()}`;
+  return { subject, html: layout({ preheader: "Your account is live — send a quote in 3 minutes", body, unsubscribeUrl }) };
+}
+
 function templateDay2HasQuote(firstName: string, appUrl: string, unsubscribeUrl: string): { subject: string; html: string } {
   const subject = `Great start, ${firstName} — here's how to close that quote`;
   const body = `
@@ -360,6 +373,19 @@ export async function sendDripDay(
   if (day === 0) {
     ({ subject, html } = templateDay0(firstName, appUrl, unsubscribeUrl));
     templateKey = "drip_day0_welcome";
+  } else if (day === 1) {
+    const stats = await getDripStats(userId);
+    if (stats.quotesSent > 0) {
+      // User already sent a quote — no nudge needed; advance the counter and exit
+      await pool.query(
+        `UPDATE users SET trial_drip_last_sent_day = 1 WHERE id = $1`,
+        [userId]
+      );
+      console.log(`[drip] Day 1 skipped (already sent quote) → ${email}`);
+      return;
+    }
+    ({ subject, html } = templateDay1(firstName, unsubscribeUrl));
+    templateKey = "drip_day1_firstquote";
   } else if (day === 2) {
     const stats = await getDripStats(userId);
     if (stats.quotesSent > 0) {
@@ -457,7 +483,8 @@ export async function processDripQueue(): Promise<void> {
 
         let nextDay: number | null = null;
 
-        if (lastDay === 0 && daysSinceEnroll >= 2) nextDay = 2;
+        if (lastDay === 0 && daysSinceEnroll >= 1) nextDay = 1;
+        else if (lastDay === 1 && daysSinceEnroll >= 2) nextDay = 2;
         else if (lastDay === 2 && daysSinceEnroll >= 4) nextDay = 4;
         else if (lastDay === 4 && daysSinceEnroll >= 7) nextDay = 7;
         else if (lastDay === 7 && daysSinceEnroll >= 13) nextDay = 13;
