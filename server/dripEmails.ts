@@ -327,7 +327,7 @@ ${bullet([
   "Campaign emails to your customer list",
   "Revenue reports and forecasting",
   "Good / Better / Best proposal tiers",
-  "Unlimited quotes (free tier: 5/month)",
+  "Unlimited quotes (free tier: 3/month)",
 ])}
 ${callout("<strong>Everything you've set up stays intact.</strong> Your customers, quotes, and jobs are safe either way. Upgrading just means keeping the AI features running.")}
 ${p("Upgrading takes 60 seconds:")}
