@@ -36,11 +36,13 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   needsOnboarding: boolean;
+  pendingPlanIntent: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   setBusiness: (b: Business | null) => void;
+  consumePlanIntent: () => Promise<string | null>;
 }
 
 interface RegisterData {
@@ -49,6 +51,7 @@ interface RegisterData {
   firstName?: string;
   lastName?: string;
   companyName?: string;
+  intent?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -57,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingPlanIntent, setPendingPlanIntent] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -64,13 +68,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.user) {
         setUser(data.user);
         setBusiness(data.business || null);
+        setPendingPlanIntent(data.pendingPlanIntent || null);
       } else {
         setUser(null);
         setBusiness(null);
+        setPendingPlanIntent(null);
       }
     } catch {
       setUser(null);
       setBusiness(null);
+      setPendingPlanIntent(null);
     }
   }, []);
 
@@ -82,12 +89,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data: any = await apiPost("/api/auth/login", { email, password });
     setUser(data.user);
     setBusiness(data.business || null);
+    setPendingPlanIntent(data.pendingPlanIntent || null);
   }, []);
 
   const register = useCallback(async (data: RegisterData) => {
     const res: any = await apiPost("/api/auth/register", data);
     setUser(res.user);
     setBusiness(res.business || null);
+    setPendingPlanIntent(res.pendingPlanIntent || null);
   }, []);
 
   const logout = useCallback(async () => {
@@ -95,7 +104,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
     setUser(null);
     setBusiness(null);
+    setPendingPlanIntent(null);
   }, []);
+
+  const consumePlanIntent = useCallback(async (): Promise<string | null> => {
+    if (!pendingPlanIntent) return null;
+    try {
+      const res: any = await apiPost("/api/auth/consume-plan-intent", {});
+      setPendingPlanIntent(null);
+      return res.pendingPlanIntent || null;
+    } catch {
+      setPendingPlanIntent(null);
+      return null;
+    }
+  }, [pendingPlanIntent]);
 
   return (
     <AuthContext.Provider
@@ -105,11 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         needsOnboarding: !!user && !business?.onboardingComplete,
+        pendingPlanIntent,
         login,
         register,
         logout,
         refresh,
         setBusiness,
+        consumePlanIntent,
       }}
     >
       {children}

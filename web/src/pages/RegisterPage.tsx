@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { Zap, AlertCircle, Check } from "lucide-react";
 
@@ -22,6 +22,8 @@ const TRUST_POINTS = [
 export default function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const intent = searchParams.get("intent") || "";
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -38,7 +40,7 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
     try {
-      await register(form);
+      await register({ ...form, ...(intent ? { intent } : {}) });
       navigate("/dashboard");
     } catch (err: any) {
       setError(err.message || "Registration failed. Please try again.");
@@ -51,7 +53,8 @@ export default function RegisterPage() {
     setError("");
     setGoogleLoading(true);
     try {
-      const res = await fetch("/api/auth/google/start?platform=web", { credentials: "include" });
+      const intentParam = intent ? `&intent=${encodeURIComponent(intent)}` : "";
+      const res = await fetch(`/api/auth/google/start?platform=web${intentParam}`, { credentials: "include" });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;

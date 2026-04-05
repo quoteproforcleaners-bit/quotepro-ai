@@ -37,8 +37,10 @@ import {
  AlertCircle,
  Link2,
  X,
+ Crown,
 } from"lucide-react";
 import { Button, Badge, Card, CardHeader, ProgressBar, MetricRing, FunnelBar } from"../components/ui";
+import { type PlanTier } from"../lib/subscription";
 import { formatCurrency } from"../utils/currency";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -997,9 +999,9 @@ function RevenueChart({ quotes, fmt }: { quotes: any[]; fmt: (n: number) => stri
 
 export default function DashboardPage() {
  const navigate = useNavigate();
- const { business } = useAuth();
+ const { business, pendingPlanIntent, consumePlanIntent, needsOnboarding } = useAuth();
  const fmt = makeFmt((business as any)?.currency ||"USD");
- const { isInFreeTrial, freeTrialDaysLeft } = useSubscription();
+ const { isInFreeTrial, freeTrialDaysLeft, startCheckout, checkoutLoading } = useSubscription();
  const { data: quotes = [] } = useQuery<any[]>({ queryKey: ["/api/quotes"] });
  const { data: customers = [] } = useQuery<any[]>({ queryKey: ["/api/customers"] });
  const { data: jobs = [] } = useQuery<any[]>({ queryKey: ["/api/jobs"] });
@@ -1050,6 +1052,22 @@ export default function DashboardPage() {
  localStorage.setItem("qp_pricing_banner_dismissed_until", String(Date.now() + 7 * 24 * 60 * 60 * 1000));
  } catch {}
  setPricingBannerDismissed(true);
+ }
+
+ // Plan intent banner — shown when user signed up with an upgrade intent but skipped onboarding
+ const [intentBannerDismissed, setIntentBannerDismissed] = useState(false);
+ const showIntentBanner = !!pendingPlanIntent && !needsOnboarding && !intentBannerDismissed;
+
+ async function dismissIntentBanner() {
+   setIntentBannerDismissed(true);
+   await consumePlanIntent();
+ }
+
+ async function handleIntentCheckout() {
+   setIntentBannerDismissed(true);
+   const intent = pendingPlanIntent as PlanTier;
+   await consumePlanIntent();
+   await startCheckout(intent || "growth", "monthly");
  }
 
  // Revenue milestone modal
@@ -1476,7 +1494,46 @@ export default function DashboardPage() {
  />
  ) : null}
 
- {/* 2b. Pricing not configured banner */}
+ {/* 2b. Plan intent banner — for users who came from pricing page but skipped onboarding */}
+ {showIntentBanner && (
+   <div
+     className="rounded-2xl p-4 mb-6 flex items-start gap-3 transition-all duration-200"
+     style={{ border:"1px solid rgba(124,58,237,0.35)", background:"linear-gradient(135deg, rgba(124,58,237,0.07) 0%, rgba(99,102,241,0.03) 100%)"}}
+   >
+     <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center shrink-0 mt-0.5">
+       <Crown className="w-4 h-4 text-white"/>
+     </div>
+     <div className="flex-1 min-w-0">
+       <p className="text-sm font-bold text-slate-800">
+         Ready to activate your {pendingPlanIntent ? pendingPlanIntent.charAt(0).toUpperCase() + pendingPlanIntent.slice(1) : "plan"} plan?
+       </p>
+       <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+         You started signing up for the {pendingPlanIntent} plan. Complete your subscription to unlock all features.
+       </p>
+       <div className="mt-2.5 flex items-center gap-2">
+         <Button
+           variant="primary"
+           size="sm"
+           onClick={handleIntentCheckout}
+           disabled={checkoutLoading}
+         >
+           {checkoutLoading ? "Redirecting…" : "Activate Plan"}
+         </Button>
+         <button
+           onClick={dismissIntentBanner}
+           className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+         >
+           Dismiss
+         </button>
+       </div>
+     </div>
+     <button onClick={dismissIntentBanner} className="text-slate-400 hover:text-slate-600 transition-colors mt-0.5">
+       <X className="w-4 h-4"/>
+     </button>
+   </div>
+ )}
+
+ {/* 2c. Pricing not configured banner */}
  {pricingStatus && !pricingStatus.configured && !pricingBannerDismissed && (
  <div
  className="rounded-2xl p-4 mb-6 flex items-start gap-3 transition-all duration-200"

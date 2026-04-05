@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { useSubscription, type PlanTier } from "../lib/subscription";
 import { apiPut, apiPatch, apiPost } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
 import {
@@ -8,6 +9,12 @@ import {
   Upload, Check, Sparkles, Mail, MessageSquare, Link2, Gift,
 } from "lucide-react";
 import AIAgentIntro from "../components/AIAgentIntro";
+
+const PLAN_LABELS: Record<string, { name: string; price: string }> = {
+  starter: { name: "Starter", price: "$19/mo" },
+  growth:  { name: "Growth",  price: "$49/mo" },
+  pro:     { name: "Pro",     price: "$99/mo" },
+};
 
 const STEPS = [
   { id: 1, label: "Business" },
@@ -54,11 +61,15 @@ function smsBody(days: string): string {
 }
 
 export default function OnboardingWizardPage() {
-  const { business, user, refresh, setBusiness } = useAuth();
+  const { business, user, refresh, setBusiness, pendingPlanIntent, consumePlanIntent } = useAuth();
+  const { startCheckout, checkoutLoading } = useSubscription();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [showAIIntro, setShowAIIntro] = useState(false);
+  const [showIntentModal, setShowIntentModal] = useState(false);
+  const [capturedIntent, setCapturedIntent] = useState<string | null>(null);
+  const intentConsumedRef = useRef(false);
 
   // Step 1 fields
   const [companyName, setCompanyName] = useState(business?.companyName || "");
@@ -80,6 +91,15 @@ export default function OnboardingWizardPage() {
   // Step 5 fields — pricing
   const [minimumTicket, setMinimumTicket] = useState(150);
   const [hourlyRate, setHourlyRate] = useState(55);
+
+  useEffect(() => {
+    if (step === 6 && pendingPlanIntent && !intentConsumedRef.current) {
+      intentConsumedRef.current = true;
+      setCapturedIntent(pendingPlanIntent);
+      consumePlanIntent();
+      setShowIntentModal(true);
+    }
+  }, [step, pendingPlanIntent, consumePlanIntent]);
 
   const uploadLogo = async (file: File) => {
     setLogoUploading(true);
@@ -781,6 +801,50 @@ export default function OnboardingWizardPage() {
           </div>
         )}
       </div>
+
+      {/* ── Intent modal overlay ──────────────────────────────────── */}
+      {showIntentModal && (() => {
+        const plan = pendingPlanIntent && PLAN_LABELS[pendingPlanIntent]
+          ? pendingPlanIntent
+          : "growth";
+        const { name, price } = PLAN_LABELS[plan] || PLAN_LABELS.growth;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-8 shadow-2xl text-center">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-6 h-6 text-blue-400" />
+              </div>
+              <h2 className="text-white font-bold text-lg mb-2">
+                Complete your {name} setup
+              </h2>
+              <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                You were setting up {name} — activate it now to unlock unlimited quotes and AI follow-ups.
+              </p>
+              <button
+                onClick={() => {
+                  setShowIntentModal(false);
+                  startCheckout(plan as PlanTier);
+                }}
+                disabled={checkoutLoading}
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold mb-3 transition-all"
+              >
+                {checkoutLoading
+                  ? <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  : `Activate ${name} (${price})`}
+              </button>
+              <button
+                onClick={() => {
+                  setShowIntentModal(false);
+                  navigate("/dashboard");
+                }}
+                className="text-slate-500 hover:text-slate-300 text-sm transition-colors"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

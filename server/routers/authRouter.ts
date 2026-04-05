@@ -154,12 +154,17 @@ const router = Router();
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
       req.session.userId = user.id;
+      const _regIntent = (req.body.intent || req.query.intent) as string | undefined;
+      if (_regIntent && ["starter", "growth", "pro"].includes(_regIntent)) {
+        (req.session as any).pendingPlanIntent = _regIntent;
+      }
       await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
 
       return res.json({
         user: formatUser(user),
         business: formatBusiness(business),
         needsOnboarding: !business.onboardingComplete,
+        pendingPlanIntent: (req.session as any).pendingPlanIntent || null,
       });
     } catch (error: any) {
       console.error("Register error:", error);
@@ -390,12 +395,17 @@ const router = Router();
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
         req.session.userId = user.id;
+        const _appleIntent = (req.body.intent || req.query.intent) as string | undefined;
+        if (_appleIntent && ["starter", "growth", "pro"].includes(_appleIntent)) {
+          (req.session as any).pendingPlanIntent = _appleIntent;
+        }
         pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
 
         return res.json({
           user: formatUser(user),
           business: formatBusiness(business),
           needsOnboarding: true,
+          pendingPlanIntent: (req.session as any).pendingPlanIntent || null,
         });
       }
 
@@ -472,12 +482,17 @@ const router = Router();
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
         req.session.userId = user.id;
+        const _googleIntent = (req.body.intent || req.query.intent) as string | undefined;
+        if (_googleIntent && ["starter", "growth", "pro"].includes(_googleIntent)) {
+          (req.session as any).pendingPlanIntent = _googleIntent;
+        }
         pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
 
         return res.json({
           user: formatUser(user),
           business: formatBusiness(business),
           needsOnboarding: true,
+          pendingPlanIntent: (req.session as any).pendingPlanIntent || null,
         });
       }
 
@@ -524,11 +539,15 @@ const router = Router();
         process.env.GOOGLE_CLIENT_SECRET,
         redirectUri
       );
+      const _startIntent = (req.query.intent as string) || "";
+      const _startState = (_startIntent && ["starter", "growth", "pro"].includes(_startIntent))
+        ? `${platform}:${_startIntent}`
+        : platform;
       const url = oauth2Client.generateAuthUrl({
         access_type: "offline",
         scope: ["openid", "email", "profile"],
         prompt: "select_account",
-        state: platform,
+        state: _startState,
       });
       res.set("Cache-Control", "no-store, no-cache, must-revalidate");
       res.set("Pragma", "no-cache");
@@ -542,7 +561,9 @@ const router = Router();
   router.get("/api/auth/google/callback", async (req: Request, res: Response) => {
     try {
       const { code, state } = req.query as { code: string; state?: string };
-      const isWeb = state === "web";
+      const [_cbPlatform, _cbIntent] = (state || "").split(":");
+      const isWeb = _cbPlatform === "web";
+      const _cbPlanIntent = (_cbIntent && ["starter", "growth", "pro"].includes(_cbIntent)) ? _cbIntent : null;
       if (!code) {
         return res.status(400).send("Missing authorization code");
       }
@@ -603,6 +624,9 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
         req.session.userId = user.id;
+        if (needsOnboarding && _cbPlanIntent) {
+          (req.session as any).pendingPlanIntent = _cbPlanIntent;
+        }
         pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [user.id]).catch(() => {});
         return new Promise<void>((resolve) => {
           req.session.save(() => {
@@ -689,6 +713,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         user: formatUser(user),
         business: business ? formatBusiness(business) : null,
         needsOnboarding: !business?.onboardingComplete,
+        pendingPlanIntent: (req.session as any).pendingPlanIntent || null,
       });
     } catch (error: any) {
       console.error("Auth check error:", error);
@@ -819,6 +844,13 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     } finally {
       client.release();
     }
+  });
+
+  router.post("/api/auth/consume-plan-intent", requireAuth, (req: Request, res: Response) => {
+    const intent = (req.session as any).pendingPlanIntent || null;
+    delete (req.session as any).pendingPlanIntent;
+    req.session.save(() => {});
+    return res.json({ pendingPlanIntent: intent });
   });
 
   // Hidden admin utility: expire a user's trial for testing
