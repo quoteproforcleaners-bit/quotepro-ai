@@ -120,7 +120,7 @@ export default function RegisterPage() {
           <div className="flex items-center gap-6 pt-4 border-t border-white/10">
             {[
               { value: "60 sec", label: "avg. quote time" },
-              { value: "7-day", label: "free Pro trial" },
+              { value: "14-day", label: "free Pro trial" },
               { value: "$0", label: "to get started" },
             ].map((s) => (
               <div key={s.label}>

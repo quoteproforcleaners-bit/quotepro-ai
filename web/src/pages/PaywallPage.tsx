@@ -131,7 +131,7 @@ export default function PaywallPage() {
                       <span className="text-2xl font-bold text-primary-200">.99</span>
                       <span className="text-primary-200 text-sm mb-1.5">/mo</span>
                     </div>
-                    <p className="text-primary-200 text-sm">7-day free trial included</p>
+                    <p className="text-primary-200 text-sm">14-day free trial included</p>
                   </div>
                 </div>
 

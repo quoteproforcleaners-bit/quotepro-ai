@@ -38,10 +38,10 @@ const FEATURES = {
 const FAQS = [
   {
     q: "Can I try QuotePro before paying?",
-    a: "Yes. Growth and Pro plans both include a 7-day free trial. You won't be charged until the trial ends, and you can cancel anytime before then.",
+    a: "Yes. Growth and Pro plans both include a 14-day free trial. You won't be charged until the trial ends, and you can cancel anytime before then.",
   },
   {
-    q: "What happens after the 7-day trial?",
+    q: "What happens after the 14-day trial?",
     a: "Your card is charged at the start of your billing period. You'll get a reminder email before the trial ends. Cancel anytime if it's not the right fit.",
   },
   {
@@ -161,9 +161,9 @@ export default function PricingPage() {
 
   const ctaLabel = (plan: PlanTier, rank: number) => {
     if (userRank >= rank) return "Current plan";
-    if (!isAuthenticated) return plan === "growth" ? "Start 7-day free trial" : "Get started";
+    if (!isAuthenticated) return plan === "growth" ? "Start 14-day free trial" : "Get started";
     if (plan === "starter") return "Upgrade to Starter";
-    if (plan === "growth") return "Start 7-day free trial";
+    if (plan === "growth") return "Start 14-day free trial";
     return "Upgrade to Pro";
   };
 
@@ -280,7 +280,7 @@ export default function PricingPage() {
             </div>
 
             <div className="mb-5 text-xs text-blue-100 bg-white/10 rounded-lg px-3 py-2">
-              7-day free trial included — no charge until day 8
+              14-day free trial included — no charge until day 15
             </div>
 
             <button
@@ -396,7 +396,7 @@ export default function PricingPage() {
       <div className="bg-slate-900 text-white text-center px-6 py-16">
         <h2 className="text-2xl font-bold mb-2">Ready to close more jobs?</h2>
         <p className="text-slate-400 text-sm mb-6 max-w-md mx-auto">
-          Start your 7-day free trial on Growth. No credit card required to try it.
+          Start your 14-day free trial on Growth. No credit card required to try it.
         </p>
         <button
           onClick={() => handleSelect("growth")}
