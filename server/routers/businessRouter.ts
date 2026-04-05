@@ -74,7 +74,7 @@ import {
   updateRecurringSeries, cancelRecurringSeries, skipSeriesOccurrence, generateSeriesJobs,
 } from "../storage";
 import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
-import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "../mail";
+import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME, sendPaymentNotification } from "../mail";
 import { sendTestReminder } from "../appointmentReminderScheduler";
 import { trackEvent } from "../analytics";
 import { AnalyticsEvents } from "../../shared/analytics-events";
@@ -788,6 +788,13 @@ const router = Router();
         );
         await updateUser(req.session.userId!, updateData as any);
         console.log(`[verify-session] Activated ${planFromMeta} for user ${req.session.userId}`);
+        sendPaymentNotification({
+          userEmail: (user as any).email,
+          userName: (user as any).name,
+          plan: planFromMeta,
+          interval: intervalFromMeta,
+          source: "stripe",
+        });
         return res.json({ success: true, tier: planFromMeta });
       }
       return res.json({ success: false, status: session.status, payment_status: session.payment_status });
@@ -854,6 +861,19 @@ const router = Router();
             await updateUser(userId, updateData as any);
             trackEvent(userId, AnalyticsEvents.UPGRADE_COMPLETED, { plan: planMeta, interval: intervalMeta }).catch(() => {});
             console.log(`Subscription activated for user ${userId} on plan ${planMeta}`);
+
+            // Notify Mike of the new payment (fire-and-forget)
+            getUserById(userId).then((paidUser) => {
+              if (paidUser) {
+                sendPaymentNotification({
+                  userEmail: (paidUser as any).email,
+                  userName: (paidUser as any).name,
+                  plan: planMeta,
+                  interval: intervalMeta,
+                  source: "stripe",
+                });
+              }
+            }).catch(() => {});
 
             // Sync to RevenueCat: grant promotional entitlement so mobile reflects web purchase
             try {

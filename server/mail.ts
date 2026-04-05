@@ -13,8 +13,7 @@
 export const PLATFORM_FROM_EMAIL = "mike@getquotepro.ai";
 export const PLATFORM_FROM_NAME  = "QuotePro";
 export const MIKE_EMAIL          = "mike@getquotepro.ai";
-// Alias used for internal notifications — same inbox, avoids SendGrid same-sender block
-const MIKE_ALERTS_EMAIL          = "mike+alerts@getquotepro.ai";
+export const MIKE_ALERTS_EMAIL   = "mike@getquotepro.ai";
 
 const SENDGRID_SEND_URL = "https://api.sendgrid.com/v3/mail/send";
 
@@ -357,6 +356,208 @@ export function sendSignupNotification(
   }).catch((err) => {
     console.error("[signup-notification] failed —", err?.message || err);
   });
+}
+
+/**
+ * Notify Mike when a user completes a paid subscription.
+ * Fire-and-forget — never throws.
+ */
+export function sendPaymentNotification(opts: {
+  userEmail: string;
+  userName: string | null | undefined;
+  plan: string;
+  interval: string;
+  source: "stripe" | "revenuecat";
+}): void {
+  const { userEmail, userName, plan, interval, source } = opts;
+  const displayName = userName || "(no name)";
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+  const priceMap: Record<string, string> = { starter: "$19", growth: "$49", pro: "$99" };
+  const price = priceMap[plan] ?? "?";
+  const intervalLabel = interval === "annual" ? "/ year" : "/ month";
+  const now = new Date().toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>New QuotePro Payment</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;">
+<tr><td align="center" style="padding:40px 16px;">
+  <table width="520" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;width:100%;">
+    <tr>
+      <td style="background:linear-gradient(135deg,#052e16 0%,#166534 55%,#16a34a 100%);border-radius:14px 14px 0 0;padding:28px 32px;">
+        <p style="font-size:11px;font-weight:700;color:#bbf7d0;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">New Payment</p>
+        <h1 style="font-size:22px;font-weight:800;color:#ffffff;margin:0;line-height:1.2;">You just made a sale!</h1>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+            <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Customer</span><br>
+            <span style="font-size:16px;font-weight:700;color:#0f172a;">${displayName}</span>
+          </td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+            <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Email</span><br>
+            <span style="font-size:16px;color:#0f172a;">${userEmail}</span>
+          </td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+            <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Plan</span><br>
+            <span style="font-size:16px;font-weight:700;color:#16a34a;">${planLabel} &mdash; ${price}${intervalLabel}</span>
+          </td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #f1f5f9;">
+            <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Source</span><br>
+            <span style="font-size:16px;color:#0f172a;">${source === "revenuecat" ? "Mobile (RevenueCat)" : "Web (Stripe)"}</span>
+          </td></tr>
+          <tr><td style="padding:10px 0;">
+            <span style="font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;">Time (ET)</span><br>
+            <span style="font-size:16px;color:#0f172a;">${now}</span>
+          </td></tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;padding:16px 32px;text-align:center;">
+        <p style="font-size:12px;color:#94a3b8;margin:0;">QuotePro &mdash; app.getquotepro.ai</p>
+      </td>
+    </tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`;
+
+  sendEmail({
+    to: MIKE_ALERTS_EMAIL,
+    subject: `Payment: ${displayName} upgraded to ${planLabel} (${price}${intervalLabel})`,
+    html,
+    fromName: "QuotePro Alerts",
+    replyTo: null,
+  }).catch((err) => {
+    console.error("[payment-notification] failed —", err?.message || err);
+  });
+}
+
+/**
+ * Send a 12-hour recap of signups and payments to Mike.
+ * Queries the DB and sends a summary email.
+ */
+export async function sendOwnerDailyRecap(pool: import("pg").Pool, periodLabel: "7 AM" | "7 PM"): Promise<void> {
+  try {
+    const since = new Date(Date.now() - 12 * 60 * 60 * 1000);
+
+    const signupRes = await pool.query<{
+      email: string; name: string | null; auth_provider: string; created_at: string;
+    }>(
+      `SELECT email, name, auth_provider, created_at
+       FROM users
+       WHERE created_at >= $1
+         AND email NOT LIKE '%privaterelay.appleid.com'
+       ORDER BY created_at DESC`,
+      [since]
+    );
+
+    const paymentRes = await pool.query<{
+      email: string; name: string | null; subscription_tier: string;
+      subscription_interval: string | null; subscription_started_at: string;
+    }>(
+      `SELECT email, name, subscription_tier, subscription_interval, subscription_started_at
+       FROM users
+       WHERE subscription_started_at >= $1
+         AND subscription_tier != 'free'
+         AND email NOT LIKE '%privaterelay.appleid.com'
+       ORDER BY subscription_started_at DESC`,
+      [since]
+    );
+
+    const signups = signupRes.rows;
+    const payments = paymentRes.rows;
+    const nowLabel = new Date().toLocaleString("en-US", {
+      timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short",
+    });
+
+    const priceMap: Record<string, string> = { starter: "$19", growth: "$49", pro: "$99" };
+
+    const signupRows = signups.length === 0
+      ? `<tr><td colspan="3" style="padding:12px;color:#94a3b8;text-align:center;">No new signups</td></tr>`
+      : signups.map(u => `
+        <tr>
+          <td style="padding:8px 12px;font-size:13px;color:#0f172a;">${u.name || "(no name)"}</td>
+          <td style="padding:8px 12px;font-size:13px;color:#0f172a;">${u.email}</td>
+          <td style="padding:8px 12px;font-size:13px;color:#64748b;">${u.auth_provider || "email"}</td>
+        </tr>`).join("");
+
+    const paymentRows = payments.length === 0
+      ? `<tr><td colspan="3" style="padding:12px;color:#94a3b8;text-align:center;">No new payments</td></tr>`
+      : payments.map(u => `
+        <tr>
+          <td style="padding:8px 12px;font-size:13px;color:#0f172a;">${u.name || "(no name)"}</td>
+          <td style="padding:8px 12px;font-size:13px;color:#0f172a;">${u.email}</td>
+          <td style="padding:8px 12px;font-size:13px;font-weight:700;color:#16a34a;">${
+            u.subscription_tier.charAt(0).toUpperCase() + u.subscription_tier.slice(1)
+          } &mdash; ${priceMap[u.subscription_tier] ?? "?"}${u.subscription_interval === "annual" ? "/yr" : "/mo"}</td>
+        </tr>`).join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>QuotePro ${periodLabel} Recap</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+  <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 55%,#2563eb 100%);border-radius:14px 14px 0 0;padding:28px 32px;">
+    <p style="font-size:11px;font-weight:700;color:#93c5fd;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px;">${periodLabel} Recap &mdash; ${nowLabel}</p>
+    <h1 style="font-size:22px;font-weight:800;color:#ffffff;margin:0;">
+      ${signups.length} new signup${signups.length !== 1 ? "s" : ""} &nbsp;&middot;&nbsp; ${payments.length} new payment${payments.length !== 1 ? "s" : ""}
+    </h1>
+  </td></tr>
+  <tr><td style="background:#ffffff;padding:28px 32px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+
+    <p style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px;">New Signups (last 12 hrs)</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+      <thead><tr style="background:#f8fafc;">
+        <th style="padding:8px 12px;font-size:11px;color:#64748b;text-align:left;">Name</th>
+        <th style="padding:8px 12px;font-size:11px;color:#64748b;text-align:left;">Email</th>
+        <th style="padding:8px 12px;font-size:11px;color:#64748b;text-align:left;">Method</th>
+      </tr></thead>
+      <tbody>${signupRows}</tbody>
+    </table>
+
+    <p style="font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px;">New Payments (last 12 hrs)</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+      <thead><tr style="background:#f8fafc;">
+        <th style="padding:8px 12px;font-size:11px;color:#64748b;text-align:left;">Name</th>
+        <th style="padding:8px 12px;font-size:11px;color:#64748b;text-align:left;">Email</th>
+        <th style="padding:8px 12px;font-size:11px;color:#64748b;text-align:left;">Plan</th>
+      </tr></thead>
+      <tbody>${paymentRows}</tbody>
+    </table>
+
+  </td></tr>
+  <tr><td style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 14px 14px;padding:16px 32px;text-align:center;">
+    <p style="font-size:12px;color:#94a3b8;margin:0;">QuotePro &mdash; app.getquotepro.ai</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+
+    await sendEmail({
+      to: MIKE_ALERTS_EMAIL,
+      subject: `QuotePro ${periodLabel} recap: ${signups.length} signup${signups.length !== 1 ? "s" : ""}, ${payments.length} payment${payments.length !== 1 ? "s" : ""}`,
+      html,
+      fromName: "QuotePro Alerts",
+      replyTo: null,
+    });
+    console.log(`[recap] ${periodLabel} recap sent — ${signups.length} signups, ${payments.length} payments`);
+  } catch (err: any) {
+    console.error("[recap] Failed to send daily recap:", err?.message || err);
+  }
 }
 
 /**

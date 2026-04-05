@@ -6,6 +6,7 @@ import * as path from "path";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
 import { processDripQueue } from "./dripEmails";
+import { sendOwnerDailyRecap } from "./mail";
 import { processSentQuoteFollowUps } from "./quoteFollowUpScheduler";
 import { processDraftQuoteNudges } from "./draftQuoteNudge";
 import { bulkSyncRcUsers } from "./routers/revenuecatRouter";
@@ -635,6 +636,32 @@ async function seedToDoDemo() {
   }
   scheduleRcBulkSync();
 
+  // ─── Owner recap emails: 7 AM and 7 PM Eastern ───────────────────────────
+  // Sends Mike a 12-hour summary of signups and payments at 7 AM and 7 PM ET.
+  function scheduleOwnerRecaps() {
+    function easternHour(): number {
+      return parseInt(
+        new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: "America/New_York" })
+          .format(new Date()),
+        10
+      );
+    }
+    let lastRecapHour = -1;
+    setInterval(async () => {
+      const h = easternHour();
+      if ((h === 7 || h === 19) && h !== lastRecapHour) {
+        lastRecapHour = h;
+        const label = h === 7 ? "7 AM" : "7 PM";
+        sendOwnerDailyRecap(pool, label).catch((e: any) =>
+          console.error(`[recap] ${label} failed:`, e.message)
+        );
+      }
+      // Reset tracker when we move out of the target hour
+      if (h !== 7 && h !== 19) lastRecapHour = -1;
+    }, 5 * 60 * 1000); // check every 5 minutes
+  }
+  scheduleOwnerRecaps();
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // ─── Follow-up queue push: daily 8:30am, once per day if queue > 0 ────────
   function scheduleFollowUpQueuePushCron() {
