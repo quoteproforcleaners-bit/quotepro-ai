@@ -13,7 +13,7 @@ const { Pool } = require("pg");
 const Anthropic = require("@anthropic-ai/sdk").default;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY2 || process.env.ANTHROPIC_API_KEY });
 
 // Top 50 US metros by cleaning business density, with representative zip codes
 const METROS = [
@@ -73,120 +73,76 @@ const BEDROOMS = [1, 2, 3, 4, 5];
 const BATHROOMS = [1.0, 1.5, 2.0, 2.5, 3.0];
 const FREQUENCIES = ["weekly", "biweekly", "monthly", "onetime"];
 
-function buildPrompt(city, state) {
-  const combos = [];
-  for (const bed of BEDROOMS) {
-    for (const bath of BATHROOMS) {
-      for (const freq of FREQUENCIES) {
-        combos.push({ bedrooms: bed, bathrooms: bath, frequency: freq });
-      }
-    }
-  }
+function buildChunkPrompt(city, state, zip, combos) {
+  const lines = combos.map((c, i) =>
+    `${i + 1}. beds:${c.bedrooms} baths:${c.bathrooms} freq:${c.frequency}`
+  ).join("\n");
 
-  return `Generate realistic 2024-2025 residential house cleaning market rate data for ${city}, ${state}.
+  return `Residential cleaning market rates for ${city}, ${state} (zip: ${zip}), 2024-2025.
 
-You must return a JSON array with exactly ${combos.length} objects — one for each combination below.
-Base prices on real market conditions for ${city}, ${state}. Account for local cost of living.
-All prices in USD. p10 < p25 < p50 < p75 < p90 must always be true.
-Recurring services (weekly/biweekly/monthly) are per-visit prices, not annual totals.
-Weekly visits are cheapest per-visit. Onetime is the most expensive per-visit.
+Price exactly these ${combos.length} combinations — return a JSON array with ${combos.length} objects in order:
+${lines}
 
-Combinations to price (in this exact order):
-${combos.map((c, i) => `${i + 1}. beds:${c.bedrooms} baths:${c.bathrooms} freq:${c.frequency}`).join("\n")}
+Rules: p10<p25<p50<p75<p90. All USD. Recurring = per-visit price. Weekly cheapest, onetime most expensive. Reflect local cost of living.
 
-Return ONLY valid JSON array, no markdown, no preamble, no explanation:
-[
-  {
-    "zip_code": "${/* use the city's main zip */ ""}",
-    "city": "${city}",
-    "state": "${state}",
-    "bedrooms": <number>,
-    "bathrooms": <number>,
-    "frequency": "<weekly|biweekly|monthly|onetime>",
-    "price_p10": <number>,
-    "price_p25": <number>,
-    "price_p50": <number>,
-    "price_p75": <number>,
-    "price_p90": <number>,
-    "sample_size": <estimated number of data points, 20-500>
-  },
-  ...
-]`;
+Return ONLY valid JSON array, no markdown:
+[{"zip_code":"${zip}","city":"${city}","state":"${state}","bedrooms":N,"bathrooms":N,"frequency":"...","price_p10":N,"price_p25":N,"price_p50":N,"price_p75":N,"price_p90":N,"sample_size":N},...]`;
 }
 
-function buildPromptWithZip(city, state, zip) {
-  const combos = [];
-  for (const bed of BEDROOMS) {
-    for (const bath of BATHROOMS) {
-      for (const freq of FREQUENCIES) {
-        combos.push({ bedrooms: bed, bathrooms: bath, frequency: freq });
-      }
+async function callClaudeChunk(prompt, label) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        system: "You are a market research analyst. Return ONLY valid JSON arrays, no other text.",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 2048,
+      });
+
+      const raw = (response.content[0]).text?.trim() || "";
+      if (!raw) throw new Error("Empty response");
+
+      const cleaned = raw.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
+      const rows = JSON.parse(cleaned);
+      if (!Array.isArray(rows)) throw new Error(`Expected array, got ${typeof rows}`);
+      return rows;
+    } catch (err) {
+      if (attempt >= maxAttempts) throw err;
+      await sleep(2000 * attempt);
     }
   }
-
-  return `Generate realistic 2024-2025 residential house cleaning market rate data for ${city}, ${state} (zip: ${zip}).
-
-Return a JSON array with exactly ${combos.length} objects — one per combination below.
-Base prices on real market conditions for this area. Account for local cost of living.
-All prices USD. p10 < p25 < p50 < p75 < p90 must hold. Recurring = per-visit price.
-Weekly is cheapest per-visit. Onetime is most expensive. Typical onetime = 1.4-2x weekly price.
-
-${combos.map((c, i) => `${i + 1}. beds:${c.bedrooms} baths:${c.bathrooms} freq:${c.frequency}`).join("\n")}
-
-Return ONLY a valid JSON array, no markdown, no extra text:
-[{"zip_code":"${zip}","city":"${city}","state":"${state}","bedrooms":N,"bathrooms":N,"frequency":"...","price_p10":N,"price_p25":N,"price_p50":N,"price_p75":N,"price_p90":N,"sample_size":N},...]`;
 }
 
 async function generateForMetro(metro) {
   const { city, state, zip } = metro;
-  const prompt = buildPromptWithZip(city, state, zip);
 
-  const expectedRows = BEDROOMS.length * BATHROOMS.length * FREQUENCIES.length;
-
-  let attempt = 0;
-  const maxAttempts = 3;
-
-  while (attempt < maxAttempts) {
-    attempt++;
-    try {
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        system: "You are a market research analyst specializing in residential cleaning service pricing. Return ONLY valid JSON arrays with no other text.",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 6000,
-      });
-
-      const raw = (response.content[0]).text?.trim() || "";
-      if (!raw) throw new Error("Empty response from Claude");
-
-      // Strip any markdown fences if present
-      const cleaned = raw.replace(/^```(?:json)?\n?/i, "").replace(/\n?```$/i, "").trim();
-
-      let rows;
-      try {
-        rows = JSON.parse(cleaned);
-      } catch (parseErr) {
-        console.error(`  [${city}] JSON parse failed on attempt ${attempt}:`, parseErr.message);
-        if (attempt >= maxAttempts) throw parseErr;
-        await sleep(2000);
-        continue;
+  // Build all combinations
+  const allCombos = [];
+  for (const bed of BEDROOMS) {
+    for (const bath of BATHROOMS) {
+      for (const freq of FREQUENCIES) {
+        allCombos.push({ bedrooms: bed, bathrooms: bath, frequency: freq });
       }
-
-      if (!Array.isArray(rows)) {
-        throw new Error(`Expected array, got ${typeof rows}`);
-      }
-
-      if (rows.length < expectedRows * 0.8) {
-        console.warn(`  [${city}] WARNING: Got ${rows.length} rows, expected ${expectedRows}. Proceeding anyway.`);
-      }
-
-      return rows;
-    } catch (err) {
-      console.error(`  [${city}] Attempt ${attempt} failed:`, err.message);
-      if (attempt >= maxAttempts) throw err;
-      await sleep(3000 * attempt);
     }
   }
+
+  // Split into chunks of 25 — each chunk fits comfortably within 2048 output tokens
+  const CHUNK_SIZE = 25;
+  const chunks = [];
+  for (let i = 0; i < allCombos.length; i += CHUNK_SIZE) {
+    chunks.push(allCombos.slice(i, i + CHUNK_SIZE));
+  }
+
+  const allRows = [];
+  for (const chunk of chunks) {
+    const prompt = buildChunkPrompt(city, state, zip, chunk);
+    const rows = await callClaudeChunk(prompt, `${city} chunk`);
+    allRows.push(...rows);
+    await sleep(300); // small pause between chunk calls
+  }
+
+  return allRows;
 }
 
 async function upsertRows(rows) {

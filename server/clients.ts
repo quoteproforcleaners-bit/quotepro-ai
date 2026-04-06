@@ -17,7 +17,7 @@ import { getCustomerById } from "./storage";
 // ─── Anthropic ────────────────────────────────────────────────────────────────
 
 export const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: process.env.ANTHROPIC_API_KEY2 || process.env.ANTHROPIC_API_KEY,
 });
 
 // ─── Stripe ──────────────────────────────────────────────────────────────────
