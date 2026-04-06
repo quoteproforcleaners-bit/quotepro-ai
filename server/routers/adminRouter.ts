@@ -6,6 +6,7 @@ import { Router, type Request, type Response } from "express";
 import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
+import { fallbackAdminContent } from "../aiFallbacks";
 import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
@@ -706,8 +707,11 @@ router.post("/api/admin/generate-content", async (req: Request, res: Response) =
     console.log(`[admin/generate-content] type=${type} params=${JSON.stringify(params)} tokens=${completion.usage?.output_tokens}`);
     return res.json({ type, params, content: parsed });
   } catch (err: any) {
-    console.error("[admin/generate-content] error:", err?.message || err);
-    return res.status(500).json({ error: "Content generation failed. Please try again." });
+    console.error(
+      "[admin/generate-content] AI failure — type:", type, "params:", JSON.stringify(params),
+      "| error:", err?.message || err
+    );
+    return res.json({ type, params, content: fallbackAdminContent(type, params as Record<string, string>), fallback: true });
   }
 });
 

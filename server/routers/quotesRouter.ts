@@ -7,6 +7,7 @@ import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter, isGrowthOrAbove } from "../middleware";
 import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { fallbackCommercialScope, fallbackRiskScan } from "../aiFallbacks";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -544,8 +545,11 @@ const router = Router();
         rotationTasks: parsed.rotationTasks || [],
       });
     } catch (error: any) {
-      console.error("Commercial generate-scope error:", error);
-      return res.status(500).json({ message: "Failed to generate scope" });
+      console.error(
+        "[commercial/generate-scope] AI failure — facility:", facilityName, "type:", facilityType,
+        "sqft:", totalSqFt, "| error:", (error as any)?.message || error
+      );
+      return res.json(fallbackCommercialScope(facilityName, facilityType));
     }
   });
 
@@ -591,8 +595,11 @@ const router = Router();
         overallAssessment: parsed.overallAssessment || "Unable to generate assessment.",
       });
     } catch (error: any) {
-      console.error("Commercial risk-scan error:", error);
-      return res.status(500).json({ message: "Failed to run risk scan" });
+      console.error(
+        "[commercial/risk-scan] AI failure — facility:", facilityName, "sqft:", totalSqFt,
+        "pricePerVisit:", pricePerVisit, "| error:", (error as any)?.message || error
+      );
+      return res.json(fallbackRiskScan());
     }
   });
 

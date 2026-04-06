@@ -2,6 +2,13 @@ import { Router, Request, Response } from "express";
 import { anthropic } from "../clients";
 import { requireAuth, requireGrowth } from "../middleware";
 import { sanitizeForPrompt } from "../promptSanitizer";
+import {
+  fallbackPricingAnalysis,
+  fallbackClientNarrative,
+  fallbackOptimize,
+  fallbackAdjust,
+  fallbackScope,
+} from "../aiFallbacks";
 
 export const quoteDoctorRouter = Router();
 
@@ -129,8 +136,19 @@ quoteDoctorRouter.post("/api/quote-doctor/client-narrative", requireAuth, async 
     console.log("[QuoteDoctor/narrative] output length:", narrative.length);
     return res.json({ narrative });
   } catch (err: any) {
-    console.error("[QuoteDoctor/narrative] error:", err?.message || err);
-    return res.status(500).json({ error: "Failed to generate message. Please try again." });
+    console.error(
+      "[QuoteDoctor/narrative] AI failure — prompt snippet:",
+      userPrompt.slice(0, 300),
+      "| error:", err?.message || err
+    );
+    const narrative = fallbackClientNarrative({
+      bedrooms: bedrooms || 0,
+      bathrooms: bathrooms || 0,
+      sqft: sqft || 0,
+      frequency: frequency || "one-time",
+      amount: amount || 0,
+    });
+    return res.json({ narrative });
   }
 });
 
@@ -179,11 +197,15 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", requireAuth, async (req: Re
     console.log("[QuoteDoctor] success — output length:", optimized.length);
     return res.json({ optimized });
   } catch (err: any) {
-    console.error("[QuoteDoctor] error:", err?.message || err, err?.status, err?.code);
-    const msg = err?.message?.includes("image") || err?.code === "invalid_request_error"
-      ? "Could not read the image. Please try a clearer screenshot or paste the quote as text."
-      : "Failed to optimize quote. Please try again.";
-    return res.status(500).json({ error: msg });
+    const isImageError = err?.message?.includes("image") || err?.code === "invalid_request_error";
+    console.error(
+      "[QuoteDoctor/optimize] AI failure — hasText:", !!quoteText, "hasImage:", !!imageBase64,
+      "| error:", err?.message || err
+    );
+    if (isImageError) {
+      return res.status(400).json({ error: "Could not read the image. Please try a clearer screenshot or paste the quote as text." });
+    }
+    return res.json({ optimized: fallbackOptimize(quoteText || "") });
   }
 });
 
@@ -234,8 +256,11 @@ quoteDoctorRouter.post("/api/quote-doctor/scope", requireAuth, async (req: Reque
     console.log("[QuoteDoctor/scope] success — output length:", scope.length);
     return res.json({ scope });
   } catch (err: any) {
-    console.error("[QuoteDoctor/scope] error:", err?.message || err);
-    return res.status(500).json({ error: "Failed to generate scope. Please try again." });
+    console.error(
+      "[QuoteDoctor/scope] AI failure — facilityType:", facilityType, "sqft:", sqft,
+      "| error:", err?.message || err
+    );
+    return res.json({ scope: fallbackScope({ facilityType, sqft, floors, frequency, clientName, companyName }) });
   }
 });
 
@@ -299,9 +324,14 @@ Return ONLY this JSON (no markdown, no explanation):
 
     let result: any;
     try {
-      result = JSON.parse(raw);
-    } catch {
-      return res.status(500).json({ error: "Could not parse analysis. Please try again." });
+      const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+      result = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error(
+        "[QuoteDoctor/analyze] JSON parse failure — raw:", raw.slice(0, 200),
+        "| prompt snippet:", userPrompt.slice(0, 200)
+      );
+      return res.json(fallbackPricingAnalysis({ quoteAmount, bedrooms, bathrooms, sqft: sqft || 0, frequency: freq }));
     }
 
     const verdict = ["too_low", "fair", "too_high"].includes(result.verdict) ? result.verdict : "fair";
@@ -315,8 +345,11 @@ Return ONLY this JSON (no markdown, no explanation):
       coaching_note: String(result.coaching_note || ""),
     });
   } catch (err: any) {
-    console.error("[QuoteDoctor/analyze] error:", err?.message || err);
-    return res.status(500).json({ error: "Analysis failed. Please try again." });
+    console.error(
+      "[QuoteDoctor/analyze] AI failure — quoteAmount:", quoteAmount, "beds:", bedrooms, "baths:", bathrooms,
+      "sqft:", sqft, "freq:", frequency, "| error:", err?.message || err
+    );
+    return res.json(fallbackPricingAnalysis({ quoteAmount: quoteAmount!, bedrooms: bedrooms!, bathrooms: bathrooms!, sqft: sqft || 0, frequency: freq }));
   }
 });
 
@@ -349,7 +382,10 @@ quoteDoctorRouter.post("/api/quote-doctor/adjust", requireAuth, async (req: Requ
     console.log("[QuoteDoctor/adjust] success — output length:", adjusted.length);
     return res.json({ adjusted });
   } catch (err: any) {
-    console.error("[QuoteDoctor/adjust] error:", err?.message || err);
-    return res.status(500).json({ error: "Failed to adjust proposal. Please try again." });
+    console.error(
+      "[QuoteDoctor/adjust] AI failure — instructions snippet:", instructions.slice(0, 150),
+      "| error:", err?.message || err
+    );
+    return res.json({ adjusted: fallbackAdjust(currentProposal) });
   }
 });
