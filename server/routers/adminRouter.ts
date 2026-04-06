@@ -625,4 +625,90 @@ const router = Router();
     return res.json({ processed: results.length, results });
   });
 
+// ─── Content generation (internal/admin only) ─────────────────────────────────
+
+router.post("/api/admin/generate-content", async (req: Request, res: Response) => {
+  const ADMIN_SECRET = process.env.ADMIN_GRANT_PRO_SECRET;
+  const provided = req.headers["x-admin-key"];
+
+  if (!ADMIN_SECRET || provided !== ADMIN_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const { type, params = {} } = req.body as {
+    type?: "city_page" | "faq" | "comparison";
+    params?: Record<string, string>;
+  };
+
+  if (!type) {
+    return res.status(400).json({ error: "Missing required field: type" });
+  }
+
+  const allowedTypes = ["city_page", "faq", "comparison"];
+  if (!allowedTypes.includes(type)) {
+    return res.status(400).json({ error: `Invalid type. Must be one of: ${allowedTypes.join(", ")}` });
+  }
+
+  try {
+    let systemPrompt: string;
+    let userPrompt: string;
+    let maxTokens: number;
+
+    if (type === "city_page") {
+      const city = params.city || "your city";
+      const state = params.state || "your state";
+
+      systemPrompt = `You are an expert SEO content writer for home services. You write clear, factual, locally-relevant content that ranks well and converts readers into customers. Return ONLY valid JSON with no markdown fences or extra text.`;
+      userPrompt = `Write SEO-optimized content for a page targeting the keyword "house cleaning cost in ${city}, ${state}". Include: an H1, a 150-word intro, a pricing table (studio / 1bd / 2bd / 3bd / 4bd+ with price ranges), an FAQ section with 5 questions, and a CTA paragraph. Format as JSON with keys: h1 (string), intro (string), pricing_table (array of objects with keys: room_type, price_low, price_high, unit), faqs (array of {question, answer}), cta (string).`;
+      maxTokens = 1800;
+    } else if (type === "faq") {
+      const topic = params.topic || "house cleaning";
+      const city = params.city || "";
+      const cityClause = city ? ` in ${city}` : "";
+
+      systemPrompt = `You are an expert SEO content writer for home services. Return ONLY valid JSON with no markdown fences or extra text.`;
+      userPrompt = `Write an FAQ section about ${topic}${cityClause}. Produce 8 questions and answers covering common customer concerns: pricing, what's included, frequency, preparation, safety, satisfaction guarantees, booking, and cancellation. Format as JSON: { "faqs": [{ "question": "...", "answer": "..." }] }`;
+      maxTokens = 1200;
+    } else {
+      // comparison
+      const competitor = params.competitor || "a competitor";
+      const city = params.city || "";
+      const cityClause = city ? ` in ${city}` : "";
+
+      systemPrompt = `You are an expert copywriter for home cleaning services. Write honest, factual comparison copy. Return ONLY valid JSON with no markdown fences or extra text.`;
+      userPrompt = `Write a comparison page between a local cleaning company and ${competitor}${cityClause}. Include: a headline, a 100-word intro, a feature comparison table (5 categories), and a closing paragraph with a CTA. Format as JSON: { "headline": "...", "intro": "...", "comparison_table": [{ "category": "...", "us": "...", "them": "..." }], "closing_cta": "..." }`;
+      maxTokens = 1200;
+    }
+
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+      max_tokens: maxTokens,
+    });
+
+    const raw = (completion.content[0] as any).text?.trim() ?? "";
+
+    // Strip any accidental markdown fences
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.error("[admin/generate-content] JSON parse failed. Raw output:", raw.slice(0, 300));
+      return res.status(502).json({
+        error: "AI returned malformed JSON",
+        raw: cleaned.slice(0, 500),
+      });
+    }
+
+    console.log(`[admin/generate-content] type=${type} params=${JSON.stringify(params)} tokens=${completion.usage?.output_tokens}`);
+    return res.json({ type, params, content: parsed });
+  } catch (err: any) {
+    console.error("[admin/generate-content] error:", err?.message || err);
+    return res.status(500).json({ error: "Content generation failed. Please try again." });
+  }
+});
+
 export default router;
