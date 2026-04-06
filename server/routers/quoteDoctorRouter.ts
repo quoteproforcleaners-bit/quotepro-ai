@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { anthropic } from "../clients";
-import { requireAuth } from "../middleware";
+import { requireAuth, requireGrowth } from "../middleware";
 import { sanitizeForPrompt } from "../promptSanitizer";
 
 export const quoteDoctorRouter = Router();
@@ -81,6 +81,12 @@ For each area:
 [Explicit exclusions to set expectations]
 
 Return ONLY the scope document. No preamble or explanations.`;
+
+const PRICING_COACH_SYSTEM = `You are a cleaning industry pricing coach with deep expertise in regional market rates across the United States. You help cleaning business owners understand whether their quotes are competitive, profitable, and market-appropriate.
+
+Your analysis is direct, data-driven, and actionable. You never hedge or give vague answers. When you say a quote is too low, you say exactly why and by how much.
+
+Always respond with ONLY valid JSON — no markdown, no commentary.`;
 
 const ADJUST_SYSTEM = `You are Quote Doctor, a cleaning industry proposal expert. The user has an optimized cleaning quote and wants to make specific changes to it.
 
@@ -193,6 +199,87 @@ quoteDoctorRouter.post("/api/quote-doctor/scope", requireAuth, async (req: Reque
   } catch (err: any) {
     console.error("[QuoteDoctor/scope] error:", err?.message || err);
     return res.status(500).json({ error: "Failed to generate scope. Please try again." });
+  }
+});
+
+// ─── Pricing analysis (Growth+ gated) ────────────────────────────────────────
+
+quoteDoctorRouter.post("/api/quote-doctor/analyze", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  try {
+    const {
+      quoteAmount,
+      bedrooms,
+      bathrooms,
+      sqft,
+      frequency,
+      city,
+      state,
+    } = req.body as {
+      quoteAmount?: number;
+      bedrooms?: number;
+      bathrooms?: number;
+      sqft?: number;
+      frequency?: string;
+      city?: string;
+      state?: string;
+    };
+
+    if (!quoteAmount || !bedrooms || !bathrooms) {
+      return res.status(400).json({ error: "Quote amount, bedrooms, and bathrooms are required" });
+    }
+
+    const location = [city, state].filter(Boolean).join(", ") || "United States";
+    const freq = frequency || "one-time";
+    const sqftStr = sqft ? `${sqft.toLocaleString()} sqft` : "unknown sqft";
+
+    const userPrompt = `You are a cleaning industry pricing coach. A cleaning business owner is about to send this quote: $${quoteAmount} for a ${bedrooms}bd/${bathrooms}ba, ${sqftStr} ${freq} clean in ${location}.
+
+Analyze whether this quote is too low, fair, or too high for their market. Consider:
+- Regional cleaning market rates for this city/state
+- Property size (beds/baths/sqft)
+- Cleaning type and frequency (recurring jobs should be priced slightly lower per visit than one-time)
+- Typical hourly rates for cleaners in this region ($20-$40/hr labor, plus overhead and profit margin)
+- Industry standard: residential cleaning should target 50-60% gross margin
+
+Return ONLY this JSON (no markdown, no explanation):
+{
+  "verdict": "too_low" | "fair" | "too_high",
+  "margin_risk": "high" | "medium" | "low",
+  "suggested_range_low": number,
+  "suggested_range_high": number,
+  "coaching_note": "2 sentences max, direct and actionable advice"
+}`;
+
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      system: PRICING_COACH_SYSTEM,
+      messages: [{ role: "user", content: userPrompt }],
+      max_tokens: 300,
+    });
+
+    const raw = (completion.content[0] as any).text?.trim() ?? "";
+    console.log("[QuoteDoctor/analyze] raw response:", raw.slice(0, 200));
+
+    let result: any;
+    try {
+      result = JSON.parse(raw);
+    } catch {
+      return res.status(500).json({ error: "Could not parse analysis. Please try again." });
+    }
+
+    const verdict = ["too_low", "fair", "too_high"].includes(result.verdict) ? result.verdict : "fair";
+    const marginRisk = ["high", "medium", "low"].includes(result.margin_risk) ? result.margin_risk : "medium";
+
+    return res.json({
+      verdict,
+      margin_risk: marginRisk,
+      suggested_range_low: Number(result.suggested_range_low) || 0,
+      suggested_range_high: Number(result.suggested_range_high) || 0,
+      coaching_note: String(result.coaching_note || ""),
+    });
+  } catch (err: any) {
+    console.error("[QuoteDoctor/analyze] error:", err?.message || err);
+    return res.status(500).json({ error: "Analysis failed. Please try again." });
   }
 });
 
