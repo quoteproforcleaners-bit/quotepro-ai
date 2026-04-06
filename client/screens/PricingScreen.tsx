@@ -16,6 +16,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { ServiceTypeConfig, PricingSettings } from "@/types";
 import { useApp } from "@/context/AppContext";
 import { apiRequest } from "@/lib/query-client";
+import { useSubscription } from "@/context/SubscriptionContext";
 
 export default function PricingScreen() {
   const insets = useSafeAreaInsets();
@@ -27,6 +28,8 @@ export default function PricingScreen() {
   const useMaxWidth = screenWidth > 600;
   const [editingService, setEditingService] = useState<ServiceTypeConfig | null>(null);
   const [showServiceModal, setShowServiceModal] = useState(false);
+  const { tier } = useSubscription();
+  const canUseInstantMode = tier === "growth" || tier === "pro";
 
   const { data: growthSettings, refetch: refetchGrowthSettings } = useQuery<any>({
     queryKey: ["/api/growth-automation-settings"],
@@ -593,6 +596,47 @@ export default function PricingScreen() {
             <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: -Spacing.md, marginBottom: Spacing.lg }}>
               100% = base rate. Higher = more expensive, lower = cheaper.
             </ThemedText>
+
+            {/* Booking Mode */}
+            <View style={{ marginBottom: Spacing.lg }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: Spacing.xs }}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="body" style={{ fontWeight: "600" }}>Instant Booking Mode</ThemedText>
+                  <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
+                    {canUseInstantMode
+                      ? "Customers pick a time slot when requesting a quote"
+                      : "Growth plan required to enable instant booking"}
+                  </ThemedText>
+                </View>
+                <Switch
+                  value={editingService?.bookingMode === "instant"}
+                  onValueChange={(val) => {
+                    if (!canUseInstantMode) return;
+                    setEditingService((prev) => prev ? { ...prev, bookingMode: val ? "instant" : "guided" } : null);
+                  }}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                  thumbColor="#FFFFFF"
+                  disabled={!canUseInstantMode}
+                  testID="switch-booking-mode"
+                />
+              </View>
+              {!canUseInstantMode && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: `${theme.warning}15`, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                  <Feather name="lock" size={12} color={theme.warning} />
+                  <ThemedText type="caption" style={{ color: theme.warning, flex: 1 }}>
+                    Upgrade to Growth or Pro to enable instant booking for this service type.
+                  </ThemedText>
+                </View>
+              )}
+              {editingService?.bookingMode === "instant" && canUseInstantMode && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: `${theme.success}15`, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                  <Feather name="zap" size={12} color={theme.success} />
+                  <ThemedText type="caption" style={{ color: theme.success, flex: 1 }}>
+                    Customers will see a time slot picker on your quote page. Configure availability in Settings.
+                  </ThemedText>
+                </View>
+              )}
+            </View>
 
             {editingService && settings.serviceTypes.find((s) => s.id === editingService.id) ? (
               <Pressable

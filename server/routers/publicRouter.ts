@@ -2210,6 +2210,16 @@ Return ONLY valid JSON — no markdown, no preamble:
     };
   }
 
+  // Simpler check: pricing is "complete" when hourly rate and minimum ticket are both set
+  function isPricingComplete(stored: any): boolean {
+    const s = stored || {};
+    const hr = Number(s.hourlyRate ?? 0);
+    if (hr <= 0) return false;
+    const mt = Number(s.minimumTicket ?? 0);
+    if (mt <= 0) return false;
+    return true;
+  }
+
   // Default add-on prices used when none are configured
   const DEFAULT_ADD_ON_PRICES = {
     insideFridge: 0, insideOven: 0, insideCabinets: 0,
@@ -2242,6 +2252,20 @@ Return ONLY valid JSON — no markdown, no preamble:
       } catch {}
 
       const pricingStatus = checkPricingConfigured(storedSettings);
+      const pricingIsComplete = isPricingComplete(storedSettings);
+
+      // Check if any service type has instant booking mode enabled
+      const serviceTypes: any[] = storedSettings.serviceTypes || [];
+      const hasInstantMode = serviceTypes.some((st: any) => st?.bookingMode === "instant");
+
+      // Fetch availability settings for instant mode
+      let availabilityData: any = null;
+      if (hasInstantMode) {
+        try {
+          const avail = await getBookingAvailability(row.id);
+          if (avail?.enabled) availabilityData = avail;
+        } catch {}
+      }
 
       // Build full pricing config for the client-side engine
       const pricingConfig = {
@@ -2285,9 +2309,90 @@ Return ONLY valid JSON — no markdown, no preamble:
         usingDefaultPricing: pricingStatus.usingDefaultPricing,
         pricingCompletionPercent: pricingStatus.completionPercent,
         pricingMissingItems: pricingStatus.missingItems,
+        isPricingComplete: pricingIsComplete,
+        hasInstantMode,
+        availability: availabilityData,
       });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ─── Lead Link Booking Slots ──────────────────────────────────────────────
+  router.get("/api/public/lead-link/:slug/slots", leadLinkConfigLimiter, async (req: Request, res: Response) => {
+    try {
+      const slug = req.params.slug?.toLowerCase().trim();
+      if (!slug) return res.status(400).json({ error: "slug required" });
+      const r = await pool.query(
+        `SELECT id FROM businesses WHERE public_quote_slug = $1 LIMIT 1`,
+        [slug],
+      );
+      if (!r.rows.length) return res.status(404).json({ error: "not_found" });
+      const businessId = r.rows[0].id;
+      const avail = await getBookingAvailability(businessId);
+      if (!avail?.enabled) return res.json({ enabled: false, slots: [] });
+      const from = new Date();
+      const to = new Date(from.getFullYear(), from.getMonth() + 2, 0);
+      const slots = await generateBookingSlots(businessId, from, to);
+      return res.json({ enabled: true, slots });
+    } catch (e) {
+      console.error("lead-link slots error:", e);
+      return res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  // ─── Lead Link Instant Booking ─────────────────────────────────────────────
+  router.post("/api/public/lead-link/:slug/instant-book", leadLinkConfigLimiter, async (req: Request, res: Response) => {
+    try {
+      const slug = req.params.slug?.toLowerCase().trim();
+      if (!slug) return res.status(400).json({ error: "slug required" });
+      const r = await pool.query(
+        `SELECT b.id, b.company_name, b.intake_code FROM businesses b WHERE b.public_quote_slug = $1 LIMIT 1`,
+        [slug],
+      );
+      if (!r.rows.length) return res.status(404).json({ error: "not_found" });
+      const row = r.rows[0];
+      const businessId = row.id;
+
+      const avail = await getBookingAvailability(businessId);
+      if (!avail?.enabled) return res.status(400).json({ error: "Self-booking not enabled" });
+
+      const { customerName, customerPhone, customerEmail, customerAddress, slotStart, slotEnd, serviceType, priceRange, extractedFields } = req.body;
+      if (!customerName?.trim() || !customerPhone?.trim() || !slotStart) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const startDatetime = new Date(slotStart);
+      if (isNaN(startDatetime.getTime())) return res.status(400).json({ error: "Invalid slot time" });
+      const endDatetime = slotEnd
+        ? new Date(slotEnd)
+        : new Date(startDatetime.getTime() + (avail.slotDurationHours || 3) * 60 * 60 * 1000);
+
+      // Create an intake record with confirmed status so the business sees it
+      const ef = {
+        ...(extractedFields || {}),
+        instantBooking: { slotStart, slotEnd: endDatetime.toISOString(), confirmed: true },
+        priceRange: priceRange || null,
+      };
+      const intakeRes = await pool.query(
+        `INSERT INTO intake_requests (business_id, customer_name, customer_email, customer_phone, customer_address, extracted_fields, source, status, confidence, missing_field_flags)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'confirmed', 'high', '[]') RETURNING id`,
+        [
+          businessId,
+          customerName.trim(),
+          customerEmail?.trim() || "",
+          customerPhone.trim(),
+          customerAddress?.trim() || "",
+          JSON.stringify(ef),
+          "lead_link_instant",
+        ],
+      );
+      const intakeId = intakeRes.rows[0]?.id;
+
+      return res.json({ success: true, intakeId, confirmedSlot: { start: startDatetime.toISOString(), end: endDatetime.toISOString() } });
+    } catch (e: any) {
+      console.error("instant-book error:", e);
+      return res.status(500).json({ error: e.message || "Server error" });
     }
   });
 

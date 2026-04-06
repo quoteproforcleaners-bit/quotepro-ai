@@ -203,6 +203,60 @@ export default function SettingsScreen() {
     queryKey: ["/api/stripe/status"],
   });
 
+  // ─── Booking Availability ───────────────────────────────────────────────────
+  const { data: availRaw, refetch: refetchAvail } = useQuery<any>({
+    queryKey: ["/api/booking-availability"],
+  });
+  const [availEnabled, setAvailEnabled] = useState(false);
+  const [availDays, setAvailDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [availStart, setAvailStart] = useState("08:00");
+  const [availEnd, setAvailEnd] = useState("17:00");
+  const [availBuffer, setAvailBuffer] = useState("2");
+  const [availNotice, setAvailNotice] = useState("24");
+  const [availMaxJobs, setAvailMaxJobs] = useState("4");
+  const [availSaving, setAvailSaving] = useState(false);
+
+  useEffect(() => {
+    if (availRaw) {
+      setAvailEnabled(!!availRaw.enabled);
+      setAvailDays(availRaw.allowedDays || [1, 2, 3, 4, 5]);
+      const tw = availRaw.timeWindows?.[0];
+      if (tw) { setAvailStart(tw.start || "08:00"); setAvailEnd(tw.end || "17:00"); }
+      setAvailBuffer(String(availRaw.slotIntervalHours ?? 2));
+      setAvailNotice(String(availRaw.minNoticeHours ?? 24));
+      setAvailMaxJobs(String(availRaw.maxJobsPerDay ?? 4));
+    }
+  }, [availRaw]);
+
+  const saveAvailability = useCallback(async (overrides?: Partial<{
+    enabled: boolean; allowedDays: number[]; start: string; end: string;
+    buffer: string; notice: string; maxJobs: string;
+  }>) => {
+    setAvailSaving(true);
+    try {
+      await apiRequest("PUT", "/api/booking-availability", {
+        enabled: overrides?.enabled ?? availEnabled,
+        allowedDays: overrides?.allowedDays ?? availDays,
+        timeWindows: [{ start: overrides?.start ?? availStart, end: overrides?.end ?? availEnd }],
+        slotIntervalHours: Number(overrides?.buffer ?? availBuffer) || 2,
+        minNoticeHours: Number(overrides?.notice ?? availNotice) || 24,
+        maxJobsPerDay: Number(overrides?.maxJobs ?? availMaxJobs) || 4,
+        slotDurationHours: availRaw?.slotDurationHours ?? 3,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/booking-availability"] });
+      if (Platform.OS !== "web") Haptics.selectionAsync();
+    } catch (e) {
+      console.warn("Failed to save availability:", e);
+    } finally {
+      setAvailSaving(false);
+    }
+  }, [availEnabled, availDays, availStart, availEnd, availBuffer, availNotice, availMaxJobs, availRaw, queryClient]);
+
+  const toggleAvailDay = (day: number) => {
+    const next = availDays.includes(day) ? availDays.filter((d) => d !== day) : [...availDays, day].sort();
+    setAvailDays(next);
+    saveAvailability({ allowedDays: next });
+  };
 
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
@@ -791,6 +845,146 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Pressable>
+
+      {/* ─── Availability Settings ─────────────────────────────────── */}
+      <SectionHeader
+        title="Booking Availability"
+        subtitle="Configure when customers can book appointments"
+      />
+
+      <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border, paddingVertical: Spacing.md }]}>
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}15` }]}>
+            <Feather name="calendar" size={20} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>Enable Self-Booking</ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Let customers pick appointment times on your quote page
+            </ThemedText>
+          </View>
+          <Switch
+            value={availEnabled}
+            onValueChange={async (val) => {
+              setAvailEnabled(val);
+              await saveAvailability({ enabled: val });
+            }}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFFFFF"
+            testID="switch-booking-enabled"
+          />
+        </View>
+      </View>
+
+      {availEnabled ? (
+        <View style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          {/* Working Days */}
+          <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.sm }}>
+            <ThemedText type="small" style={{ fontWeight: "700", marginBottom: Spacing.sm, color: theme.textSecondary }}>
+              WORKING DAYS
+            </ThemedText>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: Spacing.xs }}>
+              {[1, 2, 3, 4, 5, 6, 0].map((day) => {
+                const shortNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+                const active = availDays.includes(day);
+                return (
+                  <Pressable
+                    key={day}
+                    onPress={() => toggleAvailDay(day)}
+                    style={{
+                      width: 40, height: 40, borderRadius: 20,
+                      alignItems: "center", justifyContent: "center",
+                      backgroundColor: active ? theme.primary : theme.backgroundSecondary,
+                      borderWidth: 1, borderColor: active ? theme.primary : theme.border,
+                    }}
+                    testID={`button-avail-day-${day}`}
+                  >
+                    <ThemedText type="caption" style={{ color: active ? "#fff" : theme.textSecondary, fontWeight: "600" }}>
+                      {shortNames[day]}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Working Hours */}
+          <View style={{ borderTopWidth: 1, borderTopColor: theme.border, paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.sm }}>
+            <ThemedText type="small" style={{ fontWeight: "700", marginBottom: Spacing.sm, color: theme.textSecondary }}>
+              WORKING HOURS
+            </ThemedText>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: 4 }}>Start</ThemedText>
+                <RNTextInput
+                  value={availStart}
+                  onChangeText={setAvailStart}
+                  onBlur={() => saveAvailability({ start: availStart })}
+                  placeholder="08:00"
+                  placeholderTextColor={theme.textSecondary}
+                  style={{
+                    borderWidth: 1, borderColor: theme.border, borderRadius: 8,
+                    paddingHorizontal: 12, paddingVertical: 8, color: theme.text,
+                    backgroundColor: theme.backgroundSecondary, fontSize: 14,
+                  }}
+                  testID="input-avail-start"
+                />
+              </View>
+              <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: 16 }}>→</ThemedText>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="caption" style={{ color: theme.textSecondary, marginBottom: 4 }}>End</ThemedText>
+                <RNTextInput
+                  value={availEnd}
+                  onChangeText={setAvailEnd}
+                  onBlur={() => saveAvailability({ end: availEnd })}
+                  placeholder="17:00"
+                  placeholderTextColor={theme.textSecondary}
+                  style={{
+                    borderWidth: 1, borderColor: theme.border, borderRadius: 8,
+                    paddingHorizontal: 12, paddingVertical: 8, color: theme.text,
+                    backgroundColor: theme.backgroundSecondary, fontSize: 14,
+                  }}
+                  testID="input-avail-end"
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Buffer, Notice, Max Jobs */}
+          <View style={{ borderTopWidth: 1, borderTopColor: theme.border, paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.md }}>
+            <ThemedText type="small" style={{ fontWeight: "700", marginBottom: Spacing.sm, color: theme.textSecondary }}>
+              SCHEDULING RULES
+            </ThemedText>
+            {[
+              { label: "Buffer between jobs (hours)", value: availBuffer, setter: setAvailBuffer, key: "buffer", testID: "input-avail-buffer" },
+              { label: "Minimum notice (hours)", value: availNotice, setter: setAvailNotice, key: "notice", testID: "input-avail-notice" },
+              { label: "Max bookings per day", value: availMaxJobs, setter: setAvailMaxJobs, key: "maxJobs", testID: "input-avail-max-jobs" },
+            ].map((row) => (
+              <View key={row.key} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: Spacing.xs }}>
+                <ThemedText type="small" style={{ flex: 1, color: theme.text }}>{row.label}</ThemedText>
+                <RNTextInput
+                  value={row.value}
+                  onChangeText={row.setter}
+                  onBlur={() => saveAvailability()}
+                  keyboardType="numeric"
+                  style={{
+                    borderWidth: 1, borderColor: theme.border, borderRadius: 8,
+                    paddingHorizontal: 12, paddingVertical: 6, color: theme.text,
+                    backgroundColor: theme.backgroundSecondary, fontSize: 14,
+                    width: 70, textAlign: "center",
+                  }}
+                  testID={row.testID}
+                />
+              </View>
+            ))}
+            {availSaving ? (
+              <ThemedText type="caption" style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
+                Saving...
+              </ThemedText>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
 
       <SectionHeader title={t.settings.integrations} subtitle={t.settings.integrationsSubtitle} />
 

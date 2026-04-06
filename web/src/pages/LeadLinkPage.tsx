@@ -11,6 +11,14 @@ const API_BASE = typeof window !== "undefined" ? window.location.origin : "";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+interface BookingSlot {
+  date: string;
+  startTime: string;
+  endTime: string;
+  startDatetime: string;
+  endDatetime: string;
+}
+
 interface LeadLinkConfig {
   slug: string;
   businessId: string;
@@ -29,9 +37,20 @@ interface LeadLinkConfig {
   usingDefaultPricing: boolean;
   pricingCompletionPercent: number;
   pricingMissingItems: string[];
+  isPricingComplete: boolean;
+  hasInstantMode: boolean;
+  availability?: {
+    enabled: boolean;
+    allowedDays: number[];
+    timeWindows: { start: string; end: string }[];
+    slotDurationHours: number;
+    slotIntervalHours: number;
+    minNoticeHours: number;
+    maxJobsPerDay: number;
+  } | null;
 }
 
-type FlowStep = "step1" | "calculating" | "reveal" | "step2" | "step3" | "step4";
+type FlowStep = "step1" | "calculating" | "reveal" | "slot_pick" | "step2" | "step3" | "step4";
 type ServiceType = "standard" | "deep" | "move" | "recurring";
 type Condition = "great" | "average" | "needs_work";
 type SqftRange = "under1000" | "1000_1500" | "1500_2000" | "2000_2500" | "2500_3000" | "3000plus";
@@ -157,7 +176,8 @@ function useCountUp(target: number, active: boolean, duration = 700) {
 function ProgressDots({ step }: { step: FlowStep }) {
   const steps: FlowStep[] = ["step1", "reveal", "step2", "step3"];
   const labels = ["Home Info", "Your Price", "Details", "Contact"];
-  const cur = steps.indexOf(step === "calculating" ? "reveal" : step);
+  const normalizedStep = step === "calculating" ? "reveal" : step === "slot_pick" ? "step2" : step;
+  const cur = steps.indexOf(normalizedStep);
   return (
     <div className="flex items-center gap-2 justify-center mb-6">
       {steps.map((s, i) => (
@@ -337,6 +357,12 @@ export default function LeadLinkPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
+  // Instant mode / slot picker
+  const [slots, setSlots] = useState<BookingSlot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<BookingSlot | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
   const scrollTopRef = useRef<HTMLDivElement>(null);
 
   function scrollToTop() {
@@ -397,6 +423,21 @@ export default function LeadLinkPage() {
     [config, beds, baths, serviceType],
   );
 
+  async function fetchSlots(slugVal: string) {
+    setSlotsLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/public/lead-link/${slugVal}/slots`);
+      const data = await r.json();
+      if (data.enabled && Array.isArray(data.slots)) {
+        setSlots(data.slots);
+        if (data.slots.length > 0) {
+          setSelectedDate(data.slots[0].date);
+        }
+      }
+    } catch {}
+    setSlotsLoading(false);
+  }
+
   function goToReveal() {
     if (!step1Valid || !config) return;
     const price = computePrice();
@@ -404,11 +445,26 @@ export default function LeadLinkPage() {
     setPriceRange(price);
     setStep("calculating");
     trackEventWithMeta(slug!, "leadlink_step1_complete", !!config?.usingDefaultPricing);
+    if (config.hasInstantMode && config.availability?.enabled) {
+      fetchSlots(slug!);
+    }
     setTimeout(() => setStep("reveal"), 900);
     scrollToTop();
   }
 
   function goToStep2() {
+    // If instant mode and we have slots but haven't picked one, go to slot picker first
+    if (config?.hasInstantMode && config.availability?.enabled && slots.length > 0 && step === "reveal") {
+      setStep("slot_pick");
+      scrollToTop();
+      return;
+    }
+    setStep("step2");
+    trackEvent(slug!, "leadlink_step2_start");
+    scrollToTop();
+  }
+
+  function goToStep2FromSlot() {
     setStep("step2");
     trackEvent(slug!, "leadlink_step2_start");
     scrollToTop();
@@ -450,6 +506,50 @@ export default function LeadLinkPage() {
     setSubmitting(true);
     setSubmitError("");
     try {
+      const extractedFields = {
+        serviceType: serviceType === "standard" ? "standard_cleaning"
+          : serviceType === "deep" ? "deep_clean"
+          : serviceType === "move" ? "move_in_out"
+          : "recurring",
+        beds: beds ? parseInt(beds) : null,
+        baths: baths ? parseFloat(baths) : null,
+        sqft: s2.sqft ? SQFT_MIDPOINTS[s2.sqft] : null,
+        frequency: serviceType === "recurring" ? "biweekly" : "one-time",
+        pets: s2.pets,
+        addOns: s2.addOns,
+        condition: s2.condition,
+        preferredDate: s2.preferredDate || null,
+        confidence: beds && baths && s2.sqft ? "high" : "medium",
+        missingFields: [],
+      };
+
+      // Use instant booking endpoint when a slot is selected
+      if (selectedSlot) {
+        const r = await fetch(`${API_BASE}/api/public/lead-link/${slug}/instant-book`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerName: name.trim(),
+            customerPhone: phone.trim(),
+            customerEmail: email.trim(),
+            customerAddress: address.trim(),
+            slotStart: selectedSlot.startDatetime,
+            slotEnd: selectedSlot.endDatetime,
+            serviceType: extractedFields.serviceType,
+            priceRange,
+            extractedFields,
+          }),
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.error || err.message || "Booking failed. Please try again.");
+        }
+        trackEventWithMeta(slug!, "leadlink_instant_booked", false);
+        setStep("step4");
+        scrollToTop();
+        return;
+      }
+
       const r = await fetch(`${API_BASE}/api/public/intake/${config.businessId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -458,22 +558,7 @@ export default function LeadLinkPage() {
           customerPhone: phone.trim(),
           customerEmail: email.trim(),
           customerAddress: address.trim(),
-          extractedFields: {
-            serviceType: serviceType === "standard" ? "standard_cleaning"
-              : serviceType === "deep" ? "deep_clean"
-              : serviceType === "move" ? "move_in_out"
-              : "recurring",
-            beds: beds ? parseInt(beds) : null,
-            baths: baths ? parseFloat(baths) : null,
-            sqft: s2.sqft ? SQFT_MIDPOINTS[s2.sqft] : null,
-            frequency: serviceType === "recurring" ? "biweekly" : "one-time",
-            pets: s2.pets,
-            addOns: s2.addOns,
-            condition: s2.condition,
-            preferredDate: s2.preferredDate || null,
-            confidence: beds && baths && s2.sqft ? "high" : "medium",
-            missingFields: [],
-          },
+          extractedFields,
           priceRange: priceRange,
           source: "lead_link",
         }),
@@ -517,21 +602,21 @@ export default function LeadLinkPage() {
       className="min-h-screen flex flex-col"
       style={{ background: "linear-gradient(160deg, #f8faff 0%, #eff6ff 100%)" }}
     >
-      {/* Default pricing disclaimer — sticky at very top */}
-      {config.usingDefaultPricing && (
+      {/* Soft pricing note — only when pricing is not fully configured */}
+      {!config.isPricingComplete && step !== "step4" && (
         <div
           style={{
             position: "sticky", top: 0, zIndex: 30,
-            background: "#fef3c7",
-            borderBottom: "2px solid #f59e0b",
-            padding: "10px 16px",
-            fontSize: 13,
+            background: "#eff6ff",
+            borderBottom: "1px solid #bfdbfe",
+            padding: "8px 16px",
+            fontSize: 12,
             textAlign: "center",
-            color: "#78350f",
+            color: "#1d4ed8",
           }}
         >
-          <AlertTriangle className="inline w-3.5 h-3.5 mr-1 mb-0.5" style={{ color: "#d97706" }} />
-          Estimates on this page are approximate. {config.companyName} will confirm your exact price before any work begins.
+          <Clock className="inline w-3 h-3 mr-1 mb-0.5" style={{ color: "#3b82f6" }} />
+          Estimates are based on local market data. {config.companyName} will review your details and follow up with your personalized quote.
         </div>
       )}
 
@@ -691,14 +776,10 @@ export default function LeadLinkPage() {
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-5">
                 <div className="text-center">
                   <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4" style={{ letterSpacing: "1.5px" }}>
-                    {config.usingDefaultPricing ? "Estimated price range" : (
-                      <>
-                        {serviceType === "standard" ? "Standard Clean"
-                          : serviceType === "deep" ? "Deep Clean"
-                          : serviceType === "move" ? "Move In/Out Clean"
-                          : "Recurring Clean"} · One-time estimate
-                      </>
-                    )}
+                    {serviceType === "standard" ? "Standard Clean"
+                      : serviceType === "deep" ? "Deep Clean"
+                      : serviceType === "move" ? "Move In/Out Clean"
+                      : "Recurring Clean"} &middot; {config.isPricingComplete ? "Estimated range" : "Market-based estimate"}
                   </p>
 
                   <div
@@ -746,10 +827,9 @@ export default function LeadLinkPage() {
                     </button>
                     {showWhyRange && (
                       <div className="mt-3 text-xs text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3 text-left">
-                        This estimate is based on the typical hours for a{" "}
-                        {beds === "0" ? "studio" : `${beds}-bedroom`} home at local market rates,
-                        adjusted for your home's size and cleaning type.{" "}
-                        {config.companyName} will confirm the exact price before any work begins.
+                        This range is calculated from typical cleaning hours for a{" "}
+                        {beds === "0" ? "studio" : `${beds}-bedroom`} home, using {config.companyName}'s{" "}
+                        rates and local market data. Your final quote will be tailored to your home after review.
                       </div>
                     )}
                   </div>
@@ -766,7 +846,9 @@ export default function LeadLinkPage() {
                   boxShadow: `0 0 24px ${primary}40`,
                 }}
               >
-                Get My Exact Quote <ArrowRight className="w-4 h-4" />
+                {config.hasInstantMode && config.availability?.enabled && slots.length > 0
+                  ? <><Clock className="w-4 h-4" /> Pick a Time</>
+                  : <>Get My Exact Quote <ArrowRight className="w-4 h-4" /></>}
               </button>
 
               <button
@@ -775,6 +857,123 @@ export default function LeadLinkPage() {
               >
                 <ChevronLeft className="w-4 h-4" /> Change my answers
               </button>
+            </div>
+          )}
+
+          {/* ─── SLOT PICKER ─── */}
+          {step === "slot_pick" && priceRange && (
+            <div>
+              <ProgressDots step="slot_pick" />
+
+              <div className="text-center mb-5">
+                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: primary, letterSpacing: "1.5px" }}>
+                  Choose Your Time
+                </p>
+                <h2 className="text-xl font-bold text-slate-900">When works for you?</h2>
+                <p className="text-sm text-slate-500 mt-1">Select a time slot and we'll hold it for you</p>
+              </div>
+
+              {/* Price badge */}
+              <div className="flex items-center justify-center gap-2 py-2 px-4 rounded-xl mb-5" style={{ background: "#eff6ff" }}>
+                <Zap className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
+                <span className="text-sm font-bold" style={{ color: "#1e40af" }}>
+                  Estimate: ${priceRange.low.toLocaleString()}–${priceRange.high.toLocaleString()}
+                </span>
+              </div>
+
+              {slotsLoading ? (
+                <div className="flex flex-col items-center py-12 text-slate-400">
+                  <Loader2 className="w-6 h-6 animate-spin mb-2" />
+                  <p className="text-sm">Loading available times...</p>
+                </div>
+              ) : slots.length === 0 ? (
+                <div className="text-center py-8 bg-white rounded-2xl border border-slate-100">
+                  <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-600">No available slots right now</p>
+                  <p className="text-xs text-slate-400 mt-1">We'll contact you to schedule manually</p>
+                </div>
+              ) : (
+                <>
+                  {/* Date tabs */}
+                  <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+                    {Array.from(new Set(slots.map((s) => s.date))).slice(0, 14).map((date) => {
+                      const d = new Date(date + "T00:00:00");
+                      const isSelected = selectedDate === date;
+                      return (
+                        <button
+                          key={date}
+                          onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
+                          className="flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all min-w-[56px]"
+                          style={{
+                            borderColor: isSelected ? primary : "#e2e8f0",
+                            background: isSelected ? `${primary}12` : "#fff",
+                            color: isSelected ? primary : "#475569",
+                          }}
+                        >
+                          <span style={{ fontSize: 10, opacity: 0.7 }}>
+                            {d.toLocaleDateString("en-US", { weekday: "short" })}
+                          </span>
+                          <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2, marginTop: 2 }}>
+                            {d.getDate()}
+                          </span>
+                          <span style={{ fontSize: 10, opacity: 0.7 }}>
+                            {d.toLocaleDateString("en-US", { month: "short" })}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Time slots for selected date */}
+                  <div className="grid grid-cols-2 gap-2 mb-6">
+                    {slots.filter((s) => s.date === selectedDate).map((slot) => {
+                      const isSelected = selectedSlot?.startDatetime === slot.startDatetime;
+                      return (
+                        <button
+                          key={slot.startDatetime}
+                          onClick={() => setSelectedSlot(slot)}
+                          className="py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all"
+                          style={{
+                            borderColor: isSelected ? primary : "#e2e8f0",
+                            background: isSelected ? `${primary}12` : "#fff",
+                            color: isSelected ? primary : "#374151",
+                          }}
+                        >
+                          {slot.startTime}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              <div className="fixed bottom-0 left-0 right-0 px-4 pb-5 pt-3" style={{ background: "linear-gradient(to top, rgba(248,250,255,1) 60%, transparent)" }}>
+                <div style={{ maxWidth: 480, margin: "0 auto" }}>
+                  <button
+                    onClick={goToStep2FromSlot}
+                    disabled={slots.length > 0 && !selectedSlot}
+                    className="w-full flex items-center justify-center gap-2 font-bold text-white rounded-2xl transition-all"
+                    style={{
+                      height: 56,
+                      fontSize: 16,
+                      background: (slots.length > 0 && !selectedSlot)
+                        ? "#e2e8f0"
+                        : `linear-gradient(135deg, ${primary}, #06b6d4)`,
+                      color: (slots.length > 0 && !selectedSlot) ? "#94a3b8" : "#fff",
+                      boxShadow: (slots.length > 0 && !selectedSlot) ? "none" : `0 0 24px ${primary}40`,
+                      cursor: (slots.length > 0 && !selectedSlot) ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {slots.length === 0 ? "Continue Without a Time" : "Confirm This Slot"} <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setStep("reveal")}
+                    className="w-full mt-2 py-2 text-sm text-slate-400 hover:text-slate-600 text-center"
+                  >
+                    <ChevronLeft className="inline w-4 h-4" /> Back
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1125,34 +1324,51 @@ export default function LeadLinkPage() {
               </div>
 
               <h1 className="text-2xl font-black text-slate-900 mb-2">
-                You're all set, {name.split(" ")[0]}!
+                {selectedSlot ? "You're booked!" : `You're all set, ${name.split(" ")[0]}!`}
               </h1>
               <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto leading-relaxed">
-                {config.companyName} has your details and is preparing your quote now.
-                You'll receive a text at {phone} shortly.
+                {selectedSlot
+                  ? `Your appointment with ${config.companyName} is confirmed. We'll see you on ${new Date(selectedSlot.startDatetime).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${selectedSlot.startTime}.`
+                  : `${config.companyName} has your details and is preparing your quote now. You'll receive a text at ${phone} shortly.`}
               </p>
 
-              {/* Urgency */}
-              <div
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl mb-6"
-                style={{ background: "#fffbeb", border: "1px solid #fde68a" }}
-              >
-                <Clock className="w-4 h-4 shrink-0" style={{ color: "#d97706" }} />
-                <span className="text-sm font-semibold" style={{ color: "#92400e" }}>
-                  Most quotes arrive in under 10 minutes
-                </span>
-              </div>
+              {/* Urgency / Booking confirmed */}
+              {selectedSlot ? (
+                <div
+                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl mb-6"
+                  style={{ background: "#dcfce7", border: "1px solid #86efac" }}
+                >
+                  <Check className="w-4 h-4 shrink-0" style={{ color: "#16a34a" }} />
+                  <span className="text-sm font-semibold" style={{ color: "#15803d" }}>
+                    Booking confirmed — {selectedSlot.startTime}
+                  </span>
+                </div>
+              ) : (
+                <div
+                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl mb-6"
+                  style={{ background: "#fffbeb", border: "1px solid #fde68a" }}
+                >
+                  <Clock className="w-4 h-4 shrink-0" style={{ color: "#d97706" }} />
+                  <span className="text-sm font-semibold" style={{ color: "#92400e" }}>
+                    Most quotes arrive in under 10 minutes
+                  </span>
+                </div>
+              )}
 
               {/* What happens next */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-left mb-6">
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4" style={{ letterSpacing: "1.2px" }}>
                   What happens next
                 </p>
-                {[
+                {(selectedSlot ? [
+                  `${config.companyName} will reach out to confirm your appointment`,
+                  "You'll receive a reminder the day before",
+                  "Enjoy your professionally cleaned home!",
+                ] : [
                   `${config.companyName} reviews your home details`,
                   "You receive your personalized quote by text",
                   "Book directly from the quote link",
-                ].map((item, i) => (
+                ]).map((item, i) => (
                   <div key={i} className="flex items-start gap-3 mb-3 last:mb-0">
                     <div
                       className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5"

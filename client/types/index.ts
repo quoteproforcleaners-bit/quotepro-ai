@@ -63,6 +63,20 @@ export interface ServiceTypeConfig {
   multiplier: number;
   scope: string;
   isDefault: boolean;
+  bookingMode?: "guided" | "instant";
+}
+
+export interface BookingAvailabilitySettings {
+  enabled: boolean;
+  allowedDays: number[];
+  timeWindows: { start: string; end: string }[];
+  slotDurationHours: number;
+  slotIntervalHours: number;
+  minNoticeHours: number;
+  maxJobsPerDay: number;
+  blackoutDates: string[];
+  serviceAreaNotes?: string;
+  confirmationMessage?: string;
 }
 
 export interface PricingSettings {
