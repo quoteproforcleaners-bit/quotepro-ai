@@ -192,6 +192,7 @@ async function processPaidInactiveSignals(): Promise<void> {
      FROM users u
      JOIN businesses b ON b.owner_user_id = u.id
      WHERE u.subscription_tier != 'free'
+       AND u.created_at < NOW() - INTERVAL '14 days'
        AND NOT EXISTS (
          SELECT 1 FROM quotes q
          WHERE q.business_id = b.id
