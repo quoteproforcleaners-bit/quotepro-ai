@@ -21,9 +21,9 @@ interface ProGateProps {
 export function ProGate({ children, featureName, minTier = "growth" }: ProGateProps) {
   const { hasAccess, isLoading } = usePlanGate(minTier);
 
-  // While subscription state loads, show the locked overlay (not the premium content).
-  // Never expose premium content before entitlement is confirmed.
-  if (isLoading) return <ProGateOverlay featureName={featureName} minTier={minTier} isLoading />;
+  // While subscription state loads, render nothing — avoids a flash of the
+  // locked overlay for paying users whose entitlement hasn't resolved yet.
+  if (isLoading) return null;
   if (hasAccess) return <>{children}</>;
 
   return <ProGateOverlay featureName={featureName} minTier={minTier} />;
