@@ -372,9 +372,11 @@ export function sendPaymentNotification(opts: {
   const { userEmail, userName, plan, interval, source } = opts;
   const displayName = userName || "(no name)";
   const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
-  const priceMap: Record<string, string> = { starter: "$19", growth: "$49", pro: "$99" };
-  const price = priceMap[plan] ?? "?";
-  const intervalLabel = interval === "annual" ? "/ year" : "/ month";
+  const monthlyPriceMap: Record<string, string> = { starter: "$19", growth: "$49", pro: "$99" };
+  const annualPriceMap: Record<string, string> = { starter: "$228", growth: "$490", pro: "$990" };
+  const isAnnual = interval === "annual";
+  const price = (isAnnual ? annualPriceMap[plan] : monthlyPriceMap[plan]) ?? "?";
+  const intervalLabel = isAnnual ? "/ year" : "/ month";
   const now = new Date().toLocaleString("en-US", {
     timeZone: "America/New_York",
     dateStyle: "medium",
