@@ -10,6 +10,8 @@ import {
   real,
   serial,
   index,
+  numeric,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1339,6 +1341,42 @@ export const rescheduleRequests = pgTable("reschedule_requests", {
 
 export type CustomerPortal = typeof customerPortals.$inferSelect;
 export type RescheduleRequest = typeof rescheduleRequests.$inferSelect;
+
+// ═══════════════════════════════════════════════════════════════════
+// Market Rate Intelligence — zip-level pricing benchmarks
+// ═══════════════════════════════════════════════════════════════════
+export const marketRates = pgTable(
+  "market_rates",
+  {
+    id: serial("id").primaryKey(),
+    zipCode: varchar("zip_code", { length: 10 }),
+    city: varchar("city", { length: 100 }),
+    state: varchar("state", { length: 2 }),
+    bedrooms: integer("bedrooms"),
+    bathrooms: numeric("bathrooms", { precision: 3, scale: 1 }),
+    frequency: varchar("frequency", { length: 20 }),
+    priceP10: numeric("price_p10", { precision: 8, scale: 2 }),
+    priceP25: numeric("price_p25", { precision: 8, scale: 2 }),
+    priceP50: numeric("price_p50", { precision: 8, scale: 2 }),
+    priceP75: numeric("price_p75", { precision: 8, scale: 2 }),
+    priceP90: numeric("price_p90", { precision: 8, scale: 2 }),
+    sampleSize: integer("sample_size"),
+    lastUpdated: timestamp("last_updated").defaultNow(),
+  },
+  (t) => ({
+    uniqRate: uniqueIndex("market_rates_uniq").on(
+      t.zipCode,
+      t.bedrooms,
+      t.bathrooms,
+      t.frequency
+    ),
+    zipIdx: index("market_rates_zip_idx").on(t.zipCode),
+    stateIdx: index("market_rates_state_idx").on(t.state),
+  })
+);
+
+export type MarketRate = typeof marketRates.$inferSelect;
+export type InsertMarketRate = typeof marketRates.$inferInsert;
 
 // ─── Backward-compatibility aliases (used by auto-generated router imports) ───
 export const photos = jobPhotos;
