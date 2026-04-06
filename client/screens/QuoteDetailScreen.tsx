@@ -123,6 +123,10 @@ export default function QuoteDetailScreen() {
   const [followUpSendingNow, setFollowUpSendingNow] = useState(false);
   const [showTimingPicker, setShowTimingPicker] = useState(false);
 
+  const [clientNarrative, setClientNarrative] = useState<string | null>(null);
+  const [clientNarrativeLoading, setClientNarrativeLoading] = useState(false);
+  const [clientNarrativeCopied, setClientNarrativeCopied] = useState(false);
+
   const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
   });
@@ -373,6 +377,33 @@ export default function QuoteDetailScreen() {
     }
   };
 
+
+  const generateClientNarrative = useCallback(async () => {
+    if (!quote) return;
+    setClientNarrativeLoading(true);
+    setClientNarrative(null);
+    try {
+      const url = new URL("/api/quote-doctor/client-narrative", getApiUrl());
+      const res = await apiRequest("POST", url.toString(), {
+        bedrooms: quote.propertyBeds || 0,
+        bathrooms: quote.propertyBaths || 0,
+        sqft: quote.propertySqft || 0,
+        frequency: quote.frequencySelected || "one-time",
+        amount: quote.total || 0,
+      });
+      const data = await res.json();
+      if (data.narrative) {
+        setClientNarrative(data.narrative);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setClientNarrative(data.error || "Unable to generate message.");
+      }
+    } catch {
+      setClientNarrative("Unable to generate message. Please try again.");
+    } finally {
+      setClientNarrativeLoading(false);
+    }
+  }, [quote]);
 
   const fetchAiDraft = useCallback(async (type: "email" | "sms", purpose: DraftPurpose) => {
     if (!quote) return;
@@ -1157,6 +1188,91 @@ export default function QuoteDetailScreen() {
             ) : null}
           </View>
         </View>
+
+        {/* Generate Client Message */}
+        <Pressable
+          onPress={generateClientNarrative}
+          disabled={clientNarrativeLoading}
+          testID="button-generate-client-message"
+          style={[
+            styles.detailsCard,
+            {
+              backgroundColor: theme.cardBackground,
+              borderColor: theme.border,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: Spacing.sm,
+              paddingVertical: 14,
+            },
+          ]}
+        >
+          {clientNarrativeLoading ? (
+            <ActivityIndicator size="small" color={theme.primary} />
+          ) : (
+            <Feather name="edit-3" size={16} color={theme.primary} />
+          )}
+          <ThemedText type="body" style={{ color: theme.primary, fontWeight: "600" }}>
+            {clientNarrativeLoading ? "Writing message..." : "Generate Client Message"}
+          </ThemedText>
+        </Pressable>
+
+        {clientNarrative ? (
+          <View
+            style={[
+              styles.detailsCard,
+              { backgroundColor: theme.cardBackground, borderColor: theme.border, gap: Spacing.md },
+            ]}
+          >
+            <TextInput
+              multiline
+              editable={false}
+              value={clientNarrative}
+              style={{
+                color: theme.text,
+                fontSize: 15,
+                lineHeight: 23,
+                fontFamily: "System",
+              }}
+              testID="text-client-narrative"
+            />
+            <Pressable
+              onPress={async () => {
+                await Clipboard.setStringAsync(clientNarrative);
+                setClientNarrativeCopied(true);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                setTimeout(() => setClientNarrativeCopied(false), 2500);
+              }}
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor: clientNarrativeCopied ? `${theme.success}18` : `${theme.primary}12`,
+                  borderColor: clientNarrativeCopied ? theme.success : theme.primary,
+                  borderWidth: 1,
+                  paddingHorizontal: 18,
+                  paddingVertical: 10,
+                  alignSelf: "flex-start",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                },
+              ]}
+              testID="button-copy-client-narrative"
+            >
+              <Feather
+                name={clientNarrativeCopied ? "check" : "copy"}
+                size={14}
+                color={clientNarrativeCopied ? theme.success : theme.primary}
+              />
+              <ThemedText
+                type="small"
+                style={{ color: clientNarrativeCopied ? theme.success : theme.primary, fontWeight: "600" }}
+              >
+                {clientNarrativeCopied ? "Copied!" : "Copy"}
+              </ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
 
         {(stripeStatus as any)?.connected && quote.paymentStatus !== "paid" ? (
           <Pressable

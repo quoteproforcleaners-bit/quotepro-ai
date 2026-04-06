@@ -97,6 +97,43 @@ Apply the requested changes precisely:
 - Do not add explanations or commentary
 - Return ONLY the revised proposal`;
 
+// ─── Client narrative (any auth'd user) ──────────────────────────────────────
+
+quoteDoctorRouter.post("/api/quote-doctor/client-narrative", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { bedrooms, bathrooms, sqft, frequency, amount } = req.body as {
+      bedrooms?: number;
+      bathrooms?: number;
+      sqft?: number;
+      frequency?: string;
+      amount?: number;
+    };
+
+    if (!amount) {
+      return res.status(400).json({ error: "Quote amount is required" });
+    }
+
+    const sqftPart = sqft && sqft > 0 ? `${sqft} sqft, ` : "";
+    const freqPart = frequency || "one-time";
+    const bedsPart = `${bedrooms || 0}bd/${bathrooms || 0}ba`;
+
+    const userPrompt = `You are helping a cleaning business owner write a professional, warm message to send to a potential customer alongside their quote. Job: ${bedsPart}, ${sqftPart}${freqPart}, quote: $${amount}. Write a 3–4 sentence message in a friendly, confident tone. Do not use the word "pristine." Do not be sycophantic. Sound like a real local business owner, not a chatbot. Reply with ONLY the message text — no subject line, no label, no preamble.`;
+
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      messages: [{ role: "user", content: userPrompt }],
+      max_tokens: 200,
+    });
+
+    const narrative = (completion.content[0] as any).text?.trim() ?? "";
+    console.log("[QuoteDoctor/narrative] output length:", narrative.length);
+    return res.json({ narrative });
+  } catch (err: any) {
+    console.error("[QuoteDoctor/narrative] error:", err?.message || err);
+    return res.status(500).json({ error: "Failed to generate message. Please try again." });
+  }
+});
+
 // ─── Optimize existing quote ──────────────────────────────────────────────────
 
 quoteDoctorRouter.post("/api/quote-doctor/optimize", requireAuth, async (req: Request, res: Response) => {
