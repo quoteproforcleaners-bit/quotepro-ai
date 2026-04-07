@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Zap, Play, Pause, CheckCircle, Clock,
   Users, Mail, Star, ArrowRight, Lock, Loader2, RefreshCw,
@@ -33,6 +33,11 @@ interface AutopilotStats {
   emailsSent: number;
 }
 
+interface AutopilotSettings {
+  autopilotEnabled: boolean;
+  googleReviewLink: string | null;
+}
+
 /* ─── Step labels ─────────────────────────────────────────────────────────── */
 
 const STEP_LABELS: Record<number, { label: string; icon: typeof Mail; color: string }> = {
@@ -41,6 +46,66 @@ const STEP_LABELS: Record<number, { label: string; icon: typeof Mail; color: str
   3: { label: "Welcome",           icon: CheckCircle, color: "text-green-600" },
   4: { label: "Review Request",    icon: Star,        color: "text-purple-600" },
 };
+
+/* ─── ON/OFF Toggle ───────────────────────────────────────────────────────── */
+
+function AutopilotToggle({ enabled, onToggle, loading }: {
+  enabled: boolean;
+  onToggle: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl p-5 flex items-center gap-5 mb-6 transition-all ${
+        enabled
+          ? "bg-emerald-50 border border-emerald-200"
+          : "bg-slate-50 border border-slate-200"
+      }`}
+    >
+      {/* Toggle switch */}
+      <button
+        onClick={onToggle}
+        disabled={loading}
+        className={`relative inline-flex h-10 w-[72px] shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+          enabled ? "bg-emerald-500" : "bg-slate-300"
+        }`}
+        role="switch"
+        aria-checked={enabled}
+      >
+        {loading ? (
+          <span className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="w-4 h-4 text-white animate-spin" />
+          </span>
+        ) : (
+          <span
+            className={`inline-block h-8 w-8 translate-y-0.5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ${
+              enabled ? "translate-x-8" : "translate-x-0.5"
+            }`}
+          />
+        )}
+      </button>
+
+      {/* Status text */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-base font-bold ${enabled ? "text-emerald-800" : "text-slate-600"}`}>
+            Autopilot is {enabled ? "ON" : "OFF"}
+          </span>
+          {enabled && (
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold uppercase tracking-wide">
+              Running
+            </span>
+          )}
+        </div>
+        <p className={`text-sm mt-0.5 ${enabled ? "text-emerald-700" : "text-slate-500"}`}>
+          {enabled
+            ? "New leads from your intake form are automatically enrolled and processed — no action needed."
+            : "Toggle ON to automatically qualify, quote, follow up, and request reviews for every new lead."}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /* ─── Upsell wall ─────────────────────────────────────────────────────────── */
 
@@ -92,11 +157,7 @@ function AutopilotUpsell({ isGrowth }: { isGrowth: boolean }) {
           <p className="text-sm text-slate-500">
             Autopilot is available as an add-on for Growth plan users for <strong>$29/month</strong>.
           </p>
-          <Button
-            onClick={handleCheckout}
-            disabled={loading}
-            className="w-full"
-          >
+          <Button onClick={handleCheckout} disabled={loading} className="w-full">
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
             Add Autopilot — $29/mo
           </Button>
@@ -164,7 +225,7 @@ function JobRow({ job, onPause, onResume }: {
         <button
           onClick={() => onPause(job.id)}
           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-          title="Pause"
+          title="Pause this lead"
         >
           <Pause className="w-4 h-4" />
         </button>
@@ -173,7 +234,7 @@ function JobRow({ job, onPause, onResume }: {
         <button
           onClick={() => onResume(job.id)}
           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors"
-          title="Resume"
+          title="Resume this lead"
         >
           <Play className="w-4 h-4" />
         </button>
@@ -187,11 +248,25 @@ function JobRow({ job, onPause, onResume }: {
 function AutopilotDashboard() {
   const queryClient = useQueryClient();
 
+  const { data: settings, isLoading: settingsLoading } = useQuery<AutopilotSettings>({
+    queryKey: ["/api/autopilot/settings"],
+  });
+
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<AutopilotJob[]>({
     queryKey: ["/api/autopilot/jobs"],
   });
+
   const { data: stats } = useQuery<AutopilotStats>({
     queryKey: ["/api/autopilot/stats"],
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      await apiRequest("POST", "/api/autopilot/settings", { autopilotEnabled: enabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/autopilot/settings"] });
+    },
   });
 
   const pause = async (id: string) => {
@@ -206,7 +281,7 @@ function AutopilotDashboard() {
     queryClient.invalidateQueries({ queryKey: ["/api/autopilot/stats"] });
   };
 
-  if (jobsLoading) {
+  if (jobsLoading || settingsLoading) {
     return (
       <div className="flex justify-center py-20">
         <Spinner size="lg" />
@@ -214,44 +289,33 @@ function AutopilotDashboard() {
     );
   }
 
+  const isEnabled = settings?.autopilotEnabled ?? false;
+
   return (
     <div className="space-y-6">
+      {/* Master ON/OFF toggle */}
+      <AutopilotToggle
+        enabled={isEnabled}
+        onToggle={() => toggleMutation.mutate(!isEnabled)}
+        loading={toggleMutation.isPending}
+      />
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          label="Active"
-          value={stats?.active ?? 0}
-          icon={Play}
-          color="emerald"
-        />
-        <StatCard
-          label="Completed"
-          value={stats?.completed ?? 0}
-          icon={CheckCircle}
-          color="primary"
-        />
-        <StatCard
-          label="Paused"
-          value={stats?.paused ?? 0}
-          icon={Pause}
-          color="amber"
-        />
-        <StatCard
-          label="Emails Sent"
-          value={stats?.emailsSent ?? 0}
-          icon={Mail}
-          color="violet"
-        />
+        <StatCard label="Active"      value={stats?.active ?? 0}     icon={Play}        color="emerald" />
+        <StatCard label="Completed"   value={stats?.completed ?? 0}  icon={CheckCircle} color="primary" />
+        <StatCard label="Paused"      value={stats?.paused ?? 0}     icon={Pause}       color="amber" />
+        <StatCard label="Emails Sent" value={stats?.emailsSent ?? 0} icon={Mail}        color="violet" />
       </div>
 
       {/* How it works strip */}
       <Card>
         <div className="flex flex-wrap gap-3">
           {[
-            { step: 1, label: "Qualify + Quote",   icon: Zap,         color: "text-blue-600",   bg: "bg-blue-50" },
-            { step: 2, label: "Follow-Up",          icon: RefreshCw,   color: "text-amber-600",  bg: "bg-amber-50" },
-            { step: 3, label: "Welcome",            icon: CheckCircle, color: "text-green-600",  bg: "bg-green-50" },
-            { step: 4, label: "Review Request",     icon: Star,        color: "text-purple-600", bg: "bg-purple-50" },
+            { step: 1, label: "Qualify + Quote",  icon: Zap,         color: "text-blue-600",   bg: "bg-blue-50" },
+            { step: 2, label: "Follow-Up",         icon: RefreshCw,   color: "text-amber-600",  bg: "bg-amber-50" },
+            { step: 3, label: "Welcome",           icon: CheckCircle, color: "text-green-600",  bg: "bg-green-50" },
+            { step: 4, label: "Review Request",    icon: Star,        color: "text-purple-600", bg: "bg-purple-50" },
           ].map(({ step, label, icon: Icon, color, bg }, i, arr) => (
             <div key={step} className="flex items-center gap-2">
               <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${bg}`}>
@@ -277,8 +341,12 @@ function AutopilotDashboard() {
         {jobs.length === 0 ? (
           <EmptyState
             icon={Zap}
-            title="No leads enrolled yet"
-            description="Enroll a lead from the Quote Requests page to start their automated pipeline."
+            title={isEnabled ? "Waiting for new leads" : "Autopilot is off"}
+            description={
+              isEnabled
+                ? "When a customer fills out your intake form, they'll be automatically enrolled and appear here."
+                : "Toggle Autopilot ON above to automatically process every new lead — no manual steps required."
+            }
           />
         ) : (
           <div>
@@ -293,8 +361,8 @@ function AutopilotDashboard() {
       <div className="flex items-start gap-3 px-4 py-3 bg-blue-50 rounded-xl text-sm text-blue-700">
         <Clock className="w-4 h-4 flex-shrink-0 mt-0.5" />
         <p>
-          Autopilot checks for pending actions every 15 minutes. Enroll leads from the
-          <strong> Quote Requests</strong> page using the lightning bolt icon on each card.
+          Autopilot runs every 15 minutes. When ON, every new lead from your intake form is
+          automatically enrolled — no action needed from you.
         </p>
       </div>
     </div>
@@ -318,7 +386,7 @@ export default function AutopilotPage() {
     <div>
       <PageHeader
         title="Autopilot"
-        subtitle="AI-powered lead nurturing pipeline — qualify, quote, follow up, and request reviews automatically"
+        subtitle="AI-powered lead nurturing — qualify, quote, follow up, and request reviews automatically"
         badge={isPro ? undefined : isGrowth ? <Badge status="warning" label="Add-on" /> : <Badge status="pro" label="Pro" />}
       />
 

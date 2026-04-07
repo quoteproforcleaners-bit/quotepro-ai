@@ -12,6 +12,7 @@ import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter, isGrowthOrAbove } from "../middleware";
 import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { enrollLead } from "../services/autopilotService";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -2116,7 +2117,21 @@ Return ONLY valid JSON — no markdown, no preamble:
           JSON.stringify(missingFieldFlags),
         ]
       );
-      res.status(201).json({ id: result.rows[0].id, message: "Request submitted successfully", status });
+      const newLeadId = result.rows[0].id;
+      res.status(201).json({ id: newLeadId, message: "Request submitted successfully", status });
+
+      // Auto-enroll in Autopilot if the owner has it enabled (fire-and-forget)
+      if (biz.ownerUserId) {
+        pool.query(`SELECT autopilot_enabled FROM users WHERE id = $1`, [biz.ownerUserId])
+          .then(async (ur) => {
+            if (ur.rows[0]?.autopilot_enabled) {
+              enrollLead(biz.ownerUserId!, biz.id, newLeadId).catch((err) => {
+                console.error("[autopilot] auto-enroll failed:", err.message);
+              });
+            }
+          })
+          .catch(() => {});
+      }
     } catch (e: any) {
       console.error("Intake submit error:", e);
       res.status(500).json({ message: e.message });

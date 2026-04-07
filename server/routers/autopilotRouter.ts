@@ -137,6 +137,23 @@ router.get("/stats", requireAuth, requireAutopilot, async (req: Request, res: Re
   }
 });
 
+router.get("/settings", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = await getUserById(req.session.userId!);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    const business = await getBusinessByOwner(req.session.userId!);
+    let googleReviewLink = null;
+    if (business) {
+      const gr = await pool.query(`SELECT google_review_link FROM growth_automation_settings WHERE business_id=$1 LIMIT 1`, [business.id]);
+      googleReviewLink = gr.rows[0]?.google_review_link ?? null;
+    }
+    const rawUser = await pool.query(`SELECT autopilot_enabled FROM users WHERE id=$1 LIMIT 1`, [req.session.userId]);
+    return res.json({ autopilotEnabled: rawUser.rows[0]?.autopilot_enabled ?? false, googleReviewLink });
+  } catch (err: any) {
+    return res.status(500).json({ message: "Failed to fetch settings" });
+  }
+});
+
 router.post("/settings", requireAuth, async (req: Request, res: Response) => {
   try {
     const { autopilotEnabled, googleReviewLink } = req.body;
