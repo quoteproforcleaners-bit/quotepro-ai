@@ -7,7 +7,7 @@ import {
   processAutopilotJobs,
 } from "../services/autopilotService";
 import { isGrowthOrAbove, isProTier } from "../middleware";
-import { stripe } from "../clients";
+import { getStripe } from "../clients";
 
 const router = Router();
 
@@ -179,12 +179,13 @@ router.post("/api/autopilot/checkout", requireAuth, async (req: Request, res: Re
     const addonPriceId = process.env.AUTOPILOT_ADDON_PRICE_ID;
     if (!addonPriceId) return res.status(503).json({ message: "Autopilot add-on not configured" });
 
-    if (!stripe) return res.status(503).json({ message: "Stripe not available" });
+    const stripeClient = getStripe();
+    if (!stripeClient) return res.status(503).json({ message: "Stripe not available" });
 
     const user = await getUserById(req.session.userId!);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await stripeClient.checkout.sessions.create({
       mode: "subscription",
       customer_email: user.email,
       line_items: [{ price: addonPriceId, quantity: 1 }],
