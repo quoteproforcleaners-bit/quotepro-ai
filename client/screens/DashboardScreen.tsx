@@ -283,7 +283,7 @@ export default function DashboardScreen() {
             </View>
           </View>
           <Pressable
-            onPress={() => nav("Main", { screen: "SettingsTab" })}
+            onPress={() => nav("Settings")}
             style={[s.headerBtn, { backgroundColor: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)" }]}
             testID="settings-btn"
           >

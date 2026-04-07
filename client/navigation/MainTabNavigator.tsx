@@ -30,8 +30,7 @@ import DashboardScreen from "@/screens/DashboardScreen";
 import CustomersScreen from "@/screens/CustomersScreen";
 import QuotesScreen from "@/screens/QuotesScreen";
 import CalendarScreen from "@/screens/CalendarScreen";
-import SettingsScreen from "@/screens/SettingsScreen";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import MoreMenuScreen from "@/screens/MoreMenuScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useTheme } from "@/hooks/useTheme";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -39,10 +38,10 @@ import { useLanguage } from "@/context/LanguageContext";
 
 export type MainTabParamList = {
   HomeTab: undefined;
-  CustomersTab: undefined;
   QuotesTab: undefined;
+  CustomersTab: undefined;
   JobsTab: undefined;
-  SettingsTab: undefined;
+  MoreTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -251,14 +250,6 @@ function CalendarHeaderRight() {
   );
 }
 
-function WrappedSettings(props: any) {
-  return (
-    <ErrorBoundary>
-      <SettingsScreen {...props} />
-    </ErrorBoundary>
-  );
-}
-
 export default function MainTabNavigator() {
   const { theme, isDark } = useTheme();
   const screenOptions = useScreenOptions();
@@ -384,13 +375,13 @@ export default function MainTabNavigator() {
         listeners={{ tabPress: handleTabPress }}
       />
       <Tab.Screen
-        name="SettingsTab"
-        component={WrappedSettings}
+        name="MoreTab"
+        component={MoreMenuScreen}
         options={{
-          title: t.tabs.settings,
-          headerTitle: t.tabs.settings,
+          title: "More",
+          headerTitle: "More",
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="settings" color={color} size={size} focused={focused} badgeCount={pendingTaskCount} />
+            <TabIcon name="grid" color={color} size={size} focused={focused} badgeCount={pendingTaskCount} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}

@@ -282,7 +282,7 @@ export default function ProSetupChecklistScreen() {
       }
       try {
         if (item.action === "Settings") {
-          navigation.navigate("Main", { screen: "SettingsTab" });
+          navigation.navigate("Settings");
         } else if (item.action === "Quotes") {
           navigation.navigate("Main", { screen: "QuotesTab" });
         } else {

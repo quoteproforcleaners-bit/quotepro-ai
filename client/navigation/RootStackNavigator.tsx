@@ -45,6 +45,7 @@ import NPSSurveyModal from "@/screens/NPSSurveyModal";
 import QuoteDoctorScreen from "@/screens/QuoteDoctorScreen";
 import GrowthDashboardScreen from "@/screens/GrowthDashboardScreen";
 import AutopilotScreen from "@/screens/AutopilotScreen";
+import SettingsScreen from "@/screens/SettingsScreen";
 
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
@@ -98,6 +99,7 @@ export type RootStackParamList = {
   QuoteDoctor: undefined;
   GrowthDashboard: undefined;
   Autopilot: undefined;
+  Settings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -531,6 +533,13 @@ export default function RootStackNavigator() {
             component={AutopilotScreen}
             options={{
               headerTitle: "Autopilot",
+            }}
+          />
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{
+              headerTitle: "Settings",
             }}
           />
           <Stack.Screen
