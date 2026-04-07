@@ -35,6 +35,7 @@ interface Message {
   content: string;
   isLoading?: boolean;
   isError?: boolean;
+  isStreaming?: boolean;
 }
 
 // ─── Mode Config ──────────────────────────────────────────────────────────────
@@ -427,10 +428,27 @@ function MessageRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-5 py-4 shadow-sm">
-          <div className="prose-sm max-w-none">{renderMarkdown(msg.content)}</div>
-          <div className="flex items-center justify-end mt-3 pt-2.5 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-            <CopyButton text={msg.content} />
+          <div className="prose-sm max-w-none">
+            {renderMarkdown(msg.content)}
+            {msg.isStreaming && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "2px",
+                  height: "1em",
+                  background: "var(--color-primary, #007aff)",
+                  marginLeft: "2px",
+                  verticalAlign: "text-bottom",
+                  animation: "ai-cursor-blink 0.8s step-end infinite",
+                }}
+              />
+            )}
           </div>
+          {!msg.isStreaming && (
+            <div className="flex items-center justify-end mt-3 pt-2.5 border-t border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+              <CopyButton text={msg.content} />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -567,15 +585,11 @@ function AgentChat() {
 
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: text.trim() };
     const loadingMsg: Message = { id: "loading", role: "assistant", content: "", isLoading: true };
+    const streamingId = (Date.now() + 1).toString();
 
     setMessages((prev) => [...prev, userMsg, loadingMsg]);
     setInput("");
-
-    // Reset textarea height
-    if (inputRef.current) {
-      inputRef.current.style.height = "auto";
-    }
-
+    if (inputRef.current) inputRef.current.style.height = "auto";
     setIsLoading(true);
 
     const history = [...messages, userMsg]
@@ -583,30 +597,101 @@ function AgentChat() {
       .slice(-6)
       .map((m) => ({ role: m.role, content: m.content }));
 
+    const supportsStreaming = typeof ReadableStream !== "undefined";
+
     try {
-      const res = await apiRequest("POST", "/api/ai/agent-chat", {
-        message: text.trim(),
-        mode,
-        conversationHistory: history,
-      });
-      const data = await res.json();
+      if (supportsStreaming) {
+        const res = await fetch("/api/ai/agent-chat", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+          },
+          body: JSON.stringify({ message: text.trim(), mode, conversationHistory: history }),
+        });
 
-      if (!res.ok) throw new Error(data.message || "Request failed");
+        if (!res.ok) {
+          let errMsg = `Request failed (${res.status})`;
+          try { const d = await res.json(); errMsg = d.message || errMsg; } catch {}
+          throw new Error(errMsg);
+        }
 
-      const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.reply || "I couldn't generate a response. Please try again.",
-      };
-      setMessages((prev) => prev.map((m) => (m.id === "loading" ? assistantMsg : m)));
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let fullText = "";
+        let streamStarted = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr) continue;
+            try {
+              const event = JSON.parse(jsonStr);
+              if (event.type === "delta") {
+                fullText += event.text;
+                if (!streamStarted) {
+                  streamStarted = true;
+                  setMessages((prev) => prev.map((m) =>
+                    m.id === "loading"
+                      ? { id: streamingId, role: "assistant" as const, content: fullText, isStreaming: true }
+                      : m
+                  ));
+                } else {
+                  setMessages((prev) => prev.map((m) =>
+                    m.id === streamingId ? { ...m, content: fullText } : m
+                  ));
+                }
+              } else if (event.type === "done") {
+                setMessages((prev) => prev.map((m) =>
+                  m.id === streamingId ? { ...m, isStreaming: false } : m
+                ));
+              } else if (event.type === "error") {
+                throw new Error(event.message || "Streaming error");
+              }
+            } catch {}
+          }
+        }
+
+        // If stream ended but no content arrived (server error before first chunk), show error
+        if (!streamStarted) {
+          throw new Error("No response received. Please try again.");
+        }
+      } else {
+        // Non-streaming fallback
+        const res = await apiRequest("POST", "/api/ai/agent-chat", {
+          message: text.trim(),
+          mode,
+          conversationHistory: history,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Request failed");
+        const assistantMsg: Message = {
+          id: streamingId,
+          role: "assistant",
+          content: data.reply || "I couldn't generate a response. Please try again.",
+        };
+        setMessages((prev) => prev.map((m) => (m.id === "loading" ? assistantMsg : m)));
+      }
     } catch (err: any) {
       const errMsg: Message = {
-        id: (Date.now() + 1).toString(),
+        id: streamingId,
         role: "assistant",
         content: err.message || "Something went wrong. Please check your connection and try again.",
         isError: true,
       };
-      setMessages((prev) => prev.map((m) => (m.id === "loading" ? errMsg : m)));
+      setMessages((prev) => prev.map((m) =>
+        m.id === "loading" || m.id === streamingId ? errMsg : m
+      ));
     } finally {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);

@@ -641,6 +641,45 @@ SALES & MARKETING:
       }
       chatMessages.push({ role: "user", content: message });
 
+      // ── Streaming mode ────────────────────────────────────────────────────
+      if (req.headers["accept"] === "text/event-stream") {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.flushHeaders();
+
+        try {
+          const systemMsg = chatMessages.find((m: any) => m.role === "system");
+          const anthropicMessages = chatMessages
+            .filter((m: any) => m.role !== "system")
+            .map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+          const stream = anthropic.messages.stream({
+            model: "claude-sonnet-4-5",
+            max_tokens: 900,
+            ...(systemMsg ? { system: systemMsg.content } : {}),
+            messages: anthropicMessages,
+          });
+
+          for await (const chunk of stream) {
+            if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+              res.write(`data: ${JSON.stringify({ type: "delta", text: chunk.delta.text })}\n\n`);
+            }
+          }
+
+          res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+          res.end();
+        } catch (err: any) {
+          console.error("[agent-chat] Streaming error:", err.message);
+          try {
+            res.write(`data: ${JSON.stringify({ type: "error", message: "AI streaming failed. Please try again." })}\n\n`);
+          } catch {}
+          res.end();
+        }
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       let reply: string;
       try {
         const { content } = await callAI(chatMessages, {
