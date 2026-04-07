@@ -42,6 +42,8 @@ import portalRouter from "./routers/portalRouter";
 import employeeRouter from "./routers/employeeRouter";
 import fieldAdminRouter from "./routers/fieldAdminRouter";
 import marketRatesRouter from "./routers/marketRatesRouter";
+import autopilotRouter from "./routers/autopilotRouter";
+import { processAutopilotJobs } from "./services/autopilotService";
 
 // Session type extension
 declare module "express-session" {
@@ -121,11 +123,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(employeeRouter);
   app.use(fieldAdminRouter);
   app.use(marketRatesRouter);
+  app.use(autopilotRouter);
 
   // 4. HTTP server
   const httpServer = createServer(app);
 
-  // 5. Background workers (hourly tick)
+  // 5. Background workers
+  // — 15-minute Autopilot cron
+  setInterval(async () => {
+    try {
+      await processAutopilotJobs();
+    } catch (e) {
+      console.error("[autopilot] Cron error:", e);
+    }
+  }, 15 * 60 * 1000);
+
+  // — Hourly cron
   setInterval(async () => {
     try {
       await expireOldQuotes();

@@ -65,6 +65,7 @@ export const users = pgTable("users", {
   subscriptionStartedAt: timestamp("subscription_started_at"),
   emailUnreachable: boolean("email_unreachable").notNull().default(false),
   contactEmail: text("contact_email"),
+  autopilotEnabled: boolean("autopilot_enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1377,6 +1378,35 @@ export const marketRates = pgTable(
 
 export type MarketRate = typeof marketRates.$inferSelect;
 export type InsertMarketRate = typeof marketRates.$inferInsert;
+
+// ─── Autopilot ────────────────────────────────────────────────────────────────
+
+export const autopilotJobs = pgTable("autopilot_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  leadId: varchar("lead_id"),
+  quoteId: varchar("quote_id"),
+  status: text("status").notNull().default("pending_quote"),
+  lastActionAt: timestamp("last_action_at"),
+  nextActionAt: timestamp("next_action_at"),
+  metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type AutopilotJob = typeof autopilotJobs.$inferSelect;
+export type InsertAutopilotJob = typeof autopilotJobs.$inferInsert;
+
+export const autopilotJobLogs = pgTable("autopilot_job_logs", {
+  id: serial("id").primaryKey(),
+  jobId: varchar("job_id").notNull().references(() => autopilotJobs.id),
+  step: text("step").notNull(),
+  action: text("action").notNull(),
+  result: text("result"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type AutopilotJobLog = typeof autopilotJobLogs.$inferSelect;
 
 // ─── Backward-compatibility aliases (used by auto-generated router imports) ───
 export const photos = jobPhotos;

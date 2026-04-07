@@ -282,6 +282,13 @@ const router = Router();
         }
 
         if (data.status === "accepted") {
+          // ── Autopilot: trigger step 3 (welcome email) ───────────────────
+          import("../services/autopilotService").then(({ triggerStep3ForQuote }) => {
+            triggerStep3ForQuote(q.id).catch((e) => {
+              console.error("[autopilot] step3 trigger error:", e.message);
+            });
+          }).catch(() => {});
+
           pool.query(
             `SELECT auto_create_invoice FROM qbo_connections WHERE user_id = $1 AND status = 'connected'`,
             [req.session.userId]

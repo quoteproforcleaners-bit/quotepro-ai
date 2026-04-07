@@ -86,3 +86,12 @@ Session-based authentication supports email/password, Apple, and Google SSO.
 - **Metro Proxy**: `metro.config.js` proxies `/home/*` and `/api/portal/*` from port 8081 → 5000 so the portal is accessible in development and testing.
 - **Web App Router**: `/home/` added to `TOP_LEVEL_PATHS` in `web/src/main.tsx` so React Router uses `basename="/"` for portal routes.
 - **Token Backfill**: All 69 existing customers backfilled with portal tokens on startup.
+## Sprint 24 — QuotePro Autopilot
+- **Feature Gate**: Free/Starter → 403 upsell; Growth → requires Autopilot add-on ($29/mo, `AUTOPILOT_ADDON_PRICE_ID` env var); Pro → included.
+- **DB Tables**: `autopilot_jobs` (UUID PK, lead_id, quote_id, status, next_action_at, metadata), `autopilot_job_logs` (serial PK, job_id, step, action, result). Users table extended with `autopilot_enabled` (boolean).
+- **Service** (`server/services/autopilotService.ts`): 4-step pipeline — step1 (Claude qualifies lead + emails quote), step2 (48hr follow-up with AI-generated angle), step3 (welcome email on quote accept), step4 (Google Review request on job complete).
+- **Router** (`server/routers/autopilotRouter.ts`): `POST /api/autopilot/enroll`, `GET /api/autopilot/jobs`, `POST /api/autopilot/jobs/:id/pause|resume`, `GET /api/autopilot/stats`, `POST /api/autopilot/settings`, `POST /api/autopilot/checkout`.
+- **Cron**: 15-minute interval registered in `server/routes.ts`, runs `processAutopilotJobs()`.
+- **Event Hooks**: `quotesRouter.ts` line ~288 triggers step3 when quote accepted; `jobsRouter.ts` line ~1366 triggers step4 when job completed.
+- **Frontend**: `client/screens/AutopilotScreen.tsx` (dashboard with stats, jobs list, enroll modal); `client/components/AutopilotUpsellModal.tsx` (paywall with Stripe checkout link).
+- **Navigation**: Push screen `Autopilot` in `RootStackNavigator.tsx`. Entry point in `SettingsScreen.tsx`. Zap icon in `IntakeQueueScreen.tsx` per-card action button.

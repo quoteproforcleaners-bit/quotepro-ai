@@ -1360,6 +1360,15 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
         }).catch(() => {});
       }
 
+      // ── Autopilot: trigger step 4 (review request) ──────────────────────
+      if (job.businessId) {
+        import("../services/autopilotService").then(({ triggerStep4ForBusiness }) => {
+          triggerStep4ForBusiness(job.businessId).catch((e) => {
+            console.error("[autopilot] step4 trigger error:", e.message);
+          });
+        }).catch(() => {});
+      }
+
       return res.json({
         completedJob: updatedJob,
         nextJob,

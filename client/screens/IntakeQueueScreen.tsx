@@ -116,6 +116,7 @@ function IntakeCard({
   onMarkReview,
   onNotesSaved,
   onUpgrade,
+  onEnroll,
   tab,
   isPro,
 }: {
@@ -126,6 +127,7 @@ function IntakeCard({
   onMarkReview: () => void;
   onNotesSaved: (notes: string) => void;
   onUpgrade: () => void;
+  onEnroll?: () => void;
   tab: TabKey;
   isPro: boolean;
 }) {
@@ -331,6 +333,15 @@ function IntakeCard({
             >
               <Feather name="x" size={15} color={theme.textSecondary} />
             </Pressable>
+            {onEnroll ? (
+              <Pressable
+                testID={`button-autopilot-enroll-${item.id}`}
+                onPress={onEnroll}
+                style={[styles.iconBtn, { borderColor: "#0ea5e940", backgroundColor: "#0ea5e910" }]}
+              >
+                <Feather name="zap" size={13} color="#0ea5e9" />
+              </Pressable>
+            ) : null}
           </View>
 
           <Pressable
@@ -568,6 +579,13 @@ export default function IntakeQueueScreen() {
     },
   });
 
+  const enrollMutation = useMutation({
+    mutationFn: (leadId: string) => apiRequest("POST", "/api/autopilot/enroll", { leadId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/autopilot/jobs"] });
+    },
+  });
+
   const patchMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Record<string, any> }) =>
       apiRequest("PATCH", `/api/intake-requests/${id}`, data),
@@ -711,6 +729,7 @@ export default function IntakeQueueScreen() {
             onDismiss={() => handleDismiss(item.id)}
             onMarkReview={() => handleMarkReview(item.id)}
             onNotesSaved={(notes) => handleSaveNotes(item.id, notes)}
+            onEnroll={() => enrollMutation.mutate(item.id)}
           />
         )}
         ListEmptyComponent={

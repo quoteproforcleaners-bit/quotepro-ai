@@ -1659,6 +1659,30 @@ export default function SettingsScreen() {
 
 
       <Pressable
+        onPress={() => navigation.navigate("Autopilot" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-autopilot"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: "#0ea5e915" }]}>
+            <Feather name="zap" size={20} color="#0ea5e9" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>Autopilot</ThemedText>
+              <View style={{ backgroundColor: "#0ea5e9", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                <ThemedText style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>NEW</ThemedText>
+              </View>
+            </View>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              AI nurtures leads from quote to review, automatically
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      <Pressable
         onPress={() => navigation.navigate("AutomationsHub" as any)}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
         testID="button-automations-hub"
