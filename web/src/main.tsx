@@ -7,6 +7,7 @@ import { queryClient } from "./lib/queryClient";
 import { WebErrorBoundary } from "./components/WebErrorBoundary";
 import App from "./App";
 import "./index.css";
+import "./styles/apple.css";
 import "./lib/i18n";
 
 // Some paths live outside the /app prefix and need basename "/":
