@@ -185,18 +185,26 @@ export default function IntakePage() {
         body: JSON.stringify({ text: aiText }),
       });
       const d = await r.json();
-      if (d.extracted) {
+      if (r.ok && d.extracted) {
         setFields(prev => ({
           ...prev,
           ...d.extracted,
           addOns: d.extracted.addOns || {},
           clarificationQuestions: d.extracted.clarificationQuestions || [],
           missingFields: d.extracted.missingFields || [],
+          // always preserve raw text as notes fallback
+          notes: d.extracted.notes || aiText,
         }));
+        setStep("ai-confirm");
+      } else {
+        // Extraction failed — store raw description in notes and go to guided form
+        setGNotes(aiText);
+        setStep("guided-property");
       }
-      setStep("ai-confirm");
     } catch {
-      setStep("ai-confirm");
+      // Network error — store raw description in notes and fall back to guided form
+      setGNotes(aiText);
+      setStep("guided-property");
     } finally {
       setAiLoading(false);
     }

@@ -2028,10 +2028,6 @@ loadMonth(nextMo);
     try {
       const biz = await lookupIntakeBusiness(req.params.businessId);
       if (!biz) return res.status(404).json({ message: "Business not found" });
-      const owner = await getUserById(biz.ownerUserId!);
-      if (!owner || !isGrowthOrAbove(owner.subscriptionTier)) {
-        return res.status(403).json({ message: "This feature requires a Growth or Pro subscription", requiresUpgrade: true });
-      }
       const completion = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
         system: `You are a cleaning quote intake assistant. Extract structured fields from a customer's description of their cleaning job.
