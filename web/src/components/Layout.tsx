@@ -61,6 +61,7 @@ const CORE_NAV_ITEMS: NavItem[] = [
 // BUSINESS — labeled section (was GROWTH)
 const BUSINESS_NAV_ITEMS: NavItem[] = [
   { to: "/follow-ups",       label: "Follow-Ups",       icon: Bell,       description: "Every quote that needs a follow-up, ranked by priority. Never let a lead go cold." },
+  { to: "/autopilot",        label: "Autopilot",         icon: PlugZap,    pro: true, beta: true, description: "4-step AI pipeline: qualify leads, send quotes, follow up, and request reviews — all automatically." },
   { to: "/opportunities",    label: "Win-Back",          icon: Repeat2,    pro: true, description: "Re-engage past customers who went quiet — AI surfaces the best win-back opportunities." },
   { to: "/revenue",          label: "Revenue",           icon: DollarSign, pro: true, description: "Full revenue reporting — monthly totals, job type breakdown, and trends vs. prior periods." },
   { to: "/reviews-referrals",label: "Reviews & Referrals",icon: Star,      pro: true, description: "Automate Google review requests and track referrals from your best customers." },
@@ -69,7 +70,6 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
 // TOOLS — labeled section (collapsed by default)
 const TOOLS_NAV_ITEMS: NavItem[] = [
   { to: "/quote-doctor",      label: "Quote Doctor",       icon: Zap,         description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
-  { to: "/autopilot",         label: "Autopilot",          icon: PlugZap,     pro: true, beta: true, description: "4-step AI pipeline: qualify leads, send quotes, follow up, and request reviews — all automatically." },
   { to: "/automations",       label: "Automations",        icon: Cpu,         pro: true, description: "Set up automated follow-ups, review requests, and customer sequences that run on autopilot." },
   { to: "/email-sequences",   label: "Automated Emails",   icon: MailOpen,    pro: true, description: "Drip campaigns and one-off emails — automated sequences that nurture leads into booked jobs." },
   { to: "/ai-assistant",      label: "Sales Assistant",    icon: Bot,         pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
