@@ -42,6 +42,7 @@ import {
 import { Button, Badge, Card, CardHeader, ProgressBar, MetricRing, FunnelBar } from"../components/ui";
 import { type PlanTier } from"../lib/subscription";
 import { formatCurrency } from"../utils/currency";
+import DashboardUpsellCard from"../components/DashboardUpsellCard";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1639,6 +1640,9 @@ export default function DashboardPage() {
  </div>
  </button>
  ) : null}
+
+ {/* 3b. Upsell card — only for Free/Starter, non-trial users */}
+ <DashboardUpsellCard />
 
  {/* 4. Today's Focus */}
  <TodaysFocus items={focusItems} navigate={navigate} />

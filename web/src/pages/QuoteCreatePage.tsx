@@ -130,7 +130,7 @@ export default function QuoteCreatePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, trialExpired } = useAuth();
-  const { quotesPerMonth, startCheckout, showPaywall } = useSubscription();
+  const { quotesPerMonth, startCheckout, showPaywall, isGrowth, isPro, trackUpgradeClick, checkoutLoading } = useSubscription();
 
   useEffect(() => {
     if (trialExpired) navigate("/paywall", { replace: true });
@@ -270,7 +270,7 @@ export default function QuoteCreatePage() {
       const isQuotaHit = err?.data?.quoteLimitReached || err?.message?.toLowerCase().includes("free quotes") || err?.message?.toLowerCase().includes("quote limit");
       if (isQuotaHit) {
         setQuotaError(true);
-        showPaywall();
+        showPaywall("quote_limit");
         return;
       }
       setSubmitError(err?.message || "Failed to create quote. Please try again.");
@@ -1240,6 +1240,33 @@ export default function QuoteCreatePage() {
                 );
               })}
             </div>
+
+            {/* Better/Best upsell nudge — only for non-Growth/Pro users */}
+            {!isGrowth && !isPro ? (
+              <div
+                className="rounded-xl px-4 py-3 flex items-center gap-3"
+                style={{ background: "linear-gradient(135deg, #f5f3ff, #fafaff)", border: "1px solid rgba(79,70,229,0.15)" }}
+              >
+                <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                </div>
+                <p className="text-[13px] text-slate-700 flex-1">
+                  <span className="font-semibold text-indigo-700">Growth cleaners close 68% at Better or Best</span>
+                  {" "}— that's $40–$80 more per clean with the same AI pricing insight.
+                </p>
+                <button
+                  onClick={async () => {
+                    trackUpgradeClick("growth", "quote_better_best_nudge");
+                    await startCheckout("growth", "annual");
+                  }}
+                  disabled={checkoutLoading}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-bold text-white transition-all active:scale-95 disabled:opacity-60"
+                  style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+                >
+                  Try free 14 days
+                </button>
+              </div>
+            ) : null}
 
             {/* AI Tools Row */}
             <div className="flex flex-wrap gap-2">

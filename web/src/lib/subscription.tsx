@@ -15,6 +15,17 @@ export const PLAN_LIMITS: Record<PlanTier, { quotesPerMonth: number; label: stri
 
 const FREE_TRIAL_DAYS = 14;
 
+/** What triggered the paywall — drives contextual copy in UpgradeModal */
+export type PaywallTrigger =
+  | "quote_limit"
+  | "near_limit"
+  | "ai_feature"
+  | "pro_feature"
+  | "better_best"
+  | "dashboard"
+  | "sidebar"
+  | null;
+
 interface SubscriptionContextType {
   tier: PlanTier;
   isPro: boolean;
@@ -33,12 +44,14 @@ interface SubscriptionContextType {
   canManageOnWeb: boolean;
   canManageOnIOS: boolean;
   trialDaysRemaining: number | null;
-  showPaywall: () => void;
+  showPaywall: (trigger?: PaywallTrigger) => void;
   hidePaywall: () => void;
   paywallVisible: boolean;
+  paywallTrigger: PaywallTrigger;
   startCheckout: (plan?: PlanTier, interval?: BillingInterval) => Promise<void>;
   openPortal: () => Promise<void>;
   checkoutLoading: boolean;
+  trackUpgradeClick: (plan: string, trigger?: string) => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | null>(null);
@@ -46,6 +59,7 @@ const SubscriptionContext = createContext<SubscriptionContextType | null>(null);
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth();
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const [paywallTrigger, setPaywallTrigger] = useState<PaywallTrigger>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   // Fetch unified subscription status from DB
@@ -93,8 +107,15 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     ? Math.max(0, FREE_TRIAL_DAYS - Math.floor(userAgeMs / 86_400_000))
     : 0;
 
-  const showPaywall = useCallback(() => setPaywallVisible(true), []);
-  const hidePaywall = useCallback(() => setPaywallVisible(false), []);
+  const showPaywall = useCallback((trigger: PaywallTrigger = null) => {
+    setPaywallTrigger(trigger);
+    setPaywallVisible(true);
+  }, []);
+
+  const hidePaywall = useCallback(() => {
+    setPaywallVisible(false);
+    setPaywallTrigger(null);
+  }, []);
 
   const startCheckout = useCallback(async (plan: PlanTier = "growth", interval: BillingInterval = "monthly") => {
     setCheckoutLoading(true);
@@ -121,6 +142,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** Fire-and-forget upgrade click tracking — never throws */
+  const trackUpgradeClick = useCallback((plan: string, trigger?: string) => {
+    apiPost("/api/analytics/events", {
+      event: "upgrade_clicked",
+      properties: { plan, trigger: trigger ?? "unknown", source: "web" },
+    }).catch(() => {});
+  }, []);
+
   return (
     <SubscriptionContext.Provider
       value={{
@@ -128,8 +157,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         isInFreeTrial, freeTrialDaysLeft,
         hasUnlimitedQuotes, hasAI, hasPremium, quotesPerMonth,
         platform, subscriptionStatus, canManageOnWeb, canManageOnIOS, trialDaysRemaining,
-        showPaywall, hidePaywall, paywallVisible,
+        showPaywall, hidePaywall, paywallVisible, paywallTrigger,
         startCheckout, openPortal, checkoutLoading,
+        trackUpgradeClick,
       }}
     >
       {children}
