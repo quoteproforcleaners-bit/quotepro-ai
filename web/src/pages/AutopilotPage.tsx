@@ -40,10 +40,7 @@ interface AutopilotSettings {
 
 /* ─── Hero card ───────────────────────────────────────────────────────────── */
 
-function AutopilotHeroCard({ enabled, onToggle, loading, stats }: {
-  enabled: boolean;
-  onToggle: () => void;
-  loading: boolean;
+function AutopilotHeroCard({ stats }: {
   stats?: AutopilotStats;
 }) {
   return (
@@ -99,45 +96,6 @@ function AutopilotHeroCard({ enabled, onToggle, loading, stats }: {
               <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", margin: 0 }}>{label}</p>
             </div>
           ))}
-
-          {/* Hero toggle — special white/blue variant */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-            <button
-              onClick={onToggle}
-              disabled={loading}
-              role="switch"
-              aria-checked={enabled}
-              style={{
-                position: "relative",
-                width: "42px", height: "26px",
-                borderRadius: "13px",
-                border: "none",
-                cursor: loading ? "not-allowed" : "pointer",
-                background: enabled ? "rgba(255,255,255,0.90)" : "rgba(255,255,255,0.25)",
-                transition: "background .20s cubic-bezier(0.23, 0.93, 0.58, 1.2)",
-                flexShrink: 0,
-                opacity: loading ? 0.7 : 1,
-              }}
-            >
-              {loading ? (
-                <Loader2 style={{ position: "absolute", top: "5px", left: "11px", width: "16px", height: "16px", color: enabled ? "#007aff" : "white" }} className="animate-spin" />
-              ) : (
-                <span style={{
-                  position: "absolute",
-                  top: "3px",
-                  left: enabled ? "19px" : "3px",
-                  width: "20px", height: "20px",
-                  borderRadius: "50%",
-                  background: enabled ? "#007aff" : "white",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.22)",
-                  transition: "left .20s cubic-bezier(0.23, 0.93, 0.58, 1.2), background .20s",
-                }} />
-              )}
-            </button>
-            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.55)", margin: 0, textTransform: "uppercase", letterSpacing: ".04em" }}>
-              {enabled ? "ON" : "OFF"}
-            </p>
-          </div>
         </div>
       </div>
     </div>
@@ -302,25 +260,15 @@ function QuickActions({ navigate }: { navigate: (path: string) => void }) {
 
 /* ─── Main dashboard ──────────────────────────────────────────────────────── */
 
-function AutopilotDashboard() {
+function AutopilotDashboard({ isEnabled }: { isEnabled: boolean }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: settings, isLoading: settingsLoading } = useQuery<AutopilotSettings>({
-    queryKey: ["/api/autopilot/settings"],
-  });
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<AutopilotJob[]>({
     queryKey: ["/api/autopilot/jobs"],
   });
   const { data: stats } = useQuery<AutopilotStats>({
     queryKey: ["/api/autopilot/stats"],
-  });
-
-  const toggleMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      await apiRequest("POST", "/api/autopilot/settings", { autopilotEnabled: enabled });
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/autopilot/settings"] }),
   });
 
   const pause = async (id: string) => {
@@ -334,21 +282,14 @@ function AutopilotDashboard() {
     queryClient.invalidateQueries({ queryKey: ["/api/autopilot/stats"] });
   };
 
-  if (jobsLoading || settingsLoading) {
+  if (jobsLoading) {
     return <div style={{ display: "flex", justifyContent: "center", padding: "80px 0" }}><Spinner size="lg" /></div>;
   }
-
-  const isEnabled = settings?.autopilotEnabled ?? false;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
       {/* Hero card */}
-      <AutopilotHeroCard
-        enabled={isEnabled}
-        onToggle={() => toggleMutation.mutate(!isEnabled)}
-        loading={toggleMutation.isPending}
-        stats={stats}
-      />
+      <AutopilotHeroCard stats={stats} />
 
       {/* Metrics row — 3 cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
@@ -409,23 +350,69 @@ function AutopilotDashboard() {
 
 export default function AutopilotPage() {
   const { isGrowth, isPro } = useSubscription();
+  const queryClient = useQueryClient();
 
-  const { error } = useQuery<AutopilotJob[]>({
-    queryKey: ["/api/autopilot/jobs"],
-    retry: false,
+  const showUpsell = !isPro && !isGrowth;
+
+  const { data: settings, isLoading: settingsLoading } = useQuery<AutopilotSettings>({
+    queryKey: ["/api/autopilot/settings"],
+    enabled: !showUpsell,
   });
 
-  const is403 = (error as any)?.status === 403 || (error as any)?.upsell;
-  const showUpsell = !isPro && !isGrowth;
+  const toggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      await apiRequest("POST", "/api/autopilot/settings", { autopilotEnabled: enabled });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/autopilot/settings"] }),
+  });
+
+  const isEnabled = settings?.autopilotEnabled ?? false;
+  const toggleLoading = toggleMutation.isPending || settingsLoading;
 
   return (
     <div style={{ padding: "16px 18px" }}>
       {/* Page header */}
       <div style={{ marginBottom: "14px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
-          <h1 style={{ fontSize: "17px", fontWeight: 600, color: "var(--t1)", margin: 0 }}>Autopilot</h1>
-          {!isPro && !isGrowth && (
-            <Badge status="pro" label="Pro" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "2px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <h1 style={{ fontSize: "17px", fontWeight: 600, color: "var(--t1)", margin: 0 }}>Autopilot</h1>
+            {!isPro && !isGrowth && (
+              <Badge status="pro" label="Pro" />
+            )}
+          </div>
+          {!showUpsell && (
+            <button
+              onClick={() => !toggleLoading && toggleMutation.mutate(!isEnabled)}
+              role="switch"
+              aria-checked={isEnabled}
+              style={{
+                position: "relative",
+                width: "42px", height: "26px",
+                borderRadius: "13px",
+                border: "none",
+                cursor: toggleLoading ? "not-allowed" : "pointer",
+                background: isEnabled ? "#007aff" : "rgba(120,120,128,0.22)",
+                transition: "background .2s cubic-bezier(0.23,0.93,0.58,1.2)",
+                flexShrink: 0,
+                opacity: toggleLoading ? 0.6 : 1,
+                padding: 0,
+              }}
+            >
+              {toggleLoading ? (
+                <Loader2 style={{ position: "absolute", top: "5px", left: "11px", width: "16px", height: "16px", color: isEnabled ? "white" : "rgba(0,0,0,0.4)" }} className="animate-spin" />
+              ) : (
+                <span style={{
+                  position: "absolute",
+                  top: "3px",
+                  left: isEnabled ? "19px" : "3px",
+                  width: "20px", height: "20px",
+                  borderRadius: "50%",
+                  background: "white",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.22)",
+                  transition: "left .2s cubic-bezier(0.23,0.93,0.58,1.2)",
+                }} />
+              )}
+            </button>
           )}
         </div>
         <p style={{ fontSize: "12px", color: "var(--t3)", margin: 0 }}>
@@ -433,7 +420,7 @@ export default function AutopilotPage() {
         </p>
       </div>
 
-      {showUpsell ? <AutopilotLockedState isGrowth={isGrowth} /> : <AutopilotDashboard />}
+      {showUpsell ? <AutopilotLockedState isGrowth={isGrowth} /> : <AutopilotDashboard isEnabled={isEnabled} />}
     </div>
   );
 }
