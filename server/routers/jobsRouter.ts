@@ -1129,6 +1129,33 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
       const { photoData, photoType, caption, customerVisible } = req.body;
       if (!photoData) return res.status(400).json({ message: "Photo data required" });
 
+      // ── File validation ────────────────────────────────────────────────────
+      const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+      const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+      const mimeMatch = (photoData as string).match(/^data:([^;]+);base64,/);
+      const declaredMime = mimeMatch ? mimeMatch[1].toLowerCase() : null;
+
+      const base64Data = (photoData as string).replace(/^data:[^;]+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+
+      // Check file size
+      if (buffer.byteLength > MAX_BYTES) {
+        trackEvent(req.session.userId!, AnalyticsEvents.INVALID_FILE_UPLOAD_REJECTED, { reason: "file_too_large", size: buffer.byteLength }).catch(() => {});
+        return res.status(400).json({ message: "File too large. Maximum size is 10 MB." });
+      }
+
+      // Check MIME type via declared header and actual magic bytes
+      const { fileTypeFromBuffer } = await import("file-type");
+      const detected = await fileTypeFromBuffer(buffer);
+      const effectiveMime = detected?.mime ?? declaredMime;
+
+      if (!effectiveMime || !ALLOWED_MIME_TYPES.includes(effectiveMime)) {
+        trackEvent(req.session.userId!, AnalyticsEvents.INVALID_FILE_UPLOAD_REJECTED, { reason: "invalid_mime", mime: effectiveMime }).catch(() => {});
+        return res.status(400).json({ message: "Invalid file type. Only JPEG, PNG, WebP, and HEIC images are allowed." });
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
       const fs = await import("fs");
       const path = await import("path");
       const uploadsDir = path.join(process.cwd(), "uploads", "job-photos");
@@ -1136,11 +1163,11 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
 
-      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const ext = detected?.ext ?? "jpg";
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const filePath = path.join(uploadsDir, fileName);
 
-      const base64Data = photoData.replace(/^data:image\/\w+;base64,/, "");
-      fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+      fs.writeFileSync(filePath, buffer);
 
       const photoUrl = `/uploads/job-photos/${fileName}`;
       const photo = await createJobPhoto({

@@ -55,3 +55,10 @@ coverage/
 # Audit exports
 *.tar.gz
 quotepro-source-audit.zip
+quotepro-source-audit.tar.gz
+audit_dump.txt
+session-transcript.md
+commercial_calculator_audit.txt
+
+# Secrets / platform config
+google-services.json

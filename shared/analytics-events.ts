@@ -9,6 +9,9 @@ export const AnalyticsEvents = {
   ACCOUNT_CREATED: "account_created",
   TRIAL_STARTED: "trial_started",
 
+  // ─── Security ───────────────────────────────────────────────────────────────
+  INVALID_FILE_UPLOAD_REJECTED: "invalid_file_upload_rejected",
+
   // ─── Activation (first value moments) ──────────────────────────────────────
   FIRST_QUOTE_CREATED: "first_quote_created",
   FIRST_QUOTE_SENT: "first_quote_sent",

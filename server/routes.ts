@@ -90,11 +90,7 @@ function setupSession(app: Express) {
       secret: (() => {
         const s = process.env.SESSION_SECRET;
         if (!s) {
-          const isProduction = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1";
-          if (isProduction) {
-            console.error("[SECURITY] SESSION_SECRET env var is not set in production — sessions are insecure. Set this immediately.");
-          }
-          return "quotepro-dev-secret";
+          throw new Error("[FATAL] SESSION_SECRET environment variable is not set. Set it before starting the server.");
         }
         return s;
       })(),
@@ -158,7 +154,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }, 15 * 60 * 1000);
 
   // — Hourly cron
+  let isWorkerRunning = false;
   setInterval(async () => {
+    if (isWorkerRunning) {
+      console.warn("Background worker tick skipped — previous run still in progress");
+      return;
+    }
+    isWorkerRunning = true;
     try {
       await expireOldQuotes();
       const { sent, canceled } = await processPendingFollowUps();
@@ -172,6 +174,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (e) {
       console.error("Background worker error:", e);
+    } finally {
+      isWorkerRunning = false;
     }
   }, 60 * 60 * 1000);
 
