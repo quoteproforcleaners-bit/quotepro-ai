@@ -32,6 +32,7 @@ interface NavItem {
   icon: LucideIcon;
   pro?: boolean;
   beta?: boolean;
+  free?: boolean;
   shortcut?: string;
   description?: string;
 }
@@ -46,57 +47,61 @@ interface NavSection {
 
 const SETTINGS_NAV_KEY = "quotepro_nav_settings_open";
 
-// CORE — unlabeled, always visible
-const CORE_NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard",      label: "Dashboard",       icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — jobs today, pipeline health, and the most important actions." },
-  { to: "/lead-capture",   label: "Lead Capture",    icon: Link2,                            description: "Share your branded quote request link — customers submit details, you get instant leads." },
-  { to: "/intake-requests",label: "Quote Requests",  icon: Inbox,                            description: "View and manage quote requests submitted through your lead capture link." },
-  { to: "/commercial-quote",label: "Commercial Quote",icon: Building2,       pro: true,      description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
-  { to: "/quotes",         label: "Quotes",          icon: FileText,        shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
-  { to: "/customers",      label: "Customers",       icon: Users,           pro: true,       description: "Full contact history, quote history, job records, and notes for every client in one place." },
-  { to: "/jobs",           label: "Jobs",            icon: Briefcase,       pro: true,       description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
-  { to: "/calendar",       label: "Schedule",        icon: CalendarDays,    pro: true,       description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
+// PIPELINE — lead-to-quote workflow
+const PIPELINE_NAV_ITEMS: NavItem[] = [
+  { to: "/lead-capture",    label: "Lead Capture",    icon: Link2,       description: "Share your branded quote request link — customers submit details, you get instant leads." },
+  { to: "/intake-requests", label: "Quote Requests",  icon: Inbox,       description: "View and manage quote requests submitted through your lead capture link." },
+  { to: "/quotes",          label: "Quotes",          icon: FileText,    shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
+  { to: "/commercial-quote",label: "Commercial",      icon: Building2,   pro: true, description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
 ];
 
-// BUSINESS — labeled section (was GROWTH)
-const BUSINESS_NAV_ITEMS: NavItem[] = [
-  { to: "/follow-ups",       label: "Follow-Ups",       icon: Bell,       description: "Every quote that needs a follow-up, ranked by priority. Never let a lead go cold." },
-  { to: "/autopilot",        label: "Autopilot",         icon: PlugZap,    pro: true, beta: true, description: "4-step AI pipeline: qualify leads, send quotes, follow up, and request reviews — all automatically." },
-  { to: "/opportunities",    label: "Win-Back",          icon: Repeat2,    pro: true, description: "Re-engage past customers who went quiet — AI surfaces the best win-back opportunities." },
-  { to: "/revenue",          label: "Revenue",           icon: DollarSign, pro: true, description: "Full revenue reporting — monthly totals, job type breakdown, and trends vs. prior periods." },
-  { to: "/reviews-referrals",label: "Reviews & Referrals",icon: Star,      pro: true, description: "Automate Google review requests and track referrals from your best customers." },
+// OPERATIONS — day-to-day work management
+const OPERATIONS_NAV_ITEMS: NavItem[] = [
+  { to: "/customers", label: "Customers", icon: Users,        pro: true, description: "Full contact history, quote history, job records, and notes for every client in one place." },
+  { to: "/jobs",      label: "Jobs",      icon: Briefcase,    pro: true, description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
+  { to: "/calendar",  label: "Schedule",  icon: CalendarDays, pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
 ];
 
-// TOOLS — labeled section (collapsed by default)
+// GROWTH — business intelligence + automation
+const GROWTH_NAV_ITEMS: NavItem[] = [
+  { to: "/follow-ups",       label: "Follow-Ups",        icon: Bell,       description: "Every quote that needs a follow-up, ranked by priority. Never let a lead go cold." },
+  { to: "/autopilot",        label: "Autopilot",          icon: PlugZap,    pro: true, beta: true, description: "4-step AI pipeline: qualify leads, send quotes, follow up, and request reviews — all automatically." },
+  { to: "/opportunities",    label: "Win-Back",           icon: Repeat2,    pro: true, description: "Re-engage past customers who went quiet — AI surfaces the best win-back opportunities." },
+  { to: "/revenue",          label: "Revenue",            icon: DollarSign, pro: true, description: "Full revenue reporting — monthly totals, job type breakdown, and trends vs. prior periods." },
+  { to: "/reviews-referrals",label: "Reviews & Referrals",icon: Star,       pro: true, description: "Automate Google review requests and track referrals from your best customers." },
+];
+
+// TOOLS — AI-powered aids (collapsible)
 const TOOLS_NAV_ITEMS: NavItem[] = [
-  { to: "/quote-doctor",      label: "Quote Doctor",       icon: Zap,         description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
-  { to: "/automations",       label: "Automations",        icon: Cpu,         pro: true, description: "Set up automated follow-ups, review requests, and customer sequences that run on autopilot." },
-  { to: "/email-sequences",   label: "Automated Emails",   icon: MailOpen,    pro: true, description: "Drip campaigns and one-off emails — automated sequences that nurture leads into booked jobs." },
-  { to: "/ai-assistant",      label: "Sales Assistant",    icon: Bot,         pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
-  { to: "/closing-assistant", label: "Handle Objections",  icon: Target,      pro: true, description: "AI coach that gives you word-for-word responses to price pushback and sales objections." },
-  { to: "/walkthrough-ai",    label: "Voice-to-Quote",     icon: Wand2,       description: "Paste your walkthrough notes and let AI generate a complete, ready-to-send quote instantly." },
-  { to: "/toolkit",           label: "Toolkit",            icon: Wrench,      description: "Calculators, scripts, templates, and reference tools for running a professional cleaning business." },
+  { to: "/quote-doctor",      label: "Quote Doctor",     icon: Zap,      free: true, description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
+  { to: "/walkthrough-ai",    label: "Voice-to-Quote",   icon: Wand2,               description: "Paste your walkthrough notes and let AI generate a complete, ready-to-send quote instantly." },
+  { to: "/ai-assistant",      label: "Sales Assistant",  icon: Bot,      pro: true,  description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
+  { to: "/closing-assistant", label: "Handle Objections",icon: Target,   pro: true,  description: "AI coach that gives you word-for-word responses to price pushback and sales objections." },
+  { to: "/automations",       label: "Automations",      icon: Cpu,      pro: true,  description: "Set up automated follow-ups, review requests, and customer sequences that run on autopilot." },
+  { to: "/email-sequences",   label: "Email Sequences",  icon: MailOpen, pro: true,  description: "Drip campaigns and one-off emails — automated sequences that nurture leads into booked jobs." },
+  { to: "/toolkit",           label: "Toolkit",          icon: Wrench,              description: "Calculators, scripts, templates, and reference tools for running a professional cleaning business." },
 ];
 
-// SETTINGS — collapsible labeled section
+// SETTINGS — configuration (hidden at bottom, collapsible)
 const SETTINGS_NAV_ITEMS: NavItem[] = [
-  { to: "/settings",          label: "Price Settings",    icon: Settings,    description: "Set your base rates, add-on prices, discounts, and tax rules for all your cleaning services." },
-  { to: "/quote-preferences", label: "Quote Settings",    icon: Sliders,     description: "Control what appears on your quotes — service lines, terms, branding, and layout preferences." },
-  { to: "/pricing-logic",     label: "Pricing Engine",    icon: Brain,       description: "AI-powered pricing logic based on your market, home size, and service type. Set your rates here." },
-  { to: "/sales-strategy",    label: "Sales Strategy",    icon: Layers,      pro: true, description: "Personalized playbooks and talking points to help you close more jobs at higher prices." },
-  { to: "/employees",         label: "Team Members",      icon: UserCog,     description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
-  { to: "/team",              label: "Field Status",      icon: Radio,       description: "Live kanban view of today's field assignments — see who's checked in, en route, or completed." },
-  { to: "/file-library",      label: "File Library",      icon: FolderOpen,  description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
-  { to: "/qbo-settings",      label: "QuickBooks",        icon: PlugZap,     description: "Sync your quotes, invoices, and payments directly to QuickBooks Online." },
-  { to: "/account-settings",  label: "Account",           icon: CircleUser,  description: "Manage your profile, password, notification preferences, and billing information." },
+  { to: "/settings",          label: "Price Settings",  icon: Settings,   description: "Set your base rates, add-on prices, discounts, and tax rules for all your cleaning services." },
+  { to: "/quote-preferences", label: "Quote Settings",  icon: Sliders,    description: "Control what appears on your quotes — service lines, terms, branding, and layout preferences." },
+  { to: "/pricing-logic",     label: "Pricing Engine",  icon: Brain,      description: "AI-powered pricing logic based on your market, home size, and service type. Set your rates here." },
+  { to: "/sales-strategy",    label: "Sales Strategy",  icon: Layers,     pro: true, description: "Personalized playbooks and talking points to help you close more jobs at higher prices." },
+  { to: "/employees",         label: "Team Members",    icon: UserCog,    description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
+  { to: "/team",              label: "Field Status",    icon: Radio,      description: "Live kanban view of today's field assignments — see who's checked in, en route, or completed." },
+  { to: "/file-library",      label: "File Library",    icon: FolderOpen, description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
+  { to: "/qbo-settings",      label: "QuickBooks",      icon: PlugZap,    description: "Sync your quotes, invoices, and payments directly to QuickBooks Online." },
+  { to: "/account-settings",  label: "Account",         icon: CircleUser, description: "Manage your profile, password, notification preferences, and billing information." },
 ];
 
 // All nav items for command palette
 const navSections: NavSection[] = [
-  { label: null,       items: CORE_NAV_ITEMS },
-  { label: "BUSINESS", items: BUSINESS_NAV_ITEMS },
-  { label: "TOOLS",    items: TOOLS_NAV_ITEMS },
-  { label: "SETTINGS", items: SETTINGS_NAV_ITEMS },
+  { label: "Pipeline",    items: PIPELINE_NAV_ITEMS },
+  { label: "Operations",  items: OPERATIONS_NAV_ITEMS },
+  { label: "Growth",      items: GROWTH_NAV_ITEMS },
+  { label: "Tools",       items: TOOLS_NAV_ITEMS },
+  { label: "Settings",    items: SETTINGS_NAV_ITEMS },
 ];
 
 /* ─── Nav Translation Keys ────────────────────────────────────────────────── */
@@ -143,6 +148,53 @@ const SECTION_LABEL_KEYS: Record<string, string> = {
   Integrations: "nav.sections.integrations",
 };
 
+/* ─── Section label ──────────────────────────────────────────────────────── */
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <p style={{
+      fontSize: "10.5px",
+      fontWeight: 600,
+      color: "#b4b4bc",
+      letterSpacing: "0.04em",
+      padding: "0 10px",
+      marginBottom: "2px",
+      userSelect: "none",
+    }}>
+      {label}
+    </p>
+  );
+}
+
+function CollapsibleSectionLabel({
+  label, open, onToggle,
+}: { label: string; open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-1 group"
+      style={{ background: "none", border: "none", cursor: "pointer", padding: "0 10px 2px", marginBottom: "2px" }}
+    >
+      <span style={{ fontSize: "10.5px", fontWeight: 600, color: "#b4b4bc", letterSpacing: "0.04em", flex: 1, textAlign: "left" }}>
+        {label}
+      </span>
+      <ChevronDown
+        style={{
+          width: "11px", height: "11px", color: "#c4c4cc",
+          transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+          transition: "transform 0.18s ease",
+        }}
+      />
+    </button>
+  );
+}
+
+function NavDivider() {
+  return (
+    <div style={{ margin: "10px 2px", borderTop: "1px solid rgba(0,0,0,0.06)" }} />
+  );
+}
+
 /* ─── Nav Tooltip ────────────────────────────────────────────────────────── */
 
 const NAV_TOOLTIPS_KEY = "qp_nav_tooltips";
@@ -178,6 +230,8 @@ function NavItemWithTooltip({
   const bg = isDark ? "#27272a" : "#ffffff";
   const border = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
 
+  const isQuoteDoctor = item.to === "/quote-doctor";
+
   return (
     <div ref={wrapperRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
       <NavLink
@@ -185,28 +239,60 @@ function NavItemWithTooltip({
         onClick={() => setSidebarOpen(false)}
         className={({ isActive }) => `nav-item w-full ${isActive ? "nav-item-active" : ""}`}
       >
-        <item.icon className="shrink-0" style={{ width: "15px", height: "15px", opacity: item.to === "/quote-doctor" ? 1 : 0.85, color: item.to === "/quote-doctor" ? "#10b981" : undefined }} />
-        <span className="flex-1 text-[13px]" style={item.to === "/quote-doctor" ? { fontWeight: 700, color: "#059669" } : undefined}>{t(NAV_LABEL_KEYS[item.to] || item.label)}</span>
-        {item.to === "/quote-doctor" ? (
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500 text-white uppercase tracking-wider leading-none">FREE</span>
+        <item.icon
+          className="shrink-0"
+          style={{
+            width: "15px", height: "15px",
+            color: isQuoteDoctor ? "#059669" : undefined,
+            opacity: isQuoteDoctor ? 1 : 0.75,
+          }}
+        />
+        <span
+          className="flex-1 text-[13px]"
+          style={isQuoteDoctor ? { color: "#059669", fontWeight: 600 } : undefined}
+        >
+          {t(NAV_LABEL_KEYS[item.to] || item.label)}
+        </span>
+
+        {/* Badges — refined pill style */}
+        {item.free ? (
+          <span style={{
+            fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em",
+            padding: "2px 5px", borderRadius: "4px",
+            background: "rgba(16,185,129,0.1)", color: "#059669",
+            border: "1px solid rgba(16,185,129,0.25)",
+          }}>
+            FREE
+          </span>
         ) : null}
+        {item.beta ? (
+          <span style={{
+            fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
+            padding: "2px 5px", borderRadius: "4px",
+            background: "rgba(245,158,11,0.1)", color: "#d97706",
+            border: "1px solid rgba(245,158,11,0.25)",
+          }}>
+            BETA
+          </span>
+        ) : null}
+
+        {/* Notification badges */}
         {item.to === "/quotes" && quoteResponseCount > 0 ? (
           <span className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
-            style={{ minWidth: "18px", height: "18px", fontSize: "10px", padding: "0 4px" }}>
+            style={{ minWidth: "17px", height: "17px", fontSize: "9.5px", padding: "0 3px" }}>
             {quoteResponseCount > 99 ? "99+" : quoteResponseCount}
           </span>
         ) : null}
         {item.to === "/intake-requests" && intakeNewCount > 0 ? (
           <span className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
-            style={{ minWidth: "18px", height: "18px", fontSize: "10px", padding: "0 4px" }}>
+            style={{ minWidth: "17px", height: "17px", fontSize: "9.5px", padding: "0 3px" }}>
             {intakeNewCount > 99 ? "99+" : intakeNewCount}
           </span>
         ) : null}
-        {item.beta ? (
-          <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500 text-white uppercase tracking-wider leading-none">Beta</span>
-        ) : null}
+
+        {/* Pro lock */}
         {item.pro && !isPro ? (
-          <Lock className="shrink-0" style={{ width: "12px", height: "12px", color: "#d4d4d8" }} />
+          <Lock className="shrink-0" style={{ width: "11px", height: "11px", color: "#d4d4d8" }} />
         ) : null}
       </NavLink>
 
@@ -215,7 +301,7 @@ function NavItemWithTooltip({
           onMouseEnter={clear}
           onMouseLeave={handleMouseLeave}
           style={{
-            position: "fixed", left: 262, top: tooltipTop,
+            position: "fixed", left: 270, top: tooltipTop,
             transform: "translateY(-50%)", zIndex: 9999, width: 228,
             background: bg, border: `1px solid ${border}`,
             borderRadius: 12, padding: "10px 14px",
@@ -245,25 +331,28 @@ function NavItemWithTooltip({
 /* ─── Command Palette ─────────────────────────────────────────────────────── */
 
 const ALL_CMD_ITEMS = [
-  { label: "New Quote", icon: Plus, path: "/quotes/new", group: "Actions", color: "#2563eb" },
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", group: "Navigate" },
-  { label: "Quotes", icon: FileText, path: "/quotes", group: "Navigate" },
-  { label: "Customers", icon: Users, path: "/customers", group: "Navigate" },
-  { label: "Jobs", icon: Briefcase, path: "/jobs", group: "Navigate" },
-  { label: "Team Members", icon: UserCog, path: "/employees", group: "Navigate" },
-  { label: "Schedule", icon: CalendarDays, path: "/calendar", group: "Navigate" },
-  { label: "Follow-Ups", icon: Bell, path: "/follow-ups", group: "Navigate" },
-  { label: "Win-Back", icon: Repeat2, path: "/opportunities", group: "Navigate" },
-  { label: "Revenue", icon: DollarSign, path: "/revenue", group: "Navigate" },
-  { label: "Reviews & Referrals", icon: Star, path: "/reviews-referrals", group: "Navigate" },
-  { label: "Lead Capture", icon: Link2, path: "/lead-capture", group: "Navigate" },
-  { label: "Autopilot", icon: PlugZap, path: "/autopilot", group: "Navigate" },
-  { label: "Automations", icon: Cpu, path: "/automations", group: "Navigate" },
-  { label: "Sales Assistant", icon: Bot, path: "/ai-assistant", group: "Navigate" },
-  { label: "Handle Objections", icon: Target, path: "/closing-assistant", group: "Navigate" },
-  { label: "Voice-to-Quote", icon: Wand2, path: "/walkthrough-ai", group: "Navigate" },
-  { label: "Pricing Engine", icon: Brain, path: "/pricing-logic", group: "Navigate" },
-  { label: "Account Settings", icon: Settings, path: "/account-settings", group: "Navigate" },
+  { label: "New Quote",          icon: Plus,            path: "/quotes/new",        group: "Actions",  color: "#2563eb" },
+  { label: "Dashboard",          icon: LayoutDashboard, path: "/dashboard",         group: "Navigate" },
+  { label: "Lead Capture",       icon: Link2,           path: "/lead-capture",      group: "Navigate" },
+  { label: "Quote Requests",     icon: Inbox,           path: "/intake-requests",   group: "Navigate" },
+  { label: "Quotes",             icon: FileText,        path: "/quotes",            group: "Navigate" },
+  { label: "Commercial Quote",   icon: Building2,       path: "/commercial-quote",  group: "Navigate" },
+  { label: "Customers",          icon: Users,           path: "/customers",         group: "Navigate" },
+  { label: "Jobs",               icon: Briefcase,       path: "/jobs",              group: "Navigate" },
+  { label: "Schedule",           icon: CalendarDays,    path: "/calendar",          group: "Navigate" },
+  { label: "Follow-Ups",         icon: Bell,            path: "/follow-ups",        group: "Navigate" },
+  { label: "Autopilot",          icon: PlugZap,         path: "/autopilot",         group: "Navigate" },
+  { label: "Win-Back",           icon: Repeat2,         path: "/opportunities",     group: "Navigate" },
+  { label: "Revenue",            icon: DollarSign,      path: "/revenue",           group: "Navigate" },
+  { label: "Reviews & Referrals",icon: Star,            path: "/reviews-referrals", group: "Navigate" },
+  { label: "Quote Doctor",       icon: Zap,             path: "/quote-doctor",      group: "Navigate" },
+  { label: "Voice-to-Quote",     icon: Wand2,           path: "/walkthrough-ai",    group: "Navigate" },
+  { label: "Sales Assistant",    icon: Bot,             path: "/ai-assistant",      group: "Navigate" },
+  { label: "Handle Objections",  icon: Target,          path: "/closing-assistant", group: "Navigate" },
+  { label: "Automations",        icon: Cpu,             path: "/automations",       group: "Navigate" },
+  { label: "Pricing Engine",     icon: Brain,           path: "/pricing-logic",     group: "Navigate" },
+  { label: "Account Settings",   icon: Settings,        path: "/account-settings",  group: "Navigate" },
+  { label: "Team Members",       icon: UserCog,         path: "/employees",         group: "Navigate" },
 ];
 
 function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -386,7 +475,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/follow-ups": "Follow-Ups", "/revenue": "Revenue", "/growth": "Growth Hub",
   "/opportunities": "Win-Back", "/lead-finder": "Lead Finder",
   "/lead-capture": "Lead Capture", "/reactivation": "Win-Back",
-  "/email-sequences": "Automated Emails", "/reviews-referrals": "Reviews & Referrals",
+  "/email-sequences": "Email Sequences", "/reviews-referrals": "Reviews & Referrals",
   "/weekly-recap": "Weekly Recap", "/tasks-queue": "Tasks Queue",
   "/autopilot": "Autopilot", "/automations": "Automations", "/ai-assistant": "Sales Assistant",
   "/walkthrough-ai": "Voice-to-Quote", "/intake-requests": "Quote Requests",
@@ -452,6 +541,24 @@ function TrialCountdownBanner() {
   );
 }
 
+/* ─── Sidebar nav helper ─────────────────────────────────────────────────── */
+
+function renderNavItems(
+  items: NavItem[],
+  props: {
+    enabled: boolean;
+    intakeNewCount: number;
+    quoteResponseCount: number;
+    isPro: boolean;
+    setSidebarOpen: (v: boolean) => void;
+    t: (k: string) => string;
+  }
+) {
+  return items.map((item) => (
+    <NavItemWithTooltip key={item.to} item={item} {...props} />
+  ));
+}
+
 export function Layout() {
   const { user, business } = useAuth();
   const { isPro } = useSubscription();
@@ -502,7 +609,6 @@ export function Layout() {
   const quoteCount = quoteCountData?.count ?? 0;
   const featureUnlocked = quoteCount >= 5;
 
-  // Badge: count accepted/declined responses since user last visited /quotes
   const QP_QUOTES_CHECKED_KEY = "qp_quotes_last_checked";
   const [lastQuotesChecked] = useState<string>(() => {
     try { return localStorage.getItem(QP_QUOTES_CHECKED_KEY) || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); } catch { return new Date(0).toISOString(); }
@@ -518,7 +624,6 @@ export function Layout() {
   });
   const quoteResponseCount = quoteResponseData?.count ?? 0;
 
-  // Clear badge when user navigates to /quotes
   useEffect(() => {
     if (location.pathname === "/quotes" || location.pathname.startsWith("/quotes/")) {
       try {
@@ -565,6 +670,15 @@ export function Layout() {
   const currentTitle = ROUTE_TITLES[location.pathname] ||
     (location.pathname.startsWith("/quotes/") ? "Quote" : "QuotePro");
 
+  const navItemProps = {
+    enabled: navTooltipsEnabled,
+    intakeNewCount,
+    quoteResponseCount,
+    isPro,
+    setSidebarOpen,
+    t,
+  };
+
   return (
     <AIToastProvider>
     <div className="min-h-screen flex bg-[#F5F4F1]">
@@ -572,7 +686,7 @@ export function Layout() {
       {sidebarOpen ? (
         <div
           className="fixed inset-0 z-40 lg:hidden"
-          style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
+          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
           onClick={() => setSidebarOpen(false)}
         />
       ) : null}
@@ -585,294 +699,270 @@ export function Layout() {
           lg:translate-x-0 lg:static lg:z-auto
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
-        style={{
-          width: "248px",
-          borderRight: "1px solid rgba(0,0,0,0.07)",
-        }}
+        style={{ width: "260px", borderRight: "1px solid rgba(0,0,0,0.07)" }}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 px-4 shrink-0" style={{ height: "56px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+
+        {/* ── Logo / Header ── */}
+        <div
+          className="flex items-center gap-2.5 px-4 shrink-0"
+          style={{ height: "56px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}
+        >
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
             style={{ background: "linear-gradient(135deg, #1d4ed8, #2563eb)" }}
           >
             <Zap className="w-3.5 h-3.5 text-white" />
           </div>
-          <span className="font-bold text-[15px] tracking-tight text-zinc-900">
-            QuotePro
-          </span>
-          <span
-            className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-            style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)", color: "white", letterSpacing: "0.08em" }}
-          >
-            AI
-          </span>
-          <div className="flex items-center gap-1.5 ml-auto">
-            {isPro ? (
-              <span
-                className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
-                style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "white" }}
-              >
-                Pro
-              </span>
-            ) : null}
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-1 rounded-md text-zinc-400 hover:text-zinc-600 transition-colors"
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <span className="font-bold text-[15px] tracking-tight text-zinc-900">QuotePro</span>
+            <span
+              style={{
+                fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em",
+                padding: "2px 5px", borderRadius: "4px",
+                background: "linear-gradient(135deg, #f59e0b, #f97316)", color: "white",
+              }}
             >
-              <X className="w-4 h-4" />
-            </button>
+              AI
+            </span>
           </div>
+          {isPro ? (
+            <span
+              style={{
+                fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em",
+                padding: "2px 7px", borderRadius: "5px",
+                background: "rgba(124,58,237,0.08)", color: "#7c3aed",
+                border: "1px solid rgba(124,58,237,0.2)",
+              }}
+            >
+              Pro
+            </span>
+          ) : null}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-1 rounded-md text-zinc-400 hover:text-zinc-600 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Command palette trigger */}
-        <div className="px-3 pt-3 pb-2 shrink-0">
+        {/* ── Search + New Quote ── */}
+        <div className="px-3 pt-3 pb-2 shrink-0 space-y-2">
           <button
             onClick={() => setCmdOpen(true)}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left group"
             style={{ background: "#F4F4F5", border: "1px solid rgba(0,0,0,0.06)" }}
           >
-            <Search className="w-3.5 h-3.5 shrink-0" style={{ color: "#a1a1aa" }} />
-            <span className="flex-1 text-[12.5px]" style={{ color: "#a1a1aa" }}>{t("common.searchOrJump")}</span>
+            <Search className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
+            <span className="flex-1 text-[12.5px] text-zinc-400">{t("common.searchOrJump")}</span>
             <div className="flex items-center gap-0.5">
               <kbd className="cmd-kbd">⌘</kbd>
               <kbd className="cmd-kbd">K</kbd>
             </div>
           </button>
+
+          <button
+            onClick={() => { navigate("/quotes/new"); setSidebarOpen(false); }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold text-white transition-all active:scale-[0.98]"
+            style={{
+              background: "linear-gradient(135deg, #1d4ed8, #2563eb)",
+              boxShadow: "0 1px 4px rgba(37,99,235,0.25)",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.92"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Quote
+          </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 pb-3 overflow-y-auto" style={{ paddingTop: "4px" }}>
-          {/* CORE — unlabeled */}
+        {/* ── Navigation ── */}
+        <nav className="flex-1 px-3 pb-3 overflow-y-auto" style={{ paddingTop: "6px" }}>
+
+          {/* Dashboard — top-level, prominent */}
           <div className="space-y-0.5 mb-1">
-            {CORE_NAV_ITEMS.map((item) => (
-              <NavItemWithTooltip
-                key={item.to}
-                item={item}
-                enabled={navTooltipsEnabled}
-                intakeNewCount={intakeNewCount}
-                quoteResponseCount={quoteResponseCount}
-                isPro={isPro}
-                setSidebarOpen={setSidebarOpen}
-                t={t}
-              />
-            ))}
+            <NavItemWithTooltip
+              item={{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — jobs today, pipeline health, and the most important actions." }}
+              {...navItemProps}
+            />
           </div>
 
-          {/* BUSINESS */}
-          <div style={{ marginTop: "24px" }}>
-            <p
-              className="px-3 mb-1"
-              style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", color: "#a1a1aa" }}
-            >
-              BUSINESS
-            </p>
-            <div className="space-y-0.5">
-              {BUSINESS_NAV_ITEMS.map((item) => (
-                <NavItemWithTooltip
-                  key={item.to}
-                  item={item}
-                  enabled={navTooltipsEnabled}
-                  intakeNewCount={intakeNewCount}
-                  quoteResponseCount={quoteResponseCount}
-                  isPro={isPro}
-                  setSidebarOpen={setSidebarOpen}
-                  t={t}
-                />
-              ))}
-            </div>
+          <NavDivider />
+
+          {/* Pipeline */}
+          <div className="space-y-0.5 mb-1">
+            <SectionLabel label="pipeline" />
+            {renderNavItems(PIPELINE_NAV_ITEMS, navItemProps)}
           </div>
 
-          {/* TOOLS — collapsible, closed by default */}
-          <div style={{ marginTop: "24px" }}>
-            <button
-              onClick={toggleToolsNav}
-              className="w-full px-3 mb-1 flex items-center gap-1.5 group"
-              style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 12px 4px" }}
-            >
-              <span
-                style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", color: "#a1a1aa", flex: 1, textAlign: "left" }}
-              >
-                TOOLS
-              </span>
-              <ChevronDown
-                style={{
-                  width: "12px", height: "12px", color: "#a1a1aa",
-                  transform: toolsOpen ? "rotate(0deg)" : "rotate(-90deg)",
-                  transition: "transform 0.18s ease",
-                }}
-              />
-            </button>
-            {toolsOpen && (
+          <NavDivider />
+
+          {/* Operations */}
+          <div className="space-y-0.5 mb-1">
+            <SectionLabel label="operations" />
+            {renderNavItems(OPERATIONS_NAV_ITEMS, navItemProps)}
+          </div>
+
+          <NavDivider />
+
+          {/* Growth */}
+          <div className="space-y-0.5 mb-1">
+            <SectionLabel label="growth" />
+            {renderNavItems(GROWTH_NAV_ITEMS, navItemProps)}
+          </div>
+
+          <NavDivider />
+
+          {/* Tools — collapsible */}
+          <div className="space-y-0.5 mb-1">
+            <CollapsibleSectionLabel label="tools" open={toolsOpen} onToggle={toggleToolsNav} />
+            {toolsOpen ? (
               <div className="space-y-0.5">
-                {TOOLS_NAV_ITEMS.map((item) => (
-                  <NavItemWithTooltip
-                    key={item.to}
-                    item={item}
-                    enabled={navTooltipsEnabled}
-                    intakeNewCount={intakeNewCount}
-                    quoteResponseCount={quoteResponseCount}
-                    isPro={isPro}
-                    setSidebarOpen={setSidebarOpen}
-                    t={t}
-                  />
-                ))}
+                {renderNavItems(TOOLS_NAV_ITEMS, navItemProps)}
               </div>
-            )}
+            ) : null}
           </div>
 
-          {/* SETTINGS — collapsible */}
-          <div style={{ marginTop: "24px" }}>
+        </nav>
+
+        {/* ── Footer ── */}
+        <div className="shrink-0" style={{ borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+
+          {/* Progressive feature disclosure */}
+          {!featureUnlocked ? (
+            <div className="px-3 pt-3 pb-2">
+              <div
+                className="rounded-xl p-3"
+                style={{
+                  background: "linear-gradient(135deg, rgba(59,130,246,0.06), rgba(99,102,241,0.06))",
+                  border: "1px solid rgba(99,102,241,0.15)",
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#6366f1", flexShrink: 0 }} />
+                  <span style={{ fontSize: "10.5px", fontWeight: 700, color: "#818cf8" }}>More features unlock soon</span>
+                </div>
+                <div className="flex gap-1 mb-1.5">
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        flex: 1, height: "3px", borderRadius: "2px",
+                        background: i < quoteCount ? "#6366f1" : "rgba(99,102,241,0.12)",
+                        transition: "background 0.3s",
+                      }}
+                    />
+                  ))}
+                </div>
+                <p style={{ fontSize: "10px", color: "#94a3b8", lineHeight: 1.5 }}>
+                  {quoteCount === 0
+                    ? "Send your first quote to get started"
+                    : `${5 - quoteCount} more quote${5 - quoteCount !== 1 ? "s" : ""} to unlock Growth, AI & Automations`}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Settings — collapsible at footer */}
+          <div className="px-3 pt-2 pb-1">
             <button
               onClick={toggleSettingsNav}
-              className="w-full px-3 mb-1 flex items-center gap-1.5 group"
-              style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 12px 4px" }}
+              className="nav-item w-full"
+              style={{ color: settingsOpen ? "#52525b" : "#a1a1aa" }}
             >
-              <span
-                style={{ fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.7px", color: "#a1a1aa", flex: 1, textAlign: "left" }}
-              >
-                SETTINGS
-              </span>
+              <Settings style={{ width: "14px", height: "14px", opacity: 0.7 }} />
+              <span style={{ fontSize: "12.5px", flex: 1 }}>Settings</span>
               <ChevronDown
                 style={{
-                  width: "12px", height: "12px", color: "#a1a1aa",
+                  width: "11px", height: "11px", color: "#c4c4cc",
                   transform: settingsOpen ? "rotate(0deg)" : "rotate(-90deg)",
                   transition: "transform 0.18s ease",
                 }}
               />
             </button>
-            {settingsOpen && (
-              <div className="space-y-0.5">
-                {SETTINGS_NAV_ITEMS.map((item) => (
-                  <NavItemWithTooltip
-                    key={item.to}
-                    item={item}
-                    enabled={navTooltipsEnabled}
-                    intakeNewCount={intakeNewCount}
-                    quoteResponseCount={quoteResponseCount}
-                    isPro={isPro}
-                    setSidebarOpen={setSidebarOpen}
-                    t={t}
-                  />
-                ))}
+            {settingsOpen ? (
+              <div className="space-y-0.5 mt-0.5 mb-1">
+                {renderNavItems(SETTINGS_NAV_ITEMS, navItemProps)}
               </div>
-            )}
+            ) : null}
           </div>
-        </nav>
 
-        {/* Progressive feature disclosure */}
-        {!featureUnlocked && (
-          <div className="px-3 pb-2 shrink-0">
-            <div
-              className="rounded-xl p-3"
-              style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.08))", border: "1px solid rgba(99,102,241,0.2)" }}
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#6366f1", flexShrink: 0 }} />
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#a5b4fc" }}>More features unlock soon</span>
-              </div>
-              <div className="flex gap-1 mb-1.5">
-                {[...Array(5)].map((_, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      flex: 1, height: "3px", borderRadius: "2px",
-                      background: i < quoteCount ? "#6366f1" : "rgba(99,102,241,0.15)",
-                      transition: "background 0.3s",
-                    }}
-                  />
-                ))}
-              </div>
-              <p style={{ fontSize: "10.5px", color: "#94a3b8", lineHeight: 1.5 }}>
-                {quoteCount === 0
-                  ? "Send your first quote to get started"
-                  : `${5 - quoteCount} more quote${5 - quoteCount !== 1 ? "s" : ""} to unlock Growth, Automations & AI`}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Product Tour */}
-        <div className="px-3 pb-1 shrink-0">
-          <button
-            onClick={() => { resetTour(); setSidebarOpen(false); }}
-            className="nav-item w-full"
-            style={{ color: "#a1a1aa" }}
-          >
-            <BookOpen style={{ width: "14px", height: "14px" }} />
-            <span style={{ fontSize: "12.5px" }}>{t("nav.productTour")}</span>
-          </button>
-        </div>
-
-        {/* Help & Support */}
-        <div className="px-3 pb-2 shrink-0">
-          <button
-            onClick={() => { setSupportOpen(true); setSidebarOpen(false); }}
-            className="nav-item w-full"
-            style={{ color: "#a1a1aa" }}
-          >
-            <LifeBuoy style={{ width: "14px", height: "14px" }} />
-            <span style={{ fontSize: "12.5px" }}>Help &amp; Support</span>
-          </button>
-        </div>
-
-        <AppStoreQR />
-
-        {/* Upgrade CTA */}
-        {!isPro ? (
-          <div className="px-3 pb-3 shrink-0">
+          {/* Product Tour + Help */}
+          <div className="px-3 pb-1 space-y-0.5">
             <button
-              onClick={() => navigate("/upgrade?source=sidebar")}
-              className="w-full p-3.5 rounded-xl text-left relative overflow-hidden group"
-              style={{ background: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)" }}
+              onClick={() => { resetTour(); setSidebarOpen(false); }}
+              className="nav-item w-full"
+              style={{ color: "#a1a1aa" }}
+            >
+              <BookOpen style={{ width: "14px", height: "14px" }} />
+              <span style={{ fontSize: "12.5px" }}>{t("nav.productTour")}</span>
+            </button>
+            <button
+              onClick={() => { setSupportOpen(true); setSidebarOpen(false); }}
+              className="nav-item w-full"
+              style={{ color: "#a1a1aa" }}
+            >
+              <LifeBuoy style={{ width: "14px", height: "14px" }} />
+              <span style={{ fontSize: "12.5px" }}>Help &amp; Support</span>
+            </button>
+          </div>
+
+          <AppStoreQR />
+
+          {/* Upgrade CTA */}
+          {!isPro ? (
+            <div className="px-3 pb-3">
+              <button
+                onClick={() => navigate("/upgrade?source=sidebar")}
+                className="w-full p-3.5 rounded-xl text-left relative overflow-hidden group"
+                style={{ background: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)" }}
+              >
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: "radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1), transparent 60%)" }}
+                />
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Crown className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
+                    <span className="text-[13px] font-bold text-white">Upgrade to Growth</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed" style={{ color: "rgba(147,197,253,0.9)" }}>
+                    Unlimited quotes, AI tools, CRM &amp; more
+                  </p>
+                  <div className="flex items-center gap-1 mt-2 text-[11px] font-semibold" style={{ color: "rgba(147,197,253,0.8)" }}>
+                    <span>From $19/mo</span>
+                    <span style={{ opacity: 0.5 }}>&middot;</span>
+                    <span>7-day free trial</span>
+                    <ArrowUpRight className="w-3 h-3 ml-auto" />
+                  </div>
+                </div>
+              </button>
+            </div>
+          ) : null}
+
+          {/* User Profile */}
+          <div className="px-3 pb-3" style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: "12px" }}>
+            <button
+              onClick={() => { navigate("/account-settings"); setSidebarOpen(false); }}
+              className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg transition-colors text-left"
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
             >
               <div
-                className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ background: "radial-gradient(circle at 80% 20%, rgba(255,255,255,0.12), transparent 60%)" }}
-              />
-              <div className="relative">
-                <div className="flex items-center gap-2 mb-1">
-                  <Crown className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
-                  <span className="text-[13px] font-bold text-white">Upgrade to Growth</span>
-                </div>
-                <p className="text-[11px] leading-relaxed" style={{ color: "rgba(147,197,253,0.9)" }}>
-                  Unlimited quotes, AI tools, CRM &amp; more
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}
+              >
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12.5px] font-semibold truncate leading-tight" style={{ color: "#18181b" }}>
+                  {user?.firstName} {user?.lastName}
                 </p>
-                <div className="flex items-center gap-1 mt-2 text-[11px] font-semibold" style={{ color: "rgba(147,197,253,0.8)" }}>
-                  <span>From $19/mo</span>
-                  <span style={{ opacity: 0.5 }}>&middot;</span>
-                  <span>7-day free trial</span>
-                  <ArrowUpRight className="w-3 h-3 ml-auto" />
-                </div>
+                <p className="text-[11px] truncate leading-tight" style={{ color: "#a1a1aa" }}>
+                  {business?.companyName || ""}
+                </p>
               </div>
             </button>
           </div>
-        ) : null}
-
-        {/* User Profile */}
-        <div className="px-3 pb-3 shrink-0" style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: "12px" }}>
-          <button
-            onClick={() => { navigate("/account-settings"); setSidebarOpen(false); }}
-            className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg transition-colors text-left group"
-            style={{ hover: {} }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
-          >
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-              style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}
-            >
-              {initials}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[12.5px] font-semibold truncate leading-tight" style={{ color: "#18181b" }}>
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p className="text-[11px] truncate leading-tight" style={{ color: "#a1a1aa" }}>
-                {business?.companyName || ""}
-              </p>
-            </div>
-          </button>
         </div>
       </aside>
 

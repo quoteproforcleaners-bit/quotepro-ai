@@ -315,20 +315,20 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 6px 10px;
-  border-radius: 7px;
+  padding: 7px 10px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
   color: #52525b;
   cursor: pointer;
-  transition: all 0.1s ease;
+  transition: background 0.12s ease, color 0.12s ease;
   text-decoration: none;
   white-space: nowrap;
 }
 
 .nav-item:hover {
-  background: rgba(0,0,0,0.04);
-  color: #18181b;
+  background: rgba(0,0,0,0.042);
+  color: #27272a;
 }
 
 .nav-item-active {
@@ -341,11 +341,11 @@ input[type="range"]::-moz-range-thumb {
   content: '';
   position: absolute;
   left: 0;
-  top: 20%;
-  height: 60%;
+  top: 18%;
+  height: 64%;
   width: 2.5px;
   background: #2563eb;
-  border-radius: 0 2px 2px 0;
+  border-radius: 0 3px 3px 0;
 }
 
 /* ─── Command Palette ────────────────────────────────────────────────────── */
