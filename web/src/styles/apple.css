@@ -43,3 +43,51 @@ body {
   background: rgba(0,0,0,0.15);
   border-radius: 3px;
 }
+
+/* ── Nav icon squares ── */
+.nav-icon-sq {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.68;
+  transition: opacity .1s;
+}
+.nav-item-active .nav-icon-sq {
+  background: rgba(255,255,255,0.22) !important;
+  opacity: 1;
+}
+.nav-item:hover:not(.nav-item-active) .nav-icon-sq {
+  opacity: 0.88;
+}
+
+/* ── Nav count badges ── */
+.nav-badge {
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(0,0,0,0.10);
+  border-radius: 8px;
+  padding: 1px 6px;
+  color: var(--t2);
+  line-height: 1.5;
+}
+.nav-item-active .nav-badge {
+  background: rgba(255,255,255,0.28) !important;
+  color: white !important;
+}
+
+/* ── Nav new/beta/free tags ── */
+.nav-new-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  line-height: 1.5;
+}
+.nav-item-active .nav-new-tag {
+  background: rgba(255,255,255,0.28) !important;
+  color: white !important;
+}

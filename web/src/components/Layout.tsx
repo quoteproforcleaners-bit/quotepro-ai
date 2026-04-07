@@ -153,12 +153,13 @@ const SECTION_LABEL_KEYS: Record<string, string> = {
 function SectionLabel({ label }: { label: string }) {
   return (
     <p style={{
-      fontSize: "10.5px",
+      fontSize: "10px",
       fontWeight: 600,
-      color: "#b4b4bc",
-      letterSpacing: "0.04em",
+      color: "var(--t4)",
+      letterSpacing: ".08em",
+      textTransform: "uppercase",
       padding: "0 10px",
-      marginBottom: "2px",
+      margin: "0 0 2px",
       userSelect: "none",
     }}>
       {label}
@@ -175,12 +176,12 @@ function CollapsibleSectionLabel({
       className="w-full flex items-center gap-1 group"
       style={{ background: "none", border: "none", cursor: "pointer", padding: "0 10px 2px", marginBottom: "2px" }}
     >
-      <span style={{ fontSize: "10.5px", fontWeight: 600, color: "#b4b4bc", letterSpacing: "0.04em", flex: 1, textAlign: "left" }}>
+      <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--t4)", letterSpacing: ".08em", textTransform: "uppercase", flex: 1, textAlign: "left" }}>
         {label}
       </span>
       <ChevronDown
         style={{
-          width: "11px", height: "11px", color: "#c4c4cc",
+          width: "11px", height: "11px", color: "var(--t4)",
           transform: open ? "rotate(0deg)" : "rotate(-90deg)",
           transition: "transform 0.18s ease",
         }}
@@ -239,60 +240,52 @@ function NavItemWithTooltip({
         onClick={() => setSidebarOpen(false)}
         className={({ isActive }) => `nav-item w-full ${isActive ? "nav-item-active" : ""}`}
       >
-        <item.icon
-          className="shrink-0"
-          style={{
-            width: "15px", height: "15px",
-            color: isQuoteDoctor ? "#059669" : undefined,
-            opacity: isQuoteDoctor ? 1 : 0.75,
-          }}
-        />
+        {/* Icon square */}
         <span
-          className="flex-1 text-[13px]"
-          style={isQuoteDoctor ? { color: "#059669", fontWeight: 600 } : undefined}
+          className="nav-icon-sq"
+          style={isQuoteDoctor ? { color: "#059669" } : undefined}
+        >
+          <item.icon style={{ width: "13px", height: "13px" }} />
+        </span>
+
+        <span
+          className="flex-1"
+          style={{
+            fontSize: "13px",
+            ...(isQuoteDoctor ? { color: "#059669", fontWeight: 600 } : {}),
+          }}
         >
           {t(NAV_LABEL_KEYS[item.to] || item.label)}
         </span>
 
-        {/* Badges — refined pill style */}
+        {/* Free tag */}
         {item.free ? (
-          <span style={{
-            fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em",
-            padding: "2px 5px", borderRadius: "4px",
-            background: "rgba(16,185,129,0.1)", color: "#059669",
-            border: "1px solid rgba(16,185,129,0.25)",
-          }}>
+          <span className="nav-new-tag" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>
             FREE
           </span>
         ) : null}
+        {/* Beta tag */}
         {item.beta ? (
-          <span style={{
-            fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
-            padding: "2px 5px", borderRadius: "4px",
-            background: "rgba(245,158,11,0.1)", color: "#d97706",
-            border: "1px solid rgba(245,158,11,0.25)",
-          }}>
+          <span className="nav-new-tag" style={{ background: "rgba(245,158,11,0.10)", color: "#d97706" }}>
             BETA
           </span>
         ) : null}
 
-        {/* Notification badges */}
+        {/* Notification count badges */}
         {item.to === "/quotes" && quoteResponseCount > 0 ? (
-          <span className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
-            style={{ minWidth: "17px", height: "17px", fontSize: "9.5px", padding: "0 3px" }}>
+          <span className="nav-badge" style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626" }}>
             {quoteResponseCount > 99 ? "99+" : quoteResponseCount}
           </span>
         ) : null}
         {item.to === "/intake-requests" && intakeNewCount > 0 ? (
-          <span className="flex items-center justify-center rounded-full bg-red-500 text-white font-bold leading-none"
-            style={{ minWidth: "17px", height: "17px", fontSize: "9.5px", padding: "0 3px" }}>
+          <span className="nav-badge" style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626" }}>
             {intakeNewCount > 99 ? "99+" : intakeNewCount}
           </span>
         ) : null}
 
         {/* Pro lock */}
         {item.pro && !isPro ? (
-          <Lock className="shrink-0" style={{ width: "11px", height: "11px", color: "#d4d4d8" }} />
+          <Lock className="shrink-0" style={{ width: "11px", height: "11px", color: "var(--t4)" }} />
         ) : null}
       </NavLink>
 
@@ -681,387 +674,460 @@ export function Layout() {
 
   return (
     <AIToastProvider>
-    <div className="min-h-screen flex bg-[#F5F4F1]">
-      {/* Mobile overlay */}
-      {sidebarOpen ? (
-        <div
-          className="fixed inset-0 z-40 lg:hidden"
-          style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
-          onClick={() => setSidebarOpen(false)}
-        />
-      ) : null}
-
-      {/* ── Sidebar ── */}
-      <aside
-        className={`
-          fixed inset-y-0 left-0 z-50 flex flex-col bg-white
-          transform transition-transform duration-200 ease-out
-          lg:translate-x-0 lg:static lg:z-auto
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-        `}
-        style={{ width: "260px", borderRight: "1px solid rgba(0,0,0,0.07)" }}
+      {/* ── App window chrome ── */}
+      <div
+        style={{
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          borderRadius: "var(--r14)",
+          overflow: "hidden",
+          boxShadow: "var(--shadow-window)",
+          background: "var(--sys-bg)",
+        }}
       >
-
-        {/* ── Logo / Header ── */}
+        {/* ── TITLEBAR (full-width, spans sidebar + content) ── */}
         <div
-          className="flex items-center gap-2.5 px-4 shrink-0"
-          style={{ height: "56px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}
-        >
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: "linear-gradient(135deg, #1d4ed8, #2563eb)" }}
-          >
-            <Zap className="w-3.5 h-3.5 text-white" />
-          </div>
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className="font-bold text-[15px] tracking-tight text-zinc-900">QuotePro</span>
-            <span
-              style={{
-                fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em",
-                padding: "2px 5px", borderRadius: "4px",
-                background: "linear-gradient(135deg, #f59e0b, #f97316)", color: "white",
-              }}
-            >
-              AI
-            </span>
-          </div>
-          {isPro ? (
-            <span
-              style={{
-                fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em",
-                padding: "2px 7px", borderRadius: "5px",
-                background: "rgba(124,58,237,0.08)", color: "#7c3aed",
-                border: "1px solid rgba(124,58,237,0.2)",
-              }}
-            >
-              Pro
-            </span>
-          ) : null}
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1 rounded-md text-zinc-400 hover:text-zinc-600 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* ── Search + New Quote ── */}
-        <div className="px-3 pt-3 pb-2 shrink-0 space-y-2">
-          <button
-            onClick={() => setCmdOpen(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left group"
-            style={{ background: "#F4F4F5", border: "1px solid rgba(0,0,0,0.06)" }}
-          >
-            <Search className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
-            <span className="flex-1 text-[12.5px] text-zinc-400">{t("common.searchOrJump")}</span>
-            <div className="flex items-center gap-0.5">
-              <kbd className="cmd-kbd">⌘</kbd>
-              <kbd className="cmd-kbd">K</kbd>
-            </div>
-          </button>
-
-          <button
-            onClick={() => { navigate("/quotes/new"); setSidebarOpen(false); }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-[13px] font-semibold text-white transition-all active:scale-[0.98]"
-            style={{
-              background: "linear-gradient(135deg, #1d4ed8, #2563eb)",
-              boxShadow: "0 1px 4px rgba(37,99,235,0.25)",
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.92"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New Quote
-          </button>
-        </div>
-
-        {/* ── Navigation ── */}
-        <nav className="flex-1 px-3 pb-3 overflow-y-auto" style={{ paddingTop: "6px" }}>
-
-          {/* Dashboard — top-level, prominent */}
-          <div className="space-y-0.5 mb-1">
-            <NavItemWithTooltip
-              item={{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — jobs today, pipeline health, and the most important actions." }}
-              {...navItemProps}
-            />
-          </div>
-
-          <NavDivider />
-
-          {/* Pipeline */}
-          <div className="space-y-0.5 mb-1">
-            <SectionLabel label="pipeline" />
-            {renderNavItems(PIPELINE_NAV_ITEMS, navItemProps)}
-          </div>
-
-          <NavDivider />
-
-          {/* Operations */}
-          <div className="space-y-0.5 mb-1">
-            <SectionLabel label="operations" />
-            {renderNavItems(OPERATIONS_NAV_ITEMS, navItemProps)}
-          </div>
-
-          <NavDivider />
-
-          {/* Growth */}
-          <div className="space-y-0.5 mb-1">
-            <SectionLabel label="growth" />
-            {renderNavItems(GROWTH_NAV_ITEMS, navItemProps)}
-          </div>
-
-          <NavDivider />
-
-          {/* Tools — collapsible */}
-          <div className="space-y-0.5 mb-1">
-            <CollapsibleSectionLabel label="tools" open={toolsOpen} onToggle={toggleToolsNav} />
-            {toolsOpen ? (
-              <div className="space-y-0.5">
-                {renderNavItems(TOOLS_NAV_ITEMS, navItemProps)}
-              </div>
-            ) : null}
-          </div>
-
-        </nav>
-
-        {/* ── Footer ── */}
-        <div className="shrink-0" style={{ borderTop: "1px solid rgba(0,0,0,0.06)" }}>
-
-          {/* Progressive feature disclosure */}
-          {!featureUnlocked ? (
-            <div className="px-3 pt-3 pb-2">
-              <div
-                className="rounded-xl p-3"
-                style={{
-                  background: "linear-gradient(135deg, rgba(59,130,246,0.06), rgba(99,102,241,0.06))",
-                  border: "1px solid rgba(99,102,241,0.15)",
-                }}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#6366f1", flexShrink: 0 }} />
-                  <span style={{ fontSize: "10.5px", fontWeight: 700, color: "#818cf8" }}>More features unlock soon</span>
-                </div>
-                <div className="flex gap-1 mb-1.5">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        flex: 1, height: "3px", borderRadius: "2px",
-                        background: i < quoteCount ? "#6366f1" : "rgba(99,102,241,0.12)",
-                        transition: "background 0.3s",
-                      }}
-                    />
-                  ))}
-                </div>
-                <p style={{ fontSize: "10px", color: "#94a3b8", lineHeight: 1.5 }}>
-                  {quoteCount === 0
-                    ? "Send your first quote to get started"
-                    : `${5 - quoteCount} more quote${5 - quoteCount !== 1 ? "s" : ""} to unlock Growth, AI & Automations`}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {/* Settings — collapsible at footer */}
-          <div className="px-3 pt-2 pb-1">
-            <button
-              onClick={toggleSettingsNav}
-              className="nav-item w-full"
-              style={{ color: settingsOpen ? "#52525b" : "#a1a1aa" }}
-            >
-              <Settings style={{ width: "14px", height: "14px", opacity: 0.7 }} />
-              <span style={{ fontSize: "12.5px", flex: 1 }}>Settings</span>
-              <ChevronDown
-                style={{
-                  width: "11px", height: "11px", color: "#c4c4cc",
-                  transform: settingsOpen ? "rotate(0deg)" : "rotate(-90deg)",
-                  transition: "transform 0.18s ease",
-                }}
-              />
-            </button>
-            {settingsOpen ? (
-              <div className="space-y-0.5 mt-0.5 mb-1">
-                {renderNavItems(SETTINGS_NAV_ITEMS, navItemProps)}
-              </div>
-            ) : null}
-          </div>
-
-          {/* Product Tour + Help */}
-          <div className="px-3 pb-1 space-y-0.5">
-            <button
-              onClick={() => { resetTour(); setSidebarOpen(false); }}
-              className="nav-item w-full"
-              style={{ color: "#a1a1aa" }}
-            >
-              <BookOpen style={{ width: "14px", height: "14px" }} />
-              <span style={{ fontSize: "12.5px" }}>{t("nav.productTour")}</span>
-            </button>
-            <button
-              onClick={() => { setSupportOpen(true); setSidebarOpen(false); }}
-              className="nav-item w-full"
-              style={{ color: "#a1a1aa" }}
-            >
-              <LifeBuoy style={{ width: "14px", height: "14px" }} />
-              <span style={{ fontSize: "12.5px" }}>Help &amp; Support</span>
-            </button>
-          </div>
-
-          <AppStoreQR />
-
-          {/* Upgrade CTA */}
-          {!isPro ? (
-            <div className="px-3 pb-3">
-              <button
-                onClick={() => navigate("/upgrade?source=sidebar")}
-                className="w-full p-3.5 rounded-xl text-left relative overflow-hidden group"
-                style={{ background: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)" }}
-              >
-                <div
-                  className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ background: "radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1), transparent 60%)" }}
-                />
-                <div className="relative">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Crown className="w-3.5 h-3.5" style={{ color: "#fbbf24" }} />
-                    <span className="text-[13px] font-bold text-white">Upgrade to Growth</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed" style={{ color: "rgba(147,197,253,0.9)" }}>
-                    Unlimited quotes, AI tools, CRM &amp; more
-                  </p>
-                  <div className="flex items-center gap-1 mt-2 text-[11px] font-semibold" style={{ color: "rgba(147,197,253,0.8)" }}>
-                    <span>From $19/mo</span>
-                    <span style={{ opacity: 0.5 }}>&middot;</span>
-                    <span>7-day free trial</span>
-                    <ArrowUpRight className="w-3 h-3 ml-auto" />
-                  </div>
-                </div>
-              </button>
-            </div>
-          ) : null}
-
-          {/* User Profile */}
-          <div className="px-3 pb-3" style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: "12px" }}>
-            <button
-              onClick={() => { navigate("/account-settings"); setSidebarOpen(false); }}
-              className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg transition-colors text-left"
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.04)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; }}
-            >
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-                style={{ background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}
-              >
-                {initials}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[12.5px] font-semibold truncate leading-tight" style={{ color: "#18181b" }}>
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className="text-[11px] truncate leading-tight" style={{ color: "#a1a1aa" }}>
-                  {business?.companyName || ""}
-                </p>
-              </div>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── Main ── */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header
-          className="flex items-center px-4 lg:px-6 shrink-0 sticky top-0 z-30 gap-3"
           style={{
-            height: "56px",
-            background: "rgba(245,244,241,0.85)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            borderBottom: "1px solid var(--border)",
+            height: "44px",
+            background: "rgba(235,235,240,0.85)",
+            backdropFilter: "saturate(200%) blur(30px)",
+            WebkitBackdropFilter: "saturate(200%) blur(30px)",
+            borderBottom: "0.5px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            paddingLeft: "16px",
+            paddingRight: "10px",
+            position: "relative",
+            flexShrink: 0,
           }}
         >
+          {/* Traffic lights */}
+          <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+            {(["#ff5f57", "#febc2e", "#28c840"] as const).map((color) => (
+              <div
+                key={color}
+                style={{
+                  width: "12px", height: "12px", borderRadius: "50%",
+                  background: color,
+                  boxShadow: "0 0 0 0.5px rgba(0,0,0,0.12)",
+                  cursor: "default",
+                  transition: "filter .12s",
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = "brightness(0.88)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ""; }}
+              />
+            ))}
+          </div>
+
           {/* Mobile hamburger */}
           <button
+            className="lg:hidden"
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -ml-1.5 rounded-lg transition-colors"
-            style={{ color: "#71717a" }}
+            style={{
+              marginLeft: "10px", background: "none", border: "none",
+              cursor: "pointer", padding: "4px", borderRadius: "6px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "var(--t3)",
+            }}
           >
-            <Menu className="w-5 h-5" />
+            <Menu style={{ width: "16px", height: "16px" }} />
           </button>
 
-          {/* Page title (mobile) */}
-          <span className="lg:hidden text-[14px] font-semibold" style={{ color: "#18181b" }}>
+          {/* Centered page title */}
+          <span
+            style={{
+              position: "absolute", left: "50%", transform: "translateX(-50%)",
+              fontSize: "13px", fontWeight: 600, color: "var(--t2)",
+              letterSpacing: "-0.2px", whiteSpace: "nowrap", pointerEvents: "none",
+            }}
+          >
             {currentTitle}
           </span>
 
-          {/* Search trigger (desktop) */}
-          <button
-            onClick={() => setCmdOpen(true)}
-            className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-colors"
+          {/* Right icon buttons */}
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "2px" }}>
+            {[
+              { icon: Search, onClick: () => setCmdOpen(true),            title: "Search (⌘K)" },
+              { icon: Plus,   onClick: () => navigate("/quotes/new"),     title: "New Quote"   },
+              { icon: Bell,   onClick: () => {},                          title: "Notifications" },
+            ].map(({ icon: Icon, onClick, title }) => (
+              <button
+                key={title}
+                onClick={onClick}
+                title={title}
+                style={{
+                  width: "28px", height: "22px", borderRadius: "6px",
+                  background: "none", border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--t3)", transition: "background .1s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.07)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "none"; }}
+              >
+                <Icon style={{ width: "13px", height: "13px" }} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Body row: sidebar + content ── */}
+        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+          {/* Mobile overlay */}
+          {sidebarOpen ? (
+            <div
+              className="fixed inset-0 z-40 lg:hidden"
+              style={{ background: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+              onClick={() => setSidebarOpen(false)}
+            />
+          ) : null}
+
+          {/* ── SIDEBAR ── */}
+          <aside
+            className={`
+              fixed inset-y-0 left-0 z-50 flex flex-col
+              transform transition-transform duration-200 ease-out
+              lg:translate-x-0 lg:static lg:z-auto
+              ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+            `}
             style={{
-              background: "rgba(0,0,0,0.04)",
-              border: "1px solid rgba(0,0,0,0.07)",
-              color: "#a1a1aa",
-              minWidth: "200px",
+              width: "214px",
+              background: "var(--sidebar-blur)",
+              backdropFilter: "saturate(200%) blur(30px)",
+              WebkitBackdropFilter: "saturate(200%) blur(30px)",
+              borderRight: "0.5px solid var(--border)",
+              flexShrink: 0,
             }}
           >
-            <Search className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-[12.5px] flex-1 text-left">Search...</span>
-            <div className="flex items-center gap-0.5 ml-2">
-              <kbd className="cmd-kbd">⌘K</kbd>
+            {/* ── App identity block ── */}
+            <div style={{ padding: "14px 12px 10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+                <div
+                  style={{
+                    width: "36px", height: "36px", borderRadius: "9px",
+                    background: "linear-gradient(150deg, #007aff 0%, #32ade6 60%, #5ac8fa 100%)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.08)",
+                  }}
+                >
+                  <Zap style={{ width: "18px", height: "18px", color: "white" }} />
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <p style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "-0.25px", color: "var(--t1)", lineHeight: 1.25, margin: 0 }}>
+                    QuotePro
+                  </p>
+                  <p style={{ fontSize: "10px", color: "var(--t4)", lineHeight: 1.3, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {user?.email || business?.companyName || "My Account"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="lg:hidden"
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--t4)", padding: "2px", borderRadius: "4px", flexShrink: 0 }}
+                >
+                  <X style={{ width: "14px", height: "14px" }} />
+                </button>
+              </div>
             </div>
-          </button>
 
-          <div className="flex-1" />
+            {/* ── Search field ── */}
+            <div style={{ padding: "0 10px 8px" }}>
+              <button
+                onClick={() => setCmdOpen(true)}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: "7px",
+                  padding: "5px 10px", borderRadius: "var(--r8)",
+                  background: "rgba(0,0,0,0.06)", border: "none",
+                  cursor: "pointer", fontSize: "12px", color: "var(--t3)",
+                  textAlign: "left", transition: "background .1s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.09)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.06)"; }}
+              >
+                <Search style={{ width: "13px", height: "13px", flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>Search</span>
+                <span style={{ fontSize: "10px", color: "var(--t4)", opacity: 0.8 }}>⌘K</span>
+              </button>
+            </div>
 
-          {/* Quick actions */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate("/quotes/new")}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-[13px] font-semibold transition-all active:scale-[0.97]"
+            {/* ── Navigation ── */}
+            <nav style={{ flex: 1, padding: "2px 8px 8px", overflowY: "auto" }}>
+
+              {/* Dashboard */}
+              <div style={{ marginBottom: "4px" }}>
+                <NavItemWithTooltip
+                  item={{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, shortcut: "G H", description: "Your real-time command center — jobs today, pipeline health, and the most important actions." }}
+                  {...navItemProps}
+                />
+              </div>
+
+              <NavDivider />
+
+              {/* Pipeline */}
+              <div style={{ marginBottom: "4px" }}>
+                <SectionLabel label="Pipeline" />
+                {renderNavItems(PIPELINE_NAV_ITEMS, navItemProps)}
+              </div>
+
+              <NavDivider />
+
+              {/* Operations */}
+              <div style={{ marginBottom: "4px" }}>
+                <SectionLabel label="Operations" />
+                {renderNavItems(OPERATIONS_NAV_ITEMS, navItemProps)}
+              </div>
+
+              <NavDivider />
+
+              {/* Growth */}
+              <div style={{ marginBottom: "4px" }}>
+                <SectionLabel label="Growth" />
+                {renderNavItems(GROWTH_NAV_ITEMS, navItemProps)}
+              </div>
+
+              <NavDivider />
+
+              {/* Tools — collapsible */}
+              <div style={{ marginBottom: "4px" }}>
+                <CollapsibleSectionLabel label="Tools" open={toolsOpen} onToggle={toggleToolsNav} />
+                {toolsOpen ? (
+                  <div>
+                    {renderNavItems(TOOLS_NAV_ITEMS, navItemProps)}
+                  </div>
+                ) : null}
+              </div>
+
+            </nav>
+
+            {/* ── Sidebar footer ── */}
+            <div style={{ flexShrink: 0 }}>
+
+              {/* Progressive feature disclosure */}
+              {!featureUnlocked ? (
+                <div style={{ padding: "0 10px 8px" }}>
+                  <div style={{
+                    borderRadius: "10px", padding: "10px 12px",
+                    background: "linear-gradient(135deg, rgba(59,130,246,0.06), rgba(99,102,241,0.06))",
+                    border: "1px solid rgba(99,102,241,0.15)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                      <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#6366f1", flexShrink: 0 }} />
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: "#818cf8" }}>More features unlock soon</span>
+                    </div>
+                    <div style={{ display: "flex", gap: "3px", marginBottom: "6px" }}>
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} style={{
+                          flex: 1, height: "3px", borderRadius: "2px",
+                          background: i < quoteCount ? "#6366f1" : "rgba(99,102,241,0.12)",
+                          transition: "background 0.3s",
+                        }} />
+                      ))}
+                    </div>
+                    <p style={{ fontSize: "10px", color: "#94a3b8", lineHeight: 1.5, margin: 0 }}>
+                      {quoteCount === 0
+                        ? "Send your first quote to get started"
+                        : `${5 - quoteCount} more quote${5 - quoteCount !== 1 ? "s" : ""} to unlock Growth, AI & Automations`}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Settings — collapsible */}
+              <div style={{ padding: "0 8px 2px" }}>
+                <button
+                  onClick={toggleSettingsNav}
+                  className="nav-item w-full"
+                  style={{ color: settingsOpen ? "var(--t2)" : "var(--t4)" }}
+                >
+                  <span className="nav-icon-sq">
+                    <Settings style={{ width: "13px", height: "13px" }} />
+                  </span>
+                  <span style={{ fontSize: "12.5px", flex: 1 }}>Settings</span>
+                  <ChevronDown style={{
+                    width: "11px", height: "11px", color: "var(--t4)",
+                    transform: settingsOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                    transition: "transform 0.18s ease",
+                  }} />
+                </button>
+                {settingsOpen ? (
+                  <div style={{ marginTop: "2px", marginBottom: "2px" }}>
+                    {renderNavItems(SETTINGS_NAV_ITEMS, navItemProps)}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Product Tour + Help */}
+              <div style={{ padding: "0 8px 4px" }}>
+                <button onClick={() => { resetTour(); setSidebarOpen(false); }} className="nav-item w-full" style={{ color: "var(--t4)" }}>
+                  <span className="nav-icon-sq"><BookOpen style={{ width: "13px", height: "13px" }} /></span>
+                  <span style={{ fontSize: "12.5px" }}>{t("nav.productTour")}</span>
+                </button>
+                <button onClick={() => { setSupportOpen(true); setSidebarOpen(false); }} className="nav-item w-full" style={{ color: "var(--t4)" }}>
+                  <span className="nav-icon-sq"><LifeBuoy style={{ width: "13px", height: "13px" }} /></span>
+                  <span style={{ fontSize: "12.5px" }}>Help &amp; Support</span>
+                </button>
+              </div>
+
+              <AppStoreQR />
+
+              {/* Upgrade CTA */}
+              {!isPro ? (
+                <div style={{ padding: "0 10px 10px" }}>
+                  <button
+                    onClick={() => navigate("/upgrade?source=sidebar")}
+                    style={{
+                      width: "100%", padding: "12px 14px", borderRadius: "12px",
+                      background: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)",
+                      border: "none", cursor: "pointer", textAlign: "left",
+                      transition: "opacity .1s",
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.88"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                      <Crown style={{ width: "13px", height: "13px", color: "#fbbf24" }} />
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: "white" }}>Upgrade to Growth</span>
+                    </div>
+                    <p style={{ fontSize: "10px", color: "rgba(147,197,253,0.9)", margin: "0 0 6px", lineHeight: 1.45 }}>
+                      Unlimited quotes, AI tools, CRM &amp; more
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", fontWeight: 600, color: "rgba(147,197,253,0.8)" }}>
+                      <span>From $19/mo</span>
+                      <span style={{ opacity: 0.5 }}>·</span>
+                      <span>7-day free trial</span>
+                      <ArrowUpRight style={{ width: "10px", height: "10px", marginLeft: "auto" }} />
+                    </div>
+                  </button>
+                </div>
+              ) : null}
+
+              {/* ── User row ── */}
+              <div style={{ borderTop: "0.5px solid var(--sep)", padding: "8px 10px 10px" }}>
+                <button
+                  onClick={() => { navigate("/account-settings"); setSidebarOpen(false); }}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: "8px",
+                    padding: "5px 6px", borderRadius: "var(--r8)",
+                    background: "none", border: "none", cursor: "pointer", textAlign: "left",
+                    transition: "background .1s",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.05)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "none"; }}
+                >
+                  <div style={{
+                    width: "28px", height: "28px", borderRadius: "50%",
+                    background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "10px", fontWeight: 700, color: "white", flexShrink: 0,
+                  }}>
+                    {initials}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "12px", fontWeight: 500, color: "var(--t1)", lineHeight: 1.25, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {user?.firstName} {user?.lastName}
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#28cd41", flexShrink: 0 }} />
+                      <p style={{ fontSize: "10px", color: "var(--t4)", lineHeight: 1.3, margin: 0 }}>
+                        {isPro ? "Pro plan · active" : "Free plan · active"}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+            </div>
+          </aside>
+
+          {/* ── Main content area ── */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--win-bg)" }}>
+
+            {/* ── CONTENT TOOLBAR ── */}
+            <div
               style={{
-                background: "linear-gradient(135deg, #2563eb, #06b6d4)",
-                boxShadow: "0 0 20px rgba(37,99,235,0.3)",
-                borderRadius: "8px",
+                height: "44px",
+                background: "rgba(245,245,245,0.90)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                borderBottom: "0.5px solid var(--sep)",
+                display: "flex",
+                alignItems: "center",
+                padding: "0 20px",
+                flexShrink: 0,
+                gap: "8px",
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.9"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
             >
-              <Plus className="w-3.5 h-3.5" />
-              New Quote
-            </button>
-            <button
-              className="p-2 rounded-lg transition-colors relative"
-              style={{ color: "#71717a" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#18181b"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#71717a"; }}
-              title="Notifications"
-            >
-              <Bell className="w-4 h-4" />
-            </button>
-          </div>
-        </header>
+              {/* Page title */}
+              <span style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "-0.3px", color: "var(--t1)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {currentTitle}
+              </span>
 
-        {/* Content */}
-        <main ref={mainRef} className="flex-1 overflow-y-auto" style={{ padding: "28px 24px 40px" }}>
-          <TrialCountdownBanner />
-          <QuoteUsageBanner />
-          <div className="max-w-7xl mx-auto animate-fade-in">
-            <Outlet />
+              {/* Ghost: search ⌘K */}
+              <button
+                onClick={() => setCmdOpen(true)}
+                className="hidden lg:flex items-center gap-1.5"
+                style={{
+                  background: "rgba(0,0,0,0.055)", color: "var(--t2)",
+                  borderRadius: "var(--r6)", padding: "5px 12px", fontSize: "12px",
+                  border: "none", cursor: "pointer", transition: "background .1s",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.085)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.055)"; }}
+              >
+                <Search style={{ width: "12px", height: "12px" }} />
+                <span>Search</span>
+                <kbd style={{ fontSize: "10px", marginLeft: "4px", opacity: 0.55, fontFamily: "system-ui" }}>⌘K</kbd>
+              </button>
+
+              {/* Primary: New Quote */}
+              <button
+                onClick={() => { navigate("/quotes/new"); setSidebarOpen(false); }}
+                className="hidden sm:flex items-center gap-1.5"
+                style={{
+                  background: "var(--blue)", color: "white",
+                  borderRadius: "var(--r6)", padding: "5px 12px",
+                  fontSize: "12px", fontWeight: 600,
+                  border: "none", cursor: "pointer",
+                  boxShadow: "var(--shadow-btn-blue)",
+                  transition: "background .1s, transform .1s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = "var(--blue-d)";
+                  (e.currentTarget as HTMLElement).style.transform = "translateY(-0.5px)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = "var(--blue)";
+                  (e.currentTarget as HTMLElement).style.transform = "";
+                }}
+              >
+                <Plus style={{ width: "12px", height: "12px" }} />
+                New Quote
+              </button>
+            </div>
+
+            {/* ── Scrollable content ── */}
+            <main ref={mainRef} className="flex-1 overflow-y-auto" style={{ padding: "28px 24px 40px" }}>
+              <TrialCountdownBanner />
+              <QuoteUsageBanner />
+              <div className="max-w-7xl mx-auto animate-fade-in">
+                <Outlet />
+              </div>
+            </main>
+
           </div>
-        </main>
+        </div>
       </div>
 
-      {/* Command Palette */}
+      {/* ── Overlays (outside window chrome so they cover full viewport) ── */}
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
-
       <WalkthroughOverlay />
-
-      {/* AI chat bubble — hidden on the full AI assistant page */}
       {location.pathname !== "/ai-assistant" && <AIChatBubble />}
       <NPSSurvey />
       {supportOpen && <SupportModal onClose={() => setSupportOpen(false)} />}
       <UpgradeModal />
-    </div>
     </AIToastProvider>
   );
 }
