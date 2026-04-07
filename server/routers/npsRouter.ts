@@ -12,7 +12,7 @@ import { sendEmail } from "../mail";
 const router = Router();
 
 // ── GET /api/nps/status — check if the NPS survey should be shown ──────────
-router.get("/api/nps/status", requireAuth, async (req: Request, res: Response) => {
+router.get("/status", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     const result = await pool.query(
@@ -63,7 +63,7 @@ router.get("/api/nps/status", requireAuth, async (req: Request, res: Response) =
 });
 
 // ── POST /api/nps/submit ───────────────────────────────────────────────────
-router.post("/api/nps/submit", requireAuth, async (req: Request, res: Response) => {
+router.post("/submit", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     const { score, followUp } = req.body as { score: number; followUp?: string };

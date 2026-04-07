@@ -81,7 +81,7 @@ import { google } from "googleapis";
 
 const router = Router();
 
-  router.post("/api/internal/cron", async (_req: Request, res: Response) => {
+  router.post("/internal/cron", async (_req: Request, res: Response) => {
     try {
       const expiredCount = await expireOldQuotes();
       if (expiredCount > 0) console.log(`Expired ${expiredCount} quotes`);
@@ -103,7 +103,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/google-calendar/status", requireAuth, async (req: Request, res: Response) => {
+  router.get("/google-calendar/status", requireAuth, async (req: Request, res: Response) => {
     try {
       const tokens = await getGoogleCalendarToken(req.session.userId!);
       if (tokens) {
@@ -116,7 +116,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/google-calendar/connect", requireAuth, async (req: Request, res: Response) => {
+  router.get("/google-calendar/connect", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         return res.status(503).json({ message: "Google Calendar is not set up yet. Contact support to enable calendar sync." });
@@ -145,7 +145,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/google-calendar/callback", async (req: Request, res: Response) => {
+  router.get("/google-calendar/callback", async (req: Request, res: Response) => {
     try {
       const { code, state } = req.query as { code: string; state: string };
       if (!code || !state) {
@@ -188,7 +188,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/google-calendar/disconnect", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/google-calendar/disconnect", requireAuth, async (req: Request, res: Response) => {
     try {
       await deleteGoogleCalendarToken(req.session.userId!);
       return res.json({ message: "Disconnected" });
@@ -198,7 +198,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/google-calendar/sync-job", requireAuth, async (req: Request, res: Response) => {
+  router.post("/google-calendar/sync-job", requireAuth, async (req: Request, res: Response) => {
     try {
       const { jobId } = req.body;
       if (!jobId) return res.status(400).json({ message: "jobId is required" });
@@ -220,7 +220,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/stripe/status", requireAuth, async (req: Request, res: Response) => {
+  router.get("/stripe/status", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -234,7 +234,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/stripe/connect", requireAuth, async (req: Request, res: Response) => {
+  router.post("/stripe/connect", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured. Please add your Stripe API keys to enable payments." });
       const business = await getBusinessByOwner(req.session.userId!);
@@ -283,7 +283,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/stripe/connect-callback", async (req: Request, res: Response) => {
+  router.get("/stripe/connect-callback", async (req: Request, res: Response) => {
     try {
       if (!getStripe()) return res.status(503).send("Stripe not configured");
       const { userId } = req.query as { userId: string };
@@ -311,7 +311,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/stripe/connect-refresh", async (req: Request, res: Response) => {
+  router.get("/stripe/connect-refresh", async (req: Request, res: Response) => {
     try {
       if (!getStripe()) return res.status(503).send("Stripe not configured");
       const { userId } = req.query as { userId: string };
@@ -334,7 +334,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/stripe/disconnect", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/stripe/disconnect", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -346,7 +346,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/stripe/create-payment", requireAuth, async (req: Request, res: Response) => {
+  router.post("/stripe/create-payment", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured" });
       const { quoteId } = req.body;
@@ -389,7 +389,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/stripe/deposit-success", async (req: Request, res: Response) => {
+  router.get("/stripe/deposit-success", async (req: Request, res: Response) => {
     try {
       const { quoteId, session_id } = req.query as { quoteId: string; session_id: string };
       if (!quoteId || !session_id || !(await getStripe())) {
@@ -433,7 +433,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/stripe/payment-success", async (req: Request, res: Response) => {
+  router.get("/stripe/payment-success", async (req: Request, res: Response) => {
     try {
       const { quoteId, session_id } = req.query as { quoteId: string; session_id: string };
       if (quoteId) {
@@ -472,7 +472,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/stripe/payment-cancel", async (_req: Request, res: Response) => {
+  router.get("/stripe/payment-cancel", async (_req: Request, res: Response) => {
     return res.send(`<!DOCTYPE html>
 <html><head><title>Payment Cancelled</title>
 <style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
@@ -481,7 +481,7 @@ const router = Router();
 </head><body><div class="card"><div class="icon">&#10007;</div><h2>Payment Cancelled</h2><p>No charge was made. You can close this window.</p></div></body></html>`);
   });
 
-  router.post("/api/api-keys", requireAuth, async (req: any, res) => {
+  router.post("/api-keys", requireAuth, async (req: any, res) => {
     try {
       const rawKey = `qp_${crypto.randomBytes(32).toString("hex")}`;
       const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
@@ -516,7 +516,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/api-keys", requireAuth, async (req: any, res) => {
+  router.get("/api-keys", requireAuth, async (req: any, res) => {
     try {
       const keys = await getApiKeysByUserId(req.session.userId!);
       res.json(keys.map((k: any) => ({ id: k.id, keyPrefix: k.keyPrefix, label: k.label, isActive: k.isActive, scopes: k.scopes ?? ["read:quotes"], createdAt: k.createdAt })));
@@ -525,7 +525,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/api-keys/:id", requireAuth, async (req: any, res) => {
+  router.delete("/api-keys/:id", requireAuth, async (req: any, res) => {
     try {
       await deactivateApiKey(req.params.id, req.session.userId!);
       res.json({ success: true });
@@ -534,7 +534,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/webhook-endpoints", requireAuth, async (req: any, res) => {
+  router.post("/webhook-endpoints", requireAuth, async (req: any, res) => {
     try {
       const { url, enabledEvents = [] } = req.body;
       if (!url) return res.status(400).json({ error: "url required" });
@@ -551,7 +551,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/webhook-endpoints", requireAuth, async (req: any, res) => {
+  router.get("/webhook-endpoints", requireAuth, async (req: any, res) => {
     try {
       const endpoints = await getWebhookEndpointsByUserId(req.session.userId!);
       res.json(endpoints);
@@ -560,7 +560,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/webhook-endpoints/:id", requireAuth, async (req: any, res) => {
+  router.put("/webhook-endpoints/:id", requireAuth, async (req: any, res) => {
     try {
       const { url, isActive, enabledEvents } = req.body;
       const updated = await updateWebhookEndpoint(req.params.id, req.session.userId!, { url, isActive, enabledEvents });
@@ -571,7 +571,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/webhook-endpoints/:id", requireAuth, async (req: any, res) => {
+  router.delete("/webhook-endpoints/:id", requireAuth, async (req: any, res) => {
     try {
       await deleteWebhookEndpoint(req.params.id, req.session.userId!);
       res.json({ success: true });
@@ -580,7 +580,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/webhook-endpoints/:id/test", requireAuth, async (req: any, res) => {
+  router.post("/webhook-endpoints/:id/test", requireAuth, async (req: any, res) => {
     try {
       const endpoints = await getWebhookEndpointsByUserId(req.session.userId!);
       const ep = endpoints.find((e: any) => e.id === req.params.id);
@@ -617,7 +617,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/webhook-events", requireAuth, async (req: any, res) => {
+  router.get("/webhook-events", requireAuth, async (req: any, res) => {
     try {
       const events = await getWebhookEventsByUserId(req.session.userId!);
       const eventsWithStatus = await Promise.all(
@@ -635,7 +635,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/webhook-events/:id", requireAuth, async (req: any, res) => {
+  router.get("/webhook-events/:id", requireAuth, async (req: any, res) => {
     try {
       const evt = await getWebhookEventById(req.params.id);
       if (!evt || evt.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
@@ -646,7 +646,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/integrations/qbo/status", requireAuth, async (req: any, res) => {
+  router.get("/integrations/qbo/status", requireAuth, async (req: any, res) => {
     try {
       const result = await pool.query(
         `SELECT status, company_name as "companyName", realm_id as "realmId", environment,
@@ -663,7 +663,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/integrations/qbo/connect", requireAuth, async (req: any, res) => {
+  router.get("/integrations/qbo/connect", requireAuth, async (req: any, res) => {
     try {
       const clientId = process.env.INTUIT_CLIENT_ID;
       if (!clientId) return res.status(500).json({ error: "QuickBooks integration not configured" });
@@ -694,7 +694,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/integrations/qbo/callback", async (req: any, res) => {
+  router.get("/integrations/qbo/callback", async (req: any, res) => {
     try {
       const { code, state, realmId } = req.query;
       if (!code || !state || !realmId) {
@@ -779,7 +779,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/integrations/qbo/disconnect", requireAuth, async (req: any, res) => {
+  router.post("/integrations/qbo/disconnect", requireAuth, async (req: any, res) => {
     try {
       await pool.query(
         `UPDATE qbo_connections SET status = 'disconnected', disconnected_at = NOW(),
@@ -794,7 +794,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/integrations/qbo/test", requireAuth, async (req: any, res) => {
+  router.post("/integrations/qbo/test", requireAuth, async (req: any, res) => {
     try {
       const client = new QBOClient(req.session.userId);
       const conn = await client.loadConnection();
@@ -809,7 +809,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/integrations/qbo/create-invoice", requireAuth, async (req: any, res) => {
+  router.post("/integrations/qbo/create-invoice", requireAuth, async (req: any, res) => {
     try {
       const { quoteId } = req.body;
       if (!quoteId) return res.status(400).json({ error: "quoteId is required" });
@@ -824,7 +824,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/integrations/qbo/logs", requireAuth, async (req: any, res) => {
+  router.get("/integrations/qbo/logs", requireAuth, async (req: any, res) => {
     try {
       const result = await pool.query(
         `SELECT id, user_id as "userId", quote_id as "quoteId", action,
@@ -839,7 +839,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/integrations/qbo/settings", requireAuth, async (req: any, res) => {
+  router.put("/integrations/qbo/settings", requireAuth, async (req: any, res) => {
     try {
       const { autoCreateInvoice } = req.body;
       await pool.query(
@@ -852,7 +852,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/integrations/qbo/invoice-link/:quoteId", requireAuth, async (req: any, res) => {
+  router.get("/integrations/qbo/invoice-link/:quoteId", requireAuth, async (req: any, res) => {
     try {
       const result = await pool.query(
         `SELECT qbo_invoice_id as "qboInvoiceId", qbo_doc_number as "qboDocNumber", created_at as "createdAt"

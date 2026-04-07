@@ -84,7 +84,7 @@ import { pendingAuthTokens, generateAuthToken } from "../clients";
 
 const router = Router();
 
-  router.post("/api/crash-report", async (req: Request, res: Response) => {
+  router.post("/crash-report", async (req: Request, res: Response) => {
     try {
       const { error, stack, componentStack, source } = req.body;
       console.error("[CRASH REPORT]", {
@@ -100,7 +100,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/auth/register", authLimiter, async (req: Request, res: Response) => {
+  router.post("/auth/register", authLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password, firstName, name, ref } = req.body;
 
@@ -174,7 +174,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/auth/login", authLimiter, loginFailureLimiter, async (req: Request, res: Response) => {
+  router.post("/auth/login", authLimiter, loginFailureLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
 
@@ -228,7 +228,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/auth/apple/start", async (req: Request, res: Response) => {
+  router.get("/auth/apple/start", async (req: Request, res: Response) => {
     try {
       const clientId = process.env.APPLE_SERVICE_ID;
       if (!clientId) {
@@ -253,7 +253,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/auth/apple/callback", authLimiter, async (req: Request, res: Response) => {
+  router.post("/auth/apple/callback", authLimiter, async (req: Request, res: Response) => {
     try {
       const { id_token, user: userJson, state } = req.body;
 
@@ -342,7 +342,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/auth/apple", authLimiter, async (req: Request, res: Response) => {
+  router.post("/auth/apple", authLimiter, async (req: Request, res: Response) => {
     try {
       const { identityToken, user: appleUser, fullName, email: appleEmail } = req.body;
 
@@ -437,7 +437,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/auth/google", authLimiter, async (req: Request, res: Response) => {
+  router.post("/auth/google", authLimiter, async (req: Request, res: Response) => {
     try {
       const { idToken } = req.body;
 
@@ -524,7 +524,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/auth/google/start", async (req: Request, res: Response) => {
+  router.get("/auth/google/start", async (req: Request, res: Response) => {
     try {
       if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         return res.status(500).json({ message: "Google OAuth not configured" });
@@ -568,7 +568,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/auth/google/callback", async (req: Request, res: Response) => {
+  router.get("/auth/google/callback", async (req: Request, res: Response) => {
     try {
       const { code, state } = req.query as { code: string; state?: string };
       const [_cbPlatform, _cbIntent] = (state || "").split(":");
@@ -662,7 +662,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
-  router.post("/api/auth/exchange-token", async (req: Request, res: Response) => {
+  router.post("/auth/exchange-token", async (req: Request, res: Response) => {
     try {
       const { token } = req.body;
       if (!token) return res.status(400).json({ message: "Missing token" });
@@ -691,7 +691,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
-  router.get("/api/auth/me", async (req: Request, res: Response) => {
+  router.get("/auth/me", async (req: Request, res: Response) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Not authenticated" });
     }
@@ -731,7 +731,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
-  router.post("/api/auth/logout", (req: Request, res: Response) => {
+  router.post("/auth/logout", (req: Request, res: Response) => {
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "Logout failed" });
@@ -741,7 +741,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     });
   });
 
-  router.get("/api/consent", requireAuth, async (req: Request, res: Response) => {
+  router.get("/consent", requireAuth, async (req: Request, res: Response) => {
     try {
       const result = await pool.query(
         `SELECT ai_consent_accepted_at, terms_accepted_at, consent_version FROM users WHERE id = $1`,
@@ -759,7 +759,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
-  router.post("/api/consent", requireAuth, async (req: Request, res: Response) => {
+  router.post("/consent", requireAuth, async (req: Request, res: Response) => {
     const { type, version } = req.body as { type: "ai" | "terms" | "both"; version?: string };
     const now = new Date();
     const ver = version ?? "1.0";
@@ -789,7 +789,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
-  router.post("/api/auth/delete-account", requireAuth, async (req: Request, res: Response) => {
+  router.post("/auth/delete-account", requireAuth, async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
       const userId = req.session.userId!;
@@ -856,14 +856,14 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     }
   });
 
-  router.post("/api/auth/consume-plan-intent", requireAuth, (req: Request, res: Response) => {
+  router.post("/auth/consume-plan-intent", requireAuth, (req: Request, res: Response) => {
     const intent = (req.session as any).pendingPlanIntent || null;
     delete (req.session as any).pendingPlanIntent;
     req.session.save(() => {});
     return res.json({ pendingPlanIntent: intent });
   });
 
-  router.patch("/api/auth/contact-email", requireAuth, async (req: Request, res: Response) => {
+  router.patch("/auth/contact-email", requireAuth, async (req: Request, res: Response) => {
     try {
       const { contactEmail } = req.body;
       if (!contactEmail || typeof contactEmail !== "string" || !contactEmail.includes("@")) {
@@ -882,7 +882,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
 
   // Hidden admin utility: expire a user's trial for testing
   // Usage: POST /api/admin/expire-trial { email, key }
-  router.post("/api/admin/expire-trial", async (req: Request, res: Response) => {
+  router.post("/admin/expire-trial", async (req: Request, res: Response) => {
     const { email, key } = req.body;
     const ADMIN_KEY = process.env.ADMIN_TEST_KEY;
     if (!ADMIN_KEY || key !== ADMIN_KEY) return res.status(403).json({ message: "Forbidden" });

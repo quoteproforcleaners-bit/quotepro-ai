@@ -12,7 +12,7 @@ const TIER_LABELS: Record<string, string> = {
   pro: "Pro ($99/mo)",
 };
 
-supportRouter.post("/api/support/ticket", async (req: Request, res: Response) => {
+supportRouter.post("/ticket", async (req: Request, res: Response) => {
   try {
     const { name, email, tier, message, screenshots } = req.body as {
       name: string;

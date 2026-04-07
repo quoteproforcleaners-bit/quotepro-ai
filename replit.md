@@ -14,7 +14,32 @@ Freemium model with 4 tiers: Free (3 total quotes), Starter ($19/mo, 20 quotes/m
 The frontend comprises a React Native (Expo SDK 54) mobile application and a React 19 web application. Both use React Navigation/React Router for navigation, React Native Reanimated for animations (mobile), and React Context/React Query for state management. Styling is theme-based with light/dark modes. The web app features a "Warm Minimal" design system, a 248px left sidebar, a command palette (⌘K), and a "Revenue Command Center" dashboard with KPIs.
 
 ### Backend Architecture
-The backend is an Express.js application built with Node.js and TypeScript, providing authenticated API routes and managing background jobs.
+The backend is an Express.js application built with Node.js and TypeScript. All routing is fully modular — 19 domain routers in `server/routers/`, registered in `server/routes.ts` with three mounting strategies:
+
+- **Group A — prefix-mounted** (each router defines paths relative to its mount prefix):
+  - `app.use('/api/admin', adminRouter)` — admin dashboard + field management (merged from former `fieldAdminRouter`)
+  - `app.use('/api/nps', npsRouter)` — NPS surveys
+  - `app.use('/api/autopilot', autopilotRouter)` — Autopilot pipeline
+  - `app.use('/api/webhooks', revenuecatRouter)` — RevenueCat webhooks
+  - `app.use('/api/employee', employeeRouter)` — employee portal
+  - `app.use('/api/market-rates', marketRatesRouter)` — market rate data
+  - `app.use('/api/pricing', pricingRouter)` — pricing config
+  - `app.use('/api/support', supportRouter)` — support tickets
+  - `app.use('/api/quote-doctor', quoteDoctorRouter)` — AI quote improvement
+
+- **Group B — multi-domain, mounted at `/api`** (internal paths are relative to `/api`):
+  - `authRouter` — `/api/auth/*`, `/api/consent`, `/api/crash-report`
+  - `quotesRouter` — `/api/quotes/*`, `/api/commercial/*`
+  - `customersRouter` — `/api/customers/*`, `/api/intake-requests/*`
+  - `jobsRouter` — `/api/jobs/*`, `/api/schedule/*`, `/api/dispatch/*`
+  - `businessRouter` — `/api/business/*`, `/api/subscription/*`, `/api/settings`, `/api/preferences`, `/api/files`, `/api/tasks`, `/api/referrals`, `/api/badges`, `/api/communications`, `/api/analytics`, `/api/geocode`, `/api/lead-link`, `/api/tip-settings`, `/api/tips`
+  - `aiRouter` — `/api/ai/*`, `/api/send/*`
+  - `automationsRouter` — `/api/automations`, `/api/social/*`, `/api/streaks`
+  - `integrationsRouter` — `/api/google-calendar/*`, `/api/stripe/*`, `/api/api-keys`, `/api/webhook-endpoints`, `/api/internal/*`
+
+- **Group C — hybrid (mounted at root)** — serve both API routes and static HTML pages:
+  - `publicRouter` — `/api/public/*` + `/q`, `/privacy`, `/terms`, `/calculators`
+  - `portalRouter` — `/api/portal/*` + `/portal-manifest/*`, `/api/portal-stats`
 
 ### Data Storage
 A PostgreSQL Database, powered by Neon, is used with Drizzle ORM. Session management uses `express-session` with `connect-pg-simple`.

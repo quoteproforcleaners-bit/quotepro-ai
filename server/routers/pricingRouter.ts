@@ -77,7 +77,7 @@ import { businessFiles, sequenceEnrollments, employees, schedulePublications, cl
 const router = Router();
 import { runPricingEngine } from "../pricingEngine";
 
-  router.get("/api/pricing", requireAuth, async (req: Request, res: Response) => {
+  router.get("/", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) {
@@ -104,7 +104,7 @@ import { runPricingEngine } from "../pricingEngine";
     }
   });
 
-  router.put("/api/pricing", requireAuth, async (req: Request, res: Response) => {
+  router.put("/", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) {
@@ -119,7 +119,7 @@ import { runPricingEngine } from "../pricingEngine";
     }
   });
 
-  router.get("/api/pricing/jobs", requireAuth, async (req: Request, res: Response) => {
+  router.get("/jobs", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -130,7 +130,7 @@ import { runPricingEngine } from "../pricingEngine";
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.post("/api/pricing/jobs", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -160,7 +160,7 @@ import { runPricingEngine } from "../pricingEngine";
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.put("/api/pricing/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/jobs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -179,7 +179,7 @@ import { runPricingEngine } from "../pricingEngine";
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.delete("/api/pricing/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/jobs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -188,7 +188,7 @@ import { runPricingEngine } from "../pricingEngine";
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.get("/api/pricing/questionnaire", requireAuth, async (req: Request, res: Response) => {
+  router.get("/questionnaire", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -199,7 +199,7 @@ import { runPricingEngine } from "../pricingEngine";
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.post("/api/pricing/questionnaire", requireAuth, async (req: Request, res: Response) => {
+  router.post("/questionnaire", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -233,7 +233,7 @@ import { runPricingEngine } from "../pricingEngine";
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.post("/api/pricing/analyze", requireAuth, async (req: Request, res: Response) => {
+  router.post("/analyze", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -416,7 +416,7 @@ Focus on real patterns in the data. Flag jobs that appear underpriced relative t
     }
   });
 
-  router.get("/api/pricing/analysis", requireAuth, async (req: Request, res: Response) => {
+  router.get("/analysis", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -427,7 +427,7 @@ Focus on real patterns in the data. Flag jobs that appear underpriced relative t
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.get("/api/pricing/rules", requireAuth, async (req: Request, res: Response) => {
+  router.get("/rules", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -438,7 +438,7 @@ Focus on real patterns in the data. Flag jobs that appear underpriced relative t
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.put("/api/pricing/rules/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/rules/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -452,7 +452,7 @@ Focus on real patterns in the data. Flag jobs that appear underpriced relative t
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.delete("/api/pricing/rules/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/rules/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -461,7 +461,7 @@ Focus on real patterns in the data. Flag jobs that appear underpriced relative t
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.post("/api/pricing/publish", requireAuth, async (req: Request, res: Response) => {
+  router.post("/publish", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -483,7 +483,7 @@ Focus on real patterns in the data. Flag jobs that appear underpriced relative t
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.get("/api/pricing/profile", requireAuth, async (req: Request, res: Response) => {
+  router.get("/profile", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -494,7 +494,7 @@ Focus on real patterns in the data. Flag jobs that appear underpriced relative t
     } catch (e: any) { return res.status(500).json({ message: e.message }); }
   });
 
-  router.post("/api/pricing/calculate", requireAuth, async (req: Request, res: Response) => {
+  router.post("/calculate", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });

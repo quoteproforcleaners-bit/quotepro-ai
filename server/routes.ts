@@ -1,12 +1,24 @@
 /**
  * server/routes.ts — Route Registry
  *
- * Registers all domain routers onto the Express app.
- * Business logic, route handlers, and helper functions live in:
- *   • server/routers/<domain>Router.ts  — route handlers
- *   • server/helpers.ts                 — shared helper functions
- *   • server/clients.ts                 — shared singletons (openai, stripe, etc.)
- *   • server/middleware.ts              — auth / rate-limit middleware
+ * Mounts all domain routers onto the Express app.
+ * Business logic lives in server/routers/<domain>Router.ts
+ *
+ * ─── Mount strategy ───────────────────────────────────────────────────────────
+ *
+ * Group A — pure single-domain routers
+ *   Each router defines paths relative to its mount prefix.
+ *   e.g. pricingRouter has router.get("/", ...) and router.get("/:id", ...)
+ *        mounted at /api/pricing → handles GET /api/pricing and GET /api/pricing/:id
+ *
+ * Group B — multi-domain routers (mounted at /api)
+ *   These routers span several path families under /api.
+ *   e.g. businessRouter handles /api/business, /api/subscription, /api/settings, etc.
+ *   Internal paths are relative to /api (no /api/ prefix in route strings).
+ *
+ * Group C — hybrid routers with static pages (mounted at root)
+ *   publicRouter: /api/public/* API routes + /privacy, /terms, /calculators HTML pages
+ *   portalRouter: /api/portal/* API routes + /portal-manifest/* routes
  */
 
 import type { Express, Request, Response } from "express";
@@ -22,27 +34,31 @@ import {
   sendWeeklyDigestEmails,
 } from "./helpers";
 
-// Domain routers
-import adminRouter from "./routers/adminRouter";
-import authRouter from "./routers/authRouter";
-import quotesRouter from "./routers/quotesRouter";
-import customersRouter from "./routers/customersRouter";
-import jobsRouter from "./routers/jobsRouter";
-import pricingRouter from "./routers/pricingRouter";
-import aiRouter from "./routers/aiRouter";
-import automationsRouter from "./routers/automationsRouter";
-import integrationsRouter from "./routers/integrationsRouter";
-import businessRouter from "./routers/businessRouter";
-import publicRouter from "./routers/publicRouter";
-import revenuecatRouter from "./routers/revenuecatRouter";
-import npsRouter from "./routers/npsRouter";
-import { quoteDoctorRouter } from "./routers/quoteDoctorRouter";
-import { supportRouter } from "./routers/supportRouter";
-import portalRouter from "./routers/portalRouter";
-import employeeRouter from "./routers/employeeRouter";
-import fieldAdminRouter from "./routers/fieldAdminRouter";
-import marketRatesRouter from "./routers/marketRatesRouter";
-import autopilotRouter from "./routers/autopilotRouter";
+// ─── Group A — pure single-domain routers ─────────────────────────────────────
+import adminRouter from "./routers/adminRouter";           // → /api/admin
+import npsRouter from "./routers/npsRouter";               // → /api/nps
+import autopilotRouter from "./routers/autopilotRouter";   // → /api/autopilot
+import revenuecatRouter from "./routers/revenuecatRouter"; // → /api/webhooks
+import employeeRouter from "./routers/employeeRouter";     // → /api/employee
+import marketRatesRouter from "./routers/marketRatesRouter"; // → /api/market-rates
+import pricingRouter from "./routers/pricingRouter";       // → /api/pricing
+import { supportRouter } from "./routers/supportRouter";   // → /api/support
+import { quoteDoctorRouter } from "./routers/quoteDoctorRouter"; // → /api/quote-doctor
+
+// ─── Group B — multi-domain routers (all mounted at /api) ─────────────────────
+import authRouter from "./routers/authRouter";             // /api/auth/*, /api/consent, /api/crash-report
+import quotesRouter from "./routers/quotesRouter";         // /api/quotes/*, /api/commercial/*
+import customersRouter from "./routers/customersRouter";   // /api/customers/*, /api/intake-requests/*
+import jobsRouter from "./routers/jobsRouter";             // /api/jobs/*, /api/schedule/*, /api/dispatch/*
+import businessRouter from "./routers/businessRouter";     // /api/business/*, /api/subscription/*, /api/settings, /api/preferences, /api/files, /api/tasks, /api/referrals, /api/badges, /api/communications, /api/analytics, /api/geocode, /api/lead-link, /api/tip-settings, /api/tips
+import aiRouter from "./routers/aiRouter";                 // /api/ai/*, /api/send/*
+import automationsRouter from "./routers/automationsRouter"; // /api/automations, /api/social/*, /api/streaks
+import integrationsRouter from "./routers/integrationsRouter"; // /api/google-calendar/*, /api/stripe/*, /api/api-keys, /api/webhook-endpoints, /api/internal/*
+
+// ─── Group C — hybrid routers with static pages (mounted at root) ─────────────
+import publicRouter from "./routers/publicRouter";         // /api/public/*, /q, /privacy, /terms, /calculators
+import portalRouter from "./routers/portalRouter";         // /api/portal/*, /portal-manifest/*, /api/portal-stats
+
 import { processAutopilotJobs } from "./services/autopilotService";
 
 // Session type extension
@@ -103,32 +119,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 2. Session middleware
   setupSession(app);
 
-  // 3. Mount domain routers
-  app.use(adminRouter);
-  app.use(authRouter);
-  app.use(quotesRouter);
-  app.use(customersRouter);
-  app.use(jobsRouter);
-  app.use(pricingRouter);
-  app.use(aiRouter);
-  app.use(automationsRouter);
-  app.use(integrationsRouter);
-  app.use(businessRouter);
-  app.use(revenuecatRouter);
-  app.use(npsRouter);
-  app.use(quoteDoctorRouter);
-  app.use(supportRouter);
+  // 3. Mount Group A — pure single-domain routers
+  app.use("/api/admin", adminRouter);
+  app.use("/api/nps", npsRouter);
+  app.use("/api/autopilot", autopilotRouter);
+  app.use("/api/webhooks", revenuecatRouter);
+  app.use("/api/employee", employeeRouter);
+  app.use("/api/market-rates", marketRatesRouter);
+  app.use("/api/pricing", pricingRouter);
+  app.use("/api/support", supportRouter);
+  app.use("/api/quote-doctor", quoteDoctorRouter);
+
+  // 4. Mount Group B — multi-domain routers at /api
+  app.use("/api", authRouter);
+  app.use("/api", quotesRouter);
+  app.use("/api", customersRouter);
+  app.use("/api", jobsRouter);
+  app.use("/api", aiRouter);
+  app.use("/api", automationsRouter);
+  app.use("/api", integrationsRouter);
+  app.use("/api", businessRouter);
+
+  // 5. Mount Group C — hybrid routers at root (API + static pages)
   app.use(publicRouter);
   app.use(portalRouter);
-  app.use(employeeRouter);
-  app.use(fieldAdminRouter);
-  app.use(marketRatesRouter);
-  app.use(autopilotRouter);
 
-  // 4. HTTP server
+  // 6. HTTP server
   const httpServer = createServer(app);
 
-  // 5. Background workers
+  // 7. Background workers
   // — 15-minute Autopilot cron
   setInterval(async () => {
     try {

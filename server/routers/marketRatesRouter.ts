@@ -156,7 +156,7 @@ Rules:
  *   3. State match (same beds/baths/freq), averaged across state records
  *   4. AI-generated estimate (cached to DB for future requests)
  */
-router.get("/api/market-rates", requireAuth, async (req: Request, res: Response) => {
+router.get("/", requireAuth, async (req: Request, res: Response) => {
   const { zip, bedrooms, bathrooms, frequency } = req.query;
 
   if (!zip || !bedrooms || !bathrooms || !frequency) {

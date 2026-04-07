@@ -41,7 +41,7 @@ function mapProductToTier(productId: string): string {
 // ── RevenueCat Webhook ─────────────────────────────────────────────────────
 // POST /api/webhooks/revenuecat
 // RevenueCat sends Authorization: Bearer {REVENUECAT_WEBHOOK_SECRET}
-router.post("/api/webhooks/revenuecat", async (req: Request, res: Response) => {
+router.post("/revenuecat", async (req: Request, res: Response) => {
   try {
     // 1. Verify webhook authenticity
     const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;

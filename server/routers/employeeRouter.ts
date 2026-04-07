@@ -55,7 +55,7 @@ function formatJobForEmployee(
 
 // ─── Auth: Login ──────────────────────────────────────────────────────────────
 
-router.post("/api/employee/auth/login", async (req: Request, res: Response) => {
+router.post("/auth/login", async (req: Request, res: Response) => {
   try {
     const { email, pin, businessId } = req.body as {
       email?: string;
@@ -121,7 +121,7 @@ router.post("/api/employee/auth/login", async (req: Request, res: Response) => {
 
 // ─── Jobs: Today ─────────────────────────────────────────────────────────────
 
-router.get("/api/employee/jobs/today", employeeAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/jobs/today", employeeAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { employeeId } = getEmployee(req);
     const today = todayDateStr();
@@ -153,7 +153,7 @@ router.get("/api/employee/jobs/today", employeeAuthMiddleware, async (req: Reque
 
 // ─── Jobs: Upcoming (7 days) ─────────────────────────────────────────────────
 
-router.get("/api/employee/jobs/upcoming", employeeAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/jobs/upcoming", employeeAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { employeeId } = getEmployee(req);
     const today = todayDateStr();
@@ -207,7 +207,7 @@ router.get("/api/employee/jobs/upcoming", employeeAuthMiddleware, async (req: Re
 
 // ─── Jobs: Detail ─────────────────────────────────────────────────────────────
 
-router.get("/api/employee/jobs/:assignmentId", employeeAuthMiddleware, async (req: Request, res: Response) => {
+router.get("/jobs/:assignmentId", employeeAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { employeeId } = getEmployee(req);
     const { assignmentId } = req.params;
@@ -239,7 +239,7 @@ router.get("/api/employee/jobs/:assignmentId", employeeAuthMiddleware, async (re
 
 // ─── Jobs: En Route ─────────────────────────────────────────────────────────
 
-router.patch("/api/employee/jobs/:assignmentId/status", employeeAuthMiddleware, async (req: Request, res: Response) => {
+router.patch("/jobs/:assignmentId/status", employeeAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { employeeId, businessId } = getEmployee(req);
     const { assignmentId } = req.params;
@@ -283,7 +283,7 @@ router.patch("/api/employee/jobs/:assignmentId/status", employeeAuthMiddleware, 
 
 // ─── Jobs: Check In ──────────────────────────────────────────────────────────
 
-router.post("/api/employee/jobs/:assignmentId/checkin", employeeAuthMiddleware, async (req: Request, res: Response) => {
+router.post("/jobs/:assignmentId/checkin", employeeAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { employeeId, businessId, name } = getEmployee(req);
     const { assignmentId } = req.params;
@@ -365,7 +365,7 @@ router.post("/api/employee/jobs/:assignmentId/checkin", employeeAuthMiddleware, 
 
 // ─── Jobs: Check Out ─────────────────────────────────────────────────────────
 
-router.post("/api/employee/jobs/:assignmentId/checkout", employeeAuthMiddleware, async (req: Request, res: Response) => {
+router.post("/jobs/:assignmentId/checkout", employeeAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const { employeeId, businessId, name } = getEmployee(req);
     const { assignmentId } = req.params;

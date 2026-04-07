@@ -94,7 +94,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
   return emp?.id ?? null;
 }
 
-  router.get("/api/schedule/week-jobs", requireAuth, async (req: Request, res: Response) => {
+  router.get("/schedule/week-jobs", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -181,7 +181,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/schedule/publications", requireAuth, async (req: Request, res: Response) => {
+  router.get("/schedule/publications", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -205,7 +205,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/schedule/publications/:pubId", requireAuth, async (req: Request, res: Response) => {
+  router.get("/schedule/publications/:pubId", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -224,7 +224,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/schedule/publish", requireAuth, async (req: Request, res: Response) => {
+  router.post("/schedule/publish", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -365,7 +365,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/schedule/publications/:pubId/resend/:notifId", requireAuth, async (req: Request, res: Response) => {
+  router.post("/schedule/publications/:pubId/resend/:notifId", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -411,7 +411,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/schedule/ack/:token", async (req: Request, res: Response) => {
+  router.get("/schedule/ack/:token", async (req: Request, res: Response) => {
     try {
       const [notif] = await db.select().from(cleanerScheduleNotifications)
         .where(eq(cleanerScheduleNotifications.ackToken, req.params.token));
@@ -481,7 +481,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/schedule/ack/:token", async (req: Request, res: Response) => {
+  router.post("/schedule/ack/:token", async (req: Request, res: Response) => {
     try {
       const [notif] = await db.select().from(cleanerScheduleNotifications)
         .where(eq(cleanerScheduleNotifications.ackToken, req.params.token));
@@ -502,7 +502,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/dispatch/send", requireAuth, async (req: Request, res: Response) => {
+  router.post("/dispatch/send", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -566,7 +566,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/assign", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/assign", requireAuth, async (req: Request, res: Response) => {
     try {
       const { employeeIds } = req.body;
       if (!Array.isArray(employeeIds)) return res.status(400).json({ message: "employeeIds must be array" });
@@ -624,7 +624,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/send-work-order", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/send-work-order", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner((req as any).session?.userId);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -636,7 +636,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/jobs/calendar", requireAuth, async (req: Request, res: Response) => {
+  router.get("/jobs/calendar", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -672,7 +672,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
+  router.get("/jobs", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -702,7 +702,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/jobs/quote/:quoteId", requireAuth, async (req: any, res: Response) => {
+  router.get("/jobs/quote/:quoteId", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -713,7 +713,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+  router.get("/jobs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const j = await getJobById(req.params.id);
       if (!j) return res.status(404).json({ message: "Job not found" });
@@ -729,7 +729,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -793,7 +793,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.put("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/jobs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const data = { ...req.body };
       if (data.startDatetime) data.startDatetime = new Date(data.startDatetime);
@@ -817,7 +817,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.delete("/api/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/jobs/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await deleteJob(req.params.id);
       return res.json({ message: "Deleted" });
@@ -826,7 +826,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/recurring-series", requireAuth, async (req: Request, res: Response) => {
+  router.get("/recurring-series", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -837,7 +837,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/recurring-series", requireAuth, async (req: Request, res: Response) => {
+  router.post("/recurring-series", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -853,7 +853,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/recurring-series/:id", requireAuth, async (req: Request, res: Response) => {
+  router.get("/recurring-series/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const series = await getRecurringSeriesById(req.params.id);
       if (!series) return res.status(404).json({ message: "Series not found" });
@@ -863,7 +863,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.put("/api/recurring-series/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/recurring-series/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const series = await updateRecurringSeries(req.params.id, req.body, true);
       return res.json(series);
@@ -872,7 +872,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/recurring-series/:id/cancel", requireAuth, async (req: Request, res: Response) => {
+  router.post("/recurring-series/:id/cancel", requireAuth, async (req: Request, res: Response) => {
     try {
       await cancelRecurringSeries(req.params.id);
       return res.json({ message: "Series cancelled" });
@@ -881,7 +881,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/recurring-series/:id/pause", requireAuth, async (req: Request, res: Response) => {
+  router.post("/recurring-series/:id/pause", requireAuth, async (req: Request, res: Response) => {
     try {
       await updateRecurringSeries(req.params.id, { status: "paused" }, false);
       return res.json({ message: "Series paused" });
@@ -890,7 +890,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/recurring-series/:id/resume", requireAuth, async (req: Request, res: Response) => {
+  router.post("/recurring-series/:id/resume", requireAuth, async (req: Request, res: Response) => {
     try {
       await updateRecurringSeries(req.params.id, { status: "active" }, true);
       return res.json({ message: "Series resumed" });
@@ -899,7 +899,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/skip", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/skip", requireAuth, async (req: Request, res: Response) => {
     try {
       const j = await skipSeriesOccurrence(req.params.id);
       return res.json(j);
@@ -908,7 +908,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/recurring-series/:id/generate", requireAuth, async (req: Request, res: Response) => {
+  router.post("/recurring-series/:id/generate", requireAuth, async (req: Request, res: Response) => {
     try {
       await generateSeriesJobs(req.params.id, 90);
       return res.json({ message: "Jobs generated" });
@@ -917,7 +917,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/send-confirmation", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/send-confirmation", requireAuth, async (req: Request, res: Response) => {
     try {
       const job = await getJobById(req.params.id);
       if (!job) return res.status(404).json({ message: "Job not found" });
@@ -1088,7 +1088,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:jobId/checklist", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:jobId/checklist", requireAuth, async (req: Request, res: Response) => {
     try {
       const item = await createChecklistItem({ jobId: req.params.jobId, ...req.body });
       return res.json(item);
@@ -1097,7 +1097,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.put("/api/checklist/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/checklist/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const item = await updateChecklistItem(req.params.id, req.body);
       return res.json(item);
@@ -1106,7 +1106,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.delete("/api/checklist/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/checklist/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await deleteChecklistItem(req.params.id);
       return res.json({ message: "Deleted" });
@@ -1115,7 +1115,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/jobs/:jobId/photos", requireAuth, async (req: Request, res: Response) => {
+  router.get("/jobs/:jobId/photos", requireAuth, async (req: Request, res: Response) => {
     try {
       const photos = await getPhotosByJob(req.params.jobId);
       return res.json(photos);
@@ -1124,7 +1124,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:jobId/photos", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:jobId/photos", requireAuth, async (req: Request, res: Response) => {
     try {
       const { photoData, photoType, caption, customerVisible } = req.body;
       if (!photoData) return res.status(400).json({ message: "Photo data required" });
@@ -1157,7 +1157,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.delete("/api/photos/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/photos/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const fs = await import("fs");
       const path = await import("path");
@@ -1177,7 +1177,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
   });
 
   // ── Email before/after photos to customer ─────────────────────────────────
-  router.post("/api/jobs/:id/email-photos", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/email-photos", requireAuth, async (req: Request, res: Response) => {
     try {
       const job = await getJobById(req.params.id);
       if (!job) return res.status(404).json({ message: "Job not found" });
@@ -1247,7 +1247,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/start", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/start", requireAuth, async (req: Request, res: Response) => {
     try {
       const job = await getJobById(req.params.id);
       if (!job) return res.status(404).json({ message: "Job not found" });
@@ -1267,7 +1267,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/complete", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/complete", requireAuth, async (req: Request, res: Response) => {
     try {
       const job = await getJobById(req.params.id);
       if (!job) return res.status(404).json({ message: "Job not found" });
@@ -1383,7 +1383,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/rate", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/rate", requireAuth, async (req: Request, res: Response) => {
     try {
       const { rating, comment } = req.body;
       if (!rating || rating < 1 || rating > 5) {
@@ -1399,7 +1399,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/ratings/summary", requireAuth, async (req: Request, res: Response) => {
+  router.get("/ratings/summary", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1411,7 +1411,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/generate-update-token", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/generate-update-token", requireAuth, async (req: Request, res: Response) => {
     try {
       const job = await getJobById(req.params.id);
       if (!job) return res.status(404).json({ message: "Job not found" });
@@ -1429,7 +1429,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/jobs/:id/update-token", requireAuth, async (req: Request, res: Response) => {
+  router.get("/jobs/:id/update-token", requireAuth, async (req: Request, res: Response) => {
     try {
       const result = await pool.query(`SELECT update_token FROM jobs WHERE id = $1`, [req.params.id]);
       return res.json({ token: result.rows[0]?.update_token || null });
@@ -1438,7 +1438,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/update-status", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/update-status", requireAuth, async (req: Request, res: Response) => {
     try {
       const { status, note } = req.body;
       if (!status) return res.status(400).json({ message: "Status is required" });
@@ -1477,7 +1477,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/jobs/:id/timeline", requireAuth, async (req: Request, res: Response) => {
+  router.get("/jobs/:id/timeline", requireAuth, async (req: Request, res: Response) => {
     try {
       const result = await pool.query(
         `SELECT * FROM job_status_history WHERE job_id = $1 ORDER BY created_at ASC`,
@@ -1489,7 +1489,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.post("/api/jobs/:id/notes", requireAuth, async (req: Request, res: Response) => {
+  router.post("/jobs/:id/notes", requireAuth, async (req: Request, res: Response) => {
     try {
       const { content, customerVisible } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "Content is required" });
@@ -1503,7 +1503,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/jobs/:id/notes", requireAuth, async (req: Request, res: Response) => {
+  router.get("/jobs/:id/notes", requireAuth, async (req: Request, res: Response) => {
     try {
       const result = await pool.query(
         `SELECT * FROM job_notes WHERE job_id = $1 ORDER BY created_at DESC`,
@@ -1515,7 +1515,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.delete("/api/jobs/:id/notes/:noteId", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/jobs/:id/notes/:noteId", requireAuth, async (req: Request, res: Response) => {
     try {
       await pool.query(`DELETE FROM job_notes WHERE id = $1 AND job_id = $2`, [req.params.noteId, req.params.id]);
       return res.json({ message: "Deleted" });
@@ -1524,7 +1524,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.get("/api/booking-availability", requireAuth, async (req: any, res) => {
+  router.get("/booking-availability", requireAuth, async (req: any, res) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ error: "Business not found" });
@@ -1546,7 +1546,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
     }
   });
 
-  router.put("/api/booking-availability", requireAuth, async (req: any, res) => {
+  router.put("/booking-availability", requireAuth, async (req: any, res) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ error: "Business not found" });
@@ -1573,7 +1573,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
 // Public check-in routes — authenticated via checkin_token, no session needed
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.get("/api/jobs/checkin/:token", async (req: Request, res: Response) => {
+router.get("/jobs/checkin/:token", async (req: Request, res: Response) => {
   try {
     const { rows } = await pool.query(
       `SELECT j.id, j.status, j.address, j.start_datetime, j.end_datetime,
@@ -1609,7 +1609,7 @@ router.get("/api/jobs/checkin/:token", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/api/jobs/checkin/:token/start", async (req: Request, res: Response) => {
+router.post("/jobs/checkin/:token/start", async (req: Request, res: Response) => {
   try {
     const { rows } = await pool.query(
       `UPDATE jobs SET status = 'in_progress', started_at = COALESCE(started_at, NOW()),
@@ -1634,7 +1634,7 @@ router.post("/api/jobs/checkin/:token/start", async (req: Request, res: Response
   }
 });
 
-router.post("/api/jobs/checkin/:token/complete", async (req: Request, res: Response) => {
+router.post("/jobs/checkin/:token/complete", async (req: Request, res: Response) => {
   try {
     const { notes, photoUrls } = req.body as { notes?: string; photoUrls?: string[] };
 
@@ -1744,7 +1744,7 @@ router.post("/api/jobs/checkin/:token/complete", async (req: Request, res: Respo
   }
 });
 
-router.post("/api/jobs/checkin/:token/photos", async (req: Request, res: Response) => {
+router.post("/jobs/checkin/:token/photos", async (req: Request, res: Response) => {
   try {
     const { photoData, caption } = req.body as { photoData?: string; caption?: string };
     if (!photoData) return res.status(400).json({ message: "photoData required" });

@@ -27,7 +27,7 @@ async function requireAutopilot(req: Request, res: Response, next: any) {
   }
 }
 
-router.post("/api/autopilot/enroll", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
+router.post("/enroll", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
   try {
     const { leadId } = req.body;
     if (!leadId) return res.status(400).json({ message: "leadId is required" });
@@ -43,7 +43,7 @@ router.post("/api/autopilot/enroll", requireAuth, requireAutopilot, async (req: 
   }
 });
 
-router.get("/api/autopilot/jobs", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
+router.get("/jobs", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
   try {
     const business = await getBusinessByOwner(req.session.userId!);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -67,7 +67,7 @@ router.get("/api/autopilot/jobs", requireAuth, requireAutopilot, async (req: Req
   }
 });
 
-router.post("/api/autopilot/jobs/:id/pause", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
+router.post("/jobs/:id/pause", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
   try {
     const business = await getBusinessByOwner(req.session.userId!);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -82,7 +82,7 @@ router.post("/api/autopilot/jobs/:id/pause", requireAuth, requireAutopilot, asyn
   }
 });
 
-router.post("/api/autopilot/jobs/:id/resume", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
+router.post("/jobs/:id/resume", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
   try {
     const business = await getBusinessByOwner(req.session.userId!);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -98,7 +98,7 @@ router.post("/api/autopilot/jobs/:id/resume", requireAuth, requireAutopilot, asy
   }
 });
 
-router.get("/api/autopilot/stats", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
+router.get("/stats", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
   try {
     const business = await getBusinessByOwner(req.session.userId!);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -137,7 +137,7 @@ router.get("/api/autopilot/stats", requireAuth, requireAutopilot, async (req: Re
   }
 });
 
-router.post("/api/autopilot/settings", requireAuth, async (req: Request, res: Response) => {
+router.post("/settings", requireAuth, async (req: Request, res: Response) => {
   try {
     const { autopilotEnabled, googleReviewLink } = req.body;
 
@@ -174,7 +174,7 @@ router.post("/api/autopilot/settings", requireAuth, async (req: Request, res: Re
   }
 });
 
-router.post("/api/autopilot/checkout", requireAuth, async (req: Request, res: Response) => {
+router.post("/checkout", requireAuth, async (req: Request, res: Response) => {
   try {
     const addonPriceId = process.env.AUTOPILOT_ADDON_PRICE_ID;
     if (!addonPriceId) return res.status(503).json({ message: "Autopilot add-on not configured" });

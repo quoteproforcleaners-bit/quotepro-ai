@@ -88,7 +88,7 @@ import { GROWTH_TASK_LIBRARY, getBusinessStage } from "../data/growth-tasks-libr
 
 const router = Router();
 
-  router.get("/api/automations", requireAuth, async (req: Request, res: Response) => {
+  router.get("/automations", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -99,7 +99,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/automations", requireAuth, async (req: Request, res: Response) => {
+  router.put("/automations", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -110,7 +110,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/social/connections", requireAuth, async (req: Request, res: Response) => {
+  router.get("/social/connections", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -127,7 +127,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/social/connections", requireAuth, async (req: Request, res: Response) => {
+  router.post("/social/connections", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -147,7 +147,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/social/connections/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/social/connections/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await deleteChannelConnection(req.params.id);
       return res.json({ message: "Disconnected" });
@@ -156,7 +156,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/social/automation", requireAuth, async (req: Request, res: Response) => {
+  router.get("/social/automation", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -173,7 +173,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/social/automation", requireAuth, async (req: Request, res: Response) => {
+  router.put("/social/automation", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -184,7 +184,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/social/conversations", requireAuth, async (req: Request, res: Response) => {
+  router.get("/social/conversations", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -196,7 +196,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/social/conversations/:id/messages", requireAuth, async (req: Request, res: Response) => {
+  router.get("/social/conversations/:id/messages", requireAuth, async (req: Request, res: Response) => {
     try {
       const messages = await getMessagesByConversation(req.params.id);
       return res.json(messages);
@@ -205,7 +205,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/social/leads", requireAuth, async (req: Request, res: Response) => {
+  router.get("/social/leads", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -217,7 +217,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/social/leads/:id", requireAuth, async (req: Request, res: Response) => {
+  router.get("/social/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const lead = await getSocialLeadById(req.params.id);
       if (!lead) return res.status(404).json({ message: "Lead not found" });
@@ -227,7 +227,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/social/leads", requireAuth, async (req: Request, res: Response) => {
+  router.post("/social/leads", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -246,7 +246,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/social/leads/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/social/leads/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const lead = await updateSocialLead(req.params.id, req.body);
       return res.json(lead);
@@ -255,7 +255,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/social/stats", requireAuth, async (req: Request, res: Response) => {
+  router.get("/social/stats", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -267,7 +267,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/social/attribution", requireAuth, async (req: Request, res: Response) => {
+  router.get("/social/attribution", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -279,7 +279,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/social/optouts", requireAuth, async (req: Request, res: Response) => {
+  router.get("/social/optouts", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -290,7 +290,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/social/simulate-dm", requireAuth, async (req: Request, res: Response) => {
+  router.post("/social/simulate-dm", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -420,7 +420,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/social/tiktok-lead", requireAuth, async (req: Request, res: Response) => {
+  router.post("/social/tiktok-lead", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -465,7 +465,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.get("/api/streaks", requireAuth, async (req: Request, res: Response) => {
+  router.get("/streaks", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -477,7 +477,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/streaks/action", requireAuth, async (req: Request, res: Response) => {
+  router.post("/streaks/action", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -515,7 +515,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.get("/api/milestones/check", requireAuth, async (req: Request, res: Response) => {
+  router.get("/milestones/check", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -530,7 +530,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/milestones/celebrate", requireAuth, async (req: Request, res: Response) => {
+  router.post("/milestones/celebrate", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -543,7 +543,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.get("/api/growth-tasks", requireAuth, async (req: Request, res: Response) => {
+  router.get("/growth-tasks", requireAuth, async (req: Request, res: Response) => {
     // mode=curated → personalized task library (1 AI + 2 library, max 3)
     if (req.query.mode === "curated") {
       try {
@@ -673,7 +673,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.get("/api/growth-tasks/:id", requireAuth, async (req: Request, res: Response) => {
+  router.get("/growth-tasks/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const task = await getGrowthTaskById(req.params.id);
       if (!task) return res.status(404).json({ message: "Growth task not found" });
@@ -684,7 +684,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/growth-tasks", requireAuth, async (req: Request, res: Response) => {
+  router.post("/growth-tasks", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -710,7 +710,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.put("/api/growth-tasks/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/growth-tasks/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const existing = await getGrowthTaskById(req.params.id);
       if (!existing) return res.status(404).json({ message: "Growth task not found" });
@@ -732,7 +732,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.delete("/api/growth-tasks/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/growth-tasks/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const existing = await getGrowthTaskById(req.params.id);
       if (!existing) return res.status(404).json({ message: "Growth task not found" });
@@ -744,7 +744,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/growth-tasks/:id/action", requireAuth, async (req: Request, res: Response) => {
+  router.post("/growth-tasks/:id/action", requireAuth, async (req: Request, res: Response) => {
     try {
       const task = await getGrowthTaskById(req.params.id);
       if (!task) return res.status(404).json({ message: "Growth task not found" });
@@ -763,7 +763,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/growth-tasks/:id/snooze", requireAuth, async (req: Request, res: Response) => {
+  router.post("/growth-tasks/:id/snooze", requireAuth, async (req: Request, res: Response) => {
     try {
       const task = await getGrowthTaskById(req.params.id);
       if (!task) return res.status(404).json({ message: "Growth task not found" });
@@ -778,7 +778,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.get("/api/review-requests", requireAuth, async (req: Request, res: Response) => {
+  router.get("/review-requests", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -807,7 +807,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/review-requests", requireAuth, async (req: Request, res: Response) => {
+  router.post("/review-requests", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -820,7 +820,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.put("/api/review-requests/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/review-requests/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const { rating, feedbackText, reviewClicked, referralSent } = req.body;
       const updateData: any = {};
@@ -842,7 +842,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.get("/api/growth-automation-settings", requireAuth, async (req: Request, res: Response) => {
+  router.get("/growth-automation-settings", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -854,7 +854,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.put("/api/growth-automation-settings", requireAuth, async (req: Request, res: Response) => {
+  router.put("/growth-automation-settings", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -872,7 +872,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.get("/api/campaigns", requireAuth, async (req: Request, res: Response) => {
+  router.get("/campaigns", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -884,7 +884,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/campaigns", requireAuth, async (req: Request, res: Response) => {
+  router.post("/campaigns", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -897,7 +897,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.put("/api/campaigns/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/campaigns/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const existing = await getCampaignById(req.params.id);
       if (!existing) return res.status(404).json({ message: "Campaign not found" });
@@ -917,7 +917,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.get("/api/campaigns/:id/recipients", requireAuth, async (req: Request, res: Response) => {
+  router.get("/campaigns/:id/recipients", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -966,7 +966,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/campaigns/:id/send", requireAuth, async (req: Request, res: Response) => {
+  router.post("/campaigns/:id/send", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1066,11 +1066,11 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.get("/api/email-sequences/library", requireAuth, async (_req: Request, res: Response) => {
+  router.get("/email-sequences/library", requireAuth, async (_req: Request, res: Response) => {
     return res.json(BUILT_IN_SEQUENCES);
   });
 
-  router.get("/api/email-sequences/enrollments", requireAuth, async (req: Request, res: Response) => {
+  router.get("/email-sequences/enrollments", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1085,7 +1085,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/email-sequences/:sequenceId/enroll", requireAuth, async (req: Request, res: Response) => {
+  router.post("/email-sequences/:sequenceId/enroll", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1136,7 +1136,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.post("/api/email-sequences/enrollments/:id/send-step", requireAuth, async (req: Request, res: Response) => {
+  router.post("/email-sequences/enrollments/:id/send-step", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1237,7 +1237,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.patch("/api/email-sequences/enrollments/:id/status", requireAuth, async (req: Request, res: Response) => {
+  router.patch("/email-sequences/enrollments/:id/status", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1255,7 +1255,7 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
-  router.delete("/api/email-sequences/enrollments/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/email-sequences/enrollments/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });

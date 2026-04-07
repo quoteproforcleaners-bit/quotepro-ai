@@ -78,7 +78,7 @@ import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NA
 
 const router = Router();
 
-  router.get("/api/customers", requireAuth, async (req: Request, res: Response) => {
+  router.get("/customers", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -139,7 +139,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/customers/:id", requireAuth, async (req: Request, res: Response) => {
+  router.get("/customers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const c = await getCustomerById(req.params.id);
       if (!c) return res.status(404).json({ message: "Customer not found" });
@@ -149,7 +149,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/customers/:id/last-job", requireAuth, async (req: Request, res: Response) => {
+  router.get("/customers/:id/last-job", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -162,7 +162,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/customers", requireAuth, async (req: Request, res: Response) => {
+  router.post("/customers", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -175,7 +175,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/customers/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/customers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const c = await updateCustomer(req.params.id, req.body);
       return res.json(c);
@@ -184,7 +184,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/customers/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/customers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await deleteCustomer(req.params.id);
       return res.json({ message: "Deleted" });
@@ -193,7 +193,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/customers/:id/do-not-contact", requireAuth, async (req: Request, res: Response) => {
+  router.put("/customers/:id/do-not-contact", requireAuth, async (req: Request, res: Response) => {
     try {
       const customer = await getCustomerById(req.params.id);
       if (!customer) return res.status(404).json({ message: "Customer not found" });
@@ -207,7 +207,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/customers/:id/marketing-prefs", requireAuth, async (req: Request, res: Response) => {
+  router.get("/customers/:id/marketing-prefs", requireAuth, async (req: Request, res: Response) => {
     try {
       const prefs = await getMarketingPrefsByCustomer(req.params.id);
       return res.json(prefs || null);
@@ -217,7 +217,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/customers/:id/marketing-prefs", requireAuth, async (req: Request, res: Response) => {
+  router.put("/customers/:id/marketing-prefs", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -230,7 +230,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/intake-requests", requireAuth, async (req: any, res: Response) => {
+  router.get("/intake-requests", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -267,7 +267,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/intake-requests/:id", requireAuth, async (req: any, res: Response) => {
+  router.delete("/intake-requests/:id", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -281,7 +281,7 @@ const router = Router();
     }
   });
 
-  router.patch("/api/intake-requests/:id", requireAuth, async (req: any, res: Response) => {
+  router.patch("/intake-requests/:id", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -321,7 +321,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/intake-requests/my-link", requireAuth, async (req: any, res: Response) => {
+  router.get("/intake-requests/my-link", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -345,7 +345,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/intake-requests/:id/ai-quote", requireAuth, requirePro, async (req: any, res: Response) => {
+  router.post("/intake-requests/:id/ai-quote", requireAuth, requirePro, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -558,7 +558,7 @@ Rules:
     }
   });
 
-  router.post("/api/intake-requests/:id/convert", requireAuth, async (req: any, res: Response) => {
+  router.post("/intake-requests/:id/convert", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -573,7 +573,7 @@ Rules:
     }
   });
 
-  router.post("/api/intake-requests/send-link", requireAuth, async (req: any, res: Response) => {
+  router.post("/intake-requests/send-link", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -699,7 +699,7 @@ Rules:
     }
   });
 
-  router.get("/api/intake-requests/count", requireAuth, async (req: any, res: Response) => {
+  router.get("/intake-requests/count", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });

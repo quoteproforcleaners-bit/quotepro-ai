@@ -106,7 +106,7 @@ Apply the requested changes precisely:
 
 // ─── Client narrative (any auth'd user) ──────────────────────────────────────
 
-quoteDoctorRouter.post("/api/quote-doctor/client-narrative", requireAuth, async (req: Request, res: Response) => {
+quoteDoctorRouter.post("/client-narrative", requireAuth, async (req: Request, res: Response) => {
   try {
     const { bedrooms, bathrooms, sqft, frequency, amount } = req.body as {
       bedrooms?: number;
@@ -154,7 +154,7 @@ quoteDoctorRouter.post("/api/quote-doctor/client-narrative", requireAuth, async 
 
 // ─── Optimize existing quote ──────────────────────────────────────────────────
 
-quoteDoctorRouter.post("/api/quote-doctor/optimize", requireAuth, async (req: Request, res: Response) => {
+quoteDoctorRouter.post("/optimize", requireAuth, async (req: Request, res: Response) => {
   try {
     const { quoteText: rawQuoteText, imageBase64, imageMimeType } = req.body as {
       quoteText?: string;
@@ -211,7 +211,7 @@ quoteDoctorRouter.post("/api/quote-doctor/optimize", requireAuth, async (req: Re
 
 // ─── Generate scope of work ───────────────────────────────────────────────────
 
-quoteDoctorRouter.post("/api/quote-doctor/scope", requireAuth, async (req: Request, res: Response) => {
+quoteDoctorRouter.post("/scope", requireAuth, async (req: Request, res: Response) => {
   try {
     const {
       facilityType,
@@ -266,7 +266,7 @@ quoteDoctorRouter.post("/api/quote-doctor/scope", requireAuth, async (req: Reque
 
 // ─── Pricing analysis (Growth+ gated) ────────────────────────────────────────
 
-quoteDoctorRouter.post("/api/quote-doctor/analyze", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+quoteDoctorRouter.post("/analyze", requireAuth, requireGrowth, async (req: Request, res: Response) => {
   try {
     const {
       quoteAmount,
@@ -355,7 +355,7 @@ Return ONLY this JSON (no markdown, no explanation):
 
 // ─── AI adjust existing proposal ──────────────────────────────────────────────
 
-quoteDoctorRouter.post("/api/quote-doctor/adjust", requireAuth, async (req: Request, res: Response) => {
+quoteDoctorRouter.post("/adjust", requireAuth, async (req: Request, res: Response) => {
   try {
     const { currentProposal: rawProposal, instructions: rawInstructions } = req.body as {
       currentProposal?: string;

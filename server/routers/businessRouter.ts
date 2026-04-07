@@ -81,7 +81,7 @@ import { AnalyticsEvents } from "../../shared/analytics-events";
 
 const router = Router();
 
-  router.get("/api/business", requireAuth, async (req: Request, res: Response) => {
+  router.get("/business", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) {
@@ -94,7 +94,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/business", requireAuth, async (req: Request, res: Response) => {
+  router.put("/business", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) {
@@ -109,7 +109,7 @@ const router = Router();
     }
   });
 
-  router.patch("/api/business", requireAuth, async (req: Request, res: Response) => {
+  router.patch("/business", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) {
@@ -124,7 +124,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/settings/language", requireAuth, async (req: Request, res: Response) => {
+  router.put("/settings/language", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -140,7 +140,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/business/logo", requireAuth, async (req: Request, res: Response) => {
+  router.post("/business/logo", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -180,7 +180,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/settings", requireAuth, async (req: Request, res: Response) => {
+  router.get("/settings", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -197,7 +197,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/employees", requireAuth, async (req: Request, res: Response) => {
+  router.get("/employees", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -210,7 +210,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/employees", requireAuth, async (req: Request, res: Response) => {
+  router.post("/employees", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -232,7 +232,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/employees/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/employees/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -248,7 +248,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/employees/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/employees/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -260,7 +260,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/push-token", requireAuth, async (req: Request, res: Response) => {
+  router.post("/push-token", requireAuth, async (req: Request, res: Response) => {
     try {
       const { token, platform } = req.body;
       if (!token) return res.status(400).json({ message: "Token required" });
@@ -275,7 +275,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/push-token", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/push-token", requireAuth, async (req: Request, res: Response) => {
     try {
       const { token } = req.body;
       if (!token) return res.status(400).json({ message: "Token required" });
@@ -286,7 +286,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/communications", requireAuth, async (req: Request, res: Response) => {
+  router.get("/communications", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -298,7 +298,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/communications", requireAuth, async (req: Request, res: Response) => {
+  router.post("/communications", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -310,7 +310,7 @@ const router = Router();
   });
 
   // ─── Direct send: create comm record and immediately deliver ───────────────
-  router.post("/api/communications/send-direct", requireAuth, async (req: Request, res: Response) => {
+  router.post("/communications/send-direct", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -404,7 +404,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/communications/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/communications/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const { content, scheduledFor, channel } = req.body;
       const updates: any = {};
@@ -418,7 +418,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/communications/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/communications/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await updateCommunication(req.params.id, { status: "canceled" });
       return res.json({ message: "Follow-up canceled" });
@@ -427,7 +427,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/communications/:id/send-now", requireAuth, async (req: Request, res: Response) => {
+  router.post("/communications/:id/send-now", requireAuth, async (req: Request, res: Response) => {
     try {
       // Starter AI follow-up quota: 3/month taste
       const user = await getUserById(req.session.userId!);
@@ -463,7 +463,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/referrals", requireAuth, async (req: Request, res: Response) => {
+  router.get("/referrals", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ message: "Not found" });
@@ -502,7 +502,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/tasks", requireAuth, async (req: Request, res: Response) => {
+  router.get("/tasks", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -518,7 +518,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/tasks", requireAuth, async (req: Request, res: Response) => {
+  router.post("/tasks", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -531,7 +531,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+  router.put("/tasks/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const data = { ...req.body };
       if (data.dueDate) data.dueDate = new Date(data.dueDate);
@@ -543,7 +543,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/tasks/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       await deleteTask(req.params.id);
       return res.json({ message: "Deleted" });
@@ -552,7 +552,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/subscription", requireAuth, async (req: Request, res: Response) => {
+  router.get("/subscription", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = await getUserById(req.session.userId!);
       if (!user) return res.status(401).json({ message: "Not found" });
@@ -567,11 +567,11 @@ const router = Router();
 
   // DEPRECATED — free Pro upgrade removed. Use /api/subscription/create-checkout.
   // Kept as 410 Gone so any cached clients get a clear signal.
-  router.post("/api/subscription/upgrade", (_req: Request, res: Response) => {
+  router.post("/subscription/upgrade", (_req: Request, res: Response) => {
     return res.status(410).json({ message: "This endpoint is no longer available. Use the checkout flow to upgrade." });
   });
 
-  router.get("/api/subscription/config", requireAuth, async (_req: Request, res: Response) => {
+  router.get("/subscription/config", requireAuth, async (_req: Request, res: Response) => {
     return res.json({
       apiKey: process.env.REVENUECAT_API_KEY || "",
       googleApiKey: process.env.REVENUECAT_GOOGLE_API_KEY || "",
@@ -579,7 +579,7 @@ const router = Router();
     });
   });
 
-  router.post("/api/subscription/sync", requireAuth, async (req: Request, res: Response) => {
+  router.post("/subscription/sync", requireAuth, async (req: Request, res: Response) => {
     try {
       const { tier, appUserId } = req.body;
       const validTiers = ["free", "starter", "growth", "pro"];
@@ -639,7 +639,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/subscription/create-checkout", requireAuth, async (req: Request, res: Response) => {
+  router.post("/subscription/create-checkout", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured" });
       const user = await getUserById(req.session.userId!);
@@ -740,7 +740,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/subscription/verify-session", requireAuth, async (req: Request, res: Response) => {
+  router.get("/subscription/verify-session", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured" });
       const { session_id } = req.query as { session_id: string };
@@ -804,7 +804,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/subscription/webhook", async (req: Request, res: Response) => {
+  router.post("/subscription/webhook", async (req: Request, res: Response) => {
     try {
       if (!getStripe()) return res.status(503).send("Stripe not configured");
       const sig = req.headers["stripe-signature"];
@@ -1086,7 +1086,7 @@ const router = Router();
   });
 
   // ── Unified subscription status endpoint ──────────────────────────────────
-  router.get("/api/subscription/status", requireAuth, async (req: Request, res: Response) => {
+  router.get("/subscription/status", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const result = await pool.query(
@@ -1156,7 +1156,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/subscription/create-portal", requireAuth, async (req: Request, res: Response) => {
+  router.post("/subscription/create-portal", requireAuth, async (req: Request, res: Response) => {
     try {
       if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured" });
       const user = await getUserById(req.session.userId!);
@@ -1180,7 +1180,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/preferences", requireAuth, async (req: Request, res: Response) => {
+  router.get("/preferences", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1204,7 +1204,7 @@ const router = Router();
     }
   });
 
-  router.put("/api/preferences", requireAuth, async (req: Request, res: Response) => {
+  router.put("/preferences", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1237,7 +1237,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/badges", requireAuth, async (req: Request, res: Response) => {
+  router.get("/badges", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1249,7 +1249,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/business/lead-capture-settings", requireAuth, requireGrowth, async (req: any, res: Response) => {
+  router.get("/business/lead-capture-settings", requireAuth, requireGrowth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1271,7 +1271,7 @@ const router = Router();
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  router.put("/api/business/lead-capture-settings", requireAuth, requireGrowth, async (req: any, res: Response) => {
+  router.put("/business/lead-capture-settings", requireAuth, requireGrowth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1306,7 +1306,7 @@ const router = Router();
   });
 
   // ─── Lead Link Pricing Status ─────────────────────────────────────────────
-  router.get("/api/lead-link/pricing-status", requireAuth, async (req: Request, res: Response) => {
+  router.get("/lead-link/pricing-status", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1347,7 +1347,7 @@ const router = Router();
   });
 
   // ─── Lead Link Guide Email ────────────────────────────────────────────────
-  router.get("/api/lead-link/guide-status", requireAuth, async (req: any, res: Response) => {
+  router.get("/lead-link/guide-status", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1365,7 +1365,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/lead-link/send-guide-email", requireAuth, async (req: any, res: Response) => {
+  router.post("/lead-link/send-guide-email", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1526,7 +1526,7 @@ const router = Router();
   }
 
   // ─── Lead Link Analytics ─────────────────────────────────────────────────
-  router.get("/api/business/lead-link-analytics", requireAuth, requireGrowth, async (req: any, res: Response) => {
+  router.get("/business/lead-link-analytics", requireAuth, requireGrowth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1561,7 +1561,7 @@ const router = Router();
     }
   });
 
-  router.get("/api/files", requireAuth, async (req: Request, res: Response) => {
+  router.get("/files", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1576,7 +1576,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/files/upload", requireAuth, async (req: Request, res: Response) => {
+  router.post("/files/upload", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1615,7 +1615,7 @@ const router = Router();
     }
   });
 
-  router.patch("/api/files/:id", requireAuth, async (req: Request, res: Response) => {
+  router.patch("/files/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1632,7 +1632,7 @@ const router = Router();
     }
   });
 
-  router.delete("/api/files/:id", requireAuth, async (req: Request, res: Response) => {
+  router.delete("/files/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1654,7 +1654,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/analytics/events", requireAuth, async (req: Request, res: Response) => {
+  router.post("/analytics/events", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1688,7 +1688,7 @@ const geocodeLimiter = rateLimit({
   message: { message: "Too many geocode requests. Try again later." },
 });
 
-router.get("/api/geocode/city-suggestions", requireAuth, geocodeLimiter, async (req: Request, res: Response) => {
+router.get("/geocode/city-suggestions", requireAuth, geocodeLimiter, async (req: Request, res: Response) => {
   try {
     const q = ((req.query.q as string) || "").trim();
     if (q.length < 2) return res.json([]);
@@ -1737,7 +1737,7 @@ router.get("/api/geocode/city-suggestions", requireAuth, geocodeLimiter, async (
 
 // ── Cleaner Notification Preferences ─────────────────────────────────────────
 
-router.get("/api/cleaner-notification-preferences", requireAuth, async (req: any, res: Response) => {
+router.get("/cleaner-notification-preferences", requireAuth, async (req: any, res: Response) => {
   try {
     const r = await pool.query(
       `SELECT cleaner_notifications_enabled, cleaner_notification_days,
@@ -1760,7 +1760,7 @@ router.get("/api/cleaner-notification-preferences", requireAuth, async (req: any
   }
 });
 
-router.put("/api/cleaner-notification-preferences", requireAuth, async (req: any, res: Response) => {
+router.put("/cleaner-notification-preferences", requireAuth, async (req: any, res: Response) => {
   try {
     const { enabled, days, email, sms, timing } = req.body;
     await pool.query(
@@ -1787,7 +1787,7 @@ router.put("/api/cleaner-notification-preferences", requireAuth, async (req: any
   }
 });
 
-router.post("/api/cleaner-notification-preferences/test", requireAuth, async (req: any, res: Response) => {
+router.post("/cleaner-notification-preferences/test", requireAuth, async (req: any, res: Response) => {
   try {
     const bizRes = await pool.query(
       `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.session.userId]
@@ -1804,7 +1804,7 @@ router.post("/api/cleaner-notification-preferences/test", requireAuth, async (re
 
 // ── Reminder Preferences ─────────────────────────────────────────────────────
 
-router.get("/api/reminder-preferences", requireAuth, async (req: any, res: Response) => {
+router.get("/reminder-preferences", requireAuth, async (req: any, res: Response) => {
   try {
     const r = await pool.query(
       `SELECT customer_email_reminder_days, customer_sms_reminder_days FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
@@ -1821,7 +1821,7 @@ router.get("/api/reminder-preferences", requireAuth, async (req: any, res: Respo
   }
 });
 
-router.put("/api/reminder-preferences", requireAuth, async (req: any, res: Response) => {
+router.put("/reminder-preferences", requireAuth, async (req: any, res: Response) => {
   try {
     const { emailReminderDays, smsReminderDays } = req.body;
     await pool.query(
@@ -1839,7 +1839,7 @@ router.put("/api/reminder-preferences", requireAuth, async (req: any, res: Respo
   }
 });
 
-router.post("/api/reminder-preferences/test", requireAuth, async (req: any, res: Response) => {
+router.post("/reminder-preferences/test", requireAuth, async (req: any, res: Response) => {
   try {
     const bizRes = await pool.query(
       `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.session.userId]
@@ -1854,7 +1854,7 @@ router.post("/api/reminder-preferences/test", requireAuth, async (req: any, res:
 
 // ── Tip Settings ──────────────────────────────────────────────────────────────
 
-router.get("/api/tip-settings", requireAuth, async (req: any, res: Response) => {
+router.get("/tip-settings", requireAuth, async (req: any, res: Response) => {
   try {
     const bizRes = await pool.query(
       `SELECT id, tips_enabled, tip_percentage_options, tip_distribution_percent, tip_request_delay
@@ -1875,7 +1875,7 @@ router.get("/api/tip-settings", requireAuth, async (req: any, res: Response) => 
   }
 });
 
-router.put("/api/tip-settings", requireAuth, async (req: any, res: Response) => {
+router.put("/tip-settings", requireAuth, async (req: any, res: Response) => {
   try {
     const bizRes = await pool.query(
       `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.session.userId]
@@ -1910,7 +1910,7 @@ router.put("/api/tip-settings", requireAuth, async (req: any, res: Response) => 
 
 // ── Tip History ───────────────────────────────────────────────────────────────
 
-router.get("/api/tips", requireAuth, async (req: any, res: Response) => {
+router.get("/tips", requireAuth, async (req: any, res: Response) => {
   try {
     const bizRes = await pool.query(
       `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`, [req.session.userId]

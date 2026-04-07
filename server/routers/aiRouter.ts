@@ -81,7 +81,7 @@ import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NA
 
 const router = Router();
 
-  router.post("/api/ai/job-update-message", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/job-update-message", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { type, customerName, companyName, senderName, updateLink, language: commLang } = req.body;
       if (!type) return res.status(400).json({ message: "type is required" });
@@ -126,7 +126,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/ai/analyze-quote", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/analyze-quote", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { quoteId } = req.body;
       if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
@@ -172,7 +172,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/ai/generate-followup", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/generate-followup", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { quoteId, channel, context, language: commLang } = req.body;
       if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
@@ -208,7 +208,7 @@ const router = Router();
     }
   });
 
-  router.post("/api/ai/sales-chat", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/sales-chat", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { message, conversationHistory } = req.body;
       if (!message) return res.status(400).json({ message: "message is required" });
@@ -354,7 +354,7 @@ ${contextStr}`;
     }
   });
 
-  router.post("/api/ai/agent-chat", requireAuth, async (req: Request, res: Response) => {
+  router.post("/ai/agent-chat", requireAuth, async (req: Request, res: Response) => {
     try {
       const { mode = "coach", conversationHistory = [] } = req.body;
       const message = sanitizeAndLog(req.body.message || "", req.session.userId!, "agent-chat");
@@ -661,7 +661,7 @@ SALES & MARKETING:
     }
   });
 
-  router.post("/api/send/email", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/send/email", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { to, subject, body, customerId, quoteId, includeQuoteLink } = req.body;
       if (!to || !body) {
@@ -800,7 +800,7 @@ SALES & MARKETING:
     }
   });
 
-  router.post("/api/ai/quote-descriptions", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/quote-descriptions", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { homeDetails, serviceTypes, addOns, companyName } = req.body;
 
@@ -877,7 +877,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
     }
   });
 
-  router.post("/api/ai/pricing-suggestion", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/pricing-suggestion", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { homeDetails, addOns, frequency, currentPrices, pricingSettings: ps, businessHistory } = req.body;
       if (!homeDetails || !currentPrices) return res.status(400).json({ message: "homeDetails and currentPrices required" });
@@ -973,7 +973,7 @@ ${historyContext}`;
     }
   });
 
-  router.post("/api/ai/walkthrough-extract", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/walkthrough-extract", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const rawInput = req.body.description || req.body.notes || "";
       const description = sanitizeAndLog(
@@ -1124,7 +1124,7 @@ Field rules:
     }
   });
 
-  router.post("/api/ai/closing-message", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/closing-message", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const {
         objectionText,
@@ -1233,7 +1233,7 @@ Return exactly this JSON structure:
     }
   });
 
-  router.post("/api/ai/objection-extract", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/objection-extract", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { imageBase64, mimeType } = req.body;
       if (!imageBase64) return res.status(400).json({ message: "Image is required" });
@@ -1268,7 +1268,7 @@ Return exactly this JSON structure:
     }
   });
 
-  router.post("/api/ai/communication-draft", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/communication-draft", requireAuth, requireGrowth, async (req: Request, res: Response) => {
     try {
       const { type, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;
       const purpose = sanitizeAndLog(req.body.purpose || "", req.session.userId!, "communication-draft-purpose");
@@ -1332,7 +1332,7 @@ Return exactly this JSON structure:
     }
   });
 
-  router.post("/api/ai/generate-campaign-content", requireAuth, async (req: Request, res: Response) => {
+  router.post("/ai/generate-campaign-content", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1414,7 +1414,7 @@ Return exactly this JSON structure:
     }
   });
 
-  router.post("/api/ai/generate-review-email", requireAuth, async (req: Request, res: Response) => {
+  router.post("/ai/generate-review-email", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1485,7 +1485,7 @@ Return exactly this JSON structure:
     }
   });
 
-  router.post("/api/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
+  router.post("/ai/generate-message", requireAuth, async (req: Request, res: Response) => {
     try {
       const { channel, total, status, quoteLink, bookingLink, paymentMethodsText, language: commLang, quoteId } = req.body;
       const purpose = sanitizeAndLog(req.body.purpose || "", req.session.userId!, "generate-message-purpose");
@@ -1570,7 +1570,7 @@ Return exactly this JSON structure:
     }
   });
 
-  router.post("/api/lead-finder/leads/:id/generate-replies", requireAuth, async (req: Request, res: Response) => {
+  router.post("/lead-finder/leads/:id/generate-replies", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const business = await getBusinessByOwner(req.session.userId!);
