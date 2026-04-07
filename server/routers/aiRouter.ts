@@ -800,7 +800,7 @@ SALES & MARKETING:
     }
   });
 
-  router.post("/ai/quote-descriptions", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/quote-descriptions", requireAuth, async (req: Request, res: Response) => {
     try {
       const { homeDetails, serviceTypes, addOns, companyName } = req.body;
 
@@ -877,7 +877,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
     }
   });
 
-  router.post("/ai/pricing-suggestion", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+  router.post("/ai/pricing-suggestion", requireAuth, async (req: Request, res: Response) => {
     try {
       const { homeDetails, addOns, frequency, currentPrices, pricingSettings: ps, businessHistory } = req.body;
       if (!homeDetails || !currentPrices) return res.status(400).json({ message: "homeDetails and currentPrices required" });
