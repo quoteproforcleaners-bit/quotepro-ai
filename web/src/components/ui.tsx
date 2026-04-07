@@ -66,16 +66,16 @@ export function Card({
  variant?:"default"|"glass"|"interactive"|"elevated";
  onClick?: () => void;
 }) {
- const base = {
- default:"bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
- glass:"glass-card rounded-xl",
- interactive:"card-interactive rounded-xl",
- elevated:"card-elevated rounded-xl",
+ const cls: Record<string, string> = {
+  default:     "card-apple",
+  glass:       "glass-card rounded-xl",
+  interactive: "card-apple-clickable",
+  elevated:    "card-apple",
  };
  return (
  <div
- onClick={onClick}
- className={`${base[variant]} ${padding ?"p-5 lg:p-6":""} ${className}`}
+  onClick={onClick}
+  className={`${cls[variant] ?? "card-apple"} ${padding ? "p-5 lg:p-6" : ""} ${className}`}
  >
  {children}
  </div>
@@ -129,36 +129,38 @@ export function HeroCard({
  );
 }
 
-const badgeStyles: Record<string, string> = {
- draft:"bg-slate-100 text-slate-600",
- sent:"bg-blue-50 text-blue-700",
- viewed:"bg-violet-50 text-violet-700",
- accepted:"bg-emerald-50 text-emerald-700",
- declined:"bg-red-50 text-red-600",
-"changes-requested":"bg-amber-50 text-amber-700",
- expired:"bg-slate-100 text-slate-500",
- scheduled:"bg-blue-50 text-blue-700",
- en_route:"bg-cyan-50 text-cyan-700",
- service_started:"bg-indigo-50 text-indigo-700",
- in_progress:"bg-amber-50 text-amber-700",
- final_touches:"bg-purple-50 text-purple-700",
- completed:"bg-emerald-50 text-emerald-700",
- canceled:"bg-red-50 text-red-600",
- active:"bg-emerald-50 text-emerald-700",
- inactive:"bg-slate-100 text-slate-500",
- lead:"bg-blue-50 text-blue-700",
- success:"bg-emerald-50 text-emerald-700",
- warning:"bg-amber-50 text-amber-700",
- error:"bg-red-50 text-red-600",
- info:"bg-blue-50 text-blue-700",
- pro:"bg-violet-50 text-violet-700",
- critical:"bg-red-100 text-red-700 font-semibold",
- cold:"bg-orange-100 text-orange-700 font-semibold",
- cooling:"bg-amber-100 text-amber-700",
- pending:"bg-amber-50 text-amber-700",
- clicked:"bg-blue-50 text-blue-700",
- done:"bg-emerald-50 text-emerald-700",
- snoozed:"bg-slate-100 text-slate-600",
+const PILL_MAP: Record<string, string> = {
+ draft:               "pill-neutral",
+ expired:             "pill-neutral",
+ inactive:            "pill-neutral",
+ snoozed:             "pill-neutral",
+ neutral:             "pill-neutral",
+ sent:                "pill-info",
+ info:                "pill-info",
+ clicked:             "pill-info",
+ lead:                "pill-info",
+ viewed:              "pill-info",
+ scheduled:           "pill-info",
+ en_route:            "pill-teal",
+ pending:             "pill-warning",
+ warning:             "pill-warning",
+ cold:                "pill-warning",
+ cooling:             "pill-warning",
+ "changes-requested": "pill-warning",
+ in_progress:         "pill-warning",
+ final_touches:       "pill-warning",
+ accepted:            "pill-success",
+ completed:           "pill-success",
+ active:              "pill-success",
+ success:             "pill-success",
+ done:                "pill-success",
+ service_started:     "pill-success",
+ declined:            "pill-danger",
+ canceled:            "pill-danger",
+ error:               "pill-danger",
+ critical:            "pill-danger",
+ pro:                 "pill-purple",
+ live:                "pill-success",
 };
 
 export function Badge({
@@ -172,16 +174,18 @@ export function Badge({
  dot?: boolean;
  size?:"sm"|"md";
 }) {
- const style = badgeStyles[status] || badgeStyles.draft;
- const text = label || (status ? status.replace(/[-_]/g,"") :"");
- const sizeClass = size ==="sm"?"px-2 py-px text-[10px]":"px-2.5 py-0.5 text-xs";
+ const pillClass = PILL_MAP[status] ?? "pill-neutral";
+ const text = label || (status ? status.replace(/[-_]/g, " ") : "");
  return (
- <span
- className={`inline-flex items-center gap-1.5 rounded-full font-medium capitalize ${style} ${sizeClass}`}
- >
- {dot ? <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70"/> : null}
- {text}
- </span>
+  <span
+   className={`pill-apple ${pillClass}`}
+   style={size === "sm" ? { padding: "1.5px 6px", fontSize: "9px" } : undefined}
+  >
+   {dot ? (
+    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "currentColor", opacity: 0.7, display: "inline-block", marginRight: "3px", verticalAlign: "middle" }} />
+   ) : null}
+   {text}
+  </span>
  );
 }
 
@@ -210,37 +214,38 @@ export function Button({
  className?: string;
  glow?: boolean;
 }) {
- const variants = {
- primary:
-"bg-primary-600 hover:bg-primary-700 text-white shadow-sm shadow-primary-600/10",
- secondary:
-"bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm",
- ghost:"text-slate-600 hover:bg-slate-100 hover:text-slate-900",
- danger:"bg-red-600 hover:bg-red-700 text-white shadow-sm",
- success:"bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm",
- warning:"bg-amber-500 hover:bg-amber-600 text-white shadow-sm",
+ const variantCls: Record<string, string> = {
+  primary:   "btn-primary-apple",
+  secondary: "btn-secondary-apple",
+  ghost:     "btn-secondary-apple",
+  danger:    "btn-danger-apple",
+  success:   "btn-success-apple",
+  warning:   "btn-danger-apple",
  };
- const sizes = {
- xs:"h-7 px-2.5 text-xs gap-1",
- sm:"h-8 px-3 text-xs gap-1.5",
- md:"h-9 px-4 text-sm gap-2",
- lg:"h-11 px-5 text-sm gap-2",
- };
+ const sizeSt: React.CSSProperties = size === "xs"
+  ? { padding: "3px 8px",  fontSize: "11px" }
+  : size === "sm"
+  ? { padding: "4px 10px", fontSize: "11px" }
+  : size === "lg"
+  ? { padding: "7px 16px", fontSize: "13px" }
+  : { padding: "5px 12px", fontSize: "12px" };
+ const iconSz = size === "xs" || size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5";
  return (
- <button
- type={type}
- onClick={onClick}
- disabled={disabled || loading}
- className={`inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 active:scale-[0.96] active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${variants[variant]} ${sizes[size]} ${glow ?"animate-pulse-glow":""} ${className}`}
- >
- {loading ? (
- <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/>
- ) : Icon ? (
- <Icon className={size ==="xs"|| size ==="sm"?"w-3.5 h-3.5":"w-4 h-4"} />
- ) : null}
- {children}
- {IconRight ? <IconRight className="w-4 h-4"/> : null}
- </button>
+  <button
+   type={type}
+   onClick={onClick}
+   disabled={disabled || loading}
+   className={`btn-apple ${variantCls[variant] ?? "btn-secondary-apple"} ${glow ? "animate-pulse-glow" : ""} ${className}`}
+   style={sizeSt}
+  >
+   {loading ? (
+    <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"/>
+   ) : Icon ? (
+    <Icon className={iconSz} />
+   ) : null}
+   {children}
+   {IconRight ? <IconRight className={iconSz}/> : null}
+  </button>
  );
 }
 
@@ -255,30 +260,26 @@ export function Input({
  helper?: string;
 } & React.InputHTMLAttributes<HTMLInputElement>) {
  return (
- <div>
- {label ? (
- <label className="block text-sm font-medium text-slate-700 mb-1.5">
- {label}
- </label>
- ) : null}
- <input
- {...props}
- className={`w-full h-11 px-3.5 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 ${
- error
- ?"border-red-300 focus:ring-red-500/20 focus:border-red-500"
- :"border-slate-200 hover:border-slate-300"
- } ${props.className ||""}`}
- />
- {helper && !error ? (
- <p className="text-xs text-slate-400 mt-1">{helper}</p>
- ) : null}
- {error ? (
- <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
- <AlertCircle className="w-3 h-3"/>
- {error}
- </p>
- ) : null}
- </div>
+  <div>
+   {label ? (
+    <label style={{ display: "block", fontSize: "12px", fontWeight: 500, color: "var(--t2)", marginBottom: "5px" }}>
+     {label}
+    </label>
+   ) : null}
+   <input
+    {...props}
+    className={`input-apple ${error ? "input-apple-error" : ""} ${props.className ?? ""}`}
+   />
+   {helper && !error ? (
+    <p style={{ fontSize: "11px", color: "var(--t4)", marginTop: "4px" }}>{helper}</p>
+   ) : null}
+   {error ? (
+    <p style={{ fontSize: "11px", color: "var(--red)", marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+     <AlertCircle style={{ width: "12px", height: "12px" }}/>
+     {error}
+    </p>
+   ) : null}
+  </div>
  );
 }
 
@@ -291,27 +292,24 @@ export function Textarea({
  error?: string;
 } & React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
  return (
- <div>
- {label ? (
- <label className="block text-sm font-medium text-slate-700 mb-1.5">
- {label}
- </label>
- ) : null}
- <textarea
- {...props}
- className={`w-full px-3.5 py-3 rounded-lg border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 resize-none ${
- error
- ?"border-red-300 focus:ring-red-500/20 focus:border-red-500"
- :"border-slate-200 hover:border-slate-300"
- } ${props.className ||""}`}
- />
- {error ? (
- <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
- <AlertCircle className="w-3 h-3"/>
- {error}
- </p>
- ) : null}
- </div>
+  <div>
+   {label ? (
+    <label style={{ display: "block", fontSize: "12px", fontWeight: 500, color: "var(--t2)", marginBottom: "5px" }}>
+     {label}
+    </label>
+   ) : null}
+   <textarea
+    {...props}
+    className={`input-apple ${error ? "input-apple-error" : ""} ${props.className ?? ""}`}
+    style={{ resize: "none", ...(props.style ?? {}) }}
+   />
+   {error ? (
+    <p style={{ fontSize: "11px", color: "var(--red)", marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+     <AlertCircle style={{ width: "12px", height: "12px" }}/>
+     {error}
+    </p>
+   ) : null}
+  </div>
  );
 }
 
@@ -324,25 +322,24 @@ export function Select({
  options: Array<{ value: string; label: string }>;
 } & React.SelectHTMLAttributes<HTMLSelectElement>) {
  return (
- <div>
- {label ? (
- <label className="block text-sm font-medium text-slate-700 mb-1.5">
- {label}
- </label>
- ) : null}
- <select
- {...props}
- className={`w-full h-11 px-3 rounded-lg border border-slate-200 hover:border-slate-300 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white ${
- props.className ||""
- }`}
- >
- {options.map((o) => (
- <option key={o.value} value={o.value}>
- {o.label}
- </option>
- ))}
- </select>
- </div>
+  <div>
+   {label ? (
+    <label style={{ display: "block", fontSize: "12px", fontWeight: 500, color: "var(--t2)", marginBottom: "5px" }}>
+     {label}
+    </label>
+   ) : null}
+   <select
+    {...props}
+    className={`input-apple ${props.className ?? ""}`}
+    style={{ cursor: "pointer", ...(props.style ?? {}) }}
+   >
+    {options.map((o) => (
+     <option key={o.value} value={o.value}>
+      {o.label}
+     </option>
+    ))}
+   </select>
+  </div>
  );
 }
 
@@ -399,22 +396,18 @@ export function SegmentedControl({
  onChange: (value: string) => void;
 }) {
  return (
- <div className="inline-flex items-center bg-slate-100 rounded-lg p-1">
- {segments.map((s) => (
- <button
- key={s.value}
- onClick={() => onChange(s.value)}
- className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-150 ${
- active === s.value
- ?"bg-white text-slate-900 shadow-sm"
- :"text-slate-500 hover:text-slate-700"
- }`}
- >
- {s.icon ? <s.icon className="w-3.5 h-3.5"/> : null}
- {s.label}
- </button>
- ))}
- </div>
+  <div className="seg-ctrl-apple">
+   {segments.map((s) => (
+    <button
+     key={s.value}
+     onClick={() => onChange(s.value)}
+     className={`seg-btn-apple ${active === s.value ? "seg-btn-apple-active" : ""}`}
+    >
+     {s.icon ? <s.icon style={{ width: "12px", height: "12px" }}/> : null}
+     {s.label}
+    </button>
+   ))}
+  </div>
  );
 }
 
@@ -471,41 +464,50 @@ export function StatCard({
  color?:"primary"|"violet"|"emerald"|"amber"|"red"|"cyan";
  onClick?: () => void;
 }) {
- const colors = {
- primary:"bg-primary-50 text-primary-600",
- violet:"bg-violet-50 text-violet-600",
- emerald:"bg-emerald-50 text-emerald-600",
- amber:"bg-amber-50 text-amber-600",
- red:"bg-red-50 text-red-600",
- cyan:"bg-cyan-50 text-cyan-600",
+ const iconBg: Record<string, string> = {
+  primary: "rgba(0,122,255,0.10)",
+  violet:  "rgba(88,86,214,0.10)",
+  emerald: "rgba(40,205,65,0.10)",
+  amber:   "rgba(255,149,0,0.10)",
+  red:     "rgba(255,59,48,0.10)",
+  cyan:    "rgba(90,200,250,0.13)",
  };
+ const iconColor: Record<string, string> = {
+  primary: "var(--blue)",
+  violet:  "var(--indigo, #5856d6)",
+  emerald: "var(--green)",
+  amber:   "var(--orange)",
+  red:     "var(--red)",
+  cyan:    "var(--teal, #5ac8fa)",
+ };
+ const bg = iconBg[color]    ?? iconBg.primary;
+ const ic = iconColor[color] ?? "var(--blue)";
  return (
- <Card variant={onClick ?"interactive":"default"} onClick={onClick}>
- <div className="flex items-start justify-between">
- <div className="flex-1">
- <p className="text-sm font-medium text-slate-500 mb-2">{label}</p>
- <p className="text-2xl font-bold text-slate-900 tracking-tight stat-number animate-count-up">{value}</p>
- {subtitle ? (
- <p className="text-xs text-slate-400 mt-1.5">{subtitle}</p>
- ) : null}
- {trend ? (
- <p
- className={`text-xs font-medium mt-1.5 ${
- trend.value >= 0 ?"text-emerald-600":"text-red-600"
- }`}
- >
- {trend.value >= 0 ?"+":""}
- {trend.value}% {trend.label}
- </p>
- ) : null}
- </div>
- <div
- className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${colors[color]}`}
- >
- <Icon className="w-5 h-5"/>
- </div>
- </div>
- </Card>
+  <div
+   className={onClick ? "card-apple-clickable" : "card-apple"}
+   style={{ padding: "14px 16px", cursor: onClick ? "pointer" : undefined }}
+   onClick={onClick}
+  >
+   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+    <div style={{ flex: 1, minWidth: 0 }}>
+     <p style={{ fontSize: "11px", color: "var(--t3)", fontWeight: 400, margin: "0 0 6px" }}>{label}</p>
+     <p style={{ fontSize: "22px", fontWeight: 700, letterSpacing: "-0.8px", fontVariantNumeric: "tabular-nums", color: "var(--t1)", margin: 0, lineHeight: 1.1 }}>
+      {value}
+     </p>
+     {subtitle ? (
+      <p style={{ fontSize: "11px", color: "var(--t4)", margin: "4px 0 0" }}>{subtitle}</p>
+     ) : null}
+     {trend ? (
+      <p style={{ fontSize: "10px", fontWeight: 600, margin: "4px 0 0", color: trend.value >= 0 ? "var(--green)" : "var(--red)" }}>
+       {trend.value >= 0 ? "↑" : "↓"} {Math.abs(trend.value)}% {trend.label}
+      </p>
+     ) : null}
+    </div>
+    <div style={{ width: "30px", height: "30px", borderRadius: "8px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: ic }}>
+     <Icon style={{ width: "15px", height: "15px" }} />
+    </div>
+   </div>
+  </div>
  );
 }
 
@@ -601,6 +603,17 @@ export function Timeline({
  );
 }
 
+function getAvatarColorClass(name: string): string {
+ if (!name) return "avatar-af";
+ const parts = name.trim().split(/\s+/);
+ const lastName = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+ const first = (lastName?.[0] ?? "A").toUpperCase();
+ if (first <= "F") return "avatar-af";
+ if (first <= "L") return "avatar-gl";
+ if (first <= "R") return "avatar-mr";
+ return "avatar-sz";
+}
+
 export function Avatar({
  name,
  size ="md",
@@ -612,34 +625,23 @@ export function Avatar({
  src?: string;
  className?: string;
 }) {
- const initials = name
- .split("")
- .map((n) => n[0])
- .join("")
- .toUpperCase()
- .slice(0, 2);
- const sizes = {
- xs:"w-6 h-6 text-[10px]",
- sm:"w-8 h-8 text-xs",
- md:"w-10 h-10 text-sm",
- lg:"w-12 h-12 text-base",
- xl:"w-16 h-16 text-lg",
- };
+ const initials = name.split(" ").map(n => n[0]).filter(Boolean).join("").toUpperCase().slice(0, 2);
+ const sizeSt: React.CSSProperties = {
+  xs: { width: "24px", height: "24px", fontSize: "9px"  },
+  sm: { width: "32px", height: "32px", fontSize: "11px" },
+  md: { width: "34px", height: "34px", fontSize: "12px" },
+  lg: { width: "48px", height: "48px", fontSize: "15px" },
+  xl: { width: "64px", height: "64px", fontSize: "18px" },
+ }[size];
  if (src) {
- return (
- <img
- src={src}
- alt={name}
- className={`${sizes[size]} rounded-full object-cover ${className}`}
- />
- );
+  return (
+   <img src={src} alt={name} style={{ ...sizeSt, borderRadius: "50%", objectFit: "cover" }} className={className} />
+  );
  }
  return (
- <div
- className={`${sizes[size]} rounded-full bg-gradient-to-br from-primary-400 to-primary-600 text-white flex items-center justify-center font-semibold shadow-sm ${className}`}
- >
- {initials}
- </div>
+  <div className={`avatar-apple ${getAvatarColorClass(name)} ${className}`} style={sizeSt}>
+   {initials}
+  </div>
  );
 }
 
@@ -712,33 +714,25 @@ export function Toggle({
  description?: string;
 }) {
  return (
- <label className="flex items-start gap-3 cursor-pointer group">
- <button
- type="button"
- role="switch"
- aria-checked={checked}
- onClick={() => onChange(!checked)}
- className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ${
- checked ?"bg-primary-600":"bg-slate-200"
- }`}
- >
- <span
- className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
- checked ?"translate-x-6":"translate-x-1"
- }`}
- />
- </button>
- {label ? (
- <div>
- <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900 transition-colors">
- {label}
- </span>
- {description ? (
- <p className="text-xs text-slate-500 mt-0.5">{description}</p>
- ) : null}
- </div>
- ) : null}
- </label>
+  <label style={{ display: "flex", alignItems: "flex-start", gap: "10px", cursor: "pointer" }}>
+   <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    className={`toggle-apple-track ${checked ? "toggle-apple-track-on" : "toggle-apple-track-off"}`}
+   >
+    <span className={`toggle-apple-thumb ${checked ? "toggle-apple-thumb-on" : "toggle-apple-thumb-off"}`} />
+   </button>
+   {label ? (
+    <div>
+     <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--t2)" }}>{label}</span>
+     {description ? (
+      <p style={{ fontSize: "11px", color: "var(--t4)", margin: "2px 0 0" }}>{description}</p>
+     ) : null}
+    </div>
+   ) : null}
+  </label>
  );
 }
 
