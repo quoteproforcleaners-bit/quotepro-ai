@@ -42,6 +42,9 @@ import {
   PLATFORM_FROM_EMAIL,
   PLATFORM_FROM_NAME,
 } from "./mail";
+import { sendPush } from "./pushNotifications";
+import { trackEvent } from "./analytics";
+import { AnalyticsEvents } from "../shared/analytics-events";
 
 const JOB_TYPE_EMAIL_LABEL: Record<string, string> = {
   regular: "Regular Clean",
@@ -1919,3 +1922,223 @@ export const BUILT_IN_SEQUENCES = [
       ],
     },
   ];
+
+// ─── sendActivationNudges ────────────────────────────────────────────────────
+
+/**
+ * 72-hour activation nudge pipeline.
+ * Runs hourly. For users who have NOT yet sent their first quote:
+ *   - 24 h after signup → email
+ *   - 48 h after signup → SMS (if phone on file and not opted out)
+ *   - 70 h after signup → email + push notification
+ * Capped at one nudge type per user per run.
+ * Stops sending once `first_quote_sent_at` is set.
+ */
+export async function sendActivationNudges(): Promise<void> {
+  try {
+    const { rows } = await pool.query<{
+      id: string;
+      email: string;
+      name: string | null;
+      activation_nudge_24h_sent: boolean;
+      activation_nudge_48h_sent: boolean;
+      activation_nudge_70h_sent: boolean;
+      sms_opted_out: boolean;
+      trial_drip_unsubscribed: boolean;
+      email_unreachable: boolean;
+      phone: string | null;
+      created_at: Date;
+    }>(`
+      SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.activation_nudge_24h_sent,
+        u.activation_nudge_48h_sent,
+        u.activation_nudge_70h_sent,
+        u.sms_opted_out,
+        u.trial_drip_unsubscribed,
+        u.email_unreachable,
+        b.phone,
+        u.created_at
+      FROM users u
+      LEFT JOIN businesses b ON b.owner_user_id = u.id
+      WHERE u.first_quote_sent_at IS NULL
+        AND u.created_at >= NOW() - INTERVAL '72 hours'
+        AND u.created_at <= NOW() - INTERVAL '24 hours'
+        AND u.subscription_tier != 'free'
+        AND u.email IS NOT NULL
+    `);
+
+    if (!rows.length) return;
+
+    const appUrl = process.env.APP_URL || "https://app.getquotepro.ai";
+
+    for (const user of rows) {
+      try {
+        const ageMs  = Date.now() - new Date(user.created_at).getTime();
+        const ageH   = ageMs / (1_000 * 60 * 60);
+        const firstName = (user.name || "there").split(" ")[0];
+
+        // ── 24 h — Email ──────────────────────────────────────────────────────
+        if (ageH >= 24 && !user.activation_nudge_24h_sent) {
+          if (!user.email_unreachable && !user.trial_drip_unsubscribed) {
+            const html = `
+<!DOCTYPE html>
+<html>
+<head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+        <tr><td style="background:#1a1a2e;padding:28px 32px">
+          <p style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.3px">QuotePro</p>
+        </td></tr>
+        <tr><td style="padding:36px 32px 28px">
+          <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3">
+            ${firstName}, your first quote takes 60 seconds
+          </h1>
+          <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6">
+            You signed up for QuotePro yesterday. Cleaning companies that send their first quote within 24 hours are <strong>3× more likely to close</strong> their first job.
+          </p>
+          <p style="margin:0 0 28px;font-size:15px;color:#475569;line-height:1.6">
+            It takes under a minute — type an address, pick your room count, and tap Send.
+          </p>
+          <table cellpadding="0" cellspacing="0"><tr><td>
+            <a href="${appUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;font-size:15px;font-weight:600;padding:13px 28px;border-radius:8px;text-decoration:none">
+              Send my first quote
+            </a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="padding:20px 32px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:12px;color:#94a3b8">
+            QuotePro &mdash; Built for residential cleaning pros.<br>
+            <a href="${appUrl}/unsubscribe" style="color:#94a3b8">Unsubscribe from these tips</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+            await sendEmail({
+              to: user.email,
+              subject: `${firstName}, your first quote takes 60 seconds`,
+              html,
+              text: `Hi ${firstName},\n\nYou signed up for QuotePro yesterday. Cleaning companies that send their first quote within 24 hours are 3x more likely to close their first job.\n\nIt takes under a minute — open the app, type an address, pick your room count, and tap Send.\n\n${appUrl}\n\nThe QuotePro Team`,
+              fromName: PLATFORM_FROM_NAME,
+            });
+          }
+
+          await pool.query(
+            `UPDATE users SET activation_nudge_24h_sent = true WHERE id = $1`,
+            [user.id],
+          );
+          trackEvent(user.id, AnalyticsEvents.ACTIVATION_NUDGE_24H_SENT, { channel: "email" }).catch(() => {});
+          continue; // one nudge per user per run
+        }
+
+        // ── 48 h — SMS ────────────────────────────────────────────────────────
+        if (ageH >= 48 && !user.activation_nudge_48h_sent) {
+          if (!user.sms_opted_out && user.phone) {
+            const twilioSid   = process.env.TWILIO_ACCOUNT_SID;
+            const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+            const twilioFrom  = process.env.TWILIO_PHONE_NUMBER;
+            if (twilioSid && twilioToken && twilioFrom) {
+              const body = `Hi ${firstName}! Your QuotePro trial is halfway through. Have you sent a quote yet? It takes under a minute: ${appUrl} Reply STOP to opt out.`;
+              await fetch(
+                `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+                {
+                  method: "POST",
+                  headers: {
+                    Authorization: "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+                    "Content-Type": "application/x-www-form-urlencoded",
+                  },
+                  body: new URLSearchParams({ To: user.phone, From: twilioFrom, Body: body }).toString(),
+                },
+              ).catch((e) => console.error("[activation-nudge] SMS 48h error:", e));
+            }
+          }
+
+          await pool.query(
+            `UPDATE users SET activation_nudge_48h_sent = true WHERE id = $1`,
+            [user.id],
+          );
+          trackEvent(user.id, AnalyticsEvents.ACTIVATION_NUDGE_48H_SENT, { channel: "sms" }).catch(() => {});
+          continue; // one nudge per user per run
+        }
+
+        // ── 70 h — Email + Push ───────────────────────────────────────────────
+        if (ageH >= 70 && !user.activation_nudge_70h_sent) {
+          if (!user.email_unreachable && !user.trial_drip_unsubscribed) {
+            const html = `
+<!DOCTYPE html>
+<html>
+<head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+        <tr><td style="background:#1a1a2e;padding:28px 32px">
+          <p style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.3px">QuotePro</p>
+        </td></tr>
+        <tr><td style="padding:36px 32px 28px">
+          <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#dc2626;line-height:1.3">
+            ${firstName}, 2 hours left in your activation window
+          </h1>
+          <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6">
+            Your 72-hour activation window closes soon. Users who send at least one quote in the first 72 hours are <strong>5× more likely to become paying customers</strong>.
+          </p>
+          <p style="margin:0 0 28px;font-size:15px;color:#475569;line-height:1.6">
+            Don't let this one slip. It takes less than 60 seconds to send your first quote.
+          </p>
+          <table cellpadding="0" cellspacing="0"><tr><td>
+            <a href="${appUrl}" style="display:inline-block;background:#dc2626;color:#ffffff;font-size:15px;font-weight:600;padding:13px 28px;border-radius:8px;text-decoration:none">
+              Send my first quote now
+            </a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="padding:20px 32px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:12px;color:#94a3b8">
+            QuotePro &mdash; Built for residential cleaning pros.<br>
+            <a href="${appUrl}/unsubscribe" style="color:#94a3b8">Unsubscribe from these tips</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+            await sendEmail({
+              to: user.email,
+              subject: `${firstName}, 2 hours left in your activation window`,
+              html,
+              text: `Hi ${firstName},\n\nYour 72-hour activation window closes soon. Users who send at least one quote in the first 72 hours are 5x more likely to become paying customers.\n\nDon't let this one slip. It takes less than 60 seconds.\n\n${appUrl}\n\nThe QuotePro Team`,
+              fromName: PLATFORM_FROM_NAME,
+            });
+          }
+
+          // Push notification (best-effort)
+          await sendPush(user.id, {
+            title: "2 hours left in your activation window",
+            body: "Send one quote before your 72-hour window closes — it takes 60 seconds.",
+            data: { screen: "QuoteCalculator" },
+            channel: "growth",
+          });
+
+          await pool.query(
+            `UPDATE users SET activation_nudge_70h_sent = true WHERE id = $1`,
+            [user.id],
+          );
+          trackEvent(user.id, AnalyticsEvents.ACTIVATION_NUDGE_70H_SENT, { channel: "email_push" }).catch(() => {});
+        }
+      } catch (e: any) {
+        console.error(`[activation-nudge] Error for user ${user.id}:`, e.message);
+      }
+    }
+  } catch (e: any) {
+    console.error("[activation-nudge] sendActivationNudges failed:", e.message);
+  }
+}

@@ -254,6 +254,13 @@ async function fireDueActivationTriggers(): Promise<void> {
 
 export async function onFirstQuoteSent(userId: string): Promise<void> {
   try {
+    // Record when the first quote was sent (used by activation nudge system)
+    await pool.query(
+      `UPDATE users SET first_quote_sent_at = NOW()
+       WHERE id = $1 AND first_quote_sent_at IS NULL`,
+      [userId],
+    );
+
     await pool.query(
       `UPDATE notification_triggers
        SET cancelled_at = NOW()

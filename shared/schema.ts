@@ -66,6 +66,12 @@ export const users = pgTable("users", {
   emailUnreachable: boolean("email_unreachable").notNull().default(false),
   contactEmail: text("contact_email"),
   autopilotEnabled: boolean("autopilot_enabled").notNull().default(false),
+  // Activation nudge tracking
+  firstQuoteSentAt: timestamp("first_quote_sent_at"),
+  activationNudge24hSent: boolean("activation_nudge_24h_sent").notNull().default(false),
+  activationNudge48hSent: boolean("activation_nudge_48h_sent").notNull().default(false),
+  activationNudge70hSent: boolean("activation_nudge_70h_sent").notNull().default(false),
+  smsOptedOut: boolean("sms_opted_out").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

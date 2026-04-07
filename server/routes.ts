@@ -32,6 +32,7 @@ import {
   processPendingFollowUps,
   sendStaleQuoteNudges,
   sendWeeklyDigestEmails,
+  sendActivationNudges,
 } from "./helpers";
 
 // ─── Group A — pure single-domain routers ─────────────────────────────────────
@@ -169,6 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       await sendStaleQuoteNudges();
       await sendWeeklyDigestEmails();
+      await sendActivationNudges();
       if ((app as any).__leadFinderWorker) {
         await (app as any).__leadFinderWorker();
       }

@@ -41,6 +41,11 @@ export const AnalyticsEvents = {
   CANCEL_INITIATED: "cancel_initiated",
   QUOTE_QUOTA_HIT: "quote_quota_hit",
 
+  // ─── Activation nudges ───────────────────────────────────────────────────────
+  ACTIVATION_NUDGE_24H_SENT: "activation_nudge_24h_sent",
+  ACTIVATION_NUDGE_48H_SENT: "activation_nudge_48h_sent",
+  ACTIVATION_NUDGE_70H_SENT: "activation_nudge_70h_sent",
+
   // ─── Internal churn signal markers (not displayed in funnel) ────────────────
   CHURN_RISK_INACTIVE_TRIAL: "churn_risk_inactive_trial",
   CHURN_RISK_PAID_INACTIVE: "churn_risk_paid_inactive",
