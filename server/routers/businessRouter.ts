@@ -1090,7 +1090,7 @@ const router = Router();
     try {
       const userId = req.session.userId!;
       const result = await pool.query(
-        `SELECT subscription_tier, subscription_interval, subscription_expires_at,
+        `SELECT email, subscription_tier, subscription_interval, subscription_expires_at,
                 stripe_customer_id, stripe_subscription_id, stripe_subscription_status,
                 revenuecat_user_id, revenuecat_entitlement,
                 subscription_platform, subscription_synced_at,
@@ -1102,7 +1102,13 @@ const router = Router();
       if (result.rows.length === 0) return res.status(404).json({ message: "User not found" });
 
       const u = result.rows[0];
-      const tier = (u.subscription_tier || "free") as string;
+
+      // Admin email override — emails listed in ADMIN_EMAILS (comma-separated) always get Pro
+      const adminEmails = (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+      const userEmail = (u.email || "").toLowerCase();
+      const isAdminOverride = adminEmails.length > 0 && adminEmails.includes(userEmail);
+
+      const tier = (isAdminOverride ? "pro" : (u.subscription_tier || "free")) as string;
       const platform = (u.subscription_platform as string | null) ?? null;
 
       // Derive status
