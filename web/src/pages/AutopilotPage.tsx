@@ -416,7 +416,7 @@ export default function AutopilotPage() {
   });
 
   const is403 = (error as any)?.status === 403 || (error as any)?.upsell;
-  const showUpsell = !isPro && ((!isGrowth) || is403);
+  const showUpsell = !isPro && !isGrowth;
 
   return (
     <div style={{ padding: "16px 18px" }}>
@@ -424,9 +424,8 @@ export default function AutopilotPage() {
       <div style={{ marginBottom: "14px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
           <h1 style={{ fontSize: "17px", fontWeight: 600, color: "var(--t1)", margin: 0 }}>Autopilot</h1>
-          {!isPro && (isGrowth
-            ? <Badge status="warning" label="Add-on" />
-            : <Badge status="pro" label="Pro" />
+          {!isPro && !isGrowth && (
+            <Badge status="pro" label="Pro" />
           )}
         </div>
         <p style={{ fontSize: "12px", color: "var(--t3)", margin: 0 }}>

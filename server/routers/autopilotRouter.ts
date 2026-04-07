@@ -16,7 +16,7 @@ async function requireAutopilot(req: Request, res: Response, next: any) {
     const user = await getUserById(req.session.userId!);
     if (!user) return res.status(401).json({ message: "Not authenticated" });
     if (isProTier(user.subscriptionTier)) return next();
-    if (isGrowthOrAbove(user.subscriptionTier) && (user as any).autopilotEnabled) return next();
+    if (isGrowthOrAbove(user.subscriptionTier)) return next();
     return res.status(403).json({
       upsell: true,
       message: "Upgrade to unlock Autopilot",
