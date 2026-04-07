@@ -29,6 +29,7 @@ import OnboardingBanner from "@/components/OnboardingBanner";
 import { useProGate } from "@/components/ProGate";
 import MilestoneCelebrationModal from "@/components/MilestoneCelebrationModal";
 import { apiRequest } from "@/lib/query-client";
+import { HeroCard } from "@/components/HeroCard";
 
 type Nav = NativeStackNavigationProp<any>;
 
@@ -147,6 +148,11 @@ export default function DashboardScreen() {
   const { data: intakeCount } = useQuery<{ count: number; newCount: number; reviewCount: number }>({
     queryKey: ["/api/intake-requests/count"],
     staleTime: 60000,
+  });
+
+  const { data: autopilotStats } = useQuery<any>({
+    queryKey: ["/api/autopilot/stats"],
+    staleTime: 120000,
   });
 
   const { data: milestoneData } = useQuery<{
@@ -479,6 +485,38 @@ export default function DashboardScreen() {
             ))}
           </View>
         </View>
+
+        {/* ── Autopilot Banner ── */}
+        {(autopilotStats?.enrolledThisMonth > 0 || autopilotStats?.followUpsFired > 0) ? (
+          <View style={s.section}>
+            <Pressable onPress={() => nav("Autopilot")} testID="autopilot-banner">
+              <HeroCard
+                colors={isDark ? ["#1A2744", "#0E1620", "#060C14"] : ["#0A84FF", "#007AFF", "#0055CC"]}
+                gradientStyle={{ padding: 14, borderRadius: 18 }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <View style={{ width: 34, height: 34, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" }}>
+                      <Feather name="zap" size={16} color="#FFF" />
+                    </View>
+                    <View>
+                      <ThemedText style={{ fontSize: 14, fontWeight: "700", color: "#FFF", lineHeight: 18 }}>
+                        Autopilot
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: "rgba(255,255,255,0.72)", lineHeight: 16 }}>
+                        {autopilotStats?.followUpsFired ?? 0} follow-ups sent this month
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <ThemedText style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", fontWeight: "500" }}>View</ThemedText>
+                    <Feather name="chevron-right" size={15} color="rgba(255,255,255,0.7)" />
+                  </View>
+                </View>
+              </HeroCard>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* ── Recent Activity ── */}
         {recentActivity.length > 0 ? (

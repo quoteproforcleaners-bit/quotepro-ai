@@ -28,6 +28,7 @@ import { useSubscription } from "@/context/SubscriptionContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { StatusPill } from "@/components/StatusPill";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type TabKey = "new" | "review" | "done";
@@ -66,6 +67,17 @@ function timeAgo(dateStr: string) {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
+}
+
+function hoursAgo(dateStr: string): number {
+  return (Date.now() - new Date(dateStr).getTime()) / 3600000;
+}
+
+function urgencyLabel(dateStr: string): string | null {
+  const h = hoursAgo(dateStr);
+  if (h >= 48) return `${Math.floor(h / 24)}d old`;
+  if (h >= 2) return `${Math.floor(h)}h old`;
+  return null;
 }
 
 interface IntakeRequest {
@@ -200,6 +212,13 @@ function IntakeCard({
         </View>
         <View style={styles.cardRight}>
           <ThemedText style={[styles.timeText, { color: theme.textMuted ?? theme.textSecondary }]}>{timeAgo(item.createdAt)}</ThemedText>
+          {!isDone && urgencyLabel(item.createdAt) ? (
+            <StatusPill
+              label={urgencyLabel(item.createdAt) as string}
+              color="#FF9500"
+              size="sm"
+            />
+          ) : null}
           {f.frequency && f.frequency !== "one-time" ? (
             <View style={[styles.freqBadge, { backgroundColor: "#10B98115" }]}>
               <Feather name="repeat" size={10} color="#10B981" />
@@ -337,9 +356,10 @@ function IntakeCard({
               <Pressable
                 testID={`button-autopilot-enroll-${item.id}`}
                 onPress={onEnroll}
-                style={[styles.iconBtn, { borderColor: "#0ea5e940", backgroundColor: "#0ea5e910" }]}
+                style={[styles.enrollBtn, { borderColor: "#007AFF40", backgroundColor: "#007AFF0E" }]}
               >
-                <Feather name="zap" size={13} color="#0ea5e9" />
+                <Feather name="zap" size={12} color="#007AFF" />
+                <ThemedText style={styles.enrollBtnText}>Autopilot</ThemedText>
               </Pressable>
             ) : null}
           </View>
@@ -680,6 +700,8 @@ export default function IntakeQueueScreen() {
     </View>
   ), [activeTab, theme, countData]);
 
+  const oldLeadsCount = activeTab === "new" ? requests.filter(r => hoursAgo(r.createdAt) >= 2).length : 0;
+
   const ListHeader = useCallback(() => (
     <View style={styles.listHeader}>
       <View style={[styles.linkCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
@@ -702,13 +724,26 @@ export default function IntakeQueueScreen() {
         </Pressable>
       </View>
       <TabBar />
+      {oldLeadsCount > 0 ? (
+        <View style={styles.urgencyBanner}>
+          <Feather name="alert-triangle" size={14} color="#FF9500" />
+          <View style={{ flex: 1 }}>
+            <ThemedText style={styles.urgencyBannerTitle}>
+              {oldLeadsCount} lead{oldLeadsCount !== 1 ? "s" : ""} waiting 2+ hours
+            </ThemedText>
+            <ThemedText style={styles.urgencyBannerSub}>
+              Respond quickly to improve your close rate
+            </ThemedText>
+          </View>
+        </View>
+      ) : null}
       {requests.length > 0 ? (
         <ThemedText style={[styles.countLabel, { color: theme.textSecondary }]}>
           {requests.length} {activeTab === "new" ? "new" : activeTab === "review" ? "flagged for review" : "completed"} {requests.length === 1 ? "request" : "requests"}
         </ThemedText>
       ) : null}
     </View>
-  ), [theme, intakeUrl, activeTab, requests.length, countData]);
+  ), [theme, intakeUrl, activeTab, requests.length, countData, oldLeadsCount]);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
@@ -818,6 +853,26 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   } as any,
   countLabel: { fontSize: 12, marginTop: 2 },
+
+  urgencyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "rgba(255,149,0,0.08)",
+    borderColor: "rgba(255,149,0,0.25)",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  urgencyBannerTitle: { fontSize: 13, fontWeight: "600", color: "#FF9500" },
+  urgencyBannerSub: { fontSize: 11, color: "rgba(255,149,0,0.75)", marginTop: 1 },
+
+  enrollBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9999, borderWidth: 1,
+  },
+  enrollBtnText: { fontSize: 12, fontWeight: "600", color: "#007AFF" },
 
   card: { marginBottom: Spacing.md, padding: Spacing.md },
   cardHeader: { flexDirection: "row", alignItems: "flex-start", gap: Spacing.sm, marginBottom: Spacing.sm },

@@ -35,6 +35,7 @@ import { FeatureFlags } from "@/lib/featureFlags";
 import { useTutorial } from "@/context/TutorialContext";
 import { DASHBOARD_TOUR, SETTINGS_TOUR } from "@/lib/tourDefinitions";
 import { trackEvent } from "@/lib/analytics";
+import { ListGroup, SectionLabel } from "@/components/ListRow";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
