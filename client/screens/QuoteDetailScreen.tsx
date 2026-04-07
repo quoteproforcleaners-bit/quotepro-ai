@@ -201,7 +201,7 @@ export default function QuoteDetailScreen() {
 
       trackEvent("quote_completed", {
         quote_type: quote.quoteType || "residential",
-        total: quote.selectedTotal || quote.totalPrice || 0,
+        total: quote.total || 0,
         is_demo: isDemo,
         quote_number_for_user: totalQuotes,
       });
