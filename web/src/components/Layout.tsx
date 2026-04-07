@@ -600,7 +600,7 @@ export function Layout() {
     queryKey: ["/api/intake-requests/count"],
     refetchInterval: 60_000,
   });
-  const intakeNewCount = intakeCount?.newCount ?? 0;
+  const intakeNewCount = intakeCount?.count ?? 0; // count = pending + needs_review (both need attention)
 
   const { data: quoteCountData } = useQuery<{ count: number }>({
     queryKey: ["/api/quotes/count"],
