@@ -39,6 +39,9 @@ export function getStripe(): Stripe | null {
   return _stripe;
 }
 
+/** Direct export alias for the lazily-initialised Stripe client (may be null if not configured). */
+export { _stripe as stripe };
+
 // ─── Auth token store (used by auth routes and exchange-token endpoint) ───────
 
 export const pendingAuthTokens = new Map<string, {
