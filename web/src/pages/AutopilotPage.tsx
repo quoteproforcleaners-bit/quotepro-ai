@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import {
   Zap, Play, Pause, CheckCircle, Clock,
-  Users, Mail, Star, ArrowRight, Lock, Loader2, RefreshCw,
+  Users, Mail, Star, Lock, Loader2, RefreshCw,
+  Settings, BarChart3, MessageSquare,
 } from "lucide-react";
-import {
-  PageHeader, Card, Badge, Button, Spinner, EmptyState, StatCard,
-} from "../components/ui";
+import { Badge, Button, Spinner, StatCard, Avatar } from "../components/ui";
 import { apiRequest, apiPost } from "../lib/api";
 import { useSubscription } from "../lib/subscription";
 
@@ -38,207 +38,264 @@ interface AutopilotSettings {
   googleReviewLink: string | null;
 }
 
-/* ─── Step labels ─────────────────────────────────────────────────────────── */
+/* ─── Hero card ───────────────────────────────────────────────────────────── */
 
-const STEP_LABELS: Record<number, { label: string; icon: typeof Mail; color: string }> = {
-  1: { label: "Qualify & Quote",   icon: Zap,         color: "text-blue-600" },
-  2: { label: "Follow-Up",         icon: RefreshCw,   color: "text-amber-600" },
-  3: { label: "Welcome",           icon: CheckCircle, color: "text-green-600" },
-  4: { label: "Review Request",    icon: Star,        color: "text-purple-600" },
-};
-
-/* ─── ON/OFF Toggle ───────────────────────────────────────────────────────── */
-
-function AutopilotToggle({ enabled, onToggle, loading }: {
+function AutopilotHeroCard({ enabled, onToggle, loading, stats }: {
   enabled: boolean;
   onToggle: () => void;
   loading: boolean;
+  stats?: AutopilotStats;
 }) {
   return (
-    <div
-      className={`rounded-2xl p-5 flex items-center gap-5 mb-6 transition-all ${
-        enabled
-          ? "bg-emerald-50 border border-emerald-200"
-          : "bg-slate-50 border border-slate-200"
-      }`}
-    >
-      {/* Toggle switch */}
-      <button
-        onClick={onToggle}
-        disabled={loading}
-        className={`relative inline-flex h-10 w-[72px] shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-          enabled ? "bg-emerald-500" : "bg-slate-300"
-        }`}
-        role="switch"
-        aria-checked={enabled}
-      >
-        {loading ? (
-          <span className="absolute inset-0 flex items-center justify-center">
-            <Loader2 className="w-4 h-4 text-white animate-spin" />
-          </span>
-        ) : (
-          <span
-            className={`inline-block h-8 w-8 translate-y-0.5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ${
-              enabled ? "translate-x-8" : "translate-x-0.5"
-            }`}
-          />
-        )}
-      </button>
+    <div style={{
+      background: "linear-gradient(140deg, #007aff 0%, #0062cc 40%, #5856d6 100%)",
+      borderRadius: "var(--r16)",
+      padding: "20px 22px",
+      boxShadow: "0 2px 12px rgba(0,122,255,0.28), 0 1px 3px rgba(0,0,0,0.08)",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* Decorative circles */}
+      {[
+        { w: 200, h: 200, top: -60,  right: -40  },
+        { w: 130, h: 130, top: "auto" as any, bottom: -50, right: 80 },
+        { w: 80,  h: 80,  top: 10,   right: 160  },
+      ].map((c, i) => (
+        <div key={i} style={{
+          position: "absolute",
+          width: c.w, height: c.h,
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.05)",
+          top: c.top,
+          bottom: (c as any).bottom,
+          right: c.right,
+          pointerEvents: "none",
+        }} />
+      ))}
 
-      {/* Status text */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-base font-bold ${enabled ? "text-emerald-800" : "text-slate-600"}`}>
-            Autopilot is {enabled ? "ON" : "OFF"}
-          </span>
-          {enabled && (
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[11px] font-bold uppercase tracking-wide">
-              Running
-            </span>
-          )}
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "24px", flexWrap: "wrap" }}>
+        {/* Left: headline number */}
+        <div style={{ flex: 1, minWidth: "140px" }}>
+          <p style={{ fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: ".08em", margin: "0 0 4px" }}>
+            Autopilot
+          </p>
+          <p style={{ fontSize: "38px", fontWeight: 700, color: "white", letterSpacing: "-1.5px", lineHeight: 1, margin: "0 0 4px" }}>
+            {stats?.total ?? 0}
+          </p>
+          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.65)", margin: 0 }}>
+            leads in pipeline
+          </p>
         </div>
-        <p className={`text-sm mt-0.5 ${enabled ? "text-emerald-700" : "text-slate-500"}`}>
-          {enabled
-            ? "New leads from your intake form are automatically enrolled and processed — no action needed."
-            : "Toggle ON to automatically qualify, quote, follow up, and request reviews for every new lead."}
-        </p>
+
+        {/* Right: 3 mini stats + hero toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
+          {[
+            { label: "Follow-ups", value: stats?.emailsSent ?? 0 },
+            { label: "Completed",  value: stats?.completed  ?? 0 },
+            { label: "Active",     value: stats?.active     ?? 0 },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <p style={{ fontSize: "20px", fontWeight: 700, color: "white", letterSpacing: "-0.5px", margin: "0 0 2px" }}>{value}</p>
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", margin: 0 }}>{label}</p>
+            </div>
+          ))}
+
+          {/* Hero toggle — special white/blue variant */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+            <button
+              onClick={onToggle}
+              disabled={loading}
+              role="switch"
+              aria-checked={enabled}
+              style={{
+                position: "relative",
+                width: "42px", height: "26px",
+                borderRadius: "13px",
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                background: enabled ? "rgba(255,255,255,0.90)" : "rgba(255,255,255,0.25)",
+                transition: "background .20s cubic-bezier(0.23, 0.93, 0.58, 1.2)",
+                flexShrink: 0,
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? (
+                <Loader2 style={{ position: "absolute", top: "5px", left: "11px", width: "16px", height: "16px", color: enabled ? "#007aff" : "white" }} className="animate-spin" />
+              ) : (
+                <span style={{
+                  position: "absolute",
+                  top: "3px",
+                  left: enabled ? "19px" : "3px",
+                  width: "20px", height: "20px",
+                  borderRadius: "50%",
+                  background: enabled ? "#007aff" : "white",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.22)",
+                  transition: "left .20s cubic-bezier(0.23, 0.93, 0.58, 1.2), background .20s",
+                }} />
+              )}
+            </button>
+            <p style={{ fontSize: "9px", color: "rgba(255,255,255,0.55)", margin: 0, textTransform: "uppercase", letterSpacing: ".04em" }}>
+              {enabled ? "ON" : "OFF"}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-/* ─── Upsell wall ─────────────────────────────────────────────────────────── */
+/* ─── Locked state ────────────────────────────────────────────────────────── */
 
-function AutopilotUpsell({ isGrowth }: { isGrowth: boolean }) {
+function AutopilotLockedState({ isGrowth }: { isGrowth: boolean }) {
   const [loading, setLoading] = useState(false);
-
   const handleCheckout = async () => {
     setLoading(true);
     try {
       const data = await apiPost<{ url: string }>("/api/autopilot/checkout");
       if (data?.url) window.location.href = data.url;
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
+    } catch { } finally { setLoading(false); }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center py-20 max-w-xl mx-auto text-center gap-6">
-      <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center">
-        <Zap className="w-8 h-8 text-violet-600" />
+    <div style={{
+      border: "1.5px dashed rgba(0,0,0,0.10)",
+      borderRadius: "var(--r16)",
+      background: "rgba(0,0,0,0.015)",
+      padding: "56px 24px",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      textAlign: "center",
+      gap: "14px",
+    }}>
+      <div style={{
+        width: "56px", height: "56px",
+        borderRadius: "16px",
+        background: "rgba(0,122,255,0.08)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Zap style={{ width: "32px", height: "32px", color: "var(--blue)" }} />
       </div>
+
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">QuotePro Autopilot</h2>
-        <p className="text-slate-500 text-base leading-relaxed">
+        <h2 style={{ fontSize: "17px", fontWeight: 600, color: "var(--t1)", margin: "0 0 6px" }}>
+          QuotePro Autopilot
+        </h2>
+        <p style={{ fontSize: "14px", color: "var(--t3)", lineHeight: 1.6, maxWidth: "320px", margin: "0 auto" }}>
           A 4-step AI pipeline that qualifies leads, sends quotes, follows up, and requests reviews — automatically.
         </p>
       </div>
 
-      <div className="w-full bg-slate-50 rounded-2xl p-5 space-y-3 text-left">
-        {[
-          { icon: Zap,         label: "Step 1 — AI qualifies the lead and sends a tailored quote" },
-          { icon: RefreshCw,   label: "Step 2 — Automated follow-up if no response" },
-          { icon: CheckCircle, label: "Step 3 — Welcome email when the quote is accepted" },
-          { icon: Star,        label: "Step 4 — Review request after the job is complete" },
-        ].map(({ icon: Icon, label }) => (
-          <div key={label} className="flex items-start gap-3">
-            <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Icon className="w-3.5 h-3.5 text-violet-600" />
-            </div>
-            <p className="text-sm text-slate-700 leading-snug">{label}</p>
-          </div>
-        ))}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center", marginTop: "4px" }}>
+        {isGrowth ? (
+          <>
+            <Button onClick={handleCheckout} disabled={loading} icon={Zap}>
+              {loading ? "Loading..." : "Add Autopilot — $29/mo"}
+            </Button>
+            <Button variant="ghost" onClick={() => window.location.href = "/pricing"}>
+              View plans
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button onClick={() => window.location.href = "/pricing"} icon={Zap}>
+              Get Pro
+            </Button>
+            <Button variant="ghost" onClick={handleCheckout} disabled={loading}>
+              {loading ? "Loading..." : "Add to Growth $29/mo"}
+            </Button>
+          </>
+        )}
       </div>
-
-      {isGrowth ? (
-        <div className="w-full space-y-3">
-          <p className="text-sm text-slate-500">
-            Autopilot is available as an add-on for Growth plan users for <strong>$29/month</strong>.
-          </p>
-          <Button onClick={handleCheckout} disabled={loading} className="w-full">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
-            Add Autopilot — $29/mo
-          </Button>
-        </div>
-      ) : (
-        <div className="w-full space-y-3">
-          <p className="text-sm text-slate-500">
-            Autopilot is included in the <strong>Pro plan</strong> or available as an add-on on Growth.
-          </p>
-          <Button onClick={() => window.location.href = "/pricing"} className="w-full">
-            <Lock className="w-4 h-4 mr-2" />
-            Upgrade to unlock Autopilot
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
 
-/* ─── Status badge ────────────────────────────────────────────────────────── */
-
-function StatusBadge({ status }: { status: AutopilotJob["status"] }) {
-  const map: Record<AutopilotJob["status"], string> = {
-    active:    "active",
-    paused:    "warning",
-    completed: "completed",
-    failed:    "error",
-  };
-  return <Badge status={map[status] ?? "draft"} />;
-}
-
 /* ─── Job row ─────────────────────────────────────────────────────────────── */
+
+const STATUS_MAP: Record<string, string> = {
+  active: "active", paused: "warning", completed: "completed", failed: "error",
+};
 
 function JobRow({ job, onPause, onResume }: {
   job: AutopilotJob;
   onPause: (id: string) => void;
   onResume: (id: string) => void;
 }) {
-  const step = STEP_LABELS[job.current_step];
-  const StepIcon = step?.icon ?? Zap;
-
-  const nextAt = job.next_action_at
-    ? new Date(job.next_action_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-    : null;
+  const STEP_LABELS: Record<number, string> = {
+    1: "Qualify & Quote", 2: "Follow-Up", 3: "Welcome", 4: "Review Request",
+  };
+  const name = job.lead_name || job.lead_email || "Unknown";
+  const meta = [
+    STEP_LABELS[job.current_step],
+    job.log_count > 0 ? `${job.log_count} email${job.log_count !== 1 ? "s" : ""} sent` : null,
+    job.next_action_at
+      ? `Next: ${new Date(job.next_action_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      : null,
+  ].filter(Boolean).join(" · ");
 
   return (
-    <div className="flex items-center gap-4 py-3 border-b border-slate-100 last:border-0">
-      <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
-        <StepIcon className={`w-4 h-4 ${step?.color ?? "text-slate-500"}`} />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-900 text-sm truncate">{job.lead_name || job.lead_email}</p>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Step {job.current_step}: {step?.label ?? "Unknown"}
-          {nextAt ? ` · Next: ${nextAt}` : ""}
-          {" · "}{job.log_count} email{job.log_count !== 1 ? "s" : ""} sent
+    <div className="list-row-apple" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      <Avatar name={name} size="sm" />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: "13px", fontWeight: 500, color: "var(--t1)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {name}
+        </p>
+        <p style={{ fontSize: "11px", color: "var(--t4)", margin: "1px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "240px" }}>
+          {meta}
         </p>
       </div>
 
-      <StatusBadge status={job.status} />
+      <Badge status={STATUS_MAP[job.status] ?? "draft"} />
+
+      <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--t3)", minWidth: "40px", textAlign: "right", flexShrink: 0 }}>
+        Step {job.current_step}
+      </span>
 
       {job.status === "active" && (
-        <button
-          onClick={() => onPause(job.id)}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-          title="Pause this lead"
-        >
-          <Pause className="w-4 h-4" />
+        <button onClick={() => onPause(job.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", borderRadius: "6px", color: "var(--t4)", flexShrink: 0 }} title="Pause">
+          <Pause style={{ width: "14px", height: "14px" }} />
         </button>
       )}
       {job.status === "paused" && (
-        <button
-          onClick={() => onResume(job.id)}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors"
-          title="Resume this lead"
-        >
-          <Play className="w-4 h-4" />
+        <button onClick={() => onResume(job.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", borderRadius: "6px", color: "var(--t4)", flexShrink: 0 }} title="Resume">
+          <Play style={{ width: "14px", height: "14px" }} />
         </button>
       )}
+
+      {/* Disclosure chevron */}
+      <span style={{ display: "inline-block", width: "6px", height: "6px", borderRight: "1.5px solid var(--t4)", borderTop: "1.5px solid var(--t4)", transform: "rotate(45deg)", opacity: 0.7, flexShrink: 0 }} />
+    </div>
+  );
+}
+
+/* ─── Quick actions grid ──────────────────────────────────────────────────── */
+
+function QuickActions({ navigate }: { navigate: (path: string) => void }) {
+  const actions = [
+    { icon: Settings,      label: "Configure Pipeline", sub: "Edit steps and timing",    bg: "rgba(88,86,214,0.10)",  ic: "#5856d6",        to: "/settings" },
+    { icon: BarChart3,     label: "View Analytics",     sub: "Conversion rates & trends", bg: "rgba(0,122,255,0.10)", ic: "var(--blue)",    to: "/growth" },
+    { icon: MessageSquare, label: "Email Templates",    sub: "Customize follow-up copy", bg: "rgba(255,149,0,0.10)", ic: "var(--orange)",  to: "/email-sequences" },
+    { icon: Star,          label: "Review Settings",    sub: "Google review link",        bg: "rgba(40,205,65,0.10)", ic: "var(--green)",   to: "/settings" },
+  ];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+      {actions.map(({ icon: Icon, label, sub, bg, ic, to }) => (
+        <button
+          key={label}
+          onClick={() => navigate(to)}
+          className="card-apple-clickable"
+          style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px", border: "none", cursor: "pointer", textAlign: "left", width: "100%", background: "white" }}
+        >
+          <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <Icon style={{ width: "18px", height: "18px", color: ic }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--t1)", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</p>
+            <p style={{ fontSize: "11px", color: "var(--t3)", margin: 0 }}>{sub}</p>
+          </div>
+        </button>
+      ))}
     </div>
   );
 }
@@ -246,16 +303,15 @@ function JobRow({ job, onPause, onResume }: {
 /* ─── Main dashboard ──────────────────────────────────────────────────────── */
 
 function AutopilotDashboard() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading: settingsLoading } = useQuery<AutopilotSettings>({
     queryKey: ["/api/autopilot/settings"],
   });
-
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<AutopilotJob[]>({
     queryKey: ["/api/autopilot/jobs"],
   });
-
   const { data: stats } = useQuery<AutopilotStats>({
     queryKey: ["/api/autopilot/stats"],
   });
@@ -264,9 +320,7 @@ function AutopilotDashboard() {
     mutationFn: async (enabled: boolean) => {
       await apiRequest("POST", "/api/autopilot/settings", { autopilotEnabled: enabled });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/autopilot/settings"] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/autopilot/settings"] }),
   });
 
   const pause = async (id: string) => {
@@ -274,7 +328,6 @@ function AutopilotDashboard() {
     queryClient.invalidateQueries({ queryKey: ["/api/autopilot/jobs"] });
     queryClient.invalidateQueries({ queryKey: ["/api/autopilot/stats"] });
   };
-
   const resume = async (id: string) => {
     await apiRequest("POST", `/api/autopilot/jobs/${id}/resume`);
     queryClient.invalidateQueries({ queryKey: ["/api/autopilot/jobs"] });
@@ -282,72 +335,47 @@ function AutopilotDashboard() {
   };
 
   if (jobsLoading || settingsLoading) {
-    return (
-      <div className="flex justify-center py-20">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <div style={{ display: "flex", justifyContent: "center", padding: "80px 0" }}><Spinner size="lg" /></div>;
   }
 
   const isEnabled = settings?.autopilotEnabled ?? false;
 
   return (
-    <div className="space-y-6">
-      {/* Master ON/OFF toggle */}
-      <AutopilotToggle
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      {/* Hero card */}
+      <AutopilotHeroCard
         enabled={isEnabled}
         onToggle={() => toggleMutation.mutate(!isEnabled)}
         loading={toggleMutation.isPending}
+        stats={stats}
       />
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Active"      value={stats?.active ?? 0}     icon={Play}        color="emerald" />
-        <StatCard label="Completed"   value={stats?.completed ?? 0}  icon={CheckCircle} color="primary" />
-        <StatCard label="Paused"      value={stats?.paused ?? 0}     icon={Pause}       color="amber" />
-        <StatCard label="Emails Sent" value={stats?.emailsSent ?? 0} icon={Mail}        color="violet" />
+      {/* Metrics row — 3 cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+        <StatCard label="Enrolled"    value={stats?.total       ?? 0} icon={Users}       color="primary" />
+        <StatCard label="Emails Sent" value={stats?.emailsSent  ?? 0} icon={Mail}        color="amber"   />
+        <StatCard label="Completed"   value={stats?.completed   ?? 0} icon={CheckCircle} color="emerald" />
       </div>
 
-      {/* How it works strip */}
-      <Card>
-        <div className="flex flex-wrap gap-3">
-          {[
-            { step: 1, label: "Qualify + Quote",  icon: Zap,         color: "text-blue-600",   bg: "bg-blue-50" },
-            { step: 2, label: "Follow-Up",         icon: RefreshCw,   color: "text-amber-600",  bg: "bg-amber-50" },
-            { step: 3, label: "Welcome",           icon: CheckCircle, color: "text-green-600",  bg: "bg-green-50" },
-            { step: 4, label: "Review Request",    icon: Star,        color: "text-purple-600", bg: "bg-purple-50" },
-          ].map(({ step, label, icon: Icon, color, bg }, i, arr) => (
-            <div key={step} className="flex items-center gap-2">
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl ${bg}`}>
-                <Icon className={`w-4 h-4 ${color}`} />
-                <span className={`text-xs font-semibold ${color}`}>Step {step}: {label}</span>
-              </div>
-              {i < arr.length - 1 && <ArrowRight className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />}
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Jobs list */}
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-900">Active Pipelines</h3>
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-slate-400" />
-            <span className="text-sm text-slate-500">{jobs.length} lead{jobs.length !== 1 ? "s" : ""}</span>
-          </div>
+      {/* Job list */}
+      <div className="card-apple-lg" style={{ overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px 10px" }}>
+          <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--t1)", margin: 0 }}>Active Pipelines</p>
+          <p style={{ fontSize: "11px", color: "var(--t4)", margin: 0 }}>{jobs.length} lead{jobs.length !== 1 ? "s" : ""}</p>
         </div>
 
         {jobs.length === 0 ? (
-          <EmptyState
-            icon={Zap}
-            title={isEnabled ? "Waiting for new leads" : "Autopilot is off"}
-            description={
-              isEnabled
-                ? "When a customer fills out your intake form, they'll be automatically enrolled and appear here."
-                : "Toggle Autopilot ON above to automatically process every new lead — no manual steps required."
-            }
-          />
+          <div style={{ padding: "32px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+            <Zap style={{ width: "24px", height: "24px", color: "var(--t4)" }} />
+            <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--t1)", margin: 0 }}>
+              {isEnabled ? "Waiting for new leads" : "Autopilot is off"}
+            </p>
+            <p style={{ fontSize: "12px", color: "var(--t3)", margin: 0, textAlign: "center", maxWidth: "260px" }}>
+              {isEnabled
+                ? "New leads from your intake form will appear here automatically."
+                : "Toggle Autopilot ON above to start processing leads."}
+            </p>
+          </div>
         ) : (
           <div>
             {jobs.map((job) => (
@@ -355,14 +383,22 @@ function AutopilotDashboard() {
             ))}
           </div>
         )}
-      </Card>
+      </div>
 
-      {/* Info */}
-      <div className="flex items-start gap-3 px-4 py-3 bg-blue-50 rounded-xl text-sm text-blue-700">
-        <Clock className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        <p>
-          Autopilot runs every 15 minutes. When ON, every new lead from your intake form is
-          automatically enrolled — no action needed from you.
+      {/* Quick actions */}
+      <QuickActions navigate={navigate} />
+
+      {/* Info strip */}
+      <div style={{
+        display: "flex", alignItems: "flex-start", gap: "10px",
+        padding: "10px 14px",
+        background: "rgba(0,122,255,0.05)",
+        border: "0.5px solid rgba(0,122,255,0.14)",
+        borderRadius: "var(--r12)",
+      }}>
+        <Clock style={{ width: "14px", height: "14px", color: "var(--blue)", flexShrink: 0, marginTop: "1px" }} />
+        <p style={{ fontSize: "12px", color: "var(--t2)", margin: 0, lineHeight: 1.5 }}>
+          Autopilot runs every 15 minutes. When ON, every new lead from your intake form is automatically enrolled — no action needed.
         </p>
       </div>
     </div>
@@ -383,18 +419,22 @@ export default function AutopilotPage() {
   const showUpsell = !isPro && ((!isGrowth) || is403);
 
   return (
-    <div>
-      <PageHeader
-        title="Autopilot"
-        subtitle="AI-powered lead nurturing — qualify, quote, follow up, and request reviews automatically"
-        badge={isPro ? undefined : isGrowth ? <Badge status="warning" label="Add-on" /> : <Badge status="pro" label="Pro" />}
-      />
+    <div style={{ padding: "16px 18px" }}>
+      {/* Page header */}
+      <div style={{ marginBottom: "14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
+          <h1 style={{ fontSize: "17px", fontWeight: 600, color: "var(--t1)", margin: 0 }}>Autopilot</h1>
+          {!isPro && (isGrowth
+            ? <Badge status="warning" label="Add-on" />
+            : <Badge status="pro" label="Pro" />
+          )}
+        </div>
+        <p style={{ fontSize: "12px", color: "var(--t3)", margin: 0 }}>
+          AI-powered lead nurturing — qualify, quote, follow up, and request reviews automatically
+        </p>
+      </div>
 
-      {showUpsell ? (
-        <AutopilotUpsell isGrowth={isGrowth} />
-      ) : (
-        <AutopilotDashboard />
-      )}
+      {showUpsell ? <AutopilotLockedState isGrowth={isGrowth} /> : <AutopilotDashboard />}
     </div>
   );
 }

@@ -344,3 +344,55 @@ button, [role="button"], .pill-apple, .nav-badge, .nav-new-tag, .seg-btn-apple {
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* ── Settings rows ────────────────────────────────────── */
+.setting-row-apple {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+}
+.setting-row-apple:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 16px;
+  right: 0;
+  height: 0.5px;
+  background: var(--sep);
+}
+.setting-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+.setting-group-card {
+  background: white;
+  border-radius: var(--r14);
+  border: 0.5px solid var(--border);
+  overflow: hidden;
+}
+.destructive-row-apple {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  border-radius: var(--r14);
+  transition: background .12s ease;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--red);
+}
+.destructive-row-apple:hover {
+  background: rgba(255,59,48,0.05);
+}

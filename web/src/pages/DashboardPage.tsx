@@ -1029,6 +1029,14 @@ export default function DashboardPage() {
  queryKey: ["/api/intake-requests/count"],
  refetchInterval: 60_000,
  });
+ const { data: autopilotSettings } = useQuery<{ autopilotEnabled: boolean }>({
+ queryKey: ["/api/autopilot/settings"],
+ retry: false,
+ });
+ const { data: autopilotStats } = useQuery<{ emailsSent: number; total: number }>({
+ queryKey: ["/api/autopilot/stats"],
+ retry: false,
+ });
 
  // ── Derived state ──────────────────────────────────────────────────────────
  const sentQuotes = quotes.filter((q: any) => q.status ==="sent");
@@ -1609,6 +1617,36 @@ export default function DashboardPage() {
  </div>
  </div>
  )}
+
+ {/* 2b. Autopilot summary banner */}
+ {autopilotSettings?.autopilotEnabled ? (
+ <div style={{
+ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap",
+ padding: "11px 16px",
+ background: "rgba(0,122,255,0.05)",
+ border: "0.5px solid rgba(0,122,255,0.14)",
+ borderRadius: "var(--r12)",
+ marginBottom: "14px",
+ }}>
+ <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+ <Zap style={{ width: "14px", height: "14px", color: "var(--blue)", flexShrink: 0 }} />
+ <p style={{ fontSize: "13px", color: "var(--t2)", margin: 0 }}>
+ <strong style={{ color: "var(--t1)" }}>Autopilot is working</strong>
+ {" — "}{autopilotStats?.emailsSent ?? 0} follow-up{(autopilotStats?.emailsSent ?? 0) !== 1 ? "s" : ""} sent automatically
+ </p>
+ </div>
+ <button
+ onClick={() => navigate("/autopilot")}
+ style={{
+ fontSize: "12px", fontWeight: 600, color: "var(--blue)",
+ background: "none", border: "none", cursor: "pointer", padding: 0,
+ flexShrink: 0,
+ }}
+ >
+ View Autopilot
+ </button>
+ </div>
+ ) : null}
 
  {/* 3. New Quote Requests banner */}
  {(intakeCountData?.newCount ?? 0) > 0 ? (

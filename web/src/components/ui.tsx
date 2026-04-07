@@ -94,10 +94,14 @@ export function CardHeader({
  badge?: ReactNode;
 }) {
  return (
- <div className="flex items-center justify-between mb-4">
- <div className="flex items-center gap-2">
- {Icon ? <Icon className="w-4.5 h-4.5 text-slate-400"/> : null}
- <h2 className="font-semibold text-slate-900">{title}</h2>
+ <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+ <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+ {Icon ? (
+ <div style={{ width: "28px", height: "28px", borderRadius: "8px", background: "rgba(0,0,0,0.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+ <Icon style={{ width: "14px", height: "14px", color: "var(--t3)" }} />
+ </div>
+ ) : null}
+ <h2 style={{ fontSize: "13px", fontWeight: 600, color: "var(--t1)", margin: 0 }}>{title}</h2>
  {badgeEl}
  </div>
  {actions}

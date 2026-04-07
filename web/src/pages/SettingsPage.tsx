@@ -201,14 +201,29 @@ function SettingRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-3.5 border-b border-slate-100 last:border-0">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-900">{label}</p>
+    <div className="setting-row-apple">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: "13px", fontWeight: 500, color: "var(--t1)", margin: 0 }}>{label}</p>
         {description ? (
-          <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+          <p style={{ fontSize: "11px", color: "var(--t3)", margin: "2px 0 0" }}>{description}</p>
         ) : null}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div style={{ flexShrink: 0 }}>{children}</div>
+    </div>
+  );
+}
+
+function SettingGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="setting-group-label">{label}</p>
+      <div className="setting-group-card">{children}</div>
     </div>
   );
 }

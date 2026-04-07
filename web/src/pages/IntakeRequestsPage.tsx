@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { apiRequest } from "../lib/api";
-import { PageHeader, Card, Badge, Button, EmptyState } from "../components/ui";
+import { PageHeader, Card, Badge, Button, EmptyState, Avatar } from "../components/ui";
 import {
   Inbox, User, Phone, Mail, Home, RefreshCw, Trash2, ChevronRight, ChevronDown, Sparkles,
-  Clock, CheckCircle, Copy, ExternalLink, Flag, AlertTriangle, Send, X, Edit3, FileText,
+  Clock, CheckCircle, Copy, ExternalLink, Flag, AlertTriangle, Send, X, Edit3, FileText, Zap,
 } from "lucide-react";
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -141,17 +141,31 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
     setEditMode(false);
   }
 
+  // Urgency: hours since creation
+  const hoursOld = Math.floor((Date.now() - new Date(req.createdAt).getTime()) / 3600000);
+  const showUrgency = hoursOld >= 1;
+
   return (
     <Card className="p-0 overflow-hidden">
       <div className="p-4">
         {/* Header */}
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-            <span className="text-blue-700 font-semibold text-sm">{(req.customerName || "?").charAt(0).toUpperCase()}</span>
-          </div>
+          <Avatar name={req.customerName || "?"} size="sm" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-0.5">
               <span className="font-semibold text-slate-900 text-sm">{req.customerName}</span>
+              {showUrgency && !isDone && (
+                <span style={{
+                  fontSize: "10px", fontWeight: 600,
+                  background: "rgba(255,149,0,0.12)",
+                  color: "#c47400",
+                  border: "0.5px solid rgba(255,149,0,0.25)",
+                  borderRadius: "20px",
+                  padding: "1px 7px",
+                }}>
+                  {hoursOld}h old
+                </span>
+              )}
               {!isDone ? <ConfidenceBadge level={req.confidence || "low"} /> : null}
               {f.frequency && f.frequency !== "one-time" && (
                 <Badge status="success" label={FREQ_LABELS[f.frequency] || f.frequency} />
@@ -323,7 +337,7 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
 
       {/* Action bar */}
       {!isDone ? (
-        <div className="border-t border-slate-100 px-4 py-3 flex items-center gap-2 bg-slate-50/50">
+        <div className="border-t border-slate-100 px-4 py-3 flex items-center gap-2 bg-slate-50/50 flex-wrap">
           <Button
             size="sm"
             onClick={() => navigate(`/quotes/new?${buildQueryString(f)}`)}
@@ -331,6 +345,22 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
           >
             <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Build Quote
           </Button>
+          <button
+            onClick={() => navigate("/autopilot")}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: "4px",
+              fontSize: "11px", fontWeight: 600,
+              padding: "4px 10px", borderRadius: "8px",
+              background: "rgba(0,122,255,0.08)",
+              color: "var(--blue)",
+              border: "0.5px solid rgba(0,122,255,0.18)",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <Zap style={{ width: "11px", height: "11px" }} />
+            Enroll in Autopilot
+          </button>
           {tab === "new" && (
             <button
               onClick={() => patch.mutate({ status: "needs_review" })}
@@ -538,6 +568,36 @@ export default function IntakeRequestsPage() {
           </button>
         ))}
       </div>
+
+      {/* Alert banner — leads waiting >2hrs */}
+      {activeTab === "new" && requests.filter((r: IntakeRequest) => {
+        const hrs = (Date.now() - new Date(r.createdAt).getTime()) / 3600000;
+        return hrs >= 2;
+      }).length > 0 ? (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px",
+          background: "rgba(255,149,0,0.08)",
+          border: "0.5px solid rgba(255,149,0,0.20)",
+          borderRadius: "var(--r12)", padding: "11px 16px",
+        }}>
+          <p style={{ fontSize: "12px", color: "var(--t2)", margin: 0 }}>
+            <span style={{ fontWeight: 600, color: "#c47400" }}>
+              {requests.filter((r: IntakeRequest) => (Date.now() - new Date(r.createdAt).getTime()) / 3600000 >= 2).length} lead{requests.filter((r: IntakeRequest) => (Date.now() - new Date(r.createdAt).getTime()) / 3600000 >= 2).length !== 1 ? "s" : ""}
+            </span>
+            {" "}waiting more than 2 hours — respond to close more business.
+          </p>
+          <button
+            onClick={() => window.location.href = "/autopilot"}
+            style={{
+              fontSize: "11px", fontWeight: 600, color: "#c47400",
+              background: "rgba(255,149,0,0.12)", border: "0.5px solid rgba(255,149,0,0.25)",
+              borderRadius: "8px", padding: "4px 10px", cursor: "pointer", flexShrink: 0,
+            }}
+          >
+            Enroll All
+          </button>
+        </div>
+      ) : null}
 
       {/* List */}
       {isLoading ? (
