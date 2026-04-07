@@ -48,6 +48,7 @@ import CommercialSettingsPage from "./pages/CommercialSettingsPage";
 import CommercialCalculatorPage from "./pages/CommercialCalculatorPage";
 import ResidentialCalculatorPage from "./pages/ResidentialCalculatorPage";
 import ReactivationPage from "./pages/ReactivationPage";
+import AutopilotPage from "./pages/AutopilotPage";
 import AutomationsHubPage from "./pages/AutomationsHubPage";
 import SalesStrategyPage from "./pages/SalesStrategyPage";
 import WeeklyRecapPage from "./pages/WeeklyRecapPage";
@@ -197,6 +198,7 @@ export default function App() {
           <Route path="/commercial-quote" element={<ProGate feature="Commercial Quoting"><CommercialQuotePage /></ProGate>} />
           <Route path="/commercial-settings" element={<ProGate feature="Commercial Quoting"><CommercialSettingsPage /></ProGate>} />
           <Route path="/reactivation" element={<ProGate feature="Reactivation Campaigns"><ReactivationPage /></ProGate>} />
+          <Route path="/autopilot" element={<AutopilotPage />} />
           <Route path="/automations" element={<ProGate feature="Automations"><AutomationsHubPage /></ProGate>} />
           <Route path="/sales-strategy" element={<ProGate feature="Sales Strategy"><SalesStrategyPage /></ProGate>} />
           <Route path="/weekly-recap" element={<ProGate feature="Weekly Recap"><WeeklyRecapPage /></ProGate>} />

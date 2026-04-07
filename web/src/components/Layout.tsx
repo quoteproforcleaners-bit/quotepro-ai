@@ -69,6 +69,7 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
 // TOOLS — labeled section (collapsed by default)
 const TOOLS_NAV_ITEMS: NavItem[] = [
   { to: "/quote-doctor",      label: "Quote Doctor",       icon: Zap,         description: "Free AI tool — paste any cleaning quote and get an optimized version that converts more jobs." },
+  { to: "/autopilot",         label: "Autopilot",          icon: PlugZap,     pro: true, beta: true, description: "4-step AI pipeline: qualify leads, send quotes, follow up, and request reviews — all automatically." },
   { to: "/automations",       label: "Automations",        icon: Cpu,         pro: true, description: "Set up automated follow-ups, review requests, and customer sequences that run on autopilot." },
   { to: "/email-sequences",   label: "Automated Emails",   icon: MailOpen,    pro: true, description: "Drip campaigns and one-off emails — automated sequences that nurture leads into booked jobs." },
   { to: "/ai-assistant",      label: "Sales Assistant",    icon: Bot,         pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
@@ -256,6 +257,7 @@ const ALL_CMD_ITEMS = [
   { label: "Revenue", icon: DollarSign, path: "/revenue", group: "Navigate" },
   { label: "Reviews & Referrals", icon: Star, path: "/reviews-referrals", group: "Navigate" },
   { label: "Lead Capture", icon: Link2, path: "/lead-capture", group: "Navigate" },
+  { label: "Autopilot", icon: PlugZap, path: "/autopilot", group: "Navigate" },
   { label: "Automations", icon: Cpu, path: "/automations", group: "Navigate" },
   { label: "Sales Assistant", icon: Bot, path: "/ai-assistant", group: "Navigate" },
   { label: "Handle Objections", icon: Target, path: "/closing-assistant", group: "Navigate" },
@@ -386,7 +388,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/lead-capture": "Lead Capture", "/reactivation": "Win-Back",
   "/email-sequences": "Automated Emails", "/reviews-referrals": "Reviews & Referrals",
   "/weekly-recap": "Weekly Recap", "/tasks-queue": "Tasks Queue",
-  "/automations": "Automations", "/ai-assistant": "Sales Assistant",
+  "/autopilot": "Autopilot", "/automations": "Automations", "/ai-assistant": "Sales Assistant",
   "/walkthrough-ai": "Voice-to-Quote", "/intake-requests": "Quote Requests",
   "/closing-assistant": "Handle Objections", "/sales-strategy": "Sales Strategy",
   "/commercial-quote": "Commercial Quote", "/file-library": "File Library",
