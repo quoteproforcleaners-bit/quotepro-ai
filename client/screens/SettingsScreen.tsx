@@ -1879,6 +1879,27 @@ export default function SettingsScreen() {
         </View>
       </Pressable>
 
+      <Pressable
+        onPress={() => navigation.navigate("Referral" as any)}
+        style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
+        testID="button-refer-friend"
+      >
+        <View style={styles.settingsLinkContent}>
+          <View style={[styles.settingsLinkIcon, { backgroundColor: "#16a34a15" }]}>
+            <Feather name="gift" size={20} color="#16a34a" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="body" style={{ fontWeight: "600" }}>
+              Refer a friend
+            </ThemedText>
+            <ThemedText type="small" style={{ color: theme.textSecondary }}>
+              Share your link — you both get a free month
+            </ThemedText>
+          </View>
+          <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
       <SectionHeader title={t.reviewSettings.referralSection} />
 
       <View style={[styles.prefSection, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>

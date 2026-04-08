@@ -38,6 +38,7 @@ import {
  Link2,
  X,
  Crown,
+ Gift,
 } from"lucide-react";
 import { Button, Badge, Card, CardHeader, ProgressBar, MetricRing, FunnelBar } from"../components/ui";
 import { type PlanTier } from"../lib/subscription";
@@ -1037,6 +1038,19 @@ export default function DashboardPage() {
  queryKey: ["/api/autopilot/stats"],
  retry: false,
  });
+ const { data: referralData } = useQuery<{ creditsEarned: number; referralUrl: string }>({
+ queryKey: ["/api/referrals"],
+ staleTime: 5 * 60_000,
+ retry: false,
+ });
+
+ const [referralCardDismissed, setReferralCardDismissed] = useState<boolean>(() => {
+ try { return localStorage.getItem("qp_referral_card_dismissed") === "1"; } catch { return false; }
+ });
+ function dismissReferralCard() {
+ try { localStorage.setItem("qp_referral_card_dismissed", "1"); } catch {}
+ setReferralCardDismissed(true);
+ }
 
  // ── Derived state ──────────────────────────────────────────────────────────
  const sentQuotes = quotes.filter((q: any) => q.status ==="sent");
@@ -1681,6 +1695,33 @@ export default function DashboardPage() {
 
  {/* 3b. Upsell card — only for Free/Starter, non-trial users */}
  <DashboardUpsellCard />
+
+ {/* 3c. Referral card — only for users who haven't earned any credits yet */}
+ {!referralCardDismissed && referralData !== undefined && referralData.creditsEarned === 0 ? (
+ <div className="relative rounded-2xl border border-green-100 bg-gradient-to-r from-green-50 to-emerald-50 p-4 flex items-center gap-4 shadow-sm">
+ <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#dcfce7" }}>
+ <Gift className="w-5 h-5 text-green-600" />
+ </div>
+ <div className="flex-1 min-w-0">
+ <p className="text-sm font-bold text-slate-800 leading-snug">Refer a friend &rarr; get a free month</p>
+ <p className="text-xs text-slate-500 mt-0.5">Share your link. When they start a paid plan, you both get a free month.</p>
+ </div>
+ <button
+ onClick={() => navigate("/referral")}
+ className="shrink-0 text-xs font-semibold px-4 py-2 rounded-xl text-white transition-colors"
+ style={{ background: "#16a34a" }}
+ >
+ Get my link
+ </button>
+ <button
+ onClick={dismissReferralCard}
+ className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+ aria-label="Dismiss"
+ >
+ <X className="w-3.5 h-3.5" />
+ </button>
+ </div>
+ ) : null}
 
  {/* 4. Today's Focus */}
  <TodaysFocus items={focusItems} navigate={navigate} />

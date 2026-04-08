@@ -19,6 +19,7 @@ import WeeklyRecapScreen from "@/screens/WeeklyRecapScreen";
 import OpportunitiesScreen from "@/screens/OpportunitiesScreen";
 import TasksQueueScreen from "@/screens/TasksQueueScreen";
 import ReviewsReferralsScreen from "@/screens/ReviewsReferralsScreen";
+import ReferralScreen from "@/screens/ReferralScreen";
 import UpsellOpportunitiesScreen from "@/screens/UpsellOpportunitiesScreen";
 import ReactivationScreen from "@/screens/ReactivationScreen";
 import AutomationsHubScreen from "@/screens/AutomationsHubScreen";
@@ -75,6 +76,7 @@ export type RootStackParamList = {
   Opportunities: undefined;
   TasksQueue: undefined;
   ReviewsReferrals: undefined;
+  Referral: undefined;
   UpsellOpportunities: undefined;
   ReactivationCampaigns: undefined;
   AutomationsHub: undefined;
@@ -405,6 +407,13 @@ export default function RootStackNavigator() {
             component={ReviewsReferralsScreen}
             options={{
               headerTitle: "Reviews & Referrals",
+            }}
+          />
+          <Stack.Screen
+            name="Referral"
+            component={ReferralScreen}
+            options={{
+              headerTitle: "Refer & Earn",
             }}
           />
           <Stack.Screen

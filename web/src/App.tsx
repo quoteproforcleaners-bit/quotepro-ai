@@ -66,6 +66,7 @@ import SchedulePublishPage from "./pages/SchedulePublishPage";
 import ScheduleAckPage from "./pages/ScheduleAckPage";
 import WinLossFeedbackPage from "./pages/WinLossFeedbackPage";
 import WinLossPage from "./pages/WinLossPage";
+import ReferralPage from "./pages/ReferralPage";
 import TipPage from "./pages/TipPage";
 import OnboardingWizardPage from "./pages/OnboardingWizardPage";
 import QuoteDoctorPage from "./pages/QuoteDoctorPage";
@@ -207,6 +208,7 @@ export default function App() {
           <Route path="/commercial-settings" element={<ProGate feature="Commercial Quoting"><CommercialSettingsPage /></ProGate>} />
           <Route path="/reactivation" element={<ProGate feature="Reactivation Campaigns"><ReactivationPage /></ProGate>} />
           <Route path="/win-loss" element={<ProGate feature="Win/Loss Analysis"><WinLossPage /></ProGate>} />
+          <Route path="/referral" element={<ReferralPage />} />
           <Route path="/autopilot" element={<AutopilotPage />} />
           <Route path="/automations" element={<ProGate feature="Automations"><AutomationsHubPage /></ProGate>} />
           <Route path="/sales-strategy" element={<ProGate feature="Sales Strategy"><SalesStrategyPage /></ProGate>} />

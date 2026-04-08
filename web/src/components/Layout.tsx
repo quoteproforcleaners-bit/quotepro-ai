@@ -18,7 +18,7 @@ import {
   RefreshCw, CheckSquare, BarChart2, Star, Layers, BookOpen, Sliders,
   Clipboard, PlugZap, FolderOpen, MailOpen, Brain, UserCog, Globe,
   Search, Plus, ChevronRight, ChevronDown, LifeBuoy, CircleUser,
-  Repeat2, TrendingDown, type LucideIcon,
+  Repeat2, TrendingDown, Gift, type LucideIcon,
 } from "lucide-react";
 import { SupportModal } from "./SupportModal";
 import UpgradeModal from "./UpgradeModal";
@@ -137,6 +137,7 @@ const NAV_LABEL_KEYS: Record<string, string> = {
   "/booking-widget":    "nav.bookingWidget",
   "/reactivation":      "nav.reactivation",
   "/win-loss":          "Win/Loss Analysis",
+  "/referral":          "Refer & Earn",
   "/email-sequences":   "nav.emailSequences",
   "/reviews-referrals": "nav.reviewsReferrals",
   "/weekly-recap":      "nav.weeklyRecap",
@@ -346,6 +347,7 @@ const ALL_CMD_ITEMS = [
   { label: "Autopilot",          icon: PlugZap,         path: "/autopilot",         group: "Navigate" },
   { label: "Win-Back",           icon: Repeat2,         path: "/opportunities",     group: "Navigate" },
   { label: "Win/Loss Analysis",  icon: TrendingDown,    path: "/win-loss",          group: "Navigate" },
+  { label: "Refer & Earn",       icon: Gift,            path: "/referral",          group: "Navigate" },
   { label: "Revenue",            icon: DollarSign,      path: "/revenue",           group: "Navigate" },
   { label: "Reviews & Referrals",icon: Star,            path: "/reviews-referrals", group: "Navigate" },
   { label: "Quote Doctor",       icon: Zap,             path: "/quote-doctor",      group: "Navigate" },
@@ -971,6 +973,15 @@ export function Layout() {
 
               {/* Product Tour + Help */}
               <div style={{ padding: "0 8px 4px" }}>
+                <NavLink
+                  to="/referral"
+                  className={({ isActive }: { isActive: boolean }) => `nav-item${isActive ? " nav-item-active" : ""}`}
+                  onClick={() => setSidebarOpen(false)}
+                  style={{ color: "var(--t4)" }}
+                >
+                  <span className="nav-icon-sq"><Gift style={{ width: "13px", height: "13px", color: "#16a34a" }} /></span>
+                  <span style={{ fontSize: "12.5px", color: "#16a34a", fontWeight: 600 }}>Refer &amp; Earn</span>
+                </NavLink>
                 <button onClick={() => { resetTour(); setSidebarOpen(false); }} className="nav-item w-full" style={{ color: "var(--t4)" }}>
                   <span className="nav-icon-sq"><BookOpen style={{ width: "13px", height: "13px" }} /></span>
                   <span style={{ fontSize: "12.5px" }}>{t("nav.productTour")}</span>

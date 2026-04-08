@@ -495,7 +495,17 @@ const router = Router();
       );
       const paidReferrals = parseInt(paidResult.rows[0]?.count || "0");
 
-      return res.json({ referralCode, referralUrl, referredCount, paidReferrals, creditsEarned });
+      // Pending = on a paid plan but signed up < 30 days ago (credit not yet applied)
+      const pendingResult = await pool.query(
+        `SELECT COUNT(*) as count FROM users WHERE referred_by = $1
+         AND subscription_tier != 'free'
+         AND created_at > NOW() - INTERVAL '30 days'`,
+        [referralCode]
+      );
+      const pendingCredits = parseInt(pendingResult.rows[0]?.count || "0");
+      const creditsRemaining = Math.max(0, 6 - creditsEarned);
+
+      return res.json({ referralCode, referralUrl, referredCount, paidReferrals, creditsEarned, pendingCredits, creditsRemaining });
     } catch (error: any) {
       console.error("Referrals error:", error);
       return res.status(500).json({ message: "Failed to get referral info" });
