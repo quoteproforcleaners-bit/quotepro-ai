@@ -17,7 +17,10 @@ const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
 /* ─── Token helpers ─────────────────────────────────────────────────────────── */
 
 function getDripSecret(): string {
-  return process.env.SESSION_SECRET || "quotepro-drip-fallback-secret";
+  if (!process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET environment variable is required");
+  }
+  return process.env.SESSION_SECRET;
 }
 
 export function generateUnsubscribeToken(userId: string): string {
