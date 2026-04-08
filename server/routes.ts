@@ -48,6 +48,7 @@ import { supportRouter } from "./routers/supportRouter";   // → /api/support
 import { quoteDoctorRouter } from "./routers/quoteDoctorRouter"; // → /api/quote-doctor
 import recurringRouter from "./routers/recurringRouter";         // → /api/recurring-schedules
 import staffRouter from "./routers/staffRouter";                 // → /api/staff/*
+import bookingWidgetRouter from "./routers/bookingWidgetRouter"; // → /api/booking/*
 
 // ─── Group B — multi-domain routers (all mounted at /api) ─────────────────────
 import authRouter from "./routers/authRouter";             // /api/auth/*, /api/consent, /api/crash-report
@@ -64,6 +65,7 @@ import publicRouter from "./routers/publicRouter";         // /api/public/*, /q,
 import portalRouter from "./routers/portalRouter";         // /api/portal/*, /portal-manifest/*, /api/portal-stats
 
 import { processAutopilotJobs } from "./services/autopilotService";
+import { buildWidgetJs } from "./widgetTemplate";
 
 // Session type extension
 declare module "express-session" {
@@ -131,6 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/quote-doctor", quoteDoctorRouter);
   app.use("/api", recurringRouter);
   app.use("/api", staffRouter);
+  app.use("/api/booking", bookingWidgetRouter);
 
   // 4. Mount Group B — multi-domain routers at /api
   app.use("/api", authRouter);
@@ -145,6 +148,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 5. Mount Group C — hybrid routers at root (API + static pages)
   app.use(publicRouter);
   app.use(portalRouter);
+
+  // 5b. Booking widget JS — GET /widget/:businessId.js
+  app.get("/widget/:businessId.js", async (req, res) => {
+    const { businessId } = req.params;
+    const baseUrl =
+      process.env.REPLIT_DOMAINS?.split(",")[0]
+        ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+        : "https://app.getquotepro.ai";
+    const js = buildWidgetJs(businessId, baseUrl);
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.send(js);
+  });
 
   // 6. HTTP server
   const httpServer = createServer(app);

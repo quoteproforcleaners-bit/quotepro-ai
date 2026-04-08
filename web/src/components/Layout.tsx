@@ -16,7 +16,7 @@ import {
   Menu, X, Zap, Bell, Bot, TrendingUp, Target, Wand2, Crown, Lock,
   ArrowUpRight, Wrench, Inbox, Radio, Cpu, Link2, DollarSign, Building2,
   RefreshCw, CheckSquare, BarChart2, Star, Layers, BookOpen, Sliders,
-  Clipboard, PlugZap, FolderOpen, MailOpen, Brain, UserCog,
+  Clipboard, PlugZap, FolderOpen, MailOpen, Brain, UserCog, Globe,
   Search, Plus, ChevronRight, ChevronDown, LifeBuoy, CircleUser,
   Repeat2, type LucideIcon,
 } from "lucide-react";
@@ -51,6 +51,7 @@ const SETTINGS_NAV_KEY = "quotepro_nav_settings_open";
 const PIPELINE_NAV_ITEMS: NavItem[] = [
   { to: "/lead-capture",    label: "Lead Capture",    icon: Link2,       description: "Share your branded quote request link — customers submit details, you get instant leads." },
   { to: "/intake-requests", label: "Quote Requests",  icon: Inbox,       description: "View and manage quote requests submitted through your lead capture link." },
+  { to: "/booking-widget",  label: "Booking Widget",  icon: Globe,       pro: true, description: "Embed a booking form on your own website — customers pick a service, date, and time without leaving your site." },
   { to: "/quotes",          label: "Quotes",          icon: FileText,    shortcut: "G Q", description: "Create, send, and track professional cleaning quotes. See which are pending, accepted, or expired." },
   { to: "/commercial-quote",label: "Commercial",      icon: Building2,   pro: true, description: "Build detailed multi-area quotes for offices, warehouses, and commercial properties." },
 ];
@@ -131,6 +132,7 @@ const NAV_LABEL_KEYS: Record<string, string> = {
   "/opportunities":     "nav.opportunities",
   "/lead-finder":       "nav.leadRadar",
   "/lead-capture":      "nav.leadCapture",
+  "/booking-widget":    "nav.bookingWidget",
   "/reactivation":      "nav.reactivation",
   "/email-sequences":   "nav.emailSequences",
   "/reviews-referrals": "nav.reviewsReferrals",
@@ -331,6 +333,7 @@ const ALL_CMD_ITEMS = [
   { label: "Dashboard",          icon: LayoutDashboard, path: "/dashboard",         group: "Navigate" },
   { label: "Lead Capture",       icon: Link2,           path: "/lead-capture",      group: "Navigate" },
   { label: "Quote Requests",     icon: Inbox,           path: "/intake-requests",   group: "Navigate" },
+  { label: "Booking Widget",     icon: Globe,           path: "/booking-widget",    group: "Navigate" },
   { label: "Quotes",             icon: FileText,        path: "/quotes",            group: "Navigate" },
   { label: "Commercial Quote",   icon: Building2,       path: "/commercial-quote",  group: "Navigate" },
   { label: "Customers",          icon: Users,           path: "/customers",         group: "Navigate" },
@@ -470,7 +473,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/settings": "Price Settings", "/quote-preferences": "Quote Settings",
   "/follow-ups": "Follow-Ups", "/revenue": "Revenue", "/growth": "Growth Hub",
   "/opportunities": "Win-Back", "/lead-finder": "Lead Finder",
-  "/lead-capture": "Lead Capture", "/reactivation": "Win-Back",
+  "/lead-capture": "Lead Capture", "/booking-widget": "Booking Widget", "/reactivation": "Win-Back",
   "/email-sequences": "Email Sequences", "/reviews-referrals": "Reviews & Referrals",
   "/weekly-recap": "Weekly Recap", "/tasks-queue": "Tasks Queue",
   "/autopilot": "Autopilot", "/automations": "Automations", "/ai-assistant": "Sales Assistant",
@@ -483,7 +486,7 @@ const ROUTE_TITLES: Record<string, string> = {
 
 const PRO_ROUTES = [
   "/customers", "/jobs", "/calendar", "/growth", "/opportunities", "/ai-assistant",
-  "/lead-finder", "/lead-capture", "/revenue", "/closing-assistant",
+  "/lead-finder", "/lead-capture", "/booking-widget", "/revenue", "/closing-assistant",
   "/commercial-quote", "/reactivation", "/automations", "/sales-strategy",
   "/weekly-recap", "/tasks-queue", "/reviews-referrals", "/qbo-settings",
 ];

@@ -81,6 +81,7 @@ import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import FieldStatusPage from "./pages/FieldStatusPage";
 import RecurringSchedulesPage from "./pages/RecurringSchedulesPage";
 import StaffManagementPage from "./pages/StaffManagementPage";
+import BookingWidgetPage from "./pages/BookingWidgetPage";
 
 function EmployeeGuard({ children }: { children: React.ReactNode }) {
   if (!isLoggedIn()) return <Navigate to="/employee/login" replace />;
@@ -193,6 +194,7 @@ export default function App() {
           <Route path="/toolkit" element={<ToolkitPage />} />
           <Route path="/intake-requests" element={<IntakeRequestsPage />} />
           <Route path="/lead-capture" element={<ProGate feature="Lead Capture Link"><LeadCapturePage /></ProGate>} />
+          <Route path="/booking-widget" element={<BookingWidgetPage />} />
           <Route path="/lead-finder" element={<ProGate feature="Local Lead Finder"><LeadFinderPage /></ProGate>} />
           <Route path="/lead-finder/settings" element={<ProGate feature="Local Lead Finder"><LeadFinderSettingsPage /></ProGate>} />
           <Route path="/lead-finder/:id" element={<ProGate feature="Local Lead Finder"><LeadFinderDetailPage /></ProGate>} />
