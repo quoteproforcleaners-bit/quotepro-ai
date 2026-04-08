@@ -3,7 +3,7 @@ import {
   View, StyleSheet, ScrollView, RefreshControl, Pressable, Platform, useWindowDimensions,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
@@ -86,7 +86,7 @@ const TASK_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
 
 export default function GrowthDashboardScreen() {
   const headerHeight = useHeaderHeight();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
   const { theme, isDark } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
@@ -165,7 +165,7 @@ export default function GrowthDashboardScreen() {
         <ScrollView
           contentContainerStyle={[
             s.content,
-            { paddingTop: headerHeight + Spacing.lg, paddingBottom: tabBarHeight + Spacing["2xl"] },
+            { paddingTop: headerHeight + Spacing.lg, paddingBottom: insets.bottom + Spacing["2xl"] },
             maxWidth ? { maxWidth: 540, alignSelf: "center" as const, width: "100%" } : undefined,
           ]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />}

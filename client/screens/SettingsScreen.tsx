@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, Image, Pressable, Platform, Modal, TextInput as RNTextInput, Linking, useWindowDimensions, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
@@ -40,7 +40,6 @@ import { ListGroup, SectionLabel } from "@/components/ListRow";
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  const tabBarHeight = useBottomTabBarHeight();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
   const { theme } = useTheme();
@@ -379,7 +378,7 @@ export default function SettingsScreen() {
         styles.content,
         {
           paddingTop: headerHeight + Spacing.xl,
-          paddingBottom: tabBarHeight + Spacing.xl,
+          paddingBottom: insets.bottom + Spacing.xl,
         },
         useMaxWidth ? { maxWidth: 560, alignSelf: "center" as const, width: "100%" } : undefined,
       ]}

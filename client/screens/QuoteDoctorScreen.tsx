@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -155,7 +155,6 @@ const FREQUENCY_OPTIONS = [
 export default function QuoteDoctorScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
   const headerHeight = useHeaderHeight();
   const { isGrowth, tier } = useSubscription();
 
@@ -347,7 +346,7 @@ export default function QuoteDoctorScreen() {
         ref={scrollRef}
         contentContainerStyle={{
           paddingTop: headerHeight + 16,
-          paddingBottom: tabBarHeight + 40,
+          paddingBottom: insets.bottom + 40,
           paddingHorizontal: 16,
         }}
         showsVerticalScrollIndicator={false}

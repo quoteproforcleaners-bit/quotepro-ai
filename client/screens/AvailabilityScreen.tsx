@@ -10,7 +10,7 @@ import {
   Platform,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -98,7 +98,7 @@ function RowPicker({
 export default function AvailabilityScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<any>({
@@ -220,7 +220,7 @@ export default function AvailabilityScreen() {
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       contentContainerStyle={{
         paddingTop: headerHeight + Spacing.md,
-        paddingBottom: tabBarHeight + Spacing.xl,
+        paddingBottom: insets.bottom + Spacing.xl,
         paddingHorizontal: Spacing.lg,
         gap: Spacing.md,
       }}

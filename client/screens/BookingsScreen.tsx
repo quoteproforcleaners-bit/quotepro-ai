@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
@@ -111,7 +111,7 @@ function BookingCard({ item }: { item: any }) {
 export default function BookingsScreen() {
   const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
 
   const { data: bookings = [], isLoading, refetch } = useQuery<any[]>({
@@ -130,7 +130,7 @@ export default function BookingsScreen() {
       style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
       contentContainerStyle={{
         paddingTop: headerHeight + Spacing.md,
-        paddingBottom: tabBarHeight + Spacing.xl,
+        paddingBottom: insets.bottom + Spacing.xl,
         paddingHorizontal: Spacing.lg,
         gap: Spacing.sm,
       }}
