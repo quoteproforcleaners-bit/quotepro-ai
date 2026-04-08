@@ -58,7 +58,7 @@ import quotesRouter from "./routers/quotesRouter";         // /api/quotes/*, /ap
 import customersRouter from "./routers/customersRouter";   // /api/customers/*, /api/intake-requests/*
 import jobsRouter from "./routers/jobsRouter";             // /api/jobs/*, /api/schedule/*, /api/dispatch/*
 import businessRouter from "./routers/businessRouter";     // /api/business/*, /api/subscription/*, /api/settings, /api/preferences, /api/files, /api/tasks, /api/referrals, /api/badges, /api/communications, /api/analytics, /api/geocode, /api/lead-link, /api/tip-settings, /api/tips
-import aiRouter from "./routers/aiRouter";                 // /api/ai/*, /api/send/*
+import aiRouter from "./routers/ai/index";                  // /api/ai/*, /api/send/*, /api/lead-finder/*
 import automationsRouter from "./routers/automationsRouter"; // /api/automations, /api/social/*, /api/streaks
 import integrationsRouter from "./routers/integrationsRouter"; // /api/google-calendar/*, /api/stripe/*, /api/api-keys, /api/webhook-endpoints, /api/internal/*
 
