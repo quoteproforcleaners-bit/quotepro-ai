@@ -30186,6 +30186,12 @@ var TOOLS_LIST = [
   {
     name: "get_cleaning_quote",
     description: "Get an instant AI-powered Good/Better/Best cleaning quote for any residential property. Returns three pricing tiers with what's included at each level.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -30210,6 +30216,12 @@ var TOOLS_LIST = [
   {
     name: "get_commercial_bid",
     description: "Calculate a monthly commercial cleaning bid for offices, medical facilities, retail spaces, schools, and warehouses. Returns a professional janitorial bid estimate.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -30234,6 +30246,12 @@ var TOOLS_LIST = [
   {
     name: "get_autopilot_info",
     description: "Learn about QuotePro Autopilot \u2014 the AI agent that automatically quotes leads, sends follow-ups, and requests Google reviews for cleaning businesses.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -30241,6 +30259,44 @@ var TOOLS_LIST = [
       },
       required: ["question"]
     }
+  }
+];
+var PROMPTS_LIST = [
+  {
+    name: "residential_quote",
+    description: "Generate a Good/Better/Best cleaning quote for a residential property",
+    arguments: [
+      { name: "bedrooms", description: "Number of bedrooms", required: true },
+      { name: "bathrooms", description: "Number of bathrooms", required: true },
+      { name: "city", description: "City", required: true },
+      { name: "state", description: "2-letter state code", required: true },
+      { name: "frequency", description: "Cleaning frequency (one_time, weekly, biweekly, monthly)", required: true }
+    ]
+  },
+  {
+    name: "commercial_bid",
+    description: "Calculate a janitorial bid for a commercial facility",
+    arguments: [
+      { name: "facility_type", description: "Type of facility (office, medical, retail, warehouse, school, restaurant)", required: true },
+      { name: "square_footage", description: "Total square footage", required: true },
+      { name: "frequency", description: "Cleaning frequency (daily, 3x_week, weekly, biweekly)", required: true },
+      { name: "city", description: "City", required: true },
+      { name: "state", description: "2-letter state code", required: true }
+    ]
+  }
+];
+var RESOURCES_LIST = [
+  {
+    uri: "quotepro://pricing-guide",
+    name: "Cleaning Business Pricing Guide",
+    description: "Industry benchmarks for residential and commercial cleaning pricing, including Good/Better/Best tier strategies and market rate data by region.",
+    mimeType: "text/plain"
+  },
+  {
+    uri: "quotepro://autopilot-overview",
+    name: "QuotePro Autopilot Overview",
+    description: "How the QuotePro Autopilot 4-step pipeline works: instant quote, follow-up, win/loss, and review request automation for cleaning businesses.",
+    mimeType: "text/plain"
   }
 ];
 function runTool(name, args) {
@@ -30325,10 +30381,10 @@ mcpRouter.post("/", mcpLimiter, (req, res) => {
           return;
         }
         case "resources/list":
-          res.json({ jsonrpc: "2.0", id, result: { resources: [] } });
+          res.json({ jsonrpc: "2.0", id, result: { resources: RESOURCES_LIST } });
           return;
         case "prompts/list":
-          res.json({ jsonrpc: "2.0", id, result: { prompts: [] } });
+          res.json({ jsonrpc: "2.0", id, result: { prompts: PROMPTS_LIST } });
           return;
         default:
           res.json({

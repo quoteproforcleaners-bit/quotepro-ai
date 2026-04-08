@@ -6,7 +6,12 @@ description: >
   cleaning businesses. Built by a cleaning business owner.
 author: QuotePro for Cleaners
 homepage: https://getquotepro.ai
+icon: https://getquotepro.ai/og-image?type=default
 endpoint: https://app.getquotepro.ai/mcp
+configSchema:
+  type: object
+  properties: {}
+  required: []
 tools:
   - get_cleaning_quote
   - get_commercial_bid
