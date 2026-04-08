@@ -21920,8 +21920,10 @@ CRITICAL RULES:
 2. If you cannot justify a higher price, match the base price exactly.
 3. Your reasoning must explicitly compare to the base price and explain WHY the price is higher (or why the base is already optimal).
 4. Be specific about what factors drive the price up (pet shedding, condition score, add-ons, market positioning).
+5. Also estimate the typical US residential cleaning market price range for this specific property (size, beds, baths, frequency). Return marketRange.min and marketRange.max as realistic low/high dollar amounts, and a label describing where the better-tier base price sits in that range.
 
-Respond with JSON: {"good":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"better":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"best":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"overallAssessment":"1-2 sentences","confidence":"low"|"medium"|"high","keyInsight":"1 sentence"}`;
+Respond with valid JSON only \u2014 no markdown, no code fences:
+{"good":{"suggestedPrice":number,"reasoning":"1-2 sentences"},"better":{"suggestedPrice":number,"reasoning":"1-2 sentences"},"best":{"suggestedPrice":number,"reasoning":"1-2 sentences"},"overallAssessment":"1-2 sentences","confidence":"low"|"medium"|"high","keyInsight":"1 sentence","marketRange":{"min":number,"max":number,"label":"Below market"|"Competitively priced"|"At market rate"|"Slightly above market"|"Above market"}}`;
     const userPrompt2 = `Property: ${propertyDesc}
 Frequency: ${frequency2 || "one-time"}
 Add-ons: ${addOnsList.length > 0 ? addOnsList.join(", ") : "none"}
@@ -21938,11 +21940,13 @@ ${historyContext}`;
       maxTokens: 400
     });
     if (!content) return res.status(500).json({ message: "No response from AI" });
+    const stripped = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     let parsed;
     try {
-      parsed = JSON.parse(content);
+      parsed = JSON.parse(stripped);
     } catch {
-      return res.status(500).json({ message: "Invalid AI response" });
+      console.warn("[pricing-suggestion] JSON parse failed, raw:", stripped.slice(0, 300));
+      return res.status(500).json({ message: "Invalid AI response format" });
     }
     const floorPrice = (aiPrice, base) => {
       const ai = typeof aiPrice === "number" && !isNaN(aiPrice) ? aiPrice : base;
@@ -21951,6 +21955,9 @@ ${historyContext}`;
     const goodPrice = floorPrice(parsed.good?.suggestedPrice, currentPrices.good);
     const betterPrice = floorPrice(parsed.better?.suggestedPrice, currentPrices.better);
     const bestPrice = floorPrice(parsed.best?.suggestedPrice, currentPrices.best);
+    const mrMin = typeof parsed.marketRange?.min === "number" ? Math.round(parsed.marketRange.min) : 0;
+    const mrMax = typeof parsed.marketRange?.max === "number" ? Math.round(parsed.marketRange.max) : 0;
+    const mrLabel = typeof parsed.marketRange?.label === "string" ? parsed.marketRange.label : "Market data unavailable";
     return res.json({
       good: {
         suggestedPrice: goodPrice,
@@ -21970,7 +21977,8 @@ ${historyContext}`;
       overallAssessment: parsed.overallAssessment || "",
       confidence: parsed.confidence || "medium",
       keyInsight: parsed.keyInsight || "",
-      baselinePrices: { good: currentPrices.good, better: currentPrices.better, best: currentPrices.best }
+      baselinePrices: { good: currentPrices.good, better: currentPrices.better, best: currentPrices.best },
+      marketRange: { min: mrMin, max: mrMax, label: mrLabel }
     });
   } catch (error) {
     console.error("AI pricing suggestion error:", error);

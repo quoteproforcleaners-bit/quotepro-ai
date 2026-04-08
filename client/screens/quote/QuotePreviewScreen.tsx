@@ -129,14 +129,16 @@ export default function QuotePreviewScreen({
   const [priceOverrides, setPriceOverrides] = useState<{ good?: number; better?: number; best?: number }>({});
   const [pdfLoading, setPdfLoading] = useState(false);
   const [aiPricing, setAiPricing] = useState<{
-    good: { suggestedPrice: number; reasoning: string };
-    better: { suggestedPrice: number; reasoning: string };
-    best: { suggestedPrice: number; reasoning: string };
+    good: { suggestedPrice: number; reasoning: string; flooredToBase?: boolean };
+    better: { suggestedPrice: number; reasoning: string; flooredToBase?: boolean };
+    best: { suggestedPrice: number; reasoning: string; flooredToBase?: boolean };
     overallAssessment: string;
     confidence: "low" | "medium" | "high";
     keyInsight: string;
+    marketRange: { min: number; max: number; label: string };
   } | null>(null);
   const [aiPricingLoading, setAiPricingLoading] = useState(false);
+  const [aiPricingError, setAiPricingError] = useState<string | null>(null);
   const [showAiPricing, setShowAiPricing] = useState(false);
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const [upsellDismissed, setUpsellDismissed] = useState(false);
@@ -315,8 +317,17 @@ export default function QuotePreviewScreen({
     const consented = await requestConsent();
     if (!consented) return;
     setAiPricingLoading(true);
+    setAiPricingError(null);
     setShowAiPricing(true);
+
+    // Safety timeout — never spin forever
+    const abortTimer = setTimeout(() => {
+      setAiPricingLoading(false);
+      setAiPricingError("Request timed out. Tap to retry.");
+    }, 25000);
+
     try {
+      console.log("[AI Price Check] Requesting market pricing analysis");
       const res = await apiRequest("POST", "/api/ai/pricing-suggestion", {
         homeDetails: {
           sqft: homeDetails.sqft,
@@ -341,12 +352,17 @@ export default function QuotePreviewScreen({
         },
       });
       const data = await res.json();
+      console.log("[AI Price Check] Response:", JSON.stringify(data).slice(0, 300));
       if (data.good && data.better && data.best) {
         setAiPricing(data);
+      } else {
+        setAiPricingError("Could not analyze pricing. Tap to retry.");
       }
-    } catch (err) {
-      console.log("AI pricing suggestion unavailable");
+    } catch (err: any) {
+      console.log("[AI Price Check] Error:", err?.message);
+      setAiPricingError("Pricing analysis unavailable. Tap to retry.");
     } finally {
+      clearTimeout(abortTimer);
       setAiPricingLoading(false);
     }
   }, [homeDetails, addOns, frequency, options, pricingSettings, isPro]);
@@ -827,45 +843,80 @@ export default function QuotePreviewScreen({
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: Spacing.lg }}>
                 <ActivityIndicator size="small" color={theme.primary} />
                 <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: 8 }}>
-                  Analyzing pricing...
+                  Analyzing market prices...
                 </ThemedText>
+              </View>
+            </View>
+          ) : aiPricingError ? (
+            <View style={[styles.aiPricingCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: Spacing.sm }}>
+                <Feather name="alert-circle" size={15} color={theme.warning} />
+                <ThemedText type="small" style={{ color: theme.textSecondary, flex: 1 }}>
+                  {aiPricingError}
+                </ThemedText>
+                <Pressable onPress={fetchAiPricing} style={{ padding: 4 }}>
+                  <Feather name="refresh-cw" size={14} color={theme.primary} />
+                </Pressable>
               </View>
             </View>
           ) : aiPricing ? (
             <View style={[styles.aiPricingCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-              <ThemedText type="small" style={{ color: theme.text, marginBottom: Spacing.sm }}>
-                {aiPricing.overallAssessment}
-              </ThemedText>
 
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.sm, gap: 8 }}>
-                <View style={[
-                  styles.aiPricingConfidence,
-                  {
-                    backgroundColor: aiPricing.confidence === "high"
-                      ? `${theme.success}15`
-                      : aiPricing.confidence === "medium"
-                        ? `${theme.primary}15`
-                        : `${theme.warning}15`,
-                  },
-                ]}>
-                  <ThemedText type="caption" style={{
-                    color: aiPricing.confidence === "high"
-                      ? theme.success
-                      : aiPricing.confidence === "medium"
-                        ? theme.primary
-                        : theme.warning,
-                    fontWeight: "600",
-                    textTransform: "capitalize",
-                  }}>
-                    {aiPricing.confidence} confidence
-                  </ThemedText>
-                </View>
-              </View>
+              {/* ── Market Range Bar ── */}
+              {aiPricing.marketRange.min > 0 && aiPricing.marketRange.max > aiPricing.marketRange.min ? (() => {
+                const quotedPrice = options[selectedOption].price;
+                const range = aiPricing.marketRange.max - aiPricing.marketRange.min;
+                const rawPos = (quotedPrice - aiPricing.marketRange.min) / range;
+                const clampedPos = Math.min(0.95, Math.max(0.05, rawPos));
+                const mrLabel = aiPricing.marketRange.label;
+                const isPositive = mrLabel === "Competitively priced" || mrLabel === "At market rate" || mrLabel === "Below market";
+                const markerColor = isPositive ? theme.success : theme.warning;
+                const markerIcon: any = isPositive ? "check-circle" : "alert-circle";
+                return (
+                  <View style={styles.marketRangeSection}>
+                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: Spacing.xs }}>
+                      <Feather name="bar-chart-2" size={13} color={theme.primary} />
+                      <ThemedText type="caption" style={{ color: theme.textSecondary, marginLeft: 5, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                        Market Range for This Home
+                      </ThemedText>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                      <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                        {formatCurrency(aiPricing.marketRange.min, currency)}
+                      </ThemedText>
+                      <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                        {formatCurrency(aiPricing.marketRange.max, currency)}
+                      </ThemedText>
+                    </View>
+                    {/* Bar track */}
+                    <View style={[styles.marketRangeTrack, { backgroundColor: theme.border }]}>
+                      {/* Filled portion */}
+                      <View style={[styles.marketRangeFill, { width: `${clampedPos * 100}%` as any, backgroundColor: `${markerColor}40` }]} />
+                      {/* Marker dot */}
+                      <View style={[styles.marketRangeMarker, { left: `${clampedPos * 100}%` as any, backgroundColor: "#fff", borderColor: markerColor }]} />
+                    </View>
+                    {/* Label row */}
+                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: Spacing.sm, gap: 5 }}>
+                      <Feather name={markerIcon} size={13} color={markerColor} />
+                      <ThemedText type="caption" style={{ color: markerColor, fontWeight: "700" }}>
+                        {mrLabel}
+                      </ThemedText>
+                      <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                        · Your {selectedOption} price: {formatCurrency(quotedPrice, currency)}
+                      </ThemedText>
+                    </View>
+                  </View>
+                );
+              })() : null}
 
-              <ThemedText type="small" style={{ color: theme.textSecondary, fontStyle: "italic", marginBottom: Spacing.md }}>
-                {aiPricing.keyInsight}
-              </ThemedText>
+              {/* ── Key insight ── */}
+              {aiPricing.keyInsight ? (
+                <ThemedText type="small" style={{ color: theme.textSecondary, fontStyle: "italic", marginBottom: Spacing.md }}>
+                  {aiPricing.keyInsight}
+                </ThemedText>
+              ) : null}
 
+              {/* ── Tier rows ── */}
               {(["good", "better", "best"] as const).map((tier) => {
                 const current = options[tier].price;
                 const suggested = aiPricing[tier].suggestedPrice;
@@ -903,6 +954,7 @@ export default function QuotePreviewScreen({
                 );
               })}
 
+              {/* ── Apply All ── */}
               <Pressable
                 onPress={() => {
                   setPriceOverrides({
@@ -1618,6 +1670,34 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.xs,
     marginTop: Spacing.md,
+  },
+  marketRangeSection: {
+    marginBottom: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.06)",
+  },
+  marketRangeTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: "visible",
+    position: "relative",
+  },
+  marketRangeFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    height: 8,
+    borderRadius: 4,
+  },
+  marketRangeMarker: {
+    position: "absolute",
+    top: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2.5,
+    marginLeft: -8,
   },
   upsellCard: {
     borderWidth: 1,
