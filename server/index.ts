@@ -9,6 +9,7 @@ import { processDripQueue } from "./dripEmails";
 import { sendOwnerDailyRecap } from "./mail";
 import { processSentQuoteFollowUps } from "./quoteFollowUpScheduler";
 import { processDraftQuoteNudges } from "./draftQuoteNudge";
+import { processAutopilotJobs } from "./services/autopilotService";
 import { bulkSyncRcUsers } from "./routers/revenuecatRouter";
 import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
 import { sendPush } from "./pushNotifications";
@@ -883,6 +884,21 @@ async function seedToDoDemo() {
     }, 60 * 60 * 1000); // check every hour
   }
   scheduleDraftQuoteNudgeCron();
+
+  // ─── Autopilot cron: advance pipeline every 15 minutes ───────────────────
+  // Handles step1→step2 progression for enrolled leads where next_action_at <= NOW()
+  function scheduleAutopilotCron() {
+    // Run immediately on startup (catches any leads that missed their window)
+    processAutopilotJobs().catch((e: any) =>
+      console.error("[autopilot] Startup run failed:", e.message)
+    );
+    setInterval(() => {
+      processAutopilotJobs().catch((e: any) =>
+        console.error("[autopilot] Cron failed:", e.message)
+      );
+    }, 15 * 60 * 1000); // every 15 minutes
+  }
+  scheduleAutopilotCron();
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

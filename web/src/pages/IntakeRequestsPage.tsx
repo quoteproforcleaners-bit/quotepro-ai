@@ -106,6 +106,8 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
   const [reviewNotes, setReviewNotes] = useState(req.reviewNotes || "");
   const [editFields, setEditFields] = useState({ ...req.extractedFields });
 
+  const [enrolledJobId, setEnrolledJobId] = useState<string | null>(null);
+
   const dismiss = useMutation({
     mutationFn: () => apiRequest("DELETE", `/api/intake-requests/${req.id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/intake-requests"] }); onRefresh(); },
@@ -114,6 +116,14 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
   const patch = useMutation({
     mutationFn: (data: Record<string, any>) => apiRequest("PATCH", `/api/intake-requests/${req.id}`, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/intake-requests"] }); onRefresh(); },
+  });
+
+  const enrollAutopilot = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/autopilot/enroll-intake/${req.id}`),
+    onSuccess: (data: any) => {
+      setEnrolledJobId(data?.jobId || "enrolled");
+      qc.invalidateQueries({ queryKey: ["/api/autopilot/jobs"] });
+    },
   });
 
   function buildQueryString(fields: typeof req.extractedFields) {
@@ -346,20 +356,22 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
             <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Build Quote
           </Button>
           <button
-            onClick={() => navigate("/autopilot")}
+            onClick={() => enrolledJobId ? navigate("/autopilot") : enrollAutopilot.mutate()}
+            disabled={enrollAutopilot.isPending}
             style={{
               display: "inline-flex", alignItems: "center", gap: "4px",
               fontSize: "11px", fontWeight: 600,
               padding: "4px 10px", borderRadius: "8px",
-              background: "rgba(0,122,255,0.08)",
-              color: "var(--blue)",
-              border: "0.5px solid rgba(0,122,255,0.18)",
+              background: enrolledJobId ? "rgba(52,199,89,0.12)" : "rgba(0,122,255,0.08)",
+              color: enrolledJobId ? "#1a7f37" : "var(--blue)",
+              border: `0.5px solid ${enrolledJobId ? "rgba(52,199,89,0.25)" : "rgba(0,122,255,0.18)"}`,
               cursor: "pointer",
               flexShrink: 0,
+              opacity: enrollAutopilot.isPending ? 0.6 : 1,
             }}
           >
             <Zap style={{ width: "11px", height: "11px" }} />
-            Enroll in Autopilot
+            {enrolledJobId ? "In Autopilot" : enrollAutopilot.isPending ? "Enrolling…" : "Enroll in Autopilot"}
           </button>
           {tab === "new" && (
             <button
@@ -422,6 +434,12 @@ export default function IntakeRequestsPage() {
 
   const { data: countData } = useQuery<{ count: number; newCount: number; reviewCount: number }>({
     queryKey: ["/api/intake-requests/count"],
+  });
+
+  const [enrolledAll, setEnrolledAll] = useState(false);
+  const enrollAll = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/autopilot/settings", { autopilotEnabled: true }),
+    onSuccess: () => setEnrolledAll(true),
   });
 
   const { data: linkData } = useQuery<{ url: string; code: string; businessName: string }>({
@@ -587,14 +605,18 @@ export default function IntakeRequestsPage() {
             {" "}waiting more than 2 hours — respond to close more business.
           </p>
           <button
-            onClick={() => window.location.href = "/autopilot"}
+            onClick={() => enrolledAll ? (window.location.href = "/autopilot") : enrollAll.mutate()}
+            disabled={enrollAll.isPending}
             style={{
-              fontSize: "11px", fontWeight: 600, color: "#c47400",
-              background: "rgba(255,149,0,0.12)", border: "0.5px solid rgba(255,149,0,0.25)",
+              fontSize: "11px", fontWeight: 600,
+              color: enrolledAll ? "#1a7f37" : "#c47400",
+              background: enrolledAll ? "rgba(52,199,89,0.12)" : "rgba(255,149,0,0.12)",
+              border: `0.5px solid ${enrolledAll ? "rgba(52,199,89,0.25)" : "rgba(255,149,0,0.25)"}`,
               borderRadius: "8px", padding: "4px 10px", cursor: "pointer", flexShrink: 0,
+              opacity: enrollAll.isPending ? 0.6 : 1,
             }}
           >
-            Enroll All
+            {enrolledAll ? "Enrolled — View Pipeline" : enrollAll.isPending ? "Enrolling…" : "Enroll All in Autopilot"}
           </button>
         </div>
       ) : null}

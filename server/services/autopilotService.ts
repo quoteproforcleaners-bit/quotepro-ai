@@ -45,6 +45,55 @@ Scoring guide:
 
 Tone: confident, warm, not salesy. This is a relationship-driven industry.`;
 
+// ─── Lead Data Normalizer ─────────────────────────────────────────────────────
+// Handles lead_id pointing to either a `customers` row or an `intake_requests` row.
+// This keeps enrollLead() generic — callers can pass either type of ID.
+
+interface LeadData {
+  email: string | null;
+  firstName: string;
+  fullName: string;
+  address: string | null;
+  notes: string | null;
+  leadSource: string | null;
+  extractedFields: any;
+}
+
+async function getLeadData(leadId: string): Promise<LeadData | null> {
+  // 1. Try customers table
+  const custRes = await pool.query(`SELECT * FROM customers WHERE id = $1`, [leadId]);
+  if (custRes.rows.length > 0) {
+    const c = custRes.rows[0];
+    return {
+      email: c.email || null,
+      firstName: c.first_name || (c.customer_name || "").split(" ")[0] || "there",
+      fullName: `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.customer_name || "Customer",
+      address: c.address || null,
+      notes: c.notes || null,
+      leadSource: c.lead_source || null,
+      extractedFields: c.extracted_fields || {},
+    };
+  }
+
+  // 2. Fall back to intake_requests
+  const intakeRes = await pool.query(`SELECT * FROM intake_requests WHERE id = $1`, [leadId]);
+  if (intakeRes.rows.length > 0) {
+    const r = intakeRes.rows[0];
+    const nameParts = (r.customer_name || "").split(" ");
+    return {
+      email: r.customer_email || null,
+      firstName: nameParts[0] || "there",
+      fullName: r.customer_name || "Customer",
+      address: r.customer_address || null,
+      notes: r.raw_text || null,
+      leadSource: r.source || null,
+      extractedFields: r.extracted_fields || {},
+    };
+  }
+
+  return null;
+}
+
 async function logAction(jobId: string, step: string, action: string, result: string) {
   try {
     await pool.query(
@@ -110,23 +159,18 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
   const job = jobRes.rows[0];
   if (!job) return;
 
-  const leadRes = await pool.query(
-    `SELECT * FROM customers WHERE id = $1`,
-    [job.lead_id]
-  );
-  const lead = leadRes.rows[0];
+  const lead = await getLeadData(job.lead_id);
   if (!lead || !lead.email) {
     await logAction(jobId, "step1", "Skipped — no lead or email", "skipped");
     return;
   }
 
   const leadContext = JSON.stringify({
-    name: `${lead.first_name || ""} ${lead.last_name || ""}`.trim() || lead.customer_name,
+    name: lead.fullName,
     address: lead.address,
     notes: lead.notes,
-    tags: lead.tags,
-    leadSource: lead.lead_source,
-    extractedFields: lead.extracted_fields,
+    leadSource: lead.leadSource,
+    extractedFields: lead.extractedFields,
   });
 
   let qualification: any = {};
@@ -145,7 +189,7 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
       scoreReason: "Unable to qualify automatically",
       recommendedTier: "standard",
       urgencySignals: [],
-      openingLine: `Hi ${lead.first_name || "there"}, thanks for reaching out!`,
+      openingLine: `Hi ${lead.firstName}, thanks for reaching out!`,
       redFlags: [],
       suggestedFollowUpAngle: "Follow up to see if they still need cleaning services.",
     };
@@ -172,7 +216,7 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
        RETURNING id`,
       [
         job.business_id,
-        `${lead.first_name || ""} ${lead.last_name || ""}`.trim() || "Customer",
+        lead.fullName,
         lead.email,
         estimatedTotal,
       ]
@@ -189,7 +233,7 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
   const tierLabel = tier === "premium" ? "Premium Clean" : tier === "deep_clean" ? "Deep Clean" : "Standard Clean";
   const emailHtml = buildOutreachEmail({
     openingLine: qualification.openingLine,
-    firstName: lead.first_name || "there",
+    firstName: lead.firstName,
     companyName: business.company_name,
     tierLabel,
     estimatedTotal,
@@ -241,8 +285,7 @@ export async function step2_followUp(jobId: string): Promise<void> {
   const job = jobRes.rows[0];
   if (!job) return;
 
-  const leadRes = await pool.query(`SELECT * FROM customers WHERE id = $1`, [job.lead_id]);
-  const lead = leadRes.rows[0];
+  const lead = await getLeadData(job.lead_id);
   if (!lead || !lead.email) return;
 
   const meta: any = job.metadata || {};
@@ -253,7 +296,7 @@ export async function step2_followUp(jobId: string): Promise<void> {
   const { fromName, replyTo } = getBusinessSendParams(business);
 
   const html = buildFollowUpEmail({
-    firstName: lead.first_name || "there",
+    firstName: lead.firstName,
     companyName: business.company_name,
     angle,
     primaryColor: business.primary_color || "#2563EB",
@@ -296,8 +339,7 @@ export async function step3_sendContract(jobId: string): Promise<void> {
   const job = jobRes.rows[0];
   if (!job) return;
 
-  const leadRes = await pool.query(`SELECT * FROM customers WHERE id = $1`, [job.lead_id]);
-  const lead = leadRes.rows[0];
+  const lead = await getLeadData(job.lead_id);
   if (!lead || !lead.email) return;
 
   const businessRes = await pool.query(`SELECT * FROM businesses WHERE id = $1`, [job.business_id]);
@@ -305,7 +347,7 @@ export async function step3_sendContract(jobId: string): Promise<void> {
   const { fromName, replyTo } = getBusinessSendParams(business);
 
   const html = buildWelcomeEmail({
-    firstName: lead.first_name || "there",
+    firstName: lead.firstName,
     companyName: business.company_name,
     primaryColor: business.primary_color || "#2563EB",
   });
@@ -345,8 +387,7 @@ export async function step4_requestReview(jobId: string): Promise<void> {
   const job = jobRes.rows[0];
   if (!job) return;
 
-  const leadRes = await pool.query(`SELECT * FROM customers WHERE id = $1`, [job.lead_id]);
-  const lead = leadRes.rows[0];
+  const lead = await getLeadData(job.lead_id);
   if (!lead || !lead.email) return;
 
   const businessRes = await pool.query(`SELECT * FROM businesses WHERE id = $1`, [job.business_id]);
@@ -360,7 +401,7 @@ export async function step4_requestReview(jobId: string): Promise<void> {
   const googleReviewLink = growthRes.rows[0]?.google_review_link || "";
 
   const html = buildReviewEmail({
-    firstName: lead.first_name || "there",
+    firstName: lead.firstName,
     companyName: business.company_name,
     primaryColor: business.primary_color || "#2563EB",
     googleReviewLink,
@@ -419,6 +460,50 @@ export async function triggerStep4ForBusiness(businessId: string): Promise<void>
     }
   } catch (err: any) {
     console.error("[autopilot] triggerStep4ForBusiness failed:", err.message);
+  }
+}
+
+// ─── Back-enroll existing pending intake requests ────────────────────────────
+// Called when a user first enables autopilot — picks up any quote requests that
+// came in before the toggle was turned on.
+
+export async function enrollAllPendingIntakeRequests(
+  userId: string,
+  businessId: string
+): Promise<number> {
+  try {
+    // Find intake requests that haven't been enrolled yet and are actionable
+    const { rows } = await pool.query(
+      `SELECT ir.id
+       FROM intake_requests ir
+       WHERE ir.business_id = $1
+         AND ir.status NOT IN ('dismissed', 'converted')
+         AND NOT EXISTS (
+           SELECT 1 FROM autopilot_jobs aj WHERE aj.lead_id = ir.id
+         )
+       ORDER BY ir.created_at DESC
+       LIMIT 50`,
+      [businessId]
+    );
+
+    let enrolled = 0;
+    for (const row of rows) {
+      try {
+        await enrollLead(userId, businessId, row.id);
+        enrolled++;
+      } catch (e: any) {
+        console.warn(`[autopilot] Back-enroll failed for intake ${row.id}:`, e.message);
+      }
+    }
+
+    if (enrolled > 0) {
+      console.log(`[autopilot] Back-enrolled ${enrolled} existing leads for business ${businessId}`);
+    }
+
+    return enrolled;
+  } catch (err: any) {
+    console.error("[autopilot] enrollAllPendingIntakeRequests failed:", err.message);
+    return 0;
   }
 }
 

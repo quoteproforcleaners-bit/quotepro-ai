@@ -5,6 +5,7 @@ import { getBusinessByOwner, getUserById } from "../storage";
 import {
   enrollLead,
   processAutopilotJobs,
+  enrollAllPendingIntakeRequests,
 } from "../services/autopilotService";
 import { isGrowthOrAbove, isProTier } from "../middleware";
 import { getStripe } from "../clients";
@@ -39,6 +40,30 @@ router.post("/enroll", requireAuth, requireAutopilot, async (req: Request, res: 
     return res.json({ jobId, message: "Lead enrolled in Autopilot" });
   } catch (err: any) {
     console.error("[autopilot] enroll error:", err.message);
+    return res.status(500).json({ message: "Failed to enroll lead" });
+  }
+});
+
+// Manually enroll a specific intake request into autopilot (from Quote Requests page)
+router.post("/enroll-intake/:intakeId", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
+  try {
+    const { intakeId } = req.params;
+    const business = await getBusinessByOwner(req.session.userId!);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+
+    // Verify intake belongs to this business
+    const check = await pool.query(
+      `SELECT id FROM intake_requests WHERE id = $1 AND business_id = $2`,
+      [intakeId, business.id]
+    );
+    if (check.rows.length === 0) {
+      return res.status(404).json({ message: "Quote request not found" });
+    }
+
+    const jobId = await enrollLead(req.session.userId!, business.id, intakeId);
+    return res.json({ jobId, message: "Lead enrolled in Autopilot" });
+  } catch (err: any) {
+    console.error("[autopilot] enroll-intake error:", err.message);
     return res.status(500).json({ message: "Failed to enroll lead" });
   }
 });
@@ -170,6 +195,18 @@ router.post("/settings", requireAuth, async (req: Request, res: Response) => {
         `UPDATE users SET autopilot_enabled = $1 WHERE id = $2`,
         [autopilotEnabled, req.session.userId]
       );
+
+      // When toggling ON, back-enroll any existing pending quote requests
+      // so they enter the pipeline immediately (fire-and-forget)
+      if (autopilotEnabled) {
+        getBusinessByOwner(req.session.userId!).then((biz) => {
+          if (biz) {
+            enrollAllPendingIntakeRequests(req.session.userId!, biz.id).catch((err) =>
+              console.error("[autopilot] back-enroll error:", err.message)
+            );
+          }
+        }).catch(() => {});
+      }
     }
 
     if (typeof googleReviewLink === "string") {
