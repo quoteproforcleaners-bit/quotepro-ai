@@ -57,9 +57,10 @@ const PIPELINE_NAV_ITEMS: NavItem[] = [
 
 // OPERATIONS — day-to-day work management
 const OPERATIONS_NAV_ITEMS: NavItem[] = [
-  { to: "/customers", label: "Customers", icon: Users,        pro: true, description: "Full contact history, quote history, job records, and notes for every client in one place." },
-  { to: "/jobs",      label: "Jobs",      icon: Briefcase,    pro: true, description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
-  { to: "/calendar",  label: "Schedule",  icon: CalendarDays, pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
+  { to: "/customers",            label: "Customers",  icon: Users,        pro: true, description: "Full contact history, quote history, job records, and notes for every client in one place." },
+  { to: "/jobs",                 label: "Jobs",       icon: Briefcase,    pro: true, description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
+  { to: "/recurring-schedules",  label: "Recurring",  icon: Repeat2,      pro: true, description: "Set up repeating cleans with automatic job generation and optional auto-charge billing." },
+  { to: "/calendar",             label: "Schedule",   icon: CalendarDays, pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
 ];
 
 // GROWTH — business intelligence + automation

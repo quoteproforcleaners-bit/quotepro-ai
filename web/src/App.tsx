@@ -79,6 +79,7 @@ import EmployeeCheckout from "./pages/employee/EmployeeCheckout";
 import EmployeeSchedule from "./pages/employee/EmployeeSchedule";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import FieldStatusPage from "./pages/FieldStatusPage";
+import RecurringSchedulesPage from "./pages/RecurringSchedulesPage";
 
 function EmployeeGuard({ children }: { children: React.ReactNode }) {
   if (!isLoggedIn()) return <Navigate to="/employee/login" replace />;
@@ -177,6 +178,7 @@ export default function App() {
           <Route path="/customers/:id" element={<ProGate feature="Customer Management"><CustomerDetailPage /></ProGate>} />
           <Route path="/jobs" element={<ProGate feature="Job Management"><JobsPage /></ProGate>} />
           <Route path="/jobs/:id" element={<ProGate feature="Job Management"><JobDetailPage /></ProGate>} />
+          <Route path="/recurring-schedules" element={<RecurringSchedulesPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
           <Route path="/team" element={<FieldStatusPage />} />
           <Route path="/calendar" element={<ProGate feature="Job Management"><CalendarPage /></ProGate>} />

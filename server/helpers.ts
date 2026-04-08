@@ -35,6 +35,7 @@ import {
   getWeeklyQuoteStats,
   markQuoteNudgeSent,
   markWeeklyDigestSent,
+  generateSeriesJobs,
 } from "./storage";
 import {
   sendEmail,
@@ -1922,6 +1923,127 @@ export const BUILT_IN_SEQUENCES = [
       ],
     },
   ];
+
+// ─── generateRecurringJobs ────────────────────────────────────────────────────
+
+/**
+ * Hourly worker: generates upcoming jobs for all active recurring schedules (7-day lookahead)
+ * and processes auto-charge Stripe PaymentIntents where configured.
+ */
+export async function generateRecurringJobs(): Promise<void> {
+  try {
+    // Fetch all active series with auto_charge info
+    const { rows: activeSeries } = await pool.query<{
+      id: string;
+      business_id: string;
+      auto_charge: boolean;
+      stripe_payment_method_id: string | null;
+      default_price: number | null;
+      customer_id: string | null;
+    }>(`
+      SELECT id, business_id, auto_charge, stripe_payment_method_id, default_price, customer_id
+      FROM recurring_clean_series
+      WHERE status = 'active'
+    `);
+
+    if (!activeSeries.length) return;
+
+    const { getStripe } = await import("./clients");
+    const stripe = getStripe();
+
+    for (const series of activeSeries) {
+      try {
+        // Generate jobs for the next 7 days (incremental — won't duplicate)
+        await generateSeriesJobs(series.id, 7);
+
+        // Auto-charge: find newly-created unpaid jobs within the next 7 days
+        if (series.auto_charge && series.stripe_payment_method_id && stripe) {
+          const amountCents = series.default_price ? Math.round(series.default_price * 100) : 0;
+          if (amountCents <= 0) continue;
+
+          const { rows: pendingJobs } = await pool.query<{
+            id: string;
+            start_datetime: Date;
+          }>(`
+            SELECT id, start_datetime
+            FROM jobs
+            WHERE series_id     = $1
+              AND start_datetime >= NOW()
+              AND start_datetime <  NOW() + INTERVAL '7 days'
+              AND (total IS NULL OR total = 0)
+              AND status        != 'cancelled'
+              AND skipped       = false
+            ORDER BY start_datetime ASC
+            LIMIT 5
+          `, [series.id]);
+
+          for (const job of pendingJobs) {
+            try {
+              const intent = await stripe.paymentIntents.create({
+                amount: amountCents,
+                currency: "usd",
+                customer: undefined,
+                payment_method: series.stripe_payment_method_id,
+                confirm: true,
+                automatic_payment_methods: { enabled: false },
+                metadata: { jobId: job.id, seriesId: series.id },
+              });
+
+              if (intent.status === "succeeded") {
+                await pool.query(
+                  `UPDATE jobs SET total = $1, updated_at = NOW() WHERE id = $2`,
+                  [series.default_price, job.id]
+                );
+                // Look up the business owner for analytics
+                const { rows: bizRows } = await pool.query(
+                  `SELECT owner_user_id FROM businesses WHERE id = $1`,
+                  [series.business_id]
+                );
+                const userId = bizRows[0]?.owner_user_id;
+                if (userId) {
+                  trackEvent(userId, "RECURRING_AUTO_CHARGE_SUCCESS" as any, {
+                    jobId: job.id, amount: amountCents,
+                  }).catch(() => {});
+                }
+                console.log(`[recurring] Auto-charged $${series.default_price} for job ${job.id}`);
+              }
+            } catch (chargeErr: any) {
+              console.error(`[recurring] Auto-charge failed for job ${job.id}:`, chargeErr.message);
+
+              // Look up business owner and customer for failure notifications
+              const { rows: bizRows } = await pool.query(
+                `SELECT owner_user_id, company_name, email FROM businesses WHERE id = $1`,
+                [series.business_id]
+              );
+              const biz = bizRows[0];
+              if (biz?.owner_user_id) {
+                trackEvent(biz.owner_user_id, "RECURRING_AUTO_CHARGE_FAILED" as any, {
+                  jobId: job.id, error: chargeErr.message,
+                }).catch(() => {});
+
+                // Notify business owner
+                const ownerUser = await getUserById(biz.owner_user_id);
+                if (ownerUser?.email) {
+                  await sendEmail({
+                    to: ownerUser.email,
+                    subject: "Auto-charge failed for a recurring job",
+                    html: `<p>Hi,</p><p>We were unable to automatically charge for a recurring job scheduled on <strong>${new Date(job.start_datetime).toLocaleDateString()}</strong>.</p><p>Please collect payment manually or update the payment method in QuotePro.</p><p>The QuotePro Team</p>`,
+                    text: `A recurring job auto-charge failed for ${new Date(job.start_datetime).toLocaleDateString()}. Please collect payment manually.`,
+                    fromName: PLATFORM_FROM_NAME,
+                  }).catch(() => {});
+                }
+              }
+            }
+          }
+        }
+      } catch (seriesErr: any) {
+        console.error(`[recurring] Error processing series ${series.id}:`, seriesErr.message);
+      }
+    }
+  } catch (e: any) {
+    console.error("[recurring] generateRecurringJobs failed:", e.message);
+  }
+}
 
 // ─── sendActivationNudges ────────────────────────────────────────────────────
 

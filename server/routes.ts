@@ -33,6 +33,7 @@ import {
   sendStaleQuoteNudges,
   sendWeeklyDigestEmails,
   sendActivationNudges,
+  generateRecurringJobs,
 } from "./helpers";
 
 // ─── Group A — pure single-domain routers ─────────────────────────────────────
@@ -45,6 +46,7 @@ import marketRatesRouter from "./routers/marketRatesRouter"; // → /api/market-
 import pricingRouter from "./routers/pricingRouter";       // → /api/pricing
 import { supportRouter } from "./routers/supportRouter";   // → /api/support
 import { quoteDoctorRouter } from "./routers/quoteDoctorRouter"; // → /api/quote-doctor
+import recurringRouter from "./routers/recurringRouter";         // → /api/recurring-schedules
 
 // ─── Group B — multi-domain routers (all mounted at /api) ─────────────────────
 import authRouter from "./routers/authRouter";             // /api/auth/*, /api/consent, /api/crash-report
@@ -126,6 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/pricing", pricingRouter);
   app.use("/api/support", supportRouter);
   app.use("/api/quote-doctor", quoteDoctorRouter);
+  app.use("/api", recurringRouter);
 
   // 4. Mount Group B — multi-domain routers at /api
   app.use("/api", authRouter);
@@ -171,6 +174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await sendStaleQuoteNudges();
       await sendWeeklyDigestEmails();
       await sendActivationNudges();
+      await generateRecurringJobs();
       if ((app as any).__leadFinderWorker) {
         await (app as any).__leadFinderWorker();
       }

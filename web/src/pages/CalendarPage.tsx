@@ -33,6 +33,7 @@ interface CalendarJob {
   id: string;
   customerId: string | null;
   quoteId: string | null;
+  seriesId: string | null;
   jobType: string;
   status: string;
   startDatetime: string;
@@ -755,7 +756,10 @@ function WeekView({
                       onClick={() => onJobClick(job)}
                       className={`w-full text-left p-2 rounded-lg border text-xs transition-all hover:shadow-sm ${c.bg} ${c.border} ${c.text}`}
                     >
-                      <p className="font-semibold truncate">{job.customerName || job.jobType}</p>
+                      <div className="flex items-center gap-1">
+                        {job.seriesId ? <Repeat className="w-2.5 h-2.5 opacity-60 flex-shrink-0" /> : null}
+                        <p className="font-semibold truncate">{job.customerName || job.jobType}</p>
+                      </div>
                       <p className="opacity-70 mt-0.5">{formatTime(job.startDatetime)}</p>
                       {job.total ? <p className="font-medium mt-0.5">{formatMoney(job.total)}</p> : null}
                     </button>
@@ -833,7 +837,10 @@ function DayView({
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className={`text-base font-bold ${c.text}`}>{job.customerName || "Job"}</p>
+                      <div className="flex items-center gap-1.5">
+                        {job.seriesId ? <Repeat className={`w-3.5 h-3.5 opacity-60 flex-shrink-0 ${c.text}`} /> : null}
+                        <p className={`text-base font-bold ${c.text}`}>{job.customerName || "Job"}</p>
+                      </div>
                       <p className={`text-sm font-medium opacity-70 ${c.text}`}>{job.jobType}</p>
                     </div>
                     {job.total ? (

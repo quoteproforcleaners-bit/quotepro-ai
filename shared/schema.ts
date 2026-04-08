@@ -283,6 +283,8 @@ export const recurringCleanSeries = pgTable("recurring_clean_series", {
   teamMembers: jsonb("team_members").$type<string[]>().default([]),
   internalNotes: text("internal_notes").notNull().default(""),
   arrivalTime: text("arrival_time").notNull().default("09:00"),
+  autoCharge: boolean("auto_charge").notNull().default(false),
+  stripePaymentMethodId: text("stripe_payment_method_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
