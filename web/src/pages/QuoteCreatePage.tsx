@@ -19,6 +19,10 @@ import {
   Pencil,
   Zap,
   Lock,
+  Camera,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
 } from "lucide-react";
 import { PageHeader, Card, CardHeader, Button, Badge, Alert } from "../components/ui";
 import { computeResidentialQuote } from "../lib/pricingEngine";
@@ -138,6 +142,71 @@ export default function QuoteCreatePage() {
   const [step, setStep] = useState(0);
   const [quotaError, setQuotaError] = useState(false);
   const [dismissedNudge, setDismissedNudge] = useState(false);
+
+  // ─── Photo-to-Quote state ──────────────────────────────────────────────────
+  interface PhotoEstimate {
+    spaceType: string;
+    estimatedSqft: number;
+    cleanLevel: "light" | "standard" | "deep";
+    timeRangeHours: { min: number; max: number };
+    priceRange: { min: number; max: number };
+    observations: string[];
+    confidence: "low" | "medium" | "high";
+  }
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoAnalyzing, setPhotoAnalyzing] = useState(false);
+  const [photoEstimate, setPhotoEstimate] = useState<PhotoEstimate | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoSectionOpen, setPhotoSectionOpen] = useState(false);
+
+  async function analyzePhoto(file: File) {
+    setPhotoAnalyzing(true);
+    setPhotoError(null);
+    setPhotoEstimate(null);
+    try {
+      const formData = new FormData();
+      formData.append("photo", file);
+      formData.append("propertyType", "residential");
+      const res = await fetch("/api/ai/photo-to-quote", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPhotoError(data.message || "Could not analyze the photo.");
+        return;
+      }
+      setPhotoEstimate(data as PhotoEstimate);
+    } catch {
+      setPhotoError("Something went wrong. Please try again.");
+    } finally {
+      setPhotoAnalyzing(false);
+    }
+  }
+
+  function handlePhotoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+    setPhotoEstimate(null);
+    setPhotoError(null);
+    analyzePhoto(file);
+  }
+
+  function applyPhotoEstimate() {
+    if (!photoEstimate) return;
+    const cleanLevelToScore: Record<string, number> = { light: 8, standard: 5, deep: 2 };
+    setProperty((p) => ({
+      ...p,
+      sqft: photoEstimate.estimatedSqft,
+      conditionScore: cleanLevelToScore[photoEstimate.cleanLevel] ?? 5,
+    }));
+    setPhotoSectionOpen(false);
+    setStep(1);
+  }
   const [intakeId, setIntakeId] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState("");
   const [newCustomer, setNewCustomer] = useState(false);
@@ -512,6 +581,145 @@ export default function QuoteCreatePage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* ─── Photo-to-Quote Panel ──────────────────────────────────────────── */}
+      {(isGrowth || isPro) && step === 0 && (
+        <div className="mb-5">
+          <button
+            type="button"
+            onClick={() => setPhotoSectionOpen((v) => !v)}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 hover:border-blue-400 transition-colors group"
+          >
+            <span className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                <Camera className="w-4 h-4 text-blue-600" />
+              </span>
+              <span className="text-left">
+                <span className="block text-sm font-semibold text-blue-900">
+                  Start from a Photo
+                </span>
+                <span className="block text-xs text-blue-600">
+                  AI analyzes your photo and auto-fills property details
+                </span>
+              </span>
+            </span>
+            {photoSectionOpen ? (
+              <ChevronUp className="w-4 h-4 text-blue-500 shrink-0" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-blue-500 shrink-0" />
+            )}
+          </button>
+
+          {photoSectionOpen && (
+            <div className="mt-3 p-5 rounded-xl border border-blue-200 bg-white space-y-4">
+              {/* File picker */}
+              <div className="flex items-center gap-3">
+                <label className="cursor-pointer flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-sm font-medium text-slate-700">
+                  <Camera className="w-4 h-4 text-slate-500" />
+                  {photoFile ? "Change Photo" : "Choose Photo"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handlePhotoFileChange}
+                  />
+                </label>
+                {photoFile && (
+                  <span className="text-xs text-slate-500 truncate max-w-[180px]">
+                    {photoFile.name}
+                  </span>
+                )}
+              </div>
+
+              {/* Preview + result row */}
+              <div className="flex gap-4 items-start">
+                {photoPreviewUrl && (
+                  <img
+                    src={photoPreviewUrl}
+                    alt="Preview"
+                    className="w-28 h-20 object-cover rounded-lg border border-slate-200 shrink-0"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  {photoAnalyzing && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      Analyzing photo...
+                    </div>
+                  )}
+                  {photoError && (
+                    <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      {photoError}
+                    </div>
+                  )}
+                  {photoEstimate && !photoAnalyzing && (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <span className="px-2 py-1 rounded-md bg-slate-100 text-xs font-medium text-slate-700 capitalize">
+                          {photoEstimate.spaceType}
+                        </span>
+                        <span className="px-2 py-1 rounded-md bg-slate-100 text-xs font-medium text-slate-700">
+                          ~{photoEstimate.estimatedSqft} sqft
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded-md text-xs font-semibold ${
+                            photoEstimate.cleanLevel === "deep"
+                              ? "bg-red-100 text-red-700"
+                              : photoEstimate.cleanLevel === "light"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {photoEstimate.cleanLevel === "deep"
+                            ? "Deep Clean"
+                            : photoEstimate.cleanLevel === "light"
+                            ? "Light Clean"
+                            : "Standard Clean"}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded-md text-xs font-medium ${
+                            photoEstimate.confidence === "high"
+                              ? "bg-green-50 text-green-700"
+                              : photoEstimate.confidence === "low"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-blue-50 text-blue-700"
+                          }`}
+                        >
+                          {photoEstimate.confidence} confidence
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold text-slate-900">
+                        Suggested: ${photoEstimate.priceRange.min}–${photoEstimate.priceRange.max}
+                        <span className="ml-2 text-xs font-normal text-slate-500">
+                          ({photoEstimate.timeRangeHours.min}–{photoEstimate.timeRangeHours.max} hrs)
+                        </span>
+                      </p>
+                      {photoEstimate.observations.length > 0 && (
+                        <ul className="text-xs text-slate-600 space-y-0.5">
+                          {photoEstimate.observations.map((obs, i) => (
+                            <li key={i} className="flex items-start gap-1.5">
+                              <span className="w-1 h-1 rounded-full bg-slate-400 mt-1.5 shrink-0" />
+                              {obs}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        onClick={applyPhotoEstimate}
+                        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                      >
+                        Use This Estimate
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

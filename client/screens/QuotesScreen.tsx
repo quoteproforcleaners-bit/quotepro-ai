@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, StyleSheet, FlatList, RefreshControl, useWindowDimensions } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, FlatList, RefreshControl, useWindowDimensions, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -12,6 +12,7 @@ import { FAB } from "@/components/FAB";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TypeFilterBar } from "@/components/TypeFilterBar";
 import { ProBanner } from "@/components/ProBanner";
+import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
@@ -56,6 +57,27 @@ export default function QuotesScreen() {
   const handleNewQuote = () => {
     navigation.navigate("QuoteCalculator");
   };
+
+  const handlePhotoToQuote = () => {
+    navigation.navigate("PhotoToQuote");
+  };
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Pressable
+            onPress={handlePhotoToQuote}
+            style={{ padding: 8 }}
+            testID="button-photo-to-quote"
+            hitSlop={8}
+          >
+            <Feather name="camera" size={22} color={theme.primary} />
+          </Pressable>
+        </View>
+      ),
+    });
+  }, [navigation, theme]);
 
   const handleQuotePress = (quote: any) => {
     navigation.navigate("QuoteDetail", { quoteId: quote.id });

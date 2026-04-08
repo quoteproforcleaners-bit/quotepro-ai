@@ -54,6 +54,7 @@ export default function QuoteCalculatorScreen() {
   const prefill = routeParams.prefillCustomer;
   const editQuoteId = routeParams.editQuoteId as string | undefined;
   const editQuoteData = routeParams.editQuoteData as any | undefined;
+  const prefillPhotoEstimate = routeParams.prefillPhotoEstimate as any | undefined;
   const isEditMode = !!editQuoteId;
   const [currentStep, setCurrentStep] = useState(isEditMode ? 1 : 0);
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -96,6 +97,21 @@ export default function QuoteCalculatorScreen() {
         petShedding: pd.petShedding || false,
         homeType: pd.homeType || "house",
         kitchensCount: pd.kitchensCount || 1,
+      };
+    }
+    if (prefillPhotoEstimate) {
+      const cleanLevelToScore: Record<string, number> = { light: 8, standard: 5, deep: 2 };
+      return {
+        sqft: prefillPhotoEstimate.estimatedSqft || 0,
+        beds: 3,
+        baths: 2,
+        halfBaths: 0,
+        conditionScore: cleanLevelToScore[prefillPhotoEstimate.cleanLevel] ?? 5,
+        peopleCount: 2,
+        petType: "none",
+        petShedding: false,
+        homeType: "house",
+        kitchensCount: 1,
       };
     }
     return {

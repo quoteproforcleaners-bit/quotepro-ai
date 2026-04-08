@@ -20,6 +20,7 @@ import OpportunitiesScreen from "@/screens/OpportunitiesScreen";
 import TasksQueueScreen from "@/screens/TasksQueueScreen";
 import ReviewsReferralsScreen from "@/screens/ReviewsReferralsScreen";
 import ReferralScreen from "@/screens/ReferralScreen";
+import PhotoToQuoteScreen from "@/screens/PhotoToQuoteScreen";
 import UpsellOpportunitiesScreen from "@/screens/UpsellOpportunitiesScreen";
 import ReactivationScreen from "@/screens/ReactivationScreen";
 import AutomationsHubScreen from "@/screens/AutomationsHubScreen";
@@ -77,6 +78,7 @@ export type RootStackParamList = {
   TasksQueue: undefined;
   ReviewsReferrals: undefined;
   Referral: undefined;
+  PhotoToQuote: undefined;
   UpsellOpportunities: undefined;
   ReactivationCampaigns: undefined;
   AutomationsHub: undefined;
@@ -414,6 +416,13 @@ export default function RootStackNavigator() {
             component={ReferralScreen}
             options={{
               headerTitle: "Refer & Earn",
+            }}
+          />
+          <Stack.Screen
+            name="PhotoToQuote"
+            component={PhotoToQuoteScreen}
+            options={{
+              headerTitle: "Photo to Quote",
             }}
           />
           <Stack.Screen

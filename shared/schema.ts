@@ -49,6 +49,7 @@ export const users = pgTable("users", {
   loyaltyDiscountPct: integer("loyalty_discount_pct").default(0),
   mrrDashboardUnlocked: boolean("mrr_dashboard_unlocked").default(false),
   aiFollowUpsUsedThisMonth: integer("ai_follow_ups_used_this_month").default(0),
+  photoQuotesUsedThisMonth: integer("photo_quotes_used_this_month").default(0),
   trialDripEnrolledAt: timestamp("trial_drip_enrolled_at"),
   trialDripLastSentDay: integer("trial_drip_last_sent_day").default(0),
   trialDripCompleted: boolean("trial_drip_completed").default(false),
