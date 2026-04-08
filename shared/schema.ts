@@ -38,7 +38,7 @@ export const users = pgTable("users", {
   quotesThisMonth: integer("quotes_this_month").default(0),
   quotesMonthResetAt: timestamp("quotes_month_reset_at"),
   trialStartedAt: timestamp("trial_started_at"),
-  referralCode: text("referral_code").unique(),
+  referralCode: text("referral_code"),
   referredBy: text("referred_by"),
   referralCreditsMonths: integer("referral_credits_months").default(0),
   referralFraudFlagged: boolean("referral_fraud_flagged").default(false),
@@ -335,11 +335,11 @@ export const jobs = pgTable("jobs", {
   satisfactionRating: integer("satisfaction_rating"),
   ratingComment: text("rating_comment"),
   ratingToken: varchar("rating_token").default(sql`gen_random_uuid()`),
-  updateToken: varchar("update_token").unique(),
+  updateToken: varchar("update_token"),
   detailedStatus: text("detailed_status").notNull().default("scheduled"),
   teamMembers: jsonb("team_members").$type<string[]>().default([]),
   cleanerNotes: text("cleaner_notes").notNull().default(""),
-  checkinToken: varchar("checkin_token").unique().default(sql`gen_random_uuid()`),
+  checkinToken: varchar("checkin_token").default(sql`gen_random_uuid()`),
   invoiced: boolean("invoiced").notNull().default(false),
   specialRequests: text("special_requests"),
   accessCode: varchar("access_code", { length: 100 }),
@@ -678,7 +678,7 @@ export const followUpTouches = pgTable("follow_up_touches", {
 
 export const streaks = pgTable("streaks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
   currentStreak: integer("current_streak").notNull().default(0),
   longestStreak: integer("longest_streak").notNull().default(0),
   lastActionDate: text("last_action_date"),
@@ -687,7 +687,7 @@ export const streaks = pgTable("streaks", {
 
 export const userPreferences = pgTable("user_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
   dailyPulseEnabled: boolean("daily_pulse_enabled").notNull().default(true),
   dailyPulseTime: text("daily_pulse_time").notNull().default("08:00"),
   weeklyRecapEnabled: boolean("weekly_recap_enabled").notNull().default(true),
@@ -787,7 +787,7 @@ export const customerMarketingPrefs = pgTable("customer_marketing_prefs", {
 
 export const growthAutomationSettings = pgTable("growth_automation_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
   marketingModeEnabled: boolean("marketing_mode_enabled").notNull().default(false),
   abandonedQuoteRecovery: boolean("abandoned_quote_recovery").notNull().default(true),
   weeklyReactivation: boolean("weekly_reactivation").notNull().default(true),
@@ -815,7 +815,7 @@ export const growthAutomationSettings = pgTable("growth_automation_settings", {
 
 export const salesStrategySettings = pgTable("sales_strategy_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
   selectedProfile: text("selected_profile").notNull().default("professional"),
   escalationEnabled: boolean("escalation_enabled").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -977,7 +977,6 @@ export const qboConnections = pgTable("qbo_connections", {
     .default(sql`gen_random_uuid()`),
   userId: varchar("user_id")
     .notNull()
-    .unique()
     .references(() => users.id),
   realmId: text("realm_id"),
   accessTokenEncrypted: text("access_token_encrypted"),
@@ -1262,7 +1261,7 @@ export type PublishedPricingProfile = typeof publishedPricingProfiles.$inferSele
 
 export const bookingAvailabilitySettings = pgTable("booking_availability_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  businessId: varchar("business_id").notNull().unique().references(() => businesses.id),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
   enabled: boolean("enabled").notNull().default(false),
   allowedDays: integer("allowed_days").array().notNull().default([1, 2, 3, 4, 5]),
   timeWindows: jsonb("time_windows").notNull().default([{ start: "08:00", end: "17:00" }]),
@@ -1309,7 +1308,7 @@ export const cleanerScheduleNotifications = pgTable("cleaner_schedule_notificati
   cleanerId: varchar("cleaner_id").notNull().references(() => employees.id),
   cleanerName: text("cleaner_name").notNull(),
   cleanerEmail: text("cleaner_email").notNull().default(""),
-  ackToken: varchar("ack_token").unique().default(sql`gen_random_uuid()`),
+  ackToken: varchar("ack_token").default(sql`gen_random_uuid()`),
   sendStatus: text("send_status").notNull().default("pending"),
   sentAt: timestamp("sent_at"),
   acknowledgedAt: timestamp("acknowledged_at"),
@@ -1344,7 +1343,7 @@ export const customerPortals = pgTable("customer_portals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
   businessId: varchar("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
-  token: varchar("token", { length: 64 }).unique().notNull(),
+  token: varchar("token", { length: 64 }).notNull(),
   preferences: jsonb("preferences"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastViewedAt: timestamp("last_viewed_at"),
@@ -1414,6 +1413,14 @@ export const autopilotJobs = pgTable("autopilot_jobs", {
   nextActionAt: timestamp("next_action_at"),
   metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Booking flow columns
+  quoteAmount: real("quote_amount"),
+  quoteSentAt: timestamp("quote_sent_at"),
+  quoteAcceptedAt: timestamp("quote_accepted_at"),
+  bookingToken: varchar("booking_token").default(sql`gen_random_uuid()`),
+  currentStep: text("current_step").notNull().default("quote_sent"),
+  confirmationSentAt: timestamp("confirmation_sent_at"),
+  bookingId: integer("booking_id"),
 });
 
 export type AutopilotJob = typeof autopilotJobs.$inferSelect;
@@ -1448,7 +1455,7 @@ export const winLossResponses = pgTable("win_loss_responses", {
   quoteId: varchar("quote_id").notNull().references(() => quotes.id),
   businessId: varchar("business_id").notNull().references(() => businesses.id),
   customerEmail: text("customer_email").notNull(),
-  responseToken: text("response_token").notNull().unique(),
+  responseToken: text("response_token").notNull(),
   reason: text("reason"),
   reasonCategory: text("reason_category"), // 'price_too_high' | 'went_with_competitor' | 'no_longer_needed' | 'no_response_yet' | 'other'
   competitorMentioned: text("competitor_mentioned"),
@@ -1494,3 +1501,58 @@ export const businessLocations = pgTable("business_locations", {
 
 export type BusinessLocation = typeof businessLocations.$inferSelect;
 export type InsertBusinessLocation = typeof businessLocations.$inferInsert;
+
+// ─── Autopilot Availability Settings ─────────────────────────────────────────
+// Per-user availability configuration for the autopilot booking flow.
+
+export const availabilitySettings = pgTable("availability_settings", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  workingDays: integer("working_days").array().notNull().default([1, 2, 3, 4, 5]),
+  startTime: varchar("start_time", { length: 5 }).notNull().default("08:00"),
+  endTime: varchar("end_time", { length: 5 }).notNull().default("17:00"),
+  slotDurationMinutes: integer("slot_duration_minutes").notNull().default(120),
+  bufferMinutes: integer("buffer_minutes").notNull().default(30),
+  advanceBookingDays: integer("advance_booking_days").notNull().default(30),
+  minNoticeHours: integer("min_notice_hours").notNull().default(24),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type AvailabilitySettings = typeof availabilitySettings.$inferSelect;
+export type InsertAvailabilitySettings = typeof availabilitySettings.$inferInsert;
+
+// ─── Blocked Dates ────────────────────────────────────────────────────────────
+export const blockedDates = pgTable("blocked_dates", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  blockedDate: text("blocked_date").notNull(),
+  reason: varchar("reason", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type BlockedDate = typeof blockedDates.$inferSelect;
+export type InsertBlockedDate = typeof blockedDates.$inferInsert;
+
+// ─── Bookings ─────────────────────────────────────────────────────────────────
+export const bookings = pgTable("bookings", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  autopilotJobId: varchar("autopilot_job_id").references(() => autopilotJobs.id, { onDelete: "set null" }),
+  scheduledDate: text("scheduled_date").notNull(),
+  scheduledTime: varchar("scheduled_time", { length: 5 }).notNull(),
+  durationMinutes: integer("duration_minutes").notNull().default(120),
+  customerName: text("customer_name"),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  serviceType: text("service_type"),
+  address: text("address"),
+  quoteAmount: real("quote_amount"),
+  status: varchar("status", { length: 20 }).notNull().default("confirmed"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type Booking = typeof bookings.$inferSelect;
+export type InsertBooking = typeof bookings.$inferInsert;

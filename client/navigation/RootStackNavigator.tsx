@@ -47,6 +47,8 @@ import NPSSurveyModal from "@/screens/NPSSurveyModal";
 import QuoteDoctorScreen from "@/screens/QuoteDoctorScreen";
 import GrowthDashboardScreen from "@/screens/GrowthDashboardScreen";
 import AutopilotScreen from "@/screens/AutopilotScreen";
+import AvailabilityScreen from "@/screens/AvailabilityScreen";
+import BookingsScreen from "@/screens/BookingsScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 
 import LoginScreen from "@/screens/auth/LoginScreen";
@@ -104,6 +106,8 @@ export type RootStackParamList = {
   QuoteDoctor: undefined;
   GrowthDashboard: undefined;
   Autopilot: undefined;
+  Availability: undefined;
+  Bookings: undefined;
   Settings: undefined;
 };
 
@@ -585,6 +589,20 @@ export default function RootStackNavigator() {
             component={AutopilotScreen}
             options={{
               headerTitle: "Autopilot",
+            }}
+          />
+          <Stack.Screen
+            name="Availability"
+            component={AvailabilityScreen}
+            options={{
+              headerTitle: "Availability Settings",
+            }}
+          />
+          <Stack.Screen
+            name="Bookings"
+            component={BookingsScreen}
+            options={{
+              headerTitle: "Bookings",
             }}
           />
           <Stack.Screen

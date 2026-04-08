@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book Your Cleaning</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; background: #f5f5f7; color: #1d1d1f; min-height: 100vh; }
+  .page { max-width: 540px; margin: 0 auto; padding: 24px 16px 60px; }
+  .logo-bar { text-align: center; padding: 20px 0 8px; }
+  .logo-bar .brand { font-size: 13px; font-weight: 600; color: #6e6e73; letter-spacing: 0.05em; text-transform: uppercase; }
+  .card { background: #fff; border-radius: 18px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+  .card h2 { font-size: 13px; font-weight: 600; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .quote-hero { text-align: center; padding: 8px 0 4px; }
+  .quote-price { font-size: 48px; font-weight: 800; color: var(--primary, #007AFF); line-height: 1; }
+  .quote-price-label { font-size: 14px; color: #6e6e73; margin-top: 4px; }
+  .quote-tagline { margin-top: 14px; font-size: 15px; color: #1d1d1f; line-height: 1.5; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+  .detail-item { background: #f5f5f7; border-radius: 10px; padding: 12px; }
+  .detail-label { font-size: 11px; font-weight: 600; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.05em; }
+  .detail-value { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .dates-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .dates-strip::-webkit-scrollbar { display: none; }
+  .date-pill { flex: 0 0 auto; padding: 10px 14px; border-radius: 12px; border: 1.5px solid #e0e0e5; cursor: pointer; text-align: center; transition: all 0.15s; background: #fff; min-width: 68px; }
+  .date-pill.unavailable { opacity: 0.35; cursor: default; }
+  .date-pill.selected { background: var(--primary, #007AFF); border-color: var(--primary, #007AFF); color: #fff; }
+  .date-pill .dow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; }
+  .date-pill .dom { font-size: 20px; font-weight: 700; line-height: 1.2; }
+  .date-pill.selected .dow { opacity: 0.85; }
+  .times-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+  .time-pill { padding: 10px 18px; border-radius: 10px; border: 1.5px solid #e0e0e5; cursor: pointer; font-size: 15px; font-weight: 600; background: #fff; transition: all 0.15s; }
+  .time-pill.selected { background: var(--primary, #007AFF); border-color: var(--primary, #007AFF); color: #fff; }
+  .time-pill:hover:not(.selected) { border-color: var(--primary, #007AFF); color: var(--primary, #007AFF); }
+  .no-times { font-size: 14px; color: #6e6e73; padding: 8px 0; }
+  .confirm-btn { display: block; width: 100%; padding: 17px; background: var(--primary, #007AFF); color: #fff; border: none; border-radius: 14px; font-size: 17px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; margin-top: 8px; }
+  .confirm-btn:disabled { opacity: 0.45; cursor: default; }
+  .confirm-btn:not(:disabled):active { opacity: 0.8; }
+  .spinner { display: none; text-align: center; padding: 24px; }
+  .spinner.visible { display: block; }
+  .error-msg { color: #ff3b30; font-size: 14px; margin-top: 8px; display: none; }
+  .error-msg.visible { display: block; }
+  /* Confirmed page */
+  .confirmed-hero { text-align: center; padding: 32px 0 8px; }
+  .confirmed-icon { font-size: 64px; margin-bottom: 16px; }
+  .confirmed-title { font-size: 28px; font-weight: 800; color: #1d1d1f; }
+  .confirmed-sub { font-size: 16px; color: #6e6e73; margin-top: 8px; line-height: 1.5; }
+  .booking-summary { background: #f5f5f7; border-radius: 14px; padding: 16px; margin-top: 20px; }
+  .booking-summary-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e0e0e5; }
+  .booking-summary-row:last-child { border-bottom: none; }
+  .booking-summary-label { font-size: 14px; color: #6e6e73; }
+  .booking-summary-value { font-size: 14px; font-weight: 600; }
+  .payment-note { background: #fff8e6; border: 1.5px solid #ffcc02; border-radius: 12px; padding: 14px 16px; margin-top: 16px; font-size: 14px; color: #7a5f00; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="loading" class="page">
+    <div style="text-align:center;padding:80px 0;color:#6e6e73;">Loading your quote...</div>
+  </div>
+</div>
+
+<script>
+const token = location.pathname.split('/book/')[1]?.replace('/confirmed','').replace(/\//g,'');
+const isConfirmed = location.pathname.includes('/confirmed');
+const PRIMARY = '#007AFF';
+
+async function fetchData(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+function formatTime12(t) {
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+async function renderBookingPage(data) {
+  const { lead, business } = data;
+  const primary = business.primaryColor || PRIMARY;
+
+  document.head.insertAdjacentHTML('beforeend', `<style>:root{--primary:${primary}}</style>`);
+
+  let allSlots = [];
+  try {
+    const start = new Date().toISOString().slice(0,10);
+    allSlots = await fetchData(`/api/availability/slots?userId=${lead.userId}&startDate=${start}&days=30`);
+  } catch(e) { console.warn('Slots error', e); }
+
+  // Group slots by date
+  const slotsByDate = {};
+  for (const s of allSlots) {
+    if (!slotsByDate[s.date]) slotsByDate[s.date] = [];
+    slotsByDate[s.date].push(s);
+  }
+
+  const uniqueDates = Object.keys(slotsByDate).slice(0, 14);
+  let selectedDate = uniqueDates[0] || null;
+  let selectedTime = null;
+
+  function buildDatePills() {
+    if (uniqueDates.length === 0) return '<p class="no-times">No available dates found. Contact the business directly.</p>';
+    return `<div class="dates-strip" id="dates-strip">
+      ${uniqueDates.map(d => {
+        const dt = new Date(d + 'T00:00:00');
+        const dow = dt.toLocaleDateString('en-US',{weekday:'short'});
+        const dom = dt.getDate();
+        const sel = d === selectedDate ? ' selected' : '';
+        return `<div class="date-pill${sel}" data-date="${d}"><div class="dow">${dow}</div><div class="dom">${dom}</div></div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  function buildTimePills() {
+    const times = selectedDate ? (slotsByDate[selectedDate] || []) : [];
+    if (!selectedDate || times.length === 0) return '<p class="no-times">No times available for this day.</p>';
+    return `<div class="times-grid" id="times-grid">
+      ${times.map(s => {
+        const sel = s.time === selectedTime ? ' selected' : '';
+        return `<div class="time-pill${sel}" data-time="${s.time}">${s.displayTime}</div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  function render() {
+    const beds = lead.extractedBeds || lead.propertyBeds || '—';
+    const baths = lead.extractedBaths || lead.propertyBaths || '—';
+    const sqft = lead.extractedSqft || lead.propertySqft || null;
+    const freq = lead.frequency || lead.extractedFrequency || 'One-time';
+    const price = lead.quoteAmount ? `$${parseFloat(lead.quoteAmount).toFixed(0)}` : '—';
+
+    document.getElementById('app').innerHTML = `
+      <div class="page">
+        <div class="logo-bar"><div class="brand">${escHtml(business.companyName || 'Your Cleaner')}</div></div>
+
+        <div class="card">
+          <div class="quote-hero">
+            <div class="quote-price">${price}</div>
+            <div class="quote-price-label">Estimated Quote</div>
+            <div class="quote-tagline">You're one step away from a sparkling clean home!</div>
+          </div>
+          <div class="detail-grid">
+            ${beds !== '—' ? `<div class="detail-item"><div class="detail-label">Bedrooms</div><div class="detail-value">${escHtml(String(beds))}</div></div>` : ''}
+            ${baths !== '—' ? `<div class="detail-item"><div class="detail-label">Bathrooms</div><div class="detail-value">${escHtml(String(baths))}</div></div>` : ''}
+            ${sqft ? `<div class="detail-item"><div class="detail-label">Square Feet</div><div class="detail-value">${escHtml(String(sqft))}</div></div>` : ''}
+            <div class="detail-item"><div class="detail-label">Frequency</div><div class="detail-value">${escHtml(freq)}</div></div>
+          </div>
+        </div>
+
+        ${uniqueDates.length > 0 ? `
+        <div class="card">
+          <h2>Pick a Date</h2>
+          ${buildDatePills()}
+        </div>
+
+        <div class="card" id="times-card">
+          <h2>Pick a Time</h2>
+          ${buildTimePills()}
+        </div>
+
+        <button class="confirm-btn" id="confirm-btn" ${selectedTime ? '' : 'disabled'}>
+          Confirm Booking
+        </button>
+        <div class="error-msg" id="error-msg"></div>
+        ` : `
+        <div class="card">
+          <p style="color:#6e6e73;font-size:15px;line-height:1.6;">No open slots are available right now. Please contact ${escHtml(business.companyName || 'the business')} directly to schedule.</p>
+          ${business.email ? `<p style="margin-top:12px;font-size:15px;"><a href="mailto:${escHtml(business.email)}" style="color:var(--primary)">${escHtml(business.email)}</a></p>` : ''}
+        </div>
+        `}
+      </div>
+    `;
+
+    attachListeners();
+  }
+
+  function attachListeners() {
+    document.querySelectorAll('.date-pill').forEach(el => {
+      el.addEventListener('click', () => {
+        selectedDate = el.dataset.date;
+        selectedTime = null;
+        document.querySelectorAll('.date-pill').forEach(p => p.classList.remove('selected'));
+        el.classList.add('selected');
+        const tc = document.getElementById('times-card');
+        if (tc) tc.querySelector('.times-grid, .no-times')?.replaceWith(...new DOMParser().parseFromString(buildTimePills(), 'text/html').body.childNodes);
+        if (tc) tc.innerHTML = '<h2>Pick a Time</h2>' + buildTimePills();
+        attachTimePillListeners();
+        updateConfirmBtn();
+      });
+    });
+    attachTimePillListeners();
+  }
+
+  function attachTimePillListeners() {
+    document.querySelectorAll('.time-pill').forEach(el => {
+      el.addEventListener('click', () => {
+        selectedTime = el.dataset.time;
+        document.querySelectorAll('.time-pill').forEach(p => p.classList.remove('selected'));
+        el.classList.add('selected');
+        updateConfirmBtn();
+      });
+    });
+  }
+
+  function updateConfirmBtn() {
+    const btn = document.getElementById('confirm-btn');
+    if (btn) btn.disabled = !selectedTime;
+  }
+
+  render();
+
+  document.addEventListener('click', async (e) => {
+    if (e.target.id !== 'confirm-btn') return;
+    if (!selectedDate || !selectedTime) return;
+    const btn = document.getElementById('confirm-btn');
+    const errEl = document.getElementById('error-msg');
+    btn.disabled = true;
+    btn.textContent = 'Confirming...';
+    errEl.classList.remove('visible');
+    try {
+      const r = await fetch(`/api/book/${token}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ date: selectedDate, time: selectedTime })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message || 'Booking failed');
+      window.location.href = `/book/${token}/confirmed`;
+    } catch(err) {
+      errEl.textContent = err.message || 'Something went wrong. Please try again.';
+      errEl.classList.add('visible');
+      btn.disabled = false;
+      btn.textContent = 'Confirm Booking';
+    }
+  });
+}
+
+async function renderConfirmedPage(data) {
+  const { lead, business, booking } = data;
+  const primary = business.primaryColor || PRIMARY;
+  document.head.insertAdjacentHTML('beforeend', `<style>:root{--primary:${primary}}</style>`);
+
+  const dateStr = booking?.scheduledDate ? formatDate(booking.scheduledDate) : '—';
+  const timeStr = booking?.scheduledTime ? formatTime12(booking.scheduledTime) : '—';
+
+  document.getElementById('app').innerHTML = `
+    <div class="page">
+      <div class="logo-bar"><div class="brand">${escHtml(business.companyName || 'Your Cleaner')}</div></div>
+      <div class="card confirmed-hero">
+        <div class="confirmed-icon">🎉</div>
+        <div class="confirmed-title">You're all booked!</div>
+        <div class="confirmed-sub">Thanks for booking with ${escHtml(business.companyName || 'us')}. We can't wait to take care of your home.</div>
+        <div class="booking-summary">
+          <div class="booking-summary-row">
+            <span class="booking-summary-label">Date</span>
+            <span class="booking-summary-value">${escHtml(dateStr)}</span>
+          </div>
+          <div class="booking-summary-row">
+            <span class="booking-summary-label">Time</span>
+            <span class="booking-summary-value">${escHtml(timeStr)}</span>
+          </div>
+          ${lead.quoteAmount ? `<div class="booking-summary-row">
+            <span class="booking-summary-label">Quote</span>
+            <span class="booking-summary-value">$${parseFloat(lead.quoteAmount).toFixed(0)}</span>
+          </div>` : ''}
+        </div>
+        <div class="payment-note">
+          The owner will reach out shortly to arrange payment and confirm final details.
+          ${business.email ? `Questions? Email <a href="mailto:${escHtml(business.email)}" style="color:inherit;font-weight:600">${escHtml(business.email)}</a>.` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function init() {
+  if (!token) {
+    document.getElementById('app').innerHTML = '<div class="page" style="padding:80px 16px;text-align:center;color:#6e6e73;">Invalid booking link.</div>';
+    return;
+  }
+  try {
+    const data = await fetchData(`/api/book/${token}`);
+    if (isConfirmed) {
+      await renderConfirmedPage(data);
+    } else {
+      await renderBookingPage(data);
+    }
+  } catch(e) {
+    document.getElementById('app').innerHTML = `<div class="page" style="padding:80px 16px;text-align:center;color:#ff3b30;">Unable to load booking. The link may be expired or invalid.</div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

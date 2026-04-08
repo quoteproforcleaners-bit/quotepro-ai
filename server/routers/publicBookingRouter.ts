@@ -1,0 +1,376 @@
+/**
+ * publicBookingRouter.ts
+ *
+ * Public routes (no auth) for the customer-facing booking flow.
+ *
+ * GET  /book/:token          → Serve the booking page HTML
+ * GET  /book/:token/confirmed → Serve the confirmed page HTML
+ * GET  /api/book/:token      → Return booking data as JSON
+ * POST /api/book/:token      → Confirm a booking
+ */
+
+import { Router, Request, Response } from "express";
+import path from "path";
+import fs from "fs";
+import { pool } from "../db";
+import { sendEmail, PLATFORM_FROM_EMAIL } from "../mail";
+
+const router = Router();
+
+// ─── Serve booking HTML page ──────────────────────────────────────────────────
+
+const bookingHtmlPath = path.join(__dirname, "../templates/booking.html");
+
+router.get("/book/:token", (_req: Request, res: Response) => {
+  try {
+    const html = fs.readFileSync(bookingHtmlPath, "utf-8");
+    res.setHeader("Content-Type", "text/html");
+    return res.send(html);
+  } catch {
+    return res.status(500).send("Page unavailable.");
+  }
+});
+
+router.get("/book/:token/confirmed", (_req: Request, res: Response) => {
+  try {
+    const html = fs.readFileSync(bookingHtmlPath, "utf-8");
+    res.setHeader("Content-Type", "text/html");
+    return res.send(html);
+  } catch {
+    return res.status(500).send("Page unavailable.");
+  }
+});
+
+// ─── GET /api/book/:token — return booking data ───────────────────────────────
+
+router.get("/api/book/:token", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+
+    const jobRes = await pool.query(
+      `SELECT aj.*,
+              b.company_name, b.email AS business_email, b.primary_color,
+              b.phone AS business_phone, b.owner_user_id,
+              COALESCE(
+                NULLIF(TRIM(c.first_name || ' ' || c.last_name), ''),
+                ir.customer_name
+              ) AS lead_full_name,
+              COALESCE(c.email, ir.customer_email) AS lead_email,
+              COALESCE(c.phone, ir.customer_phone) AS lead_phone,
+              c.address AS customer_address,
+              ir.customer_address AS intake_address,
+              ir.extracted_fields,
+              ir.property_beds, ir.property_baths, ir.property_sqft,
+              ir.service_type, ir.frequency
+       FROM autopilot_jobs aj
+       JOIN businesses b ON b.id = aj.business_id
+       LEFT JOIN customers c ON c.id = aj.lead_id
+       LEFT JOIN intake_requests ir ON ir.id = aj.lead_id
+       WHERE aj.booking_token = $1`,
+      [token]
+    );
+
+    if (jobRes.rows.length === 0) {
+      return res.status(404).json({ message: "Booking link not found or expired" });
+    }
+
+    const job = jobRes.rows[0];
+
+    // Fetch most recent confirmed booking for this job (if any)
+    let booking = null;
+    if (job.booking_id) {
+      const bkRes = await pool.query(
+        `SELECT * FROM bookings WHERE id = $1`,
+        [job.booking_id]
+      );
+      if (bkRes.rows.length > 0) booking = bkRes.rows[0];
+    }
+
+    return res.json({
+      lead: {
+        id: job.id,
+        userId: job.owner_user_id || job.user_id,
+        fullName: job.lead_full_name,
+        email: job.lead_email,
+        phone: job.lead_phone,
+        address: job.customer_address || job.intake_address,
+        quoteAmount: job.quote_amount,
+        currentStep: job.current_step,
+        frequency: job.frequency,
+        serviceType: job.service_type,
+        propertyBeds: job.property_beds,
+        propertyBaths: job.property_baths,
+        propertySqft: job.property_sqft,
+        extractedFields: job.extracted_fields,
+        extractedBeds: job.extracted_fields?.beds || job.extracted_fields?.bedrooms,
+        extractedBaths: job.extracted_fields?.baths || job.extracted_fields?.bathrooms,
+        extractedSqft: job.extracted_fields?.sqft || job.extracted_fields?.square_feet,
+        extractedFrequency: job.extracted_fields?.frequency,
+      },
+      business: {
+        companyName: job.company_name,
+        email: job.business_email,
+        phone: job.business_phone,
+        primaryColor: job.primary_color,
+        userId: job.owner_user_id || job.user_id,
+      },
+      booking,
+    });
+  } catch (err: any) {
+    console.error("[publicBooking] GET error:", err.message);
+    return res.status(500).json({ message: "Failed to load booking" });
+  }
+});
+
+// ─── POST /api/book/:token — confirm a booking ────────────────────────────────
+
+router.post("/api/book/:token", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { date, time } = req.body;
+
+    if (!date || !time) {
+      return res.status(400).json({ message: "Date and time are required" });
+    }
+
+    // Fetch job
+    const jobRes = await pool.query(
+      `SELECT aj.*,
+              b.company_name, b.email AS business_email, b.primary_color,
+              b.owner_user_id,
+              COALESCE(
+                NULLIF(TRIM(c.first_name || ' ' || c.last_name), ''),
+                ir.customer_name
+              ) AS lead_full_name,
+              COALESCE(c.email, ir.customer_email) AS lead_email,
+              COALESCE(c.phone, ir.customer_phone) AS lead_phone,
+              c.address AS customer_address,
+              ir.customer_address AS intake_address,
+              ir.service_type, ir.frequency,
+              ir.property_beds, ir.property_baths, ir.property_sqft
+       FROM autopilot_jobs aj
+       JOIN businesses b ON b.id = aj.business_id
+       LEFT JOIN customers c ON c.id = aj.lead_id
+       LEFT JOIN intake_requests ir ON ir.id = aj.lead_id
+       WHERE aj.booking_token = $1`,
+      [token]
+    );
+
+    if (jobRes.rows.length === 0) {
+      return res.status(404).json({ message: "Booking link not found" });
+    }
+
+    const job = jobRes.rows[0];
+
+    if (job.current_step === "booked" || job.current_step === "completed") {
+      return res.status(409).json({ message: "This slot has already been booked" });
+    }
+
+    const settingsRes = await pool.query(
+      `SELECT slot_duration_minutes FROM availability_settings WHERE user_id = $1`,
+      [job.owner_user_id || job.user_id]
+    );
+    const duration = settingsRes.rows[0]?.slot_duration_minutes || 120;
+
+    // Create booking record
+    const bookingRes = await pool.query(
+      `INSERT INTO bookings
+         (user_id, autopilot_job_id, scheduled_date, scheduled_time, duration_minutes,
+          customer_name, customer_email, customer_phone, service_type, address,
+          quote_amount, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'confirmed')
+       RETURNING *`,
+      [
+        job.owner_user_id || job.user_id,
+        job.id,
+        date,
+        time,
+        duration,
+        job.lead_full_name,
+        job.lead_email,
+        job.lead_phone,
+        job.service_type,
+        job.customer_address || job.intake_address,
+        job.quote_amount,
+      ]
+    );
+
+    const booking = bookingRes.rows[0];
+
+    // Update autopilot_job
+    await pool.query(
+      `UPDATE autopilot_jobs
+       SET current_step = 'booked',
+           quote_accepted_at = NOW(),
+           booking_id = $1,
+           status = 'pending_review'
+       WHERE id = $2`,
+      [booking.id, job.id]
+    );
+
+    // Format display values
+    const displayDate = new Date(date + "T00:00:00").toLocaleDateString("en-US", {
+      weekday: "long", month: "long", day: "numeric", year: "numeric",
+    });
+    const [h, m] = time.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    const displayTime = `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+
+    // Email 2: Confirmation to customer
+    if (job.lead_email) {
+      sendEmail({
+        to: job.lead_email,
+        subject: `Your Cleaning is Booked! — ${job.company_name}`,
+        html: buildCustomerConfirmationEmail({
+          firstName: (job.lead_full_name || "").split(" ")[0] || "there",
+          companyName: job.company_name,
+          displayDate,
+          displayTime,
+          serviceType: job.service_type,
+          address: job.customer_address || job.intake_address,
+          businessEmail: job.business_email,
+          primaryColor: job.primary_color || "#007AFF",
+        }),
+        fromName: job.company_name,
+        replyTo: job.business_email || null,
+      }).catch((e) => console.error("[publicBooking] customer email error:", e.message));
+    }
+
+    // Email 3: Notification to owner
+    if (job.business_email) {
+      sendEmail({
+        to: job.business_email,
+        subject: `New Booking Confirmed — ${job.lead_full_name || "Customer"}`,
+        html: buildOwnerNotificationEmail({
+          customerName: job.lead_full_name,
+          customerEmail: job.lead_email,
+          customerPhone: job.lead_phone,
+          companyName: job.company_name,
+          displayDate,
+          displayTime,
+          serviceType: job.service_type,
+          address: job.customer_address || job.intake_address,
+          beds: job.property_beds,
+          baths: job.property_baths,
+          sqft: job.property_sqft,
+          quoteAmount: job.quote_amount,
+          primaryColor: job.primary_color || "#007AFF",
+        }),
+        fromName: "QuotePro Autopilot",
+        replyTo: null,
+      }).catch((e) => console.error("[publicBooking] owner email error:", e.message));
+    }
+
+    // Update confirmation_sent_at
+    pool.query(
+      `UPDATE autopilot_jobs SET confirmation_sent_at = NOW() WHERE id = $1`,
+      [job.id]
+    ).catch(() => {});
+
+    return res.json({ success: true, booking });
+  } catch (err: any) {
+    console.error("[publicBooking] POST error:", err.message);
+    return res.status(500).json({ message: "Failed to confirm booking" });
+  }
+});
+
+// ─── Email Templates ──────────────────────────────────────────────────────────
+
+function buildCustomerConfirmationEmail({
+  firstName, companyName, displayDate, displayTime, serviceType, address, businessEmail, primaryColor,
+}: any) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;">
+<tr><td align="center" style="padding:40px 16px;">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+  <tr><td style="background:${primaryColor};padding:32px;">
+    <h1 style="margin:0;font-size:24px;font-weight:800;color:#fff;">Your Cleaning is Booked!</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <p style="margin:0 0 16px;font-size:16px;color:#374151;line-height:1.6;">Hi ${firstName},</p>
+    <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">Thanks for booking with <strong>${companyName}</strong> — we're looking forward to taking care of your home.</p>
+    <table cellpadding="0" cellspacing="0" style="width:100%;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:24px;">
+      <tr><td style="padding:20px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:13px;color:#6b7280;">Date</span><br>
+              <strong style="font-size:15px;color:#111827;">${displayDate}</strong>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:13px;color:#6b7280;">Time</span><br>
+              <strong style="font-size:15px;color:#111827;">${displayTime}</strong>
+            </td>
+          </tr>
+          ${serviceType ? `<tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+            <span style="font-size:13px;color:#6b7280;">Service</span><br>
+            <strong style="font-size:15px;color:#111827;">${serviceType}</strong>
+          </td></tr>` : ""}
+          ${address ? `<tr><td style="padding:8px 0;">
+            <span style="font-size:13px;color:#6b7280;">Address</span><br>
+            <strong style="font-size:15px;color:#111827;">${address}</strong>
+          </td></tr>` : ""}
+        </table>
+      </td></tr>
+    </table>
+    <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">Your cleaner will arrive at <strong>${displayTime}</strong> on <strong>${displayDate}</strong>.</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">The owner will be in touch soon to arrange payment and confirm any final details.</p>
+    ${businessEmail ? `<p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">Questions? Reply to this email or reach us at <a href="mailto:${businessEmail}" style="color:${primaryColor}">${businessEmail}</a>.</p>` : ""}
+  </td></tr>
+  <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center;">
+    <p style="font-size:12px;color:#9ca3af;margin:0;">${companyName} · Powered by QuotePro</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+
+function buildOwnerNotificationEmail({
+  customerName, customerEmail, customerPhone, companyName,
+  displayDate, displayTime, serviceType, address, beds, baths, sqft, quoteAmount, primaryColor,
+}: any) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;">
+<tr><td align="center" style="padding:40px 16px;">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+  <tr><td style="background:${primaryColor};padding:32px;">
+    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:rgba(255,255,255,0.75);text-transform:uppercase;letter-spacing:0.08em;">QuotePro Autopilot</p>
+    <h1 style="margin:0;font-size:22px;font-weight:800;color:#fff;">New Booking Confirmed</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;"><strong>${customerName || "A customer"}</strong> just booked through your Autopilot link.</p>
+    <table cellpadding="0" cellspacing="0" style="width:100%;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:24px;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Customer</p>
+        ${customerName ? `<p style="margin:0 0 4px;font-size:15px;color:#111827;"><strong>${customerName}</strong></p>` : ""}
+        ${customerEmail ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">${customerEmail}</p>` : ""}
+        ${customerPhone ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">${customerPhone}</p>` : ""}
+      </td></tr>
+      <tr><td style="padding:0 24px 20px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Appointment</p>
+        <p style="margin:0 0 4px;font-size:15px;color:#111827;"><strong>${displayDate} at ${displayTime}</strong></p>
+        ${serviceType ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">Service: ${serviceType}</p>` : ""}
+        ${address ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">Address: ${address}</p>` : ""}
+        ${beds || baths ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">${beds ? `${beds} bed` : ""}${beds && baths ? " / " : ""}${baths ? `${baths} bath` : ""}${sqft ? ` / ${sqft} sqft` : ""}</p>` : ""}
+        ${quoteAmount ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">Quote: <strong>$${parseFloat(quoteAmount).toFixed(0)}</strong></p>` : ""}
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">View this lead in your QuotePro dashboard to follow up on payment and job details.</p>
+  </td></tr>
+  <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center;">
+    <p style="font-size:12px;color:#9ca3af;margin:0;">QuotePro Autopilot · ${companyName}</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+
+export { buildCustomerConfirmationEmail, buildOwnerNotificationEmail };
+export default router;

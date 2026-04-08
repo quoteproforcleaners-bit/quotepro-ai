@@ -132,8 +132,9 @@ export async function enrollLead(userId: string, businessId: string, leadId: str
   if (existing.rows.length > 0) return existing.rows[0].id;
 
   const res = await pool.query(
-    `INSERT INTO autopilot_jobs (user_id, business_id, lead_id, status, created_at)
-     VALUES ($1, $2, $3, 'pending_quote', NOW())
+    `INSERT INTO autopilot_jobs
+       (user_id, business_id, lead_id, status, current_step, created_at, next_action_at)
+     VALUES ($1, $2, $3, 'pending_quote', 'not_started', NOW(), NOW())
      RETURNING id`,
     [userId, businessId, leadId]
   );
@@ -231,6 +232,16 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
   const { fromName, replyTo } = getBusinessSendParams(business);
 
   const tierLabel = tier === "premium" ? "Premium Clean" : tier === "deep_clean" ? "Deep Clean" : "Standard Clean";
+
+  // Fetch booking_token for this job (generated at insert time)
+  const tokenRes = await pool.query(
+    `SELECT booking_token FROM autopilot_jobs WHERE id = $1`,
+    [jobId]
+  );
+  const bookingToken = tokenRes.rows[0]?.booking_token || null;
+  const appDomain = process.env.EXPO_PUBLIC_DOMAIN || process.env.APP_DOMAIN || "app.getquotepro.ai";
+  const bookingUrl = bookingToken ? `https://${appDomain}/book/${bookingToken}` : null;
+
   const emailHtml = buildOutreachEmail({
     openingLine: qualification.openingLine,
     firstName: lead.firstName,
@@ -239,12 +250,13 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
     estimatedTotal,
     primaryColor: business.primary_color || "#2563EB",
     quoteId: quoteId || "",
+    bookingUrl,
   });
 
   try {
     await sendEmail({
       to: lead.email,
-      subject: `Your cleaning quote from ${business.company_name}`,
+      subject: `Your Cleaning Quote from ${business.company_name}`,
       html: emailHtml,
       fromName,
       replyTo,
@@ -266,6 +278,9 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
   await updateJob(jobId, {
     status: "pending_response",
     quoteId,
+    quoteAmount: estimatedTotal,
+    quoteSentAt: new Date(),
+    currentStep: "quote_sent",
     lastActionAt: new Date(),
     nextActionAt: next,
     metadata: meta,
@@ -509,10 +524,46 @@ export async function enrollAllPendingIntakeRequests(
 
 export async function processAutopilotJobs(): Promise<void> {
   try {
+    // ── Step A: Auto-enroll new intake_requests for businesses with autopilot enabled ──
+    try {
+      const enabledRes = await pool.query(
+        `SELECT u.id AS user_id, b.id AS business_id
+         FROM users u
+         JOIN businesses b ON b.owner_user_id = u.id
+         WHERE u.autopilot_enabled = true`
+      );
+      for (const row of enabledRes.rows) {
+        // Find intake_requests not yet enrolled and not dismissed/converted
+        const newLeads = await pool.query(
+          `SELECT ir.id
+           FROM intake_requests ir
+           WHERE ir.business_id = $1
+             AND ir.status NOT IN ('dismissed', 'converted')
+             AND ir.customer_email IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM autopilot_jobs aj WHERE aj.lead_id = ir.id
+             )
+           ORDER BY ir.created_at DESC
+           LIMIT 20`,
+          [row.business_id]
+        );
+        for (const lead of newLeads.rows) {
+          try {
+            await enrollLead(row.user_id, row.business_id, lead.id);
+          } catch (e: any) {
+            console.warn(`[autopilot] Auto-enroll failed for lead ${lead.id}:`, e.message);
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn("[autopilot] Auto-enroll sweep failed:", e.message);
+    }
+
+    // ── Step B: Process due jobs ──
     const res = await pool.query(
       `SELECT * FROM autopilot_jobs
        WHERE next_action_at <= NOW()
-         AND status NOT IN ('complete', 'paused')
+         AND status NOT IN ('complete', 'paused', 'pending_review')
        ORDER BY next_action_at ASC
        LIMIT 50`
     );
@@ -541,31 +592,39 @@ export async function processAutopilotJobs(): Promise<void> {
 
 // ─── Email Templates ──────────────────────────────────────────────────────────
 
-function buildOutreachEmail({ openingLine, firstName, companyName, tierLabel, estimatedTotal, primaryColor, quoteId }: any) {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+function buildOutreachEmail({ openingLine, firstName, companyName, tierLabel, estimatedTotal, primaryColor, quoteId, bookingUrl }: any) {
+  const ctaSection = bookingUrl ? `
+    <table cellpadding="0" cellspacing="0" style="margin:24px 0;">
+      <tr><td style="background:${primaryColor};border-radius:10px;">
+        <a href="${bookingUrl}" style="display:inline-block;padding:15px 28px;font-size:16px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:-0.01em;">Accept Quote &amp; Book Your Cleaning &rarr;</a>
+      </td></tr>
+    </table>` : "";
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;">
 <tr><td align="center" style="padding:40px 16px;">
 <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
   <tr><td style="background:${primaryColor};padding:28px 32px;">
     <p style="margin:0;font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.1em;">${companyName}</p>
-    <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#fff;">Your cleaning quote is ready</h1>
+    <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#fff;">Your Cleaning Quote is Ready</h1>
   </td></tr>
   <tr><td style="padding:28px 32px;">
     <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.7;">${openingLine}</p>
     <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.7;">Based on what you shared, we put together a <strong>${tierLabel}</strong> quote for your home:</p>
-    <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;width:100%;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+    <table cellpadding="0" cellspacing="0" style="margin:0 0 8px;width:100%;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
       <tr><td style="padding:20px 24px;">
         <p style="margin:0 0 4px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Estimated Price</p>
-        <p style="margin:0;font-size:32px;font-weight:800;color:${primaryColor};">$${estimatedTotal}</p>
+        <p style="margin:0;font-size:36px;font-weight:800;color:${primaryColor};">$${estimatedTotal}</p>
         <p style="margin:4px 0 0;font-size:13px;color:#6b7280;">${tierLabel}</p>
       </td></tr>
     </table>
-    <p style="margin:0 0 24px;font-size:14px;color:#6b7280;line-height:1.6;">This is an estimate based on the details you provided. Final pricing is confirmed after a quick walkthrough or more details about your space.</p>
+    ${ctaSection}
+    <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.6;">This is an estimate based on the details you provided. Final pricing is confirmed after a quick walkthrough or more details about your space.</p>
     <p style="margin:0;font-size:14px;color:#374151;line-height:1.7;">Reply to this email with any questions — I read every one personally.</p>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center;">
-    <p style="font-size:12px;color:#9ca3af;margin:0;">${companyName}</p>
+    <p style="font-size:12px;color:#9ca3af;margin:0;">${companyName} · Powered by QuotePro</p>
   </td></tr>
 </table>
 </td></tr>

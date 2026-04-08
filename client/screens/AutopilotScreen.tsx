@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react";
 import {
   View,
+  Text,
   StyleSheet,
   FlatList,
   Pressable,
@@ -9,6 +10,7 @@ import {
   RefreshControl,
   Platform,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,7 +34,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string
   pending_quote: { label: "Quoting", color: "#FF9500", icon: "edit-3" },
   pending_response: { label: "Awaiting Reply", color: "#007AFF", icon: "mail" },
   pending_contract: { label: "Contract Sent", color: "#AF52DE", icon: "file-text" },
-  pending_review: { label: "Review Pending", color: "#34C759", icon: "star" },
+  pending_review: { label: "Booked", color: "#34C759", icon: "calendar" },
+  booked: { label: "Booked", color: "#34C759", icon: "calendar" },
   complete: { label: "Complete", color: "#8E8E93", icon: "check-circle" },
   paused: { label: "Paused", color: "#FF3B30", icon: "pause" },
 };
@@ -201,6 +204,7 @@ export default function AutopilotScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const queryClient = useQueryClient();
+  const navigation = useNavigation<any>();
   const { isPro, isGrowth, isStarter, tier } = useSubscription();
   const [enrollModalVisible, setEnrollModalVisible] = useState(false);
   const [upsellVisible, setUpsellVisible] = useState(false);
@@ -322,11 +326,38 @@ export default function AutopilotScreen() {
                 color="#AF52DE"
               />
               <MetricCard
-                value={stats?.reviewsRequested ?? 0}
-                label="Reviews"
-                icon="star"
+                value={stats?.bookingsCount ?? 0}
+                label="Booked"
+                icon="calendar"
                 color="#34C759"
               />
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable
+                onPress={() => navigation.navigate("Bookings")}
+                style={({ pressed }) => [
+                  styles.shortcutBtn,
+                  { borderColor: theme.border, backgroundColor: isDark ? theme.surface1 : "#fff", opacity: pressed ? 0.7 : 1 },
+                ]}
+                testID="button-view-bookings"
+              >
+                <Feather name="calendar" size={15} color="#34C759" />
+                <Text style={[styles.shortcutLabel, { color: theme.text }]}>View Bookings</Text>
+                <Feather name="chevron-right" size={14} color={theme.textSecondary} />
+              </Pressable>
+              <Pressable
+                onPress={() => navigation.navigate("Availability")}
+                style={({ pressed }) => [
+                  styles.shortcutBtn,
+                  { borderColor: theme.border, backgroundColor: isDark ? theme.surface1 : "#fff", opacity: pressed ? 0.7 : 1 },
+                ]}
+                testID="button-view-availability"
+              >
+                <Feather name="clock" size={15} color="#FF9500" />
+                <Text style={[styles.shortcutLabel, { color: theme.text }]}>Availability</Text>
+                <Feather name="chevron-right" size={14} color={theme.textSecondary} />
+              </Pressable>
             </View>
 
             {jobs.length > 0 ? (
@@ -390,6 +421,22 @@ export default function AutopilotScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  shortcutBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  shortcutLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+  },
 
   heroContent: {
     flexDirection: "row",

@@ -51,6 +51,8 @@ import recurringRouter from "./routers/recurringRouter";         // → /api/rec
 import staffRouter from "./routers/staffRouter";                 // → /api/staff/*
 import bookingWidgetRouter from "./routers/bookingWidgetRouter"; // → /api/booking/*
 import locationsRouter from "./routers/locationsRouter";         // → /api/locations/*
+import availabilityRouter from "./routers/availabilityRouter";   // → /api/availability/*
+import publicBookingRouter from "./routers/publicBookingRouter"; // → /book/:token, /api/book/:token
 
 // ─── Group B — multi-domain routers (all mounted at /api) ─────────────────────
 import authRouter from "./routers/authRouter";             // /api/auth/*, /api/consent, /api/crash-report
@@ -140,6 +142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", staffRouter);
   app.use("/api/booking", bookingWidgetRouter);
   app.use("/api", locationsRouter);
+  app.use("/api/availability", availabilityRouter);
+  app.use(publicBookingRouter);
 
   // 4. Mount Group B — multi-domain routers at /api
   app.use("/api", authRouter);
@@ -177,14 +181,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
   // 7. Background workers
-  // — 15-minute Autopilot cron
+  // — 5-minute Autopilot cron
   setInterval(async () => {
     try {
       await processAutopilotJobs();
     } catch (e) {
       console.error("[autopilot] Cron error:", e);
     }
-  }, 15 * 60 * 1000);
+  }, 5 * 60 * 1000);
 
   // — Quote expiry: every hour on the hour
   cron.schedule("0 * * * *", async () => {

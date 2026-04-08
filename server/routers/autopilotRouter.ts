@@ -75,11 +75,15 @@ router.get("/jobs", requireAuth, requireAutopilot, async (req: Request, res: Res
 
     const result = await pool.query(
       `SELECT aj.*,
-              c.first_name || ' ' || c.last_name AS lead_name,
-              c.email AS lead_email,
+              COALESCE(
+                NULLIF(TRIM(c.first_name || ' ' || c.last_name), ''),
+                ir.customer_name
+              ) AS lead_name,
+              COALESCE(c.email, ir.customer_email) AS lead_email,
               (SELECT COUNT(*) FROM autopilot_job_logs l WHERE l.job_id = aj.id) AS log_count
        FROM autopilot_jobs aj
        LEFT JOIN customers c ON c.id = aj.lead_id
+       LEFT JOIN intake_requests ir ON ir.id = aj.lead_id
        WHERE aj.business_id = $1
        ORDER BY aj.created_at DESC
        LIMIT 100`,
@@ -149,12 +153,21 @@ router.get("/stats", requireAuth, requireAutopilot, async (req: Request, res: Re
     );
 
     const row = result.rows[0] || {};
+
+    // Count bookings from new bookings table
+    const bookingsRes = await pool.query(
+      `SELECT COUNT(*) AS bookings_count FROM bookings WHERE user_id = $1 AND status != 'cancelled'`,
+      [req.session.userId]
+    );
+    const bookingsCount = parseInt(bookingsRes.rows[0]?.bookings_count || "0");
+
     return res.json({
       enrolledThisMonth: parseInt(row.enrolled_this_month || "0"),
       quotesSent: parseInt(row.quotes_sent || "0"),
       followUpsFired: parseInt(row.follow_ups_fired || "0"),
       contractsSent: parseInt(row.contracts_sent || "0"),
       reviewsRequested: parseInt(row.reviews_requested || "0"),
+      bookingsCount,
     });
   } catch (err: any) {
     console.error("[autopilot] stats error:", err.message);
@@ -225,6 +238,41 @@ router.post("/settings", requireAuth, async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("[autopilot] settings error:", err.message);
     return res.status(500).json({ message: "Failed to save settings" });
+  }
+});
+
+router.get("/bookings", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const business = await getBusinessByOwner(req.session.userId!);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+
+    const result = await pool.query(
+      `SELECT bk.*,
+              COALESCE(
+                NULLIF(TRIM(c.first_name || ' ' || c.last_name), ''),
+                ir.customer_name,
+                bk.customer_name
+              ) AS display_name,
+              aj.current_step, aj.quote_amount AS job_quote_amount
+       FROM bookings bk
+       JOIN autopilot_jobs aj ON aj.id = bk.autopilot_job_id
+       LEFT JOIN customers c ON c.id = aj.lead_id
+       LEFT JOIN intake_requests ir ON ir.id = aj.lead_id
+       WHERE bk.user_id = $1
+       ORDER BY bk.scheduled_date DESC, bk.scheduled_time DESC
+       LIMIT 100`,
+      [req.session.userId]
+    );
+
+    const rows = result.rows.map((r: any) => ({
+      ...r,
+      customer_name: r.display_name || r.customer_name,
+    }));
+
+    return res.json(rows);
+  } catch (err: any) {
+    console.error("[autopilot] bookings error:", err.message);
+    return res.status(500).json({ message: "Failed to fetch bookings" });
   }
 });
 
