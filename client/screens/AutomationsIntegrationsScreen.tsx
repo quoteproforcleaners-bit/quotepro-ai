@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { ProGateOverlay, usePlanGate } from "@/components/ProGate";
+import { ProGateOverlay, useProGate } from "@/components/ProGate";
 import {
   View,
   StyleSheet,
@@ -109,7 +109,7 @@ export default function AutomationsIntegrationsScreen() {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
-  const { hasAccess, isLoading: subLoading } = usePlanGate("pro");
+  const { hasAccess, isLoading: subLoading } = useProGate("pro");
 
   const [showNewKeyModal, setShowNewKeyModal] = useState(false);
   const [newKeyRaw, setNewKeyRaw] = useState<string | null>(null);

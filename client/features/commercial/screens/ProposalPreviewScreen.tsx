@@ -287,7 +287,7 @@ export default function ProposalPreviewScreen({
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 130 }, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 130 }, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as any }] : [])]}
         showsVerticalScrollIndicator={false}
       >
         <Card variant="emphasis" style={styles.coverCard}>

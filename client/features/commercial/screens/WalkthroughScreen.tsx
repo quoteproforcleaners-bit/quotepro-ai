@@ -134,7 +134,7 @@ export default function WalkthroughScreen({ walkthrough, onUpdate, onComplete, o
         </Pressable>
       </View>
 
-      <View style={[styles.content, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}>{renderCurrentStep()}</View>
+      <View style={[styles.content, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as any }] : [])]}>{renderCurrentStep()}</View>
     </View>
   );
 }

@@ -1011,7 +1011,7 @@ function CalculatorStep({ onBack }: { onBack: () => void }) {
  baths: job.baths ? parseFloat(job.baths) : undefined,
  halfBaths: parseInt(job.halfBaths) || 0,
  });
- setResult(res);
+ setResult(res as any);
  } catch (e: any) {
  setError(e.message ||"Calculation failed");
  } finally {
@@ -1232,7 +1232,7 @@ export default function PricingLogicPage() {
  <div className="p-6 max-w-5xl mx-auto space-y-6">
  <PageHeader
  title="Pricing Logic Engine"
- description="Turn your past jobs into a pricing system that quotes consistently and protects your margins."
+ subtitle="Turn your past jobs into a pricing system that quotes consistently and protects your margins."
  />
 
  <StepNav

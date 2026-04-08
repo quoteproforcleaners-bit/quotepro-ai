@@ -171,7 +171,7 @@ export default function FileLibraryPage() {
  <div className="p-6 max-w-6xl mx-auto space-y-6">
  <PageHeader
  title="File Library"
- description="Store and organize documents to share with customers — contracts, checklists, proposals, and more."
+ subtitle="Store and organize documents to share with customers — contracts, checklists, proposals, and more."
  actions={
  <button
  onClick={() => fileInputRef.current?.click()}

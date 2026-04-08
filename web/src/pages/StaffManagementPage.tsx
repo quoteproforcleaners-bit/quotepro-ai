@@ -355,13 +355,13 @@ export default function StaffManagementPage() {
             <Button
               variant="secondary"
               onClick={() => setShowQR(true)}
-              icon={<QrCode className="w-4 h-4" />}
+              icon={QrCode}
             >
               Business QR Code
             </Button>
             <Button
               onClick={() => { setEditTarget(null); setShowForm(true); }}
-              icon={<Plus className="w-4 h-4" />}
+              icon={Plus}
             >
               Add Staff Member
             </Button>
@@ -416,7 +416,7 @@ export default function StaffManagementPage() {
           <p className="text-sm text-slate-500 mb-6 max-w-sm">
             Add your cleaners so they can log in to the mobile app, clock in/out, and complete jobs.
           </p>
-          <Button onClick={() => setShowForm(true)} icon={<Plus className="w-4 h-4" />}>
+          <Button onClick={() => setShowForm(true)} icon={Plus}>
             Add your first cleaner
           </Button>
         </div>

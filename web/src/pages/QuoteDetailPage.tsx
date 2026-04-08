@@ -1816,7 +1816,7 @@ export default function QuoteDetailPage() {
 
  {reviewGenerating ? (
  <div className="flex items-center gap-3 py-6 justify-center text-slate-500">
- <Spinner className="w-5 h-5"/>
+ <Spinner size="sm" />
  <span className="text-sm">Drafting your review request…</span>
  </div>
  ) : (

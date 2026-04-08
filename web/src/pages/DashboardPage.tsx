@@ -282,7 +282,7 @@ function KPICard({ label, value, subtitle, icon: Icon, color, badge, badgePositi
  className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
  style={{ background: `${accent.dot}14`, color: accent.icon }}
  >
- <Icon className="w-4.5 h-4.5"style={{ width:"18px", height:"18px"}} />
+ <Icon className="w-4.5 h-4.5" />
  </div>
  {badge ? (
  <span

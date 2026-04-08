@@ -272,7 +272,7 @@ export function QuickAddCleanModal({ visible, onClose, prefilledDate, quotePrefi
           phone: newPhone.trim(),
           email: newEmail.trim(),
         });
-        customerId = cust.id;
+        customerId = (cust as any).id;
         address = newAddress.trim();
       } catch (e: any) {
         setError(e?.message || "Failed to create customer");

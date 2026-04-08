@@ -207,7 +207,7 @@ export default function EmailSequencesPage() {
  const result = await apiRequest("POST", `/api/email-sequences/${enrollModal.id}/enroll`, {
  contacts,
  notes: enrollNotes,
- }) as { enrolled: number };
+ }) as unknown as { enrolled: number };
 
  await queryClient.invalidateQueries({ queryKey: ["/api/email-sequences/enrollments"] });
  setEnrollModal(null);
@@ -277,7 +277,7 @@ export default function EmailSequencesPage() {
  <div className="p-6 max-w-6xl mx-auto space-y-6">
  <PageHeader
  title="Email Sequences"
- description="Pre-built email campaigns to nurture leads, re-engage clients, and grow your business."
+ subtitle="Pre-built email campaigns to nurture leads, re-engage clients, and grow your business."
  />
 
  {/* Stats row */}

@@ -204,7 +204,7 @@ export default function PaywallScreen() {
     setModal(m => ({ ...m, visible: false }));
     if (wasSuccess) {
       if (navigation.canGoBack()) navigation.goBack();
-      setTimeout(() => { navigation.navigate("ProSetupChecklist" as any); }, 400);
+      setTimeout(() => { (navigation as any).navigate("ProSetupChecklist"); }, 400);
     }
   };
 

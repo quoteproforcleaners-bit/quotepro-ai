@@ -352,7 +352,7 @@ export default function CommercialQuoteScreen({ customerName, customerAddress }:
           <ThemedText type="link">Save</ThemedText>
         </Pressable>
       </View>
-      <View style={[styles.content, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}>{renderPhase()}</View>
+      <View style={[styles.content, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as any }] : [])]}>{renderPhase()}</View>
     </View>
   );
 }

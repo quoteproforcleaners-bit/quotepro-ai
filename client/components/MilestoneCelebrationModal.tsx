@@ -107,7 +107,7 @@ interface Props {
 
 export default function MilestoneCelebrationModal({ visible, milestone, totalRevenue, onDismiss }: Props) {
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
+  const { theme } = useTheme();
   const particles = useConfetti(visible);
   const [showContent, setShowContent] = useState(false);
 

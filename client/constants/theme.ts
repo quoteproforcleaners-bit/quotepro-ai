@@ -64,6 +64,11 @@ export const Colors = {
     colorTextMuted: "#94A3B8",
     colorDivider: "#E2E8F0",
     radiusCard: 18,
+    // Backward-compat aliases used across the codebase
+    background: "#F6F8FB",
+    card: "#FFFFFF",
+    cardBorder: "#E2E8F0",
+    backgroundElevated: "#F1F5F9",
   },
   dark: {
     text: "#F2F2F7",
@@ -128,6 +133,11 @@ export const Colors = {
     colorTextMuted: "#8E8E93",
     colorDivider: "rgba(255, 255, 255, 0.10)",
     radiusCard: 18,
+    // Backward-compat aliases used across the codebase
+    background: "#000000",
+    card: "#1C1C1E",
+    cardBorder: "rgba(255, 255, 255, 0.15)",
+    backgroundElevated: "#2C2C2E",
   },
 };
 

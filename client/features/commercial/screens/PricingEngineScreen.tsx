@@ -134,7 +134,7 @@ export default function PricingEngineScreen({
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}
+        contentContainerStyle={[styles.scrollContent, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as any }] : [])]}
         showsVerticalScrollIndicator={false}
       >
         <SectionHeader

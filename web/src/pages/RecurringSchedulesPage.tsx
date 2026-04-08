@@ -508,11 +508,11 @@ export default function RecurringSchedulesPage() {
     <div className="max-w-3xl mx-auto">
       <PageHeader
         title="Recurring Schedules"
-        description="Set up repeating cleans that auto-generate jobs and optionally bill clients automatically."
-        action={
+        subtitle="Set up repeating cleans that auto-generate jobs and optionally bill clients automatically."
+        actions={
           <Button
             onClick={() => { setEditTarget(null); setShowForm(true); }}
-            icon={<Plus className="w-4 h-4" />}
+            icon={Plus}
           >
             New Recurring Schedule
           </Button>
@@ -567,7 +567,7 @@ export default function RecurringSchedulesPage() {
           <p className="text-sm text-slate-500 mb-6 max-w-sm">
             Set up repeating cleans for your regular clients. Jobs are generated automatically so you never miss a booking.
           </p>
-          <Button onClick={() => setShowForm(true)} icon={<Plus className="w-4 h-4" />}>
+          <Button onClick={() => setShowForm(true)} icon={Plus}>
             Create your first schedule
           </Button>
         </div>

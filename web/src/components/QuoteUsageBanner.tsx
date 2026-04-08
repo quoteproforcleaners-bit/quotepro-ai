@@ -89,7 +89,7 @@ export default function QuoteUsageBanner() {
         </div>
 
         <button
-          onClick={isAtLimit ? showPaywall : () => startCheckout("growth")}
+          onClick={isAtLimit ? () => showPaywall() : () => startCheckout("growth")}
           disabled={checkoutLoading}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200 shrink-0"
           style={{

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -825,7 +825,7 @@ export default function ReactivationScreen() {
                         setSendingCampaign(true);
                         try {
                           const res = await apiRequest("POST", `/api/campaigns/${viewingCampaign?.id}/send`, {});
-                          setSendResult(res as { sent: number; failed: number; total: number });
+                          setSendResult(res as unknown as { sent: number; failed: number; total: number });
                           setViewingCampaign((prev: any) => prev ? { ...prev, status: "sent" } : prev);
                           queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
                         } catch {

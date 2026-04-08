@@ -41,7 +41,7 @@ export function AutopilotUpsellModal({ visible, onClose, tier, embedded = false 
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const url = new URL("/api/autopilot/checkout", getApiUrl());
-      const res = await apiRequest<{ url: string }>("POST", url.pathname);
+      const res = await apiRequest("POST", url.pathname) as { url: string };
       if (res?.url) {
         await Linking.openURL(res.url);
       }

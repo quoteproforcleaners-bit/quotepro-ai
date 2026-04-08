@@ -136,9 +136,9 @@ export default function ProSetupChecklistPage() {
   };
 
   const statusMessage =
-    subscriptionStatus === "trial"
+    (subscriptionStatus as string) === "trial"
       ? "Complete setup to get the most out of your trial"
-      : subscriptionStatus === "active"
+      : (subscriptionStatus as string) === "active"
       ? "Pro subscription active"
       : "Complete setup to get the most out of QuotePro";
 

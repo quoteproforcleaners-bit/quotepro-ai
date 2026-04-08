@@ -110,7 +110,17 @@ type EventName =
   | "day_14_active"
   | "day_30_active"
   | "cancel_initiated"
-  | "quote_quota_hit";
+  | "quote_quota_hit"
+  // Job status tracking
+  | "en_route_clicked"
+  | "service_started_clicked"
+  | "completed_clicked"
+  // Objection / closing assistant
+  | "objection_assistant_used"
+  // Onboarding steps
+  | "first_quote_completed"
+  | "onboarding_business_step"
+  | "onboarding_pricing_step";
 
 export async function trackEvent(
   name: EventName,

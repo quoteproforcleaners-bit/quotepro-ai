@@ -95,7 +95,7 @@ export default function LeadFinderDetailScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const { leadId } = route.params;
-  const theme = useTheme();
+  const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
@@ -130,7 +130,7 @@ export default function LeadFinderDetailScreen() {
   const handleGenerateReplies = useCallback(async () => {
     setGenerating(true);
     try {
-      const result = await apiRequest("POST", `/api/lead-finder/leads/${leadId}/generate-replies`, {});
+      const result = await apiRequest("POST", `/api/lead-finder/leads/${leadId}/generate-replies`, {}) as any;
       setReplies(result.replies ?? []);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}

@@ -70,7 +70,7 @@ export default function SettingsScreen() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [supportModalVisible, setSupportModalVisible] = useState(false);
-  const [supportName, setSupportName] = useState(`${user?.firstName || ""} ${user?.lastName || ""}`.trim());
+  const [supportName, setSupportName] = useState(`${(user as any)?.firstName || ""} ${(user as any)?.lastName || ""}`.trim());
   const [supportEmail, setSupportEmail] = useState(user?.email || "");
   const [supportMessage, setSupportMessage] = useState("");
   const [supportScreenshots, setSupportScreenshots] = useState<{ filename: string; base64: string; mimeType: string; uri: string }[]>([]);
@@ -640,7 +640,7 @@ export default function SettingsScreen() {
               <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${theme.primary}20`, alignItems: "center", justifyContent: "center", marginBottom: Spacing.md }}>
                 <Feather name="trending-up" size={26} color={theme.primary} />
               </View>
-              <ThemedText type="title" style={{ textAlign: "center", marginBottom: Spacing.xs }}>
+              <ThemedText type="h3" style={{ textAlign: "center", marginBottom: Spacing.xs }}>
                 Switch to Annual?
               </ThemedText>
               <ThemedText type="body" style={{ textAlign: "center", color: theme.textSecondary, lineHeight: 22 }}>
@@ -1600,9 +1600,9 @@ export default function SettingsScreen() {
             </ThemedText>
           </View>
           <Switch
-            value={currentPrefs.pushPrefs?.activationReminders !== false}
+            value={(currentPrefs.pushPrefs as any)?.activationReminders !== false}
             onValueChange={(val) =>
-              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs ?? {}), activationReminders: val } })
+              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs as any ?? {}), activationReminders: val } })
             }
             trackColor={{ false: theme.border, true: theme.primary }}
             thumbColor="#FFFFFF"
@@ -1620,9 +1620,9 @@ export default function SettingsScreen() {
             </ThemedText>
           </View>
           <Switch
-            value={currentPrefs.pushPrefs?.quoteExpiryAlerts !== false}
+            value={(currentPrefs.pushPrefs as any)?.quoteExpiryAlerts !== false}
             onValueChange={(val) =>
-              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs ?? {}), quoteExpiryAlerts: val } })
+              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs as any ?? {}), quoteExpiryAlerts: val } })
             }
             trackColor={{ false: theme.border, true: theme.primary }}
             thumbColor="#FFFFFF"
@@ -1640,9 +1640,9 @@ export default function SettingsScreen() {
             </ThemedText>
           </View>
           <Switch
-            value={currentPrefs.pushPrefs?.dormantCustomerAlerts !== false}
+            value={(currentPrefs.pushPrefs as any)?.dormantCustomerAlerts !== false}
             onValueChange={(val) =>
-              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs ?? {}), dormantCustomerAlerts: val } })
+              updatePref({ pushPrefs: { ...(currentPrefs.pushPrefs as any ?? {}), dormantCustomerAlerts: val } })
             }
             trackColor={{ false: theme.border, true: theme.primary }}
             thumbColor="#FFFFFF"
@@ -2480,7 +2480,7 @@ export default function SettingsScreen() {
 
       <Pressable
         onPress={() => {
-          setSupportName(`${user?.firstName || ""} ${user?.lastName || ""}`.trim());
+          setSupportName(`${(user as any)?.firstName || ""} ${(user as any)?.lastName || ""}`.trim());
           setSupportEmail(user?.email || "");
           setSupportMessage("");
           setSupportScreenshots([]);

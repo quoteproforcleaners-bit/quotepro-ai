@@ -202,7 +202,7 @@ export default function ProSetupChecklistScreen() {
         setActivationStart(Number(stored));
         return;
       }
-      const data = await apiRequest("GET", "/api/auth/me");
+      const data = await apiRequest("GET", "/api/auth/me") as any;
       const createdAt = data?.user?.createdAt;
       if (createdAt) {
         const ts = new Date(createdAt).getTime();

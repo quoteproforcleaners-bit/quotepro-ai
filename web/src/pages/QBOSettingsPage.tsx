@@ -335,9 +335,9 @@ export default function QBOSettingsPage() {
         onClose={() => setConfirmDisconnect(false)}
         onConfirm={handleDisconnect}
         title="Disconnect QuickBooks"
-        message="Are you sure you want to disconnect your QuickBooks account? This will stop automatic invoice creation."
+        description="Are you sure you want to disconnect your QuickBooks account? This will stop automatic invoice creation."
         confirmLabel="Disconnect"
-        isDangerous
+        variant="danger"
       />
     </div>
   );

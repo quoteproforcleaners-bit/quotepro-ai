@@ -9,6 +9,6 @@
     },
     "types": ["node"]
   },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
+  "include": ["client/**/*.ts", "client/**/*.tsx", "shared/**/*.ts", "shared/**/*.tsx"],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "server/**", "web/**"],
 }

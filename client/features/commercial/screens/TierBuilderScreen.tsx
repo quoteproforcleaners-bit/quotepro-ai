@@ -54,7 +54,7 @@ export default function TierBuilderScreen({
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 80 }, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" }] : [])]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.xl + 80 }, ...(useMaxWidth ? [{ maxWidth: 560, alignSelf: "center" as const, width: "100%" as any }] : [])]}
         showsVerticalScrollIndicator={false}
       >
         <SectionHeader

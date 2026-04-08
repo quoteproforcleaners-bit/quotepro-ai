@@ -67,7 +67,7 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 export default function LeadFinderScreen() {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const { isProOnly } = useSubscription();
   const navigation = useNavigation<Nav>();
   const headerHeight = useHeaderHeight();

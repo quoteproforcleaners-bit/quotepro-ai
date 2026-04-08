@@ -31,7 +31,7 @@ interface LeadCaptureSettings {
 }
 
 export default function LeadCaptureSettingsScreen() {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();

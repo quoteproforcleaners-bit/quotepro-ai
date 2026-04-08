@@ -334,7 +334,7 @@ function calculateResidentialRecommendations(
       scope: best.scope,
       price: best.price,
       addOnsIncluded: best.addOnsIncluded,
-      isRecommended: recommendedTier === "best",
+      isRecommended: (recommendedTier as string) === "best",
     },
   ];
 

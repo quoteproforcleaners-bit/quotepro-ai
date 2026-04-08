@@ -511,7 +511,7 @@ export default function WalkthroughAIPage() {
     }, 1200);
 
     try {
-      const res = await apiPost("/api/ai/walkthrough-extract", { description: notes.trim() });
+      const res = await apiPost("/api/ai/walkthrough-extract", { description: notes.trim() }) as any;
       setExtracted(res);
       setReview(buildReviewData(res.extractedFields || {}, addOnKeys));
     } catch (err: any) {

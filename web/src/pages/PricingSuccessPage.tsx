@@ -54,7 +54,7 @@ const TIER_CONTENT: Record<string, { icon: typeof Zap; color: string; title: str
 export default function PricingSuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { refetch } = useAuth();
+  const { refetch } = useAuth() as any;
   const [tier, setTier] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 

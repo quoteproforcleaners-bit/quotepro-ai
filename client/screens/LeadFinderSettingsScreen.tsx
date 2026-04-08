@@ -208,7 +208,7 @@ function CityInput({
 }
 
 export default function LeadFinderSettingsScreen() {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
