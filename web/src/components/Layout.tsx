@@ -23,6 +23,7 @@ import {
 import { SupportModal } from "./SupportModal";
 import UpgradeModal from "./UpgradeModal";
 import QuoteUsageBanner from "./QuoteUsageBanner";
+import { AnnualUpgradeBanner } from "./AnnualUpgradeBanner";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -1117,6 +1118,7 @@ export function Layout() {
             {/* ── Scrollable content ── */}
             <main ref={mainRef} className="flex-1 overflow-y-auto" style={{ padding: "28px 24px 40px" }}>
               <TrialCountdownBanner />
+              <AnnualUpgradeBanner />
               <QuoteUsageBanner />
               <div className="max-w-7xl mx-auto animate-fade-in">
                 <Outlet />

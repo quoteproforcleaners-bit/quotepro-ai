@@ -251,10 +251,15 @@ export default function PricingPage() {
 
           {/* Growth — featured */}
           <div className="relative bg-blue-600 rounded-2xl shadow-2xl shadow-blue-600/25 p-7 -mt-4 mb-0">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
               <span className="px-3 py-1 bg-amber-400 text-amber-900 text-[11px] font-bold rounded-full uppercase tracking-wide shadow">
                 Most Popular
               </span>
+              {interval === "annual" && (
+                <span className="px-3 py-1 bg-emerald-500 text-white text-[11px] font-bold rounded-full uppercase tracking-wide shadow">
+                  Best Value
+                </span>
+              )}
             </div>
 
             <div className="mb-5">

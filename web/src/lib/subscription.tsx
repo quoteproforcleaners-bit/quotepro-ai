@@ -41,6 +41,7 @@ interface SubscriptionContextType {
   // Unified platform fields
   platform: "stripe" | "revenuecat" | null;
   subscriptionStatus: "active" | "trialing" | "past_due" | "cancelled";
+  subscriptionInterval: "monthly" | "annual";
   canManageOnWeb: boolean;
   canManageOnIOS: boolean;
   trialDaysRemaining: number | null;
@@ -67,6 +68,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     tier: string;
     platform: "stripe" | "revenuecat" | null;
     status: "active" | "trialing" | "past_due" | "cancelled";
+    subscriptionInterval: "monthly" | "annual";
     currentPeriodEnd: string | null;
     isOnTrial: boolean;
     trialDaysRemaining: number | null;
@@ -93,6 +95,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // Platform fields from unified status
   const platform = statusData?.platform ?? null;
   const subscriptionStatus = statusData?.status ?? "cancelled";
+  const subscriptionInterval = (statusData?.subscriptionInterval ?? "monthly") as "monthly" | "annual";
   const canManageOnWeb = statusData?.canManageOnWeb ?? true;
   const canManageOnIOS = statusData?.canManageOnIOS ?? false;
   const trialDaysRemaining = statusData?.trialDaysRemaining ?? null;
@@ -156,7 +159,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         tier, isPro, isGrowth, isStarter, isFree,
         isInFreeTrial, freeTrialDaysLeft,
         hasUnlimitedQuotes, hasAI, hasPremium, quotesPerMonth,
-        platform, subscriptionStatus, canManageOnWeb, canManageOnIOS, trialDaysRemaining,
+        platform, subscriptionStatus, subscriptionInterval, canManageOnWeb, canManageOnIOS, trialDaysRemaining,
         showPaywall, hidePaywall, paywallVisible, paywallTrigger,
         startCheckout, openPortal, checkoutLoading,
         trackUpgradeClick,

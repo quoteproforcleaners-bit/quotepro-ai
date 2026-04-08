@@ -1141,6 +1141,7 @@ const router = Router();
         tier,
         platform,
         status,
+        subscriptionInterval: (u.subscription_interval as string | null) ?? "monthly",
         currentPeriodEnd: u.subscription_expires_at ?? null,
         isOnTrial,
         trialDaysRemaining,
@@ -1153,6 +1154,81 @@ const router = Router();
     } catch (err: any) {
       console.error("[subscription/status]", err.message);
       return res.status(500).json({ message: "Failed to get subscription status" });
+    }
+  });
+
+  // POST /api/subscription/switch-to-annual
+  // Switches a Growth monthly Stripe subscriber to the annual plan.
+  router.post("/subscription/switch-to-annual", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const stripe = await getStripe();
+      if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
+
+      const userId = req.session.userId!;
+      const result = await pool.query(
+        `SELECT subscription_tier, subscription_interval, stripe_subscription_id
+         FROM users WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (!result.rows.length) return res.status(404).json({ message: "User not found" });
+
+      const u = result.rows[0];
+      if (u.subscription_tier !== "growth") {
+        return res.status(400).json({ message: "Only Growth plan subscribers can switch to annual" });
+      }
+      if (u.subscription_interval === "annual") {
+        return res.status(400).json({ message: "Already on annual billing" });
+      }
+      if (!u.stripe_subscription_id) {
+        return res.status(400).json({ message: "No active Stripe subscription found" });
+      }
+
+      // Retrieve current Stripe subscription to get the item ID
+      const subscription = await stripe.subscriptions.retrieve(u.stripe_subscription_id, {
+        expand: ["items.data.price.product"],
+      });
+      const item = subscription.items.data[0];
+      if (!item) return res.status(400).json({ message: "Subscription has no items" });
+
+      // Use configured price ID or create an inline annual price
+      const annualPriceId = process.env.STRIPE_PRICE_GROWTH_ANNUAL;
+
+      let newPriceId: string;
+      if (annualPriceId) {
+        newPriceId = annualPriceId;
+      } else {
+        // Create inline annual price from the current product
+        const productId =
+          typeof item.price.product === "string"
+            ? item.price.product
+            : (item.price.product as any).id;
+        const annualPrice = await stripe.prices.create({
+          product: productId,
+          unit_amount: 49000, // $490/year = $41/mo * 12
+          currency: item.price.currency || "usd",
+          recurring: { interval: "year" },
+          nickname: "Growth Annual",
+        });
+        newPriceId = annualPrice.id;
+      }
+
+      // Update subscription with proration
+      await stripe.subscriptions.update(u.stripe_subscription_id, {
+        items: [{ id: item.id, price: newPriceId }],
+        proration_behavior: "create_prorations",
+        billing_cycle_anchor: "unchanged",
+      });
+
+      // Update DB
+      await pool.query(
+        `UPDATE users SET subscription_interval = 'annual', updated_at = NOW() WHERE id = $1`,
+        [userId]
+      );
+
+      return res.json({ success: true, newAmount: 41, savings: 96 });
+    } catch (err: any) {
+      console.error("[subscription/switch-to-annual]", err.message);
+      return res.status(500).json({ message: err.message || "Failed to switch to annual" });
     }
   });
 

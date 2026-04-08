@@ -47,11 +47,14 @@ export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user, logout } = useAuth();
   const { businessProfile: profile, updateBusinessProfile } = useApp();
-  const { isPro, subscriptionStatus, trialDaysLeft, restore, tier, isInFreeTrial, freeTrialDaysLeft, platform, canManageOnWeb, canManageOnIOS } = useSubscription();
+  const { isPro, subscriptionStatus, trialDaysLeft, restore, tier, isInFreeTrial, freeTrialDaysLeft, platform, subscriptionInterval, canManageOnWeb, canManageOnIOS } = useSubscription();
   const TIER_DISPLAY: Record<string, string> = { starter: "Starter", growth: "Growth", pro: "Pro" };
   const tierDisplayName = TIER_DISPLAY[tier] || "Pro";
   const [restoring, setRestoring] = useState(false);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const [annualModalVisible, setAnnualModalVisible] = useState(false);
+  const [annualSwitching, setAnnualSwitching] = useState(false);
+  const [annualSuccess, setAnnualSuccess] = useState(false);
   const { language, setLanguage, communicationLanguage, setCommunicationLanguage, t } = useLanguage();
   const { currency, setCurrency } = useCurrency();
   const { preference: darkModePref, setPreference: setDarkModePref } = useDarkModePreference();
@@ -577,6 +580,111 @@ export default function SettingsScreen() {
           </ThemedText>
         </View>
       ) : null}
+
+      {/* Annual upgrade row — Growth monthly Stripe subscribers only */}
+      {tier === "growth" && subscriptionInterval === "monthly" && canManageOnWeb && !annualSuccess ? (
+        <Pressable
+          onPress={() => setAnnualModalVisible(true)}
+          style={[styles.settingsLink, { backgroundColor: `${theme.primary}12`, borderColor: theme.primary, borderWidth: 1.5, marginBottom: Spacing.sm }]}
+          testID="button-switch-annual"
+        >
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.primary}20` }]}>
+              <Feather name="trending-up" size={20} color={theme.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "700", color: theme.primary }}>
+                Switch to annual — save $96/year
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.primary, opacity: 0.8 }}>
+                Pay $41/mo billed annually instead of $49/mo
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={20} color={theme.primary} />
+          </View>
+        </Pressable>
+      ) : tier === "growth" && annualSuccess ? (
+        <View style={[styles.settingsLink, { backgroundColor: `${theme.success ?? "#22c55e"}15`, borderColor: theme.success ?? "#22c55e", borderWidth: 1, marginBottom: Spacing.sm }]}>
+          <View style={styles.settingsLinkContent}>
+            <View style={[styles.settingsLinkIcon, { backgroundColor: `${theme.success ?? "#22c55e"}20` }]}>
+              <Feather name="check-circle" size={20} color={theme.success ?? "#22c55e"} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="body" style={{ fontWeight: "700", color: theme.success ?? "#22c55e" }}>
+                Annual billing active
+              </ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                You are saving $96/year
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Annual upgrade confirmation modal */}
+      <Modal
+        visible={annualModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAnnualModalVisible(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center" }}
+          onPress={() => !annualSwitching && setAnnualModalVisible(false)}
+        >
+          <Pressable
+            style={{ width: "85%", backgroundColor: theme.cardBackground, borderRadius: BorderRadius.xl, padding: Spacing.xl, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20 }}
+            onPress={() => {}}
+          >
+            <View style={{ alignItems: "center", marginBottom: Spacing.lg }}>
+              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${theme.primary}20`, alignItems: "center", justifyContent: "center", marginBottom: Spacing.md }}>
+                <Feather name="trending-up" size={26} color={theme.primary} />
+              </View>
+              <ThemedText type="title" style={{ textAlign: "center", marginBottom: Spacing.xs }}>
+                Switch to Annual?
+              </ThemedText>
+              <ThemedText type="body" style={{ textAlign: "center", color: theme.textSecondary, lineHeight: 22 }}>
+                You will be charged $490/year ($41/month) instead of $49/month. You save $96 every year.
+              </ThemedText>
+            </View>
+            <View style={{ gap: Spacing.sm }}>
+              <Pressable
+                onPress={async () => {
+                  setAnnualSwitching(true);
+                  try {
+                    await apiRequest("POST", "/api/subscription/switch-to-annual", {});
+                    setAnnualSuccess(true);
+                    setAnnualModalVisible(false);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  } catch (err: any) {
+                    setAnnualModalVisible(false);
+                    alert(err?.message || "Something went wrong. Please try again.");
+                  } finally {
+                    setAnnualSwitching(false);
+                  }
+                }}
+                disabled={annualSwitching}
+                style={{ backgroundColor: theme.primary, paddingVertical: Spacing.md, borderRadius: BorderRadius.lg, alignItems: "center" }}
+                testID="button-confirm-annual"
+              >
+                <ThemedText type="body" style={{ color: "#fff", fontWeight: "700" }}>
+                  {annualSwitching ? "Switching..." : "Confirm — Save $96/year"}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={() => setAnnualModalVisible(false)}
+                disabled={annualSwitching}
+                style={{ paddingVertical: Spacing.md, alignItems: "center" }}
+                testID="button-cancel-annual"
+              >
+                <ThemedText type="body" style={{ color: theme.textSecondary }}>
+                  Keep monthly billing
+                </ThemedText>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Platform-aware subscription management */}
       {canManageOnIOS && Platform.OS === "ios" ? (

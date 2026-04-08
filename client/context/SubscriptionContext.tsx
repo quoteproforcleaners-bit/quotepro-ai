@@ -82,6 +82,7 @@ interface SubscriptionContextType {
   freeTrialDaysLeft: number;    // days remaining in the product-level free trial
   // Platform awareness
   platform: "stripe" | "revenuecat" | null;
+  subscriptionInterval: "monthly" | "annual";
   canManageOnWeb: boolean;      // can manage on web (Stripe)
   canManageOnIOS: boolean;      // can manage on iOS (RevenueCat / App Store)
   purchase: (pkg?: PurchasesPackage) => Promise<boolean>;
@@ -164,6 +165,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   // Platform awareness state
   const [platform, setPlatform] = useState<"stripe" | "revenuecat" | null>(null);
+  const [subscriptionInterval, setSubscriptionInterval] = useState<"monthly" | "annual">("monthly");
   const [canManageOnWeb, setCanManageOnWeb] = useState(true);
   const [canManageOnIOS, setCanManageOnIOS] = useState(false);
 
@@ -173,6 +175,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     apiRequest("GET", "/api/subscription/status")
       .then((data: any) => {
         if (data?.platform !== undefined) setPlatform(data.platform ?? null);
+        if (data?.subscriptionInterval !== undefined) setSubscriptionInterval(data.subscriptionInterval ?? "monthly");
         if (data?.canManageOnWeb !== undefined) setCanManageOnWeb(data.canManageOnWeb);
         if (data?.canManageOnIOS !== undefined) setCanManageOnIOS(data.canManageOnIOS);
         // Override tier if server knows better (e.g. Stripe web purchase)
@@ -479,6 +482,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         isInFreeTrial,
         freeTrialDaysLeft,
         platform,
+        subscriptionInterval,
         canManageOnWeb,
         canManageOnIOS,
         purchase,
