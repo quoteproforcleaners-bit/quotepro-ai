@@ -60,6 +60,7 @@ const OPERATIONS_NAV_ITEMS: NavItem[] = [
   { to: "/customers",            label: "Customers",  icon: Users,        pro: true, description: "Full contact history, quote history, job records, and notes for every client in one place." },
   { to: "/jobs",                 label: "Jobs",       icon: Briefcase,    pro: true, description: "Manage scheduled cleans, assign cleaners, track completion status, and mark jobs done." },
   { to: "/recurring-schedules",  label: "Recurring",  icon: Repeat2,      pro: true, description: "Set up repeating cleans with automatic job generation and optional auto-charge billing." },
+  { to: "/staff",                label: "Staff",      icon: UserCog,      pro: true, description: "Add cleaners, manage their PINs, share QR codes for mobile login, and track who's clocked in." },
   { to: "/calendar",             label: "Schedule",   icon: CalendarDays, pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
 ];
 
@@ -113,6 +114,7 @@ const NAV_LABEL_KEYS: Record<string, string> = {
   "/customers":         "nav.customers",
   "/jobs":              "nav.jobs",
   "/employees":         "nav.team",
+  "/staff":             "nav.staff",
   "/calendar":          "nav.schedule",
   "/commercial-quote":  "nav.commercial",
   "/intake-requests":   "nav.quoteRequests",

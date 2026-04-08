@@ -8,8 +8,10 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Image,
+  Modal,
   useWindowDimensions,
 } from "react-native";
+import StaffLoginScreen from "@/screens/staff/StaffLoginScreen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as WebBrowser from "expo-web-browser";
@@ -26,7 +28,11 @@ import { LANGUAGE_LABELS, type Language } from "@/i18n";
 
 type Mode = "login" | "register";
 
-export default function LoginScreen() {
+interface LoginScreenProps {
+  onStaffLoginSuccess?: (token: string, staff: any) => void;
+}
+
+export default function LoginScreen({ onStaffLoginSuccess }: LoginScreenProps = {}) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const useMaxWidth = screenWidth > 600;
@@ -35,6 +41,7 @@ export default function LoginScreen() {
   const { language, setLanguage, t } = useLanguage();
 
   const [mode, setMode] = useState<Mode>("login");
+  const [showStaffLogin, setShowStaffLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -323,7 +330,34 @@ export default function LoginScreen() {
             {mode === "login" ? t.login.signUp : t.login.signIn}
           </ThemedText>
         </Pressable>
+
+        {/* Cleaner / staff sign-in link */}
+        <Pressable
+          testID="button-staff-login"
+          style={styles.cleanerLink}
+          onPress={() => setShowStaffLogin(true)}
+        >
+          <Feather name="briefcase" size={12} color={theme.textSecondary} />
+          <ThemedText type="small" style={{ color: theme.textSecondary }}>
+            Signing in as a cleaner?
+          </ThemedText>
+        </Pressable>
       </View>
+
+      {/* Staff login modal */}
+      <Modal
+        visible={showStaffLogin}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowStaffLogin(false)}
+      >
+        <StaffLoginScreen
+          onAuthSuccess={(token, staff) => {
+            setShowStaffLogin(false);
+            onStaffLoginSuccess?.(token, staff);
+          }}
+        />
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -399,6 +433,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     marginTop: Spacing.md,
+  },
+  cleanerLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    opacity: 0.6,
   },
   languageRow: {
     flexDirection: "row",

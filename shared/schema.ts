@@ -1426,3 +1426,18 @@ export const employeeShifts = employees;
 export const intakeRequests = customers;
 export const pricingJobs = pricingAnalyses;
 export const leadCapture = socialLeads;
+
+// ─── Staff Clock Events ───────────────────────────────────────────────────────
+// Free-standing clock-in/out events (not tied to a specific job assignment)
+export const staffClockEvents = pgTable("staff_clock_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  staffId: varchar("staff_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  businessId: varchar("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  jobId: varchar("job_id").references(() => jobs.id, { onDelete: "set null" }),
+  eventType: text("event_type").notNull(), // 'clock_in' | 'clock_out'
+  latitude: real("latitude"),
+  longitude: real("longitude"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type StaffClockEvent = typeof staffClockEvents.$inferSelect;

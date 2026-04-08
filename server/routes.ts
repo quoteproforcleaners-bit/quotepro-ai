@@ -47,6 +47,7 @@ import pricingRouter from "./routers/pricingRouter";       // → /api/pricing
 import { supportRouter } from "./routers/supportRouter";   // → /api/support
 import { quoteDoctorRouter } from "./routers/quoteDoctorRouter"; // → /api/quote-doctor
 import recurringRouter from "./routers/recurringRouter";         // → /api/recurring-schedules
+import staffRouter from "./routers/staffRouter";                 // → /api/staff/*
 
 // ─── Group B — multi-domain routers (all mounted at /api) ─────────────────────
 import authRouter from "./routers/authRouter";             // /api/auth/*, /api/consent, /api/crash-report
@@ -129,6 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/support", supportRouter);
   app.use("/api/quote-doctor", quoteDoctorRouter);
   app.use("/api", recurringRouter);
+  app.use("/api", staffRouter);
 
   // 4. Mount Group B — multi-domain routers at /api
   app.use("/api", authRouter);

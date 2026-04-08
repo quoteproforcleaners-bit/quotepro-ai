@@ -49,6 +49,7 @@ import SettingsScreen from "@/screens/SettingsScreen";
 
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
+import StaffTabNavigator from "@/navigation/StaffTabNavigator";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
@@ -212,6 +213,32 @@ export default function RootStackNavigator() {
   const { isLoading: appLoading, needsOnboarding: appNeedsOnboarding } = useApp();
   const { theme } = useTheme();
 
+  // ── Staff mode ──────────────────────────────────────────────────────────────
+  const [staffMode, setStaffMode] = useState<"checking" | "staff" | "owner">("checking");
+
+  useEffect(() => {
+    AsyncStorage.getItem("staff_token").then(token => {
+      setStaffMode(token ? "staff" : "owner");
+    });
+  }, []);
+
+  if (staffMode === "checking" || authLoading || (user && appLoading && staffMode === "owner")) {
+    return (
+      <View style={[styles.loading, { backgroundColor: theme.backgroundRoot }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
+  if (staffMode === "staff") {
+    return (
+      <StaffTabNavigator
+        onSignOut={() => setStaffMode("owner")}
+      />
+    );
+  }
+  // ── End staff mode ──────────────────────────────────────────────────────────
+
   if (authLoading || (user && appLoading)) {
     return (
       <View
@@ -235,9 +262,16 @@ export default function RootStackNavigator() {
           />
           <Stack.Screen
             name="Login"
-            component={LoginScreen}
             options={{ headerShown: false }}
-          />
+          >
+            {() => (
+              <LoginScreen
+                onStaffLoginSuccess={(token, staff) => {
+                  setStaffMode("staff");
+                }}
+              />
+            )}
+          </Stack.Screen>
           <Stack.Screen
             name="GuestQuoteCalculator"
             component={QuoteCalculatorScreen}
