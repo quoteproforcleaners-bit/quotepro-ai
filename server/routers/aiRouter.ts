@@ -6,7 +6,8 @@ import { Router, type Request, type Response } from "express";
 import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
-import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { generateText, anthropic } from "../services/ai.service";
 import { callAI, AIError } from "../aiClient";
 import { trackEvent } from "../analytics";
 import { sanitizeAndLog } from "../promptSanitizer";
@@ -110,14 +111,12 @@ const router = Router();
 
       const userPrompt = `Customer update: ${statusDetail} Reply with ONLY the message text, nothing else.`;
 
-      const completion = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const content = await generateText({
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
-        max_tokens: 150,
+        maxTokens: 150,
       });
 
-      const content = (completion.content[0] as any).text;
       if (!content) return res.status(500).json({ message: "No response from AI" });
       return res.json({ message: content.trim() });
     } catch (error: any) {
@@ -140,17 +139,15 @@ const router = Router();
       const ageDays = Math.round(((Date.now() - (quote.sentAt?.getTime() || quote.createdAt.getTime())) / (1000 * 60 * 60 * 24)) * 10) / 10;
       const lastComm = comms.length > 0 ? comms[0] : null;
 
-      const completion = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const content = await generateText({
         system: `You are an AI sales assistant for a residential cleaning company. Analyze a quote and provide actionable insights. Respond with valid JSON only: {"closeProbability": number 0-100, "suggestedAction": string, "followUpMessage": string, "notes": string}`,
         messages: [{
           role: "user",
           content: `Quote: $${quote.total}, sent ${ageDays} days ago, status: ${quote.status}, ${comms.length} communications sent. Customer: ${customer ? `${customer.firstName} ${customer.lastName}, status: ${customer.status}` : "Unknown"}. Last contact: ${lastComm ? `${lastComm.channel} ${lastComm.createdAt}` : "None"}.`,
         }],
-        max_tokens: 400,
+        maxTokens: 400,
       });
 
-      const content = (completion.content[0] as any).text;
       let parsed: any = {};
       try { parsed = JSON.parse(content || "{}"); } catch {}
 
@@ -189,17 +186,14 @@ const router = Router();
       const effectiveLang = commLang || await getEffectiveLang(customer?.id, (business as any)?.commLanguage);
       const langInstruction = getLangInstruction(effectiveLang);
 
-      const completion = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const draft = await generateText({
         system: `Write a ${msgType} follow-up message (under ${maxLen} chars for SMS) for "${business?.companyName || "our company"}". The quote is $${quote.total} sent ${ageDays} days ago. Be warm, not pushy. No emojis. Sign as "${business?.senderName || "Team"}".${context ? ` Context: ${context}` : ""}${langInstruction}`,
         messages: [{
           role: "user",
           content: `Generate a follow-up ${msgType} for ${customer ? `${customer.firstName}` : "the customer"}. Reply with ONLY the message text.`,
         }],
-        max_tokens: channel === "email" ? 250 : 100,
+        maxTokens: channel === "email" ? 250 : 100,
       });
-
-      const draft = (completion.content[0] as any).text?.trim() || "";
       trackEvent(req.session.userId!, AnalyticsEvents.AI_FOLLOWUP_SENT, { quoteId, channel }).catch(() => {});
       return res.json({ draft });
     } catch (error: any) {
@@ -320,14 +314,11 @@ ${contextStr}`;
       }
       chatMessages.push({ role: "user", content: message });
 
-      const completion = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const rawContent = await generateText({
         system: systemPrompt,
         messages: chatMessages,
-        max_tokens: 800,
-      });
-
-      const rawContent = (completion.content[0] as any).text?.trim() || "";
+        maxTokens: 800,
+      }) || "";
       if (!rawContent) {
         return res.json({ reply: "I'm having trouble generating a response right now. Please try again.", mode: "coaching", quickTakeaway: "", approach: "", scripts: [], alternateVersions: [], nextStep: "" });
       }
@@ -629,7 +620,7 @@ SALES & MARKETING:
 - Referral programs that actually drive bookings`;
       }
 
-      // ── Build messages and call OpenAI ────────────────────────────────────
+      // ── Build messages and call Anthropic ────────────────────────────────
       const chatMessages: any[] = [{ role: "system", content: systemPrompt }];
 
       if (Array.isArray(conversationHistory)) {
@@ -650,15 +641,15 @@ SALES & MARKETING:
 
         try {
           const systemMsg = chatMessages.find((m: any) => m.role === "system");
-          const anthropicMessages = chatMessages
+          const nonSystemMessages = chatMessages
             .filter((m: any) => m.role !== "system")
             .map((m: any) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-          const stream = anthropic.messages.stream({
-            model: "claude-sonnet-4-5",
-            max_tokens: 900,
-            ...(systemMsg ? { system: systemMsg.content } : {}),
-            messages: anthropicMessages,
+          const stream = await generateText({
+            system: systemMsg?.content,
+            messages: nonSystemMessages,
+            maxTokens: 900,
+            stream: true,
           });
 
           for await (const chunk of stream) {
@@ -882,14 +873,12 @@ Better tier: ${serviceTypes.better || "Standard Cleaning"}
 Best tier: ${serviceTypes.best || "Deep Clean"}
 ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` : ""}`;
 
-      const completion = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const content = await generateText({
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
-        max_tokens: 400,
+        maxTokens: 400,
       });
 
-      const content = (completion.content[0] as any).text;
       if (!content) {
         return res.status(500).json({ message: "No response from AI" });
       }
@@ -962,14 +951,12 @@ BASE PRICES (your formula minimum — never go below these):
 
 ${historyContext}`;
 
-      const completion = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const content = await generateText({
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
-        max_tokens: 400,
+        maxTokens: 400,
       });
 
-      const content = (completion.content[0] as any).text;
       if (!content) return res.status(500).json({ message: "No response from AI" });
 
       let parsed: any;
@@ -1242,14 +1229,12 @@ Return exactly this JSON structure:
         ? `Generate an objection response with a ${tone} tone:\n\n${contextParts.join("\n")}`
         : `Generate a sample price objection response with a ${tone} tone for a cleaning business. Example objection: "That's more than I expected."`;
 
-      const completion = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const content = await generateText({
         system: systemPrompt,
         messages: [{ role: "user", content: userMessage }],
-        max_tokens: 800,
+        maxTokens: 800,
       });
 
-      const content = (completion.content[0] as any).text;
       if (!content) return res.status(500).json({ message: "No response from AI" });
 
       let parsed: any = {};
@@ -1340,14 +1325,12 @@ Return exactly this JSON structure:
         userPrompt = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
       }
 
-      const completion = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
+      const content = await generateText({
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
-        max_tokens: type === "sms" ? 100 : 250,
+        maxTokens: type === "sms" ? 100 : 250,
       });
 
-      const content = (completion.content[0] as any).text;
       if (!content) {
         return res.status(500).json({ message: "No response from AI" });
       }

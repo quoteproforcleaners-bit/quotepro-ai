@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { pool } from "./db";
-import { anthropic } from "./clients";
+import { anthropic, MODEL } from "./services/ai.service";
 
 /* ─── Typed Error ─────────────────────────────────────────────────────────── */
 
@@ -74,7 +74,7 @@ export async function callAI(
   options: CallAIOptions = {}
 ): Promise<{ content: string; tokensUsed: number }> {
   const {
-    model = "claude-sonnet-4-5",
+    model = MODEL,
     maxTokens = 1024,
     responseFormat,
     userId,

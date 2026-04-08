@@ -1,4 +1,6 @@
-import OpenAI, { toFile } from "openai";
+// OpenAI SDK removed — audio integration disabled.
+// Non-AI helper functions (detectAudioFormat, convertToWav) are kept intact.
+const toFile: any = null;
 import { Buffer } from "node:buffer";
 import { spawn } from "child_process";
 import { writeFile, unlink, readFile } from "fs/promises";
@@ -6,10 +8,7 @@ import { randomUUID } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
 
-export const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+export const openai: any = null; // OpenAI removed — audio AI calls unavailable
 
 export type AudioFormat = "wav" | "mp3" | "webm" | "mp4" | "ogg" | "unknown";
 

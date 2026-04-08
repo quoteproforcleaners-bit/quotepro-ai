@@ -160,7 +160,7 @@ export async function classifyLead(
     }
   }
 
-  // needs_ai: call OpenAI for full classification
+  // needs_ai: call Anthropic for full classification
   const content = `Subreddit: r/${subreddit}\nTitle: ${title}\n\n${body.slice(0, 800)}`;
   try {
     const completion = await anthropic.messages.create({

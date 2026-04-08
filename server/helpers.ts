@@ -1604,7 +1604,7 @@ export function getPrivacyPolicyHTML(): string {
 <ul>
 <li><strong>Google Calendar:</strong> With your explicit consent, we access your Google Calendar to create and update events for scheduled jobs. We only request access to create and modify calendar events (calendar.events scope). We do not read your existing calendar data.</li>
 <li><strong>SendGrid:</strong> Used to send emails on your behalf to your customers.</li>
-<li><strong>OpenAI:</strong> Used to generate AI-powered content such as email drafts and business insights. Your business data may be sent to OpenAI for processing but is not used to train their models.</li>
+<li><strong>Anthropic:</strong> Used to generate AI-powered content such as email drafts and business insights. Your business data may be sent to Anthropic for processing but is not used to train their models.</li>
 <li><strong>RevenueCat:</strong> Manages subscription purchases and entitlements.</li>
 </ul>
 
@@ -1689,7 +1689,7 @@ export function getTermsOfServiceHTML(): string {
 </ul>
 
 <h2>7. Third-Party Integrations</h2>
-<p>QuotePro integrates with third-party services including Google Calendar, SendGrid, and OpenAI. Your use of these integrations is subject to the respective third-party terms of service. We are not responsible for the availability or performance of third-party services.</p>
+<p>QuotePro integrates with third-party services including Google Calendar, SendGrid, and Anthropic. Your use of these integrations is subject to the respective third-party terms of service. We are not responsible for the availability or performance of third-party services.</p>
 
 <h2>8. Limitation of Liability</h2>
 <p>QuotePro is provided "as is" without warranties of any kind. To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the Service, including but not limited to lost profits, data loss, or business interruption.</p>

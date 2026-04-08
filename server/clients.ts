@@ -1,9 +1,9 @@
 /**
  * Shared singletons and pure helpers for QuotePro routers.
  *
- * All modules that need openai, stripe, or utility functions import from here
+ * All modules that need Anthropic, Stripe, or utility functions import from here
  * rather than initialising their own instances. This ensures:
- *   • only one OpenAI client exists (avoids duplicate base-URL config issues)
+ *   • only one Anthropic client exists (avoids duplicate config issues)
  *   • stripe is lazily initialised exactly once at startup
  *   • helper functions are defined in one place and unit-testable
  */
