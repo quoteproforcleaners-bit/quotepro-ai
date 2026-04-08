@@ -59,6 +59,10 @@ quotepro-source-audit.tar.gz
 audit_dump.txt
 session-transcript.md
 commercial_calculator_audit.txt
+AUDIT_FOR_CLAUDE.txt
+FULL_CODEBASE_FOR_AUDIT.md
+AUDIT.md
+quotepro-audit.md
 
 # Secrets / platform config
 google-services.json
