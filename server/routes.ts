@@ -68,6 +68,7 @@ import portalRouter from "./routers/portalRouter";         // /api/portal/*, /po
 import winLossRouter from "./routers/winLossRouter";       // /feedback/:token (public), /api/win-loss
 
 import { processAutopilotJobs } from "./services/autopilotService";
+import cron from "node-cron";
 import { buildWidgetJs } from "./widgetTemplate";
 import { mcpRouter } from "./mcp/index";
 
@@ -185,34 +186,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }, 15 * 60 * 1000);
 
-  // — Hourly cron
-  let isWorkerRunning = false;
-  setInterval(async () => {
-    if (isWorkerRunning) {
-      console.warn("Background worker tick skipped — previous run still in progress");
-      return;
-    }
-    isWorkerRunning = true;
+  // — Quote expiry: every hour on the hour
+  cron.schedule("0 * * * *", async () => {
     try {
       await expireOldQuotes();
+    } catch (e) {
+      console.error("[worker] Quote expiry error:", e);
+    }
+  });
+
+  // — Follow-up processing: every 30 minutes
+  cron.schedule("*/30 * * * *", async () => {
+    try {
       const { sent, canceled } = await processPendingFollowUps();
       if (sent > 0 || canceled > 0) {
         console.log(`Follow-ups processed: ${sent} sent, ${canceled} canceled`);
       }
+    } catch (e) {
+      console.error("[worker] Follow-up processing error:", e);
+    }
+  });
+
+  // — Stale quote nudges: daily at 9am
+  cron.schedule("0 9 * * *", async () => {
+    try {
       await sendStaleQuoteNudges();
+    } catch (e) {
+      console.error("[worker] Stale quote nudges error:", e);
+    }
+  });
+
+  // — Weekly digest emails: Mondays at 8am
+  cron.schedule("0 8 * * 1", async () => {
+    try {
       await sendWeeklyDigestEmails();
+    } catch (e) {
+      console.error("[worker] Weekly digest emails error:", e);
+    }
+  });
+
+  // — Activation nudges, recurring job generation, win-loss follow-ups: every hour
+  cron.schedule("0 * * * *", async () => {
+    try {
       await sendActivationNudges();
       await generateRecurringJobs();
       await sendWinLossFollowUps();
+    } catch (e) {
+      console.error("[worker] Hourly jobs error:", e);
+    }
+  });
+
+  // — Monthly AI follow-up reset: 1st of month at midnight
+  cron.schedule("0 0 1 * *", async () => {
+    try {
+      await pool.query("UPDATE users SET ai_follow_ups_used_this_month = 0");
+      console.log("[worker] Monthly AI follow-up counter reset");
+    } catch (e) {
+      console.error("[worker] Monthly AI reset error:", e);
+    }
+  });
+
+  // — Analytics TTL cleanup: daily at 2am
+  cron.schedule("0 2 * * *", async () => {
+    try {
+      const result = await pool.query(
+        `DELETE FROM analytics_events WHERE created_at < NOW() - INTERVAL '90 days'`
+      );
+      const deleted = result.rowCount ?? 0;
+      console.log(`[analytics-ttl] Purged ${deleted} events older than 90 days`);
+    } catch (e) {
+      console.error("[analytics-ttl] Purge error:", e);
+    }
+  });
+
+  // — Lead finder worker: every hour on the hour
+  cron.schedule("0 * * * *", async () => {
+    try {
       if ((app as any).__leadFinderWorker) {
         await (app as any).__leadFinderWorker();
       }
     } catch (e) {
-      console.error("Background worker error:", e);
-    } finally {
-      isWorkerRunning = false;
+      console.error("[worker] Lead finder error:", e);
     }
-  }, 60 * 60 * 1000);
+  });
 
   return httpServer;
 }
