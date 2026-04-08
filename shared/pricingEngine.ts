@@ -418,6 +418,93 @@ export function computeResidentialQuote(
   return { good, better, best, baseHours, addOnHours, addOnPrice, hourlyRate: p.hourlyRate ?? 45 };
 }
 
+// ─── Intake price estimation helper ──────────────────────────────────────────
+// Accepts the simplified flat shape produced by the AI intake-extraction step
+// and returns a single anchor price with a ±8 % band.
+
+/** Fields extracted from an AI intake request */
+export interface IntakeQuoteInput {
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  pets?: boolean;
+  /** "standard_cleaning" | "deep_clean" | "move_in_out" | "post_construction" | "airbnb" | "recurring" */
+  serviceType?: string;
+  /** "one_time" | "weekly" | "biweekly" | "monthly" */
+  frequency?: string;
+  addOns?: Record<string, unknown>;
+}
+
+export interface IntakePriceEstimate {
+  price: number;
+  min: number;
+  max: number;
+}
+
+const INTAKE_SERVICE_TYPE_MAP: Record<string, string> = {
+  standard_cleaning: "standard",
+  deep_clean:        "deep-clean",
+  move_in_out:       "move-in-out",
+  post_construction: "post-construction",
+  airbnb:            "standard",
+  recurring:         "standard",
+};
+
+// Include move-in-out and post-construction that are not in DEFAULT_PRICING.serviceTypes
+const EXTENDED_SERVICE_TYPES = [
+  ...DEFAULT_PRICING.serviceTypes,
+  { id: "move-in-out",       name: "Move-In/Move-Out",  multiplier: 2.0, scope: "Full move-in or move-out cleaning" },
+  { id: "post-construction", name: "Post-Construction",  multiplier: 2.0, scope: "Post-construction deep clean" },
+];
+
+/**
+ * Estimate a single anchor price from AI-extracted intake fields.
+ * Delegates to computeResidentialQuote and reads the "better" tier result.
+ * Returns the price together with a ±8 % band (rounded to nearest $5).
+ */
+export function estimatePriceFromIntake(
+  fields: IntakeQuoteInput,
+  settings: Partial<PricingSettings> | null,
+): IntakePriceEstimate {
+  const engineTypeId = INTAKE_SERVICE_TYPE_MAP[fields.serviceType ?? "standard_cleaning"] ?? "standard";
+
+  const pricing: PricingSettings = {
+    ...DEFAULT_PRICING,
+    serviceTypes: EXTENDED_SERVICE_TYPES,
+    ...(settings as Partial<PricingSettings> ?? {}),
+    // Override betterOptionId so the engine prices the requested service type
+    betterOptionId: engineTypeId,
+  };
+
+  const property: ResidentialProperty = {
+    beds:           fields.beds  ?? 3,
+    halfBaths:      0,
+    baths:          fields.baths ?? 2,
+    sqft:           fields.sqft  ?? 1500,
+    homeType:       "house",
+    conditionScore: 7,
+    peopleCount:    2,
+    petType:        fields.pets ? "dog" : "none",
+    petShedding:    false,
+  };
+
+  const addOns: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(fields.addOns ?? {})) {
+    addOns[k] = !!v;
+  }
+
+  // Normalise frequency: "one_time" → "one-time"
+  const frequency = (fields.frequency ?? "one_time").replace(/_/g, "-");
+
+  const result = computeResidentialQuote(property, addOns, frequency, pricing);
+  const price = result.better.price;
+  return {
+    price,
+    min: Math.round(price * 0.92 / 5) * 5,
+    max: Math.round(price * 1.08 / 5) * 5,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMMERCIAL ENGINE
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -75,6 +75,7 @@ import {
 } from "../storage";
 import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
 import { sendEmail, getBusinessSendParams, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "../mail";
+import { estimatePriceFromIntake } from "../../shared/pricingEngine";
 
 const router = Router();
 
@@ -358,23 +359,7 @@ const router = Router();
       const intake = intakeResult.rows[0];
       const f = intake.extracted_fields || {};
 
-      // ── Proper server-side pricing calculation ─────────────────────────────
-      // IMPORTANT: We calculate the expected price ourselves using configured
-      // pricing rules. This prevents AI from generating absurdly low prices
-      // (like $120 for a deep clean) due to incorrect context.
-      function calcSqftBaseHours(sqft: number): number {
-        if (sqft <= 1000) return 1.5;
-        if (sqft <= 1500) return 2.5;
-        if (sqft <= 2000) return 3.0;
-        if (sqft <= 2500) return 3.5;
-        if (sqft <= 3000) return 4.0;
-        if (sqft <= 3500) return 4.5;
-        if (sqft <= 4000) return 5.0;
-        return 5.0 + Math.ceil((sqft - 4000) / 750);
-      }
-      function roundHalfUp(h: number) { return Math.round(h * 2) / 2; }
-      function roundNearest5(n: number) { return Math.round(n / 5) * 5; }
-
+      // ── Server-side pricing via shared pricing engine ─────────────────────
       let computedMin = 120; // absolute fallback
       let computedMax = 350;
       let hourlyRate = 50;
@@ -386,50 +371,10 @@ const router = Router();
         hourlyRate = pss.hourlyRate || 50;
         minimumTicket = pss.minimumTicket || 100;
 
-        const sqft = f.sqft || 1500;
-        const beds = f.beds || 3;
-        const baths = f.baths || 2;
-
-        const sqftHours = calcSqftBaseHours(sqft);
-        const bathHours = Math.max(0, baths - 1) * 0.5;
-        const bedHours  = Math.max(0, beds - 2) * 0.25;
-        const petHours  = f.pets ? 0.5 : 0;
-        const baseHours = sqftHours + bathHours + bedHours + petHours;
-
-        // Service type multipliers — keep same as mobile client
-        const serviceTypeMultipliers: Record<string, number> = {
-          standard_cleaning: 1.0,
-          deep_clean: 1.5,
-          move_in_out: 2.0,
-          post_construction: 2.0,
-          airbnb: 1.2,
-          recurring: 1.0,
-        };
-        const mult = serviceTypeMultipliers[f.serviceType || "standard_cleaning"] || 1.0;
-
-        const totalHours = roundHalfUp(baseHours * mult);
-        let basePrice = totalHours * hourlyRate;
-        basePrice = Math.max(basePrice, minimumTicket);
-
-        // Add-on price estimates
-        const addOnPrices: Record<string, number> = pss.addOnPrices || {};
-        let addOnTotal = 0;
-        for (const [key, val] of Object.entries(f.addOns || {})) {
-          if (val && addOnPrices[key]) addOnTotal += Number(addOnPrices[key]);
-        }
-
-        // Frequency discount
-        const freqDiscounts = pss.frequencyDiscounts || { weekly: 25, biweekly: 15, monthly: 10 };
-        let freqDiscount = 0;
-        if (f.frequency === "weekly") freqDiscount = freqDiscounts.weekly / 100;
-        else if (f.frequency === "biweekly") freqDiscount = freqDiscounts.biweekly / 100;
-        else if (f.frequency === "monthly") freqDiscount = freqDiscounts.monthly / 100;
-
-        const computedPrice = roundNearest5((basePrice + addOnTotal) * (1 - freqDiscount));
-        // Provide a ±15% range so AI can write line items naturally, but stays anchored
-        computedMin = Math.round(computedPrice * 0.92 / 5) * 5;
-        computedMax = Math.round(computedPrice * 1.08 / 5) * 5;
-        console.log(`[ai-quote] computed price: $${computedPrice} (range $${computedMin}-$${computedMax}), hourlyRate=${hourlyRate}, mult=${mult}, hours=${totalHours}`);
+        const estimate = estimatePriceFromIntake(f, pss);
+        computedMin = estimate.min;
+        computedMax = estimate.max;
+        console.log(`[ai-quote] computed price: $${estimate.price} (range $${estimate.min}-$${estimate.max})`);
       } catch (pricingErr) {
         console.error("[ai-quote] pricing calc error:", pricingErr);
       }
