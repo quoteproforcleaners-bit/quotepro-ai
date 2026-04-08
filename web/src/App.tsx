@@ -86,6 +86,8 @@ import FieldStatusPage from "./pages/FieldStatusPage";
 import RecurringSchedulesPage from "./pages/RecurringSchedulesPage";
 import StaffManagementPage from "./pages/StaffManagementPage";
 import BookingWidgetPage from "./pages/BookingWidgetPage";
+import NPSDashboardPage from "./pages/NPSDashboardPage";
+import WhatsNewModal from "./components/WhatsNewModal";
 
 function EmployeeGuard({ children }: { children: React.ReactNode }) {
   if (!isLoggedIn()) return <Navigate to="/employee/login" replace />;
@@ -199,6 +201,7 @@ export default function App() {
           <Route path="/intake-requests" element={<IntakeRequestsPage />} />
           <Route path="/lead-capture" element={<ProGate feature="Lead Capture Link"><LeadCapturePage /></ProGate>} />
           <Route path="/booking-widget" element={<BookingWidgetPage />} />
+          <Route path="/nps-dashboard" element={<NPSDashboardPage />} />
           <Route path="/lead-finder" element={<ProGate feature="Local Lead Finder"><LeadFinderPage /></ProGate>} />
           <Route path="/lead-finder/settings" element={<ProGate feature="Local Lead Finder"><LeadFinderSettingsPage /></ProGate>} />
           <Route path="/lead-finder/:id" element={<ProGate feature="Local Lead Finder"><LeadFinderDetailPage /></ProGate>} />
@@ -263,6 +266,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>
+      {isAuthenticated && <WhatsNewModal />}
     </WebAIConsentProvider>
     </SubscriptionProvider>
     </WalkthroughProvider>

@@ -997,6 +997,115 @@ function RevenueChart({ quotes, fmt }: { quotes: any[]; fmt: (n: number) => stri
  );
 }
 
+// ─── Power Feature Tips ──────────────────────────────────────────────────────
+
+const FEATURE_TIPS = [
+  {
+    id: "booking-widget",
+    icon: "🔗",
+    title: "Embed your quote form",
+    desc: "Put a booking widget on your website. Visitors can request quotes without calling you.",
+    cta: "Set Up Widget",
+    path: "/booking-widget",
+    accent: "#6366f1",
+  },
+  {
+    id: "lead-capture",
+    icon: "⚡",
+    title: "Share a quote link",
+    desc: "Send a branded link that lets any prospect request an instant AI quote from you in 60 seconds.",
+    cta: "Get Your Link",
+    path: "/lead-capture",
+    accent: "#0ea5e9",
+  },
+  {
+    id: "autopilot",
+    icon: "🤖",
+    title: "Let AI follow up for you",
+    desc: "Autopilot quotes, follows up, and requests reviews automatically — while you're on the job.",
+    cta: "Explore Autopilot",
+    path: "/autopilot",
+    accent: "#f59e0b",
+  },
+] as const;
+
+function PowerFeatureTips({
+  hasQuotes,
+  autopilotEnabled,
+  navigate,
+}: {
+  hasQuotes: boolean;
+  autopilotEnabled: boolean;
+  navigate: (p: string) => void;
+}) {
+  const [dismissed, setDismissed] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("dismissedFeatureTips") || "[]"); }
+    catch { return []; }
+  });
+
+  if (!hasQuotes) return null;
+
+  const visible = FEATURE_TIPS.filter(t => {
+    if (dismissed.includes(t.id)) return false;
+    if (t.id === "autopilot" && autopilotEnabled) return false;
+    return true;
+  });
+
+  if (visible.length === 0) return null;
+
+  function dismiss(id: string) {
+    const next = [...dismissed, id];
+    setDismissed(next);
+    localStorage.setItem("dismissedFeatureTips", JSON.stringify(next));
+  }
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+        Unlock More Value
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+        {visible.map(tip => (
+          <div key={tip.id} style={{
+            background: "#fff", borderRadius: 14,
+            border: `0.5px solid ${tip.accent}30`,
+            padding: "14px 16px", position: "relative",
+            boxShadow: `0 2px 12px ${tip.accent}10`,
+          }}>
+            <button
+              onClick={() => dismiss(tip.id)}
+              style={{
+                position: "absolute", top: 10, right: 10, background: "none", border: "none",
+                cursor: "pointer", color: "#cbd5e1", padding: 2, lineHeight: 1, fontSize: 14,
+              }}
+              title="Dismiss"
+            >
+              ×
+            </button>
+            <div style={{ fontSize: 20, marginBottom: 6 }}>{tip.icon}</div>
+            <p style={{ margin: "0 0 3px", fontSize: 13, fontWeight: 700, color: "#0f172a" }}>{tip.title}</p>
+            <p style={{ margin: "0 0 12px", fontSize: 12, color: "#64748b", lineHeight: 1.45 }}>{tip.desc}</p>
+            <button
+              onClick={() => navigate(tip.path)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                padding: "7px 12px", borderRadius: 8, border: "none",
+                background: `${tip.accent}14`, color: tip.accent,
+                fontSize: 12, fontWeight: 700, cursor: "pointer",
+              }}
+            >
+              {tip.cta}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard Page ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -1546,6 +1655,9 @@ export default function DashboardPage() {
  navigate={navigate}
  />
  ) : null}
+
+ {/* 2a. Power feature discovery cards — shown to active users who haven't used them */}
+ <PowerFeatureTips hasQuotes={hasQuotes} autopilotEnabled={!!autopilotSettings?.autopilotEnabled} navigate={navigate} />
 
  {/* 2b. Plan intent banner — for users who came from pricing page but skipped onboarding */}
  {showIntentBanner && (

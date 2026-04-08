@@ -98,6 +98,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { to: "/employees",         label: "Team Members",    icon: UserCog,    description: "Add cleaners, manage availability, and keep track of your crew's schedule and assignments." },
   { to: "/team",              label: "Field Status",    icon: Radio,      description: "Live kanban view of today's field assignments — see who's checked in, en route, or completed." },
   { to: "/file-library",      label: "File Library",    icon: FolderOpen, description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
+  { to: "/nps-dashboard",      label: "NPS Dashboard",   icon: BarChart2,  description: "Customer satisfaction scores, verbatim feedback, and churn risk alerts from your NPS surveys." },
   { to: "/qbo-settings",      label: "QuickBooks",      icon: PlugZap,    description: "Sync your quotes, invoices, and payments directly to QuickBooks Online." },
   { to: "/account-settings",  label: "Account",         icon: CircleUser, description: "Manage your profile, password, notification preferences, and billing information." },
 ];
@@ -148,6 +149,7 @@ const NAV_LABEL_KEYS: Record<string, string> = {
   "/file-library":      "File Library",
   "/toolkit":           "Toolkit",
   "/pro-setup":         "Setup Checklist",
+  "/nps-dashboard":     "NPS Dashboard",
   "/qbo-settings":      "QuickBooks",
   "/account-settings":  "Account",
   "/team":              "Field Status",

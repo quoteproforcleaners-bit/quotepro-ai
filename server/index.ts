@@ -899,6 +899,139 @@ async function seedToDoDemo() {
     }, 15 * 60 * 1000); // every 15 minutes
   }
   scheduleAutopilotCron();
+
+  // ─── Dunning: add columns if not yet present, then schedule daily retry ───
+  (async () => {
+    try {
+      await pool.query(`
+        ALTER TABLE recurring_clean_series
+          ADD COLUMN IF NOT EXISTS charge_failure_count INTEGER NOT NULL DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS last_charge_failed_at TIMESTAMPTZ,
+          ADD COLUMN IF NOT EXISTS charge_paused_at TIMESTAMPTZ
+      `);
+    } catch (e: any) {
+      console.error("[dunning] Failed to add dunning columns:", e.message);
+    }
+  })();
+
+  function scheduleDunningCron() {
+    async function runDunning() {
+      try {
+        // Retry series that had a charge failure 1, 3, or 7 days ago
+        // (i.e., we round-trip daily at 7am and pick the right retry window)
+        const { rows: dunningSeries } = await pool.query<{
+          id: string;
+          business_id: string;
+          customer_id: string | null;
+          stripe_payment_method_id: string;
+          default_price: number | null;
+          charge_failure_count: number;
+        }>(`
+          SELECT id, business_id, customer_id, stripe_payment_method_id, default_price, charge_failure_count
+          FROM recurring_clean_series
+          WHERE auto_charge = true
+            AND stripe_payment_method_id IS NOT NULL
+            AND status = 'active'
+            AND charge_failure_count BETWEEN 1 AND 2
+            AND last_charge_failed_at IS NOT NULL
+            AND EXTRACT(DAY FROM (NOW() - last_charge_failed_at)) IN (1, 3, 7)
+        `);
+
+        if (!dunningSeries.length) return;
+        const { getStripe } = await import("./clients");
+        const stripe = getStripe();
+        if (!stripe) return;
+
+        for (const series of dunningSeries) {
+          try {
+            const amountCents = series.default_price ? Math.round(series.default_price * 100) : 0;
+            if (amountCents <= 0) continue;
+
+            // Find the most recent unpaid job for this series
+            const { rows: jobs } = await pool.query<{ id: string; start_datetime: Date }>(
+              `SELECT id, start_datetime FROM jobs
+               WHERE series_id = $1 AND (total IS NULL OR total = 0)
+                 AND status != 'cancelled' AND skipped = false
+               ORDER BY start_datetime DESC LIMIT 1`,
+              [series.id]
+            );
+            if (!jobs.length) continue;
+            const job = jobs[0];
+
+            const intent = await stripe.paymentIntents.create({
+              amount: amountCents,
+              currency: "usd",
+              payment_method: series.stripe_payment_method_id,
+              confirm: true,
+              automatic_payment_methods: { enabled: false },
+              metadata: { jobId: job.id, seriesId: series.id, dunning: "true" },
+            });
+
+            if (intent.status === "succeeded") {
+              await pool.query(
+                `UPDATE jobs SET total = $1, updated_at = NOW() WHERE id = $2`,
+                [series.default_price, job.id]
+              );
+              // Reset failure count
+              await pool.query(
+                `UPDATE recurring_clean_series
+                 SET charge_failure_count = 0, last_charge_failed_at = NULL, updated_at = NOW()
+                 WHERE id = $1`,
+                [series.id]
+              );
+              console.log(`[dunning] Retry succeeded for series ${series.id}`);
+            }
+          } catch (retryErr: any) {
+            console.error(`[dunning] Retry failed for series ${series.id}:`, retryErr.message);
+            // Increment and potentially pause — handled by the same logic as initial failures
+            const { rows: updated } = await pool.query<{ charge_failure_count: number }>(
+              `UPDATE recurring_clean_series
+               SET charge_failure_count = charge_failure_count + 1,
+                   last_charge_failed_at = NOW(), updated_at = NOW()
+               WHERE id = $1 RETURNING charge_failure_count`,
+              [series.id]
+            );
+            if ((updated[0]?.charge_failure_count ?? 0) >= 3) {
+              await pool.query(
+                `UPDATE recurring_clean_series
+                 SET auto_charge = false, charge_paused_at = NOW(), updated_at = NOW()
+                 WHERE id = $1`,
+                [series.id]
+              );
+              // Notify owner
+              const { rows: biz } = await pool.query(
+                `SELECT u.email, b.company_name FROM businesses b JOIN users u ON u.id = b.owner_user_id WHERE b.id = $1`,
+                [series.business_id]
+              );
+              if (biz[0]?.email) {
+                const { sendEmail } = await import("./mail");
+                sendEmail({
+                  to: biz[0].email,
+                  subject: "Recurring auto-charge paused — 3 failed payment attempts",
+                  html: `<p>Hi,</p><p>After 3 failed charge attempts, the auto-charge for one of your recurring cleaning schedules has been <strong>paused</strong>. Please contact your client to update their payment method and re-enable auto-charge in QuotePro.</p>`,
+                  text: "Recurring auto-charge paused after 3 failed attempts.",
+                  fromName: "QuotePro",
+                }).catch(() => {});
+              }
+            }
+          }
+        }
+      } catch (e: any) {
+        console.error("[dunning] Cron failed:", e.message);
+      }
+    }
+
+    // Run daily at 7am
+    const now = new Date();
+    const next7am = new Date(now);
+    next7am.setHours(7, 0, 0, 0);
+    if (next7am <= now) next7am.setDate(next7am.getDate() + 1);
+    setTimeout(() => {
+      runDunning();
+      setInterval(runDunning, 24 * 60 * 60 * 1000);
+    }, next7am.getTime() - now.getTime());
+  }
+  scheduleDunningCron();
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

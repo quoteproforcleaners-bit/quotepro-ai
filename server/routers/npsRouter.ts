@@ -130,4 +130,87 @@ router.post("/submit", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/nps/admin — dashboard data (owner only) ──────────────────────
+router.get("/admin", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+
+    // Get this owner's business
+    const bizRow = await pool.query(
+      "SELECT id FROM businesses WHERE owner_user_id = $1 LIMIT 1",
+      [userId]
+    );
+    if (!bizRow.rows.length) return res.status(404).json({ error: "Business not found" });
+
+    // All NPS responses from users attached to this business
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.email, u.nps_score, u.nps_response, u.nps_surveyed_at,
+              u.subscription_tier
+       FROM users u
+       WHERE u.nps_score IS NOT NULL
+         AND u.nps_surveyed_at IS NOT NULL
+       ORDER BY u.nps_surveyed_at DESC
+       LIMIT 200`
+    );
+
+    const rows = result.rows;
+
+    if (rows.length === 0) {
+      return res.json({
+        averageScore: null,
+        npsIndex: null,
+        totalResponses: 0,
+        promoters: 0,
+        passives: 0,
+        detractors: 0,
+        distribution: Array.from({ length: 11 }, (_, i) => ({ score: i, count: 0 })),
+        responses: [],
+        lowScoreAlerts: [],
+      });
+    }
+
+    const scores = rows.map((r: any) => Number(r.nps_score));
+    const promoters = scores.filter((s: number) => s >= 9).length;
+    const passives = scores.filter((s: number) => s >= 7 && s <= 8).length;
+    const detractors = scores.filter((s: number) => s <= 6).length;
+    const total = scores.length;
+    const npsIndex = Math.round(((promoters - detractors) / total) * 100);
+    const averageScore = +(scores.reduce((a: number, b: number) => a + b, 0) / total).toFixed(1);
+
+    const distribution = Array.from({ length: 11 }, (_, i) => ({
+      score: i,
+      count: scores.filter((s: number) => s === i).length,
+    }));
+
+    const responses = rows.map((r: any) => ({
+      id: r.id,
+      name: r.name || r.email,
+      email: r.email,
+      score: Number(r.nps_score),
+      comment: r.nps_response || null,
+      surveyedAt: r.nps_surveyed_at,
+      tier: r.subscription_tier,
+    }));
+
+    const lowScoreAlerts = responses
+      .filter((r: any) => r.score <= 6)
+      .slice(0, 10);
+
+    return res.json({
+      averageScore,
+      npsIndex,
+      totalResponses: total,
+      promoters,
+      passives,
+      detractors,
+      distribution,
+      responses,
+      lowScoreAlerts,
+    });
+  } catch (err: any) {
+    console.error("[nps/admin]", err.message);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 export default router;

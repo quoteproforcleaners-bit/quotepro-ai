@@ -2130,25 +2130,80 @@ export async function generateRecurringJobs(): Promise<void> {
             } catch (chargeErr: any) {
               console.error(`[recurring] Auto-charge failed for job ${job.id}:`, chargeErr.message);
 
+              // Increment failure count and record failure timestamp on the series
+              const { rows: updatedSeries } = await pool.query<{ charge_failure_count: number }>(
+                `UPDATE recurring_clean_series
+                 SET charge_failure_count  = COALESCE(charge_failure_count, 0) + 1,
+                     last_charge_failed_at = NOW(),
+                     updated_at            = NOW()
+                 WHERE id = $1
+                 RETURNING charge_failure_count`,
+                [series.id]
+              );
+              const newFailureCount = updatedSeries[0]?.charge_failure_count ?? 1;
+
+              // After 3 failures → pause auto-charge on this series
+              if (newFailureCount >= 3) {
+                await pool.query(
+                  `UPDATE recurring_clean_series
+                   SET auto_charge = false, charge_paused_at = NOW(), updated_at = NOW()
+                   WHERE id = $1`,
+                  [series.id]
+                );
+                console.log(`[dunning] Series ${series.id} paused after ${newFailureCount} charge failures`);
+              }
+
               // Look up business owner and customer for failure notifications
               const { rows: bizRows } = await pool.query(
                 `SELECT owner_user_id, company_name, email FROM businesses WHERE id = $1`,
                 [series.business_id]
               );
               const biz = bizRows[0];
+
+              // Email the customer about the failed payment
+              if (series.customer_id) {
+                const { rows: custRows } = await pool.query<{ email: string; first_name: string }>(
+                  `SELECT email, first_name FROM customers WHERE id = $1`,
+                  [series.customer_id]
+                );
+                const cust = custRows[0];
+                if (cust?.email) {
+                  const attemptNum = newFailureCount;
+                  const isPaused = newFailureCount >= 3;
+                  const custSubject = isPaused
+                    ? `Your recurring cleaning service has been paused — payment issue`
+                    : `Action needed: payment issue for your recurring clean (attempt ${attemptNum})`;
+                  const custBody = isPaused
+                    ? `<p>Hi ${cust.first_name || "there"},</p><p>We were unable to charge your card for your recurring cleaning service after ${newFailureCount} attempts. Your auto-charge has been <strong>paused</strong>. Please contact ${biz?.company_name || "your cleaning company"} to update your payment details and resume service.</p>`
+                    : `<p>Hi ${cust.first_name || "there"},</p><p>We had trouble charging your card for your scheduled cleaning on <strong>${new Date(job.start_datetime).toLocaleDateString()}</strong>. We'll try again automatically. If you'd like to update your payment method, please contact ${biz?.company_name || "your cleaning company"}.</p>`;
+                  sendEmail({
+                    to: cust.email,
+                    subject: custSubject,
+                    html: custBody,
+                    text: custBody.replace(/<[^>]+>/g, ""),
+                    fromName: biz?.company_name || PLATFORM_FROM_NAME,
+                  }).catch(() => {});
+                }
+              }
+
               if (biz?.owner_user_id) {
                 trackEvent(biz.owner_user_id, "RECURRING_AUTO_CHARGE_FAILED" as any, {
-                  jobId: job.id, error: chargeErr.message,
+                  jobId: job.id, error: chargeErr.message, failureCount: newFailureCount,
                 }).catch(() => {});
 
-                // Notify business owner
+                // Notify business owner — escalate message when paused
                 const ownerUser = await getUserById(biz.owner_user_id);
                 if (ownerUser?.email) {
+                  const isPaused = newFailureCount >= 3;
                   await sendEmail({
                     to: ownerUser.email,
-                    subject: "Auto-charge failed for a recurring job",
-                    html: `<p>Hi,</p><p>We were unable to automatically charge for a recurring job scheduled on <strong>${new Date(job.start_datetime).toLocaleDateString()}</strong>.</p><p>Please collect payment manually or update the payment method in QuotePro.</p><p>The QuotePro Team</p>`,
-                    text: `A recurring job auto-charge failed for ${new Date(job.start_datetime).toLocaleDateString()}. Please collect payment manually.`,
+                    subject: isPaused
+                      ? "Auto-charge paused after 3 failed attempts — action required"
+                      : `Auto-charge failed for a recurring job (attempt ${newFailureCount})`,
+                    html: isPaused
+                      ? `<p>Hi,</p><p>Auto-charge for a recurring cleaning job has been <strong>paused after 3 failed payment attempts</strong>. Please contact the client to collect payment and update their card on file.</p><p>Job date: ${new Date(job.start_datetime).toLocaleDateString()}</p><p>The QuotePro Team</p>`
+                      : `<p>Hi,</p><p>We were unable to automatically charge for a recurring job scheduled on <strong>${new Date(job.start_datetime).toLocaleDateString()}</strong> (attempt ${newFailureCount} of 3). We will retry automatically. Please verify the client's payment method in QuotePro.</p><p>The QuotePro Team</p>`,
+                    text: `Recurring job auto-charge failed (attempt ${newFailureCount}) for ${new Date(job.start_datetime).toLocaleDateString()}.`,
                     fromName: PLATFORM_FROM_NAME,
                   }).catch(() => {});
                 }

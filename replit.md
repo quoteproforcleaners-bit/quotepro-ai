@@ -111,6 +111,15 @@ Session-based authentication supports email/password, Apple, and Google SSO.
 - **Metro Proxy**: `metro.config.js` proxies `/home/*` and `/api/portal/*` from port 8081 → 5000 so the portal is accessible in development and testing.
 - **Web App Router**: `/home/` added to `TOP_LEVEL_PATHS` in `web/src/main.tsx` so React Router uses `basename="/"` for portal routes.
 - **Token Backfill**: All 69 existing customers backfilled with portal tokens on startup.
+## Sprint 25 — Product Audit Improvements
+- **ProGate (T001)**: Context-aware upgrade prompts in `web/src/components/ProGate.tsx`. Shows feature-specific benefit bullets, exact tier price badge ("$49/mo"), and feature name in headline.
+- **WhatsNewModal (T002)**: Version-gated changelog modal in `web/src/components/WhatsNewModal.tsx`. Fires once per version key (`CURRENT_VERSION = "2026.04"`) via `localStorage`. Rendered in `App.tsx` for authenticated users only.
+- **NPS Dashboard (T003)**: Admin page at `/nps-dashboard`. Backend `GET /api/nps/admin` in `server/routers/npsRouter.ts` returns averageScore, npsIndex, distribution, responses, lowScoreAlerts. Page: `web/src/pages/NPSDashboardPage.tsx`. Added to Layout.tsx Settings nav section.
+- **Customer Portal Quote UX (T004)**: Improved pending-quote CTA in `web/src/pages/CustomerPortalPage.tsx`. Full-width "Accept Quote — $XX.XX" primary button with checkmark icon and box-shadow. Trust badge "Secure digital signature · No payment today". Decline demoted to subtle text link.
+- **Feature Discovery Tips (T005)**: `PowerFeatureTips` component in `web/src/pages/DashboardPage.tsx`. Shows 3 dismissible tip cards (Booking Widget, Lead Capture Link, Autopilot) for active users who haven't used them. Dismissed state persisted in `localStorage["dismissedFeatureTips"]`.
+- **Dunning for Recurring Auto-Charge (T006)**: 3 new columns on `recurring_clean_series` — `charge_failure_count`, `last_charge_failed_at`, `charge_paused_at` — added via `ALTER TABLE IF NOT EXISTS` on startup. Failure handler in `generateRecurringJobs()` (helpers.ts) now increments count, emails customer + owner, pauses after 3 failures. Daily 7am dunning cron in `server/index.ts` retries on day 1/3/7 from `last_charge_failed_at`.
+- **Autopilot RevenueCat iOS (T007)**: `AutopilotUpsellModal.tsx` now uses RevenueCat on iOS/Android. Looks for "autopilot" offering in RC dashboard, purchases the monthly package, then calls `POST /api/autopilot/settings` to enable. Falls back to Stripe web checkout if offering not configured. Loading + cancel + error handling included.
+
 ## Sprint 24 — QuotePro Autopilot
 - **Feature Gate**: Free/Starter → 403 upsell; Growth → requires Autopilot add-on ($29/mo, `AUTOPILOT_ADDON_PRICE_ID` env var); Pro → included.
 - **DB Tables**: `autopilot_jobs` (UUID PK, lead_id, quote_id, status, next_action_at, metadata), `autopilot_job_logs` (serial PK, job_id, step, action, result). Users table extended with `autopilot_enabled` (boolean).
