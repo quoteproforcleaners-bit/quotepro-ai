@@ -41,6 +41,9 @@ export const AnalyticsEvents = {
   CANCEL_INITIATED: "cancel_initiated",
   QUOTE_QUOTA_HIT: "quote_quota_hit",
 
+  // ─── RevenueCat ─────────────────────────────────────────────────────────────
+  REVENUECAT_WEBHOOK: "revenuecat_webhook",
+
   // ─── Activation nudges ───────────────────────────────────────────────────────
   ACTIVATION_NUDGE_24H_SENT: "activation_nudge_24h_sent",
   ACTIVATION_NUDGE_48H_SENT: "activation_nudge_48h_sent",

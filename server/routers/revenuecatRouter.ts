@@ -91,6 +91,13 @@ router.post("/revenuecat", async (req: Request, res: Response) => {
 
     const user = userResult.rows[0];
 
+    // Log every webhook event to analytics_events for audit / debugging
+    trackEvent(user.id, AnalyticsEvents.REVENUECAT_WEBHOOK, {
+      eventType,
+      productId: productId || null,
+      userId: user.id,
+    }).catch(() => {});
+
     // 3. Handle event types
     if (["INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "UNCANCELLATION"].includes(eventType)) {
       const newTier = mapProductToTier(productId);
