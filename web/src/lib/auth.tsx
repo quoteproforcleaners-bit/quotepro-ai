@@ -17,6 +17,8 @@ interface User {
   subscriptionTier?: string;
   trialExpired?: boolean;
   name?: string;
+  activeLocationId?: string | null;
+  isMultiLocationEnabled?: boolean;
 }
 
 interface Business {

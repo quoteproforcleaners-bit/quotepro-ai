@@ -50,6 +50,8 @@ export const users = pgTable("users", {
   mrrDashboardUnlocked: boolean("mrr_dashboard_unlocked").default(false),
   aiFollowUpsUsedThisMonth: integer("ai_follow_ups_used_this_month").default(0),
   photoQuotesUsedThisMonth: integer("photo_quotes_used_this_month").default(0),
+  activeLocationId: varchar("active_location_id"),
+  isMultiLocationEnabled: boolean("is_multi_location_enabled").notNull().default(false),
   trialDripEnrolledAt: timestamp("trial_drip_enrolled_at"),
   trialDripLastSentDay: integer("trial_drip_last_sent_day").default(0),
   trialDripCompleted: boolean("trial_drip_completed").default(false),
@@ -140,6 +142,7 @@ export const customers = pgTable("customers", {
   businessId: varchar("business_id")
     .notNull()
     .references(() => businesses.id),
+  locationId: varchar("location_id"),
   firstName: text("first_name").notNull().default(""),
   lastName: text("last_name").notNull().default(""),
   phone: text("phone").notNull().default(""),
@@ -166,6 +169,7 @@ export const quotes = pgTable("quotes", {
   businessId: varchar("business_id")
     .notNull()
     .references(() => businesses.id),
+  locationId: varchar("location_id"),
   customerId: varchar("customer_id")
     .references(() => customers.id),
   propertyBeds: integer("property_beds").notNull().default(0),
@@ -308,6 +312,7 @@ export const jobs = pgTable("jobs", {
   businessId: varchar("business_id")
     .notNull()
     .references(() => businesses.id),
+  locationId: varchar("location_id"),
   customerId: varchar("customer_id")
     .references(() => customers.id),
   quoteId: varchar("quote_id")
@@ -1468,3 +1473,24 @@ export const staffClockEvents = pgTable("staff_clock_events", {
 });
 
 export type StaffClockEvent = typeof staffClockEvents.$inferSelect;
+
+// ─── Business Locations (Multi-location / franchise support) ──────────────────
+export const businessLocations = pgTable("business_locations", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  address: text("address"),
+  phone: text("phone"),
+  timezone: text("timezone").notNull().default("America/New_York"),
+  active: boolean("active").notNull().default(true),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type BusinessLocation = typeof businessLocations.$inferSelect;
+export type InsertBusinessLocation = typeof businessLocations.$inferInsert;

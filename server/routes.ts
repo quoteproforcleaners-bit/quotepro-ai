@@ -50,6 +50,7 @@ import { quoteDoctorRouter } from "./routers/quoteDoctorRouter"; // → /api/quo
 import recurringRouter from "./routers/recurringRouter";         // → /api/recurring-schedules
 import staffRouter from "./routers/staffRouter";                 // → /api/staff/*
 import bookingWidgetRouter from "./routers/bookingWidgetRouter"; // → /api/booking/*
+import locationsRouter from "./routers/locationsRouter";         // → /api/locations/*
 
 // ─── Group B — multi-domain routers (all mounted at /api) ─────────────────────
 import authRouter from "./routers/authRouter";             // /api/auth/*, /api/consent, /api/crash-report
@@ -136,6 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", recurringRouter);
   app.use("/api", staffRouter);
   app.use("/api/booking", bookingWidgetRouter);
+  app.use("/api", locationsRouter);
 
   // 4. Mount Group B — multi-domain routers at /api
   app.use("/api", authRouter);

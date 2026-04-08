@@ -18,8 +18,9 @@ import {
   RefreshCw, CheckSquare, BarChart2, Star, Layers, BookOpen, Sliders,
   Clipboard, PlugZap, FolderOpen, MailOpen, Brain, UserCog, Globe,
   Search, Plus, ChevronRight, ChevronDown, LifeBuoy, CircleUser,
-  Repeat2, TrendingDown, Gift, type LucideIcon,
+  Repeat2, TrendingDown, Gift, MapPin, type LucideIcon,
 } from "lucide-react";
+import { LocationSwitcher } from "./LocationSwitcher";
 import { SupportModal } from "./SupportModal";
 import UpgradeModal from "./UpgradeModal";
 import QuoteUsageBanner from "./QuoteUsageBanner";
@@ -64,6 +65,7 @@ const OPERATIONS_NAV_ITEMS: NavItem[] = [
   { to: "/recurring-schedules",  label: "Recurring",  icon: Repeat2,      pro: true, description: "Set up repeating cleans with automatic job generation and optional auto-charge billing." },
   { to: "/staff",                label: "Staff",      icon: UserCog,      pro: true, description: "Add cleaners, manage their PINs, share QR codes for mobile login, and track who's clocked in." },
   { to: "/calendar",             label: "Schedule",   icon: CalendarDays, pro: true, description: "Visual week-by-week calendar for all jobs. Publish the schedule and notify your cleaners with one click." },
+  { to: "/locations",            label: "Locations",  icon: MapPin,       pro: true, description: "Manage multiple service areas from one account — assign staff, quotes, and jobs per location." },
 ];
 
 // GROWTH — business intelligence + automation
@@ -1085,6 +1087,11 @@ export function Layout() {
               <span style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "-0.3px", color: "var(--t1)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {currentTitle}
               </span>
+
+              {/* Location switcher (only for multi-location Pro users) */}
+              <div className="hidden md:block">
+                <LocationSwitcher />
+              </div>
 
               {/* Ghost: search ⌘K */}
               <button
