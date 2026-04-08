@@ -2,7 +2,7 @@
   "name": "QuotePro for Cleaners",
   "version": "1.0.0",
   "description": "Instant cleaning quotes and commercial bids powered by AI. Good/Better/Best pricing for any property.",
-  "endpoint": "https://getquotepro.ai/mcp",
+  "endpoint": "https://app.getquotepro.ai/mcp",
   "tools": ["get_cleaning_quote", "get_commercial_bid", "get_autopilot_info"],
   "category": "business",
   "free": true,

@@ -137,8 +137,8 @@ mcpRouter.get("/", (req: Request, res: Response) => {
     version: "1.0.0",
     protocol: "MCP JSON-RPC 2.0",
     tools: TOOLS_LIST.map((t) => ({ name: t.name, description: t.description })),
-    endpoint: "https://getquotepro.ai/mcp",
-    manifest: "https://getquotepro.ai/mcp/manifest",
+    endpoint: "https://app.getquotepro.ai/mcp",
+    manifest: "https://app.getquotepro.ai/mcp/manifest",
   });
 });
 

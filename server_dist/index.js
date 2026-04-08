@@ -29895,7 +29895,7 @@ var manifest_default = {
   },
   api: {
     type: "openapi",
-    url: "https://getquotepro.ai/mcp/manifest"
+    url: "https://app.getquotepro.ai/mcp/manifest"
   },
   logo_url: "https://getquotepro.ai/logo.png",
   contact_email: "support@getquotepro.ai",
@@ -30270,8 +30270,8 @@ mcpRouter.get("/", (req, res) => {
     version: "1.0.0",
     protocol: "MCP JSON-RPC 2.0",
     tools: TOOLS_LIST.map((t) => ({ name: t.name, description: t.description })),
-    endpoint: "https://getquotepro.ai/mcp",
-    manifest: "https://getquotepro.ai/mcp/manifest"
+    endpoint: "https://app.getquotepro.ai/mcp",
+    manifest: "https://app.getquotepro.ai/mcp/manifest"
   });
 });
 mcpRouter.get("/manifest", (_req, res) => {

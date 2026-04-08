@@ -1,4 +1,4 @@
 {
-  "mcp_endpoint": "https://getquotepro.ai/mcp",
-  "manifest": "https://getquotepro.ai/mcp/manifest"
+  "mcp_endpoint": "https://app.getquotepro.ai/mcp",
+  "manifest": "https://app.getquotepro.ai/mcp/manifest"
 }

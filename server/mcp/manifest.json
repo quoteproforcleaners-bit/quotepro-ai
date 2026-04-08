@@ -9,7 +9,7 @@
   },
   "api": {
     "type": "openapi",
-    "url": "https://getquotepro.ai/mcp/manifest"
+    "url": "https://app.getquotepro.ai/mcp/manifest"
   },
   "logo_url": "https://getquotepro.ai/logo.png",
   "contact_email": "support@getquotepro.ai",
