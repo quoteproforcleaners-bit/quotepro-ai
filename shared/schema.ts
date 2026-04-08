@@ -1435,6 +1435,24 @@ export const intakeRequests = customers;
 export const pricingJobs = pricingAnalyses;
 export const leadCapture = socialLeads;
 
+// ─── Win/Loss Responses ───────────────────────────────────────────────────────
+// Automated follow-up records sent to customers after a quote expires or goes cold
+export const winLossResponses = pgTable("win_loss_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id").notNull().references(() => quotes.id),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  customerEmail: text("customer_email").notNull(),
+  responseToken: text("response_token").notNull().unique(),
+  reason: text("reason"),
+  reasonCategory: text("reason_category"), // 'price_too_high' | 'went_with_competitor' | 'no_longer_needed' | 'no_response_yet' | 'other'
+  competitorMentioned: text("competitor_mentioned"),
+  respondedAt: timestamp("responded_at"),
+  followUpSentAt: timestamp("follow_up_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type WinLossResponse = typeof winLossResponses.$inferSelect;
+
 // ─── Staff Clock Events ───────────────────────────────────────────────────────
 // Free-standing clock-in/out events (not tied to a specific job assignment)
 export const staffClockEvents = pgTable("staff_clock_events", {

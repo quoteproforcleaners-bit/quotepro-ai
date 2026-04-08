@@ -1926,10 +1926,128 @@ export const BUILT_IN_SEQUENCES = [
 
 // ─── generateRecurringJobs ────────────────────────────────────────────────────
 
-/**
- * Hourly worker: generates upcoming jobs for all active recurring schedules (7-day lookahead)
- * and processes auto-charge Stripe PaymentIntents where configured.
- */
+// ─── Win/Loss Follow-ups ─────────────────────────────────────────────────────
+// Sends automated feedback requests to customers whose quotes expired or went cold
+export async function sendWinLossFollowUps(): Promise<void> {
+  try {
+    const appUrl =
+      process.env.REPLIT_DOMAINS
+        ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+        : process.env.APP_URL || "https://app.getquotepro.ai";
+
+    // Find quotes that are expired or sent and cold (2+ days past expiry)
+    // with a customer email that haven't yet had a win/loss follow-up
+    const result = await pool.query<{
+      quote_id: string;
+      customer_name: string;
+      customer_email: string;
+      business_id: string;
+      business_name: string;
+      business_from_name: string;
+      business_from_email: string;
+      quote_total: number;
+    }>(`
+      SELECT
+        q.id               AS quote_id,
+        c.name             AS customer_name,
+        c.email            AS customer_email,
+        b.id               AS business_id,
+        b.name             AS business_name,
+        COALESCE(b.email_from_name, b.name, 'Your Cleaning Company') AS business_from_name,
+        COALESCE(b.email_from_address, b.email, $1)                  AS business_from_email,
+        q.total            AS quote_total
+      FROM quotes q
+      JOIN customers   c ON c.id = q.customer_id
+      JOIN businesses  b ON b.id = q.business_id
+      WHERE
+        c.email IS NOT NULL AND c.email <> ''
+        AND q.deleted_at IS NULL
+        AND (
+          q.status = 'expired'
+          OR (q.status = 'sent' AND q.expires_at < NOW() - INTERVAL '2 days')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM win_loss_responses wlr
+          WHERE wlr.quote_id = q.id
+        )
+      ORDER BY q.created_at ASC
+      LIMIT 20
+    `, [PLATFORM_FROM_EMAIL]);
+
+    for (const row of result.rows) {
+      const token = crypto.randomUUID();
+      try {
+        await pool.query(
+          `INSERT INTO win_loss_responses
+            (quote_id, business_id, customer_email, response_token, reason_category, follow_up_sent_at)
+           VALUES ($1, $2, $3, $4, 'no_response_yet', NOW())`,
+          [row.quote_id, row.business_id, row.customer_email, token],
+        );
+
+        const firstName = (row.customer_name || "there").split(" ")[0];
+        const feedbackUrl = `${appUrl}/feedback/${token}`;
+        const businessName = row.business_name || "Your cleaning company";
+
+        const html = `
+<!DOCTYPE html>
+<html>
+<head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+        <tr><td style="background:#1e293b;padding:28px 32px">
+          <p style="margin:0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.3px">${businessName}</p>
+        </td></tr>
+        <tr><td style="padding:36px 32px 28px">
+          <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3">
+            Did you find what you were looking for?
+          </h1>
+          <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6">
+            Hi ${firstName}, we sent you a cleaning quote recently and wanted to check in. Did you end up booking with someone?
+          </p>
+          <p style="margin:0 0 28px;font-size:15px;color:#475569;line-height:1.6">
+            Your feedback helps us improve our service and pricing. It takes 10 seconds.
+          </p>
+          <table cellpadding="0" cellspacing="0"><tr><td>
+            <a href="${feedbackUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;font-size:15px;font-weight:600;padding:13px 28px;border-radius:8px;text-decoration:none">
+              Share Quick Feedback
+            </a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="padding:20px 32px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:12px;color:#94a3b8">
+            ${businessName} &mdash; Residential cleaning services
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+        await sendEmail({
+          to: row.customer_email,
+          subject: "Did you find what you were looking for?",
+          html,
+          text: `Hi ${firstName},\n\nWe sent you a cleaning quote recently and wanted to check in. Did you end up booking with someone?\n\nYour feedback helps us improve. It takes 10 seconds:\n${feedbackUrl}\n\n${businessName}`,
+          fromName: row.business_from_name,
+        });
+
+        console.log(`[win-loss] Follow-up sent to ${row.customer_email} for quote ${row.quote_id}`);
+      } catch (innerErr: any) {
+        console.error(`[win-loss] Failed to send follow-up for quote ${row.quote_id}:`, innerErr.message);
+      }
+    }
+
+    if (result.rows.length > 0) {
+      console.log(`[win-loss] Sent ${result.rows.length} win/loss follow-up(s)`);
+    }
+  } catch (err: any) {
+    console.error("[win-loss] sendWinLossFollowUps failed:", err.message);
+  }
+}
+
 export async function generateRecurringJobs(): Promise<void> {
   try {
     // Fetch all active series with auto_charge info

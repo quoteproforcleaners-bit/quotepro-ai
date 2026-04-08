@@ -34,6 +34,7 @@ import {
   sendWeeklyDigestEmails,
   sendActivationNudges,
   generateRecurringJobs,
+  sendWinLossFollowUps,
 } from "./helpers";
 
 // ─── Group A — pure single-domain routers ─────────────────────────────────────
@@ -63,6 +64,7 @@ import integrationsRouter from "./routers/integrationsRouter"; // /api/google-ca
 // ─── Group C — hybrid routers with static pages (mounted at root) ─────────────
 import publicRouter from "./routers/publicRouter";         // /api/public/*, /q, /privacy, /terms, /calculators
 import portalRouter from "./routers/portalRouter";         // /api/portal/*, /portal-manifest/*, /api/portal-stats
+import winLossRouter from "./routers/winLossRouter";       // /feedback/:token (public), /api/win-loss
 
 import { processAutopilotJobs } from "./services/autopilotService";
 import { buildWidgetJs } from "./widgetTemplate";
@@ -148,6 +150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 5. Mount Group C — hybrid routers at root (API + static pages)
   app.use(publicRouter);
   app.use(portalRouter);
+  app.use(winLossRouter);
 
   // 5b. Booking widget JS — GET /widget/:businessId.js
   app.get("/widget/:businessId.js", async (req, res) => {
@@ -194,6 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await sendWeeklyDigestEmails();
       await sendActivationNudges();
       await generateRecurringJobs();
+      await sendWinLossFollowUps();
       if ((app as any).__leadFinderWorker) {
         await (app as any).__leadFinderWorker();
       }

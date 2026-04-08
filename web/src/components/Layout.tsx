@@ -18,7 +18,7 @@ import {
   RefreshCw, CheckSquare, BarChart2, Star, Layers, BookOpen, Sliders,
   Clipboard, PlugZap, FolderOpen, MailOpen, Brain, UserCog, Globe,
   Search, Plus, ChevronRight, ChevronDown, LifeBuoy, CircleUser,
-  Repeat2, type LucideIcon,
+  Repeat2, TrendingDown, type LucideIcon,
 } from "lucide-react";
 import { SupportModal } from "./SupportModal";
 import UpgradeModal from "./UpgradeModal";
@@ -71,6 +71,7 @@ const GROWTH_NAV_ITEMS: NavItem[] = [
   { to: "/follow-ups",       label: "Follow-Ups",        icon: Bell,       description: "Every quote that needs a follow-up, ranked by priority. Never let a lead go cold." },
   { to: "/autopilot",        label: "Autopilot",          icon: PlugZap,    pro: true, beta: true, description: "4-step AI pipeline: qualify leads, send quotes, follow up, and request reviews — all automatically." },
   { to: "/opportunities",    label: "Win-Back",           icon: Repeat2,    pro: true, description: "Re-engage past customers who went quiet — AI surfaces the best win-back opportunities." },
+  { to: "/win-loss",         label: "Win/Loss Analysis",  icon: TrendingDown, pro: true, description: "See why prospects didn't book — automated follow-up emails collect feedback and surface pricing insights." },
   { to: "/revenue",          label: "Revenue",            icon: DollarSign, pro: true, description: "Full revenue reporting — monthly totals, job type breakdown, and trends vs. prior periods." },
   { to: "/reviews-referrals",label: "Reviews & Referrals",icon: Star,       pro: true, description: "Automate Google review requests and track referrals from your best customers." },
 ];
@@ -135,6 +136,7 @@ const NAV_LABEL_KEYS: Record<string, string> = {
   "/lead-capture":      "nav.leadCapture",
   "/booking-widget":    "nav.bookingWidget",
   "/reactivation":      "nav.reactivation",
+  "/win-loss":          "Win/Loss Analysis",
   "/email-sequences":   "nav.emailSequences",
   "/reviews-referrals": "nav.reviewsReferrals",
   "/weekly-recap":      "nav.weeklyRecap",
@@ -343,6 +345,7 @@ const ALL_CMD_ITEMS = [
   { label: "Follow-Ups",         icon: Bell,            path: "/follow-ups",        group: "Navigate" },
   { label: "Autopilot",          icon: PlugZap,         path: "/autopilot",         group: "Navigate" },
   { label: "Win-Back",           icon: Repeat2,         path: "/opportunities",     group: "Navigate" },
+  { label: "Win/Loss Analysis",  icon: TrendingDown,    path: "/win-loss",          group: "Navigate" },
   { label: "Revenue",            icon: DollarSign,      path: "/revenue",           group: "Navigate" },
   { label: "Reviews & Referrals",icon: Star,            path: "/reviews-referrals", group: "Navigate" },
   { label: "Quote Doctor",       icon: Zap,             path: "/quote-doctor",      group: "Navigate" },
@@ -488,7 +491,7 @@ const ROUTE_TITLES: Record<string, string> = {
 const PRO_ROUTES = [
   "/customers", "/jobs", "/calendar", "/growth", "/opportunities", "/ai-assistant",
   "/lead-finder", "/lead-capture", "/booking-widget", "/revenue", "/closing-assistant",
-  "/commercial-quote", "/reactivation", "/automations", "/sales-strategy",
+  "/commercial-quote", "/reactivation", "/win-loss", "/automations", "/sales-strategy",
   "/weekly-recap", "/tasks-queue", "/reviews-referrals", "/qbo-settings",
 ];
 
