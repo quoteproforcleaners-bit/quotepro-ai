@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "QuotePro for Cleaners",
+  "name_for_model": "quotepro_cleaners",
+  "description_for_human": "Get instant cleaning quotes and commercial bids. Good/Better/Best pricing for any property.",
+  "description_for_model": "Use this tool to calculate accurate residential cleaning quotes and commercial janitorial bids. Returns Good/Better/Best pricing tiers based on property details, location, and cleaning frequency. Built specifically for cleaning businesses.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://getquotepro.ai/mcp/manifest"
+  },
+  "logo_url": "https://getquotepro.ai/logo.png",
+  "contact_email": "support@getquotepro.ai",
+  "legal_info_url": "https://getquotepro.ai/privacy"
+}

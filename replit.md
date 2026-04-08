@@ -111,6 +111,16 @@ Session-based authentication supports email/password, Apple, and Google SSO.
 - **Metro Proxy**: `metro.config.js` proxies `/home/*` and `/api/portal/*` from port 8081 → 5000 so the portal is accessible in development and testing.
 - **Web App Router**: `/home/` added to `TOP_LEVEL_PATHS` in `web/src/main.tsx` so React Router uses `basename="/"` for portal routes.
 - **Token Backfill**: All 69 existing customers backfilled with portal tokens on startup.
+## Sprint 26 — MCP (Model Context Protocol) Server
+- **MCP Router** (`server/mcp/index.ts`): Mounted at `/mcp`. `GET /mcp` (tool index), `GET /mcp/manifest` (OpenPlugin manifest), `POST /mcp` (tool dispatch). CORS headers for claude.ai, chat.openai.com, perplexity.ai. Rate limit: 100 req/hour per IP via `express-rate-limit`.
+- **Tool 1** (`server/mcp/tools/getCleaningQuote.ts`): `get_cleaning_quote` — Good/Better/Best residential quotes. Inputs: bedrooms, bathrooms, city, state, frequency, cleaning_type. Pricing uses spec's base rate table × frequency multiplier × type multiplier × tier multiplier (1.22/1.48).
+- **Tool 2** (`server/mcp/tools/getCommercialBid.ts`): `get_commercial_bid` — Monthly commercial janitorial bid (low/mid/high). Inputs: facility_type, sqft, frequency, restrooms, city, state. Per-sqft rates by type, frequency-scaled, restroom surcharge, ±15% range.
+- **Tool 3** (`server/mcp/tools/getAutopilotStatus.ts`): `get_autopilot_info` — Static Autopilot product info (how_it_works, pricing, stats, cta).
+- **Static Assets**: `public/.well-known/mcp.json` served via `express.static(public/, { dotfiles: "allow" })`. `smithery.yaml` and `mcpt.json` at repo root for tool directory registrations.
+- **Manifest**: `server/mcp/manifest.json` (OpenPlugin v1 schema).
+- **Tests**: `server/mcp/test.ts` — 21 assertions covering all 3 tools. Run with `npx tsx server/mcp/test.ts`.
+- **README**: MCP section added with Claude Desktop config and example prompts.
+
 ## Sprint 25 — Product Audit Improvements
 - **ProGate (T001)**: Context-aware upgrade prompts in `web/src/components/ProGate.tsx`. Shows feature-specific benefit bullets, exact tier price badge ("$49/mo"), and feature name in headline.
 - **WhatsNewModal (T002)**: Version-gated changelog modal in `web/src/components/WhatsNewModal.tsx`. Fires once per version key (`CURRENT_VERSION = "2026.04"`) via `localStorage`. Rendered in `App.tsx` for authenticated users only.

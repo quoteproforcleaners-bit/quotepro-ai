@@ -244,6 +244,7 @@ function configureExpoAndLanding(app: express.Application) {
 
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
   app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
+  app.use(express.static(path.resolve(process.cwd(), "public"), { dotfiles: "allow" }));
   app.use(express.static(path.resolve(process.cwd(), "static-build")));
 
   const webDistPath = path.resolve(process.cwd(), "web", "dist");

@@ -142,3 +142,37 @@ See [`.github/workflows/ci.yml`](.github/workflows/ci.yml) for the full pipeline
 | `npm run lint` | ESLint |
 | `npm run test` | Jest tests |
 | `cd web && npx vite build` | Production web build |
+
+---
+
+## QuotePro MCP Server
+
+QuotePro exposes an MCP (Model Context Protocol) server that allows AI assistants to calculate cleaning quotes and commercial bids directly.
+
+### Install in Claude Desktop
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "quotepro": {
+      "url": "https://getquotepro.ai/mcp"
+    }
+  }
+}
+```
+
+### Available Tools
+
+1. **get_cleaning_quote** — Residential quotes with Good/Better/Best tiers
+2. **get_commercial_bid** — Commercial janitorial bid calculator
+3. **get_autopilot_info** — Learn about QuotePro Autopilot
+
+### Example Prompts
+
+> "How much should I charge to clean a 3BR 2BA house in Philadelphia biweekly?"
+
+> "What's a fair monthly bid for a 4,000 sqft office in Dallas cleaned 3x per week?"
+
+> "How does QuotePro Autopilot work?"

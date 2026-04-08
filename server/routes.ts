@@ -69,6 +69,7 @@ import winLossRouter from "./routers/winLossRouter";       // /feedback/:token (
 
 import { processAutopilotJobs } from "./services/autopilotService";
 import { buildWidgetJs } from "./widgetTemplate";
+import { mcpRouter } from "./mcp/index";
 
 // Session type extension
 declare module "express-session" {
@@ -153,6 +154,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(publicRouter);
   app.use(portalRouter);
   app.use(winLossRouter);
+
+  // 5c. MCP (Model Context Protocol) server — GET/POST /mcp, GET /mcp/manifest
+  app.use("/mcp", mcpRouter);
 
   // 5b. Booking widget JS — GET /widget/:businessId.js
   app.get("/widget/:businessId.js", async (req, res) => {

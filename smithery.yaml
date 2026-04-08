@@ -1,0 +1,23 @@
+name: quotepro-cleaners
+version: 1.0.0
+description: >
+  Get instant AI-powered cleaning quotes and commercial bids.
+  Good/Better/Best pricing tiers for residential and commercial
+  cleaning businesses. Built by a cleaning business owner.
+author: QuotePro for Cleaners
+homepage: https://getquotepro.ai
+endpoint: https://getquotepro.ai/mcp
+tools:
+  - get_cleaning_quote
+  - get_commercial_bid
+  - get_autopilot_info
+categories:
+  - business
+  - pricing
+  - home-services
+tags:
+  - cleaning
+  - quoting
+  - janitorial
+  - home-services
+  - pricing-calculator
