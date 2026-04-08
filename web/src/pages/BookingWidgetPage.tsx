@@ -206,15 +206,19 @@ function BookingWidgetInner() {
     queryKey: ["/api/booking/settings"],
   });
 
-  const { data: embedData } = useQuery<{ scriptTag: string; businessId: string }>({
-    queryKey: ["/api/booking/embed-code"],
-    enabled: !!settings?.enabled,
-  });
-
   const [draft, setDraft] = useState<Partial<WidgetSettings>>({});
 
+  // Compute enabled from draft first so the embed-code query fires as soon
+  // as the user toggles ON — even before they save.
+  const mergedEnabled = draft.enabled ?? settings?.enabled ?? false;
+
+  const { data: embedData } = useQuery<{ scriptTag: string; businessId: string }>({
+    queryKey: ["/api/booking/embed-code"],
+    enabled: mergedEnabled,
+  });
+
   const merged: WidgetSettings = {
-    enabled: draft.enabled ?? settings?.enabled ?? false,
+    enabled: mergedEnabled,
     accentColor: draft.accentColor ?? settings?.accentColor ?? "#2563eb",
     businessName: draft.businessName ?? settings?.businessName ?? "",
     services: draft.services ?? settings?.services ?? [],
@@ -451,19 +455,32 @@ function BookingWidgetInner() {
           {/* Live preview */}
           <div className="card p-5">
             <h3 className="font-semibold text-gray-900 mb-3">Widget Preview</h3>
-            <div className="relative bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl overflow-hidden"
+            <div className="relative bg-white border border-slate-200 rounded-xl overflow-hidden"
               style={{ height: 280 }}>
-              {/* Simulated webpage */}
-              <div className="absolute inset-0 p-5">
-                <div className="w-24 h-3 bg-gray-300 rounded mb-3" />
-                <div className="w-40 h-3 bg-gray-200 rounded mb-2" />
-                <div className="w-32 h-3 bg-gray-200 rounded mb-2" />
-                <div className="w-36 h-3 bg-gray-200 rounded" />
+              {/* Simulated browser chrome */}
+              <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 border-b border-slate-200">
+                <div className="w-2 h-2 rounded-full bg-slate-300" />
+                <div className="w-2 h-2 rounded-full bg-slate-300" />
+                <div className="w-2 h-2 rounded-full bg-slate-300" />
+                <div className="flex-1 mx-2 h-4 bg-white rounded text-xs text-slate-400 flex items-center px-2 border border-slate-200 text-[10px]">
+                  yourwebsite.com
+                </div>
               </div>
-              {/* "Book Now" button preview */}
+              {/* Simulated webpage content */}
+              <div className="p-5">
+                <p className="text-slate-800 font-semibold text-sm mb-1">
+                  {merged.businessName || "Your Business"}
+                </p>
+                <p className="text-slate-400 text-xs mb-3">Professional Cleaning Services</p>
+                <p className="text-slate-500 text-xs leading-relaxed">
+                  We offer reliable, trusted cleaning for homes and businesses.
+                  Get a free quote today and see why hundreds of customers love us.
+                </p>
+              </div>
+              {/* Floating "Book Now" button */}
               <div className="absolute bottom-4 right-4">
                 <div
-                  className="rounded-full px-4 py-2 text-white text-sm font-semibold shadow-lg select-none"
+                  className="rounded-full px-4 py-2 text-white text-sm font-semibold shadow-lg select-none cursor-pointer"
                   style={{ backgroundColor: merged.accentColor }}
                 >
                   Book Now
