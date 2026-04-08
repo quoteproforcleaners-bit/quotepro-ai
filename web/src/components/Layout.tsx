@@ -716,25 +716,6 @@ export function Layout() {
             flexShrink: 0,
           }}
         >
-          {/* Traffic lights */}
-          <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-            {(["#ff5f57", "#febc2e", "#28c840"] as const).map((color) => (
-              <div
-                key={color}
-                style={{
-                  width: "12px", height: "12px", borderRadius: "50%",
-                  background: color,
-                  boxShadow: "0 0 0 0.5px rgba(0,0,0,0.12)",
-                  cursor: "default",
-                  transition: "filter .12s",
-                  flexShrink: 0,
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = "brightness(0.88)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = ""; }}
-              />
-            ))}
-          </div>
-
           {/* Mobile hamburger */}
           <button
             className="lg:hidden"
