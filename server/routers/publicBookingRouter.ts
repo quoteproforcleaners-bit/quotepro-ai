@@ -19,7 +19,7 @@ const router = Router();
 
 // ─── Serve booking HTML page ──────────────────────────────────────────────────
 
-const bookingHtmlPath = path.join(__dirname, "../templates/booking.html");
+const bookingHtmlPath = path.join(process.cwd(), "server/templates/booking.html");
 
 router.get("/book/:token", (_req: Request, res: Response) => {
   try {

@@ -24,9 +24,12 @@ __export(schema_exports, {
   automationRules: () => automationRules,
   autopilotJobLogs: () => autopilotJobLogs,
   autopilotJobs: () => autopilotJobs,
+  availabilitySettings: () => availabilitySettings,
   badges: () => badges,
+  blockedDates: () => blockedDates,
   bookingAvailability: () => bookingAvailability,
   bookingAvailabilitySettings: () => bookingAvailabilitySettings,
+  bookings: () => bookings,
   businessFiles: () => businessFiles,
   businessLocations: () => businessLocations,
   businesses: () => businesses,
@@ -116,7 +119,7 @@ import {
   uniqueIndex
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-var users, businesses, pricingSettings, customers, quotes, salesRecommendations, quoteFollowUps, quoteLineItems, recurringCleanSeries, jobs, employees, jobAssignments, jobChecklistItems, jobPhotos, jobStatusHistory, jobNotes, pushTokens, communications, automationRules, tasks, channelConnections, socialConversations, socialMessages, socialLeads, attributionEvents, socialAutomationSettings, socialOptOuts, googleCalendarTokens, followUpTouches, streaks, userPreferences, analyticsEvents, badges, growthTasks, growthTaskEvents, reviewRequests, customerMarketingPrefs, growthAutomationSettings, salesStrategySettings, campaigns, insertUserSchema, invoicePackets, calendarEventStubs, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, qboConnections, qboCustomerMappings, qboInvoiceLinks, qboSyncLog, leadFinderSettings, leadFinderLeads, leadFinderReplies, leadFinderEvents, businessFiles, sequenceEnrollments, importedJobs, pricingQuestionnaires, pricingRules, pricingAnalyses, publishedPricingProfiles, bookingAvailabilitySettings, schedulePublications, cleanerScheduleNotifications, aiUsageLogs, customerPortals, rescheduleRequests, marketRates, autopilotJobs, autopilotJobLogs, photos, preferences, bookingAvailability, checklistItems, employeeShifts, intakeRequests, pricingJobs, leadCapture, winLossResponses, staffClockEvents, businessLocations;
+var users, businesses, pricingSettings, customers, quotes, salesRecommendations, quoteFollowUps, quoteLineItems, recurringCleanSeries, jobs, employees, jobAssignments, jobChecklistItems, jobPhotos, jobStatusHistory, jobNotes, pushTokens, communications, automationRules, tasks, channelConnections, socialConversations, socialMessages, socialLeads, attributionEvents, socialAutomationSettings, socialOptOuts, googleCalendarTokens, followUpTouches, streaks, userPreferences, analyticsEvents, badges, growthTasks, growthTaskEvents, reviewRequests, customerMarketingPrefs, growthAutomationSettings, salesStrategySettings, campaigns, insertUserSchema, invoicePackets, calendarEventStubs, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, qboConnections, qboCustomerMappings, qboInvoiceLinks, qboSyncLog, leadFinderSettings, leadFinderLeads, leadFinderReplies, leadFinderEvents, businessFiles, sequenceEnrollments, importedJobs, pricingQuestionnaires, pricingRules, pricingAnalyses, publishedPricingProfiles, bookingAvailabilitySettings, schedulePublications, cleanerScheduleNotifications, aiUsageLogs, customerPortals, rescheduleRequests, marketRates, autopilotJobs, autopilotJobLogs, photos, preferences, bookingAvailability, checklistItems, employeeShifts, intakeRequests, pricingJobs, leadCapture, winLossResponses, staffClockEvents, businessLocations, availabilitySettings, blockedDates, bookings;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -141,7 +144,7 @@ var init_schema = __esm({
       quotesThisMonth: integer("quotes_this_month").default(0),
       quotesMonthResetAt: timestamp("quotes_month_reset_at"),
       trialStartedAt: timestamp("trial_started_at"),
-      referralCode: text("referral_code").unique(),
+      referralCode: text("referral_code"),
       referredBy: text("referred_by"),
       referralCreditsMonths: integer("referral_credits_months").default(0),
       referralFraudFlagged: boolean("referral_fraud_flagged").default(false),
@@ -393,11 +396,11 @@ var init_schema = __esm({
       satisfactionRating: integer("satisfaction_rating"),
       ratingComment: text("rating_comment"),
       ratingToken: varchar("rating_token").default(sql`gen_random_uuid()`),
-      updateToken: varchar("update_token").unique(),
+      updateToken: varchar("update_token"),
       detailedStatus: text("detailed_status").notNull().default("scheduled"),
       teamMembers: jsonb("team_members").$type().default([]),
       cleanerNotes: text("cleaner_notes").notNull().default(""),
-      checkinToken: varchar("checkin_token").unique().default(sql`gen_random_uuid()`),
+      checkinToken: varchar("checkin_token").default(sql`gen_random_uuid()`),
       invoiced: boolean("invoiced").notNull().default(false),
       specialRequests: text("special_requests"),
       accessCode: varchar("access_code", { length: 100 }),
@@ -654,7 +657,7 @@ var init_schema = __esm({
     });
     streaks = pgTable("streaks", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+      businessId: varchar("business_id").notNull().references(() => businesses.id),
       currentStreak: integer("current_streak").notNull().default(0),
       longestStreak: integer("longest_streak").notNull().default(0),
       lastActionDate: text("last_action_date"),
@@ -662,7 +665,7 @@ var init_schema = __esm({
     });
     userPreferences = pgTable("user_preferences", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+      businessId: varchar("business_id").notNull().references(() => businesses.id),
       dailyPulseEnabled: boolean("daily_pulse_enabled").notNull().default(true),
       dailyPulseTime: text("daily_pulse_time").notNull().default("08:00"),
       weeklyRecapEnabled: boolean("weekly_recap_enabled").notNull().default(true),
@@ -755,7 +758,7 @@ var init_schema = __esm({
     });
     growthAutomationSettings = pgTable("growth_automation_settings", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+      businessId: varchar("business_id").notNull().references(() => businesses.id),
       marketingModeEnabled: boolean("marketing_mode_enabled").notNull().default(false),
       abandonedQuoteRecovery: boolean("abandoned_quote_recovery").notNull().default(true),
       weeklyReactivation: boolean("weekly_reactivation").notNull().default(true),
@@ -782,7 +785,7 @@ var init_schema = __esm({
     });
     salesStrategySettings = pgTable("sales_strategy_settings", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id).unique(),
+      businessId: varchar("business_id").notNull().references(() => businesses.id),
       selectedProfile: text("selected_profile").notNull().default("professional"),
       escalationEnabled: boolean("escalation_enabled").notNull().default(true),
       createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -880,7 +883,7 @@ var init_schema = __esm({
     });
     qboConnections = pgTable("qbo_connections", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      userId: varchar("user_id").notNull().unique().references(() => users.id),
+      userId: varchar("user_id").notNull().references(() => users.id),
       realmId: text("realm_id"),
       accessTokenEncrypted: text("access_token_encrypted"),
       refreshTokenEncrypted: text("refresh_token_encrypted"),
@@ -1082,7 +1085,7 @@ var init_schema = __esm({
     });
     bookingAvailabilitySettings = pgTable("booking_availability_settings", {
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().unique().references(() => businesses.id),
+      businessId: varchar("business_id").notNull().references(() => businesses.id),
       enabled: boolean("enabled").notNull().default(false),
       allowedDays: integer("allowed_days").array().notNull().default([1, 2, 3, 4, 5]),
       timeWindows: jsonb("time_windows").notNull().default([{ start: "08:00", end: "17:00" }]),
@@ -1118,7 +1121,7 @@ var init_schema = __esm({
       cleanerId: varchar("cleaner_id").notNull().references(() => employees.id),
       cleanerName: text("cleaner_name").notNull(),
       cleanerEmail: text("cleaner_email").notNull().default(""),
-      ackToken: varchar("ack_token").unique().default(sql`gen_random_uuid()`),
+      ackToken: varchar("ack_token").default(sql`gen_random_uuid()`),
       sendStatus: text("send_status").notNull().default("pending"),
       sentAt: timestamp("sent_at"),
       acknowledgedAt: timestamp("acknowledged_at"),
@@ -1142,7 +1145,7 @@ var init_schema = __esm({
       id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
       customerId: varchar("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
       businessId: varchar("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
-      token: varchar("token", { length: 64 }).unique().notNull(),
+      token: varchar("token", { length: 64 }).notNull(),
       preferences: jsonb("preferences"),
       createdAt: timestamp("created_at").defaultNow().notNull(),
       lastViewedAt: timestamp("last_viewed_at"),
@@ -1197,7 +1200,15 @@ var init_schema = __esm({
       lastActionAt: timestamp("last_action_at"),
       nextActionAt: timestamp("next_action_at"),
       metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
-      createdAt: timestamp("created_at").defaultNow().notNull()
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      // Booking flow columns
+      quoteAmount: real("quote_amount"),
+      quoteSentAt: timestamp("quote_sent_at"),
+      quoteAcceptedAt: timestamp("quote_accepted_at"),
+      bookingToken: varchar("booking_token").default(sql`gen_random_uuid()`),
+      currentStep: text("current_step").notNull().default("quote_sent"),
+      confirmationSentAt: timestamp("confirmation_sent_at"),
+      bookingId: integer("booking_id")
     });
     autopilotJobLogs = pgTable("autopilot_job_logs", {
       id: serial("id").primaryKey(),
@@ -1220,7 +1231,7 @@ var init_schema = __esm({
       quoteId: varchar("quote_id").notNull().references(() => quotes.id),
       businessId: varchar("business_id").notNull().references(() => businesses.id),
       customerEmail: text("customer_email").notNull(),
-      responseToken: text("response_token").notNull().unique(),
+      responseToken: text("response_token").notNull(),
       reason: text("reason"),
       reasonCategory: text("reason_category"),
       // 'price_too_high' | 'went_with_competitor' | 'no_longer_needed' | 'no_response_yet' | 'other'
@@ -1249,6 +1260,44 @@ var init_schema = __esm({
       timezone: text("timezone").notNull().default("America/New_York"),
       active: boolean("active").notNull().default(true),
       isPrimary: boolean("is_primary").notNull().default(false),
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      updatedAt: timestamp("updated_at").defaultNow().notNull()
+    });
+    availabilitySettings = pgTable("availability_settings", {
+      id: serial("id").primaryKey(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      workingDays: integer("working_days").array().notNull().default([1, 2, 3, 4, 5]),
+      startTime: varchar("start_time", { length: 5 }).notNull().default("08:00"),
+      endTime: varchar("end_time", { length: 5 }).notNull().default("17:00"),
+      slotDurationMinutes: integer("slot_duration_minutes").notNull().default(120),
+      bufferMinutes: integer("buffer_minutes").notNull().default(30),
+      advanceBookingDays: integer("advance_booking_days").notNull().default(30),
+      minNoticeHours: integer("min_notice_hours").notNull().default(24),
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      updatedAt: timestamp("updated_at").defaultNow().notNull()
+    });
+    blockedDates = pgTable("blocked_dates", {
+      id: serial("id").primaryKey(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      blockedDate: text("blocked_date").notNull(),
+      reason: varchar("reason", { length: 255 }),
+      createdAt: timestamp("created_at").defaultNow().notNull()
+    });
+    bookings = pgTable("bookings", {
+      id: serial("id").primaryKey(),
+      userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      autopilotJobId: varchar("autopilot_job_id").references(() => autopilotJobs.id, { onDelete: "set null" }),
+      scheduledDate: text("scheduled_date").notNull(),
+      scheduledTime: varchar("scheduled_time", { length: 5 }).notNull(),
+      durationMinutes: integer("duration_minutes").notNull().default(120),
+      customerName: text("customer_name"),
+      customerEmail: text("customer_email"),
+      customerPhone: text("customer_phone"),
+      serviceType: text("service_type"),
+      address: text("address"),
+      quoteAmount: real("quote_amount"),
+      status: varchar("status", { length: 20 }).notNull().default("confirmed"),
+      notes: text("notes"),
       createdAt: timestamp("created_at").defaultNow().notNull(),
       updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
@@ -3823,6 +3872,8 @@ var init_analytics_events = __esm({
       // ─── Churn signals ──────────────────────────────────────────────────────────
       CANCEL_INITIATED: "cancel_initiated",
       QUOTE_QUOTA_HIT: "quote_quota_hit",
+      // ─── RevenueCat ─────────────────────────────────────────────────────────────
+      REVENUECAT_WEBHOOK: "revenuecat_webhook",
       // ─── Activation nudges ───────────────────────────────────────────────────────
       ACTIVATION_NUDGE_24H_SENT: "activation_nudge_24h_sent",
       ACTIVATION_NUDGE_48H_SENT: "activation_nudge_48h_sent",
@@ -4532,8 +4583,9 @@ async function enrollLead(userId, businessId, leadId) {
   );
   if (existing.rows.length > 0) return existing.rows[0].id;
   const res = await pool.query(
-    `INSERT INTO autopilot_jobs (user_id, business_id, lead_id, status, created_at)
-     VALUES ($1, $2, $3, 'pending_quote', NOW())
+    `INSERT INTO autopilot_jobs
+       (user_id, business_id, lead_id, status, current_step, created_at, next_action_at)
+     VALUES ($1, $2, $3, 'pending_quote', 'not_started', NOW(), NOW())
      RETURNING id`,
     [userId, businessId, leadId]
   );
@@ -4619,6 +4671,13 @@ ${leadContext}` }
   const business = businessRes.rows[0];
   const { fromName, replyTo } = getBusinessSendParams(business);
   const tierLabel = tier === "premium" ? "Premium Clean" : tier === "deep_clean" ? "Deep Clean" : "Standard Clean";
+  const tokenRes = await pool.query(
+    `SELECT booking_token FROM autopilot_jobs WHERE id = $1`,
+    [jobId]
+  );
+  const bookingToken = tokenRes.rows[0]?.booking_token || null;
+  const appDomain = process.env.EXPO_PUBLIC_DOMAIN || process.env.APP_DOMAIN || "app.getquotepro.ai";
+  const bookingUrl = bookingToken ? `https://${appDomain}/book/${bookingToken}` : null;
   const emailHtml = buildOutreachEmail({
     openingLine: qualification.openingLine,
     firstName: lead.firstName,
@@ -4626,12 +4685,13 @@ ${leadContext}` }
     tierLabel,
     estimatedTotal,
     primaryColor: business.primary_color || "#2563EB",
-    quoteId: quoteId || ""
+    quoteId: quoteId || "",
+    bookingUrl
   });
   try {
     await sendEmail({
       to: lead.email,
-      subject: `Your cleaning quote from ${business.company_name}`,
+      subject: `Your Cleaning Quote from ${business.company_name}`,
       html: emailHtml,
       fromName,
       replyTo
@@ -4651,6 +4711,9 @@ ${leadContext}` }
   await updateJob3(jobId, {
     status: "pending_response",
     quoteId,
+    quoteAmount: estimatedTotal,
+    quoteSentAt: /* @__PURE__ */ new Date(),
+    currentStep: "quote_sent",
     lastActionAt: /* @__PURE__ */ new Date(),
     nextActionAt: next,
     metadata: meta
@@ -4855,10 +4918,42 @@ async function enrollAllPendingIntakeRequests(userId, businessId) {
 }
 async function processAutopilotJobs() {
   try {
+    try {
+      const enabledRes = await pool.query(
+        `SELECT u.id AS user_id, b.id AS business_id
+         FROM users u
+         JOIN businesses b ON b.owner_user_id = u.id
+         WHERE u.autopilot_enabled = true`
+      );
+      for (const row of enabledRes.rows) {
+        const newLeads = await pool.query(
+          `SELECT ir.id
+           FROM intake_requests ir
+           WHERE ir.business_id = $1
+             AND ir.status NOT IN ('dismissed', 'converted')
+             AND ir.customer_email IS NOT NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM autopilot_jobs aj WHERE aj.lead_id = ir.id
+             )
+           ORDER BY ir.created_at DESC
+           LIMIT 20`,
+          [row.business_id]
+        );
+        for (const lead of newLeads.rows) {
+          try {
+            await enrollLead(row.user_id, row.business_id, lead.id);
+          } catch (e) {
+            console.warn(`[autopilot] Auto-enroll failed for lead ${lead.id}:`, e.message);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[autopilot] Auto-enroll sweep failed:", e.message);
+    }
     const res = await pool.query(
       `SELECT * FROM autopilot_jobs
        WHERE next_action_at <= NOW()
-         AND status NOT IN ('complete', 'paused')
+         AND status NOT IN ('complete', 'paused', 'pending_review')
        ORDER BY next_action_at ASC
        LIMIT 50`
     );
@@ -4883,31 +4978,38 @@ async function processAutopilotJobs() {
     console.error("[autopilot] processAutopilotJobs failed:", err.message);
   }
 }
-function buildOutreachEmail({ openingLine, firstName, companyName: companyName2, tierLabel, estimatedTotal, primaryColor, quoteId }) {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+function buildOutreachEmail({ openingLine, firstName, companyName: companyName2, tierLabel, estimatedTotal, primaryColor, quoteId, bookingUrl }) {
+  const ctaSection = bookingUrl ? `
+    <table cellpadding="0" cellspacing="0" style="margin:24px 0;">
+      <tr><td style="background:${primaryColor};border-radius:10px;">
+        <a href="${bookingUrl}" style="display:inline-block;padding:15px 28px;font-size:16px;font-weight:700;color:#fff;text-decoration:none;letter-spacing:-0.01em;">Accept Quote &amp; Book Your Cleaning &rarr;</a>
+      </td></tr>
+    </table>` : "";
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;">
 <tr><td align="center" style="padding:40px 16px;">
 <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;">
   <tr><td style="background:${primaryColor};padding:28px 32px;">
     <p style="margin:0;font-size:13px;font-weight:700;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.1em;">${companyName2}</p>
-    <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#fff;">Your cleaning quote is ready</h1>
+    <h1 style="margin:6px 0 0;font-size:22px;font-weight:800;color:#fff;">Your Cleaning Quote is Ready</h1>
   </td></tr>
   <tr><td style="padding:28px 32px;">
     <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.7;">${openingLine}</p>
     <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.7;">Based on what you shared, we put together a <strong>${tierLabel}</strong> quote for your home:</p>
-    <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;width:100%;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+    <table cellpadding="0" cellspacing="0" style="margin:0 0 8px;width:100%;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
       <tr><td style="padding:20px 24px;">
         <p style="margin:0 0 4px;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Estimated Price</p>
-        <p style="margin:0;font-size:32px;font-weight:800;color:${primaryColor};">$${estimatedTotal}</p>
+        <p style="margin:0;font-size:36px;font-weight:800;color:${primaryColor};">$${estimatedTotal}</p>
         <p style="margin:4px 0 0;font-size:13px;color:#6b7280;">${tierLabel}</p>
       </td></tr>
     </table>
-    <p style="margin:0 0 24px;font-size:14px;color:#6b7280;line-height:1.6;">This is an estimate based on the details you provided. Final pricing is confirmed after a quick walkthrough or more details about your space.</p>
+    ${ctaSection}
+    <p style="margin:0 0 16px;font-size:14px;color:#6b7280;line-height:1.6;">This is an estimate based on the details you provided. Final pricing is confirmed after a quick walkthrough or more details about your space.</p>
     <p style="margin:0;font-size:14px;color:#374151;line-height:1.7;">Reply to this email with any questions \u2014 I read every one personally.</p>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center;">
-    <p style="font-size:12px;color:#9ca3af;margin:0;">${companyName2}</p>
+    <p style="font-size:12px;color:#9ca3af;margin:0;">${companyName2} \xB7 Powered by QuotePro</p>
   </td></tr>
 </table>
 </td></tr>
@@ -5198,6 +5300,12 @@ var init_revenuecatRouter = __esm({
           return res.status(200).json({ received: true });
         }
         const user = userResult.rows[0];
+        trackEvent(user.id, AnalyticsEvents.REVENUECAT_WEBHOOK, {
+          eventType,
+          productId: productId || null,
+          userId: user.id
+        }).catch(() => {
+        });
         if (["INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "UNCANCELLATION"].includes(eventType)) {
           const newTier = mapProductToTier(productId);
           const currentTier = user.subscription_tier || "free";
@@ -6296,10 +6404,10 @@ var QBOClient = class {
     await logSync(this.userId, null, "refresh", {}, { success: true }, "ok");
     return newAccessToken;
   }
-  async request(method, path3, body, retryCount = 0) {
+  async request(method, path4, body, retryCount = 0) {
     const maxRetries = 3;
     const accessToken = await this.ensureValidToken();
-    const url = `${this.getBaseUrl()}/v3/company/${this.connection.realmId}${path3}`;
+    const url = `${this.getBaseUrl()}/v3/company/${this.connection.realmId}${path4}`;
     const headers = {
       "Authorization": `Bearer ${accessToken}`,
       "Accept": "application/json",
@@ -6312,12 +6420,12 @@ var QBOClient = class {
     });
     if (response.status === 401 && retryCount === 0) {
       this.connection.accessTokenExpiresAt = /* @__PURE__ */ new Date(0);
-      return this.request(method, path3, body, retryCount + 1);
+      return this.request(method, path4, body, retryCount + 1);
     }
     if ((response.status === 429 || response.status >= 500) && retryCount < maxRetries) {
       const delay = Math.pow(2, retryCount) * 1e3 + Math.random() * 500;
       await new Promise((resolve2) => setTimeout(resolve2, delay));
-      return this.request(method, path3, body, retryCount + 1);
+      return this.request(method, path4, body, retryCount + 1);
     }
     const data = await response.json();
     if (!response.ok) {
@@ -7319,8 +7427,8 @@ async function createQBOInvoiceForQuote(userId, quoteId) {
     }
   } else {
     const totalAmount = parseFloat(quote.total) || 0;
-    const desc13 = quote.propertyDetails ? `Cleaning Services - ${quote.propertyDetails?.sqft || ""} sqft` : "Cleaning Services";
-    lines.push({ description: desc13, amount: totalAmount });
+    const desc14 = quote.propertyDetails ? `Cleaning Services - ${quote.propertyDetails?.sqft || ""} sqft` : "Cleaning Services";
+    lines.push({ description: desc14, amount: totalAmount });
   }
   const privateNote = `QuotePro Quote #${quote.quoteNumber || quoteId}`;
   const txnDate = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
@@ -7413,8 +7521,8 @@ ${notes ? `<div class="notes"><strong>Notes:</strong> ${notes}</div>` : ""}
 async function db_getBusinessById(businessId) {
   const { db: db6 } = await Promise.resolve().then(() => (init_db(), db_exports));
   const { businesses: businesses10 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { eq: eq15 } = await import("drizzle-orm");
-  const [b] = await db6.select().from(businesses10).where(eq15(businesses10.id, businessId));
+  const { eq: eq16 } = await import("drizzle-orm");
+  const [b] = await db6.select().from(businesses10).where(eq16(businesses10.id, businessId));
   return b;
 }
 function formatUser(u) {
@@ -8074,8 +8182,8 @@ async function generateRecurringJobs() {
       WHERE status = 'active'
     `);
     if (!activeSeries.length) return;
-    const { getStripe: getStripe7 } = await Promise.resolve().then(() => (init_clients(), clients_exports));
-    const stripe = getStripe7();
+    const { getStripe: getStripe6 } = await Promise.resolve().then(() => (init_clients(), clients_exports));
+    const stripe = getStripe6();
     for (const series of activeSeries) {
       try {
         await generateSeriesJobs(series.id, 7);
@@ -10306,11 +10414,15 @@ router4.get("/jobs", requireAuth, requireAutopilot, async (req, res) => {
     if (!business) return res.status(404).json({ message: "Business not found" });
     const result = await pool.query(
       `SELECT aj.*,
-              c.first_name || ' ' || c.last_name AS lead_name,
-              c.email AS lead_email,
+              COALESCE(
+                NULLIF(TRIM(c.first_name || ' ' || c.last_name), ''),
+                ir.customer_name
+              ) AS lead_name,
+              COALESCE(c.email, ir.customer_email) AS lead_email,
               (SELECT COUNT(*) FROM autopilot_job_logs l WHERE l.job_id = aj.id) AS log_count
        FROM autopilot_jobs aj
        LEFT JOIN customers c ON c.id = aj.lead_id
+       LEFT JOIN intake_requests ir ON ir.id = aj.lead_id
        WHERE aj.business_id = $1
        ORDER BY aj.created_at DESC
        LIMIT 100`,
@@ -10372,12 +10484,18 @@ router4.get("/stats", requireAuth, requireAutopilot, async (req, res) => {
       [business.id, startOfMonth]
     );
     const row = result.rows[0] || {};
+    const bookingsRes = await pool.query(
+      `SELECT COUNT(*) AS bookings_count FROM bookings WHERE user_id = $1 AND status != 'cancelled'`,
+      [req.session.userId]
+    );
+    const bookingsCount = parseInt(bookingsRes.rows[0]?.bookings_count || "0");
     return res.json({
       enrolledThisMonth: parseInt(row.enrolled_this_month || "0"),
       quotesSent: parseInt(row.quotes_sent || "0"),
       followUpsFired: parseInt(row.follow_ups_fired || "0"),
       contractsSent: parseInt(row.contracts_sent || "0"),
-      reviewsRequested: parseInt(row.reviews_requested || "0")
+      reviewsRequested: parseInt(row.reviews_requested || "0"),
+      bookingsCount
     });
   } catch (err) {
     console.error("[autopilot] stats error:", err.message);
@@ -10439,6 +10557,37 @@ router4.post("/settings", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("[autopilot] settings error:", err.message);
     return res.status(500).json({ message: "Failed to save settings" });
+  }
+});
+router4.get("/bookings", requireAuth, async (req, res) => {
+  try {
+    const business = await getBusinessByOwner(req.session.userId);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+    const result = await pool.query(
+      `SELECT bk.*,
+              COALESCE(
+                NULLIF(TRIM(c.first_name || ' ' || c.last_name), ''),
+                ir.customer_name,
+                bk.customer_name
+              ) AS display_name,
+              aj.current_step, aj.quote_amount AS job_quote_amount
+       FROM bookings bk
+       JOIN autopilot_jobs aj ON aj.id = bk.autopilot_job_id
+       LEFT JOIN customers c ON c.id = aj.lead_id
+       LEFT JOIN intake_requests ir ON ir.id = aj.lead_id
+       WHERE bk.user_id = $1
+       ORDER BY bk.scheduled_date DESC, bk.scheduled_time DESC
+       LIMIT 100`,
+      [req.session.userId]
+    );
+    const rows = result.rows.map((r) => ({
+      ...r,
+      customer_name: r.display_name || r.customer_name
+    }));
+    return res.json(rows);
+  } catch (err) {
+    console.error("[autopilot] bookings error:", err.message);
+    return res.status(500).json({ message: "Failed to fetch bookings" });
   }
 });
 router4.post("/checkout", requireAuth, async (req, res) => {
@@ -12693,11 +12842,532 @@ router11.post("/locations/:id/switch", requireAuth, async (req, res) => {
 });
 var locationsRouter_default = router11;
 
+// server/routers/availabilityRouter.ts
+import { Router as Router14 } from "express";
+init_db();
+var router12 = Router14();
+router12.get("/", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    let result = await pool.query(
+      `SELECT * FROM availability_settings WHERE user_id = $1`,
+      [userId]
+    );
+    if (result.rows.length === 0) {
+      const insert = await pool.query(
+        `INSERT INTO availability_settings
+           (user_id, working_days, start_time, end_time, slot_duration_minutes,
+            buffer_minutes, advance_booking_days, min_notice_hours)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [userId, [1, 2, 3, 4, 5], "08:00", "17:00", 120, 30, 30, 24]
+      );
+      result = insert;
+    }
+    const settings = result.rows[0];
+    const blocked = await pool.query(
+      `SELECT * FROM blocked_dates WHERE user_id = $1 ORDER BY blocked_date ASC`,
+      [userId]
+    );
+    return res.json({ settings, blockedDates: blocked.rows });
+  } catch (err) {
+    console.error("[availability] GET error:", err.message);
+    return res.status(500).json({ message: "Failed to fetch availability settings" });
+  }
+});
+router12.post("/", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const {
+      workingDays,
+      startTime,
+      endTime,
+      slotDurationMinutes,
+      bufferMinutes,
+      advanceBookingDays,
+      minNoticeHours,
+      blockedDates: blockedDates2
+    } = req.body;
+    await pool.query(
+      `INSERT INTO availability_settings
+         (user_id, working_days, start_time, end_time, slot_duration_minutes,
+          buffer_minutes, advance_booking_days, min_notice_hours, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         working_days = EXCLUDED.working_days,
+         start_time = EXCLUDED.start_time,
+         end_time = EXCLUDED.end_time,
+         slot_duration_minutes = EXCLUDED.slot_duration_minutes,
+         buffer_minutes = EXCLUDED.buffer_minutes,
+         advance_booking_days = EXCLUDED.advance_booking_days,
+         min_notice_hours = EXCLUDED.min_notice_hours,
+         updated_at = NOW()`,
+      [
+        userId,
+        workingDays || [1, 2, 3, 4, 5],
+        startTime || "08:00",
+        endTime || "17:00",
+        slotDurationMinutes || 120,
+        bufferMinutes || 30,
+        advanceBookingDays || 30,
+        minNoticeHours || 24
+      ]
+    );
+    if (Array.isArray(blockedDates2)) {
+      await pool.query(`DELETE FROM blocked_dates WHERE user_id = $1`, [userId]);
+      for (const bd of blockedDates2) {
+        if (bd.date) {
+          await pool.query(
+            `INSERT INTO blocked_dates (user_id, blocked_date, reason) VALUES ($1, $2, $3)`,
+            [userId, bd.date, bd.reason || null]
+          );
+        }
+      }
+    }
+    return res.json({ message: "Availability settings saved" });
+  } catch (err) {
+    console.error("[availability] POST error:", err.message);
+    return res.status(500).json({ message: "Failed to save availability settings" });
+  }
+});
+router12.get("/slots", async (req, res) => {
+  try {
+    const userId = req.query.userId || req.session.userId;
+    const startDateStr = req.query.startDate || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const days = Math.min(parseInt(req.query.days) || 14, 60);
+    if (!userId) return res.status(400).json({ message: "userId required" });
+    const settingsRes = await pool.query(
+      `SELECT * FROM availability_settings WHERE user_id = $1`,
+      [userId]
+    );
+    if (settingsRes.rows.length === 0) {
+      return res.json([]);
+    }
+    const s = settingsRes.rows[0];
+    const blockedRes = await pool.query(
+      `SELECT blocked_date FROM blocked_dates WHERE user_id = $1`,
+      [userId]
+    );
+    const blockedSet = new Set(blockedRes.rows.map((r) => r.blocked_date));
+    const windowEnd = new Date(startDateStr);
+    windowEnd.setDate(windowEnd.getDate() + days);
+    const bookingsRes = await pool.query(
+      `SELECT scheduled_date, scheduled_time, duration_minutes
+       FROM bookings
+       WHERE user_id = $1
+         AND scheduled_date >= $2
+         AND scheduled_date <= $3
+         AND status != 'cancelled'`,
+      [userId, startDateStr, windowEnd.toISOString().slice(0, 10)]
+    );
+    const bookedSlots = /* @__PURE__ */ new Map();
+    for (const b of bookingsRes.rows) {
+      const key = b.scheduled_date;
+      if (!bookedSlots.has(key)) bookedSlots.set(key, []);
+      const [bh, bm] = b.scheduled_time.split(":").map(Number);
+      bookedSlots.get(key).push(bh * 60 + bm);
+    }
+    const slotDuration = parseInt(s.slot_duration_minutes) || 120;
+    const buffer = parseInt(s.buffer_minutes) || 30;
+    const advanceDays = parseInt(s.advance_booking_days) || 30;
+    const minNoticeMs = (parseInt(s.min_notice_hours) || 24) * 60 * 60 * 1e3;
+    const [sh, sm] = s.start_time.split(":").map(Number);
+    const [eh, em] = s.end_time.split(":").map(Number);
+    const now = Date.now();
+    const results = [];
+    for (let d = 0; d < days; d++) {
+      const date = /* @__PURE__ */ new Date(startDateStr + "T00:00:00");
+      date.setDate(date.getDate() + d);
+      const diffDays = (date.getTime() - now) / (1e3 * 60 * 60 * 24);
+      if (diffDays > advanceDays) break;
+      const dayOfWeek = date.getDay();
+      if (!s.working_days.includes(dayOfWeek)) continue;
+      const dateStr = date.toISOString().slice(0, 10);
+      if (blockedSet.has(dateStr)) continue;
+      const booked = bookedSlots.get(dateStr) || [];
+      let slotStart = sh * 60 + sm;
+      const dayEnd = eh * 60 + em;
+      while (slotStart + slotDuration <= dayEnd) {
+        const slotDate = /* @__PURE__ */ new Date(`${dateStr}T${String(Math.floor(slotStart / 60)).padStart(2, "0")}:${String(slotStart % 60).padStart(2, "0")}:00`);
+        if (slotDate.getTime() - now < minNoticeMs) {
+          slotStart += slotDuration + buffer;
+          continue;
+        }
+        const conflict = booked.some((b) => Math.abs(b - slotStart) < slotDuration);
+        if (!conflict) {
+          const h = Math.floor(slotStart / 60);
+          const m = slotStart % 60;
+          const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+          const ampm = h >= 12 ? "PM" : "AM";
+          const h12 = h % 12 === 0 ? 12 : h % 12;
+          const displayTime = `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+          const displayDate = date.toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric"
+          });
+          results.push({ date: dateStr, time: timeStr, displayDate, displayTime });
+        }
+        slotStart += slotDuration + buffer;
+      }
+    }
+    return res.json(results);
+  } catch (err) {
+    console.error("[availability] slots error:", err.message);
+    return res.status(500).json({ message: "Failed to compute slots" });
+  }
+});
+var availabilityRouter_default = router12;
+
+// server/routers/publicBookingRouter.ts
+init_db();
+init_mail();
+import { Router as Router15 } from "express";
+import path2 from "path";
+import fs2 from "fs";
+var router13 = Router15();
+var bookingHtmlPath = path2.join(process.cwd(), "server/templates/booking.html");
+router13.get("/book/:token", (_req, res) => {
+  try {
+    const html = fs2.readFileSync(bookingHtmlPath, "utf-8");
+    res.setHeader("Content-Type", "text/html");
+    return res.send(html);
+  } catch {
+    return res.status(500).send("Page unavailable.");
+  }
+});
+router13.get("/book/:token/confirmed", (_req, res) => {
+  try {
+    const html = fs2.readFileSync(bookingHtmlPath, "utf-8");
+    res.setHeader("Content-Type", "text/html");
+    return res.send(html);
+  } catch {
+    return res.status(500).send("Page unavailable.");
+  }
+});
+router13.get("/api/book/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const jobRes = await pool.query(
+      `SELECT aj.*,
+              b.company_name, b.email AS business_email, b.primary_color,
+              b.phone AS business_phone, b.owner_user_id,
+              COALESCE(
+                NULLIF(TRIM(c.first_name || ' ' || c.last_name), ''),
+                ir.customer_name
+              ) AS lead_full_name,
+              COALESCE(c.email, ir.customer_email) AS lead_email,
+              COALESCE(c.phone, ir.customer_phone) AS lead_phone,
+              c.address AS customer_address,
+              ir.customer_address AS intake_address,
+              ir.extracted_fields,
+              ir.property_beds, ir.property_baths, ir.property_sqft,
+              ir.service_type, ir.frequency
+       FROM autopilot_jobs aj
+       JOIN businesses b ON b.id = aj.business_id
+       LEFT JOIN customers c ON c.id = aj.lead_id
+       LEFT JOIN intake_requests ir ON ir.id = aj.lead_id
+       WHERE aj.booking_token = $1`,
+      [token]
+    );
+    if (jobRes.rows.length === 0) {
+      return res.status(404).json({ message: "Booking link not found or expired" });
+    }
+    const job = jobRes.rows[0];
+    let booking = null;
+    if (job.booking_id) {
+      const bkRes = await pool.query(
+        `SELECT * FROM bookings WHERE id = $1`,
+        [job.booking_id]
+      );
+      if (bkRes.rows.length > 0) booking = bkRes.rows[0];
+    }
+    return res.json({
+      lead: {
+        id: job.id,
+        userId: job.owner_user_id || job.user_id,
+        fullName: job.lead_full_name,
+        email: job.lead_email,
+        phone: job.lead_phone,
+        address: job.customer_address || job.intake_address,
+        quoteAmount: job.quote_amount,
+        currentStep: job.current_step,
+        frequency: job.frequency,
+        serviceType: job.service_type,
+        propertyBeds: job.property_beds,
+        propertyBaths: job.property_baths,
+        propertySqft: job.property_sqft,
+        extractedFields: job.extracted_fields,
+        extractedBeds: job.extracted_fields?.beds || job.extracted_fields?.bedrooms,
+        extractedBaths: job.extracted_fields?.baths || job.extracted_fields?.bathrooms,
+        extractedSqft: job.extracted_fields?.sqft || job.extracted_fields?.square_feet,
+        extractedFrequency: job.extracted_fields?.frequency
+      },
+      business: {
+        companyName: job.company_name,
+        email: job.business_email,
+        phone: job.business_phone,
+        primaryColor: job.primary_color,
+        userId: job.owner_user_id || job.user_id
+      },
+      booking
+    });
+  } catch (err) {
+    console.error("[publicBooking] GET error:", err.message);
+    return res.status(500).json({ message: "Failed to load booking" });
+  }
+});
+router13.post("/api/book/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { date, time } = req.body;
+    if (!date || !time) {
+      return res.status(400).json({ message: "Date and time are required" });
+    }
+    const jobRes = await pool.query(
+      `SELECT aj.*,
+              b.company_name, b.email AS business_email, b.primary_color,
+              b.owner_user_id,
+              COALESCE(
+                NULLIF(TRIM(c.first_name || ' ' || c.last_name), ''),
+                ir.customer_name
+              ) AS lead_full_name,
+              COALESCE(c.email, ir.customer_email) AS lead_email,
+              COALESCE(c.phone, ir.customer_phone) AS lead_phone,
+              c.address AS customer_address,
+              ir.customer_address AS intake_address,
+              ir.service_type, ir.frequency,
+              ir.property_beds, ir.property_baths, ir.property_sqft
+       FROM autopilot_jobs aj
+       JOIN businesses b ON b.id = aj.business_id
+       LEFT JOIN customers c ON c.id = aj.lead_id
+       LEFT JOIN intake_requests ir ON ir.id = aj.lead_id
+       WHERE aj.booking_token = $1`,
+      [token]
+    );
+    if (jobRes.rows.length === 0) {
+      return res.status(404).json({ message: "Booking link not found" });
+    }
+    const job = jobRes.rows[0];
+    if (job.current_step === "booked" || job.current_step === "completed") {
+      return res.status(409).json({ message: "This slot has already been booked" });
+    }
+    const settingsRes = await pool.query(
+      `SELECT slot_duration_minutes FROM availability_settings WHERE user_id = $1`,
+      [job.owner_user_id || job.user_id]
+    );
+    const duration = settingsRes.rows[0]?.slot_duration_minutes || 120;
+    const bookingRes = await pool.query(
+      `INSERT INTO bookings
+         (user_id, autopilot_job_id, scheduled_date, scheduled_time, duration_minutes,
+          customer_name, customer_email, customer_phone, service_type, address,
+          quote_amount, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'confirmed')
+       RETURNING *`,
+      [
+        job.owner_user_id || job.user_id,
+        job.id,
+        date,
+        time,
+        duration,
+        job.lead_full_name,
+        job.lead_email,
+        job.lead_phone,
+        job.service_type,
+        job.customer_address || job.intake_address,
+        job.quote_amount
+      ]
+    );
+    const booking = bookingRes.rows[0];
+    await pool.query(
+      `UPDATE autopilot_jobs
+       SET current_step = 'booked',
+           quote_accepted_at = NOW(),
+           booking_id = $1,
+           status = 'pending_review'
+       WHERE id = $2`,
+      [booking.id, job.id]
+    );
+    const displayDate = (/* @__PURE__ */ new Date(date + "T00:00:00")).toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric"
+    });
+    const [h, m] = time.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    const displayTime = `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+    if (job.lead_email) {
+      sendEmail({
+        to: job.lead_email,
+        subject: `Your Cleaning is Booked! \u2014 ${job.company_name}`,
+        html: buildCustomerConfirmationEmail({
+          firstName: (job.lead_full_name || "").split(" ")[0] || "there",
+          companyName: job.company_name,
+          displayDate,
+          displayTime,
+          serviceType: job.service_type,
+          address: job.customer_address || job.intake_address,
+          businessEmail: job.business_email,
+          primaryColor: job.primary_color || "#007AFF"
+        }),
+        fromName: job.company_name,
+        replyTo: job.business_email || null
+      }).catch((e) => console.error("[publicBooking] customer email error:", e.message));
+    }
+    if (job.business_email) {
+      sendEmail({
+        to: job.business_email,
+        subject: `New Booking Confirmed \u2014 ${job.lead_full_name || "Customer"}`,
+        html: buildOwnerNotificationEmail({
+          customerName: job.lead_full_name,
+          customerEmail: job.lead_email,
+          customerPhone: job.lead_phone,
+          companyName: job.company_name,
+          displayDate,
+          displayTime,
+          serviceType: job.service_type,
+          address: job.customer_address || job.intake_address,
+          beds: job.property_beds,
+          baths: job.property_baths,
+          sqft: job.property_sqft,
+          quoteAmount: job.quote_amount,
+          primaryColor: job.primary_color || "#007AFF"
+        }),
+        fromName: "QuotePro Autopilot",
+        replyTo: null
+      }).catch((e) => console.error("[publicBooking] owner email error:", e.message));
+    }
+    pool.query(
+      `UPDATE autopilot_jobs SET confirmation_sent_at = NOW() WHERE id = $1`,
+      [job.id]
+    ).catch(() => {
+    });
+    return res.json({ success: true, booking });
+  } catch (err) {
+    console.error("[publicBooking] POST error:", err.message);
+    return res.status(500).json({ message: "Failed to confirm booking" });
+  }
+});
+function buildCustomerConfirmationEmail({
+  firstName,
+  companyName: companyName2,
+  displayDate,
+  displayTime,
+  serviceType,
+  address,
+  businessEmail,
+  primaryColor
+}) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;">
+<tr><td align="center" style="padding:40px 16px;">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+  <tr><td style="background:${primaryColor};padding:32px;">
+    <h1 style="margin:0;font-size:24px;font-weight:800;color:#fff;">Your Cleaning is Booked!</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <p style="margin:0 0 16px;font-size:16px;color:#374151;line-height:1.6;">Hi ${firstName},</p>
+    <p style="margin:0 0 24px;font-size:16px;color:#374151;line-height:1.6;">Thanks for booking with <strong>${companyName2}</strong> \u2014 we're looking forward to taking care of your home.</p>
+    <table cellpadding="0" cellspacing="0" style="width:100%;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:24px;">
+      <tr><td style="padding:20px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:13px;color:#6b7280;">Date</span><br>
+              <strong style="font-size:15px;color:#111827;">${displayDate}</strong>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+              <span style="font-size:13px;color:#6b7280;">Time</span><br>
+              <strong style="font-size:15px;color:#111827;">${displayTime}</strong>
+            </td>
+          </tr>
+          ${serviceType ? `<tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
+            <span style="font-size:13px;color:#6b7280;">Service</span><br>
+            <strong style="font-size:15px;color:#111827;">${serviceType}</strong>
+          </td></tr>` : ""}
+          ${address ? `<tr><td style="padding:8px 0;">
+            <span style="font-size:13px;color:#6b7280;">Address</span><br>
+            <strong style="font-size:15px;color:#111827;">${address}</strong>
+          </td></tr>` : ""}
+        </table>
+      </td></tr>
+    </table>
+    <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">Your cleaner will arrive at <strong>${displayTime}</strong> on <strong>${displayDate}</strong>.</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">The owner will be in touch soon to arrange payment and confirm any final details.</p>
+    ${businessEmail ? `<p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">Questions? Reply to this email or reach us at <a href="mailto:${businessEmail}" style="color:${primaryColor}">${businessEmail}</a>.</p>` : ""}
+  </td></tr>
+  <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center;">
+    <p style="font-size:12px;color:#9ca3af;margin:0;">${companyName2} \xB7 Powered by QuotePro</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+function buildOwnerNotificationEmail({
+  customerName,
+  customerEmail,
+  customerPhone,
+  companyName: companyName2,
+  displayDate,
+  displayTime,
+  serviceType,
+  address,
+  beds,
+  baths,
+  sqft: sqft2,
+  quoteAmount: quoteAmount2,
+  primaryColor
+}) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;">
+<tr><td align="center" style="padding:40px 16px;">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+  <tr><td style="background:${primaryColor};padding:32px;">
+    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:rgba(255,255,255,0.75);text-transform:uppercase;letter-spacing:0.08em;">QuotePro Autopilot</p>
+    <h1 style="margin:0;font-size:22px;font-weight:800;color:#fff;">New Booking Confirmed</h1>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <p style="margin:0 0 20px;font-size:16px;color:#374151;line-height:1.6;"><strong>${customerName || "A customer"}</strong> just booked through your Autopilot link.</p>
+    <table cellpadding="0" cellspacing="0" style="width:100%;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:24px;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Customer</p>
+        ${customerName ? `<p style="margin:0 0 4px;font-size:15px;color:#111827;"><strong>${customerName}</strong></p>` : ""}
+        ${customerEmail ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">${customerEmail}</p>` : ""}
+        ${customerPhone ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">${customerPhone}</p>` : ""}
+      </td></tr>
+      <tr><td style="padding:0 24px 20px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Appointment</p>
+        <p style="margin:0 0 4px;font-size:15px;color:#111827;"><strong>${displayDate} at ${displayTime}</strong></p>
+        ${serviceType ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">Service: ${serviceType}</p>` : ""}
+        ${address ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">Address: ${address}</p>` : ""}
+        ${beds || baths ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">${beds ? `${beds} bed` : ""}${beds && baths ? " / " : ""}${baths ? `${baths} bath` : ""}${sqft2 ? ` / ${sqft2} sqft` : ""}</p>` : ""}
+        ${quoteAmount2 ? `<p style="margin:0 0 4px;font-size:14px;color:#374151;">Quote: <strong>$${parseFloat(quoteAmount2).toFixed(0)}</strong></p>` : ""}
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">View this lead in your QuotePro dashboard to follow up on payment and job details.</p>
+  </td></tr>
+  <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 32px;text-align:center;">
+    <p style="font-size:12px;color:#9ca3af;margin:0;">QuotePro Autopilot \xB7 ${companyName2}</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+var publicBookingRouter_default = router13;
+
 // server/routers/authRouter.ts
 init_db();
 import crypto5 from "node:crypto";
 import { google as google2 } from "googleapis";
-import { Router as Router14 } from "express";
+import { Router as Router16 } from "express";
 init_clients();
 
 // server/dripEmails.ts
@@ -12708,7 +13378,10 @@ var DRIP_FROM_NAME = "Mike at QuotePro";
 var DRIP_REPLY_TO2 = "mike@getquotepro.ai";
 var APP_BASE_URL2 = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
 function getDripSecret() {
-  return process.env.SESSION_SECRET || "quotepro-drip-fallback-secret";
+  if (!process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET environment variable is required");
+  }
+  return process.env.SESSION_SECRET;
 }
 function generateUnsubscribeToken(userId) {
   return crypto4.createHmac("sha256", getDripSecret()).update(userId).digest("hex");
@@ -13142,8 +13815,8 @@ init_revenuecatRouter();
 init_storage();
 init_clients();
 import bcrypt4 from "bcryptjs";
-var router12 = Router14();
-router12.post("/crash-report", async (req, res) => {
+var router14 = Router16();
+router14.post("/crash-report", async (req, res) => {
   try {
     const { error, stack, componentStack, source } = req.body;
     console.error("[CRASH REPORT]", {
@@ -13158,7 +13831,7 @@ router12.post("/crash-report", async (req, res) => {
     res.status(200).json({ received: true });
   }
 });
-router12.post("/auth/register", authLimiter, async (req, res) => {
+router14.post("/auth/register", authLimiter, async (req, res) => {
   try {
     const { email, password, firstName, name, ref } = req.body;
     if (!email || !password) {
@@ -13220,7 +13893,7 @@ router12.post("/auth/register", authLimiter, async (req, res) => {
     return res.status(500).json({ message: "Registration failed" });
   }
 });
-router12.post("/auth/login", authLimiter, loginFailureLimiter, async (req, res) => {
+router14.post("/auth/login", authLimiter, loginFailureLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -13264,7 +13937,7 @@ router12.post("/auth/login", authLimiter, loginFailureLimiter, async (req, res) 
     return res.status(500).json({ message: "Login failed" });
   }
 });
-router12.get("/auth/apple/start", async (req, res) => {
+router14.get("/auth/apple/start", async (req, res) => {
   try {
     const clientId = process.env.APPLE_SERVICE_ID;
     if (!clientId) {
@@ -13282,7 +13955,7 @@ router12.get("/auth/apple/start", async (req, res) => {
     return res.status(500).json({ message: "Failed to start Apple sign-in" });
   }
 });
-router12.post("/auth/apple/callback", authLimiter, async (req, res) => {
+router14.post("/auth/apple/callback", authLimiter, async (req, res) => {
   try {
     const { id_token, user: userJson, state } = req.body;
     const expectedState = req.session.appleOAuthState;
@@ -13364,7 +14037,7 @@ router12.post("/auth/apple/callback", authLimiter, async (req, res) => {
     return res.redirect("/app/login?error=apple_failed");
   }
 });
-router12.post("/auth/apple", authLimiter, async (req, res) => {
+router14.post("/auth/apple", authLimiter, async (req, res) => {
   try {
     const { identityToken, user: appleUser, fullName, email: appleEmail } = req.body;
     if (!identityToken) {
@@ -13445,7 +14118,7 @@ router12.post("/auth/apple", authLimiter, async (req, res) => {
     return res.status(500).json({ message: "Apple sign-in failed" });
   }
 });
-router12.post("/auth/google", authLimiter, async (req, res) => {
+router14.post("/auth/google", authLimiter, async (req, res) => {
   try {
     const { idToken } = req.body;
     if (!idToken) {
@@ -13521,7 +14194,7 @@ router12.post("/auth/google", authLimiter, async (req, res) => {
     return res.status(500).json({ message: "Google sign-in failed" });
   }
 });
-router12.get("/auth/google/start", async (req, res) => {
+router14.get("/auth/google/start", async (req, res) => {
   try {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
       return res.status(500).json({ message: "Google OAuth not configured" });
@@ -13557,7 +14230,7 @@ router12.get("/auth/google/start", async (req, res) => {
     return res.status(500).json({ message: "Failed to start Google sign-in" });
   }
 });
-router12.get("/auth/google/callback", async (req, res) => {
+router14.get("/auth/google/callback", async (req, res) => {
   try {
     const { code, state } = req.query;
     const [_cbPlatform, _cbIntent] = (state || "").split(":");
@@ -13649,7 +14322,7 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     return res.status(500).send("Google sign-in failed. Please try again.");
   }
 });
-router12.post("/auth/exchange-token", async (req, res) => {
+router14.post("/auth/exchange-token", async (req, res) => {
   try {
     const { token } = req.body;
     if (!token) return res.status(400).json({ message: "Missing token" });
@@ -13678,7 +14351,7 @@ router12.post("/auth/exchange-token", async (req, res) => {
     return res.status(500).json({ message: "Token exchange failed" });
   }
 });
-router12.get("/auth/me", async (req, res) => {
+router14.get("/auth/me", async (req, res) => {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Not authenticated" });
   }
@@ -13712,7 +14385,7 @@ router12.get("/auth/me", async (req, res) => {
     return res.status(500).json({ message: "Auth check failed" });
   }
 });
-router12.post("/auth/logout", (req, res) => {
+router14.post("/auth/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       return res.status(500).json({ message: "Logout failed" });
@@ -13721,7 +14394,7 @@ router12.post("/auth/logout", (req, res) => {
     return res.json({ message: "Logged out" });
   });
 });
-router12.get("/consent", requireAuth, async (req, res) => {
+router14.get("/consent", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT ai_consent_accepted_at, terms_accepted_at, consent_version FROM users WHERE id = $1`,
@@ -13738,7 +14411,7 @@ router12.get("/consent", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to fetch consent" });
   }
 });
-router12.post("/consent", requireAuth, async (req, res) => {
+router14.post("/consent", requireAuth, async (req, res) => {
   const { type, version } = req.body;
   const now = /* @__PURE__ */ new Date();
   const ver = version ?? "1.0";
@@ -13767,7 +14440,7 @@ router12.post("/consent", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to record consent" });
   }
 });
-router12.post("/auth/delete-account", requireAuth, async (req, res) => {
+router14.post("/auth/delete-account", requireAuth, async (req, res) => {
   const client = await pool.connect();
   try {
     const userId = req.session.userId;
@@ -13862,14 +14535,14 @@ router12.post("/auth/delete-account", requireAuth, async (req, res) => {
     client.release();
   }
 });
-router12.post("/auth/consume-plan-intent", requireAuth, (req, res) => {
+router14.post("/auth/consume-plan-intent", requireAuth, (req, res) => {
   const intent = req.session.pendingPlanIntent || null;
   delete req.session.pendingPlanIntent;
   req.session.save(() => {
   });
   return res.json({ pendingPlanIntent: intent });
 });
-router12.patch("/auth/contact-email", requireAuth, async (req, res) => {
+router14.patch("/auth/contact-email", requireAuth, async (req, res) => {
   try {
     const { contactEmail } = req.body;
     if (!contactEmail || typeof contactEmail !== "string" || !contactEmail.includes("@")) {
@@ -13885,7 +14558,7 @@ router12.patch("/auth/contact-email", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to save email" });
   }
 });
-router12.post("/admin/expire-trial", async (req, res) => {
+router14.post("/admin/expire-trial", async (req, res) => {
   const { email, key } = req.body;
   const ADMIN_KEY2 = process.env.ADMIN_TEST_KEY;
   if (!ADMIN_KEY2 || key !== ADMIN_KEY2) return res.status(403).json({ message: "Forbidden" });
@@ -13897,11 +14570,11 @@ router12.post("/admin/expire-trial", async (req, res) => {
   if (result.rowCount === 0) return res.status(404).json({ message: "User not found" });
   return res.json({ ok: true, user: result.rows[0] });
 });
-var authRouter_default = router12;
+var authRouter_default = router14;
 
 // server/routers/quotesRouter.ts
 init_db();
-import { Router as Router15 } from "express";
+import { Router as Router17 } from "express";
 import { eq as eq8, and as and7 } from "drizzle-orm";
 init_clients();
 init_analytics();
@@ -14361,8 +15034,8 @@ init_analytics_events();
 init_storage();
 init_schema();
 init_mail();
-var router13 = Router15();
-router13.get("/quotes", requireAuth, async (req, res) => {
+var router15 = Router17();
+router15.get("/quotes", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -14383,7 +15056,7 @@ router13.get("/quotes", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get quotes" });
   }
 });
-router13.get("/quotes/response-count", requireAuth, async (req, res) => {
+router15.get("/quotes/response-count", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -14404,7 +15077,7 @@ router13.get("/quotes/response-count", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get response count" });
   }
 });
-router13.get("/quotes/count", requireAuth, async (req, res) => {
+router15.get("/quotes/count", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -14423,7 +15096,7 @@ router13.get("/quotes/count", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get quote count" });
   }
 });
-router13.get("/quotes/:id", requireAuth, async (req, res) => {
+router15.get("/quotes/:id", requireAuth, async (req, res) => {
   try {
     const q = await getQuoteById(req.params.id);
     if (!q) return res.status(404).json({ message: "Quote not found" });
@@ -14457,7 +15130,7 @@ router13.get("/quotes/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get quote" });
   }
 });
-router13.post("/quotes", requireAuth, async (req, res) => {
+router15.post("/quotes", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -14502,7 +15175,7 @@ router13.post("/quotes", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create quote" });
   }
 });
-router13.put("/quotes/:id", requireAuth, async (req, res) => {
+router15.put("/quotes/:id", requireAuth, async (req, res) => {
   try {
     const { lineItems, ...data } = req.body;
     const dateFields = ["acceptedAt", "declinedAt", "sentAt", "expiresAt", "lastContactAt"];
@@ -14594,7 +15267,7 @@ router13.put("/quotes/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update quote" });
   }
 });
-router13.post("/quotes/:id/send", requireAuth, async (req, res) => {
+router15.post("/quotes/:id/send", requireAuth, async (req, res) => {
   try {
     const { channel, content } = req.body;
     const business = await getBusinessByOwner(req.session.userId);
@@ -14690,7 +15363,7 @@ router13.post("/quotes/:id/send", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to send quote" });
   }
 });
-router13.delete("/quotes/:id", requireAuth, async (req, res) => {
+router15.delete("/quotes/:id", requireAuth, async (req, res) => {
   try {
     await deleteQuote(req.params.id);
     return res.json({ message: "Deleted" });
@@ -14698,7 +15371,7 @@ router13.delete("/quotes/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete quote" });
   }
 });
-router13.get("/quotes/unscheduled-accepted", requireAuth, async (req, res) => {
+router15.get("/quotes/unscheduled-accepted", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -14732,7 +15405,7 @@ router13.get("/quotes/unscheduled-accepted", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get unscheduled quotes" });
   }
 });
-router13.get("/quotes/:id/pdf", requireAuth, async (req, res) => {
+router15.get("/quotes/:id/pdf", requireAuth, async (req, res) => {
   try {
     const quote = await getQuoteById(req.params.id);
     if (!quote) return res.status(404).json({ message: "Quote not found" });
@@ -14747,7 +15420,7 @@ router13.get("/quotes/:id/pdf", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to generate PDF" });
   }
 });
-router13.post("/commercial/generate-scope", requireAuth, requireGrowth, async (req, res) => {
+router15.post("/commercial/generate-scope", requireAuth, requireGrowth, async (req, res) => {
   try {
     const { walkthrough, tier } = req.body;
     if (!walkthrough) return res.status(400).json({ message: "walkthrough data is required" });
@@ -14799,7 +15472,7 @@ router13.post("/commercial/generate-scope", requireAuth, requireGrowth, async (r
     return res.json(fallbackCommercialScope(facilityName, facilityType));
   }
 });
-router13.post("/commercial/risk-scan", requireAuth, requireGrowth, async (req, res) => {
+router15.post("/commercial/risk-scan", requireAuth, requireGrowth, async (req, res) => {
   try {
     const { walkthrough, laborEstimate, pricing, tiers } = req.body;
     if (!walkthrough || !pricing) return res.status(400).json({ message: "walkthrough and pricing data are required" });
@@ -14851,7 +15524,7 @@ router13.post("/commercial/risk-scan", requireAuth, requireGrowth, async (req, r
     return res.json(fallbackRiskScan());
   }
 });
-router13.get("/quotes/:id/commercial-pdf", requireAuth, async (req, res) => {
+router15.get("/quotes/:id/commercial-pdf", requireAuth, async (req, res) => {
   try {
     const quote = await getQuoteById(req.params.id);
     if (!quote) return res.status(404).json({ message: "Quote not found" });
@@ -15046,7 +15719,7 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
     return res.status(500).json({ message: "Failed to generate commercial PDF" });
   }
 });
-router13.post("/quotes/:id/send-with-pdf", requireAuth, requireGrowth, async (req, res) => {
+router15.post("/quotes/:id/send-with-pdf", requireAuth, requireGrowth, async (req, res) => {
   try {
     const quote = await getQuoteById(req.params.id);
     if (!quote) return res.status(404).json({ message: "Quote not found" });
@@ -15241,7 +15914,7 @@ To view and accept your quote online, visit: ${quoteUrl}`;
     return res.status(500).json({ message: "Failed to send quote email" });
   }
 });
-router13.post("/quotes/:id/generate-email", requireAuth, async (req, res) => {
+router15.post("/quotes/:id/generate-email", requireAuth, async (req, res) => {
   try {
     const quote = await getQuoteById(req.params.id);
     if (!quote) return res.status(404).json({ message: "Quote not found" });
@@ -15329,7 +16002,7 @@ ${companyName2}`;
     return res.status(500).json({ message: "Failed to generate email" });
   }
 });
-router13.post("/quotes/:id/onboarding-send", requireAuth, async (req, res) => {
+router15.post("/quotes/:id/onboarding-send", requireAuth, async (req, res) => {
   try {
     const quote = await getQuoteById(req.params.id);
     if (!quote) return res.status(404).json({ message: "Quote not found" });
@@ -15452,7 +16125,7 @@ To view and accept your quote online, visit: ${quoteUrl}`,
     return res.status(500).json({ message: "Failed to send quote email" });
   }
 });
-router13.get("/quotes/:id/scheduled-followups", requireAuth, async (req, res) => {
+router15.get("/quotes/:id/scheduled-followups", requireAuth, async (req, res) => {
   try {
     const followUps = await getScheduledFollowUpsForQuote(req.params.id);
     return res.json(followUps);
@@ -15460,7 +16133,7 @@ router13.get("/quotes/:id/scheduled-followups", requireAuth, async (req, res) =>
     return res.status(500).json({ message: "Failed to get scheduled follow-ups" });
   }
 });
-router13.post("/quotes/:id/followup-preview", requireAuth, requireGrowth, async (req, res) => {
+router15.post("/quotes/:id/followup-preview", requireAuth, requireGrowth, async (req, res) => {
   try {
     const quote = await getQuoteById(req.params.id);
     if (!quote) return res.status(404).json({ message: "Quote not found" });
@@ -15474,7 +16147,7 @@ router13.post("/quotes/:id/followup-preview", requireAuth, requireGrowth, async 
     return res.status(500).json({ message: "Failed to generate preview" });
   }
 });
-router13.get("/reports/stats", requireAuth, async (req, res) => {
+router15.get("/reports/stats", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15484,7 +16157,7 @@ router13.get("/reports/stats", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get stats" });
   }
 });
-router13.get("/reports/revenue", requireAuth, async (req, res) => {
+router15.get("/reports/revenue", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15495,7 +16168,7 @@ router13.get("/reports/revenue", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get revenue data" });
   }
 });
-router13.get("/revenue/unfollowed", requireAuth, requireGrowth, async (req, res) => {
+router15.get("/revenue/unfollowed", requireAuth, requireGrowth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15512,7 +16185,7 @@ router13.get("/revenue/unfollowed", requireAuth, requireGrowth, async (req, res)
     return res.status(500).json({ message: "Failed to get unfollowed quotes" });
   }
 });
-router13.get("/revenue/pipeline", requireAuth, requireGrowth, async (req, res) => {
+router15.get("/revenue/pipeline", requireAuth, requireGrowth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15541,7 +16214,7 @@ router13.get("/revenue/pipeline", requireAuth, requireGrowth, async (req, res) =
     return res.status(500).json({ message: "Failed to get pipeline" });
   }
 });
-router13.get("/follow-ups", requireAuth, requireGrowth, async (req, res) => {
+router15.get("/follow-ups", requireAuth, requireGrowth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15552,7 +16225,7 @@ router13.get("/follow-ups", requireAuth, requireGrowth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get follow-ups" });
   }
 });
-router13.get("/follow-ups/quote/:quoteId", requireAuth, requireGrowth, async (req, res) => {
+router15.get("/follow-ups/quote/:quoteId", requireAuth, requireGrowth, async (req, res) => {
   try {
     const followUps = await getFollowUpsByQuote(req.params.quoteId);
     return res.json(followUps);
@@ -15560,7 +16233,7 @@ router13.get("/follow-ups/quote/:quoteId", requireAuth, requireGrowth, async (re
     return res.status(500).json({ message: "Failed to get follow-ups" });
   }
 });
-router13.post("/follow-ups", requireAuth, requireGrowth, async (req, res) => {
+router15.post("/follow-ups", requireAuth, requireGrowth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15580,7 +16253,7 @@ router13.post("/follow-ups", requireAuth, requireGrowth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create follow-up" });
   }
 });
-router13.put("/follow-ups/:id", requireAuth, requireGrowth, async (req, res) => {
+router15.put("/follow-ups/:id", requireAuth, requireGrowth, async (req, res) => {
   try {
     const data = { ...req.body };
     if (data.scheduledFor) data.scheduledFor = new Date(data.scheduledFor);
@@ -15591,7 +16264,7 @@ router13.put("/follow-ups/:id", requireAuth, requireGrowth, async (req, res) => 
     return res.status(500).json({ message: "Failed to update follow-up" });
   }
 });
-router13.delete("/follow-ups/:id", requireAuth, requireGrowth, async (req, res) => {
+router15.delete("/follow-ups/:id", requireAuth, requireGrowth, async (req, res) => {
   try {
     await deleteFollowUp(req.params.id);
     return res.json({ message: "Deleted" });
@@ -15599,7 +16272,7 @@ router13.delete("/follow-ups/:id", requireAuth, requireGrowth, async (req, res) 
     return res.status(500).json({ message: "Failed to delete follow-up" });
   }
 });
-router13.get("/followup-queue", requireAuth, async (req, res) => {
+router15.get("/followup-queue", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15610,7 +16283,7 @@ router13.get("/followup-queue", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get follow-up queue" });
   }
 });
-router13.post("/followup-touches", requireAuth, async (req, res) => {
+router15.post("/followup-touches", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15632,7 +16305,7 @@ router13.post("/followup-touches", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create follow-up touch" });
   }
 });
-router13.get("/quote-preferences", requireAuth, async (req, res) => {
+router15.get("/quote-preferences", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15655,7 +16328,7 @@ router13.get("/quote-preferences", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get quote preferences" });
   }
 });
-router13.put("/quote-preferences", requireAuth, async (req, res) => {
+router15.put("/quote-preferences", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15665,7 +16338,7 @@ router13.put("/quote-preferences", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update quote preferences" });
   }
 });
-router13.get("/weekly-recap", requireAuth, async (req, res) => {
+router15.get("/weekly-recap", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15684,7 +16357,7 @@ router13.get("/weekly-recap", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get weekly recap" });
   }
 });
-router13.get("/opportunities/dormant", requireAuth, async (req, res) => {
+router15.get("/opportunities/dormant", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15696,7 +16369,7 @@ router13.get("/opportunities/dormant", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get dormant customers" });
   }
 });
-router13.get("/opportunities/lost", requireAuth, async (req, res) => {
+router15.get("/opportunities/lost", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15708,7 +16381,7 @@ router13.get("/opportunities/lost", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get lost quotes" });
   }
 });
-router13.get("/sales-strategy", requireAuth, async (req, res) => {
+router15.get("/sales-strategy", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15719,7 +16392,7 @@ router13.get("/sales-strategy", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get sales strategy" });
   }
 });
-router13.put("/sales-strategy", requireAuth, async (req, res) => {
+router15.put("/sales-strategy", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15731,7 +16404,7 @@ router13.put("/sales-strategy", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update sales strategy" });
   }
 });
-router13.get("/upsell-opportunities", requireAuth, async (req, res) => {
+router15.get("/upsell-opportunities", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15742,7 +16415,7 @@ router13.get("/upsell-opportunities", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get upsell opportunities" });
   }
 });
-router13.get("/rebook-candidates", requireAuth, async (req, res) => {
+router15.get("/rebook-candidates", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15755,7 +16428,7 @@ router13.get("/rebook-candidates", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get rebook candidates" });
   }
 });
-router13.get("/forecast", requireAuth, async (req, res) => {
+router15.get("/forecast", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -15766,7 +16439,7 @@ router13.get("/forecast", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get forecast data" });
   }
 });
-router13.get("/quotes/:id/recommendations", requireAuth, async (req, res) => {
+router15.get("/quotes/:id/recommendations", requireAuth, async (req, res) => {
   try {
     const recommendations = await getRecommendationsByQuote(req.params.id);
     return res.json(recommendations);
@@ -15775,7 +16448,7 @@ router13.get("/quotes/:id/recommendations", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get recommendations" });
   }
 });
-router13.patch("/recommendations/:id", requireAuth, async (req, res) => {
+router15.patch("/recommendations/:id", requireAuth, async (req, res) => {
   try {
     const { status } = req.body;
     const updateData = { status };
@@ -15788,7 +16461,7 @@ router13.patch("/recommendations/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update recommendation" });
   }
 });
-router13.post("/quotes/:id/invoice-packet", requireAuth, async (req, res) => {
+router15.post("/quotes/:id/invoice-packet", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ error: "Business not found" });
@@ -15886,7 +16559,7 @@ router13.post("/quotes/:id/invoice-packet", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router13.get("/invoice-packets/:id", requireAuth, async (req, res) => {
+router15.get("/invoice-packets/:id", requireAuth, async (req, res) => {
   try {
     const packet = await getInvoicePacketById(req.params.id);
     if (!packet || packet.businessId !== req.businessId) return res.status(404).json({ error: "Not found" });
@@ -15895,7 +16568,7 @@ router13.get("/invoice-packets/:id", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router13.get("/invoice-packets/:id/csv", requireAuth, async (req, res) => {
+router15.get("/invoice-packets/:id/csv", requireAuth, async (req, res) => {
   try {
     const packet = await getInvoicePacketById(req.params.id);
     if (!packet || packet.businessId !== req.businessId) return res.status(404).json({ error: "Not found" });
@@ -15907,7 +16580,7 @@ router13.get("/invoice-packets/:id/csv", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router13.get("/invoice-packets/:id/pdf", requireAuth, async (req, res) => {
+router15.get("/invoice-packets/:id/pdf", requireAuth, async (req, res) => {
   try {
     const packet = await getInvoicePacketById(req.params.id);
     if (!packet || packet.businessId !== req.businessId) return res.status(404).json({ error: "Not found" });
@@ -15918,7 +16591,7 @@ router13.get("/invoice-packets/:id/pdf", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router13.post("/quotes/:id/calendar-event", requireAuth, async (req, res) => {
+router15.post("/quotes/:id/calendar-event", requireAuth, async (req, res) => {
   try {
     const quote = await getQuoteById(req.params.id);
     if (!quote || quote.businessId !== req.businessId) return res.status(404).json({ error: "Quote not found" });
@@ -15971,7 +16644,7 @@ router13.post("/quotes/:id/calendar-event", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router13.get("/calendar-events/quote/:id", requireAuth, async (req, res) => {
+router15.get("/calendar-events/quote/:id", requireAuth, async (req, res) => {
   try {
     const stubs = await getCalendarEventStubsByQuoteId(req.params.id);
     res.json(stubs);
@@ -15979,7 +16652,7 @@ router13.get("/calendar-events/quote/:id", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router13.get("/reminder-templates/:quoteId", requireAuth, async (req, res) => {
+router15.get("/reminder-templates/:quoteId", requireAuth, async (req, res) => {
   try {
     const quote = await getQuoteById(req.params.quoteId);
     if (!quote || quote.businessId !== req.businessId) return res.status(404).json({ error: "Quote not found" });
@@ -16009,7 +16682,7 @@ router13.get("/reminder-templates/:quoteId", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router13.post("/quotes/:id/invoice", requireAuth, async (req, res) => {
+router15.post("/quotes/:id/invoice", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const quoteId = req.params.id;
@@ -16083,20 +16756,20 @@ router13.post("/quotes/:id/invoice", requireAuth, async (req, res) => {
     return res.status(500).json({ message: err.message || "Failed to send invoice" });
   }
 });
-var quotesRouter_default = router13;
+var quotesRouter_default = router15;
 
 // server/routers/customersRouter.ts
 init_db();
-import { Router as Router17 } from "express";
+import { Router as Router19 } from "express";
 import { eq as eq9, and as and8, desc as desc7, isNull as isNull5, sql as sql7, ilike as ilike2, or as or2 } from "drizzle-orm";
 init_aiClient();
 
 // server/routers/portalRouter.ts
 init_db();
 init_clients();
-import { Router as Router16 } from "express";
+import { Router as Router18 } from "express";
 import crypto6 from "crypto";
-var router14 = Router16();
+var router16 = Router18();
 async function initPortalTables() {
   try {
     await pool.query(`
@@ -16191,7 +16864,7 @@ async function backfillPortalTokens() {
     console.error("[portal] backfill error:", e.message);
   }
 }
-router14.get("/api/portal/:token", async (req, res) => {
+router16.get("/api/portal/:token", async (req, res) => {
   try {
     const { token } = req.params;
     const portalResult = await pool.query(
@@ -16412,7 +17085,7 @@ router14.get("/api/portal/:token", async (req, res) => {
     return res.status(500).json({ message: "Failed to load portal" });
   }
 });
-router14.post("/api/portal/:token/approve-quote", async (req, res) => {
+router16.post("/api/portal/:token/approve-quote", async (req, res) => {
   try {
     const { token } = req.params;
     const { quoteId, signature } = req.body;
@@ -16448,7 +17121,7 @@ router14.post("/api/portal/:token/approve-quote", async (req, res) => {
     return res.status(500).json({ message: "Failed to approve quote" });
   }
 });
-router14.post("/api/portal/:token/decline-quote", async (req, res) => {
+router16.post("/api/portal/:token/decline-quote", async (req, res) => {
   try {
     const { token } = req.params;
     const { quoteId } = req.body;
@@ -16477,7 +17150,7 @@ router14.post("/api/portal/:token/decline-quote", async (req, res) => {
     return res.status(500).json({ message: "Failed to decline quote" });
   }
 });
-router14.put("/api/portal/:token/preferences", async (req, res) => {
+router16.put("/api/portal/:token/preferences", async (req, res) => {
   try {
     const { token } = req.params;
     const { preferences: preferences9 } = req.body;
@@ -16492,7 +17165,7 @@ router14.put("/api/portal/:token/preferences", async (req, res) => {
     return res.status(500).json({ message: "Failed to save preferences" });
   }
 });
-router14.post("/api/portal/:token/reschedule", async (req, res) => {
+router16.post("/api/portal/:token/reschedule", async (req, res) => {
   try {
     const { token } = req.params;
     const { jobId, requestedDate, preferredTime = "either", customerNote = "" } = req.body;
@@ -16520,7 +17193,7 @@ router14.post("/api/portal/:token/reschedule", async (req, res) => {
     return res.status(500).json({ message: "Failed to submit reschedule request" });
   }
 });
-router14.post("/api/portal/:token/rate", async (req, res) => {
+router16.post("/api/portal/:token/rate", async (req, res) => {
   try {
     const { token } = req.params;
     const { jobId, rating } = req.body;
@@ -16545,7 +17218,7 @@ router14.post("/api/portal/:token/rate", async (req, res) => {
     return res.status(500).json({ message: "Failed to save rating" });
   }
 });
-router14.post("/api/portal/send-link", async (req, res) => {
+router16.post("/api/portal/send-link", async (req, res) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
@@ -16592,7 +17265,7 @@ router14.post("/api/portal/send-link", async (req, res) => {
     return res.status(500).json({ message: "Failed to send portal link" });
   }
 });
-router14.get("/api/portal/customer/:customerId/preferences", async (req, res) => {
+router16.get("/api/portal/customer/:customerId/preferences", async (req, res) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
@@ -16615,7 +17288,7 @@ router14.get("/api/portal/customer/:customerId/preferences", async (req, res) =>
     return res.status(500).json({ message: "Failed to load preferences" });
   }
 });
-router14.get("/portal-manifest/:token", async (req, res) => {
+router16.get("/portal-manifest/:token", async (req, res) => {
   try {
     const { token } = req.params;
     const result = await pool.query(
@@ -16644,7 +17317,7 @@ router14.get("/portal-manifest/:token", async (req, res) => {
     return res.status(500).json({});
   }
 });
-router14.get("/api/portal-stats", async (req, res) => {
+router16.get("/api/portal-stats", async (req, res) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
@@ -16678,7 +17351,7 @@ router14.get("/api/portal-stats", async (req, res) => {
     return res.status(500).json({ message: "Failed to load stats" });
   }
 });
-router14.get("/api/portal-settings", async (req, res) => {
+router16.get("/api/portal-settings", async (req, res) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
@@ -16697,7 +17370,7 @@ router14.get("/api/portal-settings", async (req, res) => {
     return res.status(500).json({ message: "Failed to load portal settings" });
   }
 });
-router14.put("/api/portal-settings", async (req, res) => {
+router16.put("/api/portal-settings", async (req, res) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
@@ -16720,14 +17393,315 @@ router14.put("/api/portal-settings", async (req, res) => {
     return res.status(500).json({ message: "Failed to save portal settings" });
   }
 });
-var portalRouter_default = router14;
+var portalRouter_default = router16;
 
 // server/routers/customersRouter.ts
 init_storage();
 init_schema();
 init_mail();
-var router15 = Router17();
-router15.get("/customers", requireAuth, async (req, res) => {
+
+// shared/pricingEngine.ts
+var ADD_ON_OPTIONS = [
+  { key: "insideFridge", label: "Inside Fridge", hours: 0.5 },
+  { key: "insideOven", label: "Inside Oven", hours: 0.5 },
+  { key: "insideCabinets", label: "Inside Cabinets", hours: 1 },
+  { key: "interiorWindows", label: "Interior Windows", hours: 1 },
+  { key: "blindsDetail", label: "Blinds Detail", hours: 1 },
+  { key: "baseboardsDetail", label: "Baseboards Detail", hours: 1 },
+  { key: "laundryFoldOnly", label: "Laundry (Fold Only)", hours: 0.5 },
+  { key: "dishes", label: "Dishes", hours: 0.5 },
+  { key: "organizationTidy", label: "Organization & Tidy", hours: 1 }
+];
+var DEFAULT_ADD_ON_PRICES = {
+  insideFridge: 25,
+  insideOven: 25,
+  insideCabinets: 40,
+  interiorWindows: 40,
+  blindsDetail: 35,
+  baseboardsDetail: 35,
+  laundryFoldOnly: 20,
+  dishes: 15,
+  organizationTidy: 45
+};
+function getConditionMultiplier(score) {
+  if (score >= 9) return 0.9;
+  if (score >= 7) return 1;
+  if (score >= 5) return 1.2;
+  if (score >= 3) return 1.4;
+  return 1.7;
+}
+function getPeopleMultiplier(count) {
+  if (count <= 2) return 1;
+  if (count <= 4) return 1.1;
+  return 1.2;
+}
+function getPetHours(petType, shedding) {
+  if (petType === "none") return 0;
+  if (petType === "cat" && !shedding) return 0.25;
+  if (petType === "dog" || shedding) return 0.5;
+  if (petType === "multiple") return shedding ? 1 : 0.75;
+  return 0;
+}
+function roundToNearest5(v) {
+  return Math.round(v / 5) * 5;
+}
+function roundHours(h) {
+  return Math.round(h * 2) / 2;
+}
+function getMinsPer1kSqft(typeId) {
+  switch (typeId) {
+    case "touch-up":
+      return 30;
+    case "standard":
+      return 40;
+    case "deep-clean":
+      return 60;
+    case "move-in-out":
+      return 75;
+    case "post-construction":
+      return 90;
+    default:
+      return 40;
+  }
+}
+function getFreqDiscount(freq2, discounts) {
+  if (freq2 === "weekly") return discounts.weekly / 100;
+  if (freq2 === "biweekly") return discounts.biweekly / 100;
+  if (freq2 === "monthly") return discounts.monthly / 100;
+  return 0;
+}
+var DEFAULT_PRICING = {
+  pricePerSqft: 85,
+  pricePerBedroom: 15,
+  pricePerBathroom: 18,
+  hourlyRate: 45,
+  minimumTicket: 100,
+  serviceTypes: [
+    { id: "touch-up", name: "Touch Up", multiplier: 0.75, scope: "Quick surface cleaning" },
+    { id: "standard", name: "Standard Clean", multiplier: 1, scope: "Full cleaning of all rooms" },
+    { id: "deep-clean", name: "Deep Clean", multiplier: 1.5, scope: "Thorough deep cleaning" }
+  ],
+  goodOptionId: "touch-up",
+  betterOptionId: "standard",
+  bestOptionId: "deep-clean",
+  addOnPrices: DEFAULT_ADD_ON_PRICES,
+  frequencyDiscounts: { weekly: 25, biweekly: 15, monthly: 10 }
+};
+function calcTier(typeId, includeUserAddOns, property, addOns, frequency2, pricing, extraAddOns) {
+  const pricePerSqft = pricing.pricePerSqft ?? 85;
+  const pricePerBedroom = pricing.pricePerBedroom ?? 15;
+  const pricePerBathroom = pricing.pricePerBathroom ?? 18;
+  const hourlyRate = pricing.hourlyRate ?? 45;
+  const minimumTicket = pricing.minimumTicket ?? 100;
+  const serviceTypes = pricing.serviceTypes ?? [];
+  const addOnPrices = { ...DEFAULT_ADD_ON_PRICES, ...pricing.addOnPrices ?? {} };
+  const freqDiscounts = pricing.frequencyDiscounts ?? { weekly: 25, biweekly: 15, monthly: 10 };
+  const st = serviceTypes.find((s) => s.id === typeId) ?? { id: typeId, name: typeId, multiplier: 1, scope: "" };
+  const tierAddOns = includeUserAddOns ? addOns : extraAddOns ?? {};
+  const sqftRaw = property.sqft / 1e3 * pricePerSqft;
+  const bedRaw = property.beds * pricePerBedroom;
+  const bathRaw = property.baths * pricePerBathroom + property.halfBaths * (pricePerBathroom / 2);
+  const condMult = getConditionMultiplier(property.conditionScore);
+  const peopleMult = getPeopleMultiplier(property.peopleCount);
+  const petHrs = getPetHours(property.petType, property.petShedding);
+  const petSurcharge = petHrs * hourlyRate;
+  const adjustedBase = (sqftRaw + bedRaw + bathRaw) * condMult * peopleMult + petSurcharge;
+  let tierAddOnPrice = 0;
+  for (const opt of ADD_ON_OPTIONS) {
+    if (tierAddOns[opt.key]) {
+      tierAddOnPrice += addOnPrices[opt.key] ?? 0;
+    }
+  }
+  const canDiscount = st.id !== "move-in-out" && st.id !== "post-construction";
+  const discFraction = canDiscount ? getFreqDiscount(frequency2, freqDiscounts) : 0;
+  const isOneTime = frequency2 === "one-time";
+  const tierBase = adjustedBase * st.multiplier;
+  const firstCleanCalc = tierBase + tierAddOnPrice;
+  const firstCleanBelowMin = firstCleanCalc < minimumTicket;
+  const firstCleanPrice = roundToNearest5(Math.max(firstCleanCalc, minimumTicket));
+  const recurringBase = Math.max(tierBase, minimumTicket);
+  const recurringBelowMin = tierBase < minimumTicket;
+  let discountAmount = 0;
+  let recurringCalc = recurringBase;
+  if (discFraction > 0) {
+    discountAmount = recurringBase * discFraction;
+    recurringCalc = recurringBase * (1 - discFraction);
+  }
+  const recurringPrice = roundToNearest5(recurringCalc);
+  const price = isOneTime ? firstCleanPrice : recurringPrice;
+  const totalHours = property.sqft > 0 ? roundHours(property.sqft / 1e3 * getMinsPer1kSqft(st.id) / 60) : 0;
+  const lineItems = [];
+  const appliedRules = [];
+  const warnings = [];
+  if (property.sqft > 0) {
+    lineItems.push({
+      label: `Square footage (${property.sqft.toLocaleString()} sqft \xD7 $${pricePerSqft}/1k)`,
+      amount: sqftRaw * condMult * peopleMult * st.multiplier,
+      type: "base"
+    });
+  } else {
+    warnings.push({ type: "missing_sqft", message: "Enter square footage for accurate pricing." });
+  }
+  if (bedRaw > 0) {
+    lineItems.push({
+      label: `Bedrooms (${property.beds} \xD7 $${pricePerBedroom})`,
+      amount: bedRaw * condMult * peopleMult * st.multiplier,
+      type: "room"
+    });
+  }
+  if (bathRaw > 0) {
+    const bathLabel = property.halfBaths > 0 ? `Bathrooms (${property.baths} full, ${property.halfBaths} half \xD7 $${pricePerBathroom})` : `Bathrooms (${property.baths} \xD7 $${pricePerBathroom})`;
+    lineItems.push({ label: bathLabel, amount: bathRaw * condMult * peopleMult * st.multiplier, type: "room" });
+  }
+  if (condMult !== 1) {
+    const baseAt1x = (sqftRaw + bedRaw + bathRaw) * peopleMult * st.multiplier;
+    const condDelta = baseAt1x * condMult - baseAt1x;
+    const condLabel = condMult > 1 ? `Condition surcharge (score ${property.conditionScore}/10)` : `Cleanliness credit (score ${property.conditionScore}/10)`;
+    lineItems.push({ label: condLabel, amount: condDelta, type: condDelta > 0 ? "surcharge" : "discount" });
+    if (condMult > 1) {
+      appliedRules.push({ label: `+${Math.round((condMult - 1) * 100)}% condition adjustment`, impact: condDelta });
+    }
+  }
+  if (peopleMult > 1) {
+    const baseAt1person = (sqftRaw + bedRaw + bathRaw) * condMult * st.multiplier;
+    const peopleDelta = baseAt1person * peopleMult - baseAt1person;
+    lineItems.push({ label: `Occupancy surcharge (${property.peopleCount} residents)`, amount: peopleDelta, type: "surcharge" });
+  }
+  if (petSurcharge > 0) {
+    lineItems.push({
+      label: `Pet surcharge (${property.petType}${property.petShedding ? ", shedding" : ""})`,
+      amount: petSurcharge,
+      type: "surcharge"
+    });
+    appliedRules.push({ label: `Pet surcharge applied (${property.petType})`, impact: petSurcharge });
+  }
+  if (st.multiplier !== 1) {
+    const baseAt1x = adjustedBase - petSurcharge;
+    const multDelta = baseAt1x * (st.multiplier - 1);
+    appliedRules.push({ label: `${st.name} level (\xD7${st.multiplier})`, impact: multDelta });
+  }
+  for (const opt of ADD_ON_OPTIONS) {
+    if (tierAddOns[opt.key]) {
+      lineItems.push({ label: opt.label, amount: addOnPrices[opt.key] ?? 0, type: "addon" });
+    }
+  }
+  if (discountAmount > 0) {
+    const freqLabel = frequency2 === "weekly" ? `Weekly discount (${freqDiscounts.weekly}%)` : frequency2 === "biweekly" ? `Biweekly discount (${freqDiscounts.biweekly}%)` : `Monthly discount (${freqDiscounts.monthly}%)`;
+    lineItems.push({ label: freqLabel, amount: -discountAmount, type: "discount" });
+    appliedRules.push({ label: freqLabel, impact: -discountAmount });
+  }
+  if (firstCleanBelowMin || recurringBelowMin) {
+    appliedRules.push({ label: `Minimum job price applied ($${minimumTicket})`, impact: 0 });
+    warnings.push({ type: "below_minimum", message: `Quote was below minimum ticket ($${minimumTicket}) \u2014 minimum applied.` });
+  }
+  if (price > 1500) {
+    warnings.push({ type: "unusually_high", message: "This quote is above $1,500 \u2014 double-check your inputs." });
+  }
+  return {
+    price,
+    firstCleanPrice: isOneTime ? null : firstCleanPrice,
+    name: st.name,
+    scope: st.scope,
+    serviceTypeId: st.id,
+    totalHours,
+    lineItems,
+    appliedRules,
+    warnings
+  };
+}
+function computeResidentialQuote(property, addOns, frequency2, pricing) {
+  const p2 = {
+    ...DEFAULT_PRICING,
+    ...pricing ?? {},
+    // Ensure per-unit rates fall back to defaults if not set
+    pricePerSqft: pricing?.pricePerSqft ?? DEFAULT_PRICING.pricePerSqft,
+    pricePerBedroom: pricing?.pricePerBedroom ?? DEFAULT_PRICING.pricePerBedroom,
+    pricePerBathroom: pricing?.pricePerBathroom ?? DEFAULT_PRICING.pricePerBathroom
+  };
+  let good = calcTier(p2.goodOptionId, false, property, addOns, frequency2, p2);
+  let better = calcTier(p2.betterOptionId, true, property, addOns, frequency2, p2);
+  let best = calcTier(p2.bestOptionId, false, property, addOns, frequency2, p2, {
+    insideOven: true,
+    insideCabinets: true,
+    interiorWindows: true,
+    baseboardsDetail: true,
+    blindsDetail: true
+  });
+  const TIER_DELTA = 20;
+  if (better.price <= good.price) {
+    better = { ...better, price: roundToNearest5(good.price + TIER_DELTA) };
+  }
+  if (best.price <= better.price) {
+    best = { ...best, price: roundToNearest5(better.price + TIER_DELTA) };
+  }
+  if (better.firstCleanPrice !== null && good.firstCleanPrice !== null && better.firstCleanPrice <= good.firstCleanPrice) {
+    better = { ...better, firstCleanPrice: roundToNearest5(good.firstCleanPrice + TIER_DELTA) };
+  }
+  if (best.firstCleanPrice !== null && better.firstCleanPrice !== null && best.firstCleanPrice <= better.firstCleanPrice) {
+    best = { ...best, firstCleanPrice: roundToNearest5(better.firstCleanPrice + TIER_DELTA) };
+  }
+  const addOnPricesMap = { ...DEFAULT_ADD_ON_PRICES, ...p2.addOnPrices ?? {} };
+  let addOnHours = 0;
+  let addOnPrice = 0;
+  for (const opt of ADD_ON_OPTIONS) {
+    if (addOns[opt.key]) {
+      addOnHours += opt.hours;
+      addOnPrice += addOnPricesMap[opt.key] ?? 0;
+    }
+  }
+  const baseHours = property.sqft > 0 ? roundHours(property.sqft / 1e3 * getMinsPer1kSqft(p2.betterOptionId ?? "standard") / 60) : 0;
+  return { good, better, best, baseHours, addOnHours, addOnPrice, hourlyRate: p2.hourlyRate ?? 45 };
+}
+var INTAKE_SERVICE_TYPE_MAP = {
+  standard_cleaning: "standard",
+  deep_clean: "deep-clean",
+  move_in_out: "move-in-out",
+  post_construction: "post-construction",
+  airbnb: "standard",
+  recurring: "standard"
+};
+var EXTENDED_SERVICE_TYPES = [
+  ...DEFAULT_PRICING.serviceTypes,
+  { id: "move-in-out", name: "Move-In/Move-Out", multiplier: 2, scope: "Full move-in or move-out cleaning" },
+  { id: "post-construction", name: "Post-Construction", multiplier: 2, scope: "Post-construction deep clean" }
+];
+function estimatePriceFromIntake(fields, settings) {
+  const engineTypeId = INTAKE_SERVICE_TYPE_MAP[fields.serviceType ?? "standard_cleaning"] ?? "standard";
+  const pricing = {
+    ...DEFAULT_PRICING,
+    serviceTypes: EXTENDED_SERVICE_TYPES,
+    ...settings ?? {},
+    // Override betterOptionId so the engine prices the requested service type
+    betterOptionId: engineTypeId
+  };
+  const property = {
+    beds: fields.beds ?? 3,
+    halfBaths: 0,
+    baths: fields.baths ?? 2,
+    sqft: fields.sqft ?? 1500,
+    homeType: "house",
+    conditionScore: 7,
+    peopleCount: 2,
+    petType: fields.pets ? "dog" : "none",
+    petShedding: false
+  };
+  const addOns = {};
+  for (const [k, v] of Object.entries(fields.addOns ?? {})) {
+    addOns[k] = !!v;
+  }
+  const frequency2 = (fields.frequency ?? "one_time").replace(/_/g, "-");
+  const result = computeResidentialQuote(property, addOns, frequency2, pricing);
+  const price = result.better.price;
+  return {
+    price,
+    min: Math.round(price * 0.92 / 5) * 5,
+    max: Math.round(price * 1.08 / 5) * 5
+  };
+}
+
+// server/routers/customersRouter.ts
+var router17 = Router19();
+router17.get("/customers", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -16768,7 +17742,7 @@ router15.get("/customers", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get customers" });
   }
 });
-router15.get("/customers/:id", requireAuth, async (req, res) => {
+router17.get("/customers/:id", requireAuth, async (req, res) => {
   try {
     const c = await getCustomerById(req.params.id);
     if (!c) return res.status(404).json({ message: "Customer not found" });
@@ -16777,7 +17751,7 @@ router15.get("/customers/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get customer" });
   }
 });
-router15.get("/customers/:id/last-job", requireAuth, async (req, res) => {
+router17.get("/customers/:id/last-job", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -16789,7 +17763,7 @@ router15.get("/customers/:id/last-job", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get last job" });
   }
 });
-router15.post("/customers", requireAuth, async (req, res) => {
+router17.post("/customers", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -16802,7 +17776,7 @@ router15.post("/customers", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create customer" });
   }
 });
-router15.put("/customers/:id", requireAuth, async (req, res) => {
+router17.put("/customers/:id", requireAuth, async (req, res) => {
   try {
     const c = await updateCustomer(req.params.id, req.body);
     return res.json(c);
@@ -16810,7 +17784,7 @@ router15.put("/customers/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update customer" });
   }
 });
-router15.delete("/customers/:id", requireAuth, async (req, res) => {
+router17.delete("/customers/:id", requireAuth, async (req, res) => {
   try {
     await deleteCustomer(req.params.id);
     return res.json({ message: "Deleted" });
@@ -16818,7 +17792,7 @@ router15.delete("/customers/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete customer" });
   }
 });
-router15.put("/customers/:id/do-not-contact", requireAuth, async (req, res) => {
+router17.put("/customers/:id/do-not-contact", requireAuth, async (req, res) => {
   try {
     const customer = await getCustomerById(req.params.id);
     if (!customer) return res.status(404).json({ message: "Customer not found" });
@@ -16831,7 +17805,7 @@ router15.put("/customers/:id/do-not-contact", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update do-not-contact" });
   }
 });
-router15.get("/customers/:id/marketing-prefs", requireAuth, async (req, res) => {
+router17.get("/customers/:id/marketing-prefs", requireAuth, async (req, res) => {
   try {
     const prefs = await getMarketingPrefsByCustomer(req.params.id);
     return res.json(prefs || null);
@@ -16840,7 +17814,7 @@ router15.get("/customers/:id/marketing-prefs", requireAuth, async (req, res) => 
     return res.status(500).json({ message: "Failed to get marketing prefs" });
   }
 });
-router15.put("/customers/:id/marketing-prefs", requireAuth, async (req, res) => {
+router17.put("/customers/:id/marketing-prefs", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -16852,7 +17826,7 @@ router15.put("/customers/:id/marketing-prefs", requireAuth, async (req, res) => 
     return res.status(500).json({ message: "Failed to update marketing prefs" });
   }
 });
-router15.get("/intake-requests", requireAuth, async (req, res) => {
+router17.get("/intake-requests", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -16888,7 +17862,7 @@ router15.get("/intake-requests", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router15.delete("/intake-requests/:id", requireAuth, async (req, res) => {
+router17.delete("/intake-requests/:id", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -16901,7 +17875,7 @@ router15.delete("/intake-requests/:id", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router15.patch("/intake-requests/:id", requireAuth, async (req, res) => {
+router17.patch("/intake-requests/:id", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -16952,7 +17926,7 @@ router15.patch("/intake-requests/:id", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router15.get("/intake-requests/my-link", requireAuth, async (req, res) => {
+router17.get("/intake-requests/my-link", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -16972,23 +17946,8 @@ router15.get("/intake-requests/my-link", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router15.post("/intake-requests/:id/ai-quote", requireAuth, requirePro, async (req, res) => {
+router17.post("/intake-requests/:id/ai-quote", requireAuth, requirePro, async (req, res) => {
   try {
-    let calcSqftBaseHours2 = function(sqft2) {
-      if (sqft2 <= 1e3) return 1.5;
-      if (sqft2 <= 1500) return 2.5;
-      if (sqft2 <= 2e3) return 3;
-      if (sqft2 <= 2500) return 3.5;
-      if (sqft2 <= 3e3) return 4;
-      if (sqft2 <= 3500) return 4.5;
-      if (sqft2 <= 4e3) return 5;
-      return 5 + Math.ceil((sqft2 - 4e3) / 750);
-    }, roundHalfUp2 = function(h) {
-      return Math.round(h * 2) / 2;
-    }, roundNearest52 = function(n) {
-      return Math.round(n / 5) * 5;
-    };
-    var calcSqftBaseHours = calcSqftBaseHours2, roundHalfUp = roundHalfUp2, roundNearest5 = roundNearest52;
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
     const intakeResult = await pool.query(
@@ -17007,40 +17966,10 @@ router15.post("/intake-requests/:id/ai-quote", requireAuth, requirePro, async (r
       const pss = ps?.settings || {};
       hourlyRate = pss.hourlyRate || 50;
       minimumTicket = pss.minimumTicket || 100;
-      const sqft2 = f.sqft || 1500;
-      const beds = f.beds || 3;
-      const baths = f.baths || 2;
-      const sqftHours = calcSqftBaseHours2(sqft2);
-      const bathHours = Math.max(0, baths - 1) * 0.5;
-      const bedHours = Math.max(0, beds - 2) * 0.25;
-      const petHours = f.pets ? 0.5 : 0;
-      const baseHours = sqftHours + bathHours + bedHours + petHours;
-      const serviceTypeMultipliers = {
-        standard_cleaning: 1,
-        deep_clean: 1.5,
-        move_in_out: 2,
-        post_construction: 2,
-        airbnb: 1.2,
-        recurring: 1
-      };
-      const mult = serviceTypeMultipliers[f.serviceType || "standard_cleaning"] || 1;
-      const totalHours = roundHalfUp2(baseHours * mult);
-      let basePrice = totalHours * hourlyRate;
-      basePrice = Math.max(basePrice, minimumTicket);
-      const addOnPrices = pss.addOnPrices || {};
-      let addOnTotal = 0;
-      for (const [key, val] of Object.entries(f.addOns || {})) {
-        if (val && addOnPrices[key]) addOnTotal += Number(addOnPrices[key]);
-      }
-      const freqDiscounts = pss.frequencyDiscounts || { weekly: 25, biweekly: 15, monthly: 10 };
-      let freqDiscount = 0;
-      if (f.frequency === "weekly") freqDiscount = freqDiscounts.weekly / 100;
-      else if (f.frequency === "biweekly") freqDiscount = freqDiscounts.biweekly / 100;
-      else if (f.frequency === "monthly") freqDiscount = freqDiscounts.monthly / 100;
-      const computedPrice = roundNearest52((basePrice + addOnTotal) * (1 - freqDiscount));
-      computedMin = Math.round(computedPrice * 0.92 / 5) * 5;
-      computedMax = Math.round(computedPrice * 1.08 / 5) * 5;
-      console.log(`[ai-quote] computed price: $${computedPrice} (range $${computedMin}-$${computedMax}), hourlyRate=${hourlyRate}, mult=${mult}, hours=${totalHours}`);
+      const estimate = estimatePriceFromIntake(f, pss);
+      computedMin = estimate.min;
+      computedMax = estimate.max;
+      console.log(`[ai-quote] computed price: $${estimate.price} (range $${estimate.min}-$${estimate.max})`);
     } catch (pricingErr) {
       console.error("[ai-quote] pricing calc error:", pricingErr);
     }
@@ -17158,7 +18087,7 @@ Rules:
     res.status(500).json({ message: e.message });
   }
 });
-router15.post("/intake-requests/:id/convert", requireAuth, async (req, res) => {
+router17.post("/intake-requests/:id/convert", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17172,7 +18101,7 @@ router15.post("/intake-requests/:id/convert", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router15.post("/intake-requests/send-link", requireAuth, async (req, res) => {
+router17.post("/intake-requests/send-link", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17296,7 +18225,7 @@ ${senderName}`;
     res.status(500).json({ message: e.message });
   }
 });
-router15.get("/intake-requests/count", requireAuth, async (req, res) => {
+router17.get("/intake-requests/count", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17318,11 +18247,11 @@ router15.get("/intake-requests/count", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-var customersRouter_default = router15;
+var customersRouter_default = router17;
 
 // server/routers/jobsRouter.ts
 init_db();
-import { Router as Router18 } from "express";
+import { Router as Router20 } from "express";
 import { eq as eq10, and as and9, desc as desc8 } from "drizzle-orm";
 init_clients();
 init_storage();
@@ -17330,7 +18259,7 @@ init_schema();
 init_mail();
 init_analytics();
 init_analytics_events();
-var router16 = Router18();
+var router18 = Router20();
 async function resolveEmployeeId(ref, businessId) {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref);
   if (isUuid) {
@@ -17340,7 +18269,7 @@ async function resolveEmployeeId(ref, businessId) {
   const [emp] = await db.select({ id: employees.id }).from(employees).where(and9(eq10(employees.name, ref), eq10(employees.businessId, businessId))).limit(1);
   return emp?.id ?? null;
 }
-router16.get("/schedule/week-jobs", requireAuth, async (req, res) => {
+router18.get("/schedule/week-jobs", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17413,7 +18342,7 @@ router16.get("/schedule/week-jobs", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get week jobs" });
   }
 });
-router16.get("/schedule/publications", requireAuth, async (req, res) => {
+router18.get("/schedule/publications", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17429,7 +18358,7 @@ router16.get("/schedule/publications", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get publications" });
   }
 });
-router16.get("/schedule/publications/:pubId", requireAuth, async (req, res) => {
+router18.get("/schedule/publications/:pubId", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17441,7 +18370,7 @@ router16.get("/schedule/publications/:pubId", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get publication" });
   }
 });
-router16.post("/schedule/publish", requireAuth, async (req, res) => {
+router18.post("/schedule/publish", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17555,7 +18484,7 @@ router16.post("/schedule/publish", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to publish schedule" });
   }
 });
-router16.post("/schedule/publications/:pubId/resend/:notifId", requireAuth, async (req, res) => {
+router18.post("/schedule/publications/:pubId/resend/:notifId", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17589,7 +18518,7 @@ router16.post("/schedule/publications/:pubId/resend/:notifId", requireAuth, asyn
     return res.status(500).json({ message: "Failed to resend" });
   }
 });
-router16.get("/schedule/ack/:token", async (req, res) => {
+router18.get("/schedule/ack/:token", async (req, res) => {
   try {
     const [notif] = await db.select().from(cleanerScheduleNotifications).where(eq10(cleanerScheduleNotifications.ackToken, req.params.token));
     if (!notif) return res.status(404).json({ message: "Schedule not found" });
@@ -17641,7 +18570,7 @@ router16.get("/schedule/ack/:token", async (req, res) => {
     return res.status(500).json({ message: "Failed to load schedule" });
   }
 });
-router16.post("/schedule/ack/:token", async (req, res) => {
+router18.post("/schedule/ack/:token", async (req, res) => {
   try {
     const [notif] = await db.select().from(cleanerScheduleNotifications).where(eq10(cleanerScheduleNotifications.ackToken, req.params.token));
     if (!notif) return res.status(404).json({ message: "Schedule not found" });
@@ -17657,7 +18586,7 @@ router16.post("/schedule/ack/:token", async (req, res) => {
     return res.status(500).json({ message: "Failed to record response" });
   }
 });
-router16.post("/dispatch/send", requireAuth, async (req, res) => {
+router18.post("/dispatch/send", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17719,7 +18648,7 @@ router16.post("/dispatch/send", requireAuth, async (req, res) => {
     return res.status(500).json({ message: error?.message || "Failed to send dispatch" });
   }
 });
-router16.post("/jobs/:id/assign", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/assign", requireAuth, async (req, res) => {
   try {
     const { employeeIds } = req.body;
     if (!Array.isArray(employeeIds)) return res.status(400).json({ message: "employeeIds must be array" });
@@ -17767,7 +18696,7 @@ router16.post("/jobs/:id/assign", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to assign employees" });
   }
 });
-router16.post("/jobs/:id/send-work-order", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/send-work-order", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session?.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17778,7 +18707,7 @@ router16.post("/jobs/:id/send-work-order", requireAuth, async (req, res) => {
     return res.status(400).json({ message: error?.message || "Failed to send work order" });
   }
 });
-router16.get("/jobs/calendar", requireAuth, async (req, res) => {
+router18.get("/jobs/calendar", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17811,7 +18740,7 @@ router16.get("/jobs/calendar", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get calendar jobs" });
   }
 });
-router16.get("/jobs", requireAuth, async (req, res) => {
+router18.get("/jobs", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17840,7 +18769,7 @@ router16.get("/jobs", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get jobs" });
   }
 });
-router16.get("/jobs/quote/:quoteId", requireAuth, async (req, res) => {
+router18.get("/jobs/quote/:quoteId", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17850,7 +18779,7 @@ router16.get("/jobs/quote/:quoteId", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get jobs for quote" });
   }
 });
-router16.get("/jobs/:id", requireAuth, async (req, res) => {
+router18.get("/jobs/:id", requireAuth, async (req, res) => {
   try {
     const j = await getJobById(req.params.id);
     if (!j) return res.status(404).json({ message: "Job not found" });
@@ -17865,7 +18794,7 @@ router16.get("/jobs/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get job" });
   }
 });
-router16.post("/jobs", requireAuth, async (req, res) => {
+router18.post("/jobs", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17921,7 +18850,7 @@ router16.post("/jobs", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create job" });
   }
 });
-router16.put("/jobs/:id", requireAuth, async (req, res) => {
+router18.put("/jobs/:id", requireAuth, async (req, res) => {
   try {
     const data = { ...req.body };
     if (data.startDatetime) data.startDatetime = new Date(data.startDatetime);
@@ -17942,7 +18871,7 @@ router16.put("/jobs/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update job" });
   }
 });
-router16.delete("/jobs/:id", requireAuth, async (req, res) => {
+router18.delete("/jobs/:id", requireAuth, async (req, res) => {
   try {
     await deleteJob(req.params.id);
     return res.json({ message: "Deleted" });
@@ -17950,7 +18879,7 @@ router16.delete("/jobs/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete job" });
   }
 });
-router16.get("/recurring-series", requireAuth, async (req, res) => {
+router18.get("/recurring-series", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17960,7 +18889,7 @@ router16.get("/recurring-series", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get recurring series" });
   }
 });
-router16.post("/recurring-series", requireAuth, async (req, res) => {
+router18.post("/recurring-series", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -17973,7 +18902,7 @@ router16.post("/recurring-series", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create recurring series" });
   }
 });
-router16.get("/recurring-series/:id", requireAuth, async (req, res) => {
+router18.get("/recurring-series/:id", requireAuth, async (req, res) => {
   try {
     const series = await getRecurringSeriesById(req.params.id);
     if (!series) return res.status(404).json({ message: "Series not found" });
@@ -17982,7 +18911,7 @@ router16.get("/recurring-series/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get series" });
   }
 });
-router16.put("/recurring-series/:id", requireAuth, async (req, res) => {
+router18.put("/recurring-series/:id", requireAuth, async (req, res) => {
   try {
     const series = await updateRecurringSeries(req.params.id, req.body, true);
     return res.json(series);
@@ -17990,7 +18919,7 @@ router16.put("/recurring-series/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update series" });
   }
 });
-router16.post("/recurring-series/:id/cancel", requireAuth, async (req, res) => {
+router18.post("/recurring-series/:id/cancel", requireAuth, async (req, res) => {
   try {
     await cancelRecurringSeries(req.params.id);
     return res.json({ message: "Series cancelled" });
@@ -17998,7 +18927,7 @@ router16.post("/recurring-series/:id/cancel", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to cancel series" });
   }
 });
-router16.post("/recurring-series/:id/pause", requireAuth, async (req, res) => {
+router18.post("/recurring-series/:id/pause", requireAuth, async (req, res) => {
   try {
     await updateRecurringSeries(req.params.id, { status: "paused" }, false);
     return res.json({ message: "Series paused" });
@@ -18006,7 +18935,7 @@ router16.post("/recurring-series/:id/pause", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to pause series" });
   }
 });
-router16.post("/recurring-series/:id/resume", requireAuth, async (req, res) => {
+router18.post("/recurring-series/:id/resume", requireAuth, async (req, res) => {
   try {
     await updateRecurringSeries(req.params.id, { status: "active" }, true);
     return res.json({ message: "Series resumed" });
@@ -18014,7 +18943,7 @@ router16.post("/recurring-series/:id/resume", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to resume series" });
   }
 });
-router16.post("/jobs/:id/skip", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/skip", requireAuth, async (req, res) => {
   try {
     const j = await skipSeriesOccurrence(req.params.id);
     return res.json(j);
@@ -18022,7 +18951,7 @@ router16.post("/jobs/:id/skip", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to skip occurrence" });
   }
 });
-router16.post("/recurring-series/:id/generate", requireAuth, async (req, res) => {
+router18.post("/recurring-series/:id/generate", requireAuth, async (req, res) => {
   try {
     await generateSeriesJobs(req.params.id, 90);
     return res.json({ message: "Jobs generated" });
@@ -18030,7 +18959,7 @@ router16.post("/recurring-series/:id/generate", requireAuth, async (req, res) =>
     return res.status(500).json({ message: "Failed to generate jobs" });
   }
 });
-router16.post("/jobs/:id/send-confirmation", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/send-confirmation", requireAuth, async (req, res) => {
   try {
     const job = await getJobById(req.params.id);
     if (!job) return res.status(404).json({ message: "Job not found" });
@@ -18184,7 +19113,7 @@ Manage your appointments and preferences: ${portalUrl}
     return res.status(500).json({ message: "Failed to send confirmation" });
   }
 });
-router16.post("/jobs/:jobId/checklist", requireAuth, async (req, res) => {
+router18.post("/jobs/:jobId/checklist", requireAuth, async (req, res) => {
   try {
     const item = await createChecklistItem({ jobId: req.params.jobId, ...req.body });
     return res.json(item);
@@ -18192,7 +19121,7 @@ router16.post("/jobs/:jobId/checklist", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create checklist item" });
   }
 });
-router16.put("/checklist/:id", requireAuth, async (req, res) => {
+router18.put("/checklist/:id", requireAuth, async (req, res) => {
   try {
     const item = await updateChecklistItem(req.params.id, req.body);
     return res.json(item);
@@ -18200,7 +19129,7 @@ router16.put("/checklist/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update checklist item" });
   }
 });
-router16.delete("/checklist/:id", requireAuth, async (req, res) => {
+router18.delete("/checklist/:id", requireAuth, async (req, res) => {
   try {
     await deleteChecklistItem(req.params.id);
     return res.json({ message: "Deleted" });
@@ -18208,7 +19137,7 @@ router16.delete("/checklist/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete checklist item" });
   }
 });
-router16.get("/jobs/:jobId/photos", requireAuth, async (req, res) => {
+router18.get("/jobs/:jobId/photos", requireAuth, async (req, res) => {
   try {
     const photos9 = await getPhotosByJob(req.params.jobId);
     return res.json(photos9);
@@ -18216,7 +19145,7 @@ router16.get("/jobs/:jobId/photos", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get photos" });
   }
 });
-router16.post("/jobs/:jobId/photos", requireAuth, async (req, res) => {
+router18.post("/jobs/:jobId/photos", requireAuth, async (req, res) => {
   try {
     const { photoData, photoType, caption, customerVisible } = req.body;
     if (!photoData) return res.status(400).json({ message: "Photo data required" });
@@ -18239,16 +19168,16 @@ router16.post("/jobs/:jobId/photos", requireAuth, async (req, res) => {
       });
       return res.status(400).json({ message: "Invalid file type. Only JPEG, PNG, WebP, and HEIC images are allowed." });
     }
-    const fs3 = await import("fs");
-    const path3 = await import("path");
-    const uploadsDir = path3.join(process.cwd(), "uploads", "job-photos");
-    if (!fs3.existsSync(uploadsDir)) {
-      fs3.mkdirSync(uploadsDir, { recursive: true });
+    const fs4 = await import("fs");
+    const path4 = await import("path");
+    const uploadsDir = path4.join(process.cwd(), "uploads", "job-photos");
+    if (!fs4.existsSync(uploadsDir)) {
+      fs4.mkdirSync(uploadsDir, { recursive: true });
     }
     const ext = detected?.ext ?? "jpg";
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const filePath = path3.join(uploadsDir, fileName);
-    fs3.writeFileSync(filePath, buffer);
+    const filePath = path4.join(uploadsDir, fileName);
+    fs4.writeFileSync(filePath, buffer);
     const photoUrl = `/uploads/job-photos/${fileName}`;
     const photo = await createJobPhoto({
       jobId: req.params.jobId,
@@ -18263,15 +19192,15 @@ router16.post("/jobs/:jobId/photos", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to upload photo" });
   }
 });
-router16.delete("/photos/:id", requireAuth, async (req, res) => {
+router18.delete("/photos/:id", requireAuth, async (req, res) => {
   try {
-    const fs3 = await import("fs");
-    const path3 = await import("path");
+    const fs4 = await import("fs");
+    const path4 = await import("path");
     try {
       const r = await pool.query(`SELECT photo_url FROM job_photos WHERE id = $1`, [req.params.id]);
       if (r.rows[0]?.photo_url) {
-        const filePath = path3.join(process.cwd(), r.rows[0].photo_url);
-        if (fs3.existsSync(filePath)) fs3.unlinkSync(filePath);
+        const filePath = path4.join(process.cwd(), r.rows[0].photo_url);
+        if (fs4.existsSync(filePath)) fs4.unlinkSync(filePath);
       }
     } catch {
     }
@@ -18281,7 +19210,7 @@ router16.delete("/photos/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete photo" });
   }
 });
-router16.post("/jobs/:id/email-photos", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/email-photos", requireAuth, async (req, res) => {
   try {
     const job = await getJobById(req.params.id);
     if (!job) return res.status(404).json({ message: "Job not found" });
@@ -18342,7 +19271,7 @@ router16.post("/jobs/:id/email-photos", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to send photos" });
   }
 });
-router16.post("/jobs/:id/start", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/start", requireAuth, async (req, res) => {
   try {
     const job = await getJobById(req.params.id);
     if (!job) return res.status(404).json({ message: "Job not found" });
@@ -18358,7 +19287,7 @@ router16.post("/jobs/:id/start", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to start job" });
   }
 });
-router16.post("/jobs/:id/complete", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/complete", requireAuth, async (req, res) => {
   try {
     const job = await getJobById(req.params.id);
     if (!job) return res.status(404).json({ message: "Job not found" });
@@ -18461,7 +19390,7 @@ router16.post("/jobs/:id/complete", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to complete job" });
   }
 });
-router16.post("/jobs/:id/rate", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/rate", requireAuth, async (req, res) => {
   try {
     const { rating, comment } = req.body;
     if (!rating || rating < 1 || rating > 5) {
@@ -18476,7 +19405,7 @@ router16.post("/jobs/:id/rate", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to rate job" });
   }
 });
-router16.get("/ratings/summary", requireAuth, async (req, res) => {
+router18.get("/ratings/summary", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -18487,7 +19416,7 @@ router16.get("/ratings/summary", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get ratings summary" });
   }
 });
-router16.post("/jobs/:id/generate-update-token", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/generate-update-token", requireAuth, async (req, res) => {
   try {
     const job = await getJobById(req.params.id);
     if (!job) return res.status(404).json({ message: "Job not found" });
@@ -18504,7 +19433,7 @@ router16.post("/jobs/:id/generate-update-token", requireAuth, async (req, res) =
     return res.status(500).json({ message: "Failed to generate update token" });
   }
 });
-router16.get("/jobs/:id/update-token", requireAuth, async (req, res) => {
+router18.get("/jobs/:id/update-token", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`SELECT update_token FROM jobs WHERE id = $1`, [req.params.id]);
     return res.json({ token: result.rows[0]?.update_token || null });
@@ -18512,7 +19441,7 @@ router16.get("/jobs/:id/update-token", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get update token" });
   }
 });
-router16.post("/jobs/:id/update-status", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/update-status", requireAuth, async (req, res) => {
   try {
     const { status, note } = req.body;
     if (!status) return res.status(400).json({ message: "Status is required" });
@@ -18545,7 +19474,7 @@ router16.post("/jobs/:id/update-status", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update status" });
   }
 });
-router16.get("/jobs/:id/timeline", requireAuth, async (req, res) => {
+router18.get("/jobs/:id/timeline", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM job_status_history WHERE job_id = $1 ORDER BY created_at ASC`,
@@ -18556,7 +19485,7 @@ router16.get("/jobs/:id/timeline", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get timeline" });
   }
 });
-router16.post("/jobs/:id/notes", requireAuth, async (req, res) => {
+router18.post("/jobs/:id/notes", requireAuth, async (req, res) => {
   try {
     const { content, customerVisible } = req.body;
     if (!content?.trim()) return res.status(400).json({ message: "Content is required" });
@@ -18569,7 +19498,7 @@ router16.post("/jobs/:id/notes", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create note" });
   }
 });
-router16.get("/jobs/:id/notes", requireAuth, async (req, res) => {
+router18.get("/jobs/:id/notes", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM job_notes WHERE job_id = $1 ORDER BY created_at DESC`,
@@ -18580,7 +19509,7 @@ router16.get("/jobs/:id/notes", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get notes" });
   }
 });
-router16.delete("/jobs/:id/notes/:noteId", requireAuth, async (req, res) => {
+router18.delete("/jobs/:id/notes/:noteId", requireAuth, async (req, res) => {
   try {
     await pool.query(`DELETE FROM job_notes WHERE id = $1 AND job_id = $2`, [req.params.noteId, req.params.id]);
     return res.json({ message: "Deleted" });
@@ -18588,7 +19517,7 @@ router16.delete("/jobs/:id/notes/:noteId", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete note" });
   }
 });
-router16.get("/booking-availability", requireAuth, async (req, res) => {
+router18.get("/booking-availability", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ error: "Business not found" });
@@ -18609,7 +19538,7 @@ router16.get("/booking-availability", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
-router16.put("/booking-availability", requireAuth, async (req, res) => {
+router18.put("/booking-availability", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ error: "Business not found" });
@@ -18631,7 +19560,7 @@ router16.put("/booking-availability", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
-router16.get("/jobs/checkin/:token", async (req, res) => {
+router18.get("/jobs/checkin/:token", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT j.id, j.status, j.address, j.start_datetime, j.end_datetime,
@@ -18666,7 +19595,7 @@ router16.get("/jobs/checkin/:token", async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
-router16.post("/jobs/checkin/:token/start", async (req, res) => {
+router18.post("/jobs/checkin/:token/start", async (req, res) => {
   try {
     const { rows } = await pool.query(
       `UPDATE jobs SET status = 'in_progress', started_at = COALESCE(started_at, NOW()),
@@ -18690,7 +19619,7 @@ router16.post("/jobs/checkin/:token/start", async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
-router16.post("/jobs/checkin/:token/complete", async (req, res) => {
+router18.post("/jobs/checkin/:token/complete", async (req, res) => {
   try {
     const { notes, photoUrls } = req.body;
     const { rows } = await pool.query(
@@ -18791,7 +19720,7 @@ router16.post("/jobs/checkin/:token/complete", async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
-router16.post("/jobs/checkin/:token/photos", async (req, res) => {
+router18.post("/jobs/checkin/:token/photos", async (req, res) => {
   try {
     const { photoData, caption } = req.body;
     if (!photoData) return res.status(400).json({ message: "photoData required" });
@@ -18801,14 +19730,14 @@ router16.post("/jobs/checkin/:token/photos", async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ message: "Job not found" });
     const jobId = rows[0].id;
-    const fs3 = await import("fs");
-    const path3 = await import("path");
-    const uploadsDir = path3.join(process.cwd(), "uploads", "job-photos");
-    if (!fs3.existsSync(uploadsDir)) fs3.mkdirSync(uploadsDir, { recursive: true });
+    const fs4 = await import("fs");
+    const path4 = await import("path");
+    const uploadsDir = path4.join(process.cwd(), "uploads", "job-photos");
+    if (!fs4.existsSync(uploadsDir)) fs4.mkdirSync(uploadsDir, { recursive: true });
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-    const filePath = path3.join(uploadsDir, fileName);
+    const filePath = path4.join(uploadsDir, fileName);
     const base64Data = photoData.replace(/^data:image\/\w+;base64,/, "");
-    fs3.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+    fs4.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
     const photoUrl = `/uploads/job-photos/${fileName}`;
     await pool.query(
       `INSERT INTO photos (id, job_id, photo_url, photo_type, caption, created_at)
@@ -18821,12 +19750,12 @@ router16.post("/jobs/checkin/:token/photos", async (req, res) => {
     return res.status(500).json({ message: "Failed to upload photo" });
   }
 });
-var jobsRouter_default = router16;
+var jobsRouter_default = router18;
 
 // server/routers/businessRouter.ts
 init_db();
 import rateLimit2 from "express-rate-limit";
-import { Router as Router19 } from "express";
+import { Router as Router21 } from "express";
 import { eq as eq11, and as and10, desc as desc9 } from "drizzle-orm";
 init_clients();
 init_storage();
@@ -19138,8 +20067,8 @@ async function runTipRequestScheduler() {
 // server/routers/businessRouter.ts
 init_analytics();
 init_analytics_events();
-var router17 = Router19();
-router17.get("/business", requireAuth, async (req, res) => {
+var router19 = Router21();
+router19.get("/business", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) {
@@ -19151,7 +20080,7 @@ router17.get("/business", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get business" });
   }
 });
-router17.put("/business", requireAuth, async (req, res) => {
+router19.put("/business", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) {
@@ -19164,7 +20093,7 @@ router17.put("/business", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update business" });
   }
 });
-router17.patch("/business", requireAuth, async (req, res) => {
+router19.patch("/business", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) {
@@ -19177,7 +20106,7 @@ router17.patch("/business", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update business" });
   }
 });
-router17.put("/settings/language", requireAuth, async (req, res) => {
+router19.put("/settings/language", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19192,7 +20121,7 @@ router17.put("/settings/language", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update language settings" });
   }
 });
-router17.post("/business/logo", requireAuth, async (req, res) => {
+router19.post("/business/logo", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19205,15 +20134,15 @@ router17.post("/business/logo", requireAuth, async (req, res) => {
       await updateBusiness(business.id, { logoUri: imageData });
       return res.json({ logoUri: imageData });
     }
-    const fs3 = await import("fs");
-    const path3 = await import("path");
-    const uploadsDir = path3.join(process.cwd(), "uploads", "logos");
-    if (!fs3.existsSync(uploadsDir)) fs3.mkdirSync(uploadsDir, { recursive: true });
+    const fs4 = await import("fs");
+    const path4 = await import("path");
+    const uploadsDir = path4.join(process.cwd(), "uploads", "logos");
+    if (!fs4.existsSync(uploadsDir)) fs4.mkdirSync(uploadsDir, { recursive: true });
     const ext = imageData.match(/^data:image\/(\w+);/)?.[1] || "png";
     const fileName = `logo-${business.id}-${Date.now()}.${ext}`;
-    const filePath = path3.join(uploadsDir, fileName);
+    const filePath = path4.join(uploadsDir, fileName);
     const base64Data = imageData.replace(/^data:[^;]+;base64,/, "");
-    fs3.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+    fs4.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
     const logoUri = `/uploads/logos/${fileName}`;
     await updateBusiness(business.id, { logoUri });
     return res.json({ logoUri });
@@ -19222,7 +20151,7 @@ router17.post("/business/logo", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to upload logo" });
   }
 });
-router17.get("/settings", requireAuth, async (req, res) => {
+router19.get("/settings", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19238,7 +20167,7 @@ router17.get("/settings", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get settings" });
   }
 });
-router17.get("/employees", requireAuth, async (req, res) => {
+router19.get("/employees", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19248,7 +20177,7 @@ router17.get("/employees", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get employees" });
   }
 });
-router17.post("/employees", requireAuth, async (req, res) => {
+router19.post("/employees", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19269,7 +20198,7 @@ router17.post("/employees", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create employee" });
   }
 });
-router17.put("/employees/:id", requireAuth, async (req, res) => {
+router19.put("/employees/:id", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19281,7 +20210,7 @@ router17.put("/employees/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update employee" });
   }
 });
-router17.delete("/employees/:id", requireAuth, async (req, res) => {
+router19.delete("/employees/:id", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19291,7 +20220,7 @@ router17.delete("/employees/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete employee" });
   }
 });
-router17.post("/push-token", requireAuth, async (req, res) => {
+router19.post("/push-token", requireAuth, async (req, res) => {
   try {
     const { token, platform } = req.body;
     if (!token) return res.status(400).json({ message: "Token required" });
@@ -19305,7 +20234,7 @@ router17.post("/push-token", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to save push token" });
   }
 });
-router17.delete("/push-token", requireAuth, async (req, res) => {
+router19.delete("/push-token", requireAuth, async (req, res) => {
   try {
     const { token } = req.body;
     if (!token) return res.status(400).json({ message: "Token required" });
@@ -19315,7 +20244,7 @@ router17.delete("/push-token", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete push token" });
   }
 });
-router17.get("/communications", requireAuth, async (req, res) => {
+router19.get("/communications", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19326,7 +20255,7 @@ router17.get("/communications", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get communications" });
   }
 });
-router17.post("/communications", requireAuth, async (req, res) => {
+router19.post("/communications", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19336,7 +20265,7 @@ router17.post("/communications", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create communication" });
   }
 });
-router17.post("/communications/send-direct", requireAuth, async (req, res) => {
+router19.post("/communications/send-direct", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19408,7 +20337,7 @@ router17.post("/communications/send-direct", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to send message" });
   }
 });
-router17.put("/communications/:id", requireAuth, async (req, res) => {
+router19.put("/communications/:id", requireAuth, async (req, res) => {
   try {
     const { content, scheduledFor, channel } = req.body;
     const updates = {};
@@ -19421,7 +20350,7 @@ router17.put("/communications/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update communication" });
   }
 });
-router17.delete("/communications/:id", requireAuth, async (req, res) => {
+router19.delete("/communications/:id", requireAuth, async (req, res) => {
   try {
     await updateCommunication(req.params.id, { status: "canceled" });
     return res.json({ message: "Follow-up canceled" });
@@ -19429,7 +20358,7 @@ router17.delete("/communications/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to cancel follow-up" });
   }
 });
-router17.post("/communications/:id/send-now", requireAuth, async (req, res) => {
+router19.post("/communications/:id/send-now", requireAuth, async (req, res) => {
   try {
     const user = await getUserById(req.session.userId);
     if (user && user.subscriptionTier === "starter") {
@@ -19458,7 +20387,7 @@ router17.post("/communications/:id/send-now", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to send follow-up" });
   }
 });
-router17.get("/referrals", requireAuth, async (req, res) => {
+router19.get("/referrals", requireAuth, async (req, res) => {
   try {
     const user = await getUserById(req.session.userId);
     if (!user) return res.status(401).json({ message: "Not found" });
@@ -19496,7 +20425,7 @@ router17.get("/referrals", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get referral info" });
   }
 });
-router17.get("/tasks", requireAuth, async (req, res) => {
+router19.get("/tasks", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19511,7 +20440,7 @@ router17.get("/tasks", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get tasks" });
   }
 });
-router17.post("/tasks", requireAuth, async (req, res) => {
+router19.post("/tasks", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -19523,7 +20452,7 @@ router17.post("/tasks", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create task" });
   }
 });
-router17.put("/tasks/:id", requireAuth, async (req, res) => {
+router19.put("/tasks/:id", requireAuth, async (req, res) => {
   try {
     const data = { ...req.body };
     if (data.dueDate) data.dueDate = new Date(data.dueDate);
@@ -19534,7 +20463,7 @@ router17.put("/tasks/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update task" });
   }
 });
-router17.delete("/tasks/:id", requireAuth, async (req, res) => {
+router19.delete("/tasks/:id", requireAuth, async (req, res) => {
   try {
     await deleteTask(req.params.id);
     return res.json({ message: "Deleted" });
@@ -19542,7 +20471,7 @@ router17.delete("/tasks/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete task" });
   }
 });
-router17.get("/subscription", requireAuth, async (req, res) => {
+router19.get("/subscription", requireAuth, async (req, res) => {
   try {
     const user = await getUserById(req.session.userId);
     if (!user) return res.status(401).json({ message: "Not found" });
@@ -19554,17 +20483,17 @@ router17.get("/subscription", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get subscription" });
   }
 });
-router17.post("/subscription/upgrade", (_req, res) => {
+router19.post("/subscription/upgrade", (_req, res) => {
   return res.status(410).json({ message: "This endpoint is no longer available. Use the checkout flow to upgrade." });
 });
-router17.get("/subscription/config", requireAuth, async (_req, res) => {
+router19.get("/subscription/config", requireAuth, async (_req, res) => {
   return res.json({
     apiKey: process.env.REVENUECAT_API_KEY || "",
     googleApiKey: process.env.REVENUECAT_GOOGLE_API_KEY || "",
     entitlementId: "pro"
   });
 });
-router17.post("/subscription/sync", requireAuth, async (req, res) => {
+router19.post("/subscription/sync", requireAuth, async (req, res) => {
   try {
     const { tier, appUserId } = req.body;
     const validTiers = ["free", "starter", "growth", "pro"];
@@ -19614,7 +20543,7 @@ router17.post("/subscription/sync", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Sync failed" });
   }
 });
-router17.post("/subscription/create-checkout", requireAuth, async (req, res) => {
+router19.post("/subscription/create-checkout", requireAuth, async (req, res) => {
   try {
     if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured" });
     const user = await getUserById(req.session.userId);
@@ -19700,7 +20629,7 @@ router17.post("/subscription/create-checkout", requireAuth, async (req, res) => 
     return res.status(500).json({ message: "Failed to create checkout session" });
   }
 });
-router17.get("/subscription/verify-session", requireAuth, async (req, res) => {
+router19.get("/subscription/verify-session", requireAuth, async (req, res) => {
   try {
     if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured" });
     const { session_id } = req.query;
@@ -19751,7 +20680,7 @@ router17.get("/subscription/verify-session", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to verify session" });
   }
 });
-router17.post("/subscription/webhook", async (req, res) => {
+router19.post("/subscription/webhook", async (req, res) => {
   try {
     if (!getStripe()) return res.status(503).send("Stripe not configured");
     const sig = req.headers["stripe-signature"];
@@ -20000,7 +20929,7 @@ router17.post("/subscription/webhook", async (req, res) => {
     return res.status(500).json({ message: "Webhook processing failed" });
   }
 });
-router17.get("/subscription/status", requireAuth, async (req, res) => {
+router19.get("/subscription/status", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const result = await pool.query(
@@ -20058,7 +20987,7 @@ router17.get("/subscription/status", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get subscription status" });
   }
 });
-router17.post("/subscription/switch-to-annual", requireAuth, async (req, res) => {
+router19.post("/subscription/switch-to-annual", requireAuth, async (req, res) => {
   try {
     const stripe = await getStripe();
     if (!stripe) return res.status(503).json({ message: "Stripe is not configured" });
@@ -20115,7 +21044,7 @@ router17.post("/subscription/switch-to-annual", requireAuth, async (req, res) =>
     return res.status(500).json({ message: err.message || "Failed to switch to annual" });
   }
 });
-router17.post("/subscription/create-portal", requireAuth, async (req, res) => {
+router19.post("/subscription/create-portal", requireAuth, async (req, res) => {
   try {
     if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured" });
     const user = await getUserById(req.session.userId);
@@ -20136,7 +21065,7 @@ router17.post("/subscription/create-portal", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create portal session" });
   }
 });
-router17.get("/preferences", requireAuth, async (req, res) => {
+router19.get("/preferences", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20159,7 +21088,7 @@ router17.get("/preferences", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get preferences" });
   }
 });
-router17.put("/preferences", requireAuth, async (req, res) => {
+router19.put("/preferences", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20203,7 +21132,7 @@ router17.put("/preferences", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update preferences" });
   }
 });
-router17.get("/badges", requireAuth, async (req, res) => {
+router19.get("/badges", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20214,7 +21143,7 @@ router17.get("/badges", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get badges" });
   }
 });
-router17.get("/business/lead-capture-settings", requireAuth, requireGrowth, async (req, res) => {
+router19.get("/business/lead-capture-settings", requireAuth, requireGrowth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20236,7 +21165,7 @@ router17.get("/business/lead-capture-settings", requireAuth, requireGrowth, asyn
     res.status(500).json({ message: e.message });
   }
 });
-router17.put("/business/lead-capture-settings", requireAuth, requireGrowth, async (req, res) => {
+router19.put("/business/lead-capture-settings", requireAuth, requireGrowth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20278,7 +21207,7 @@ router17.put("/business/lead-capture-settings", requireAuth, requireGrowth, asyn
     res.status(500).json({ message: e.message });
   }
 });
-router17.get("/lead-link/pricing-status", requireAuth, async (req, res) => {
+router19.get("/lead-link/pricing-status", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20312,7 +21241,7 @@ router17.get("/lead-link/pricing-status", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router17.get("/lead-link/guide-status", requireAuth, async (req, res) => {
+router19.get("/lead-link/guide-status", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20329,7 +21258,7 @@ router17.get("/lead-link/guide-status", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router17.post("/lead-link/send-guide-email", requireAuth, async (req, res) => {
+router19.post("/lead-link/send-guide-email", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20471,7 +21400,7 @@ function buildLeadLinkGuideEmail(opts) {
 </body>
 </html>`;
 }
-router17.get("/business/lead-link-analytics", requireAuth, requireGrowth, async (req, res) => {
+router19.get("/business/lead-link-analytics", requireAuth, requireGrowth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20502,7 +21431,7 @@ router17.get("/business/lead-link-analytics", requireAuth, requireGrowth, async 
     res.status(500).json({ message: e.message });
   }
 });
-router17.get("/files", requireAuth, async (req, res) => {
+router19.get("/files", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20512,21 +21441,21 @@ router17.get("/files", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to fetch files" });
   }
 });
-router17.post("/files/upload", requireAuth, async (req, res) => {
+router19.post("/files/upload", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
     const { fileData, originalName, fileType, fileSize, description, category } = req.body;
     if (!fileData || !originalName) return res.status(400).json({ message: "File data and name required" });
-    const fs3 = await import("fs");
-    const path3 = await import("path");
-    const uploadsDir = path3.join(process.cwd(), "uploads", "business-files");
-    if (!fs3.existsSync(uploadsDir)) fs3.mkdirSync(uploadsDir, { recursive: true });
+    const fs4 = await import("fs");
+    const path4 = await import("path");
+    const uploadsDir = path4.join(process.cwd(), "uploads", "business-files");
+    if (!fs4.existsSync(uploadsDir)) fs4.mkdirSync(uploadsDir, { recursive: true });
     const ext = originalName.split(".").pop() || "bin";
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const filePath = path3.join(uploadsDir, fileName);
+    const filePath = path4.join(uploadsDir, fileName);
     const base64Data = fileData.replace(/^data:[^;]+;base64,/, "");
-    fs3.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+    fs4.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
     const fileUrl = `/uploads/business-files/${fileName}`;
     const [file] = await db.insert(businessFiles).values({
       businessId: business.id,
@@ -20544,7 +21473,7 @@ router17.post("/files/upload", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to upload file" });
   }
 });
-router17.patch("/files/:id", requireAuth, async (req, res) => {
+router19.patch("/files/:id", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20556,17 +21485,17 @@ router17.patch("/files/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update file" });
   }
 });
-router17.delete("/files/:id", requireAuth, async (req, res) => {
+router19.delete("/files/:id", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
     const [file] = await db.select().from(businessFiles).where(and10(eq11(businessFiles.id, req.params.id), eq11(businessFiles.businessId, business.id)));
     if (!file) return res.status(404).json({ message: "File not found" });
-    const fs3 = await import("fs");
-    const path3 = await import("path");
-    const filePath = path3.join(process.cwd(), file.fileUrl);
+    const fs4 = await import("fs");
+    const path4 = await import("path");
+    const filePath = path4.join(process.cwd(), file.fileUrl);
     try {
-      fs3.unlinkSync(filePath);
+      fs4.unlinkSync(filePath);
     } catch {
     }
     await db.delete(businessFiles).where(eq11(businessFiles.id, req.params.id));
@@ -20575,7 +21504,7 @@ router17.delete("/files/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete file" });
   }
 });
-router17.post("/analytics/events", requireAuth, async (req, res) => {
+router19.post("/analytics/events", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -20604,7 +21533,7 @@ var geocodeLimiter = rateLimit2({
   validate: { xForwardedForHeader: false },
   message: { message: "Too many geocode requests. Try again later." }
 });
-router17.get("/geocode/city-suggestions", requireAuth, geocodeLimiter, async (req, res) => {
+router19.get("/geocode/city-suggestions", requireAuth, geocodeLimiter, async (req, res) => {
   try {
     const q = (req.query.q || "").trim();
     if (q.length < 2) return res.json([]);
@@ -20644,7 +21573,7 @@ router17.get("/geocode/city-suggestions", requireAuth, geocodeLimiter, async (re
     return res.json([]);
   }
 });
-router17.get("/cleaner-notification-preferences", requireAuth, async (req, res) => {
+router19.get("/cleaner-notification-preferences", requireAuth, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT cleaner_notifications_enabled, cleaner_notification_days,
@@ -20666,7 +21595,7 @@ router17.get("/cleaner-notification-preferences", requireAuth, async (req, res) 
     res.status(500).json({ message: e.message });
   }
 });
-router17.put("/cleaner-notification-preferences", requireAuth, async (req, res) => {
+router19.put("/cleaner-notification-preferences", requireAuth, async (req, res) => {
   try {
     const { enabled, days, email, sms, timing } = req.body;
     await pool.query(
@@ -20692,7 +21621,7 @@ router17.put("/cleaner-notification-preferences", requireAuth, async (req, res) 
     res.status(500).json({ message: e.message });
   }
 });
-router17.post("/cleaner-notification-preferences/test", requireAuth, async (req, res) => {
+router19.post("/cleaner-notification-preferences/test", requireAuth, async (req, res) => {
   try {
     const bizRes = await pool.query(
       `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
@@ -20707,7 +21636,7 @@ router17.post("/cleaner-notification-preferences/test", requireAuth, async (req,
     res.status(500).json({ message: e.message });
   }
 });
-router17.get("/reminder-preferences", requireAuth, async (req, res) => {
+router19.get("/reminder-preferences", requireAuth, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT customer_email_reminder_days, customer_sms_reminder_days FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
@@ -20723,7 +21652,7 @@ router17.get("/reminder-preferences", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router17.put("/reminder-preferences", requireAuth, async (req, res) => {
+router19.put("/reminder-preferences", requireAuth, async (req, res) => {
   try {
     const { emailReminderDays, smsReminderDays } = req.body;
     await pool.query(
@@ -20740,7 +21669,7 @@ router17.put("/reminder-preferences", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router17.post("/reminder-preferences/test", requireAuth, async (req, res) => {
+router19.post("/reminder-preferences/test", requireAuth, async (req, res) => {
   try {
     const bizRes = await pool.query(
       `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
@@ -20753,7 +21682,7 @@ router17.post("/reminder-preferences/test", requireAuth, async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router17.get("/tip-settings", requireAuth, async (req, res) => {
+router19.get("/tip-settings", requireAuth, async (req, res) => {
   try {
     const bizRes = await pool.query(
       `SELECT id, tips_enabled, tip_percentage_options, tip_distribution_percent, tip_request_delay
@@ -20773,7 +21702,7 @@ router17.get("/tip-settings", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to fetch tip settings" });
   }
 });
-router17.put("/tip-settings", requireAuth, async (req, res) => {
+router19.put("/tip-settings", requireAuth, async (req, res) => {
   try {
     const bizRes = await pool.query(
       `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
@@ -20808,7 +21737,7 @@ router17.put("/tip-settings", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to save tip settings" });
   }
 });
-router17.get("/tips", requireAuth, async (req, res) => {
+router19.get("/tips", requireAuth, async (req, res) => {
   try {
     const bizRes = await pool.query(
       `SELECT id FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
@@ -20834,54 +21763,21 @@ router17.get("/tips", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to fetch tips" });
   }
 });
-var businessRouter_default = router17;
+var businessRouter_default = router19;
 
-// server/routers/aiRouter.ts
+// server/routers/ai/index.ts
+import { Router as Router26 } from "express";
+
+// server/routers/ai/quotingAI.ts
 init_db();
 import multer2 from "multer";
-import { Router as Router20 } from "express";
-init_clients();
+import { Router as Router22 } from "express";
 init_ai_service();
 init_aiClient();
 init_analytics();
-init_analytics_events();
 init_storage();
-init_mail();
-var router18 = Router20();
-router18.post("/ai/job-update-message", requireAuth, requireGrowth, async (req, res) => {
-  try {
-    const { type, customerName, companyName: companyName2, senderName, updateLink, language: commLang } = req.body;
-    if (!type) return res.status(400).json({ message: "type is required" });
-    const jobMsgBusiness = await getBusinessByOwner(req.session.userId);
-    const langInstruction = getLangInstruction(commLang || jobMsgBusiness?.commLanguage);
-    const name = customerName || "there";
-    const sender = senderName || "your cleaning team";
-    const company = companyName2 || "our company";
-    const linkPart = updateLink ? ` Track it live: ${updateLink}` : "";
-    const STATUS_CONTEXT = {
-      en_route: `We are on our way and will arrive shortly.${linkPart}`,
-      started: `We have arrived and are getting started on your home.${linkPart}`,
-      in_progress: `We are currently cleaning your home and making great progress.${linkPart}`,
-      completed: `We have finished cleaning your home \u2014 everything looks great!${linkPart}`,
-      sms: `Your live service update page is ready.${linkPart}`
-    };
-    const statusDetail = STATUS_CONTEXT[type] || `Your service is in progress.${linkPart}`;
-    const isSmsType = type === "sms";
-    const systemPrompt = isSmsType ? `Write a very short SMS (2-3 sentences max) for a cleaning company. No emojis. Be warm but extremely brief. Start with "Hi ${name}, this is ${sender} from ${company}." Then one short sentence about the update. Nothing else.${langInstruction}` : `Write a short, warm text message (3-5 sentences) that a cleaner would send to a customer. No subject line. No emojis. No formal email format. Sign off with just "${sender}". Start with "Hi ${name}," \u2014 do NOT use email structure.${langInstruction}`;
-    const userPrompt2 = `Customer update: ${statusDetail} Reply with ONLY the message text, nothing else.`;
-    const content = await generateText({
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt2 }],
-      maxTokens: 150
-    });
-    if (!content) return res.status(500).json({ message: "No response from AI" });
-    return res.json({ message: content.trim() });
-  } catch (error) {
-    console.error("Job update message error:", error);
-    return res.status(500).json({ message: "Failed to generate message" });
-  }
-});
-router18.post("/ai/analyze-quote", requireAuth, requireGrowth, async (req, res) => {
+var router20 = Router22();
+router20.post("/ai/analyze-quote", requireAuth, requireGrowth, async (req, res) => {
   try {
     const { quoteId } = req.body;
     if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
@@ -20920,7 +21816,503 @@ router18.post("/ai/analyze-quote", requireAuth, requireGrowth, async (req, res) 
     return res.status(500).json({ message: "Failed to analyze quote" });
   }
 });
-router18.post("/ai/generate-followup", requireAuth, requireGrowth, async (req, res) => {
+router20.post("/ai/quote-descriptions", requireAuth, async (req, res) => {
+  try {
+    const { homeDetails, serviceTypes, addOns, companyName: companyName2 } = req.body;
+    if (!homeDetails || !serviceTypes) {
+      return res.status(400).json({ message: "homeDetails and serviceTypes are required" });
+    }
+    const addOnsList = [];
+    if (addOns) {
+      if (addOns.insideFridge) addOnsList.push("inside fridge cleaning");
+      if (addOns.insideOven) addOnsList.push("inside oven cleaning");
+      if (addOns.insideWindows) addOnsList.push("inside window cleaning");
+      if (addOns.insideCabinets) addOnsList.push("inside cabinet cleaning");
+      if (addOns.laundry) addOnsList.push("laundry");
+      if (addOns.dishes) addOnsList.push("dishes");
+    }
+    const propertyDescription = [
+      homeDetails.sqft ? `${homeDetails.sqft} sq ft` : null,
+      homeDetails.beds ? `${homeDetails.beds} bedroom(s)` : null,
+      homeDetails.baths ? `${homeDetails.baths} bathroom(s)` : null,
+      homeDetails.halfBaths ? `${homeDetails.halfBaths} half bath(s)` : null,
+      homeDetails.homeType ? `${homeDetails.homeType}` : null,
+      homeDetails.petType && homeDetails.petType !== "none" ? `has ${homeDetails.petType}` : null,
+      homeDetails.conditionScore ? `condition score ${homeDetails.conditionScore}/5` : null
+    ].filter(Boolean).join(", ");
+    const systemPrompt = `You are a professional cleaning company copywriter for ${companyName2 || "our company"}. Generate scope-of-work descriptions for three cleaning service tiers (good, better, best). Rules:
+- Write 1-2 sentences per option, professional but warm tone
+- Include specific property details: ${propertyDescription}
+- Differentiate clearly between the three options
+- Never mention hours or time estimates
+- Never mention pricing or costs
+${addOnsList.length > 0 ? `- The best option includes these add-ons: ${addOnsList.join(", ")}` : ""}
+Respond with a JSON object with keys "good", "better", "best", each containing the description string.`;
+    const userPrompt2 = `Property: ${propertyDescription}
+Good tier: ${serviceTypes.good || "Basic Cleaning"}
+Better tier: ${serviceTypes.better || "Standard Cleaning"}
+Best tier: ${serviceTypes.best || "Deep Clean"}
+${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` : ""}`;
+    const content = await generateText({
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt2 }],
+      maxTokens: 400
+    });
+    if (!content) {
+      return res.status(500).json({ message: "No response from AI" });
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      parsed = {
+        good: content,
+        better: content,
+        best: content
+      };
+    }
+    return res.json({
+      good: parsed.good || "",
+      better: parsed.better || "",
+      best: parsed.best || ""
+    });
+  } catch (error) {
+    console.error("AI quote descriptions error:", error);
+    return res.status(500).json({ message: "Failed to generate quote descriptions" });
+  }
+});
+router20.post("/ai/pricing-suggestion", requireAuth, async (req, res) => {
+  try {
+    const { homeDetails, addOns, frequency: frequency2, currentPrices, pricingSettings: ps, businessHistory } = req.body;
+    if (!homeDetails || !currentPrices) return res.status(400).json({ message: "homeDetails and currentPrices required" });
+    const propertyDesc = [
+      homeDetails.sqft ? `${homeDetails.sqft} sqft` : null,
+      homeDetails.beds ? `${homeDetails.beds} bed` : null,
+      homeDetails.baths ? `${homeDetails.baths} bath` : null,
+      homeDetails.halfBaths ? `${homeDetails.halfBaths} half bath` : null,
+      homeDetails.homeType || null,
+      homeDetails.conditionScore ? `condition ${homeDetails.conditionScore}/10` : null,
+      homeDetails.peopleCount ? `${homeDetails.peopleCount} people` : null,
+      homeDetails.petType && homeDetails.petType !== "none" ? `pet: ${homeDetails.petType}${homeDetails.petShedding ? " (shedding)" : ""}` : null
+    ].filter(Boolean).join(", ");
+    const addOnsList = [];
+    if (addOns) {
+      Object.entries(addOns).forEach(([k, v]) => {
+        if (v) addOnsList.push(k.replace(/([A-Z])/g, " $1").toLowerCase().trim());
+      });
+    }
+    const historyContext = businessHistory ? `Business stats: ${businessHistory.totalQuotes || 0} quotes sent, ${businessHistory.acceptRate || 0}% acceptance rate, avg quote $${businessHistory.avgQuote || 0}, hourly rate $${ps?.hourlyRate || 55}. ${businessHistory.recentAccepted ? `Recent accepted quotes ranged $${businessHistory.recentAcceptedMin}-$${businessHistory.recentAcceptedMax}.` : ""}` : `Hourly rate: $${ps?.hourlyRate || 55}. No historical data available.`;
+    const systemPrompt = `You are a pricing strategist for residential cleaning. The "base prices" shown are the MINIMUM prices calculated by the business owner's own pricing formula \u2014 your suggested prices must NEVER be lower than these base prices. You may suggest higher prices when market factors, property difficulty, add-ons, or business history justify it. Round to nearest $5.
+
+CRITICAL RULES:
+1. suggestedPrice must always be >= the base price for that tier. Never suggest a lower price.
+2. If you cannot justify a higher price, match the base price exactly.
+3. Your reasoning must explicitly compare to the base price and explain WHY the price is higher (or why the base is already optimal).
+4. Be specific about what factors drive the price up (pet shedding, condition score, add-ons, market positioning).
+
+Respond with JSON: {"good":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"better":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"best":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"overallAssessment":"1-2 sentences","confidence":"low"|"medium"|"high","keyInsight":"1 sentence"}`;
+    const userPrompt2 = `Property: ${propertyDesc}
+Frequency: ${frequency2 || "one-time"}
+Add-ons: ${addOnsList.length > 0 ? addOnsList.join(", ") : "none"}
+
+BASE PRICES (your formula minimum \u2014 never go below these):
+- Good: $${currentPrices.good}
+- Better: $${currentPrices.better}
+- Best: $${currentPrices.best}
+
+${historyContext}`;
+    const content = await generateText({
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt2 }],
+      maxTokens: 400
+    });
+    if (!content) return res.status(500).json({ message: "No response from AI" });
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      return res.status(500).json({ message: "Invalid AI response" });
+    }
+    const floorPrice = (aiPrice, base) => {
+      const ai = typeof aiPrice === "number" && !isNaN(aiPrice) ? aiPrice : base;
+      return Math.max(Math.round(ai / 5) * 5, base);
+    };
+    const goodPrice = floorPrice(parsed.good?.suggestedPrice, currentPrices.good);
+    const betterPrice = floorPrice(parsed.better?.suggestedPrice, currentPrices.better);
+    const bestPrice = floorPrice(parsed.best?.suggestedPrice, currentPrices.best);
+    return res.json({
+      good: {
+        suggestedPrice: goodPrice,
+        reasoning: parsed.good?.reasoning || "",
+        flooredToBase: goodPrice === currentPrices.good
+      },
+      better: {
+        suggestedPrice: betterPrice,
+        reasoning: parsed.better?.reasoning || "",
+        flooredToBase: betterPrice === currentPrices.better
+      },
+      best: {
+        suggestedPrice: bestPrice,
+        reasoning: parsed.best?.reasoning || "",
+        flooredToBase: bestPrice === currentPrices.best
+      },
+      overallAssessment: parsed.overallAssessment || "",
+      confidence: parsed.confidence || "medium",
+      keyInsight: parsed.keyInsight || "",
+      baselinePrices: { good: currentPrices.good, better: currentPrices.better, best: currentPrices.best }
+    });
+  } catch (error) {
+    console.error("AI pricing suggestion error:", error);
+    return res.status(500).json({ message: "Failed to generate pricing suggestion" });
+  }
+});
+router20.post("/ai/walkthrough-extract", requireAuth, requireGrowth, async (req, res) => {
+  try {
+    const rawInput = req.body.description || req.body.notes || "";
+    const description = sanitizeAndLog(
+      typeof rawInput === "string" ? rawInput.trim() : "",
+      req.session.userId,
+      "walkthrough-extract"
+    );
+    if (!description) {
+      return res.status(400).json({ message: "A job description is required" });
+    }
+    const business = await getBusinessByOwner(req.session.userId);
+    if (business) {
+      try {
+        await createAnalyticsEvent({
+          businessId: business.id,
+          eventName: "walkthrough_analysis_started",
+          properties: { descriptionLength: description.length }
+        });
+      } catch (_e) {
+      }
+    }
+    const systemPrompt = `You are an expert quoting assistant for residential and commercial cleaning businesses. A cleaning company owner will paste rough notes, walkthrough text, a customer message, or a property description. Your job is to extract all useful quoting details and return a structured JSON response.
+
+You understand cleaning-industry terminology:
+- "first-time clean" or "initial clean" \u2192 isFirstTimeClean: true, often implies deep clean
+- "maintenance clean" or "recurring" \u2192 standard recurring service
+- "deep clean" \u2192 isDeepClean: true, serviceCategory: "deep"
+- "move-in" / "move-out" / "vacant" \u2192 isMoveInOut: true, serviceCategory: "move-in-out"
+- "biweekly" / "every two weeks" \u2192 frequency: "bi-weekly"
+- "very dirty" / "hasn't been cleaned in months" / "heavy buildup" \u2192 conditionLevel: "heavy" or "extreme"
+- "light" / "pretty clean" / "just needs a touch-up" \u2192 conditionLevel: "light"
+- "inside fridge" / "inside oven" \u2192 add to addOns
+- "Airbnb" / "turnover clean" / "short-term rental" \u2192 note in serviceNotes, may be recurring one-time
+- "salon" / "office" / "boutique" / "medical" / "restaurant" \u2192 isCommercial: true, set propertyType
+
+Return ONLY a valid JSON object with this exact structure:
+{
+  "extractedFields": {
+    "propertyType": "house" | "apartment" | "condo" | "townhouse" | "office" | "retail" | "medical" | "restaurant" | "gym" | "airbnb" | "other" | null,
+    "serviceCategory": "standard" | "deep" | "move-in-out" | "post-construction" | "recurring" | "one-time" | null,
+    "isCommercial": boolean,
+    "bedrooms": number | null,
+    "bathrooms": number | null,
+    "halfBaths": number | null,
+    "sqft": number | null,
+    "occupants": number | null,
+    "frequency": "one-time" | "weekly" | "bi-weekly" | "monthly" | null,
+    "isFirstTimeClean": boolean,
+    "isDeepClean": boolean,
+    "isMoveInOut": boolean,
+    "petCount": number | null,
+    "petType": "dog" | "cat" | "both" | "other" | "none" | null,
+    "petShedding": boolean | null,
+    "addOns": string[],
+    "conditionLevel": "light" | "moderate" | "heavy" | "extreme" | null,
+    "conditionReasoning": string | null,
+    "urgency": "normal" | "rush" | "flexible" | null,
+    "customerName": string | null,
+    "address": string | null,
+    "serviceNotes": string | null
+  },
+  "missingFields": string[],
+  "recommendations": string[],
+  "serviceReasoning": string,
+  "assumptions": string[],
+  "confidence": "high" | "medium" | "low"
+}
+
+Field rules:
+- Use null for any field not mentioned or inferable. Never guess without strong signal.
+- isFirstTimeClean / isDeepClean / isMoveInOut default to false if not mentioned.
+- isCommercial defaults to false.
+- addOns: use plain English strings like "inside oven", "inside fridge", "window cleaning", "laundry", "organizing", "baseboards", "blinds", "carpet cleaning", "wall washing", "garage", "pet hair treatment".
+- missingFields: list what a cleaner would need to finalize a quote but couldn't determine, e.g. ["square footage", "service frequency", "cleaning type"].
+- recommendations: 1-3 short, practical suggestions for the cleaner, e.g. "First-time deep clean recommended given language about dirtiness", "Ask about preferred recurring schedule after initial clean".
+- serviceReasoning: one sentence explaining why you chose the serviceCategory you did.
+- assumptions: list any inferences you made that aren't explicitly stated.
+- confidence: high = most key fields filled, medium = some gaps, low = very sparse.
+- NEVER include prices, costs, rates, or dollar amounts.`;
+    let aiContent;
+    try {
+      const { content: raw } = await callAI(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: description }
+        ],
+        {
+          responseFormat: "json_object",
+          userId: req.session.userId,
+          route: "walkthrough-extract"
+        }
+      );
+      aiContent = raw;
+    } catch (aiError) {
+      console.error("Walkthrough AI call failed:", aiError?.message || aiError);
+      return res.status(503).json({ message: "AI service is temporarily unavailable. Please try again in a moment." });
+    }
+    const content = aiContent;
+    if (!content) {
+      console.error("Walkthrough AI empty response");
+      return res.status(500).json({ message: "AI returned an empty response. Please try again." });
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      console.error("Walkthrough AI JSON parse failed:", content?.slice(0, 200));
+      return res.status(500).json({ message: "AI response could not be parsed. Please try again." });
+    }
+    const extractedFields = parsed.extractedFields || {};
+    const missingFields = Array.isArray(parsed.missingFields) ? parsed.missingFields : [];
+    const recommendations = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
+    const serviceReasoning = typeof parsed.serviceReasoning === "string" ? parsed.serviceReasoning : "";
+    const assumptions = Array.isArray(parsed.assumptions) ? parsed.assumptions : [];
+    const confidence = ["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low";
+    if (business) {
+      try {
+        await createAnalyticsEvent({
+          businessId: business.id,
+          eventName: "walkthrough_analysis_completed",
+          properties: {
+            confidence,
+            isCommercial: extractedFields.isCommercial || false,
+            propertyType: extractedFields.propertyType || "unknown",
+            assumptionCount: assumptions.length
+          }
+        });
+      } catch (_e) {
+      }
+    }
+    return res.json({
+      extractedFields,
+      missingFields,
+      recommendations,
+      serviceReasoning,
+      assumptions,
+      confidence
+    });
+  } catch (error) {
+    console.error("AI walkthrough extract error:", error);
+    return res.status(500).json({ message: "Failed to analyze the job description. Please try again." });
+  }
+});
+router20.post("/ai/communication-draft", requireAuth, requireGrowth, async (req, res) => {
+  try {
+    const { type, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;
+    const purpose = sanitizeAndLog(req.body.purpose || "", req.session.userId, "communication-draft-purpose");
+    const customerName = sanitizeAndLog(req.body.customerName || "", req.session.userId, "communication-draft-customer");
+    const companyName2 = sanitizeAndLog(req.body.companyName || "", req.session.userId, "communication-draft-company");
+    const senderName = sanitizeAndLog(req.body.senderName || "", req.session.userId, "communication-draft-sender");
+    if (!type || !purpose) {
+      return res.status(400).json({ message: "type and purpose are required" });
+    }
+    const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
+    const quoteContext = quoteDetails ? ` Quote: ${quoteDetails.selectedOption || "Cleaning"} $${quoteDetails.price || ""}. ${quoteDetails.scope || ""}. ${quoteDetails.propertyInfo || ""}.` : "";
+    let systemPrompt;
+    let userPrompt2;
+    const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
+    const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
+    if (type === "sms") {
+      systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
+      userPrompt2 = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
+    } else {
+      systemPrompt = `Write a short professional email (under 150 words) for "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Do NOT include the raw URL in the email body. Instead, write a sentence like "You can view and accept your quote by clicking the link below." A styled button with the link will be automatically added after your email.` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+      userPrompt2 = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
+    }
+    const content = await generateText({
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt2 }],
+      maxTokens: type === "sms" ? 100 : 250
+    });
+    if (!content) {
+      return res.status(500).json({ message: "No response from AI" });
+    }
+    let draft = content.trim();
+    if (draft.startsWith('"') && draft.endsWith('"')) {
+      draft = draft.slice(1, -1);
+    }
+    if (draft.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(draft);
+        draft = parsed.draft || content;
+      } catch {
+      }
+    }
+    draft = draft.replace(/\\n/g, "\n");
+    return res.json({ draft });
+  } catch (error) {
+    console.error("AI communication draft error:", error);
+    return res.status(500).json({ message: "Failed to generate communication draft" });
+  }
+});
+var photoUpload = multer2({
+  storage: multer2.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Invalid file type. Only JPEG, PNG, WEBP, and HEIC images are accepted."));
+  }
+});
+router20.post(
+  "/ai/photo-to-quote",
+  requireAuth,
+  photoUpload.single("photo"),
+  async (req, res) => {
+    try {
+      const user = await getUserById(req.session.userId);
+      if (!user) return res.status(401).json({ message: "Not found" });
+      const tier = user.subscriptionTier ?? "free";
+      const used = user.photoQuotesUsedThisMonth ?? 0;
+      const limits = { free: 0, starter: 3, growth: 20, pro: Infinity };
+      const limit = limits[tier] ?? 0;
+      if (used >= limit) {
+        const upgradeMsg = tier === "free" ? "Photo-to-Quote requires a Starter plan or higher." : tier === "starter" ? "You've used all 3 photo quotes this month. Upgrade to Growth for 20/month." : `You've used all ${limit} photo quotes this month. Upgrade to Pro for unlimited.`;
+        return res.status(403).json({
+          error: "limit_reached",
+          message: upgradeMsg,
+          used,
+          limit,
+          upgradeUrl: "/pricing"
+        });
+      }
+      if (!req.file) {
+        return res.status(400).json({ message: "No photo uploaded." });
+      }
+      const { buffer, mimetype } = req.file;
+      const propertyType = req.body.propertyType || "residential";
+      const base64 = buffer.toString("base64");
+      const mediaType = mimetype === "image/heic" || mimetype === "image/heif" ? "image/jpeg" : mimetype;
+      const visionResponse = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 800,
+        system: "You are an expert cleaning estimator with 20 years experience. Analyze photos and estimate cleaning requirements accurately. Always respond with valid JSON only \u2014 no markdown, no explanation.",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: mediaType,
+                  data: base64
+                }
+              },
+              {
+                type: "text",
+                text: `Analyze this photo of a ${propertyType} space to be cleaned. Estimate:
+1. Space type (bedroom, bathroom, kitchen, living room, office, etc.)
+2. Approximate square footage
+3. Cleanliness level (light/standard/deep clean needed) \u2014 be specific about what you see
+4. Estimated cleaning time in hours (give a range)
+5. Suggested price range in USD based on US ${propertyType} cleaning rates ($25-45/hr)
+6. Key observations (pet hair, clutter level, surface types visible)
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "spaceType": string,
+  "estimatedSqft": number,
+  "cleanLevel": "light" | "standard" | "deep",
+  "timeRangeHours": { "min": number, "max": number },
+  "priceRange": { "min": number, "max": number },
+  "observations": string[],
+  "confidence": "low" | "medium" | "high"
+}`
+              }
+            ]
+          }
+        ]
+      });
+      const rawText = visionResponse.content[0].text?.trim() ?? "";
+      const jsonText = rawText.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonText);
+      } catch {
+        console.error("[photo-to-quote] Invalid JSON from Claude:", rawText.slice(0, 200));
+        return res.status(500).json({ message: "AI returned an unexpected response. Please try again." });
+      }
+      await pool.query(
+        "UPDATE users SET photo_quotes_used_this_month = photo_quotes_used_this_month + 1 WHERE id = $1",
+        [user.id]
+      );
+      await trackEvent(user.id, "PHOTO_TO_QUOTE_USED", {
+        spaceType: parsed.spaceType,
+        cleanLevel: parsed.cleanLevel,
+        confidence: parsed.confidence,
+        propertyType
+      });
+      return res.json(parsed);
+    } catch (err) {
+      if (err.message?.includes("Invalid file type")) {
+        return res.status(400).json({ message: err.message });
+      }
+      console.error("[photo-to-quote] error:", err?.message || err);
+      return res.status(500).json({ message: "Failed to analyze photo. Please try again." });
+    }
+  }
+);
+var quotingAI_default = router20;
+
+// server/routers/ai/messagingAI.ts
+import { Router as Router23 } from "express";
+init_clients();
+init_ai_service();
+init_aiClient();
+init_analytics();
+init_analytics_events();
+init_mail();
+init_storage();
+var router21 = Router23();
+router21.post("/ai/job-update-message", requireAuth, requireGrowth, async (req, res) => {
+  try {
+    const { type, customerName, companyName: companyName2, senderName, updateLink, language: commLang } = req.body;
+    if (!type) return res.status(400).json({ message: "type is required" });
+    const jobMsgBusiness = await getBusinessByOwner(req.session.userId);
+    const langInstruction = getLangInstruction(commLang || jobMsgBusiness?.commLanguage);
+    const name = customerName || "there";
+    const sender = senderName || "your cleaning team";
+    const company = companyName2 || "our company";
+    const linkPart = updateLink ? ` Track it live: ${updateLink}` : "";
+    const STATUS_CONTEXT = {
+      en_route: `We are on our way and will arrive shortly.${linkPart}`,
+      started: `We have arrived and are getting started on your home.${linkPart}`,
+      in_progress: `We are currently cleaning your home and making great progress.${linkPart}`,
+      completed: `We have finished cleaning your home \u2014 everything looks great!${linkPart}`,
+      sms: `Your live service update page is ready.${linkPart}`
+    };
+    const statusDetail = STATUS_CONTEXT[type] || `Your service is in progress.${linkPart}`;
+    const isSmsType = type === "sms";
+    const systemPrompt = isSmsType ? `Write a very short SMS (2-3 sentences max) for a cleaning company. No emojis. Be warm but extremely brief. Start with "Hi ${name}, this is ${sender} from ${company}." Then one short sentence about the update. Nothing else.${langInstruction}` : `Write a short, warm text message (3-5 sentences) that a cleaner would send to a customer. No subject line. No emojis. No formal email format. Sign off with just "${sender}". Start with "Hi ${name}," \u2014 do NOT use email structure.${langInstruction}`;
+    const userPrompt2 = `Customer update: ${statusDetail} Reply with ONLY the message text, nothing else.`;
+    const content = await generateText({
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt2 }],
+      maxTokens: 150
+    });
+    if (!content) return res.status(500).json({ message: "No response from AI" });
+    return res.json({ message: content.trim() });
+  } catch (error) {
+    console.error("Job update message error:", error);
+    return res.status(500).json({ message: "Failed to generate message" });
+  }
+});
+router21.post("/ai/generate-followup", requireAuth, requireGrowth, async (req, res) => {
   try {
     const { quoteId, channel, context, language: commLang } = req.body;
     if (!quoteId) return res.status(400).json({ message: "quoteId is required" });
@@ -20949,7 +22341,434 @@ router18.post("/ai/generate-followup", requireAuth, requireGrowth, async (req, r
     return res.status(500).json({ message: "Failed to generate follow-up" });
   }
 });
-router18.post("/ai/sales-chat", requireAuth, requireGrowth, async (req, res) => {
+router21.post("/send/email", requireAuth, requireGrowth, async (req, res) => {
+  try {
+    const { to, subject, body, customerId, quoteId, includeQuoteLink } = req.body;
+    if (!to || !body) {
+      return res.status(400).json({ message: "to and body are required" });
+    }
+    const business = await getBusinessByOwner(req.session.userId);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+    const { fromName, replyTo: replyToEmail } = getBusinessSendParams(business);
+    let bodyContent = body;
+    let quoteButtonHtml = "";
+    let optionCardsHtml = "";
+    if (quoteId) {
+      const quote = await getQuoteById(quoteId);
+      if (quote && quote.publicToken) {
+        const quoteUrl = `${getPublicBaseUrl(req)}/q/${quote.publicToken}`;
+        const qpEmail = business.quotePreferences;
+        const primaryColor = qpEmail?.brandColor || business.primaryColor || "#2563EB";
+        const opts = quote.options || {};
+        const savedRecommended = quote.recommendedOption || "better";
+        const tierCards = ["good", "better", "best"].filter((k) => opts[k] !== void 0).map((k) => {
+          const opt = opts[k];
+          const price = Number(opt.price || 0);
+          const name = opt.name || opt.serviceTypeName || k.charAt(0).toUpperCase() + k.slice(1);
+          const scope = opt.scope || "";
+          const isRec = k === savedRecommended;
+          const borderColor = isRec ? primaryColor : "#eeeeee";
+          const bgColor = isRec ? "#f9f9ff" : "#ffffff";
+          const badgeHtml = isRec ? `<div style="display:inline-block;background:${primaryColor};color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;margin-bottom:12px;letter-spacing:0.5px;">RECOMMENDED</div><br/>` : "";
+          return `
+<tr><td style="padding:8px 16px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="border:2px solid ${borderColor};border-radius:8px;background-color:${bgColor};">
+    <tr><td style="padding:20px;">
+      ${badgeHtml}
+      <div style="font-size:18px;font-weight:700;color:#333333;margin-bottom:4px;">${name}</div>
+      ${scope ? `<div style="font-size:13px;color:#666666;margin-bottom:14px;line-height:1.4;">${scope}</div>` : ""}
+      <div style="font-size:26px;font-weight:700;color:${primaryColor};margin-bottom:16px;">$${price.toFixed(2)}</div>
+      <a href="${quoteUrl}?option=${k}" style="display:block;background:${primaryColor};color:white;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;text-align:center;">Accept ${name}</a>
+    </td></tr>
+  </table>
+</td></tr>`;
+        }).join("");
+        if (tierCards) {
+          optionCardsHtml = `
+<tr><td style="padding:24px 0 8px;text-align:center;border-top:1px solid #eeeeee;">
+  <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#333333;">Your Quote Options</h2>
+  <p style="margin:0;font-size:13px;color:#666666;">Select the package that works best for you.</p>
+</td></tr>
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0">
+    ${tierCards}
+  </table>
+</td></tr>
+<tr><td style="padding:16px;text-align:center;background-color:#f9f9f9;border-top:1px solid #eeeeee;">
+  <p style="margin:0;font-size:12px;color:#666666;line-height:1.5;">
+    Or reply with <strong>1</strong> (Good), <strong>2</strong> (Better), or <strong>3</strong> (Best) to select your option.
+  </p>
+</td></tr>`;
+        } else if (includeQuoteLink) {
+          quoteButtonHtml = `
+<div style="margin-top:24px;text-align:center;">
+  <a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Accept Your Quote</a>
+</div>`;
+        }
+      }
+    }
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        <tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;">
+          <h2 style="color:#ffffff;margin:0;font-size:20px;">${fromName}</h2>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          ${bodyContent.split("\n").map((line) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333333;">${line}</p>`).join("")}
+          ${quoteButtonHtml}
+        </td></tr>
+        ${optionCardsHtml}
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;">
+          <p style="margin:0;font-size:12px;color:#999999;">Sent via QuotePro</p>
+          <p style="margin:4px 0 0;font-size:11px;color:#bbbbbb;">If you no longer wish to receive these emails, please reply with "unsubscribe".</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+    try {
+      await sendEmail({
+        to,
+        subject: subject || `Message from ${fromName}`,
+        html: htmlBody,
+        text: bodyContent,
+        fromName,
+        replyTo: replyToEmail
+      });
+    } catch (mailErr) {
+      console.error("[mail] Send email error:", mailErr);
+      return res.status(502).json({ message: "Email could not be delivered. Please try again or contact support." });
+    }
+    console.log(`[mail] Email sent to ${to}`);
+    await createCommunication({
+      businessId: business.id,
+      customerId: customerId || void 0,
+      quoteId: quoteId || void 0,
+      channel: "email",
+      direction: "outbound",
+      content: bodyContent,
+      status: "sent"
+    });
+    return res.json({ success: true, message: "Email sent successfully" });
+  } catch (error) {
+    console.error("Send email error:", error);
+    return res.status(500).json({ message: "Failed to send email" });
+  }
+});
+router21.post("/ai/generate-campaign-content", requireAuth, async (req, res) => {
+  try {
+    const business = await getBusinessByOwner(req.session.userId);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+    const { campaignName, segment, customPrompt, useAI } = req.body;
+    const businessName = business.companyName || "our cleaning company";
+    const ownerName = business.senderName || business.companyName || "Your cleaning team";
+    const signOff2 = ownerName;
+    const instantTemplates = {
+      "Holiday Deep Clean": {
+        subject: `Holiday Deep Clean - ${businessName}`,
+        content: `Hi [Customer],
+
+The holidays are almost here! Let ${businessName} get your home guest-ready with a thorough deep clean.
+
+We'll tackle kitchens, bathrooms, and living spaces so every room sparkles for your gatherings.
+
+Reply to book and we'll schedule at your convenience.
+
+Best regards,
+${signOff2}`
+      },
+      "Spring Cleaning Special": {
+        subject: `Spring Cleaning Special - ${businessName}`,
+        content: `Hi [Customer],
+
+Spring is here! Time to refresh your home after winter with a deep clean from ${businessName}.
+
+We'll dust, scrub, and polish every corner so your space feels brand new for the warmer months.
+
+Reply to book your spring cleaning today.
+
+Best regards,
+${signOff2}`
+      },
+      "New Year Fresh Start": {
+        subject: `Start the New Year Fresh - ${businessName}`,
+        content: `Hi [Customer],
+
+Happy New Year! Start fresh with a spotless home from ${businessName}.
+
+A clean home sets the tone for a great year ahead. Let us handle the deep clean so you can focus on your goals.
+
+Reply to book and kick off the year right.
+
+Best regards,
+${signOff2}`
+      },
+      "Back to School Clean": {
+        subject: `Back to School Clean - ${businessName}`,
+        content: `Hi [Customer],
+
+School is starting! Get your home refreshed after a busy summer with ${businessName}.
+
+We'll deep clean every room so your family can settle into a clean, organized routine.
+
+Reply to book your back-to-school cleaning.
+
+Best regards,
+${signOff2}`
+      },
+      "Win Back Lost Leads": {
+        subject: `We'd Love to Hear from You - ${businessName}`,
+        content: `Hi [Customer],
+
+It's been a while since we connected. We'd love the chance to earn your business at ${businessName}.
+
+Whether your needs have changed or you're ready for a fresh quote, we're here to help.
+
+Reply to this email and we'll get you taken care of.
+
+Best regards,
+${signOff2}`
+      },
+      "VIP Customer Appreciation": {
+        subject: `Thank You from ${businessName}`,
+        content: `Hi [Customer],
+
+Thank you for being a valued customer of ${businessName}. We truly appreciate your continued trust.
+
+As a loyal client, we'd love to offer you priority booking for your next cleaning.
+
+Reply to book and we'll schedule you at your preferred time.
+
+Warm regards,
+${signOff2}`
+      }
+    };
+    if (!useAI && !customPrompt?.trim() && instantTemplates[campaignName]) {
+      const template = instantTemplates[campaignName];
+      return res.json({ content: template.content, subject: template.subject, channel: "email" });
+    }
+    const targetDesc = segment === "dormant" ? "past customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired" : "customers";
+    const customInstruction = customPrompt?.trim() ? ` Focus: ${customPrompt.trim()}.` : "";
+    const campaignLangInstruction = getLangInstruction(business.commLanguage);
+    const systemPrompt = `Write a short marketing email for "${businessName}" (${ownerName}) to ${targetDesc}. Theme: "${campaignName}".${customInstruction} Rules: first line "Subject: ..." then blank line then body under 60 words in 3 short paragraphs. Use [Customer] as name. Sign off as ${signOff2}. No links, no emojis. End with "Reply to book".${campaignLangInstruction}`;
+    let raw = "";
+    try {
+      const { content: aiRaw } = await callAI(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Write the email." }
+        ],
+        { userId: req.session.userId, route: "generate-campaign-content" }
+      );
+      raw = aiRaw;
+    } catch (aiErr) {
+      console.error("AI campaign content error:", aiErr?.message || aiErr);
+    }
+    if (!raw) {
+      const fallback = instantTemplates[campaignName] || { content: `Hi [Customer],
+
+We wanted to reach out from ${businessName} about our ${campaignName} offer.
+
+We'd love to serve you${segment === "dormant" ? " again" : ""}. Reply to schedule your next cleaning.
+
+Best regards,
+${signOff2}`, subject: campaignName };
+      return res.json({ content: fallback.content, subject: fallback.subject, channel: "email" });
+    }
+    let subject = "";
+    let content = raw;
+    const subjectMatch = raw.match(/^Subject:\s*(.+)/i);
+    if (subjectMatch) {
+      subject = subjectMatch[1].trim();
+      content = raw.substring(raw.indexOf("\n") + 1).trim();
+    }
+    return res.json({ content, subject: subject || campaignName, channel: "email" });
+  } catch (error) {
+    console.error("AI generate campaign content error:", error?.message || error, error?.code, error?.status);
+    return res.status(500).json({ message: "Failed to generate campaign content" });
+  }
+});
+router21.post("/ai/generate-review-email", requireAuth, async (req, res) => {
+  try {
+    const business = await getBusinessByOwner(req.session.userId);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+    const businessName = business.companyName || "our cleaning company";
+    const ownerName = business.senderName || "";
+    const growthSettings = await getGrowthAutomationSettings(business.id);
+    const googleReviewLink = growthSettings?.googleReviewLink?.trim() || "";
+    const linkInstruction = googleReviewLink ? `Include this Google review link in the email naturally: ${googleReviewLink} \u2014 encourage them to click it to leave a review.` : `No links/URLs. Ask them to reply with their feedback or leave a review.`;
+    const reviewLangInstruction = getLangInstruction(business.commLanguage);
+    const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. ${linkInstruction} No emojis. Keep it personal and genuine.${reviewLangInstruction}`;
+    let rawReview = "";
+    try {
+      const { content: aiRaw } = await callAI(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Generate a review request email." }
+        ],
+        { maxTokens: 250, userId: req.session.userId, route: "generate-review-email" }
+      );
+      rawReview = aiRaw;
+    } catch (aiErr) {
+      console.error("AI generate review email error:", aiErr?.message || aiErr);
+    }
+    const raw = rawReview;
+    let subject = "";
+    let content = raw;
+    if (raw.startsWith("Subject:")) {
+      const lines = raw.split("\n");
+      subject = lines[0].replace("Subject:", "").trim();
+      content = lines.slice(1).join("\n").trim();
+    }
+    const fallbackLink = googleReviewLink ? `
+
+Leave us a review here: ${googleReviewLink}` : "";
+    if (!content) {
+      return res.json({
+        content: `Dear [Customer],
+
+Thank you for choosing ${businessName}. We hope you were happy with our service.
+
+Would you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.${fallbackLink}
+
+We appreciate your time!
+
+Best regards,
+${ownerName || businessName}`,
+        subject: "We would love your feedback",
+        channel: "email"
+      });
+    }
+    return res.json({ content, subject, channel: "email" });
+  } catch (error) {
+    console.error("AI generate review email error:", error?.message || error);
+    const business = await getBusinessByOwner(req.session.userId).catch(() => null);
+    const businessName = business?.companyName || "our cleaning company";
+    const ownerName = business?.senderName || businessName;
+    let fallbackLink = "";
+    try {
+      if (business) {
+        const gs = await getGrowthAutomationSettings(business.id);
+        if (gs?.googleReviewLink?.trim()) fallbackLink = `
+
+Leave us a review here: ${gs.googleReviewLink.trim()}`;
+      }
+    } catch {
+    }
+    return res.json({
+      content: `Dear [Customer],
+
+Thank you for choosing ${businessName}. We hope you were happy with our service.
+
+Would you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.${fallbackLink}
+
+We appreciate your time!
+
+Best regards,
+${ownerName}`,
+      subject: "We would love your feedback",
+      channel: "email"
+    });
+  }
+});
+router21.post("/ai/generate-message", requireAuth, async (req, res) => {
+  try {
+    const { channel, total, status, quoteLink, bookingLink, paymentMethodsText, language: commLang, quoteId } = req.body;
+    const purpose = sanitizeAndLog(req.body.purpose || "", req.session.userId, "generate-message-purpose");
+    const customerName = sanitizeAndLog(req.body.customerName || "", req.session.userId, "generate-message-customer");
+    const companyName2 = sanitizeAndLog(req.body.companyName || "", req.session.userId, "generate-message-company");
+    const senderName = sanitizeAndLog(req.body.senderName || "", req.session.userId, "generate-message-sender");
+    const msgType = channel || "sms";
+    const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
+    const genMsgBusiness = await getBusinessByOwner(req.session.userId);
+    const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
+    const langInstruction = getLangInstruction(commLang || genMsgBusiness?.commLanguage);
+    let quotePackageContext = "";
+    let quoteRecommendedName = "";
+    if (purpose === "send_quote" && quoteId) {
+      try {
+        const quoteData = await getQuoteById(quoteId);
+        if (quoteData) {
+          const opts = quoteData.options || {};
+          const recKey = quoteData.recommendedOption || "better";
+          const tierLines = ["good", "better", "best"].filter((k) => opts[k] !== void 0).map((k) => {
+            const o = opts[k];
+            const name = o.name || o.serviceTypeName || k.charAt(0).toUpperCase() + k.slice(1);
+            const price = Number(o.price || 0);
+            const isRec = k === recKey;
+            if (isRec) quoteRecommendedName = name;
+            return `${name}: $${price.toFixed(0)}${isRec ? " (recommended)" : ""}`;
+          });
+          if (tierLines.length > 0) {
+            quotePackageContext = ` The quote includes ${tierLines.length} packages: ${tierLines.join(", ")}.`;
+          }
+        }
+      } catch {
+      }
+    }
+    const quoteContext = quotePackageContext || (total ? ` Quote total: $${total}.` : "");
+    let systemPrompt;
+    let userPrompt2;
+    if (msgType === "sms") {
+      systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
+      userPrompt2 = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
+    } else if (purpose === "send_quote") {
+      systemPrompt = `Write a short professional email (under 160 words) for "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. IMPORTANT: Do NOT mention specific dollar amounts \u2014 the email will include clickable pricing cards below showing each package with its price. Instead, mention the package names and invite the customer to choose. Do NOT include any URLs in the body \u2014 a styled quote button is added automatically. Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+      userPrompt2 = `Write a quote delivery email to ${customerName || "the customer"}.${quoteContext}${quoteRecommendedName ? ` Highlight the recommended package "${quoteRecommendedName}" by name.` : ""} The email should: greet ${customerName || "them"} by name, let them know their quote has multiple cleaning packages to choose from (pricing cards will appear below), invite them to reply with questions, sign off warmly from ${senderName || "the team"}.${paymentInfo} Reply with ONLY the email.`;
+    } else {
+      systemPrompt = `Write a short professional email (under 150 words) for "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Do NOT include the raw URL in the email body. Instead, write a sentence like "You can view and accept your quote by clicking the link below." A styled button with the link will be automatically added after your email.` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
+      userPrompt2 = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
+    }
+    let draft = "";
+    try {
+      const { content: aiDraft } = await callAI(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt2 }
+        ],
+        {
+          maxTokens: msgType === "sms" ? 100 : 250,
+          userId: req.session.userId,
+          route: "generate-message"
+        }
+      );
+      draft = aiDraft;
+    } catch (aiErr) {
+      console.error("AI generate message error:", aiErr?.message || aiErr);
+      return res.status(503).json({ message: "AI is temporarily unavailable. Please try again." });
+    }
+    if (draft.startsWith('"') && draft.endsWith('"')) draft = draft.slice(1, -1);
+    if (draft.startsWith("{")) {
+      try {
+        const p2 = JSON.parse(draft);
+        draft = p2.draft || p2.message || draft;
+      } catch {
+      }
+    }
+    draft = draft.replace(/\\n/g, "\n");
+    return res.json({ message: draft, draft });
+  } catch (error) {
+    console.error("AI generate message error:", error);
+    return res.status(500).json({ message: "Failed to generate message" });
+  }
+});
+var messagingAI_default = router21;
+
+// server/routers/ai/agentAI.ts
+import { Router as Router24 } from "express";
+init_ai_service();
+init_aiClient();
+init_analytics();
+init_analytics_events();
+init_storage();
+var router22 = Router24();
+router22.post("/ai/sales-chat", requireAuth, requireGrowth, async (req, res) => {
   try {
     const { message, conversationHistory } = req.body;
     if (!message) return res.status(400).json({ message: "message is required" });
@@ -21070,7 +22889,7 @@ ${contextStr}`;
     return res.status(500).json({ message: "Failed to process your question. Please try again." });
   }
 });
-router18.post("/ai/agent-chat", requireAuth, async (req, res) => {
+router22.post("/ai/agent-chat", requireAuth, async (req, res) => {
   try {
     const { mode = "coach", conversationHistory = [] } = req.body;
     const message = sanitizeAndLog(req.body.message || "", req.session.userId, "agent-chat");
@@ -21370,421 +23189,7 @@ SALES & MARKETING:
     return res.status(500).json({ message: "Failed to process your question. Please try again." });
   }
 });
-router18.post("/send/email", requireAuth, requireGrowth, async (req, res) => {
-  try {
-    const { to, subject, body, customerId, quoteId, includeQuoteLink } = req.body;
-    if (!to || !body) {
-      return res.status(400).json({ message: "to and body are required" });
-    }
-    const business = await getBusinessByOwner(req.session.userId);
-    if (!business) return res.status(404).json({ message: "Business not found" });
-    const { fromName, replyTo: replyToEmail } = getBusinessSendParams(business);
-    let bodyContent = body;
-    let quoteButtonHtml = "";
-    let optionCardsHtml = "";
-    if (quoteId) {
-      const quote = await getQuoteById(quoteId);
-      if (quote && quote.publicToken) {
-        const quoteUrl = `${getPublicBaseUrl(req)}/q/${quote.publicToken}`;
-        const qpEmail = business.quotePreferences;
-        const primaryColor = qpEmail?.brandColor || business.primaryColor || "#2563EB";
-        const opts = quote.options || {};
-        const savedRecommended = quote.recommendedOption || "better";
-        const tierCards = ["good", "better", "best"].filter((k) => opts[k] !== void 0).map((k) => {
-          const opt = opts[k];
-          const price = Number(opt.price || 0);
-          const name = opt.name || opt.serviceTypeName || k.charAt(0).toUpperCase() + k.slice(1);
-          const scope = opt.scope || "";
-          const isRec = k === savedRecommended;
-          const borderColor = isRec ? primaryColor : "#eeeeee";
-          const bgColor = isRec ? "#f9f9ff" : "#ffffff";
-          const badgeHtml = isRec ? `<div style="display:inline-block;background:${primaryColor};color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;margin-bottom:12px;letter-spacing:0.5px;">RECOMMENDED</div><br/>` : "";
-          return `
-<tr><td style="padding:8px 16px;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="border:2px solid ${borderColor};border-radius:8px;background-color:${bgColor};">
-    <tr><td style="padding:20px;">
-      ${badgeHtml}
-      <div style="font-size:18px;font-weight:700;color:#333333;margin-bottom:4px;">${name}</div>
-      ${scope ? `<div style="font-size:13px;color:#666666;margin-bottom:14px;line-height:1.4;">${scope}</div>` : ""}
-      <div style="font-size:26px;font-weight:700;color:${primaryColor};margin-bottom:16px;">$${price.toFixed(2)}</div>
-      <a href="${quoteUrl}?option=${k}" style="display:block;background:${primaryColor};color:white;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;text-align:center;">Accept ${name}</a>
-    </td></tr>
-  </table>
-</td></tr>`;
-        }).join("");
-        if (tierCards) {
-          optionCardsHtml = `
-<tr><td style="padding:24px 0 8px;text-align:center;border-top:1px solid #eeeeee;">
-  <h2 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#333333;">Your Quote Options</h2>
-  <p style="margin:0;font-size:13px;color:#666666;">Select the package that works best for you.</p>
-</td></tr>
-<tr><td>
-  <table width="100%" cellpadding="0" cellspacing="0">
-    ${tierCards}
-  </table>
-</td></tr>
-<tr><td style="padding:16px;text-align:center;background-color:#f9f9f9;border-top:1px solid #eeeeee;">
-  <p style="margin:0;font-size:12px;color:#666666;line-height:1.5;">
-    Or reply with <strong>1</strong> (Good), <strong>2</strong> (Better), or <strong>3</strong> (Best) to select your option.
-  </p>
-</td></tr>`;
-        } else if (includeQuoteLink) {
-          quoteButtonHtml = `
-<div style="margin-top:24px;text-align:center;">
-  <a href="${quoteUrl}" style="display:inline-block;background:${primaryColor};color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Accept Your Quote</a>
-</div>`;
-        }
-      }
-    }
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
-    <tr><td align="center">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-        <tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;">
-          <h2 style="color:#ffffff;margin:0;font-size:20px;">${fromName}</h2>
-        </td></tr>
-        <tr><td style="padding:32px;">
-          ${bodyContent.split("\n").map((line) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333333;">${line}</p>`).join("")}
-          ${quoteButtonHtml}
-        </td></tr>
-        ${optionCardsHtml}
-        <tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;">
-          <p style="margin:0;font-size:12px;color:#999999;">Sent via QuotePro</p>
-          <p style="margin:4px 0 0;font-size:11px;color:#bbbbbb;">If you no longer wish to receive these emails, please reply with "unsubscribe".</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-    try {
-      await sendEmail({
-        to,
-        subject: subject || `Message from ${fromName}`,
-        html: htmlBody,
-        text: bodyContent,
-        fromName,
-        replyTo: replyToEmail
-      });
-    } catch (mailErr) {
-      console.error("[mail] Send email error:", mailErr);
-      return res.status(502).json({ message: "Email could not be delivered. Please try again or contact support." });
-    }
-    console.log(`[mail] Email sent to ${to}`);
-    await createCommunication({
-      businessId: business.id,
-      customerId: customerId || void 0,
-      quoteId: quoteId || void 0,
-      channel: "email",
-      direction: "outbound",
-      content: bodyContent,
-      status: "sent"
-    });
-    return res.json({ success: true, message: "Email sent successfully" });
-  } catch (error) {
-    console.error("Send email error:", error);
-    return res.status(500).json({ message: "Failed to send email" });
-  }
-});
-router18.post("/ai/quote-descriptions", requireAuth, async (req, res) => {
-  try {
-    const { homeDetails, serviceTypes, addOns, companyName: companyName2 } = req.body;
-    if (!homeDetails || !serviceTypes) {
-      return res.status(400).json({ message: "homeDetails and serviceTypes are required" });
-    }
-    const addOnsList = [];
-    if (addOns) {
-      if (addOns.insideFridge) addOnsList.push("inside fridge cleaning");
-      if (addOns.insideOven) addOnsList.push("inside oven cleaning");
-      if (addOns.insideWindows) addOnsList.push("inside window cleaning");
-      if (addOns.insideCabinets) addOnsList.push("inside cabinet cleaning");
-      if (addOns.laundry) addOnsList.push("laundry");
-      if (addOns.dishes) addOnsList.push("dishes");
-    }
-    const propertyDescription = [
-      homeDetails.sqft ? `${homeDetails.sqft} sq ft` : null,
-      homeDetails.beds ? `${homeDetails.beds} bedroom(s)` : null,
-      homeDetails.baths ? `${homeDetails.baths} bathroom(s)` : null,
-      homeDetails.halfBaths ? `${homeDetails.halfBaths} half bath(s)` : null,
-      homeDetails.homeType ? `${homeDetails.homeType}` : null,
-      homeDetails.petType && homeDetails.petType !== "none" ? `has ${homeDetails.petType}` : null,
-      homeDetails.conditionScore ? `condition score ${homeDetails.conditionScore}/5` : null
-    ].filter(Boolean).join(", ");
-    const systemPrompt = `You are a professional cleaning company copywriter for ${companyName2 || "our company"}. Generate scope-of-work descriptions for three cleaning service tiers (good, better, best). Rules:
-- Write 1-2 sentences per option, professional but warm tone
-- Include specific property details: ${propertyDescription}
-- Differentiate clearly between the three options
-- Never mention hours or time estimates
-- Never mention pricing or costs
-${addOnsList.length > 0 ? `- The best option includes these add-ons: ${addOnsList.join(", ")}` : ""}
-Respond with a JSON object with keys "good", "better", "best", each containing the description string.`;
-    const userPrompt2 = `Property: ${propertyDescription}
-Good tier: ${serviceTypes.good || "Basic Cleaning"}
-Better tier: ${serviceTypes.better || "Standard Cleaning"}
-Best tier: ${serviceTypes.best || "Deep Clean"}
-${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` : ""}`;
-    const content = await generateText({
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt2 }],
-      maxTokens: 400
-    });
-    if (!content) {
-      return res.status(500).json({ message: "No response from AI" });
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      parsed = {
-        good: content,
-        better: content,
-        best: content
-      };
-    }
-    return res.json({
-      good: parsed.good || "",
-      better: parsed.better || "",
-      best: parsed.best || ""
-    });
-  } catch (error) {
-    console.error("AI quote descriptions error:", error);
-    return res.status(500).json({ message: "Failed to generate quote descriptions" });
-  }
-});
-router18.post("/ai/pricing-suggestion", requireAuth, async (req, res) => {
-  try {
-    const { homeDetails, addOns, frequency: frequency2, currentPrices, pricingSettings: ps, businessHistory } = req.body;
-    if (!homeDetails || !currentPrices) return res.status(400).json({ message: "homeDetails and currentPrices required" });
-    const propertyDesc = [
-      homeDetails.sqft ? `${homeDetails.sqft} sqft` : null,
-      homeDetails.beds ? `${homeDetails.beds} bed` : null,
-      homeDetails.baths ? `${homeDetails.baths} bath` : null,
-      homeDetails.halfBaths ? `${homeDetails.halfBaths} half bath` : null,
-      homeDetails.homeType || null,
-      homeDetails.conditionScore ? `condition ${homeDetails.conditionScore}/10` : null,
-      homeDetails.peopleCount ? `${homeDetails.peopleCount} people` : null,
-      homeDetails.petType && homeDetails.petType !== "none" ? `pet: ${homeDetails.petType}${homeDetails.petShedding ? " (shedding)" : ""}` : null
-    ].filter(Boolean).join(", ");
-    const addOnsList = [];
-    if (addOns) {
-      Object.entries(addOns).forEach(([k, v]) => {
-        if (v) addOnsList.push(k.replace(/([A-Z])/g, " $1").toLowerCase().trim());
-      });
-    }
-    const historyContext = businessHistory ? `Business stats: ${businessHistory.totalQuotes || 0} quotes sent, ${businessHistory.acceptRate || 0}% acceptance rate, avg quote $${businessHistory.avgQuote || 0}, hourly rate $${ps?.hourlyRate || 55}. ${businessHistory.recentAccepted ? `Recent accepted quotes ranged $${businessHistory.recentAcceptedMin}-$${businessHistory.recentAcceptedMax}.` : ""}` : `Hourly rate: $${ps?.hourlyRate || 55}. No historical data available.`;
-    const systemPrompt = `You are a pricing strategist for residential cleaning. The "base prices" shown are the MINIMUM prices calculated by the business owner's own pricing formula \u2014 your suggested prices must NEVER be lower than these base prices. You may suggest higher prices when market factors, property difficulty, add-ons, or business history justify it. Round to nearest $5.
-
-CRITICAL RULES:
-1. suggestedPrice must always be >= the base price for that tier. Never suggest a lower price.
-2. If you cannot justify a higher price, match the base price exactly.
-3. Your reasoning must explicitly compare to the base price and explain WHY the price is higher (or why the base is already optimal).
-4. Be specific about what factors drive the price up (pet shedding, condition score, add-ons, market positioning).
-
-Respond with JSON: {"good":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"better":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"best":{"suggestedPrice":number,"reasoning":"1-2 sentences explaining vs base price"},"overallAssessment":"1-2 sentences","confidence":"low"|"medium"|"high","keyInsight":"1 sentence"}`;
-    const userPrompt2 = `Property: ${propertyDesc}
-Frequency: ${frequency2 || "one-time"}
-Add-ons: ${addOnsList.length > 0 ? addOnsList.join(", ") : "none"}
-
-BASE PRICES (your formula minimum \u2014 never go below these):
-- Good: $${currentPrices.good}
-- Better: $${currentPrices.better}
-- Best: $${currentPrices.best}
-
-${historyContext}`;
-    const content = await generateText({
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt2 }],
-      maxTokens: 400
-    });
-    if (!content) return res.status(500).json({ message: "No response from AI" });
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      return res.status(500).json({ message: "Invalid AI response" });
-    }
-    const floorPrice = (aiPrice, base) => {
-      const ai = typeof aiPrice === "number" && !isNaN(aiPrice) ? aiPrice : base;
-      return Math.max(Math.round(ai / 5) * 5, base);
-    };
-    const goodPrice = floorPrice(parsed.good?.suggestedPrice, currentPrices.good);
-    const betterPrice = floorPrice(parsed.better?.suggestedPrice, currentPrices.better);
-    const bestPrice = floorPrice(parsed.best?.suggestedPrice, currentPrices.best);
-    return res.json({
-      good: {
-        suggestedPrice: goodPrice,
-        reasoning: parsed.good?.reasoning || "",
-        flooredToBase: goodPrice === currentPrices.good
-      },
-      better: {
-        suggestedPrice: betterPrice,
-        reasoning: parsed.better?.reasoning || "",
-        flooredToBase: betterPrice === currentPrices.better
-      },
-      best: {
-        suggestedPrice: bestPrice,
-        reasoning: parsed.best?.reasoning || "",
-        flooredToBase: bestPrice === currentPrices.best
-      },
-      overallAssessment: parsed.overallAssessment || "",
-      confidence: parsed.confidence || "medium",
-      keyInsight: parsed.keyInsight || "",
-      baselinePrices: { good: currentPrices.good, better: currentPrices.better, best: currentPrices.best }
-    });
-  } catch (error) {
-    console.error("AI pricing suggestion error:", error);
-    return res.status(500).json({ message: "Failed to generate pricing suggestion" });
-  }
-});
-router18.post("/ai/walkthrough-extract", requireAuth, requireGrowth, async (req, res) => {
-  try {
-    const rawInput = req.body.description || req.body.notes || "";
-    const description = sanitizeAndLog(
-      typeof rawInput === "string" ? rawInput.trim() : "",
-      req.session.userId,
-      "walkthrough-extract"
-    );
-    if (!description) {
-      return res.status(400).json({ message: "A job description is required" });
-    }
-    const business = await getBusinessByOwner(req.session.userId);
-    if (business) {
-      try {
-        await createAnalyticsEvent({
-          businessId: business.id,
-          eventName: "walkthrough_analysis_started",
-          properties: { descriptionLength: description.length }
-        });
-      } catch (_e) {
-      }
-    }
-    const systemPrompt = `You are an expert quoting assistant for residential and commercial cleaning businesses. A cleaning company owner will paste rough notes, walkthrough text, a customer message, or a property description. Your job is to extract all useful quoting details and return a structured JSON response.
-
-You understand cleaning-industry terminology:
-- "first-time clean" or "initial clean" \u2192 isFirstTimeClean: true, often implies deep clean
-- "maintenance clean" or "recurring" \u2192 standard recurring service
-- "deep clean" \u2192 isDeepClean: true, serviceCategory: "deep"
-- "move-in" / "move-out" / "vacant" \u2192 isMoveInOut: true, serviceCategory: "move-in-out"
-- "biweekly" / "every two weeks" \u2192 frequency: "bi-weekly"
-- "very dirty" / "hasn't been cleaned in months" / "heavy buildup" \u2192 conditionLevel: "heavy" or "extreme"
-- "light" / "pretty clean" / "just needs a touch-up" \u2192 conditionLevel: "light"
-- "inside fridge" / "inside oven" \u2192 add to addOns
-- "Airbnb" / "turnover clean" / "short-term rental" \u2192 note in serviceNotes, may be recurring one-time
-- "salon" / "office" / "boutique" / "medical" / "restaurant" \u2192 isCommercial: true, set propertyType
-
-Return ONLY a valid JSON object with this exact structure:
-{
-  "extractedFields": {
-    "propertyType": "house" | "apartment" | "condo" | "townhouse" | "office" | "retail" | "medical" | "restaurant" | "gym" | "airbnb" | "other" | null,
-    "serviceCategory": "standard" | "deep" | "move-in-out" | "post-construction" | "recurring" | "one-time" | null,
-    "isCommercial": boolean,
-    "bedrooms": number | null,
-    "bathrooms": number | null,
-    "halfBaths": number | null,
-    "sqft": number | null,
-    "occupants": number | null,
-    "frequency": "one-time" | "weekly" | "bi-weekly" | "monthly" | null,
-    "isFirstTimeClean": boolean,
-    "isDeepClean": boolean,
-    "isMoveInOut": boolean,
-    "petCount": number | null,
-    "petType": "dog" | "cat" | "both" | "other" | "none" | null,
-    "petShedding": boolean | null,
-    "addOns": string[],
-    "conditionLevel": "light" | "moderate" | "heavy" | "extreme" | null,
-    "conditionReasoning": string | null,
-    "urgency": "normal" | "rush" | "flexible" | null,
-    "customerName": string | null,
-    "address": string | null,
-    "serviceNotes": string | null
-  },
-  "missingFields": string[],
-  "recommendations": string[],
-  "serviceReasoning": string,
-  "assumptions": string[],
-  "confidence": "high" | "medium" | "low"
-}
-
-Field rules:
-- Use null for any field not mentioned or inferable. Never guess without strong signal.
-- isFirstTimeClean / isDeepClean / isMoveInOut default to false if not mentioned.
-- isCommercial defaults to false.
-- addOns: use plain English strings like "inside oven", "inside fridge", "window cleaning", "laundry", "organizing", "baseboards", "blinds", "carpet cleaning", "wall washing", "garage", "pet hair treatment".
-- missingFields: list what a cleaner would need to finalize a quote but couldn't determine, e.g. ["square footage", "service frequency", "cleaning type"].
-- recommendations: 1-3 short, practical suggestions for the cleaner, e.g. "First-time deep clean recommended given language about dirtiness", "Ask about preferred recurring schedule after initial clean".
-- serviceReasoning: one sentence explaining why you chose the serviceCategory you did.
-- assumptions: list any inferences you made that aren't explicitly stated.
-- confidence: high = most key fields filled, medium = some gaps, low = very sparse.
-- NEVER include prices, costs, rates, or dollar amounts.`;
-    let aiContent;
-    try {
-      const { content: raw } = await callAI(
-        [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: description }
-        ],
-        {
-          responseFormat: "json_object",
-          userId: req.session.userId,
-          route: "walkthrough-extract"
-        }
-      );
-      aiContent = raw;
-    } catch (aiError) {
-      console.error("Walkthrough AI call failed:", aiError?.message || aiError);
-      return res.status(503).json({ message: "AI service is temporarily unavailable. Please try again in a moment." });
-    }
-    const content = aiContent;
-    if (!content) {
-      console.error("Walkthrough AI empty response");
-      return res.status(500).json({ message: "AI returned an empty response. Please try again." });
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      console.error("Walkthrough AI JSON parse failed:", content?.slice(0, 200));
-      return res.status(500).json({ message: "AI response could not be parsed. Please try again." });
-    }
-    const extractedFields = parsed.extractedFields || {};
-    const missingFields = Array.isArray(parsed.missingFields) ? parsed.missingFields : [];
-    const recommendations = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
-    const serviceReasoning = typeof parsed.serviceReasoning === "string" ? parsed.serviceReasoning : "";
-    const assumptions = Array.isArray(parsed.assumptions) ? parsed.assumptions : [];
-    const confidence = ["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low";
-    if (business) {
-      try {
-        await createAnalyticsEvent({
-          businessId: business.id,
-          eventName: "walkthrough_analysis_completed",
-          properties: {
-            confidence,
-            isCommercial: extractedFields.isCommercial || false,
-            propertyType: extractedFields.propertyType || "unknown",
-            assumptionCount: assumptions.length
-          }
-        });
-      } catch (_e) {
-      }
-    }
-    return res.json({
-      extractedFields,
-      missingFields,
-      recommendations,
-      serviceReasoning,
-      assumptions,
-      confidence
-    });
-  } catch (error) {
-    console.error("AI walkthrough extract error:", error);
-    return res.status(500).json({ message: "Failed to analyze the job description. Please try again." });
-  }
-});
-router18.post("/ai/closing-message", requireAuth, requireGrowth, async (req, res) => {
+router22.post("/ai/closing-message", requireAuth, requireGrowth, async (req, res) => {
   try {
     const {
       objectionText,
@@ -21881,7 +23286,7 @@ ${contextParts.join("\n")}` : `Generate a sample price objection response with a
     return res.status(500).json({ message: "Failed to generate reply. Please try again." });
   }
 });
-router18.post("/ai/objection-extract", requireAuth, requireGrowth, async (req, res) => {
+router22.post("/ai/objection-extract", requireAuth, requireGrowth, async (req, res) => {
   try {
     const { imageBase64: imageBase642, mimeType } = req.body;
     if (!imageBase642) return res.status(400).json({ message: "Image is required" });
@@ -21913,353 +23318,18 @@ router18.post("/ai/objection-extract", requireAuth, requireGrowth, async (req, r
     return res.status(500).json({ message: "Could not extract text from image. Please type the message manually." });
   }
 });
-router18.post("/ai/communication-draft", requireAuth, requireGrowth, async (req, res) => {
-  try {
-    const { type, quoteDetails, bookingLink, quoteLink, paymentMethodsText, language: commLang } = req.body;
-    const purpose = sanitizeAndLog(req.body.purpose || "", req.session.userId, "communication-draft-purpose");
-    const customerName = sanitizeAndLog(req.body.customerName || "", req.session.userId, "communication-draft-customer");
-    const companyName2 = sanitizeAndLog(req.body.companyName || "", req.session.userId, "communication-draft-company");
-    const senderName = sanitizeAndLog(req.body.senderName || "", req.session.userId, "communication-draft-sender");
-    if (!type || !purpose) {
-      return res.status(400).json({ message: "type and purpose are required" });
-    }
-    const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
-    const quoteContext = quoteDetails ? ` Quote: ${quoteDetails.selectedOption || "Cleaning"} $${quoteDetails.price || ""}. ${quoteDetails.scope || ""}. ${quoteDetails.propertyInfo || ""}.` : "";
-    let systemPrompt;
-    let userPrompt2;
-    const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
-    const langInstruction = commLang === "es" ? " Write entirely in Spanish." : " Write entirely in English.";
-    if (type === "sms") {
-      systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
-      userPrompt2 = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
-    } else {
-      systemPrompt = `Write a short professional email (under 150 words) for "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Do NOT include the raw URL in the email body. Instead, write a sentence like "You can view and accept your quote by clicking the link below." A styled button with the link will be automatically added after your email.` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
-      userPrompt2 = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
-    }
-    const content = await generateText({
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt2 }],
-      maxTokens: type === "sms" ? 100 : 250
-    });
-    if (!content) {
-      return res.status(500).json({ message: "No response from AI" });
-    }
-    let draft = content.trim();
-    if (draft.startsWith('"') && draft.endsWith('"')) {
-      draft = draft.slice(1, -1);
-    }
-    if (draft.startsWith("{")) {
-      try {
-        const parsed = JSON.parse(draft);
-        draft = parsed.draft || content;
-      } catch {
-      }
-    }
-    draft = draft.replace(/\\n/g, "\n");
-    return res.json({ draft });
-  } catch (error) {
-    console.error("AI communication draft error:", error);
-    return res.status(500).json({ message: "Failed to generate communication draft" });
-  }
-});
-router18.post("/ai/generate-campaign-content", requireAuth, async (req, res) => {
-  try {
-    const business = await getBusinessByOwner(req.session.userId);
-    if (!business) return res.status(404).json({ message: "Business not found" });
-    const { campaignName, segment, customPrompt, useAI } = req.body;
-    const businessName = business.companyName || "our cleaning company";
-    const ownerName = business.senderName || business.companyName || "Your cleaning team";
-    const signOff2 = ownerName;
-    const instantTemplates = {
-      "Holiday Deep Clean": {
-        subject: `Holiday Deep Clean - ${businessName}`,
-        content: `Hi [Customer],
+var agentAI_default = router22;
 
-The holidays are almost here! Let ${businessName} get your home guest-ready with a thorough deep clean.
-
-We'll tackle kitchens, bathrooms, and living spaces so every room sparkles for your gatherings.
-
-Reply to book and we'll schedule at your convenience.
-
-Best regards,
-${signOff2}`
-      },
-      "Spring Cleaning Special": {
-        subject: `Spring Cleaning Special - ${businessName}`,
-        content: `Hi [Customer],
-
-Spring is here! Time to refresh your home after winter with a deep clean from ${businessName}.
-
-We'll dust, scrub, and polish every corner so your space feels brand new for the warmer months.
-
-Reply to book your spring cleaning today.
-
-Best regards,
-${signOff2}`
-      },
-      "New Year Fresh Start": {
-        subject: `Start the New Year Fresh - ${businessName}`,
-        content: `Hi [Customer],
-
-Happy New Year! Start fresh with a spotless home from ${businessName}.
-
-A clean home sets the tone for a great year ahead. Let us handle the deep clean so you can focus on your goals.
-
-Reply to book and kick off the year right.
-
-Best regards,
-${signOff2}`
-      },
-      "Back to School Clean": {
-        subject: `Back to School Clean - ${businessName}`,
-        content: `Hi [Customer],
-
-School is starting! Get your home refreshed after a busy summer with ${businessName}.
-
-We'll deep clean every room so your family can settle into a clean, organized routine.
-
-Reply to book your back-to-school cleaning.
-
-Best regards,
-${signOff2}`
-      },
-      "Win Back Lost Leads": {
-        subject: `We'd Love to Hear from You - ${businessName}`,
-        content: `Hi [Customer],
-
-It's been a while since we connected. We'd love the chance to earn your business at ${businessName}.
-
-Whether your needs have changed or you're ready for a fresh quote, we're here to help.
-
-Reply to this email and we'll get you taken care of.
-
-Best regards,
-${signOff2}`
-      },
-      "VIP Customer Appreciation": {
-        subject: `Thank You from ${businessName}`,
-        content: `Hi [Customer],
-
-Thank you for being a valued customer of ${businessName}. We truly appreciate your continued trust.
-
-As a loyal client, we'd love to offer you priority booking for your next cleaning.
-
-Reply to book and we'll schedule you at your preferred time.
-
-Warm regards,
-${signOff2}`
-      }
-    };
-    if (!useAI && !customPrompt?.trim() && instantTemplates[campaignName]) {
-      const template = instantTemplates[campaignName];
-      return res.json({ content: template.content, subject: template.subject, channel: "email" });
-    }
-    const targetDesc = segment === "dormant" ? "past customers who haven't booked in a while" : segment === "lost" ? "leads whose quotes expired" : "customers";
-    const customInstruction = customPrompt?.trim() ? ` Focus: ${customPrompt.trim()}.` : "";
-    const campaignLangInstruction = getLangInstruction(business.commLanguage);
-    const systemPrompt = `Write a short marketing email for "${businessName}" (${ownerName}) to ${targetDesc}. Theme: "${campaignName}".${customInstruction} Rules: first line "Subject: ..." then blank line then body under 60 words in 3 short paragraphs. Use [Customer] as name. Sign off as ${signOff2}. No links, no emojis. End with "Reply to book".${campaignLangInstruction}`;
-    let raw = "";
-    try {
-      const { content: aiRaw } = await callAI(
-        [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: "Write the email." }
-        ],
-        { userId: req.session.userId, route: "generate-campaign-content" }
-      );
-      raw = aiRaw;
-    } catch (aiErr) {
-      console.error("AI campaign content error:", aiErr?.message || aiErr);
-    }
-    if (!raw) {
-      const fallback = instantTemplates[campaignName] || { content: `Hi [Customer],
-
-We wanted to reach out from ${businessName} about our ${campaignName} offer.
-
-We'd love to serve you${segment === "dormant" ? " again" : ""}. Reply to schedule your next cleaning.
-
-Best regards,
-${signOff2}`, subject: campaignName };
-      return res.json({ content: fallback.content, subject: fallback.subject, channel: "email" });
-    }
-    let subject = "";
-    let content = raw;
-    const subjectMatch = raw.match(/^Subject:\s*(.+)/i);
-    if (subjectMatch) {
-      subject = subjectMatch[1].trim();
-      content = raw.substring(raw.indexOf("\n") + 1).trim();
-    }
-    return res.json({ content, subject: subject || campaignName, channel: "email" });
-  } catch (error) {
-    console.error("AI generate campaign content error:", error?.message || error, error?.code, error?.status);
-    return res.status(500).json({ message: "Failed to generate campaign content" });
-  }
-});
-router18.post("/ai/generate-review-email", requireAuth, async (req, res) => {
-  try {
-    const business = await getBusinessByOwner(req.session.userId);
-    if (!business) return res.status(404).json({ message: "Business not found" });
-    const businessName = business.companyName || "our cleaning company";
-    const ownerName = business.senderName || "";
-    const growthSettings = await getGrowthAutomationSettings(business.id);
-    const googleReviewLink = growthSettings?.googleReviewLink?.trim() || "";
-    const linkInstruction = googleReviewLink ? `Include this Google review link in the email naturally: ${googleReviewLink} \u2014 encourage them to click it to leave a review.` : `No links/URLs. Ask them to reply with their feedback or leave a review.`;
-    const reviewLangInstruction = getLangInstruction(business.commLanguage);
-    const systemPrompt = `Write a short, warm email from "${businessName}"${ownerName ? ` (${ownerName})` : ""} asking a customer for a review of their cleaning service. Format: first line "Subject: ...", blank line, then body under 100 words. Use [Customer] for their name. No placeholders for company/owner - use real names. ${linkInstruction} No emojis. Keep it personal and genuine.${reviewLangInstruction}`;
-    let rawReview = "";
-    try {
-      const { content: aiRaw } = await callAI(
-        [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: "Generate a review request email." }
-        ],
-        { maxTokens: 250, userId: req.session.userId, route: "generate-review-email" }
-      );
-      rawReview = aiRaw;
-    } catch (aiErr) {
-      console.error("AI generate review email error:", aiErr?.message || aiErr);
-    }
-    const raw = rawReview;
-    let subject = "";
-    let content = raw;
-    if (raw.startsWith("Subject:")) {
-      const lines = raw.split("\n");
-      subject = lines[0].replace("Subject:", "").trim();
-      content = lines.slice(1).join("\n").trim();
-    }
-    const fallbackLink = googleReviewLink ? `
-
-Leave us a review here: ${googleReviewLink}` : "";
-    if (!content) {
-      return res.json({
-        content: `Dear [Customer],
-
-Thank you for choosing ${businessName}. We hope you were happy with our service.
-
-Would you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.${fallbackLink}
-
-We appreciate your time!
-
-Best regards,
-${ownerName || businessName}`,
-        subject: "We would love your feedback",
-        channel: "email"
-      });
-    }
-    return res.json({ content, subject, channel: "email" });
-  } catch (error) {
-    console.error("AI generate review email error:", error?.message || error);
-    const business = await getBusinessByOwner(req.session.userId).catch(() => null);
-    const businessName = business?.companyName || "our cleaning company";
-    const ownerName = business?.senderName || businessName;
-    let fallbackLink = "";
-    try {
-      if (business) {
-        const gs = await getGrowthAutomationSettings(business.id);
-        if (gs?.googleReviewLink?.trim()) fallbackLink = `
-
-Leave us a review here: ${gs.googleReviewLink.trim()}`;
-      }
-    } catch {
-    }
-    return res.json({
-      content: `Dear [Customer],
-
-Thank you for choosing ${businessName}. We hope you were happy with our service.
-
-Would you take a moment to share your experience? Your feedback helps us improve and means a lot to our team.${fallbackLink}
-
-We appreciate your time!
-
-Best regards,
-${ownerName}`,
-      subject: "We would love your feedback",
-      channel: "email"
-    });
-  }
-});
-router18.post("/ai/generate-message", requireAuth, async (req, res) => {
-  try {
-    const { channel, total, status, quoteLink, bookingLink, paymentMethodsText, language: commLang, quoteId } = req.body;
-    const purpose = sanitizeAndLog(req.body.purpose || "", req.session.userId, "generate-message-purpose");
-    const customerName = sanitizeAndLog(req.body.customerName || "", req.session.userId, "generate-message-customer");
-    const companyName2 = sanitizeAndLog(req.body.companyName || "", req.session.userId, "generate-message-company");
-    const senderName = sanitizeAndLog(req.body.senderName || "", req.session.userId, "generate-message-sender");
-    const msgType = channel || "sms";
-    const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
-    const genMsgBusiness = await getBusinessByOwner(req.session.userId);
-    const paymentInfo = paymentMethodsText ? ` Mention accepted payment methods: ${paymentMethodsText}.` : "";
-    const langInstruction = getLangInstruction(commLang || genMsgBusiness?.commLanguage);
-    let quotePackageContext = "";
-    let quoteRecommendedName = "";
-    if (purpose === "send_quote" && quoteId) {
-      try {
-        const quoteData = await getQuoteById(quoteId);
-        if (quoteData) {
-          const opts = quoteData.options || {};
-          const recKey = quoteData.recommendedOption || "better";
-          const tierLines = ["good", "better", "best"].filter((k) => opts[k] !== void 0).map((k) => {
-            const o = opts[k];
-            const name = o.name || o.serviceTypeName || k.charAt(0).toUpperCase() + k.slice(1);
-            const price = Number(o.price || 0);
-            const isRec = k === recKey;
-            if (isRec) quoteRecommendedName = name;
-            return `${name}: $${price.toFixed(0)}${isRec ? " (recommended)" : ""}`;
-          });
-          if (tierLines.length > 0) {
-            quotePackageContext = ` The quote includes ${tierLines.length} packages: ${tierLines.join(", ")}.`;
-          }
-        }
-      } catch {
-      }
-    }
-    const quoteContext = quotePackageContext || (total ? ` Quote total: $${total}.` : "");
-    let systemPrompt;
-    let userPrompt2;
-    if (msgType === "sms") {
-      systemPrompt = `Write a short SMS (under 160 chars) for a cleaning company called "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. Be friendly but brief.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Include this quote link for the customer to view and accept: ${quoteLink}` : ""}${langInstruction}`;
-      userPrompt2 = `SMS for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the message text, nothing else.`;
-    } else if (purpose === "send_quote") {
-      systemPrompt = `Write a short professional email (under 160 words) for "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis. IMPORTANT: Do NOT mention specific dollar amounts \u2014 the email will include clickable pricing cards below showing each package with its price. Instead, mention the package names and invite the customer to choose. Do NOT include any URLs in the body \u2014 a styled quote button is added automatically. Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
-      userPrompt2 = `Write a quote delivery email to ${customerName || "the customer"}.${quoteContext}${quoteRecommendedName ? ` Highlight the recommended package "${quoteRecommendedName}" by name.` : ""} The email should: greet ${customerName || "them"} by name, let them know their quote has multiple cleaning packages to choose from (pricing cards will appear below), invite them to reply with questions, sign off warmly from ${senderName || "the team"}.${paymentInfo} Reply with ONLY the email.`;
-    } else {
-      systemPrompt = `Write a short professional email (under 150 words) for "${companyName2 || "our company"}". Sign as "${senderName || "Team"}". No hours/time estimates. No emojis.${bookingLink ? ` Include link: ${bookingLink}` : ""}${quoteLink ? ` Do NOT include the raw URL in the email body. Instead, write a sentence like "You can view and accept your quote by clicking the link below." A styled button with the link will be automatically added after your email.` : ""} Start with "Subject: " on line 1, blank line, then body.${langInstruction}`;
-      userPrompt2 = `Email for ${purposeInstruction}. Customer: ${customerName || "Customer"}.${quoteContext}${paymentInfo} Reply with ONLY the email, nothing else.`;
-    }
-    let draft = "";
-    try {
-      const { content: aiDraft } = await callAI(
-        [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt2 }
-        ],
-        {
-          maxTokens: msgType === "sms" ? 100 : 250,
-          userId: req.session.userId,
-          route: "generate-message"
-        }
-      );
-      draft = aiDraft;
-    } catch (aiErr) {
-      console.error("AI generate message error:", aiErr?.message || aiErr);
-      return res.status(503).json({ message: "AI is temporarily unavailable. Please try again." });
-    }
-    if (draft.startsWith('"') && draft.endsWith('"')) draft = draft.slice(1, -1);
-    if (draft.startsWith("{")) {
-      try {
-        const p2 = JSON.parse(draft);
-        draft = p2.draft || p2.message || draft;
-      } catch {
-      }
-    }
-    draft = draft.replace(/\\n/g, "\n");
-    return res.json({ message: draft, draft });
-  } catch (error) {
-    console.error("AI generate message error:", error);
-    return res.status(500).json({ message: "Failed to generate message" });
-  }
-});
-router18.post("/lead-finder/leads/:id/generate-replies", requireAuth, async (req, res) => {
+// server/routers/ai/growthAI.ts
+init_db();
+import { Router as Router25 } from "express";
+import { eq as eq12, desc as desc10 } from "drizzle-orm";
+init_ai_service();
+init_aiClient();
+init_storage();
+init_schema();
+var router23 = Router25();
+router23.post("/lead-finder/leads/:id/generate-replies", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const business = await getBusinessByOwner(req.session.userId);
@@ -22303,7 +23373,7 @@ router18.post("/lead-finder/leads/:id/generate-replies", requireAuth, async (req
     return res.status(500).json({ message: "Failed to generate replies" });
   }
 });
-router18.post("/ai/win-loss-insight", requireAuth, requireGrowth, async (req, res) => {
+router23.post("/ai/win-loss-insight", requireAuth, requireGrowth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const bizResult = await pool.query(
@@ -22314,15 +23384,13 @@ router18.post("/ai/win-loss-insight", requireAuth, requireGrowth, async (req, re
       return res.status(404).json({ message: "Business not found" });
     }
     const { id: businessId, name: businessName } = bizResult.rows[0];
-    const { winLossResponses: winLossResponses2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq15, isNotNull: isNotNull9, desc: desc13 } = await import("drizzle-orm");
     const rows = await db.select({
-      reasonCategory: winLossResponses2.reasonCategory,
-      competitorMentioned: winLossResponses2.competitorMentioned,
-      reason: winLossResponses2.reason
-    }).from(winLossResponses2).where(
-      eq15(winLossResponses2.businessId, businessId)
-    ).orderBy(desc13(winLossResponses2.createdAt)).limit(30);
+      reasonCategory: winLossResponses.reasonCategory,
+      competitorMentioned: winLossResponses.competitorMentioned,
+      reason: winLossResponses.reason
+    }).from(winLossResponses).where(
+      eq12(winLossResponses.businessId, businessId)
+    ).orderBy(desc10(winLossResponses.createdAt)).limit(30);
     const responded = rows.filter((r) => r.reasonCategory && r.reasonCategory !== "no_response_yet");
     if (responded.length < 2) {
       return res.json({
@@ -22353,120 +23421,20 @@ router18.post("/ai/win-loss-insight", requireAuth, requireGrowth, async (req, re
     return res.status(500).json({ message: "Failed to generate insight" });
   }
 });
-var photoUpload = multer2({
-  storage: multer2.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Invalid file type. Only JPEG, PNG, WEBP, and HEIC images are accepted."));
-  }
-});
-router18.post(
-  "/ai/photo-to-quote",
-  requireAuth,
-  photoUpload.single("photo"),
-  async (req, res) => {
-    try {
-      const user = await getUserById(req.session.userId);
-      if (!user) return res.status(401).json({ message: "Not found" });
-      const tier = user.subscriptionTier ?? "free";
-      const used = user.photoQuotesUsedThisMonth ?? 0;
-      const limits = { free: 0, starter: 3, growth: 20, pro: Infinity };
-      const limit = limits[tier] ?? 0;
-      if (used >= limit) {
-        const upgradeMsg = tier === "free" ? "Photo-to-Quote requires a Starter plan or higher." : tier === "starter" ? "You've used all 3 photo quotes this month. Upgrade to Growth for 20/month." : `You've used all ${limit} photo quotes this month. Upgrade to Pro for unlimited.`;
-        return res.status(403).json({
-          error: "limit_reached",
-          message: upgradeMsg,
-          used,
-          limit,
-          upgradeUrl: "/pricing"
-        });
-      }
-      if (!req.file) {
-        return res.status(400).json({ message: "No photo uploaded." });
-      }
-      const { buffer, mimetype } = req.file;
-      const propertyType = req.body.propertyType || "residential";
-      const base64 = buffer.toString("base64");
-      const mediaType = mimetype === "image/heic" || mimetype === "image/heif" ? "image/jpeg" : mimetype;
-      const visionResponse = await anthropic.messages.create({
-        model: MODEL,
-        max_tokens: 800,
-        system: "You are an expert cleaning estimator with 20 years experience. Analyze photos and estimate cleaning requirements accurately. Always respond with valid JSON only \u2014 no markdown, no explanation.",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: mediaType,
-                  data: base64
-                }
-              },
-              {
-                type: "text",
-                text: `Analyze this photo of a ${propertyType} space to be cleaned. Estimate:
-1. Space type (bedroom, bathroom, kitchen, living room, office, etc.)
-2. Approximate square footage
-3. Cleanliness level (light/standard/deep clean needed) \u2014 be specific about what you see
-4. Estimated cleaning time in hours (give a range)
-5. Suggested price range in USD based on US ${propertyType} cleaning rates ($25-45/hr)
-6. Key observations (pet hair, clutter level, surface types visible)
+var growthAI_default = router23;
 
-Respond ONLY with valid JSON in this exact format:
-{
-  "spaceType": string,
-  "estimatedSqft": number,
-  "cleanLevel": "light" | "standard" | "deep",
-  "timeRangeHours": { "min": number, "max": number },
-  "priceRange": { "min": number, "max": number },
-  "observations": string[],
-  "confidence": "low" | "medium" | "high"
-}`
-              }
-            ]
-          }
-        ]
-      });
-      const rawText = visionResponse.content[0].text?.trim() ?? "";
-      const jsonText = rawText.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "");
-      let parsed;
-      try {
-        parsed = JSON.parse(jsonText);
-      } catch {
-        console.error("[photo-to-quote] Invalid JSON from Claude:", rawText.slice(0, 200));
-        return res.status(500).json({ message: "AI returned an unexpected response. Please try again." });
-      }
-      await pool.query(
-        "UPDATE users SET photo_quotes_used_this_month = photo_quotes_used_this_month + 1 WHERE id = $1",
-        [user.id]
-      );
-      await trackEvent(user.id, "PHOTO_TO_QUOTE_USED", {
-        spaceType: parsed.spaceType,
-        cleanLevel: parsed.cleanLevel,
-        confidence: parsed.confidence,
-        propertyType
-      });
-      return res.json(parsed);
-    } catch (err) {
-      if (err.message?.includes("Invalid file type")) {
-        return res.status(400).json({ message: err.message });
-      }
-      console.error("[photo-to-quote] error:", err?.message || err);
-      return res.status(500).json({ message: "Failed to analyze photo. Please try again." });
-    }
-  }
-);
-var aiRouter_default = router18;
+// server/routers/ai/index.ts
+var router24 = Router26();
+router24.use("/", quotingAI_default);
+router24.use("/", messagingAI_default);
+router24.use("/", agentAI_default);
+router24.use("/", growthAI_default);
+var ai_default = router24;
 
 // server/routers/automationsRouter.ts
 init_db();
-import { Router as Router21 } from "express";
-import { eq as eq13, and as and12, desc as desc11 } from "drizzle-orm";
+import { Router as Router27 } from "express";
+import { eq as eq14, and as and12, desc as desc12 } from "drizzle-orm";
 init_clients();
 init_storage();
 init_schema();
@@ -22474,30 +23442,30 @@ init_schema();
 // server/social-storage.ts
 init_db();
 init_schema();
-import { eq as eq12, and as and11, desc as desc10, asc as asc10, gte as gte11 } from "drizzle-orm";
+import { eq as eq13, and as and11, desc as desc11, asc as asc10, gte as gte11 } from "drizzle-orm";
 async function getChannelConnectionsByBusiness(businessId) {
-  return db.select().from(channelConnections).where(eq12(channelConnections.businessId, businessId)).orderBy(desc10(channelConnections.updatedAt));
+  return db.select().from(channelConnections).where(eq13(channelConnections.businessId, businessId)).orderBy(desc11(channelConnections.updatedAt));
 }
 async function getChannelConnectionByChannel(businessId, channel) {
-  const [c] = await db.select().from(channelConnections).where(and11(eq12(channelConnections.businessId, businessId), eq12(channelConnections.channel, channel)));
+  const [c] = await db.select().from(channelConnections).where(and11(eq13(channelConnections.businessId, businessId), eq13(channelConnections.channel, channel)));
   return c;
 }
 async function upsertChannelConnection(businessId, channel, data) {
   const existing = await getChannelConnectionByChannel(businessId, channel);
   if (existing) {
-    const [c2] = await db.update(channelConnections).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq12(channelConnections.id, existing.id)).returning();
+    const [c2] = await db.update(channelConnections).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq13(channelConnections.id, existing.id)).returning();
     return c2;
   }
   const [c] = await db.insert(channelConnections).values({ businessId, channel, ...data }).returning();
   return c;
 }
 async function deleteChannelConnection(id) {
-  await db.delete(channelConnections).where(eq12(channelConnections.id, id));
+  await db.delete(channelConnections).where(eq13(channelConnections.id, id));
 }
 async function getConversationsByBusiness(businessId, opts) {
-  const conditions = [eq12(socialConversations.businessId, businessId)];
-  if (opts?.channel) conditions.push(eq12(socialConversations.channel, opts.channel));
-  let query = db.select().from(socialConversations).where(and11(...conditions)).orderBy(desc10(socialConversations.lastMessageAt));
+  const conditions = [eq13(socialConversations.businessId, businessId)];
+  if (opts?.channel) conditions.push(eq13(socialConversations.channel, opts.channel));
+  let query = db.select().from(socialConversations).where(and11(...conditions)).orderBy(desc11(socialConversations.lastMessageAt));
   if (opts?.limit) return query.limit(opts.limit);
   return query;
 }
@@ -22515,11 +23483,11 @@ async function createConversation(data) {
   return c;
 }
 async function updateConversation(id, data) {
-  const [c] = await db.update(socialConversations).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq12(socialConversations.id, id)).returning();
+  const [c] = await db.update(socialConversations).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq13(socialConversations.id, id)).returning();
   return c;
 }
 async function getMessagesByConversation(conversationId) {
-  return db.select().from(socialMessages).where(eq12(socialMessages.conversationId, conversationId)).orderBy(asc10(socialMessages.createdAt));
+  return db.select().from(socialMessages).where(eq13(socialMessages.conversationId, conversationId)).orderBy(asc10(socialMessages.createdAt));
 }
 async function createMessage(data) {
   const [m] = await db.insert(socialMessages).values({
@@ -22536,13 +23504,13 @@ async function createMessage(data) {
   return m;
 }
 async function getSocialLeadsByBusiness(businessId, opts) {
-  const conditions = [eq12(socialLeads.businessId, businessId)];
-  if (opts?.channel) conditions.push(eq12(socialLeads.channel, opts.channel));
-  if (opts?.status) conditions.push(eq12(socialLeads.status, opts.status));
-  return db.select().from(socialLeads).where(and11(...conditions)).orderBy(desc10(socialLeads.createdAt));
+  const conditions = [eq13(socialLeads.businessId, businessId)];
+  if (opts?.channel) conditions.push(eq13(socialLeads.channel, opts.channel));
+  if (opts?.status) conditions.push(eq13(socialLeads.status, opts.status));
+  return db.select().from(socialLeads).where(and11(...conditions)).orderBy(desc11(socialLeads.createdAt));
 }
 async function getSocialLeadById(id) {
-  const [l] = await db.select().from(socialLeads).where(eq12(socialLeads.id, id));
+  const [l] = await db.select().from(socialLeads).where(eq13(socialLeads.id, id));
   return l;
 }
 async function createSocialLead2(data) {
@@ -22562,7 +23530,7 @@ async function createSocialLead2(data) {
   return l;
 }
 async function updateSocialLead(id, data) {
-  const [l] = await db.update(socialLeads).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq12(socialLeads.id, id)).returning();
+  const [l] = await db.update(socialLeads).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq13(socialLeads.id, id)).returning();
   return l;
 }
 async function createAttributionEvent2(data) {
@@ -22577,36 +23545,36 @@ async function createAttributionEvent2(data) {
   return e;
 }
 async function getAttributionEventsByBusiness(businessId, opts) {
-  const conditions = [eq12(attributionEvents.businessId, businessId)];
-  if (opts?.channel) conditions.push(eq12(attributionEvents.channel, opts.channel));
+  const conditions = [eq13(attributionEvents.businessId, businessId)];
+  if (opts?.channel) conditions.push(eq13(attributionEvents.channel, opts.channel));
   if (opts?.days) {
     const since = /* @__PURE__ */ new Date();
     since.setDate(since.getDate() - opts.days);
     conditions.push(gte11(attributionEvents.createdAt, since));
   }
-  return db.select().from(attributionEvents).where(and11(...conditions)).orderBy(desc10(attributionEvents.createdAt));
+  return db.select().from(attributionEvents).where(and11(...conditions)).orderBy(desc11(attributionEvents.createdAt));
 }
 async function getSocialAutomationSettings(businessId) {
-  const [s] = await db.select().from(socialAutomationSettings).where(eq12(socialAutomationSettings.businessId, businessId));
+  const [s] = await db.select().from(socialAutomationSettings).where(eq13(socialAutomationSettings.businessId, businessId));
   return s;
 }
 async function upsertSocialAutomationSettings(businessId, data) {
   const existing = await getSocialAutomationSettings(businessId);
   if (existing) {
-    const [s2] = await db.update(socialAutomationSettings).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq12(socialAutomationSettings.id, existing.id)).returning();
+    const [s2] = await db.update(socialAutomationSettings).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq13(socialAutomationSettings.id, existing.id)).returning();
     return s2;
   }
   const [s] = await db.insert(socialAutomationSettings).values({ businessId, ...data }).returning();
   return s;
 }
 async function getSocialOptOutsByBusiness(businessId) {
-  return db.select().from(socialOptOuts).where(eq12(socialOptOuts.businessId, businessId)).orderBy(desc10(socialOptOuts.createdAt));
+  return db.select().from(socialOptOuts).where(eq13(socialOptOuts.businessId, businessId)).orderBy(desc11(socialOptOuts.createdAt));
 }
 async function getSocialStats(businessId, days = 30) {
   const since = /* @__PURE__ */ new Date();
   since.setDate(since.getDate() - days);
-  const leads = await db.select().from(socialLeads).where(and11(eq12(socialLeads.businessId, businessId), gte11(socialLeads.createdAt, since)));
-  const conversations = await db.select().from(socialConversations).where(and11(eq12(socialConversations.businessId, businessId), gte11(socialConversations.createdAt, since)));
+  const leads = await db.select().from(socialLeads).where(and11(eq13(socialLeads.businessId, businessId), gte11(socialLeads.createdAt, since)));
+  const conversations = await db.select().from(socialConversations).where(and11(eq13(socialConversations.businessId, businessId), gte11(socialConversations.createdAt, since)));
   const totalLeads = leads.length;
   const quotedLeads = leads.filter((l) => l.quoteId);
   const totalQuotes = quotedLeads.length;
@@ -23134,8 +24102,8 @@ function getBusinessStage(totalQuotesSent) {
 }
 
 // server/routers/automationsRouter.ts
-var router19 = Router21();
-router19.get("/automations", requireAuth, async (req, res) => {
+var router25 = Router27();
+router25.get("/automations", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23145,7 +24113,7 @@ router19.get("/automations", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get automation rules" });
   }
 });
-router19.put("/automations", requireAuth, async (req, res) => {
+router25.put("/automations", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23155,7 +24123,7 @@ router19.put("/automations", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update automation rules" });
   }
 });
-router19.get("/social/connections", requireAuth, async (req, res) => {
+router25.get("/social/connections", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23176,7 +24144,7 @@ router19.get("/social/connections", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get connections" });
   }
 });
-router19.post("/social/connections", requireAuth, async (req, res) => {
+router25.post("/social/connections", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23195,7 +24163,7 @@ router19.post("/social/connections", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create connection" });
   }
 });
-router19.delete("/social/connections/:id", requireAuth, async (req, res) => {
+router25.delete("/social/connections/:id", requireAuth, async (req, res) => {
   try {
     await deleteChannelConnection(req.params.id);
     return res.json({ message: "Disconnected" });
@@ -23203,7 +24171,7 @@ router19.delete("/social/connections/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to disconnect" });
   }
 });
-router19.get("/social/automation", requireAuth, async (req, res) => {
+router25.get("/social/automation", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23222,7 +24190,7 @@ router19.get("/social/automation", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get automation settings" });
   }
 });
-router19.put("/social/automation", requireAuth, async (req, res) => {
+router25.put("/social/automation", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23232,7 +24200,7 @@ router19.put("/social/automation", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update automation settings" });
   }
 });
-router19.get("/social/conversations", requireAuth, async (req, res) => {
+router25.get("/social/conversations", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23243,7 +24211,7 @@ router19.get("/social/conversations", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get conversations" });
   }
 });
-router19.get("/social/conversations/:id/messages", requireAuth, async (req, res) => {
+router25.get("/social/conversations/:id/messages", requireAuth, async (req, res) => {
   try {
     const messages = await getMessagesByConversation(req.params.id);
     return res.json(messages);
@@ -23251,7 +24219,7 @@ router19.get("/social/conversations/:id/messages", requireAuth, async (req, res)
     return res.status(500).json({ message: "Failed to get messages" });
   }
 });
-router19.get("/social/leads", requireAuth, async (req, res) => {
+router25.get("/social/leads", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23262,7 +24230,7 @@ router19.get("/social/leads", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get social leads" });
   }
 });
-router19.get("/social/leads/:id", requireAuth, async (req, res) => {
+router25.get("/social/leads/:id", requireAuth, async (req, res) => {
   try {
     const lead = await getSocialLeadById(req.params.id);
     if (!lead) return res.status(404).json({ message: "Lead not found" });
@@ -23271,7 +24239,7 @@ router19.get("/social/leads/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get lead" });
   }
 });
-router19.post("/social/leads", requireAuth, async (req, res) => {
+router25.post("/social/leads", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23289,7 +24257,7 @@ router19.post("/social/leads", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create lead" });
   }
 });
-router19.put("/social/leads/:id", requireAuth, async (req, res) => {
+router25.put("/social/leads/:id", requireAuth, async (req, res) => {
   try {
     const lead = await updateSocialLead(req.params.id, req.body);
     return res.json(lead);
@@ -23297,7 +24265,7 @@ router19.put("/social/leads/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update lead" });
   }
 });
-router19.get("/social/stats", requireAuth, async (req, res) => {
+router25.get("/social/stats", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23308,7 +24276,7 @@ router19.get("/social/stats", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get social stats" });
   }
 });
-router19.get("/social/attribution", requireAuth, async (req, res) => {
+router25.get("/social/attribution", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23319,7 +24287,7 @@ router19.get("/social/attribution", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get attribution events" });
   }
 });
-router19.get("/social/optouts", requireAuth, async (req, res) => {
+router25.get("/social/optouts", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23329,7 +24297,7 @@ router19.get("/social/optouts", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get opt-outs" });
   }
 });
-router19.post("/social/simulate-dm", requireAuth, async (req, res) => {
+router25.post("/social/simulate-dm", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23443,7 +24411,7 @@ Respond with valid JSON only: {"reply": string}`,
     return res.status(500).json({ message: "Failed to simulate DM" });
   }
 });
-router19.post("/social/tiktok-lead", requireAuth, async (req, res) => {
+router25.post("/social/tiktok-lead", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23482,7 +24450,7 @@ router19.post("/social/tiktok-lead", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create TikTok lead" });
   }
 });
-router19.get("/streaks", requireAuth, async (req, res) => {
+router25.get("/streaks", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23493,7 +24461,7 @@ router19.get("/streaks", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get streak" });
   }
 });
-router19.post("/streaks/action", requireAuth, async (req, res) => {
+router25.post("/streaks/action", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23524,7 +24492,7 @@ router19.post("/streaks/action", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update streak" });
   }
 });
-router19.get("/milestones/check", requireAuth, async (req, res) => {
+router25.get("/milestones/check", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23538,7 +24506,7 @@ router19.get("/milestones/check", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to check milestones" });
   }
 });
-router19.post("/milestones/celebrate", requireAuth, async (req, res) => {
+router25.post("/milestones/celebrate", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23550,7 +24518,7 @@ router19.post("/milestones/celebrate", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to record milestone" });
   }
 });
-router19.get("/growth-tasks", requireAuth, async (req, res) => {
+router25.get("/growth-tasks", requireAuth, async (req, res) => {
   if (req.query.mode === "curated") {
     try {
       const business = await getBusinessByOwner(req.session.userId);
@@ -23656,7 +24624,7 @@ router19.get("/growth-tasks", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get growth tasks" });
   }
 });
-router19.get("/growth-tasks/:id", requireAuth, async (req, res) => {
+router25.get("/growth-tasks/:id", requireAuth, async (req, res) => {
   try {
     const task = await getGrowthTaskById(req.params.id);
     if (!task) return res.status(404).json({ message: "Growth task not found" });
@@ -23666,7 +24634,7 @@ router19.get("/growth-tasks/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get growth task" });
   }
 });
-router19.post("/growth-tasks", requireAuth, async (req, res) => {
+router25.post("/growth-tasks", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23691,7 +24659,7 @@ router19.post("/growth-tasks", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create growth task" });
   }
 });
-router19.put("/growth-tasks/:id", requireAuth, async (req, res) => {
+router25.put("/growth-tasks/:id", requireAuth, async (req, res) => {
   try {
     const existing = await getGrowthTaskById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Growth task not found" });
@@ -23712,7 +24680,7 @@ router19.put("/growth-tasks/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update growth task" });
   }
 });
-router19.delete("/growth-tasks/:id", requireAuth, async (req, res) => {
+router25.delete("/growth-tasks/:id", requireAuth, async (req, res) => {
   try {
     const existing = await getGrowthTaskById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Growth task not found" });
@@ -23723,7 +24691,7 @@ router19.delete("/growth-tasks/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to delete growth task" });
   }
 });
-router19.post("/growth-tasks/:id/action", requireAuth, async (req, res) => {
+router25.post("/growth-tasks/:id/action", requireAuth, async (req, res) => {
   try {
     const task = await getGrowthTaskById(req.params.id);
     if (!task) return res.status(404).json({ message: "Growth task not found" });
@@ -23741,7 +24709,7 @@ router19.post("/growth-tasks/:id/action", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to record action" });
   }
 });
-router19.post("/growth-tasks/:id/snooze", requireAuth, async (req, res) => {
+router25.post("/growth-tasks/:id/snooze", requireAuth, async (req, res) => {
   try {
     const task = await getGrowthTaskById(req.params.id);
     if (!task) return res.status(404).json({ message: "Growth task not found" });
@@ -23755,7 +24723,7 @@ router19.post("/growth-tasks/:id/snooze", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to snooze task" });
   }
 });
-router19.get("/review-requests", requireAuth, async (req, res) => {
+router25.get("/review-requests", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23779,7 +24747,7 @@ router19.get("/review-requests", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get review requests" });
   }
 });
-router19.post("/review-requests", requireAuth, async (req, res) => {
+router25.post("/review-requests", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23791,7 +24759,7 @@ router19.post("/review-requests", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create review request" });
   }
 });
-router19.put("/review-requests/:id", requireAuth, async (req, res) => {
+router25.put("/review-requests/:id", requireAuth, async (req, res) => {
   try {
     const { rating, feedbackText, reviewClicked, referralSent } = req.body;
     const updateData = {};
@@ -23812,7 +24780,7 @@ router19.put("/review-requests/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update review request" });
   }
 });
-router19.get("/growth-automation-settings", requireAuth, async (req, res) => {
+router25.get("/growth-automation-settings", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23823,7 +24791,7 @@ router19.get("/growth-automation-settings", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get growth automation settings" });
   }
 });
-router19.put("/growth-automation-settings", requireAuth, async (req, res) => {
+router25.put("/growth-automation-settings", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23840,7 +24808,7 @@ router19.put("/growth-automation-settings", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update growth automation settings" });
   }
 });
-router19.get("/campaigns", requireAuth, async (req, res) => {
+router25.get("/campaigns", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23851,7 +24819,7 @@ router19.get("/campaigns", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get campaigns" });
   }
 });
-router19.post("/campaigns", requireAuth, async (req, res) => {
+router25.post("/campaigns", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23863,7 +24831,7 @@ router19.post("/campaigns", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create campaign" });
   }
 });
-router19.put("/campaigns/:id", requireAuth, async (req, res) => {
+router25.put("/campaigns/:id", requireAuth, async (req, res) => {
   try {
     const existing = await getCampaignById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Campaign not found" });
@@ -23882,7 +24850,7 @@ router19.put("/campaigns/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to update campaign" });
   }
 });
-router19.get("/campaigns/:id/recipients", requireAuth, async (req, res) => {
+router25.get("/campaigns/:id/recipients", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -23922,7 +24890,7 @@ router19.get("/campaigns/:id/recipients", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to get recipients" });
   }
 });
-router19.post("/campaigns/:id/send", requireAuth, async (req, res) => {
+router25.post("/campaigns/:id/send", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -24012,20 +24980,20 @@ router19.post("/campaigns/:id/send", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to send campaign" });
   }
 });
-router19.get("/email-sequences/library", requireAuth, async (_req, res) => {
+router25.get("/email-sequences/library", requireAuth, async (_req, res) => {
   return res.json(BUILT_IN_SEQUENCES);
 });
-router19.get("/email-sequences/enrollments", requireAuth, async (req, res) => {
+router25.get("/email-sequences/enrollments", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
-    const enrollments = await db.select().from(sequenceEnrollments).where(eq13(sequenceEnrollments.businessId, business.id)).orderBy(desc11(sequenceEnrollments.enrolledAt));
+    const enrollments = await db.select().from(sequenceEnrollments).where(eq14(sequenceEnrollments.businessId, business.id)).orderBy(desc12(sequenceEnrollments.enrolledAt));
     return res.json(enrollments);
   } catch (err) {
     return res.status(500).json({ message: "Failed to fetch enrollments" });
   }
 });
-router19.post("/email-sequences/:sequenceId/enroll", requireAuth, async (req, res) => {
+router25.post("/email-sequences/:sequenceId/enroll", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -24041,10 +25009,10 @@ router19.post("/email-sequences/:sequenceId/enroll", requireAuth, async (req, re
       const { customerName, customerEmail, customerId } = contact;
       if (!customerName || !customerEmail) continue;
       const existing = await db.select().from(sequenceEnrollments).where(and12(
-        eq13(sequenceEnrollments.businessId, business.id),
-        eq13(sequenceEnrollments.sequenceId, sequenceId),
-        eq13(sequenceEnrollments.customerEmail, customerEmail),
-        eq13(sequenceEnrollments.status, "active")
+        eq14(sequenceEnrollments.businessId, business.id),
+        eq14(sequenceEnrollments.sequenceId, sequenceId),
+        eq14(sequenceEnrollments.customerEmail, customerEmail),
+        eq14(sequenceEnrollments.status, "active")
       ));
       if (existing.length > 0) continue;
       const [enrollment] = await db.insert(sequenceEnrollments).values({
@@ -24066,18 +25034,18 @@ router19.post("/email-sequences/:sequenceId/enroll", requireAuth, async (req, re
     return res.status(500).json({ message: "Failed to enroll contacts" });
   }
 });
-router19.post("/email-sequences/enrollments/:id/send-step", requireAuth, async (req, res) => {
+router25.post("/email-sequences/enrollments/:id/send-step", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
-    const [enrollment] = await db.select().from(sequenceEnrollments).where(and12(eq13(sequenceEnrollments.id, req.params.id), eq13(sequenceEnrollments.businessId, business.id)));
+    const [enrollment] = await db.select().from(sequenceEnrollments).where(and12(eq14(sequenceEnrollments.id, req.params.id), eq14(sequenceEnrollments.businessId, business.id)));
     if (!enrollment) return res.status(404).json({ message: "Enrollment not found" });
     if (enrollment.status !== "active") return res.status(400).json({ message: "Enrollment is not active" });
     const seq = BUILT_IN_SEQUENCES.find((s) => s.id === enrollment.sequenceId);
     if (!seq) return res.status(404).json({ message: "Sequence not found" });
     const stepIndex = enrollment.currentStep;
     if (stepIndex >= seq.steps.length) {
-      await db.update(sequenceEnrollments).set({ status: "completed", completedAt: /* @__PURE__ */ new Date() }).where(eq13(sequenceEnrollments.id, enrollment.id));
+      await db.update(sequenceEnrollments).set({ status: "completed", completedAt: /* @__PURE__ */ new Date() }).where(eq14(sequenceEnrollments.id, enrollment.id));
       return res.status(400).json({ message: "All steps already completed" });
     }
     const step = seq.steps[stepIndex];
@@ -24094,7 +25062,7 @@ router19.post("/email-sequences/enrollments/:id/send-step", requireAuth, async (
     if (seqAttachIds && Array.isArray(seqAttachIds) && seqAttachIds.length > 0) {
       const fsLib2 = await import("fs");
       const pathLib2 = await import("path");
-      const allBizFiles = await db.select().from(businessFiles).where(eq13(businessFiles.businessId, business.id));
+      const allBizFiles = await db.select().from(businessFiles).where(eq14(businessFiles.businessId, business.id));
       const requestedFiles = allBizFiles.filter((f) => seqAttachIds.includes(f.id));
       for (const f of requestedFiles) {
         try {
@@ -24134,47 +25102,47 @@ router19.post("/email-sequences/enrollments/:id/send-step", requireAuth, async (
       lastSentAt: /* @__PURE__ */ new Date(),
       status: isCompleted ? "completed" : "active",
       completedAt: isCompleted ? /* @__PURE__ */ new Date() : null
-    }).where(eq13(sequenceEnrollments.id, enrollment.id));
+    }).where(eq14(sequenceEnrollments.id, enrollment.id));
     return res.json({ message: "Email sent", stepIndex, isCompleted });
   } catch (err) {
     console.error("Send step error:", err);
     return res.status(500).json({ message: "Failed to send step" });
   }
 });
-router19.patch("/email-sequences/enrollments/:id/status", requireAuth, async (req, res) => {
+router25.patch("/email-sequences/enrollments/:id/status", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
     const { status } = req.body;
     if (!["active", "paused", "cancelled"].includes(status)) return res.status(400).json({ message: "Invalid status" });
-    const [updated] = await db.update(sequenceEnrollments).set({ status }).where(and12(eq13(sequenceEnrollments.id, req.params.id), eq13(sequenceEnrollments.businessId, business.id))).returning();
+    const [updated] = await db.update(sequenceEnrollments).set({ status }).where(and12(eq14(sequenceEnrollments.id, req.params.id), eq14(sequenceEnrollments.businessId, business.id))).returning();
     if (!updated) return res.status(404).json({ message: "Enrollment not found" });
     return res.json(updated);
   } catch (err) {
     return res.status(500).json({ message: "Failed to update status" });
   }
 });
-router19.delete("/email-sequences/enrollments/:id", requireAuth, async (req, res) => {
+router25.delete("/email-sequences/enrollments/:id", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
-    await db.delete(sequenceEnrollments).where(and12(eq13(sequenceEnrollments.id, req.params.id), eq13(sequenceEnrollments.businessId, business.id)));
+    await db.delete(sequenceEnrollments).where(and12(eq14(sequenceEnrollments.id, req.params.id), eq14(sequenceEnrollments.businessId, business.id)));
     return res.json({ message: "Deleted" });
   } catch (err) {
     return res.status(500).json({ message: "Failed to delete enrollment" });
   }
 });
-var automationsRouter_default = router19;
+var automationsRouter_default = router25;
 
 // server/routers/integrationsRouter.ts
 init_db();
 import crypto9 from "node:crypto";
-import { Router as Router22 } from "express";
+import { Router as Router28 } from "express";
 init_clients();
 init_storage();
 import { google as google3 } from "googleapis";
-var router20 = Router22();
-router20.post("/internal/cron", async (_req, res) => {
+var router26 = Router28();
+router26.post("/internal/cron", async (_req, res) => {
   try {
     const expiredCount = await expireOldQuotes();
     if (expiredCount > 0) console.log(`Expired ${expiredCount} quotes`);
@@ -24196,7 +25164,7 @@ router20.post("/internal/cron", async (_req, res) => {
     return res.status(500).json({ message: "Cron failed" });
   }
 });
-router20.get("/google-calendar/status", requireAuth, async (req, res) => {
+router26.get("/google-calendar/status", requireAuth, async (req, res) => {
   try {
     const tokens = await getGoogleCalendarToken(req.session.userId);
     if (tokens) {
@@ -24208,7 +25176,7 @@ router20.get("/google-calendar/status", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to check calendar status" });
   }
 });
-router20.get("/google-calendar/connect", requireAuth, async (req, res) => {
+router26.get("/google-calendar/connect", requireAuth, async (req, res) => {
   try {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
       return res.status(503).json({ message: "Google Calendar is not set up yet. Contact support to enable calendar sync." });
@@ -24236,7 +25204,7 @@ router20.get("/google-calendar/connect", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to generate auth URL" });
   }
 });
-router20.get("/google-calendar/callback", async (req, res) => {
+router26.get("/google-calendar/callback", async (req, res) => {
   try {
     const { code, state } = req.query;
     if (!code || !state) {
@@ -24273,7 +25241,7 @@ router20.get("/google-calendar/callback", async (req, res) => {
     return res.status(500).send("Failed to connect calendar. Please try again.");
   }
 });
-router20.delete("/google-calendar/disconnect", requireAuth, async (req, res) => {
+router26.delete("/google-calendar/disconnect", requireAuth, async (req, res) => {
   try {
     await deleteGoogleCalendarToken(req.session.userId);
     return res.json({ message: "Disconnected" });
@@ -24282,7 +25250,7 @@ router20.delete("/google-calendar/disconnect", requireAuth, async (req, res) => 
     return res.status(500).json({ message: "Failed to disconnect calendar" });
   }
 });
-router20.post("/google-calendar/sync-job", requireAuth, async (req, res) => {
+router26.post("/google-calendar/sync-job", requireAuth, async (req, res) => {
   try {
     const { jobId } = req.body;
     if (!jobId) return res.status(400).json({ message: "jobId is required" });
@@ -24300,7 +25268,7 @@ router20.post("/google-calendar/sync-job", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to sync to calendar" });
   }
 });
-router20.get("/stripe/status", requireAuth, async (req, res) => {
+router26.get("/stripe/status", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -24313,7 +25281,7 @@ router20.get("/stripe/status", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to check Stripe status" });
   }
 });
-router20.post("/stripe/connect", requireAuth, async (req, res) => {
+router26.post("/stripe/connect", requireAuth, async (req, res) => {
   try {
     if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured. Please add your Stripe API keys to enable payments." });
     const business = await getBusinessByOwner(req.session.userId);
@@ -24358,7 +25326,7 @@ router20.post("/stripe/connect", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to connect Stripe. Please try again." });
   }
 });
-router20.get("/stripe/connect-callback", async (req, res) => {
+router26.get("/stripe/connect-callback", async (req, res) => {
   try {
     if (!getStripe()) return res.status(503).send("Stripe not configured");
     const { userId } = req.query;
@@ -24381,7 +25349,7 @@ router20.get("/stripe/connect-callback", async (req, res) => {
     return res.status(500).send("Failed to verify Stripe connection.");
   }
 });
-router20.get("/stripe/connect-refresh", async (req, res) => {
+router26.get("/stripe/connect-refresh", async (req, res) => {
   try {
     if (!getStripe()) return res.status(503).send("Stripe not configured");
     const { userId } = req.query;
@@ -24400,7 +25368,7 @@ router20.get("/stripe/connect-refresh", async (req, res) => {
     return res.status(500).send("Failed to refresh onboarding");
   }
 });
-router20.delete("/stripe/disconnect", requireAuth, async (req, res) => {
+router26.delete("/stripe/disconnect", requireAuth, async (req, res) => {
   try {
     const business = await getBusinessByOwner(req.session.userId);
     if (!business) return res.status(404).json({ message: "Business not found" });
@@ -24411,7 +25379,7 @@ router20.delete("/stripe/disconnect", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to disconnect Stripe" });
   }
 });
-router20.post("/stripe/create-payment", requireAuth, async (req, res) => {
+router26.post("/stripe/create-payment", requireAuth, async (req, res) => {
   try {
     if (!getStripe()) return res.status(503).json({ message: "Stripe is not configured" });
     const { quoteId } = req.body;
@@ -24448,7 +25416,7 @@ router20.post("/stripe/create-payment", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Failed to create payment session" });
   }
 });
-router20.get("/stripe/deposit-success", async (req, res) => {
+router26.get("/stripe/deposit-success", async (req, res) => {
   try {
     const { quoteId, session_id } = req.query;
     if (!quoteId || !session_id || !await getStripe()) {
@@ -24483,7 +25451,7 @@ router20.get("/stripe/deposit-success", async (req, res) => {
     return res.redirect("/");
   }
 });
-router20.get("/stripe/payment-success", async (req, res) => {
+router26.get("/stripe/payment-success", async (req, res) => {
   try {
     const { quoteId, session_id } = req.query;
     if (quoteId) {
@@ -24519,7 +25487,7 @@ router20.get("/stripe/payment-success", async (req, res) => {
     return res.status(500).send("An error occurred processing your payment confirmation.");
   }
 });
-router20.get("/stripe/payment-cancel", async (_req, res) => {
+router26.get("/stripe/payment-cancel", async (_req, res) => {
   return res.send(`<!DOCTYPE html>
 <html><head><title>Payment Cancelled</title>
 <style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;}
@@ -24527,7 +25495,7 @@ router20.get("/stripe/payment-cancel", async (_req, res) => {
 .icon{font-size:48px;margin-bottom:16px;}h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
 </head><body><div class="card"><div class="icon">&#10007;</div><h2>Payment Cancelled</h2><p>No charge was made. You can close this window.</p></div></body></html>`);
 });
-router20.post("/api-keys", requireAuth, async (req, res) => {
+router26.post("/api-keys", requireAuth, async (req, res) => {
   try {
     const rawKey = `qp_${crypto9.randomBytes(32).toString("hex")}`;
     const keyHash = crypto9.createHash("sha256").update(rawKey).digest("hex");
@@ -24557,7 +25525,7 @@ router20.post("/api-keys", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.get("/api-keys", requireAuth, async (req, res) => {
+router26.get("/api-keys", requireAuth, async (req, res) => {
   try {
     const keys = await getApiKeysByUserId(req.session.userId);
     res.json(keys.map((k) => ({ id: k.id, keyPrefix: k.keyPrefix, label: k.label, isActive: k.isActive, scopes: k.scopes ?? ["read:quotes"], createdAt: k.createdAt })));
@@ -24565,7 +25533,7 @@ router20.get("/api-keys", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.delete("/api-keys/:id", requireAuth, async (req, res) => {
+router26.delete("/api-keys/:id", requireAuth, async (req, res) => {
   try {
     await deactivateApiKey(req.params.id, req.session.userId);
     res.json({ success: true });
@@ -24573,7 +25541,7 @@ router20.delete("/api-keys/:id", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.post("/webhook-endpoints", requireAuth, async (req, res) => {
+router26.post("/webhook-endpoints", requireAuth, async (req, res) => {
   try {
     const { url, enabledEvents = [] } = req.body;
     if (!url) return res.status(400).json({ error: "url required" });
@@ -24589,7 +25557,7 @@ router20.post("/webhook-endpoints", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.get("/webhook-endpoints", requireAuth, async (req, res) => {
+router26.get("/webhook-endpoints", requireAuth, async (req, res) => {
   try {
     const endpoints = await getWebhookEndpointsByUserId(req.session.userId);
     res.json(endpoints);
@@ -24597,7 +25565,7 @@ router20.get("/webhook-endpoints", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.put("/webhook-endpoints/:id", requireAuth, async (req, res) => {
+router26.put("/webhook-endpoints/:id", requireAuth, async (req, res) => {
   try {
     const { url, isActive, enabledEvents } = req.body;
     const updated = await updateWebhookEndpoint(req.params.id, req.session.userId, { url, isActive, enabledEvents });
@@ -24607,7 +25575,7 @@ router20.put("/webhook-endpoints/:id", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.delete("/webhook-endpoints/:id", requireAuth, async (req, res) => {
+router26.delete("/webhook-endpoints/:id", requireAuth, async (req, res) => {
   try {
     await deleteWebhookEndpoint(req.params.id, req.session.userId);
     res.json({ success: true });
@@ -24615,7 +25583,7 @@ router20.delete("/webhook-endpoints/:id", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.post("/webhook-endpoints/:id/test", requireAuth, async (req, res) => {
+router26.post("/webhook-endpoints/:id/test", requireAuth, async (req, res) => {
   try {
     const endpoints = await getWebhookEndpointsByUserId(req.session.userId);
     const ep = endpoints.find((e) => e.id === req.params.id);
@@ -24646,7 +25614,7 @@ router20.post("/webhook-endpoints/:id/test", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.get("/webhook-events", requireAuth, async (req, res) => {
+router26.get("/webhook-events", requireAuth, async (req, res) => {
   try {
     const events = await getWebhookEventsByUserId(req.session.userId);
     const eventsWithStatus = await Promise.all(
@@ -24663,7 +25631,7 @@ router20.get("/webhook-events", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.get("/webhook-events/:id", requireAuth, async (req, res) => {
+router26.get("/webhook-events/:id", requireAuth, async (req, res) => {
   try {
     const evt = await getWebhookEventById(req.params.id);
     if (!evt || evt.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
@@ -24673,7 +25641,7 @@ router20.get("/webhook-events/:id", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.get("/integrations/qbo/status", requireAuth, async (req, res) => {
+router26.get("/integrations/qbo/status", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT status, company_name as "companyName", realm_id as "realmId", environment,
@@ -24689,7 +25657,7 @@ router20.get("/integrations/qbo/status", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.get("/integrations/qbo/connect", requireAuth, async (req, res) => {
+router26.get("/integrations/qbo/connect", requireAuth, async (req, res) => {
   try {
     const clientId = process.env.INTUIT_CLIENT_ID;
     if (!clientId) return res.status(500).json({ error: "QuickBooks integration not configured" });
@@ -24715,7 +25683,7 @@ router20.get("/integrations/qbo/connect", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.get("/integrations/qbo/callback", async (req, res) => {
+router26.get("/integrations/qbo/callback", async (req, res) => {
   try {
     const { code, state, realmId } = req.query;
     if (!code || !state || !realmId) {
@@ -24790,7 +25758,7 @@ router20.get("/integrations/qbo/callback", async (req, res) => {
     res.status(500).send("An error occurred during QuickBooks connection");
   }
 });
-router20.post("/integrations/qbo/disconnect", requireAuth, async (req, res) => {
+router26.post("/integrations/qbo/disconnect", requireAuth, async (req, res) => {
   try {
     await pool.query(
       `UPDATE qbo_connections SET status = 'disconnected', disconnected_at = NOW(),
@@ -24804,7 +25772,7 @@ router20.post("/integrations/qbo/disconnect", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.post("/integrations/qbo/test", requireAuth, async (req, res) => {
+router26.post("/integrations/qbo/test", requireAuth, async (req, res) => {
   try {
     const client = new QBOClient(req.session.userId);
     const conn = await client.loadConnection();
@@ -24817,7 +25785,7 @@ router20.post("/integrations/qbo/test", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.post("/integrations/qbo/create-invoice", requireAuth, async (req, res) => {
+router26.post("/integrations/qbo/create-invoice", requireAuth, async (req, res) => {
   try {
     const { quoteId } = req.body;
     if (!quoteId) return res.status(400).json({ error: "quoteId is required" });
@@ -24829,7 +25797,7 @@ router20.post("/integrations/qbo/create-invoice", requireAuth, async (req, res) 
     res.status(500).json({ error: e.message });
   }
 });
-router20.get("/integrations/qbo/logs", requireAuth, async (req, res) => {
+router26.get("/integrations/qbo/logs", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, user_id as "userId", quote_id as "quoteId", action,
@@ -24843,7 +25811,7 @@ router20.get("/integrations/qbo/logs", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.put("/integrations/qbo/settings", requireAuth, async (req, res) => {
+router26.put("/integrations/qbo/settings", requireAuth, async (req, res) => {
   try {
     const { autoCreateInvoice } = req.body;
     await pool.query(
@@ -24855,7 +25823,7 @@ router20.put("/integrations/qbo/settings", requireAuth, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-router20.get("/integrations/qbo/invoice-link/:quoteId", requireAuth, async (req, res) => {
+router26.get("/integrations/qbo/invoice-link/:quoteId", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT qbo_invoice_id as "qboInvoiceId", qbo_doc_number as "qboDocNumber", created_at as "createdAt"
@@ -24868,12 +25836,12 @@ router20.get("/integrations/qbo/invoice-link/:quoteId", requireAuth, async (req,
     res.status(500).json({ error: e.message });
   }
 });
-var integrationsRouter_default = router20;
+var integrationsRouter_default = router26;
 
 // server/routers/publicRouter.ts
 import bcrypt5 from "bcryptjs";
 import rateLimit3 from "express-rate-limit";
-import { Router as Router23 } from "express";
+import { Router as Router29 } from "express";
 init_analytics();
 init_analytics_events();
 init_db();
@@ -26938,13 +27906,13 @@ function getBaseUrl2() {
 
 // server/routers/publicRouter.ts
 init_mail();
-var router21 = Router23();
+var router27 = Router29();
 var _calcSignupAttempts = /* @__PURE__ */ new Map();
-router21.get("/download/session-transcript", (_req, res) => {
+router27.get("/download/session-transcript", (_req, res) => {
   const filePath = __require("path").resolve(process.cwd(), "session-transcript.md");
   res.download(filePath, "quotepro-agent-session-transcript.md");
 });
-router21.get("/api/public/quote/:token", async (req, res) => {
+router27.get("/api/public/quote/:token", async (req, res) => {
   try {
     const q = await getQuoteByToken(req.params.token);
     if (!q) return res.status(404).json({ message: "Quote not found" });
@@ -26987,7 +27955,7 @@ router21.get("/api/public/quote/:token", async (req, res) => {
     return res.status(500).json({ message: "Failed to load quote" });
   }
 });
-router21.post("/api/public/quote/:token/respond", async (req, res) => {
+router27.post("/api/public/quote/:token/respond", async (req, res) => {
   try {
     const { action } = req.body;
     const q = await getQuoteByToken(req.params.token);
@@ -27015,7 +27983,7 @@ router21.post("/api/public/quote/:token/respond", async (req, res) => {
     return res.status(500).json({ message: "Failed to respond to quote" });
   }
 });
-router21.get("/api/public/job-updates/:token", async (req, res) => {
+router27.get("/api/public/job-updates/:token", async (req, res) => {
   try {
     const { token } = req.params;
     const jobResult = await pool.query(
@@ -27133,10 +28101,10 @@ router21.get("/api/public/job-updates/:token", async (req, res) => {
     return res.status(500).json({ message: "Failed to load job update" });
   }
 });
-router21.get("/q", (_req, res) => {
+router27.get("/q", (_req, res) => {
   res.send(getQuickQuoteHTML());
 });
-router21.post("/api/public/quick-quote", async (req, res) => {
+router27.post("/api/public/quick-quote", async (req, res) => {
   try {
     const { businessId, channel, conversationId, name, phone, email, zip, beds, baths, sqft: sqft2, serviceType, frequency: frequency2 } = req.body;
     if (!businessId) return res.status(400).json({ message: "businessId is required" });
@@ -27231,7 +28199,7 @@ router21.post("/api/public/quick-quote", async (req, res) => {
     return res.status(500).json({ message: "Failed to create quick quote" });
   }
 });
-router21.post("/api/public/toolkit-lead", async (req, res) => {
+router27.post("/api/public/toolkit-lead", async (req, res) => {
   try {
     const { email, firstName, resource } = req.body;
     if (!email || typeof email !== "string") {
@@ -27251,7 +28219,7 @@ router21.post("/api/public/toolkit-lead", async (req, res) => {
     return res.status(500).json({ message: "Failed to save lead" });
   }
 });
-router21.post("/api/public/calculator-signup", async (req, res) => {
+router27.post("/api/public/calculator-signup", async (req, res) => {
   try {
     const { email, password, quoteData } = req.body;
     if (!email || typeof email !== "string" || !password || typeof password !== "string") {
@@ -27387,7 +28355,7 @@ router21.post("/api/public/calculator-signup", async (req, res) => {
     return res.status(500).json({ message: "Registration failed. Please try again." });
   }
 });
-router21.post("/api/public/quote/:token/pay", async (req, res) => {
+router27.post("/api/public/quote/:token/pay", async (req, res) => {
   try {
     if (!await getStripe()) return res.status(503).json({ message: "Payments not available" });
     const quote = await getQuoteByToken(req.params.token);
@@ -27423,7 +28391,7 @@ router21.post("/api/public/quote/:token/pay", async (req, res) => {
     return res.status(500).json({ message: "Failed to create payment" });
   }
 });
-router21.post("/api/public/quote/:token/pay-deposit", async (req, res) => {
+router27.post("/api/public/quote/:token/pay-deposit", async (req, res) => {
   try {
     if (!await getStripe()) return res.status(503).json({ message: "Payments not available" });
     const quote = await getQuoteByToken(req.params.token);
@@ -27460,39 +28428,39 @@ router21.post("/api/public/quote/:token/pay-deposit", async (req, res) => {
     return res.status(500).json({ message: "Failed to create deposit payment" });
   }
 });
-router21.get("/privacy", (_req, res) => {
+router27.get("/privacy", (_req, res) => {
   res.send(getPrivacyPolicyHTML());
 });
-router21.get("/terms", (_req, res) => {
+router27.get("/terms", (_req, res) => {
   res.send(getTermsOfServiceHTML());
 });
-router21.get("/delete-account", (_req, res) => {
+router27.get("/delete-account", (_req, res) => {
   res.send(getDeleteAccountHTML());
 });
-router21.get("/calculators", (_req, res) => {
+router27.get("/calculators", (_req, res) => {
   res.send(renderCalculatorIndex());
 });
-router21.get("/calculators/:slug", (req, res) => {
+router27.get("/calculators/:slug", (req, res) => {
   const def = getCalculatorBySlug(req.params.slug);
   if (!def) return res.status(404).send("Calculator not found");
   res.send(renderCalculatorPage(def));
 });
-router21.get("/house-cleaning-price-calculator", (_req, res) => {
+router27.get("/house-cleaning-price-calculator", (_req, res) => {
   res.redirect(301, "/calculators/house-cleaning-price-calculator");
 });
-router21.get("/deep-cleaning-price-calculator", (_req, res) => {
+router27.get("/deep-cleaning-price-calculator", (_req, res) => {
   res.redirect(301, "/calculators/deep-cleaning-price-calculator");
 });
-router21.get("/move-in-out-cleaning-calculator", (_req, res) => {
+router27.get("/move-in-out-cleaning-calculator", (_req, res) => {
   res.redirect(301, "/calculators/move-in-out-cleaning-calculator");
 });
-router21.get("/cleaning-quote-generator", (_req, res) => {
+router27.get("/cleaning-quote-generator", (_req, res) => {
   res.send(getCleaningQuoteGeneratorPage());
 });
-router21.get("/guides/cleaning-business-pricing-guide", (_req, res) => {
+router27.get("/guides/cleaning-business-pricing-guide", (_req, res) => {
   res.send(getUltimateCleaningPricingGuidePage());
 });
-router21.post("/api/public/rate/:token", async (req, res) => {
+router27.post("/api/public/rate/:token", async (req, res) => {
   try {
     const job = await getJobByRatingToken(req.params.token);
     if (!job) return res.status(404).json({ message: "Job not found" });
@@ -27510,7 +28478,7 @@ router21.post("/api/public/rate/:token", async (req, res) => {
     return res.status(500).json({ message: "Failed to submit rating" });
   }
 });
-router21.get("/r/:token", async (req, res) => {
+router27.get("/r/:token", async (req, res) => {
   try {
     const { token } = req.params;
     const result = await pool.query(
@@ -27527,7 +28495,7 @@ router21.get("/r/:token", async (req, res) => {
     return res.status(500).send("Redirect failed.");
   }
 });
-router21.get("/rate/:token", async (req, res) => {
+router27.get("/rate/:token", async (req, res) => {
   try {
     const job = await getJobByRatingToken(req.params.token);
     if (!job) {
@@ -27698,7 +28666,7 @@ init();
     return res.status(500).send("Something went wrong");
   }
 });
-router21.get("/q/:token", async (req, res) => {
+router27.get("/q/:token", async (req, res) => {
   try {
     const q = await getQuoteByToken(req.params.token);
     if (!q) {
@@ -28284,9 +29252,9 @@ loadMonth(nextMo);
     const acceptButtonText = depositRequired && depositAmount > 0 ? "Accept &amp; Pay Deposit" : "Accept Quote";
     const acceptModalTitle = depositRequired && depositAmount > 0 ? "Accept & Pay Deposit" : "Accept Quote";
     const todayDate = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const fs3 = await import("fs");
-    const path3 = await import("path");
-    let template = fs3.readFileSync(path3.join(process.cwd(), "server/templates/instant-quote.html"), "utf-8");
+    const fs4 = await import("fs");
+    const path4 = await import("path");
+    let template = fs4.readFileSync(path4.join(process.cwd(), "server/templates/instant-quote.html"), "utf-8");
     const replacements = {
       "{{brandColor}}": brandColor,
       "{{companyName}}": companyName2,
@@ -28376,7 +29344,7 @@ loadMonth(nextMo);
     return res.status(500).send(`<!DOCTYPE html><html><head><title>Error</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><style>body{font-family:'Inter',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F8FAFC}.card{text-align:center;padding:48px 32px;background:#fff;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,0.08);max-width:420px}h1{font-size:22px;font-weight:800;color:#0F172A;margin-bottom:8px}p{font-size:15px;color:#64748B;line-height:1.5}</style></head><body><div class="card"><h1>Something went wrong</h1><p>Please try again or contact the business directly.</p></div></body></html>`);
   }
 });
-router21.post("/q/:token/accept", async (req, res) => {
+router27.post("/q/:token/accept", async (req, res) => {
   try {
     const q = await getQuoteByToken(req.params.token);
     if (!q) return res.status(404).json({ success: false, message: "Quote not found" });
@@ -28501,7 +29469,7 @@ router21.post("/q/:token/accept", async (req, res) => {
     return res.status(500).json({ success: false, message: "Failed to accept quote" });
   }
 });
-router21.post("/q/:token/decline", async (req, res) => {
+router27.post("/q/:token/decline", async (req, res) => {
   try {
     const q = await getQuoteByToken(req.params.token);
     if (!q) return res.status(404).json({ success: false, message: "Quote not found" });
@@ -28519,7 +29487,7 @@ router21.post("/q/:token/decline", async (req, res) => {
     return res.status(500).json({ success: false, message: "Failed to decline quote" });
   }
 });
-router21.post("/q/:token/request-changes", async (req, res) => {
+router27.post("/q/:token/request-changes", async (req, res) => {
   try {
     const q = await getQuoteByToken(req.params.token);
     if (!q) return res.status(404).json({ success: false, message: "Quote not found" });
@@ -28538,7 +29506,7 @@ ${changeRequest}` : changeRequest;
     return res.status(500).json({ success: false, message: "Failed to submit change request" });
   }
 });
-router21.post("/q/:token/track", async (req, res) => {
+router27.post("/q/:token/track", async (req, res) => {
   try {
     const q = await getQuoteByToken(req.params.token);
     if (!q) return res.status(404).json({ ok: false });
@@ -28553,7 +29521,7 @@ ${entry}` : entry;
     return res.json({ ok: true });
   }
 });
-router21.get("/q/:token/booking-slots", async (req, res) => {
+router27.get("/q/:token/booking-slots", async (req, res) => {
   try {
     const q = await getQuoteByToken(req.params.token);
     if (!q) return res.status(404).json({ error: "Quote not found" });
@@ -28579,7 +29547,7 @@ router21.get("/q/:token/booking-slots", async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 });
-router21.post("/q/:token/book", async (req, res) => {
+router27.post("/q/:token/book", async (req, res) => {
   try {
     const q = await getQuoteByToken(req.params.token);
     if (!q) return res.status(404).json({ error: "Quote not found" });
@@ -28702,7 +29670,7 @@ router21.post("/q/:token/book", async (req, res) => {
     return res.status(500).json({ error: e?.message || "Failed to create booking" });
   }
 });
-router21.get("/api/public/intake-business/:businessId", async (req, res) => {
+router27.get("/api/public/intake-business/:businessId", async (req, res) => {
   try {
     const biz = await lookupIntakeBusiness(req.params.businessId);
     if (!biz) return res.status(404).json({ message: "Business not found" });
@@ -28718,7 +29686,7 @@ router21.get("/api/public/intake-business/:businessId", async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router21.post("/api/public/intake/:businessId/extract", async (req, res) => {
+router27.post("/api/public/intake/:businessId/extract", async (req, res) => {
   const { text: text2 } = req.body;
   if (!text2?.trim()) return res.status(400).json({ message: "text is required" });
   try {
@@ -28778,7 +29746,7 @@ Return ONLY valid JSON \u2014 no markdown, no preamble:
     res.status(500).json({ message: "Extraction failed" });
   }
 });
-router21.post("/api/public/intake/:businessId", async (req, res) => {
+router27.post("/api/public/intake/:businessId", async (req, res) => {
   const { businessId } = req.params;
   const { customerName, customerEmail, customerPhone, customerAddress, rawText, extractedFields, source } = req.body;
   if (!customerName?.trim()) return res.status(400).json({ message: "Customer name is required" });
@@ -28825,7 +29793,7 @@ router21.post("/api/public/intake/:businessId", async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router21.get("/api/public/slug-available/:slug", async (req, res) => {
+router27.get("/api/public/slug-available/:slug", async (req, res) => {
   try {
     const raw = req.params.slug.toLowerCase().trim();
     const slug = slugify(raw);
@@ -28904,7 +29872,7 @@ function isPricingComplete(stored) {
   if (mt <= 0) return false;
   return true;
 }
-var DEFAULT_ADD_ON_PRICES = {
+var DEFAULT_ADD_ON_PRICES2 = {
   insideFridge: 0,
   insideOven: 0,
   insideCabinets: 0,
@@ -28924,7 +29892,7 @@ var DEFAULT_ADD_ON_PRICES = {
   carpetCleaning: 0,
   wallWashing: 0
 };
-router21.get("/api/public/lead-link-config/:slug", leadLinkConfigLimiter, async (req, res) => {
+router27.get("/api/public/lead-link-config/:slug", leadLinkConfigLimiter, async (req, res) => {
   try {
     const slug = req.params.slug?.toLowerCase().trim();
     if (!slug) return res.status(400).json({ error: "slug required" });
@@ -28971,7 +29939,7 @@ router21.get("/api/public/lead-link-config/:slug", leadLinkConfigLimiter, async 
         biweekly: Number(storedSettings.frequencyDiscounts?.biweekly ?? 0),
         monthly: Number(storedSettings.frequencyDiscounts?.monthly ?? 0)
       },
-      addOnPrices: { ...DEFAULT_ADD_ON_PRICES, ...storedSettings.addOnPrices || {} }
+      addOnPrices: { ...DEFAULT_ADD_ON_PRICES2, ...storedSettings.addOnPrices || {} }
     };
     const legacyPricing = {
       hourlyRate: pricingConfig.hourlyRate,
@@ -29001,7 +29969,7 @@ router21.get("/api/public/lead-link-config/:slug", leadLinkConfigLimiter, async 
     res.status(500).json({ error: e.message });
   }
 });
-router21.get("/api/public/lead-link/:slug/slots", leadLinkConfigLimiter, async (req, res) => {
+router27.get("/api/public/lead-link/:slug/slots", leadLinkConfigLimiter, async (req, res) => {
   try {
     const slug = req.params.slug?.toLowerCase().trim();
     if (!slug) return res.status(400).json({ error: "slug required" });
@@ -29022,7 +29990,7 @@ router21.get("/api/public/lead-link/:slug/slots", leadLinkConfigLimiter, async (
     return res.status(500).json({ error: "Server error" });
   }
 });
-router21.post("/api/public/lead-link/:slug/instant-book", leadLinkConfigLimiter, async (req, res) => {
+router27.post("/api/public/lead-link/:slug/instant-book", leadLinkConfigLimiter, async (req, res) => {
   try {
     const slug = req.params.slug?.toLowerCase().trim();
     if (!slug) return res.status(400).json({ error: "slug required" });
@@ -29067,7 +30035,7 @@ router21.post("/api/public/lead-link/:slug/instant-book", leadLinkConfigLimiter,
     return res.status(500).json({ error: e.message || "Server error" });
   }
 });
-router21.post("/api/public/lead-link-event", async (req, res) => {
+router27.post("/api/public/lead-link-event", async (req, res) => {
   try {
     const { slug, eventType, sessionId, usedDefaultPricing } = req.body;
     if (!slug || !eventType) return res.status(400).json({ message: "slug and eventType required" });
@@ -29088,13 +30056,13 @@ router21.post("/api/public/lead-link-event", async (req, res) => {
     res.status(500).json({ message: e.message });
   }
 });
-router21.get("/job-updates/:token", (req, res) => {
+router27.get("/job-updates/:token", (req, res) => {
   res.redirect(301, `/j/${req.params.token}`);
 });
-router21.get("/live-update/:token", (req, res) => {
+router27.get("/live-update/:token", (req, res) => {
   res.redirect(301, `/j/${req.params.token}`);
 });
-router21.get("/j/:token", async (req, res) => {
+router27.get("/j/:token", async (req, res) => {
   try {
     const { token } = req.params;
     const jobResult = await pool.query(
@@ -29127,7 +30095,7 @@ function unsubscribePage(title, message, success) {
 </div>
 </body></html>`;
 }
-router21.get("/api/email/unsubscribe", async (req, res) => {
+router27.get("/api/email/unsubscribe", async (req, res) => {
   try {
     const { uid, token } = req.query;
     if (!uid || !token) {
@@ -29147,7 +30115,7 @@ router21.get("/api/email/unsubscribe", async (req, res) => {
     return res.status(500).send(unsubscribePage("Error", "Something went wrong. Please try again or contact support.", false));
   }
 });
-router21.get("/api/public/tip-page/:token", async (req, res) => {
+router27.get("/api/public/tip-page/:token", async (req, res) => {
   try {
     const { token } = req.params;
     const jobRes = await pool.query(
@@ -29214,7 +30182,7 @@ router21.get("/api/public/tip-page/:token", async (req, res) => {
     return res.status(500).json({ message: "Failed to load tip page" });
   }
 });
-router21.post("/api/public/tip-page/:token/checkout", async (req, res) => {
+router27.post("/api/public/tip-page/:token/checkout", async (req, res) => {
   try {
     const { token } = req.params;
     const { amountCents } = req.body;
@@ -29318,15 +30286,15 @@ router21.post("/api/public/tip-page/:token/checkout", async (req, res) => {
     return res.status(500).json({ message: "Failed to create checkout session" });
   }
 });
-var publicRouter_default = router21;
+var publicRouter_default = router27;
 
 // server/routers/winLossRouter.ts
 init_db();
-import { Router as Router24 } from "express";
-import { eq as eq14, desc as desc12 } from "drizzle-orm";
+import { Router as Router30 } from "express";
+import { eq as eq15, desc as desc13 } from "drizzle-orm";
 init_schema();
-var router22 = Router24();
-router22.get("/feedback/:token", async (req, res) => {
+var router28 = Router30();
+router28.get("/feedback/:token", async (req, res) => {
   try {
     const { token } = req.params;
     const rows = await db.select({
@@ -29336,13 +30304,13 @@ router22.get("/feedback/:token", async (req, res) => {
       quoteId: winLossResponses.quoteId,
       businessId: winLossResponses.businessId,
       customerEmail: winLossResponses.customerEmail
-    }).from(winLossResponses).where(eq14(winLossResponses.responseToken, token)).limit(1);
+    }).from(winLossResponses).where(eq15(winLossResponses.responseToken, token)).limit(1);
     if (!rows.length) {
       return res.status(404).json({ message: "Not found" });
     }
     const wlr = rows[0];
-    const bizRows = await db.select({ name: businesses.name }).from(businesses).where(eq14(businesses.id, wlr.businessId)).limit(1);
-    const quoteRows = await db.select({ total: quotes.total, selectedOption: quotes.selectedOption }).from(quotes).where(eq14(quotes.id, wlr.quoteId)).limit(1);
+    const bizRows = await db.select({ name: businesses.name }).from(businesses).where(eq15(businesses.id, wlr.businessId)).limit(1);
+    const quoteRows = await db.select({ total: quotes.total, selectedOption: quotes.selectedOption }).from(quotes).where(eq15(quotes.id, wlr.quoteId)).limit(1);
     return res.json({
       alreadyResponded: !!wlr.respondedAt,
       businessName: bizRows[0]?.name || "Your cleaning company",
@@ -29353,11 +30321,11 @@ router22.get("/feedback/:token", async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
-router22.post("/feedback/:token", async (req, res) => {
+router28.post("/feedback/:token", async (req, res) => {
   try {
     const { token } = req.params;
     const { reason_category, competitor_mentioned, reason } = req.body;
-    const rows = await db.select({ id: winLossResponses.id, respondedAt: winLossResponses.respondedAt }).from(winLossResponses).where(eq14(winLossResponses.responseToken, token)).limit(1);
+    const rows = await db.select({ id: winLossResponses.id, respondedAt: winLossResponses.respondedAt }).from(winLossResponses).where(eq15(winLossResponses.responseToken, token)).limit(1);
     if (!rows.length) {
       return res.status(404).json({ message: "Not found" });
     }
@@ -29369,14 +30337,14 @@ router22.post("/feedback/:token", async (req, res) => {
       competitorMentioned: competitor_mentioned || null,
       reason: reason || null,
       respondedAt: /* @__PURE__ */ new Date()
-    }).where(eq14(winLossResponses.id, rows[0].id));
+    }).where(eq15(winLossResponses.id, rows[0].id));
     return res.json({ ok: true });
   } catch (err) {
     console.error("[win-loss] POST /feedback/:token error:", err.message);
     return res.status(500).json({ message: "Server error" });
   }
 });
-router22.get("/api/win-loss", requireAuth, async (req, res) => {
+router28.get("/api/win-loss", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId;
     const bizResult = await pool.query(
@@ -29398,7 +30366,7 @@ router22.get("/api/win-loss", requireAuth, async (req, res) => {
       followUpSentAt: winLossResponses.followUpSentAt,
       createdAt: winLossResponses.createdAt,
       quoteTotal: quotes.total
-    }).from(winLossResponses).leftJoin(quotes, eq14(quotes.id, winLossResponses.quoteId)).where(eq14(winLossResponses.businessId, businessId)).orderBy(desc12(winLossResponses.createdAt)).limit(200);
+    }).from(winLossResponses).leftJoin(quotes, eq15(quotes.id, winLossResponses.quoteId)).where(eq15(winLossResponses.businessId, businessId)).orderBy(desc13(winLossResponses.createdAt)).limit(200);
     const totalSent = rows.length;
     const responded = rows.filter((r) => r.respondedAt);
     const responseRate = totalSent > 0 ? Math.round(responded.length / totalSent * 100) : 0;
@@ -29440,10 +30408,11 @@ router22.get("/api/win-loss", requireAuth, async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 });
-var winLossRouter_default = router22;
+var winLossRouter_default = router28;
 
 // server/routes.ts
 init_autopilotService();
+import cron from "node-cron";
 
 // server/widgetTemplate.ts
 function buildWidgetJs(businessId, baseUrl) {
@@ -29880,7 +30849,7 @@ function buildWidgetJs(businessId, baseUrl) {
 }
 
 // server/mcp/index.ts
-import { Router as Router25 } from "express";
+import { Router as Router31 } from "express";
 import rateLimit4 from "express-rate-limit";
 
 // server/mcp/manifest.json
@@ -30166,7 +31135,7 @@ var mcpLimiter = rateLimit4({
   legacyHeaders: false,
   message: { error: "Rate limit exceeded. Max 100 requests per hour." }
 });
-var mcpRouter = Router25();
+var mcpRouter = Router31();
 mcpRouter.use((req, res, next) => {
   const origin = req.headers.origin ?? "";
   if (MCP_ORIGINS.includes(origin)) {
@@ -30463,11 +31432,13 @@ async function registerRoutes(app2) {
   app2.use("/api", staffRouter_default);
   app2.use("/api/booking", bookingWidgetRouter_default);
   app2.use("/api", locationsRouter_default);
+  app2.use("/api/availability", availabilityRouter_default);
+  app2.use(publicBookingRouter_default);
   app2.use("/api", authRouter_default);
   app2.use("/api", quotesRouter_default);
   app2.use("/api", customersRouter_default);
   app2.use("/api", jobsRouter_default);
-  app2.use("/api", aiRouter_default);
+  app2.use("/api", ai_default);
   app2.use("/api", automationsRouter_default);
   app2.use("/api", integrationsRouter_default);
   app2.use("/api", businessRouter_default);
@@ -30491,41 +31462,82 @@ async function registerRoutes(app2) {
     } catch (e) {
       console.error("[autopilot] Cron error:", e);
     }
-  }, 15 * 60 * 1e3);
-  let isWorkerRunning = false;
-  setInterval(async () => {
-    if (isWorkerRunning) {
-      console.warn("Background worker tick skipped \u2014 previous run still in progress");
-      return;
-    }
-    isWorkerRunning = true;
+  }, 5 * 60 * 1e3);
+  cron.schedule("0 * * * *", async () => {
     try {
       await expireOldQuotes();
+    } catch (e) {
+      console.error("[worker] Quote expiry error:", e);
+    }
+  });
+  cron.schedule("*/30 * * * *", async () => {
+    try {
       const { sent, canceled } = await processPendingFollowUps();
       if (sent > 0 || canceled > 0) {
         console.log(`Follow-ups processed: ${sent} sent, ${canceled} canceled`);
       }
+    } catch (e) {
+      console.error("[worker] Follow-up processing error:", e);
+    }
+  });
+  cron.schedule("0 9 * * *", async () => {
+    try {
       await sendStaleQuoteNudges();
+    } catch (e) {
+      console.error("[worker] Stale quote nudges error:", e);
+    }
+  });
+  cron.schedule("0 8 * * 1", async () => {
+    try {
       await sendWeeklyDigestEmails();
+    } catch (e) {
+      console.error("[worker] Weekly digest emails error:", e);
+    }
+  });
+  cron.schedule("0 * * * *", async () => {
+    try {
       await sendActivationNudges();
       await generateRecurringJobs();
       await sendWinLossFollowUps();
+    } catch (e) {
+      console.error("[worker] Hourly jobs error:", e);
+    }
+  });
+  cron.schedule("0 0 1 * *", async () => {
+    try {
+      await pool.query("UPDATE users SET ai_follow_ups_used_this_month = 0");
+      console.log("[worker] Monthly AI follow-up counter reset");
+    } catch (e) {
+      console.error("[worker] Monthly AI reset error:", e);
+    }
+  });
+  cron.schedule("0 2 * * *", async () => {
+    try {
+      const result = await pool.query(
+        `DELETE FROM analytics_events WHERE created_at < NOW() - INTERVAL '90 days'`
+      );
+      const deleted = result.rowCount ?? 0;
+      console.log(`[analytics-ttl] Purged ${deleted} events older than 90 days`);
+    } catch (e) {
+      console.error("[analytics-ttl] Purge error:", e);
+    }
+  });
+  cron.schedule("0 * * * *", async () => {
+    try {
       if (app2.__leadFinderWorker) {
         await app2.__leadFinderWorker();
       }
     } catch (e) {
-      console.error("Background worker error:", e);
-    } finally {
-      isWorkerRunning = false;
+      console.error("[worker] Lead finder error:", e);
     }
-  }, 60 * 60 * 1e3);
+  });
   return httpServer;
 }
 
 // server/index.ts
 init_db();
-import * as fs2 from "fs";
-import * as path2 from "path";
+import * as fs3 from "fs";
+import * as path3 from "path";
 import bcrypt7 from "bcryptjs";
 init_mail();
 
@@ -31004,7 +32016,7 @@ async function seedPristineHomeDemo() {
     }
     log(`[pristine-demo] ${custDefs.length} customers seeded`);
     const quoteIds = {};
-    async function createQuote10(p2) {
+    async function createQuote9(p2) {
       const id = uuid();
       if (p2.key) quoteIds[p2.key] = id;
       const tot = jitter(p2.total, 12);
@@ -31042,50 +32054,50 @@ async function seedPristineHomeDemo() {
     const monthlyKeys = ["c19", "c20", "c21", "c22", "c23", "c24", "c25", "c26", "c27", "c28", "c29", "c30"];
     for (const k of biweeklyKeys) {
       const c = custDefs.find((x) => x.key === k);
-      await createQuote10({ key: `q_${k}`, cid: custIds[k], status: "accepted", total: c.avg, freq: "biweekly", createdAt: monthsAgo(c.mo || 6) });
+      await createQuote9({ key: `q_${k}`, cid: custIds[k], status: "accepted", total: c.avg, freq: "biweekly", createdAt: monthsAgo(c.mo || 6) });
     }
     for (const k of monthlyKeys) {
       const c = custDefs.find((x) => x.key === k);
-      await createQuote10({ key: `q_${k}`, cid: custIds[k], status: "accepted", total: c.avg, freq: "monthly", createdAt: monthsAgo(c.mo || 5) });
+      await createQuote9({ key: `q_${k}`, cid: custIds[k], status: "accepted", total: c.avg, freq: "monthly", createdAt: monthsAgo(c.mo || 5) });
     }
-    await createQuote10({ key: "q_c31", cid: custIds.c31, status: "accepted", total: 520, freq: "one-time", createdAt: daysAgo(95), beds: 4, baths: 3 });
-    await createQuote10({ key: "q_c32", cid: custIds.c32, status: "accepted", total: 285, freq: "one-time", createdAt: daysAgo(125) });
-    await createQuote10({ key: "q_c33", cid: custIds.c33, status: "accepted", total: 650, freq: "one-time", createdAt: daysAgo(65), beds: 5, baths: 3, notes: "Big job \u2014 post-reno move out" });
-    await createQuote10({ key: "q_c34", cid: custIds.c34, status: "accepted", total: 285, freq: "one-time", createdAt: daysAgo(155) });
-    await createQuote10({ key: "q_c35", cid: custIds.c35, status: "accepted", total: 580, freq: "one-time", createdAt: daysAgo(185) });
-    await createQuote10({ key: "q_c36", cid: custIds.c36, status: "sent", total: 165, freq: "one-time", createdAt: daysAgo(6), sentAt: daysAgo(5), notes: "Came in via Lead Link" });
-    await createQuote10({ key: "q_c37", cid: custIds.c37, status: "accepted", total: 195, freq: "one-time", createdAt: daysAgo(215) });
-    await createQuote10({ key: "q_c38", cid: custIds.c38, status: "sent", total: 285, freq: "one-time", createdAt: daysAgo(9), sentAt: daysAgo(8) });
-    await createQuote10({ key: "q_c39", cid: custIds.c39, status: "declined", total: 195, freq: "one-time", createdAt: daysAgo(125), notes: "Said price was too high. Went with a competitor." });
-    await createQuote10({ key: "q_c40", cid: custIds.c40, status: "sent", total: 175, freq: "biweekly", createdAt: daysAgo(4), sentAt: daysAgo(3), notes: "Follow up \u2014 pitch biweekly recurring" });
-    await createQuote10({ key: "q_c41", cid: custIds.c41, status: "accepted", total: 385, freq: "weekly", createdAt: monthsAgo(7) });
-    await createQuote10({ key: "q_c42", cid: custIds.c42, status: "accepted", total: 275, freq: "weekly", createdAt: monthsAgo(6) });
-    await createQuote10({ key: "q_c43", cid: custIds.c43, status: "accepted", total: 320, freq: "biweekly", createdAt: monthsAgo(5) });
-    await createQuote10({ key: "q_c44", cid: custIds.c44, status: "accepted", total: 420, freq: "weekly", createdAt: monthsAgo(6) });
-    await createQuote10({ key: "q_c45", cid: custIds.c45, status: "sent", total: 510, freq: "weekly", createdAt: daysAgo(3), sentAt: daysAgo(2), notes: "Upgrade from monthly to weekly \u2014 big win if we close this" });
-    await createQuote10({ cid: custIds.c45, status: "accepted", total: 510, freq: "monthly", createdAt: monthsAgo(7) });
-    await createQuote10({ key: "q_c46", cid: custIds.c46, status: "accepted", total: 195, freq: "one-time", createdAt: monthsAgo(4) });
-    await createQuote10({ key: "q_c47", cid: custIds.c47, status: "accepted", total: 340, freq: "monthly", createdAt: monthsAgo(5) });
+    await createQuote9({ key: "q_c31", cid: custIds.c31, status: "accepted", total: 520, freq: "one-time", createdAt: daysAgo(95), beds: 4, baths: 3 });
+    await createQuote9({ key: "q_c32", cid: custIds.c32, status: "accepted", total: 285, freq: "one-time", createdAt: daysAgo(125) });
+    await createQuote9({ key: "q_c33", cid: custIds.c33, status: "accepted", total: 650, freq: "one-time", createdAt: daysAgo(65), beds: 5, baths: 3, notes: "Big job \u2014 post-reno move out" });
+    await createQuote9({ key: "q_c34", cid: custIds.c34, status: "accepted", total: 285, freq: "one-time", createdAt: daysAgo(155) });
+    await createQuote9({ key: "q_c35", cid: custIds.c35, status: "accepted", total: 580, freq: "one-time", createdAt: daysAgo(185) });
+    await createQuote9({ key: "q_c36", cid: custIds.c36, status: "sent", total: 165, freq: "one-time", createdAt: daysAgo(6), sentAt: daysAgo(5), notes: "Came in via Lead Link" });
+    await createQuote9({ key: "q_c37", cid: custIds.c37, status: "accepted", total: 195, freq: "one-time", createdAt: daysAgo(215) });
+    await createQuote9({ key: "q_c38", cid: custIds.c38, status: "sent", total: 285, freq: "one-time", createdAt: daysAgo(9), sentAt: daysAgo(8) });
+    await createQuote9({ key: "q_c39", cid: custIds.c39, status: "declined", total: 195, freq: "one-time", createdAt: daysAgo(125), notes: "Said price was too high. Went with a competitor." });
+    await createQuote9({ key: "q_c40", cid: custIds.c40, status: "sent", total: 175, freq: "biweekly", createdAt: daysAgo(4), sentAt: daysAgo(3), notes: "Follow up \u2014 pitch biweekly recurring" });
+    await createQuote9({ key: "q_c41", cid: custIds.c41, status: "accepted", total: 385, freq: "weekly", createdAt: monthsAgo(7) });
+    await createQuote9({ key: "q_c42", cid: custIds.c42, status: "accepted", total: 275, freq: "weekly", createdAt: monthsAgo(6) });
+    await createQuote9({ key: "q_c43", cid: custIds.c43, status: "accepted", total: 320, freq: "biweekly", createdAt: monthsAgo(5) });
+    await createQuote9({ key: "q_c44", cid: custIds.c44, status: "accepted", total: 420, freq: "weekly", createdAt: monthsAgo(6) });
+    await createQuote9({ key: "q_c45", cid: custIds.c45, status: "sent", total: 510, freq: "weekly", createdAt: daysAgo(3), sentAt: daysAgo(2), notes: "Upgrade from monthly to weekly \u2014 big win if we close this" });
+    await createQuote9({ cid: custIds.c45, status: "accepted", total: 510, freq: "monthly", createdAt: monthsAgo(7) });
+    await createQuote9({ key: "q_c46", cid: custIds.c46, status: "accepted", total: 195, freq: "one-time", createdAt: monthsAgo(4) });
+    await createQuote9({ key: "q_c47", cid: custIds.c47, status: "accepted", total: 340, freq: "monthly", createdAt: monthsAgo(5) });
     for (const k of ["c1", "c3", "c7", "c13", "c19", "c21"]) {
       const c = custDefs.find((x) => x.key === k);
-      await createQuote10({ cid: custIds[k], status: "sent", total: c.avg * 1.85, freq: "one-time", createdAt: daysAgo(7), sentAt: daysAgo(6), notes: "Annual deep clean upgrade" });
+      await createQuote9({ cid: custIds[k], status: "sent", total: c.avg * 1.85, freq: "one-time", createdAt: daysAgo(7), sentAt: daysAgo(6), notes: "Annual deep clean upgrade" });
     }
     for (const k of ["c2", "c4", "c8", "c11", "c20", "c23", "c25", "c29", "c43"]) {
       const c = custDefs.find((x) => x.key === k);
-      await createQuote10({ cid: custIds[k], status: "expired", total: c.avg, freq: "one-time", createdAt: daysAgo(60), sentAt: daysAgo(59) });
+      await createQuote9({ cid: custIds[k], status: "expired", total: c.avg, freq: "one-time", createdAt: daysAgo(60), sentAt: daysAgo(59) });
     }
     for (const k of ["c5", "c9", "c14", "c16", "c24", "c28"]) {
       const c = custDefs.find((x) => x.key === k);
-      await createQuote10({ cid: custIds[k], status: "draft", total: c.avg, freq: "biweekly", createdAt: daysAgo(3) });
+      await createQuote9({ cid: custIds[k], status: "draft", total: c.avg, freq: "biweekly", createdAt: daysAgo(3) });
     }
     for (const k of ["c15", "c17", "c26", "c30", "c34"]) {
       const c = custDefs.find((x) => x.key === k);
-      await createQuote10({ cid: custIds[k], status: "declined", total: c.avg * 2.2, freq: "one-time", createdAt: daysAgo(100) });
+      await createQuote9({ cid: custIds[k], status: "declined", total: c.avg * 2.2, freq: "one-time", createdAt: daysAgo(100) });
     }
     log(`[pristine-demo] Quotes seeded`);
     let jobCount = 0;
     const completedJobIds = {};
-    async function createJob11(p2) {
+    async function createJob10(p2) {
       const id = uuid();
       const end = p2.end || new Date(p2.start.getTime() + 2.5 * 36e5);
       const note = p2.notes || JOB_NOTES[Math.floor(Math.random() * JOB_NOTES.length)];
@@ -31121,7 +32133,7 @@ async function seedPristineHomeDemo() {
       return id;
     }
     const today = /* @__PURE__ */ new Date();
-    const jenniferJobId = await createJob11({
+    const jenniferJobId = await createJob10({
       cid: custIds.c7,
       qid: quoteIds.q_c7,
       status: "in_progress",
@@ -31135,7 +32147,7 @@ async function seedPristineHomeDemo() {
     });
     completedJobIds.jennifer = jenniferJobId;
     const patriciaDone = minutesAgo(10);
-    const patriciaJobId = await createJob11({
+    const patriciaJobId = await createJob10({
       cid: custIds.c3,
       qid: quoteIds.q_c3,
       status: "completed",
@@ -31151,9 +32163,9 @@ async function seedPristineHomeDemo() {
     completedJobIds.patricia = patriciaJobId;
     const tmrw = /* @__PURE__ */ new Date();
     tmrw.setDate(tmrw.getDate() + 1);
-    await createJob11({ cid: custIds.c1, status: "scheduled", start: setTime(tmrw, 10), addr: "504 Chestnut Hill Rd, Villanova PA 19085", total: 185, empIds: [empIds.maria], recurrence: "biweekly" });
-    await createJob11({ cid: custIds.c41, status: "scheduled", start: setTime(tmrw, 6, 30), addr: "425 Lancaster Ave, Wayne PA 19087", total: 385, empIds: [empIds.maria, empIds.rosa], recurrence: "weekly", notes: "Medical office \u2014 hospital-grade products required. Before 7am." });
-    await createJob11({ cid: custIds.c4, status: "scheduled", start: setTime(tmrw, 13), addr: "15 Fox Hollow Lane, Malvern PA 19355", total: 210, empIds: [empIds.destiny], recurrence: "biweekly" });
+    await createJob10({ cid: custIds.c1, status: "scheduled", start: setTime(tmrw, 10), addr: "504 Chestnut Hill Rd, Villanova PA 19085", total: 185, empIds: [empIds.maria], recurrence: "biweekly" });
+    await createJob10({ cid: custIds.c41, status: "scheduled", start: setTime(tmrw, 6, 30), addr: "425 Lancaster Ave, Wayne PA 19087", total: 385, empIds: [empIds.maria, empIds.rosa], recurrence: "weekly", notes: "Medical office \u2014 hospital-grade products required. Before 7am." });
+    await createJob10({ cid: custIds.c4, status: "scheduled", start: setTime(tmrw, 13), addr: "15 Fox Hollow Lane, Malvern PA 19355", total: 210, empIds: [empIds.destiny], recurrence: "biweekly" });
     for (const k of biweeklyKeys) {
       const c = custDefs.find((x) => x.key === k);
       const numJobs = Math.min((c.mo || 6) * 2, 16);
@@ -31161,7 +32173,7 @@ async function seedPristineHomeDemo() {
         const jobDate = nextWeekday(daysAgo(i * 14 + Math.floor(Math.random() * 2)));
         const h = 8 + Math.floor(Math.random() * 5);
         const start = setTime(jobDate, h);
-        await createJob11({
+        await createJob10({
           cid: custIds[k],
           qid: quoteIds[`q_${k}`],
           status: "completed",
@@ -31180,7 +32192,7 @@ async function seedPristineHomeDemo() {
         const jobDate = nextWeekday(daysAgo(i * 30 + Math.floor(Math.random() * 3)));
         const h = 9 + Math.floor(Math.random() * 5);
         const start = setTime(jobDate, h);
-        await createJob11({
+        await createJob10({
           cid: custIds[k],
           qid: quoteIds[`q_${k}`],
           status: "completed",
@@ -31201,7 +32213,7 @@ async function seedPristineHomeDemo() {
       for (let i = 28; i >= 1; i--) {
         const jobDate = nextWeekday(daysAgo(i * 7));
         const start = setTime(jobDate, 7);
-        await createJob11({
+        await createJob10({
           cid: custIds[k],
           status: "completed",
           start,
@@ -31216,7 +32228,7 @@ async function seedPristineHomeDemo() {
     for (let i = 16; i >= 1; i--) {
       const jobDate = nextWeekday(daysAgo(i * 14));
       const start = setTime(jobDate, 8);
-      await createJob11({
+      await createJob10({
         cid: custIds.c43,
         status: "completed",
         start,
@@ -31239,7 +32251,7 @@ async function seedPristineHomeDemo() {
     ]) {
       const jobDate = nextWeekday(daysAgo(daysBack));
       const start = setTime(jobDate, 10);
-      const jid = await createJob11({
+      const jid = await createJob10({
         cid: custIds[k],
         status: "completed",
         start,
@@ -31252,7 +32264,7 @@ async function seedPristineHomeDemo() {
     for (let i = 5; i >= 1; i--) {
       const jobDate = nextWeekday(daysAgo(i * 30));
       const start = setTime(jobDate, 9);
-      await createJob11({
+      await createJob10({
         cid: custIds.c47,
         status: "completed",
         start,
@@ -31266,7 +32278,7 @@ async function seedPristineHomeDemo() {
       const c = custDefs.find((x) => x.key === k);
       for (const dOut of [14, 28]) {
         const jobDate = nextWeekday(daysFromNow(dOut));
-        await createJob11({
+        await createJob10({
           cid: custIds[k],
           status: "scheduled",
           start: setTime(jobDate, 9 + Math.floor(Math.random() * 4)),
@@ -31279,10 +32291,10 @@ async function seedPristineHomeDemo() {
     for (const k of ["c19", "c21", "c23", "c25", "c26", "c28", "c29", "c30"]) {
       const c = custDefs.find((x) => x.key === k);
       const jobDate = nextWeekday(daysFromNow(15 + Math.floor(Math.random() * 10)));
-      await createJob11({ cid: custIds[k], status: "scheduled", start: setTime(jobDate, 10), addr: c.addr, total: c.avg, recurrence: "monthly" });
+      await createJob10({ cid: custIds[k], status: "scheduled", start: setTime(jobDate, 10), addr: c.addr, total: c.avg, recurrence: "monthly" });
     }
     log(`[pristine-demo] ${jobCount} jobs seeded`);
-    async function createTask12(p2) {
+    async function createTask11(p2) {
       await client.query(
         `INSERT INTO growth_tasks (id,business_id,customer_id,quote_id,job_id,type,status,
            due_at,priority,estimated_value,message,metadata,escalation_stage,max_escalation,created_at,updated_at)
@@ -31303,18 +32315,18 @@ async function seedPristineHomeDemo() {
         ]
       );
     }
-    await createTask12({ cid: custIds.c36, qid: quoteIds.q_c36, type: "quote_follow_up", status: "pending", dueAt: daysAgo(3), priority: 92, val: 165, msg: "Follow up on quote \u2014 no response after 5 days", meta: { customerName: "Monica Reyes" } });
-    await createTask12({ cid: custIds.c38, qid: quoteIds.q_c38, type: "quote_follow_up", status: "pending", dueAt: daysAgo(5), priority: 88, val: 285, msg: "Follow up on deep clean quote \u2014 8 days with no reply", meta: { customerName: "Heather Simmons" } });
-    await createTask12({ cid: custIds.c3, jid: patriciaJobId, type: "review_request", status: "pending", dueAt: daysAgo(2), priority: 85, val: 0, msg: "Request review from Patricia Nguyen \u2014 just completed job", meta: { customerName: "Patricia Nguyen" } });
-    await createTask12({ cid: custIds.c40, qid: quoteIds.q_c40, type: "rebook_nudge", status: "pending", dueAt: daysAgo(1), priority: 78, val: 175, msg: "Pitch biweekly recurring \u2014 Catherine did one deep clean 3 months ago", meta: { customerName: "Catherine Duffy" } });
-    await createTask12({ cid: custIds.c32, type: "reactivation", status: "pending", dueAt: daysAgo(4), priority: 72, val: 285, msg: "Reactivation \u2014 Samantha Cruz has been dormant for 4 months", meta: { customerName: "Samantha Cruz" } });
-    await createTask12({ cid: custIds.c37, type: "reactivation", status: "pending", dueAt: daysAgo(6), priority: 65, val: 195, msg: "Win-back \u2014 Charles & Vivian Park, 7 months dormant", meta: { customerName: "Charles Park" } });
-    await createTask12({ cid: custIds.c1, type: "upsell", status: "pending", dueAt: daysAgo(1), priority: 70, val: 320, msg: "Upsell deep clean \u2014 Sarah has been a client for 8 months with no deep clean", meta: { customerName: "Sarah Mitchell" } });
-    await createTask12({ cid: custIds.c45, qid: quoteIds.q_c45, type: "quote_follow_up", status: "pending", dueAt: setTime(today, 10), priority: 95, val: 510, msg: "Priority follow-up \u2014 Berwyn Athletic Club weekly upgrade", meta: { customerName: "Berwyn Athletic Club" } });
-    await createTask12({ cid: custIds.c7, jid: jenniferJobId, type: "review_request", status: "pending", dueAt: setTime(today, 17), priority: 82, val: 0, msg: "Request review from Jennifer Walsh after today's job", meta: { customerName: "Jennifer Walsh" } });
-    await createTask12({ cid: custIds.c34, type: "rebook_nudge", status: "pending", dueAt: setTime(today, 9), priority: 75, val: 285, msg: "Rebook nudge \u2014 Emma Johansson, 5 months dormant", meta: { customerName: "Emma Johansson" } });
-    await createTask12({ cid: custIds.c2, type: "referral_ask", status: "pending", dueAt: setTime(today, 11), priority: 68, val: 200, msg: "Referral ask \u2014 James Hoffman, great relationship", meta: { customerName: "James Hoffman" } });
-    await createTask12({ cid: custIds.c13, type: "upsell", status: "pending", dueAt: setTime(today, 14), priority: 72, val: 150, msg: "Upsell add-ons for Lisa Greenbaum \u2014 no add-ons ever", meta: { customerName: "Lisa Greenbaum" } });
+    await createTask11({ cid: custIds.c36, qid: quoteIds.q_c36, type: "quote_follow_up", status: "pending", dueAt: daysAgo(3), priority: 92, val: 165, msg: "Follow up on quote \u2014 no response after 5 days", meta: { customerName: "Monica Reyes" } });
+    await createTask11({ cid: custIds.c38, qid: quoteIds.q_c38, type: "quote_follow_up", status: "pending", dueAt: daysAgo(5), priority: 88, val: 285, msg: "Follow up on deep clean quote \u2014 8 days with no reply", meta: { customerName: "Heather Simmons" } });
+    await createTask11({ cid: custIds.c3, jid: patriciaJobId, type: "review_request", status: "pending", dueAt: daysAgo(2), priority: 85, val: 0, msg: "Request review from Patricia Nguyen \u2014 just completed job", meta: { customerName: "Patricia Nguyen" } });
+    await createTask11({ cid: custIds.c40, qid: quoteIds.q_c40, type: "rebook_nudge", status: "pending", dueAt: daysAgo(1), priority: 78, val: 175, msg: "Pitch biweekly recurring \u2014 Catherine did one deep clean 3 months ago", meta: { customerName: "Catherine Duffy" } });
+    await createTask11({ cid: custIds.c32, type: "reactivation", status: "pending", dueAt: daysAgo(4), priority: 72, val: 285, msg: "Reactivation \u2014 Samantha Cruz has been dormant for 4 months", meta: { customerName: "Samantha Cruz" } });
+    await createTask11({ cid: custIds.c37, type: "reactivation", status: "pending", dueAt: daysAgo(6), priority: 65, val: 195, msg: "Win-back \u2014 Charles & Vivian Park, 7 months dormant", meta: { customerName: "Charles Park" } });
+    await createTask11({ cid: custIds.c1, type: "upsell", status: "pending", dueAt: daysAgo(1), priority: 70, val: 320, msg: "Upsell deep clean \u2014 Sarah has been a client for 8 months with no deep clean", meta: { customerName: "Sarah Mitchell" } });
+    await createTask11({ cid: custIds.c45, qid: quoteIds.q_c45, type: "quote_follow_up", status: "pending", dueAt: setTime(today, 10), priority: 95, val: 510, msg: "Priority follow-up \u2014 Berwyn Athletic Club weekly upgrade", meta: { customerName: "Berwyn Athletic Club" } });
+    await createTask11({ cid: custIds.c7, jid: jenniferJobId, type: "review_request", status: "pending", dueAt: setTime(today, 17), priority: 82, val: 0, msg: "Request review from Jennifer Walsh after today's job", meta: { customerName: "Jennifer Walsh" } });
+    await createTask11({ cid: custIds.c34, type: "rebook_nudge", status: "pending", dueAt: setTime(today, 9), priority: 75, val: 285, msg: "Rebook nudge \u2014 Emma Johansson, 5 months dormant", meta: { customerName: "Emma Johansson" } });
+    await createTask11({ cid: custIds.c2, type: "referral_ask", status: "pending", dueAt: setTime(today, 11), priority: 68, val: 200, msg: "Referral ask \u2014 James Hoffman, great relationship", meta: { customerName: "James Hoffman" } });
+    await createTask11({ cid: custIds.c13, type: "upsell", status: "pending", dueAt: setTime(today, 14), priority: 72, val: 150, msg: "Upsell add-ons for Lisa Greenbaum \u2014 no add-ons ever", meta: { customerName: "Lisa Greenbaum" } });
     const upcoming = [
       { k: "c9", type: "review_request", d: 1, p: 78, v: 0, m: "Review request \u2014 Kathleen Donahue", name: "Kathleen Donahue" },
       { k: "c6", type: "rebook_nudge", d: 2, p: 72, v: 240, m: "Rebook nudge \u2014 Thomas Burke, quarterly deep clean", name: "Thomas Burke" },
@@ -31329,7 +32341,7 @@ async function seedPristineHomeDemo() {
       { k: "c8", type: "review_request", d: 7, p: 70, v: 0, m: "Review request \u2014 Michael Thompson", name: "Michael Thompson" }
     ];
     for (const t of upcoming) {
-      await createTask12({ cid: custIds[t.k], type: t.type, status: "pending", dueAt: daysFromNow(t.d), priority: t.p, val: t.v, msg: t.m, meta: { customerName: t.name } });
+      await createTask11({ cid: custIds[t.k], type: t.type, status: "pending", dueAt: daysFromNow(t.d), priority: t.p, val: t.v, msg: t.m, meta: { customerName: t.name } });
     }
     log(`[pristine-demo] 23 growth tasks seeded`);
     const reviewDefs = [
@@ -31456,7 +32468,7 @@ function setupBodyParsing(app2) {
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
     const start = Date.now();
-    const path3 = req.path;
+    const path4 = req.path;
     let capturedJsonResponse = void 0;
     const originalResJson = res.json;
     res.json = function(bodyJson, ...args) {
@@ -31464,9 +32476,9 @@ function setupRequestLogging(app2) {
       return originalResJson.apply(res, [bodyJson, ...args]);
     };
     res.on("finish", () => {
-      if (!path3.startsWith("/api")) return;
+      if (!path4.startsWith("/api")) return;
       const duration = Date.now() - start;
-      let logLine = `${req.method} ${path3} ${res.statusCode} in ${duration}ms`;
+      let logLine = `${req.method} ${path4} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -31480,8 +32492,8 @@ function setupRequestLogging(app2) {
 }
 function getAppName() {
   try {
-    const appJsonPath = path2.resolve(process.cwd(), "app.json");
-    const appJsonContent = fs2.readFileSync(appJsonPath, "utf-8");
+    const appJsonPath = path3.resolve(process.cwd(), "app.json");
+    const appJsonContent = fs3.readFileSync(appJsonPath, "utf-8");
     const appJson = JSON.parse(appJsonContent);
     return appJson.expo?.name || "App Landing Page";
   } catch {
@@ -31489,13 +32501,13 @@ function getAppName() {
   }
 }
 function serveExpoManifest(platform, req, res) {
-  const manifestPath = path2.resolve(
+  const manifestPath = path3.resolve(
     process.cwd(),
     "static-build",
     platform,
     "manifest.json"
   );
-  if (!fs2.existsSync(manifestPath)) {
+  if (!fs3.existsSync(manifestPath)) {
     return res.status(404).json({ error: `Manifest not found for platform: ${platform}` });
   }
   res.setHeader("expo-protocol-version", "1");
@@ -31506,7 +32518,7 @@ function serveExpoManifest(platform, req, res) {
   const forwardedHost = req.header("x-forwarded-host");
   const host = forwardedHost || req.get("host") || "";
   const currentBaseUrl = `${protocol}://${host}`;
-  let manifest = fs2.readFileSync(manifestPath, "utf-8");
+  let manifest = fs3.readFileSync(manifestPath, "utf-8");
   manifest = manifest.replace(/https?:\/\/[^/"]+/g, (match) => {
     try {
       const url = new URL(match);
@@ -31545,15 +32557,18 @@ function serveLandingPage({
   res.status(200).send(html);
 }
 function configureExpoAndLanding(app2) {
-  const templatePath = path2.resolve(
+  const templatePath = path3.resolve(
     process.cwd(),
     "server",
     "templates",
     "landing-page.html"
   );
-  const landingPageTemplate = fs2.readFileSync(templatePath, "utf-8");
+  const landingPageTemplate = fs3.readFileSync(templatePath, "utf-8");
   const appName = getAppName();
   log2("Serving static Expo files with dynamic manifest routing");
+  app2.get("/health", (_req, res) => {
+    res.status(200).json({ status: "ok", ts: Date.now() });
+  });
   app2.use((req, res, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/q/") || req.path === "/privacy" || req.path === "/terms") {
       return next();
@@ -31579,25 +32594,25 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", express.static(path2.resolve(process.cwd(), "assets")));
-  app2.use("/uploads", express.static(path2.resolve(process.cwd(), "uploads")));
-  app2.use(express.static(path2.resolve(process.cwd(), "public"), { dotfiles: "allow" }));
-  app2.use(express.static(path2.resolve(process.cwd(), "static-build")));
-  const webDistPath = path2.resolve(process.cwd(), "web", "dist");
-  if (fs2.existsSync(webDistPath)) {
+  app2.use("/assets", express.static(path3.resolve(process.cwd(), "assets")));
+  app2.use("/uploads", express.static(path3.resolve(process.cwd(), "uploads")));
+  app2.use(express.static(path3.resolve(process.cwd(), "public"), { dotfiles: "allow" }));
+  app2.use(express.static(path3.resolve(process.cwd(), "static-build")));
+  const webDistPath = path3.resolve(process.cwd(), "web", "dist");
+  if (fs3.existsSync(webDistPath)) {
     app2.use("/app", express.static(webDistPath));
     app2.get("/request/:slug", async (req, res) => {
       const slug = req.params.slug?.toLowerCase().trim();
       if (!slug) return res.redirect("/");
-      const indexPath = path2.join(webDistPath, "index.html");
-      if (!fs2.existsSync(indexPath)) return res.redirect(`/intake/${slug}`);
+      const indexPath = path3.join(webDistPath, "index.html");
+      if (!fs3.existsSync(indexPath)) return res.redirect(`/intake/${slug}`);
       try {
         const { pool: pool4 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const r = await pool4.query(
           `SELECT company_name FROM businesses WHERE public_quote_slug = $1 LIMIT 1`,
           [slug]
         );
-        let html = fs2.readFileSync(indexPath, "utf8");
+        let html = fs3.readFileSync(indexPath, "utf8");
         if (r.rows[0]?.company_name) {
           html = html.replace(/<title>[^<]*<\/title>/, `<title>${r.rows[0].company_name} \u2014 Get a Free Quote</title>`);
         }
@@ -31608,8 +32623,8 @@ function configureExpoAndLanding(app2) {
     });
     app2.get("/home/:token", async (req, res) => {
       const { token } = req.params;
-      const indexPath = path2.join(webDistPath, "index.html");
-      if (!fs2.existsSync(indexPath)) return res.status(404).send("Not found");
+      const indexPath = path3.join(webDistPath, "index.html");
+      if (!fs3.existsSync(indexPath)) return res.status(404).send("Not found");
       try {
         const { pool: pool4 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const r = await pool4.query(
@@ -31625,7 +32640,7 @@ function configureExpoAndLanding(app2) {
            WHERE cp.token = $1 LIMIT 1`,
           [token]
         );
-        let html = fs2.readFileSync(indexPath, "utf8");
+        let html = fs3.readFileSync(indexPath, "utf8");
         const row = r.rows[0];
         if (row) {
           const ogTitle = `${row.company_name} \u2014 Your Cleaning Portal`;
@@ -31650,18 +32665,18 @@ function configureExpoAndLanding(app2) {
       }
     });
     app2.get("/home/:token/:subpage", (_req, res) => {
-      const indexPath = path2.join(webDistPath, "index.html");
-      if (fs2.existsSync(indexPath)) return res.sendFile(indexPath);
+      const indexPath = path3.join(webDistPath, "index.html");
+      if (fs3.existsSync(indexPath)) return res.sendFile(indexPath);
       res.status(404).send("Not found");
     });
     app2.get("/tip/:token", (_req, res) => {
-      const indexPath = path2.join(webDistPath, "index.html");
-      if (fs2.existsSync(indexPath)) return res.sendFile(indexPath);
+      const indexPath = path3.join(webDistPath, "index.html");
+      if (fs3.existsSync(indexPath)) return res.sendFile(indexPath);
       res.status(404).send("Not found");
     });
     app2.use("/employee", (_req, res) => {
-      const indexPath = path2.join(webDistPath, "index.html");
-      if (fs2.existsSync(indexPath)) return res.sendFile(indexPath);
+      const indexPath = path3.join(webDistPath, "index.html");
+      if (fs3.existsSync(indexPath)) return res.sendFile(indexPath);
       res.status(404).send("Not found");
     });
     const TOP_LEVEL_SPA_ROUTES = [
@@ -31678,22 +32693,22 @@ function configureExpoAndLanding(app2) {
     ];
     for (const route of TOP_LEVEL_SPA_ROUTES) {
       app2.get(route, (_req, res) => {
-        const indexPath = path2.join(webDistPath, "index.html");
-        if (fs2.existsSync(indexPath)) return res.sendFile(indexPath);
+        const indexPath = path3.join(webDistPath, "index.html");
+        if (fs3.existsSync(indexPath)) return res.sendFile(indexPath);
         res.status(404).send("Not found");
       });
     }
     app2.get("/commercial-cleaning-calculator", (_req, res) => {
-      const indexPath = path2.join(webDistPath, "index.html");
-      if (!fs2.existsSync(indexPath)) return res.status(404).send("Not found");
-      let html = fs2.readFileSync(indexPath, "utf8");
+      const indexPath = path3.join(webDistPath, "index.html");
+      if (!fs3.existsSync(indexPath)) return res.status(404).send("Not found");
+      let html = fs3.readFileSync(indexPath, "utf8");
       const title = "Commercial Cleaning Cost Calculator 2026 | Free Janitorial Quote Tool";
-      const desc13 = "Free commercial cleaning cost calculator. Instant janitorial quotes based on ISSA 2025 production rates. Compare to national averages. Covers offices, medical, retail, gyms, schools & warehouses.";
+      const desc14 = "Free commercial cleaning cost calculator. Instant janitorial quotes based on ISSA 2025 production rates. Compare to national averages. Covers offices, medical, retail, gyms, schools & warehouses.";
       html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
       const seoTags = [
-        `<meta name="description" content="${desc13}">`,
+        `<meta name="description" content="${desc14}">`,
         `<meta property="og:title" content="${title}">`,
-        `<meta property="og:description" content="${desc13}">`,
+        `<meta property="og:description" content="${desc14}">`,
         `<meta property="og:type" content="website">`,
         `<meta name="robots" content="index, follow">`,
         `<link rel="canonical" href="https://quotepro.ai/commercial-cleaning-calculator">`
@@ -31704,8 +32719,8 @@ function configureExpoAndLanding(app2) {
     });
     app2.use(async (req, res, next) => {
       if (req.path.startsWith("/app") || req.path.startsWith("/intake/")) {
-        const indexPath = path2.join(webDistPath, "index.html");
-        if (fs2.existsSync(indexPath)) {
+        const indexPath = path3.join(webDistPath, "index.html");
+        if (fs3.existsSync(indexPath)) {
           if (req.path.startsWith("/intake/")) {
             try {
               const code = req.path.split("/intake/")[1]?.split("/")[0];
@@ -31720,7 +32735,7 @@ function configureExpoAndLanding(app2) {
                   title = `${r.rows[0].company_name} \u2014 Quick Quote Form`;
                 }
               }
-              let html = fs2.readFileSync(indexPath, "utf8");
+              let html = fs3.readFileSync(indexPath, "utf8");
               html = html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`);
               return res.type("html").send(html);
             } catch {
@@ -31781,25 +32796,6 @@ function setupErrorHandler(app2) {
   }
   purgeSoftDeleted();
   setInterval(purgeSoftDeleted, 24 * 60 * 60 * 1e3);
-  function scheduleAnalyticsTTL() {
-    const now = /* @__PURE__ */ new Date();
-    const msTillNextCheck = 60 * 60 * 1e3;
-    setInterval(async () => {
-      const d = /* @__PURE__ */ new Date();
-      if (d.getDay() === 0 && d.getHours() === 2) {
-        try {
-          const result = await pool.query(
-            `DELETE FROM analytics_events WHERE created_at < NOW() - INTERVAL '90 days'`
-          );
-          const deleted = result.rowCount ?? 0;
-          log2(`[analytics-ttl] Purged ${deleted} analytics events older than 90 days`);
-        } catch (e) {
-          console.error("[analytics-ttl] Purge failed:", e.message);
-        }
-      }
-    }, msTillNextCheck);
-  }
-  scheduleAnalyticsTTL();
   function scheduleDripCron() {
     setInterval(async () => {
       const d = /* @__PURE__ */ new Date();
@@ -32101,8 +33097,8 @@ function setupErrorHandler(app2) {
             AND EXTRACT(DAY FROM (NOW() - last_charge_failed_at)) IN (1, 3, 7)
         `);
         if (!dunningSeries.length) return;
-        const { getStripe: getStripe7 } = await Promise.resolve().then(() => (init_clients(), clients_exports));
-        const stripe = getStripe7();
+        const { getStripe: getStripe6 } = await Promise.resolve().then(() => (init_clients(), clients_exports));
+        const stripe = getStripe6();
         if (!stripe) return;
         for (const series of dunningSeries) {
           try {
