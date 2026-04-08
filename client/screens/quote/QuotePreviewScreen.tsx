@@ -285,8 +285,20 @@ export default function QuotePreviewScreen({
         companyName: businessProfile.companyName || "Our Company",
       });
       const data = await res.json();
-      if (data.good && data.better && data.best) {
-        setAiDescriptions(data);
+      const toDescStr = (v: any): string => {
+        if (typeof v === "string" && v.trim()) return v.trim();
+        if (v && typeof v === "object") {
+          const s = v.description || v.text || v.content || Object.values(v)[0];
+          if (typeof s === "string" && s.trim()) return s.trim();
+        }
+        return "Description unavailable";
+      };
+      if (data.good || data.better || data.best) {
+        setAiDescriptions({
+          good: toDescStr(data.good),
+          better: toDescStr(data.better),
+          best: toDescStr(data.best),
+        });
       }
     } catch (err) {
       console.log("AI descriptions unavailable, using defaults");

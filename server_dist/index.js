@@ -21861,20 +21861,31 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
     if (!content) {
       return res.status(500).json({ message: "No response from AI" });
     }
+    const stripped = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const FALLBACK = "Description unavailable";
     let parsed;
     try {
-      parsed = JSON.parse(content);
+      parsed = JSON.parse(stripped);
     } catch {
-      parsed = {
-        good: content,
-        better: content,
-        best: content
-      };
+      console.warn("[quote-descriptions] JSON parse failed, raw content:", stripped.slice(0, 200));
+      return res.json({
+        good: FALLBACK,
+        better: FALLBACK,
+        best: FALLBACK
+      });
     }
+    const toStr = (v) => {
+      if (typeof v === "string" && v.trim()) return v.trim();
+      if (v && typeof v === "object") {
+        const s = v.description || v.text || v.content || Object.values(v)[0];
+        if (typeof s === "string" && s.trim()) return s.trim();
+      }
+      return FALLBACK;
+    };
     return res.json({
-      good: parsed.good || "",
-      better: parsed.better || "",
-      best: parsed.best || ""
+      good: toStr(parsed.good),
+      better: toStr(parsed.better),
+      best: toStr(parsed.best)
     });
   } catch (error) {
     console.error("AI quote descriptions error:", error);
