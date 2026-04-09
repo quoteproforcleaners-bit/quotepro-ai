@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { View, StyleSheet, ScrollView, Share, Pressable, ActivityIndicator, Platform, Alert, useWindowDimensions } from "react-native";
+import Slider from "@react-native-community/slider";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
@@ -78,7 +80,7 @@ interface Props {
   onSelectOption: (option: "good" | "better" | "best") => void;
   recommendedOption: "good" | "better" | "best";
   onSetRecommended: (option: "good" | "better" | "best") => void;
-  onSave: () => void;
+  onSave: (overrides?: { good?: number; better?: number; best?: number }) => void;
   onSaveForSend?: (priceOverrides?: { good?: number; better?: number; best?: number }) => Promise<string | null>;
   onAddOnsChange?: (addOns: AddOns) => void;
   isGuestMode?: boolean;
@@ -142,6 +144,7 @@ export default function QuotePreviewScreen({
   const [showAiPricing, setShowAiPricing] = useState(false);
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const [upsellDismissed, setUpsellDismissed] = useState(false);
+  const [priceAdjustPct, setPriceAdjustPct] = useState(0);
 
   // Smart upsell recommendations — revenue-focused suggestions based on job context
   const smartUpsells = useMemo(() => {
@@ -221,6 +224,16 @@ export default function QuotePreviewScreen({
       return null;
     }
   }, [homeDetails, addOns, frequency, pricingSettings, selectedOpt.serviceTypeId]);
+
+  const getEffectiveOverrides = useCallback(() => {
+    if (priceAdjustPct === 0) return priceOverrides;
+    const factor = 1 + priceAdjustPct / 100;
+    return {
+      good: Math.round((priceOverrides.good ?? baseOptions.good.price) * factor),
+      better: Math.round((priceOverrides.better ?? baseOptions.better.price) * factor),
+      best: Math.round((priceOverrides.best ?? baseOptions.best.price) * factor),
+    };
+  }, [priceAdjustPct, priceOverrides, baseOptions]);
 
   const emailDraft = useMemo(() => {
     const po = getPaymentOptions(businessProfile.paymentOptions);
@@ -492,7 +505,7 @@ export default function QuotePreviewScreen({
     try {
       let quoteId: string | null = null;
       if (onSaveForSend) {
-        quoteId = await onSaveForSend(priceOverrides);
+        quoteId = await onSaveForSend(getEffectiveOverrides());
       }
       if (!quoteId) {
         Alert.alert("Save Required", "Please save the quote first to export as PDF.");
@@ -575,7 +588,7 @@ export default function QuotePreviewScreen({
     try {
       let quoteId: string | null = null;
       if (onSaveForSend) {
-        quoteId = await onSaveForSend(priceOverrides);
+        quoteId = await onSaveForSend(getEffectiveOverrides());
       }
 
       const subjectMatch = aiDraft.match(/^Subject:\s*(.+?)(?:\n|$)/i);
@@ -618,7 +631,7 @@ export default function QuotePreviewScreen({
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    onSave();
+    onSave(getEffectiveOverrides());
   };
 
   const handleSaveAndSend = async () => {
@@ -627,7 +640,7 @@ export default function QuotePreviewScreen({
       return;
     }
     if (isEditMode && onSaveForSend) {
-      await onSaveForSend(priceOverrides);
+      await onSaveForSend(getEffectiveOverrides());
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -659,6 +672,8 @@ export default function QuotePreviewScreen({
   const subtotal = selectedOpt.price;
   const taxAmount = taxRate > 0 ? Math.round(subtotal * (taxRate / 100) * 100) / 100 : 0;
   const total = subtotal + taxAmount;
+  const adjustedDelta = priceAdjustPct !== 0 ? Math.round(total * (priceAdjustPct / 100) * 100) / 100 : 0;
+  const adjustedTotal = total + adjustedDelta;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -679,7 +694,7 @@ export default function QuotePreviewScreen({
                 Selected Quote
               </ThemedText>
               <ThemedText type="hero" style={{ color: theme.primary, marginTop: 4 }}>
-                {formatCurrency(total, currency, { decimals: true })}
+                {formatCurrency(adjustedTotal, currency, { decimals: true })}
               </ThemedText>
               <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2, textTransform: "capitalize" }}>
                 {selectedOpt.serviceTypeName}
@@ -978,6 +993,74 @@ export default function QuotePreviewScreen({
           ) : null
         ) : null}
 
+        <View style={[styles.adjustSliderCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+          <View style={styles.adjustSliderHeader}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Feather name="sliders" size={14} color={theme.primary} />
+              <ThemedText type="small" style={{ fontWeight: "600" }}>Price Adjustment</ThemedText>
+            </View>
+            <View style={[
+              styles.adjustBadge,
+              {
+                backgroundColor: priceAdjustPct === 0
+                  ? `${theme.border}60`
+                  : priceAdjustPct < 0
+                    ? "#DC262620"
+                    : "#16A34A20",
+              }
+            ]}>
+              <ThemedText type="caption" style={{
+                fontWeight: "700",
+                color: priceAdjustPct === 0
+                  ? theme.textSecondary
+                  : priceAdjustPct < 0
+                    ? "#DC2626"
+                    : "#16A34A",
+              }}>
+                {priceAdjustPct === 0 ? "0%" : `${priceAdjustPct > 0 ? "+" : ""}${priceAdjustPct}%`}
+              </ThemedText>
+            </View>
+          </View>
+          <View style={styles.adjustSliderTrackContainer}>
+            <View style={[styles.adjustGradientWrapper, { pointerEvents: "none" }]}>
+              <LinearGradient
+                colors={["#DC2626", "#F59E0B", "#9CA3AF", "#22C55E", "#16A34A"]}
+                locations={[0, 0.35, 0.5, 0.65, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.adjustGradientTrack}
+              />
+            </View>
+            <Slider
+              style={styles.adjustSlider}
+              minimumValue={-30}
+              maximumValue={30}
+              step={1}
+              value={priceAdjustPct}
+              onValueChange={(v) => setPriceAdjustPct(Math.round(v))}
+              minimumTrackTintColor="transparent"
+              maximumTrackTintColor="transparent"
+              thumbTintColor={theme.primary}
+              testID="slider-price-adjust"
+            />
+          </View>
+          <View style={styles.adjustLabels}>
+            <ThemedText type="caption" style={{ color: "#DC2626", fontWeight: "600" }}>-30%</ThemedText>
+            <Pressable onPress={() => setPriceAdjustPct(0)} hitSlop={8}>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>Reset</ThemedText>
+            </Pressable>
+            <ThemedText type="caption" style={{ color: "#16A34A", fontWeight: "600" }}>+30%</ThemedText>
+          </View>
+          {priceAdjustPct !== 0 ? (
+            <View style={[styles.adjustDeltaRow, { borderTopColor: theme.border }]}>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>Base price</ThemedText>
+              <ThemedText type="small" style={{ color: theme.textSecondary }}>
+                {formatCurrency(total, currency, { decimals: true })}
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
+
         {priceBreakdown ? (
           <Pressable
             onPress={() => setShowPriceBreakdown(v => !v)}
@@ -1037,10 +1120,20 @@ export default function QuotePreviewScreen({
               <ThemedText type="small" style={{ color: theme.textSecondary }}>{formatCurrency(taxAmount, currency, { decimals: true })}</ThemedText>
             </View>
           ) : null}
+          {priceAdjustPct !== 0 ? (
+            <View style={styles.breakdownRow}>
+              <ThemedText type="small" style={{ color: priceAdjustPct < 0 ? "#DC2626" : "#16A34A" }}>
+                Price Adjustment ({priceAdjustPct > 0 ? "+" : ""}{priceAdjustPct}%)
+              </ThemedText>
+              <ThemedText type="small" style={{ color: priceAdjustPct < 0 ? "#DC2626" : "#16A34A" }}>
+                {priceAdjustPct > 0 ? "+" : ""}{formatCurrency(adjustedDelta, currency, { decimals: true })}
+              </ThemedText>
+            </View>
+          ) : null}
           <View style={[styles.breakdownDivider, { backgroundColor: theme.border }]} />
           <View style={styles.breakdownRow}>
             <ThemedText type="body" style={{ fontWeight: "700" }}>Total</ThemedText>
-            <ThemedText type="body" style={{ fontWeight: "700", color: theme.primary }}>{formatCurrency(total, currency, { decimals: true })}</ThemedText>
+            <ThemedText type="body" style={{ fontWeight: "700", color: theme.primary }}>{formatCurrency(adjustedTotal, currency, { decimals: true })}</ThemedText>
           </View>
         </View>
 
@@ -1731,5 +1824,59 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+  },
+  adjustSliderCard: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  adjustSliderHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  adjustBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+  },
+  adjustSliderTrackContainer: {
+    position: "relative",
+    height: 40,
+    justifyContent: "center",
+  },
+  adjustGradientWrapper: {
+    position: "absolute",
+    left: 10,
+    right: 10,
+    top: 17,
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  adjustGradientTrack: {
+    flex: 1,
+  },
+  adjustSlider: {
+    position: "absolute",
+    left: -10,
+    right: -10,
+    height: 40,
+  },
+  adjustLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: -4,
+  },
+  adjustDeltaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    paddingTop: Spacing.sm,
+    marginTop: 4,
   },
 });

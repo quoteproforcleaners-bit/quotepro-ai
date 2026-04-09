@@ -237,7 +237,7 @@ export default function QuoteCalculatorScreen() {
     navigation.goBack();
   };
 
-  const handleSave = async () => {
+  const handleSave = async (overrides?: { good?: number; better?: number; best?: number }) => {
     if (isGuestMode) {
       await saveGuestDraft({ customer, homeDetails, addOns, frequency, selectedOption });
       setPendingAction("save");
@@ -259,7 +259,7 @@ export default function QuoteCalculatorScreen() {
       }
     }
 
-    await performSave();
+    await performSave(overrides);
   };
 
   const buildQuotePayload = (overrides?: { good?: number; better?: number; best?: number }) => {
@@ -307,9 +307,9 @@ export default function QuoteCalculatorScreen() {
     };
   };
 
-  const performSave = async () => {
+  const performSave = async (overrides?: { good?: number; better?: number; best?: number }) => {
     try {
-      const payload = buildQuotePayload();
+      const payload = buildQuotePayload(overrides);
       if (isEditMode && editQuoteId) {
         await apiRequest("PUT", `/api/quotes/${editQuoteId}`, payload);
         queryClient.invalidateQueries({ queryKey: ['/api/quotes'] });
