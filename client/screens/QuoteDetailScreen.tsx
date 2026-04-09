@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, ScrollView, Pressable, Alert, Platform, ActivityIndicator, TextInput, TextInput as RNTextInput, useWindowDimensions, Modal, Linking } from "react-native";
+import Slider from "@react-native-community/slider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
@@ -126,6 +127,19 @@ export default function QuoteDetailScreen() {
   const [clientNarrative, setClientNarrative] = useState<string | null>(null);
   const [clientNarrativeLoading, setClientNarrativeLoading] = useState(false);
   const [clientNarrativeCopied, setClientNarrativeCopied] = useState(false);
+
+  const [showDoctorModal, setShowDoctorModal] = useState(false);
+  const [doctorLoading, setDoctorLoading] = useState(false);
+  const [doctorResult, setDoctorResult] = useState<{
+    verdict: string;
+    suggested_range_low: number;
+    suggested_range_high: number;
+    coaching_note: string;
+    margin_risk: string;
+  } | null>(null);
+  const [doctorCustomPrice, setDoctorCustomPrice] = useState(0);
+  const [doctorApplying, setDoctorApplying] = useState(false);
+  const [doctorToast, setDoctorToast] = useState<string | null>(null);
 
   const { data: quote, isLoading, isError, error, refetch: refetchQuote } = useQuery<any>({
     queryKey: ['/api/quotes', route.params.quoteId],
@@ -377,6 +391,63 @@ export default function QuoteDetailScreen() {
     }
   };
 
+
+  const handleOpenDoctor = useCallback(async () => {
+    if (!quote) return;
+    const currentTotal = quote.total || 0;
+    setDoctorCustomPrice(currentTotal);
+    setDoctorResult(null);
+    setDoctorLoading(true);
+    setShowDoctorModal(true);
+    try {
+      const res = await apiRequest("POST", "/api/quote-doctor/analyze", {
+        quoteAmount: currentTotal,
+        bedrooms: quote.propertyBeds || 0,
+        bathrooms: quote.propertyBaths || 0,
+        sqft: quote.propertySqft || 0,
+        frequency: quote.frequencySelected || "one-time",
+        city: (quote.propertyDetails?.customerAddress || "").split(",").slice(-2, -1)[0]?.trim() || undefined,
+        state: (quote.propertyDetails?.customerAddress || "").split(",").slice(-1)[0]?.trim() || undefined,
+      });
+      const data = await res.json();
+      setDoctorResult(data);
+      const midpoint = Math.round(((data.suggested_range_low || currentTotal) + (data.suggested_range_high || currentTotal)) / 2);
+      setDoctorCustomPrice(midpoint);
+    } catch {
+      setDoctorResult(null);
+    } finally {
+      setDoctorLoading(false);
+    }
+  }, [quote]);
+
+  const handleApplyDoctorPrice = useCallback(async () => {
+    if (!doctorCustomPrice) return;
+    setDoctorApplying(true);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        updateMutation.mutate(
+          { total: doctorCustomPrice },
+          {
+            onSuccess: () => {
+              queryClient.invalidateQueries({ queryKey: ['/api/quotes', route.params.quoteId] });
+              resolve();
+            },
+            onError: reject,
+          }
+        );
+      });
+      setShowDoctorModal(false);
+      setDoctorToast(`Price updated to $${doctorCustomPrice.toFixed(0)}`);
+      setTimeout(() => setDoctorToast(null), 3000);
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch {
+      Alert.alert("Error", "Failed to update price. Please try again.");
+    } finally {
+      setDoctorApplying(false);
+    }
+  }, [doctorCustomPrice, updateMutation, queryClient, route.params.quoteId]);
 
   const generateClientNarrative = useCallback(async () => {
     if (!quote) return;
@@ -1187,6 +1258,47 @@ export default function QuoteDetailScreen() {
               </View>
             ) : null}
           </View>
+        </View>
+
+        {/* National Benchmark Warning (shown after QuoteDoctor result) */}
+        {doctorResult && doctorResult.verdict === "too_high" ? (() => {
+          const abovePct = Math.round(((quote.total || 0) - doctorResult.suggested_range_high) / doctorResult.suggested_range_high * 100);
+          return abovePct > 0 ? (
+            <View style={[styles.benchmarkCard, { backgroundColor: `${theme.error}10`, borderColor: `${theme.error}30` }]}>
+              <Feather name="alert-triangle" size={14} color={theme.error} />
+              <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                <ThemedText type="small" style={{ fontWeight: "700", color: theme.error }}>National Benchmark</ThemedText>
+                <ThemedText type="caption" style={{ color: theme.error, marginTop: 2 }}>
+                  {abovePct}% above national high — review your pricing
+                </ThemedText>
+              </View>
+            </View>
+          ) : null;
+        })() : null}
+
+        {/* QuoteDoctor Card */}
+        <View style={[styles.doctorCard, { backgroundColor: theme.primary }]}>
+          <View style={styles.doctorCardHeader}>
+            <View style={[styles.doctorIconCircle, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
+              <Feather name="activity" size={18} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "700" }}>QuoteDoctor</ThemedText>
+              <ThemedText type="caption" style={{ color: "rgba(255,255,255,0.75)", marginTop: 2 }}>
+                AI-optimize your price before sending
+              </ThemedText>
+            </View>
+          </View>
+          <Pressable
+            onPress={handleOpenDoctor}
+            style={[styles.doctorBtn, { backgroundColor: "rgba(255,255,255,0.2)" }]}
+            testID="button-optimize-price-ai"
+          >
+            <Feather name="zap" size={14} color="#FFFFFF" />
+            <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "700", marginLeft: 6 }}>
+              Optimize Price with AI
+            </ThemedText>
+          </Pressable>
         </View>
 
         {/* Generate Client Message */}
@@ -2957,6 +3069,142 @@ export default function QuoteDetailScreen() {
         </View>
       </Modal>
 
+      {/* QuoteDoctor AI Modal */}
+      <Modal
+        visible={showDoctorModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDoctorModal(false)}
+      >
+        <View style={styles.doctorOverlay}>
+          <View style={[styles.doctorModal, { backgroundColor: theme.cardBackground }]}>
+            <View style={styles.doctorModalHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                <View style={[styles.doctorIconCircle, { backgroundColor: `${theme.primary}15` }]}>
+                  <Feather name="activity" size={18} color={theme.primary} />
+                </View>
+                <ThemedText type="h4">Optimize Price with AI</ThemedText>
+              </View>
+              <Pressable onPress={() => setShowDoctorModal(false)} testID="close-doctor-modal">
+                <Feather name="x" size={22} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+
+            {doctorLoading ? (
+              <View style={styles.doctorLoadingContainer}>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.md, textAlign: "center" }}>
+                  Analyzing your quote...
+                </ThemedText>
+              </View>
+            ) : doctorResult ? (
+              <View style={{ gap: Spacing.lg }}>
+                {/* Before / After */}
+                <View style={[styles.doctorCompareRow, { backgroundColor: theme.backgroundRoot, borderRadius: BorderRadius.sm, padding: Spacing.md }]}>
+                  <View style={styles.doctorCompareCol}>
+                    <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center" }}>Current Price</ThemedText>
+                    <ThemedText type="h3" style={{ textAlign: "center", marginTop: 4 }}>
+                      ${(quote?.total || 0).toFixed(0)}
+                    </ThemedText>
+                  </View>
+                  <Feather name="arrow-right" size={20} color={theme.textSecondary} />
+                  <View style={styles.doctorCompareCol}>
+                    <ThemedText type="caption" style={{ color: theme.textSecondary, textAlign: "center" }}>Recommended</ThemedText>
+                    <ThemedText type="h3" style={{ color: "#16A34A", textAlign: "center", marginTop: 4 }}>
+                      ${doctorCustomPrice.toFixed(0)}
+                    </ThemedText>
+                  </View>
+                </View>
+
+                {/* Why */}
+                <View style={[styles.doctorReasonCard, { backgroundColor: `${theme.primary}08`, borderColor: `${theme.primary}20`, borderWidth: 1, borderRadius: BorderRadius.sm, padding: Spacing.md }]}>
+                  <ThemedText type="small" style={{ fontWeight: "700", color: theme.primary, marginBottom: 4 }}>Why</ThemedText>
+                  <ThemedText type="small" style={{ color: theme.textSecondary, lineHeight: 20 }}>
+                    {doctorResult.coaching_note}
+                  </ThemedText>
+                </View>
+
+                {/* Price Slider */}
+                <View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                    <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                      ${doctorResult.suggested_range_low}
+                    </ThemedText>
+                    <ThemedText type="small" style={{ fontWeight: "700", color: theme.primary }}>
+                      ${doctorCustomPrice}
+                    </ThemedText>
+                    <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                      ${doctorResult.suggested_range_high}
+                    </ThemedText>
+                  </View>
+                  <Slider
+                    minimumValue={Math.max(1, doctorResult.suggested_range_low)}
+                    maximumValue={Math.max(doctorResult.suggested_range_low + 1, doctorResult.suggested_range_high)}
+                    step={1}
+                    value={doctorCustomPrice}
+                    onValueChange={(v) => setDoctorCustomPrice(Math.round(v))}
+                    minimumTrackTintColor={theme.primary}
+                    maximumTrackTintColor={theme.border}
+                    thumbTintColor={theme.primary}
+                    testID="slider-doctor-price"
+                  />
+                </View>
+
+                {/* Buttons */}
+                <View style={{ flexDirection: "row", gap: Spacing.sm }}>
+                  <Pressable
+                    onPress={() => setShowDoctorModal(false)}
+                    style={[styles.doctorBtnSecondary, { borderColor: theme.border }]}
+                    testID="button-keep-current-price"
+                  >
+                    <ThemedText type="small" style={{ fontWeight: "600", color: theme.textSecondary }}>
+                      Keep Current Price
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={handleApplyDoctorPrice}
+                    disabled={doctorApplying}
+                    style={[styles.doctorBtnPrimary, { backgroundColor: theme.primary, flex: 1 }]}
+                    testID="button-apply-doctor-price"
+                  >
+                    {doctorApplying ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "700" }}>
+                        Apply This Price
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.doctorLoadingContainer}>
+                <Feather name="alert-circle" size={28} color={theme.textSecondary} />
+                <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.md, textAlign: "center" }}>
+                  Analysis unavailable. Please try again.
+                </ThemedText>
+                <Pressable
+                  onPress={() => setShowDoctorModal(false)}
+                  style={[styles.doctorBtnSecondary, { borderColor: theme.border, marginTop: Spacing.md }]}
+                >
+                  <ThemedText type="small" style={{ fontWeight: "600", color: theme.textSecondary }}>Close</ThemedText>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Toast */}
+      {doctorToast ? (
+        <View style={[styles.doctorToast, { backgroundColor: "#16A34A" }]}>
+          <Feather name="check-circle" size={16} color="#FFFFFF" />
+          <ThemedText type="small" style={{ color: "#FFFFFF", fontWeight: "600", marginLeft: Spacing.sm }}>
+            {doctorToast}
+          </ThemedText>
+        </View>
+      ) : null}
+
       <FounderModal
         visible={showFounderModal}
         onDismiss={() => setShowFounderModal(false)}
@@ -3446,5 +3694,111 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xs,
     alignItems: "center",
     justifyContent: "center",
+  },
+  benchmarkCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  doctorCard: {
+    borderRadius: BorderRadius.sm,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    gap: Spacing.md,
+  },
+  doctorCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  doctorIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  doctorBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    gap: 6,
+  },
+  doctorOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  doctorModal: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.xl,
+    gap: Spacing.lg,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  doctorModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  doctorLoadingContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing["2xl"],
+    gap: Spacing.sm,
+  },
+  doctorCompareRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  doctorCompareCol: {
+    alignItems: "center",
+    flex: 1,
+  },
+  doctorReasonCard: {},
+  doctorBtnPrimary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+  },
+  doctorBtnSecondary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  doctorToast: {
+    position: "absolute",
+    bottom: 40,
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
 });
