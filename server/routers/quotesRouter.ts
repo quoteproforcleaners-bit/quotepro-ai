@@ -150,6 +150,43 @@ const router = Router();
     }
   });
 
+  router.get("/quotes/unscheduled-accepted", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const result = await pool.query(
+        `SELECT q.*, c.first_name AS customer_first_name, c.last_name AS customer_last_name
+         FROM quotes q
+         LEFT JOIN customers c ON c.id = q.customer_id
+         WHERE q.business_id = $1
+           AND q.status = 'accepted'
+           AND NOT EXISTS (
+             SELECT 1 FROM jobs j WHERE j.quote_id = q.id
+           )
+         ORDER BY q.accepted_at DESC NULLS LAST
+         LIMIT 50`,
+        [business.id]
+      );
+      return res.json(result.rows.map((r: any) => ({
+        id: r.id,
+        customerName: r.customer_first_name
+          ? `${r.customer_first_name} ${r.customer_last_name || ""}`.trim()
+          : r.customer_name || "Unknown Customer",
+        customerId: r.customer_id,
+        total: r.total,
+        selectedOption: r.selected_option,
+        options: r.options,
+        frequencySelected: r.frequency_selected,
+        propertyDetails: r.property_details,
+        acceptedAt: r.accepted_at,
+        address: r.property_details?.customerAddress || "",
+      })));
+    } catch (error: any) {
+      console.error("Unscheduled accepted quotes error:", error);
+      return res.status(500).json({ message: "Failed to get unscheduled quotes" });
+    }
+  });
+
   router.get("/quotes/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const q = await getQuoteById(req.params.id);
@@ -452,43 +489,6 @@ const router = Router();
       return res.json({ message: "Deleted" });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to delete quote" });
-    }
-  });
-
-  router.get("/quotes/unscheduled-accepted", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const business = await getBusinessByOwner(req.session.userId!);
-      if (!business) return res.status(404).json({ message: "Business not found" });
-      const result = await pool.query(
-        `SELECT q.*, c.first_name AS customer_first_name, c.last_name AS customer_last_name
-         FROM quotes q
-         LEFT JOIN customers c ON c.id = q.customer_id
-         WHERE q.business_id = $1
-           AND q.status = 'accepted'
-           AND NOT EXISTS (
-             SELECT 1 FROM jobs j WHERE j.quote_id = q.id
-           )
-         ORDER BY q.accepted_at DESC NULLS LAST
-         LIMIT 50`,
-        [business.id]
-      );
-      return res.json(result.rows.map((r: any) => ({
-        id: r.id,
-        customerName: r.customer_first_name
-          ? `${r.customer_first_name} ${r.customer_last_name || ""}`.trim()
-          : r.customer_name || "Unknown Customer",
-        customerId: r.customer_id,
-        total: r.total,
-        selectedOption: r.selected_option,
-        options: r.options,
-        frequencySelected: r.frequency_selected,
-        propertyDetails: r.property_details,
-        acceptedAt: r.accepted_at,
-        address: r.property_details?.customerAddress || "",
-      })));
-    } catch (error: any) {
-      console.error("Unscheduled accepted quotes error:", error);
-      return res.status(500).json({ message: "Failed to get unscheduled quotes" });
     }
   });
 

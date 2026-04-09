@@ -1951,7 +1951,7 @@ export async function sendWinLossFollowUps(): Promise<void> {
     }>(`
       SELECT
         q.id               AS quote_id,
-        c.name             AS customer_name,
+        TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS customer_name,
         c.email            AS customer_email,
         b.id               AS business_id,
         b.name             AS business_name,

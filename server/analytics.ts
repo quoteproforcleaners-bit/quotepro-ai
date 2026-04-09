@@ -397,8 +397,11 @@ export async function computeAndUpdateChurnScores(): Promise<void> {
              u.churn_intervention_sent_at,
              EXTRACT(EPOCH FROM (NOW() - u.last_active_at)) / 86400 AS days_since_active
       FROM users u
-      WHERE u.subscription_tier IN ('starter','growth','pro')
-         OR (u.subscription_tier = 'free' AND u.created_at > NOW() - INTERVAL '21 days')
+      WHERE u.email NOT LIKE '%privaterelay.appleid.com'
+        AND (
+          u.subscription_tier IN ('starter','growth','pro')
+          OR (u.subscription_tier = 'free' AND u.created_at > NOW() - INTERVAL '21 days')
+        )
       ORDER BY u.id
     `);
 
