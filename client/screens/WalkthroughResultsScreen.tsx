@@ -138,9 +138,29 @@ export default function WalkthroughResultsScreen() {
       const addOnsList = fields.addOns || [];
       const addOnsObj: Record<string, boolean> = {};
       const addOnMap: Record<string, string> = {
-        fridge: "insideFridge", oven: "insideOven", cabinets: "insideCabinets",
-        windows: "interiorWindows", blinds: "blinds", baseboards: "baseboards",
-        laundry: "laundry", dishes: "dishes", organization: "organization",
+        fridge: "insideFridge",
+        "inside fridge": "insideFridge",
+        refrigerator: "insideFridge",
+        oven: "insideOven",
+        "inside oven": "insideOven",
+        stove: "insideOven",
+        cabinets: "insideCabinets",
+        "inside cabinets": "insideCabinets",
+        windows: "interiorWindows",
+        "interior windows": "interiorWindows",
+        "window cleaning": "interiorWindows",
+        blinds: "blindsDetail",
+        "blinds detail": "blindsDetail",
+        baseboards: "baseboardsDetail",
+        "baseboards detail": "baseboardsDetail",
+        laundry: "laundryFoldOnly",
+        "laundry fold": "laundryFoldOnly",
+        "laundry fold only": "laundryFoldOnly",
+        dishes: "dishes",
+        organization: "organizationTidy",
+        organizing: "organizationTidy",
+        "organization/tidy": "organizationTidy",
+        tidy: "organizationTidy",
       };
       for (const a of addOnsList) {
         const key = addOnMap[a.toLowerCase()];
@@ -218,7 +238,13 @@ export default function WalkthroughResultsScreen() {
   if (fields.serviceCategory) detailItems.push({ label: "Service Type", value: fields.serviceCategory });
   if (fields.petCount) detailItems.push({ label: "Pets", value: `${fields.petCount} ${fields.petType || ""}`.trim() });
   if (fields.conditionLevel) detailItems.push({ label: "Condition", value: fields.conditionLevel });
-  if (fields.addOns && fields.addOns.length > 0) detailItems.push({ label: "Add-Ons", value: fields.addOns.join(", ") });
+  if (fields.addOns && fields.addOns.length > 0) {
+    const formatAddOn = (a: string) =>
+      a.includes(" ")
+        ? a.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")
+        : a.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
+    detailItems.push({ label: "Add-Ons", value: fields.addOns.map(formatAddOn).join(", ") });
+  }
   if (fields.notes) detailItems.push({ label: "Notes", value: fields.notes });
 
   const { breakdown } = recommendation;

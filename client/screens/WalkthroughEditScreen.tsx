@@ -79,6 +79,50 @@ const ADD_ON_OPTIONS = [
   { key: "organization", label: "Organization/Tidy" },
 ];
 
+const ADDON_ALIAS_TO_LABEL: Record<string, string> = {
+  "inside fridge": "Inside Fridge",
+  "insideFridge": "Inside Fridge",
+  "fridge": "Inside Fridge",
+  "refrigerator": "Inside Fridge",
+  "inside oven": "Inside Oven",
+  "insideOven": "Inside Oven",
+  "oven": "Inside Oven",
+  "stove": "Inside Oven",
+  "inside cabinets": "Inside Cabinets",
+  "insideCabinets": "Inside Cabinets",
+  "cabinets": "Inside Cabinets",
+  "interior windows": "Interior Windows",
+  "interiorWindows": "Interior Windows",
+  "window cleaning": "Interior Windows",
+  "windows": "Interior Windows",
+  "blinds detail": "Blinds Detail",
+  "blindsDetail": "Blinds Detail",
+  "blinds": "Blinds Detail",
+  "baseboards detail": "Baseboards Detail",
+  "baseboardsDetail": "Baseboards Detail",
+  "baseboards": "Baseboards Detail",
+  "laundry fold only": "Laundry",
+  "laundryFoldOnly": "Laundry",
+  "laundry fold": "Laundry",
+  "laundry": "Laundry",
+  "dishes": "Dishes",
+  "organization/tidy": "Organization/Tidy",
+  "organizationTidy": "Organization/Tidy",
+  "organizing": "Organization/Tidy",
+  "organization": "Organization/Tidy",
+  "tidy": "Organization/Tidy",
+};
+
+function normalizeAddOns(rawAddOns: string[]): string[] {
+  return rawAddOns.map((a) => {
+    const lower = a.toLowerCase();
+    for (const [alias, label] of Object.entries(ADDON_ALIAS_TO_LABEL)) {
+      if (alias.toLowerCase() === lower) return label;
+    }
+    return a;
+  });
+}
+
 export default function WalkthroughEditScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<EditRoute>();
@@ -98,7 +142,7 @@ export default function WalkthroughEditScreen() {
   const [conditionLevel, setConditionLevel] = useState(initial.conditionLevel || "good");
   const [petType, setPetType] = useState(initial.petType || "none");
   const [petCount, setPetCount] = useState(initial.petCount || 0);
-  const [addOns, setAddOns] = useState<string[]>(initial.addOns || []);
+  const [addOns, setAddOns] = useState<string[]>(normalizeAddOns(initial.addOns || []));
   const [notes, setNotes] = useState(initial.notes || "");
 
   const toggleAddOn = (addOnLabel: string) => {

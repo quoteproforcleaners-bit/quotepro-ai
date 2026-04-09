@@ -23,6 +23,14 @@ interface QuoteCardProps {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+function formatAddOnLabel(name: string): string {
+  if (name.includes(" ")) return name;
+  return name
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (s) => s.toUpperCase())
+    .trim();
+}
+
 export function QuoteCard({
   option,
   isSelected,
@@ -214,7 +222,7 @@ export function QuoteCard({
                 color={theme.primary}
                 style={styles.addOnIcon}
               />
-              <ThemedText type="caption">{addOn}</ThemedText>
+              <ThemedText type="caption">{formatAddOnLabel(addOn)}</ThemedText>
             </View>
           ))}
         </View>

@@ -157,7 +157,10 @@ function IntakeCard({
     f.sqft != null ? `${f.sqft.toLocaleString()} sqft` : null,
   ].filter(Boolean).join(" · ");
 
-  const addOnKeys = Object.entries(f.addOns || {}).filter(([, v]) => v).map(([k]) => ADDON_LABELS[k] || k);
+  const addOnKeys = Object.entries(f.addOns || {}).filter(([, v]) => v).map(([k]) => {
+    if (ADDON_LABELS[k]) return ADDON_LABELS[k];
+    return k.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
+  });
   const isDone = tab === "done";
   const contactLine = item.customerPhone || item.customerEmail || "";
 
