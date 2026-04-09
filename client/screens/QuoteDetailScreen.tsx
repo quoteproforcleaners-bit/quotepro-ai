@@ -1387,32 +1387,35 @@ export default function QuoteDetailScreen() {
         ) : null}
 
         {(stripeStatus as any)?.connected && quote.paymentStatus !== "paid" ? (
-          <Pressable
-            onPress={handleRequestPayment}
-            disabled={paymentLoading}
-            style={[
-              styles.detailsCard,
-              {
-                backgroundColor: "#635BFF",
-                borderColor: "#635BFF",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: Spacing.sm,
-                paddingVertical: 14,
-              },
-            ]}
-            testID="button-request-payment"
-          >
-            {paymentLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Feather name="credit-card" size={18} color="#FFFFFF" />
-            )}
-            <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
-              Copy Payment Link
-            </ThemedText>
-          </Pressable>
+          <>
+            <SectionHeader title="Customer View" />
+            <Pressable
+              onPress={handleRequestPayment}
+              disabled={paymentLoading}
+              style={[
+                styles.detailsCard,
+                {
+                  backgroundColor: "#635BFF",
+                  borderColor: "#635BFF",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: Spacing.sm,
+                  paddingVertical: 14,
+                },
+              ]}
+              testID="button-request-payment"
+            >
+              {paymentLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Feather name="eye" size={18} color="#FFFFFF" />
+              )}
+              <ThemedText type="body" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                Preview Customer Quote
+              </ThemedText>
+            </Pressable>
+          </>
         ) : null}
 
         {(businessProfile.venmoHandle || businessProfile.cashappHandle) && quote.paymentStatus !== "paid" ? (
