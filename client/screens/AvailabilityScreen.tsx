@@ -96,7 +96,7 @@ function RowPicker({
 }
 
 export default function AvailabilityScreen() {
-  const { theme } = useTheme();
+  const { theme, isDark } = useTheme();
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -238,7 +238,7 @@ export default function AvailabilityScreen() {
                 style={[
                   styles.dayPill,
                   {
-                    backgroundColor: active ? theme.primary : (theme.isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"),
+                    backgroundColor: active ? theme.primary : (isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"),
                     borderColor: active ? theme.primary : theme.border,
                   },
                 ]}

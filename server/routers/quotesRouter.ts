@@ -7,6 +7,7 @@ import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter, isGrowthOrAbove } from "../middleware";
 import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
+import { stripJsonFences } from "../services/ai.service";
 import { fallbackCommercialScope, fallbackRiskScan } from "../aiFallbacks";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
@@ -542,7 +543,7 @@ const router = Router();
       const content = (completion.content[0] as any).text;
       let parsed: any = {};
       try {
-        parsed = JSON.parse(content || "{}");
+        parsed = JSON.parse(stripJsonFences(content || "{}"));
       } catch {}
 
       return res.json({
@@ -593,7 +594,7 @@ const router = Router();
       const content = (completion.content[0] as any).text;
       let parsed: any = {};
       try {
-        parsed = JSON.parse(content || "{}");
+        parsed = JSON.parse(stripJsonFences(content || "{}"));
       } catch {}
 
       return res.json({
@@ -1125,7 +1126,7 @@ The email should:
         const content = (completion.content[0] as any).text;
         if (!content) throw new Error("No AI response");
 
-        const parsed = JSON.parse(content);
+        const parsed = JSON.parse(stripJsonFences(content));
         return res.json({
           subject: parsed.subject || `Your Cleaning Quote from ${companyName}`,
           body: parsed.body || "",

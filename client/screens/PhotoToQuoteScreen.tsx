@@ -50,7 +50,7 @@ const CLEAN_LEVEL_COLORS = {
 };
 
 export default function PhotoToQuoteScreen() {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -165,10 +165,8 @@ export default function PhotoToQuoteScreen() {
     });
   };
 
-  const dt = theme;
-
   return (
-    <ThemedView style={{ flex: 1, backgroundColor: dt.background }}>
+    <ThemedView style={{ flex: 1, backgroundColor: theme.background }}>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -198,14 +196,14 @@ export default function PhotoToQuoteScreen() {
             )}
           </View>
         ) : (
-          <View style={[styles.placeholder, { backgroundColor: dt.backgroundSecondary, borderColor: dt.border }]}>
-            <Feather name="camera" size={32} color={dt.textSecondary} />
-            <ThemedText type="body" style={{ color: dt.textSecondary, marginTop: Spacing.sm }}>
+          <View style={[styles.placeholder, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+            <Feather name="camera" size={32} color={theme.textSecondary} />
+            <ThemedText type="body" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
               No photo selected
             </ThemedText>
             <Pressable
               onPress={showOptions}
-              style={[styles.addPhotoBtn, { backgroundColor: dt.primary }]}
+              style={[styles.addPhotoBtn, { backgroundColor: theme.primary }]}
             >
               <ThemedText type="small" style={{ color: "white", fontWeight: "700" }}>
                 Add a Photo
@@ -216,12 +214,12 @@ export default function PhotoToQuoteScreen() {
 
         {/* Loading state */}
         {loading && (
-          <View style={[styles.card, { backgroundColor: dt.cardBackground, borderColor: dt.border }]}>
-            <ActivityIndicator size="large" color={dt.primary} style={{ marginBottom: Spacing.md }} />
+          <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+            <ActivityIndicator size="large" color={theme.primary} style={{ marginBottom: Spacing.md }} />
             <ThemedText type="body" style={{ fontWeight: "700", textAlign: "center" }}>
               Analyzing your space...
             </ThemedText>
-            <ThemedText type="small" style={{ color: dt.textSecondary, textAlign: "center", marginTop: 4 }}>
+            <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", marginTop: 4 }}>
               Our AI is estimating cleaning requirements
             </ThemedText>
           </View>
@@ -248,7 +246,7 @@ export default function PhotoToQuoteScreen() {
         {/* Estimate result card */}
         {estimate && !loading && (
           <>
-            <View style={[styles.card, { backgroundColor: dt.cardBackground, borderColor: dt.border }]}>
+            <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
               {/* Header */}
               <View style={styles.estimateHeader}>
                 <View style={[styles.sparkleIcon, { backgroundColor: "#eff6ff" }]}>
@@ -278,20 +276,20 @@ export default function PhotoToQuoteScreen() {
 
               {/* Key facts */}
               <View style={styles.factsGrid}>
-                <View style={[styles.factBox, { backgroundColor: dt.backgroundSecondary }]}>
-                  <ThemedText type="small" style={{ color: dt.textSecondary }}>Space</ThemedText>
+                <View style={[styles.factBox, { backgroundColor: theme.backgroundSecondary }]}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>Space</ThemedText>
                   <ThemedText type="body" style={{ fontWeight: "700", textTransform: "capitalize" }}>
                     {estimate.spaceType}
                   </ThemedText>
                 </View>
-                <View style={[styles.factBox, { backgroundColor: dt.backgroundSecondary }]}>
-                  <ThemedText type="small" style={{ color: dt.textSecondary }}>Est. Size</ThemedText>
+                <View style={[styles.factBox, { backgroundColor: theme.backgroundSecondary }]}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>Est. Size</ThemedText>
                   <ThemedText type="body" style={{ fontWeight: "700" }}>
                     ~{estimate.estimatedSqft} sqft
                   </ThemedText>
                 </View>
-                <View style={[styles.factBox, { backgroundColor: dt.backgroundSecondary }]}>
-                  <ThemedText type="small" style={{ color: dt.textSecondary }}>Service</ThemedText>
+                <View style={[styles.factBox, { backgroundColor: theme.backgroundSecondary }]}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>Service</ThemedText>
                   <ThemedText
                     type="body"
                     style={{ fontWeight: "700", color: CLEAN_LEVEL_COLORS[estimate.cleanLevel] }}
@@ -299,8 +297,8 @@ export default function PhotoToQuoteScreen() {
                     {CLEAN_LEVEL_LABELS[estimate.cleanLevel]}
                   </ThemedText>
                 </View>
-                <View style={[styles.factBox, { backgroundColor: dt.backgroundSecondary }]}>
-                  <ThemedText type="small" style={{ color: dt.textSecondary }}>Time</ThemedText>
+                <View style={[styles.factBox, { backgroundColor: theme.backgroundSecondary }]}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>Time</ThemedText>
                   <ThemedText type="body" style={{ fontWeight: "700" }}>
                     {estimate.timeRangeHours.min}–{estimate.timeRangeHours.max} hrs
                   </ThemedText>
@@ -320,13 +318,13 @@ export default function PhotoToQuoteScreen() {
               {/* Observations */}
               {estimate.observations.length > 0 && (
                 <View style={{ marginTop: Spacing.md }}>
-                  <ThemedText type="small" style={{ color: dt.textSecondary, fontWeight: "600", marginBottom: Spacing.xs }}>
+                  <ThemedText type="small" style={{ color: theme.textSecondary, fontWeight: "600", marginBottom: Spacing.xs }}>
                     Key Observations
                   </ThemedText>
                   {estimate.observations.map((obs, i) => (
                     <View key={i} style={styles.obsRow}>
-                      <View style={[styles.obsDot, { backgroundColor: dt.primary }]} />
-                      <ThemedText type="small" style={{ flex: 1, color: dt.text, lineHeight: 18 }}>
+                      <View style={[styles.obsDot, { backgroundColor: theme.primary }]} />
+                      <ThemedText type="small" style={{ flex: 1, color: theme.text, lineHeight: 18 }}>
                         {obs}
                       </ThemedText>
                     </View>
@@ -338,7 +336,7 @@ export default function PhotoToQuoteScreen() {
             {/* Actions */}
             <Pressable
               onPress={handleBuildQuote}
-              style={[styles.primaryBtn, { backgroundColor: dt.primary }]}
+              style={[styles.primaryBtn, { backgroundColor: theme.primary }]}
               testID="button-build-quote-from-photo"
             >
               <Feather name="file-text" size={16} color="white" />
@@ -349,10 +347,10 @@ export default function PhotoToQuoteScreen() {
 
             <Pressable
               onPress={showOptions}
-              style={[styles.secondaryBtn, { borderColor: dt.border }]}
+              style={[styles.secondaryBtn, { borderColor: theme.border }]}
             >
-              <Feather name="camera" size={15} color={dt.textSecondary} />
-              <ThemedText type="body" style={{ color: dt.textSecondary, fontWeight: "600", marginLeft: Spacing.sm }}>
+              <Feather name="camera" size={15} color={theme.textSecondary} />
+              <ThemedText type="body" style={{ color: theme.textSecondary, fontWeight: "600", marginLeft: Spacing.sm }}>
                 Try a Different Photo
               </ThemedText>
             </Pressable>

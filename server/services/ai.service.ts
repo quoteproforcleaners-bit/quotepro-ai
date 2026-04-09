@@ -36,6 +36,19 @@ export interface GenerateTextOptionsStream extends GenerateTextOptionsBase {
   stream: true;
 }
 
+// ─── JSON fence stripper ──────────────────────────────────────────────────────
+/**
+ * Strip Markdown code fences that Claude sometimes wraps JSON responses in.
+ * e.g. ```json\n{...}\n``` → {...}
+ * Safe to call on plain JSON strings — returns them unchanged.
+ */
+export function stripJsonFences(raw: string): string {
+  return raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim();
+}
+
 // ─── generateText overloads ───────────────────────────────────────────────────
 
 export async function generateText(opts: GenerateTextOptionsStream): Promise<Anthropic.MessageStream>;

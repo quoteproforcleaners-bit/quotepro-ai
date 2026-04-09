@@ -29,7 +29,7 @@ interface ReferralData {
 }
 
 export default function ReferralScreen() {
-  const theme = useTheme();
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const [copied, setCopied] = useState(false);
@@ -57,10 +57,8 @@ export default function ReferralScreen() {
     } catch {}
   };
 
-  const dt = theme;
-
   return (
-    <ThemedView style={{ flex: 1, backgroundColor: dt.background }}>
+    <ThemedView style={{ flex: 1, backgroundColor: theme.background }}>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -100,18 +98,18 @@ export default function ReferralScreen() {
           ].map((s) => (
             <View
               key={s.label}
-              style={[styles.statCard, { backgroundColor: dt.cardBackground, borderColor: dt.border, flex: 1 }]}
+              style={[styles.statCard, { backgroundColor: theme.cardBackground, borderColor: theme.border, flex: 1 }]}
             >
               <View style={[styles.statIcon, { backgroundColor: `${s.color}18` }]}>
                 <Feather name={s.icon} size={16} color={s.color} />
               </View>
               <ThemedText
                 type="title"
-                style={{ fontSize: 22, fontWeight: "800", color: dt.text, marginTop: Spacing.xs }}
+                style={{ fontSize: 22, fontWeight: "800", color: theme.text, marginTop: Spacing.xs }}
               >
                 {isLoading ? "—" : s.value}
               </ThemedText>
-              <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: 2 }}>
+              <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: 2 }}>
                 {s.label}
               </ThemedText>
             </View>
@@ -119,15 +117,15 @@ export default function ReferralScreen() {
         </View>
 
         {/* Referral link card */}
-        <View style={[styles.card, { backgroundColor: dt.cardBackground, borderColor: dt.border }]}>
+        <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
           <ThemedText type="body" style={{ fontWeight: "700", marginBottom: Spacing.md }}>
             Your referral link
           </ThemedText>
 
-          <View style={[styles.linkBox, { backgroundColor: dt.backgroundSecondary, borderColor: dt.border }]}>
+          <View style={[styles.linkBox, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
             <ThemedText
               type="small"
-              style={{ color: dt.textSecondary, flex: 1, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
+              style={{ color: theme.textSecondary, flex: 1, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -152,23 +150,23 @@ export default function ReferralScreen() {
 
             <Pressable
               onPress={handleShare}
-              style={[styles.actionBtn, { backgroundColor: dt.backgroundSecondary, borderWidth: 1, borderColor: dt.border, flex: 1 }]}
+              style={[styles.actionBtn, { backgroundColor: theme.backgroundSecondary, borderWidth: 1, borderColor: theme.border, flex: 1 }]}
               testID="button-share-referral"
             >
-              <Feather name="share-2" size={15} color={dt.text} />
-              <ThemedText type="small" style={{ color: dt.text, fontWeight: "700", marginLeft: Spacing.xs }}>
+              <Feather name="share-2" size={15} color={theme.text} />
+              <ThemedText type="small" style={{ color: theme.text, fontWeight: "700", marginLeft: Spacing.xs }}>
                 Share
               </ThemedText>
             </Pressable>
           </View>
 
-          <ThemedText type="small" style={{ color: dt.textSecondary, marginTop: Spacing.sm }}>
-            Code: <ThemedText type="small" style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", fontWeight: "700", color: dt.text }}>{data?.referralCode ?? "—"}</ThemedText>
+          <ThemedText type="small" style={{ color: theme.textSecondary, marginTop: Spacing.sm }}>
+            Code: <ThemedText type="small" style={{ fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace", fontWeight: "700", color: theme.text }}>{data?.referralCode ?? "—"}</ThemedText>
           </ThemedText>
         </View>
 
         {/* How it works */}
-        <View style={[styles.card, { backgroundColor: dt.cardBackground, borderColor: dt.border }]}>
+        <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
           <ThemedText type="body" style={{ fontWeight: "700", marginBottom: Spacing.lg }}>
             How it works
           </ThemedText>
@@ -183,14 +181,14 @@ export default function ReferralScreen() {
               </View>
               <View style={{ flex: 1, marginLeft: Spacing.md }}>
                 <ThemedText type="body" style={{ fontWeight: "700", marginBottom: 2 }}>{item.title}</ThemedText>
-                <ThemedText type="small" style={{ color: dt.textSecondary, lineHeight: 18 }}>{item.desc}</ThemedText>
+                <ThemedText type="small" style={{ color: theme.textSecondary, lineHeight: 18 }}>{item.desc}</ThemedText>
               </View>
             </View>
           ))}
         </View>
 
         {/* Fine print */}
-        <ThemedText type="small" style={{ color: dt.textSecondary, textAlign: "center", paddingHorizontal: Spacing.xl, lineHeight: 18 }}>
+        <ThemedText type="small" style={{ color: theme.textSecondary, textAlign: "center", paddingHorizontal: Spacing.xl, lineHeight: 18 }}>
           Credit applied after friend's 30-day paid subscription. Max 6 months total credit per account.
         </ThemedText>
       </ScrollView>

@@ -8,7 +8,7 @@ import { pool, db } from "../db";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
-import { generateText, anthropic, MODEL } from "../services/ai.service";
+import { generateText, anthropic, MODEL, stripJsonFences } from "../services/ai.service";
 import { callAI, AIError } from "../aiClient";
 import { trackEvent } from "../analytics";
 import { sanitizeAndLog } from "../promptSanitizer";
@@ -150,7 +150,7 @@ const router = Router();
       });
 
       let parsed: any = {};
-      try { parsed = JSON.parse(content || "{}"); } catch {}
+      try { parsed = JSON.parse(stripJsonFences(content || "{}")); } catch {}
 
       await updateQuote(quoteId, {
         closeProbability: parsed.closeProbability || null,
@@ -326,7 +326,7 @@ ${contextStr}`;
 
       let structured: any = {};
       try {
-        structured = JSON.parse(rawContent);
+        structured = JSON.parse(stripJsonFences(rawContent));
       } catch {
         structured = { mode: "coaching", quickTakeaway: rawContent, approach: "", scripts: [], alternateVersions: [], nextStep: "" };
       }
@@ -886,7 +886,7 @@ ${addOnsList.length > 0 ? `Add-ons included in best: ${addOnsList.join(", ")}` :
 
       let parsed: any;
       try {
-        parsed = JSON.parse(content);
+        parsed = JSON.parse(stripJsonFences(content));
       } catch {
         parsed = {
           good: content,
@@ -961,7 +961,7 @@ ${historyContext}`;
       if (!content) return res.status(500).json({ message: "No response from AI" });
 
       let parsed: any;
-      try { parsed = JSON.parse(content); } catch { return res.status(500).json({ message: "Invalid AI response" }); }
+      try { parsed = JSON.parse(stripJsonFences(content)); } catch { return res.status(500).json({ message: "Invalid AI response" }); }
 
       // Hard floor: AI price must never be below the current formula price
       const floorPrice = (aiPrice: number | undefined, base: number): number => {
@@ -1109,7 +1109,7 @@ Field rules:
 
       let parsed: any;
       try {
-        parsed = JSON.parse(content);
+        parsed = JSON.parse(stripJsonFences(content));
       } catch {
         console.error("Walkthrough AI JSON parse failed:", content?.slice(0, 200));
         return res.status(500).json({ message: "AI response could not be parsed. Please try again." });
@@ -1240,7 +1240,7 @@ Return exactly this JSON structure:
 
       let parsed: any = {};
       try {
-        parsed = JSON.parse(content);
+        parsed = JSON.parse(stripJsonFences(content));
       } catch {
         return res.json({ message: content.trim(), primaryReply: content.trim() });
       }

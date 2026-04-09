@@ -4349,6 +4349,9 @@ var init_analytics = __esm({
 });
 
 // server/services/ai.service.ts
+function stripJsonFences(raw) {
+  return raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+}
 async function generateText({
   system,
   messages,
@@ -14577,6 +14580,7 @@ init_db();
 import { Router as Router17 } from "express";
 import { eq as eq8, and as and7 } from "drizzle-orm";
 init_clients();
+init_ai_service();
 init_analytics();
 
 // server/badgeRewards.ts
@@ -15449,7 +15453,7 @@ router15.post("/commercial/generate-scope", requireAuth, requireGrowth, async (r
     const content = completion.content[0].text;
     let parsed = {};
     try {
-      parsed = JSON.parse(content || "{}");
+      parsed = JSON.parse(stripJsonFences(content || "{}"));
     } catch {
     }
     return res.json({
@@ -15502,7 +15506,7 @@ router15.post("/commercial/risk-scan", requireAuth, requireGrowth, async (req, r
     const content = completion.content[0].text;
     let parsed = {};
     try {
-      parsed = JSON.parse(content || "{}");
+      parsed = JSON.parse(stripJsonFences(content || "{}"));
     } catch {
     }
     return res.json({
@@ -15975,7 +15979,7 @@ The email should:
       });
       const content = completion.content[0].text;
       if (!content) throw new Error("No AI response");
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(stripJsonFences(content));
       return res.json({
         subject: parsed.subject || `Your Cleaning Quote from ${companyName2}`,
         body: parsed.body || ""
