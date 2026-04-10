@@ -1109,64 +1109,134 @@ export default function QuoteDetailPage() {
  </div>
  </Card>
 
- {/* QuoteDoctor CTA — visible for draft and sent quotes */}
- {(quote.status === "draft" || quote.status === "sent") ? (
- <div
- style={{
- background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)",
- borderRadius: 14,
- padding: "18px 20px",
- position: "relative",
- overflow: "hidden",
- }}
- >
- {/* Subtle glow blob */}
+ {/* QuoteDoctor — inline market intelligence */}
+ {(quote.status === "draft" || quote.status === "sent") ? (() => {
+ const _price = Number(quote.total || 0);
+ const _beds = Number(details?.beds || 0);
+ const _freq = quote.frequencySelected;
+ const RES_BM: Record<number,{low:number;high:number;avg:number}> = {
+   1:{low:75,high:110,avg:92}, 2:{low:100,high:155,avg:127},
+   3:{low:130,high:185,avg:157}, 4:{low:175,high:250,avg:212}, 5:{low:220,high:340,avg:278},
+ };
+ const _bm = _beds > 0 ? RES_BM[Math.min(5, Math.max(1, _beds))] : null;
+ const _adjLow = _bm ? ((_freq==="weekly"||_freq==="biweekly") ? _bm.low*0.8 : _bm.low) : 0;
+ const _adjHigh = _bm ? ((_freq==="weekly"||_freq==="biweekly") ? _bm.high*0.8 : _bm.high) : 0;
+ const _adjAvg = _bm ? (_adjLow + _adjHigh) / 2 : 0;
+ const _pct = _bm && _adjAvg > 0 ? Math.round(((_price - _adjAvg) / _adjAvg) * 100) : 0;
+ const _below = _bm ? _price < _adjLow : false;
+ const _above = _bm ? _price > _adjHigh : false;
+ const _diagLabel = _below
+   ? (_pct < -20 ? "Priced too low" : "Below market avg")
+   : _above ? (_pct > 20 ? "Above market range" : "Above market avg")
+   : "Market rate";
+ const _thumbColor = _below ? "#f59e0b" : _above ? "#8b5cf6" : "#10b981";
+ const _diagBadgeBg = _below ? "rgba(251,191,36,0.15)" : _above ? "rgba(139,92,246,0.15)" : "rgba(16,185,129,0.15)";
+ const _diagBadgeColor = _below ? "#d97706" : _above ? "#7c3aed" : "#059669";
+ const _suggestion = _below && _bm
+   ? "Raise to $" + Math.round(_adjAvg) + " to reach market midpoint (+$" + Math.round(_adjAvg - _price) + ")"
+   : _above && _bm
+   ? "Currently $" + Math.round(_price - _adjAvg) + " above avg — justify with premium service"
+   : _bm ? "Your price is in the national sweet spot — well positioned" : "";
+
+ return (
  <div style={{
- position: "absolute", top: -20, right: -20,
- width: 120, height: 120,
- background: "radial-gradient(circle, rgba(99,102,241,0.35) 0%, transparent 70%)",
- borderRadius: "50%", pointerEvents: "none",
- }} />
- <div className="flex items-start gap-3">
- <div style={{
- background: "rgba(99,102,241,0.25)",
- borderRadius: 10, padding: 8, flexShrink: 0,
+   background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)",
+   borderRadius: 14, padding: "16px 18px",
+   position: "relative", overflow: "hidden",
  }}>
- <Wand2 className="w-4 h-4 text-indigo-300" />
+   <div style={{
+     position: "absolute", top: -20, right: -20, width: 120, height: 120,
+     background: "radial-gradient(circle, rgba(99,102,241,0.35) 0%, transparent 70%)",
+     borderRadius: "50%", pointerEvents: "none",
+   }} />
+
+   <div className="flex items-center justify-between mb-3">
+     <div className="flex items-center gap-2">
+       <div style={{ background:"rgba(99,102,241,0.25)", borderRadius:8, padding:6 }}>
+         <Wand2 className="w-3.5 h-3.5 text-indigo-300"/>
+       </div>
+       <span className="text-white font-semibold text-sm">QuoteDoctor</span>
+     </div>
+     {_bm ? (
+       <span style={{
+         background: _diagBadgeBg, border: "1px solid " + _diagBadgeColor + "60",
+         color: _diagBadgeColor, fontSize: 10, fontWeight: 700,
+         padding: "3px 9px", borderRadius: 20,
+       }}>{_diagLabel}</span>
+     ) : null}
+   </div>
+
+   {_bm ? (() => {
+     const _extMin = Math.min(_adjLow * 0.82, _price * 0.82);
+     const _extMax = Math.max(_adjHigh * 1.18, _price * 1.18);
+     const _span = _extMax - _extMin;
+     const _toPct = (v: number) => Math.min(94, Math.max(6, ((v - _extMin) / _span) * 100));
+     const _lowPct = _toPct(_adjLow);
+     const _highPct = _toPct(_adjHigh);
+     const _pricePct = _toPct(_price);
+     return (
+       <div style={{ marginBottom: 10 }}>
+         <div style={{ position:"relative", height:34 }}>
+           <div style={{ position:"absolute", top:15, left:0, right:0, height:5, background:"rgba(255,255,255,0.15)", borderRadius:999 }}/>
+           <div style={{ position:"absolute", top:15, height:5, left:_lowPct+"%", width:(_highPct-_lowPct)+"%", background:"linear-gradient(90deg,#34d399,#10b981,#34d399)", borderRadius:999 }}/>
+           <div style={{
+             position:"absolute", top:8, left:_pricePct+"%",
+             transform:"translateX(-50%)",
+             width:20, height:20,
+             background: _thumbColor, borderRadius:"50%",
+             border:"2.5px solid #fff",
+             boxShadow:"0 0 0 2px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.3)",
+             zIndex: 2,
+           }}/>
+           <div style={{
+             position:"absolute", bottom:0, left:0, right:0,
+             display:"flex", justifyContent:"space-between",
+             fontSize:9, color:"rgba(255,255,255,0.45)", fontWeight:600,
+           }}>
+             <span>{"$" + Math.round(_adjLow)}</span>
+             <span style={{ color:"#34d399" }}>{"avg $" + Math.round(_adjAvg)}</span>
+             <span>{"$" + Math.round(_adjHigh)}</span>
+           </div>
+         </div>
+       </div>
+     );
+   })() : null}
+
+   {_suggestion ? (
+     <p className="text-slate-300 text-xs leading-snug mb-3">{_suggestion}</p>
+   ) : (
+     <p className="text-slate-300 text-xs leading-snug mb-3">
+       {quote.status === "draft"
+         ? "AI-optimize your quote before sending — see how you compare to the market."
+         : "Your quote is out. Use QuoteDoctor to rewrite it and close more jobs."}
+     </p>
+   )}
+
+   <button
+     onClick={() => {
+       const _addOnList = Object.entries(addOns || {})
+         .filter(([,v]: any) => typeof v === 'object' ? v.selected : v)
+         .map(([k]: any) => k.replace(/([A-Z])/g,' $1').replace(/^./,(s:string)=>s.toUpperCase()))
+         .join(', ');
+       const _prefillText = [
+         quote.customerName ? 'Customer: ' + quote.customerName : '',
+         _beds > 0 ? 'Bedrooms: ' + _beds : '',
+         _freq ? 'Frequency: ' + _freq : '',
+         'Total: $' + _price.toLocaleString(),
+         _addOnList ? 'Add-Ons: ' + _addOnList : '',
+         'Service: Standard residential cleaning — Good / Better / Best pricing tiers.',
+       ].filter(Boolean).join('\n');
+       navigate('/quote-doctor', { state: { prefillText: _prefillText } });
+     }}
+     className="flex items-center gap-1.5 text-xs font-semibold text-white rounded-lg px-3 py-1.5 transition-all hover:opacity-90 active:scale-[0.97]"
+     style={{ background:"rgba(99,102,241,0.55)", border:"1px solid rgba(99,102,241,0.7)" }}
+   >
+     <Zap className="w-3.5 h-3.5"/>
+     Open QuoteDoctor — full AI rewrite
+   </button>
  </div>
- <div className="flex-1 min-w-0">
- <p className="text-white font-semibold text-sm leading-tight">
- QuoteDoctor
- </p>
- <p className="text-slate-300 text-xs mt-0.5 leading-snug">
- {quote.status === "draft"
- ? "AI-optimize your price before sending — see how you compare to the market."
- : "Your quote is out. Use QuoteDoctor to refine your next one and close more."}
- </p>
- <button
- onClick={() => {
-  const addOnList = Object.entries(addOns || {}).filter(([,v]: any) => typeof v === 'object' ? v.selected : v).map(([k]: any) => k.replace(/([A-Z])/g, ' $1').replace(/^./, (s: string) => s.toUpperCase())).join(', ');
-  const parts = [
-   quote.customerName ? 'Customer: ' + quote.customerName : '',
-   details?.beds ? 'Bedrooms: ' + details.beds : '',
-   quote.frequencySelected ? 'Frequency: ' + quote.frequencySelected : '',
-   'Total: $' + Number(quote.total || 0).toLocaleString(),
-   addOnList ? 'Add-Ons: ' + addOnList : '',
-   'Service: Standard residential cleaning — Good / Better / Best pricing tiers.',
-  ].filter(Boolean);
-  const prefillText = parts.join('\n');
-  navigate('/quote-doctor', { state: { prefillText } });
- }}
- className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-white rounded-lg px-3 py-1.5 transition-all hover:opacity-90 active:scale-[0.97]"
- style={{ background: "rgba(99,102,241,0.55)", border: "1px solid rgba(99,102,241,0.7)" }}
- >
- <Zap className="w-3.5 h-3.5" />
- Optimize with QuoteDoctor
- </button>
- </div>
- </div>
- </div>
- ) : null}
+ );
+ })() : null}
 
  {(details.customerAddress || quote.customerName) ? (
  <DispatchCard

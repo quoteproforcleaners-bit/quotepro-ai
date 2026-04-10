@@ -47,20 +47,109 @@ function positionFromPrice(price: number, low: number, high: number): Position {
  return"within";
 }
 
-// ─── Mini bar visualisation ──────────────────────────────────────────────────
+// ─── Prominent Price Range Slider ────────────────────────────────────────────
 
-function MiniBar({ price, low, high }: { price: number; low: number; high: number }) {
- const maxVal = Math.max(high * 1.25, price * 1.1);
- const lowPct = Math.min(100, (low / maxVal) * 100);
- const highPct = Math.min(100, (high / maxVal) * 100);
- const yourPct = Math.min(100, (price / maxVal) * 100);
- return (
- <div className="mt-2.5 relative h-2 bg-white rounded-full overflow-hidden border border-slate-100">
- <div className="absolute h-full bg-slate-200 rounded-full"
- style={{ left: `${lowPct}%`, width: `${Math.max(0, highPct - lowPct)}%` }} />
- <div className="absolute h-full w-0.5 bg-current rounded-full"style={{ left: `${yourPct}%` }} />
- </div>
- );
+function PriceSlider({
+  price, low, high, colorClass,
+}: {
+  price: number;
+  low: number;
+  high: number;
+  colorClass: string;
+}) {
+  const span = high - low;
+  const extendedMin = Math.min(low * 0.85, price * 0.85);
+  const extendedMax = Math.max(high * 1.15, price * 1.15);
+  const totalSpan = extendedMax - extendedMin;
+
+  const toPct = (v: number) =>
+    Math.min(98, Math.max(2, ((v - extendedMin) / totalSpan) * 100));
+
+  const lowPct = toPct(low);
+  const highPct = toPct(high);
+  const pricePct = toPct(price);
+  const avgPct = toPct((low + high) / 2);
+
+  const inRange = price >= low && price <= high;
+
+  // Track color: green inside range, amber/red outside
+  const thumbColor = inRange
+    ? "#059669"
+    : price < low
+    ? "#d97706"
+    : "#dc2626";
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      {/* Track */}
+      <div style={{ position: "relative", height: 28 }}>
+        {/* Background track */}
+        <div style={{
+          position: "absolute", top: 10, left: 0, right: 0, height: 8,
+          background: "#e2e8f0", borderRadius: 999,
+        }} />
+
+        {/* Market range highlight (green zone) */}
+        <div style={{
+          position: "absolute", top: 10, height: 8,
+          left: `${lowPct}%`,
+          width: `${highPct - lowPct}%`,
+          background: "linear-gradient(90deg, #bbf7d0, #34d399, #bbf7d0)",
+          borderRadius: 999,
+        }} />
+
+        {/* Average midpoint tick */}
+        <div style={{
+          position: "absolute", top: 6, height: 16,
+          left: `${avgPct}%`,
+          transform: "translateX(-50%)",
+          width: 2, background: "#10b981", borderRadius: 999, opacity: 0.6,
+        }} />
+
+        {/* Price thumb */}
+        <div style={{
+          position: "absolute", top: 4,
+          left: `${pricePct}%`,
+          transform: "translateX(-50%)",
+          width: 20, height: 20,
+          background: thumbColor,
+          borderRadius: "50%",
+          border: "3px solid #fff",
+          boxShadow: `0 0 0 2px ${thumbColor}40, 0 2px 6px rgba(0,0,0,0.2)`,
+          zIndex: 2,
+        }} />
+
+        {/* Price label above thumb */}
+        <div style={{
+          position: "absolute", bottom: 22,
+          left: `${pricePct}%`,
+          transform: "translateX(-50%)",
+          background: thumbColor,
+          color: "#fff",
+          fontSize: 10,
+          fontWeight: 700,
+          padding: "2px 6px",
+          borderRadius: 6,
+          whiteSpace: "nowrap",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+        }}>
+          ${Math.round(price).toLocaleString()}
+        </div>
+      </div>
+
+      {/* Labels row */}
+      <div style={{
+        display: "flex", justifyContent: "space-between",
+        marginTop: 4, fontSize: 10, color: "#64748b",
+      }}>
+        <span style={{ fontWeight: 600 }}>${Math.round(low)} low</span>
+        <span style={{ color: "#10b981", fontWeight: 600 }}>
+          ${Math.round((low + high) / 2)} avg
+        </span>
+        <span style={{ fontWeight: 600 }}>${Math.round(high)} high</span>
+      </div>
+    </div>
+  );
 }
 
 // ─── CommercialBenchmarkBadge ────────────────────────────────────────────────
@@ -69,7 +158,7 @@ export interface CommercialBenchmarkBadgeProps {
  monthlyPrice: number;
  facilityType?: FacilityType;
  totalSqFt?: number;
- /**"full"(default) |"compact"— compact omits the mini bar and source line */
+ /**"full"(default) |"compact"— compact omits the slider and source line */
  size?:"full"|"compact";
 }
 
@@ -101,13 +190,13 @@ export function CommercialBenchmarkBadge({
  </div>
  {size ==="full"&& (
  <>
- <MiniBar price={monthlyPrice} low={bm.nationalMonthlyLow} high={bm.nationalMonthlyHigh} />
- <div className="flex justify-between text-[10px] mt-1 opacity-60">
- <span>${bm.nationalMonthlyLow.toLocaleString(undefined, { maximumFractionDigits: 0 })} low</span>
- <span>Your estimate</span>
- <span>${bm.nationalMonthlyHigh.toLocaleString(undefined, { maximumFractionDigits: 0 })} high</span>
- </div>
- <p className="text-[10px] mt-1 opacity-50">Source: {bm.source} {bm.year}</p>
+ <PriceSlider
+   price={monthlyPrice}
+   low={bm.nationalMonthlyLow}
+   high={bm.nationalMonthlyHigh}
+   colorClass={c.text}
+ />
+ <p className="text-[10px] mt-2 opacity-50">Source: {bm.source} {bm.year}</p>
  </>
  )}
  </div>
@@ -129,7 +218,6 @@ export function ResidentialBenchmarkBadge({
  if (!beds || beds <= 0) return null;
  const bm = getResidentialBenchmark(beds);
 
- // Adjust benchmark for recurring (recurring cleans are typically cheaper one-time equivalent)
  const adjustedLow = frequency ==="weekly"|| frequency ==="biweekly"? bm.low * 0.8 : bm.low;
  const adjustedHigh = frequency ==="weekly"|| frequency ==="biweekly"? bm.high * 0.8 : bm.high;
  const adjustedAvg = (adjustedLow + adjustedHigh) / 2;
@@ -158,20 +246,20 @@ export function ResidentialBenchmarkBadge({
  <p className="text-[11px] mt-0.5 leading-relaxed">{labelMap[position]}</p>
  </div>
  <Tooltip
- text={`National range for ${beds}-bedroom homes: $${Math.round(adjustedLow)}–$${Math.round(adjustedHigh)} per visit${frequency && frequency !=="one-time"?"(recurring discount applied)":""}. Average: $${Math.round(adjustedAvg)}.`}
+ text={`National range for ${beds}-bedroom homes: $${Math.round(adjustedLow)}–$${Math.round(adjustedHigh)} per visit${frequency && frequency !=="one-time"?" (recurring discount applied)":""}. Average: $${Math.round(adjustedAvg)}.`}
  source={bm.source}
  side="left"
  />
  </div>
  {size ==="full"&& (
  <>
- <MiniBar price={visitPrice} low={adjustedLow} high={adjustedHigh} />
- <div className="flex justify-between text-[10px] mt-1 opacity-60">
- <span>${Math.round(adjustedLow)} low</span>
- <span>Your price</span>
- <span>${Math.round(adjustedHigh)} high</span>
- </div>
- <p className="text-[10px] mt-1 opacity-50">Source: {bm.source} · one-time standard clean</p>
+ <PriceSlider
+   price={visitPrice}
+   low={adjustedLow}
+   high={adjustedHigh}
+   colorClass={c.text}
+ />
+ <p className="text-[10px] mt-2 opacity-50">Source: {bm.source} · one-time standard clean</p>
  </>
  )}
  </div>
@@ -181,9 +269,7 @@ export function ResidentialBenchmarkBadge({
 // ─── TierBenchmarkPill — compact inline pill for tier cards ──────────────────
 
 export interface TierBenchmarkPillProps {
- /** The tier's price (per visit for residential, per month for commercial) */
  price: number;
- /** For commercial: facilityType + totalSqFt. For residential: beds */
  facilityType?: FacilityType;
  totalSqFt?: number;
  beds?: number;
@@ -221,7 +307,6 @@ export function TierBenchmarkPill({ price, facilityType, totalSqFt, beds, mode }
 }
 
 // ─── ISSATooltip — reusable tooltip for ISSA citation ───────────────────────
-
 export function ISSATooltip({ facilityType, minutesPer1k }: { facilityType: string; minutesPer1k: number }) {
  return (
  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400">
