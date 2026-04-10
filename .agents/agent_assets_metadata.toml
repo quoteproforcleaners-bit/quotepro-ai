@@ -42,3 +42,9 @@ id = "Sw7qzTwB3DMkGyADkqMDs"
 uri = "file://FULL_CODEBASE_FOR_AUDIT.md"
 type = "text"
 title = "QuotePro AI — Full Codebase (Web + Mobile + Backend)"
+
+[[outputs]]
+id = "fe79oEVIiimu_bX1JkXyk"
+uri = "file://web/public/quotepro-users-export.csv"
+type = "table"
+title = "QuotePro Users Export — April 10, 2026"
