@@ -259,7 +259,7 @@ export function ResidentialBenchmarkBadge({
    high={adjustedHigh}
    colorClass={c.text}
  />
- <p className="text-[10px] mt-2 opacity-50">Source: {bm.source} · one-time standard clean</p>
+ <p className="text-[10px] mt-2 opacity-50">Source: HomeAdvisor / Angi 2026 · one-time standard clean</p>
  </>
  )}
  </div>
