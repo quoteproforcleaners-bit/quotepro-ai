@@ -75,6 +75,28 @@ const RES_BM_DATA: Record<number,{low:number;high:number;avg:number}> = {
   3:{low:130,high:185,avg:157}, 4:{low:175,high:250,avg:212}, 5:{low:220,high:340,avg:278},
 };
 
+// Shared zone classification — used by both QuoteDoctor and BenchmarkBadge
+function getPriceZone(price: number, adjLow: number, adjAvg: number, adjHigh: number): "below" | "competitive" | "market" | "premium" {
+  if (price < adjLow) return "below";
+  if (price <= adjAvg) return "competitive";
+  if (price <= adjHigh) return "market";
+  return "premium";
+}
+
+const ZONE_CONFIG = {
+  below:       { label: "Underpriced",          color: "#d97706", bg: "rgba(251,191,36,0.15)",    border: "#d9770660" },
+  competitive: { label: "Competitive",           color: "#2563eb", bg: "rgba(37,99,235,0.12)",     border: "#2563eb60" },
+  market:      { label: "Market rate",           color: "#059669", bg: "rgba(16,185,129,0.15)",    border: "#05966960" },
+  premium:     { label: "Premium",               color: "#7c3aed", bg: "rgba(139,92,246,0.15)",    border: "#7c3aed60" },
+};
+
+const ZONE_SUGGESTION: Record<string, (vals: { abs: number; adjAvg: number; sliderVal: number }) => string> = {
+  below:       ({ abs, adjAvg, sliderVal }) => `${abs}% below market — raise to $${Math.round(adjAvg)} to hit midpoint (+$${Math.round(adjAvg - sliderVal)})`,
+  competitive: ({ abs }) => `${abs}% below market average — competitive and close to the sweet spot`,
+  market:      () => "Your price is in the national sweet spot — well positioned",
+  premium:     ({ sliderVal, adjAvg }) => `Currently $${Math.round(sliderVal - adjAvg)} above avg — be ready to justify premium value`,
+};
+
 interface QuoteDoctorCardProps {
   quote: any;
   details: any;
@@ -82,9 +104,11 @@ interface QuoteDoctorCardProps {
   quoteId: string;
   showToast: (msg: string, variant?: "success"|"error"|"info") => void;
   onPriceApplied: (newTotal: number) => void;
+  onSliderChange: (val: number) => void;
+  onFlashTier: (tierKey: string) => void;
 }
 
-function QuoteDoctorCard({ quote, details, addOns, quoteId, showToast, onPriceApplied }: QuoteDoctorCardProps) {
+function QuoteDoctorCard({ quote, details, addOns, quoteId, showToast, onPriceApplied, onSliderChange, onFlashTier }: QuoteDoctorCardProps) {
   const beds = Number(details?.beds || 0);
   const freq = quote.frequencySelected as string | undefined;
   const bm = beds > 0 ? RES_BM_DATA[Math.min(5, Math.max(1, beds))] : null;
@@ -92,8 +116,9 @@ function QuoteDoctorCard({ quote, details, addOns, quoteId, showToast, onPriceAp
   const adjHigh = bm ? ((freq==="weekly"||freq==="biweekly") ? bm.high*0.8 : bm.high) : 0;
   const adjAvg  = bm ? (adjLow + adjHigh) / 2 : 0;
 
-  const sliderMin = Math.floor(bm ? adjLow * 0.8 : Number(quote.total||0) * 0.6);
-  const sliderMax = Math.ceil(bm ? adjHigh * 1.3 : Number(quote.total||0) * 1.5);
+  // Bug 4: slider range anchored to benchmark low/high
+  const sliderMin = bm ? Math.floor(adjLow * 0.7) : Math.floor(Number(quote.total||0) * 0.5);
+  const sliderMax = bm ? Math.ceil(adjHigh * 1.4)  : Math.ceil(Number(quote.total||0) * 1.6);
 
   const [sliderVal, setSliderVal] = useState<number>(Number(quote.total || 0));
   const [applying, setApplying] = useState(false);
@@ -101,39 +126,50 @@ function QuoteDoctorCard({ quote, details, addOns, quoteId, showToast, onPriceAp
 
   useEffect(() => { setSliderVal(Number(quote.total || 0)); }, [quote.total]);
 
-  const below    = bm ? sliderVal < adjLow : false;
-  const above    = bm ? sliderVal > adjHigh : false;
+  const zone = bm ? getPriceZone(sliderVal, adjLow, adjAvg, adjHigh) : "market";
+  const zc = ZONE_CONFIG[zone];
   const pctVsAvg = bm && adjAvg > 0 ? Math.round(((sliderVal - adjAvg) / adjAvg) * 100) : 0;
-  const abs      = Math.abs(pctVsAvg);
+  const abs = Math.abs(pctVsAvg);
+  const suggestion = bm ? ZONE_SUGGESTION[zone]({ abs, adjAvg, sliderVal }) : "";
 
-  const diagLabel  = below
-    ? (pctVsAvg < -20 ? "Priced too low" : "Below market avg")
-    : above ? (pctVsAvg > 20 ? "Above market range" : "Above market avg")
-    : "Market rate";
-  const thumbColor = below ? "#f59e0b" : above ? "#8b5cf6" : "#10b981";
-  const badgeColor = below ? "#d97706" : above ? "#7c3aed" : "#059669";
-  const badgeBg    = below ? "rgba(251,191,36,0.15)" : above ? "rgba(139,92,246,0.15)" : "rgba(16,185,129,0.15)";
-  const suggestion = below && bm
-    ? abs + "% below market — raise to $" + Math.round(adjAvg) + " to hit midpoint (+$" + Math.round(adjAvg - sliderVal) + ")"
-    : above && bm
-    ? "Currently $" + Math.round(sliderVal - adjAvg) + " above avg — be ready to justify premium value"
-    : bm ? "Your price is in the national sweet spot — well positioned" : "";
-
-  const toPct = (v: number) => {
-    const p = ((v - sliderMin) / (sliderMax - sliderMin)) * 100;
-    return Math.min(100, Math.max(0, p));
-  };
+  const toPct = (v: number) => Math.min(100, Math.max(0, ((v - sliderMin) / (sliderMax - sliderMin)) * 100));
   const lowPct   = toPct(adjLow);
+  const avgPct   = toPct(adjAvg);
   const highPct  = toPct(adjHigh);
   const pricePct = toPct(sliderVal);
 
+  // Bug 1: scale all tiers proportionally on apply
   const handleApply = async () => {
     if (applying) return;
     setApplying(true);
     try {
-      await apiPut(`/api/quotes/${quoteId}`, { total: sliderVal });
+      const opts = (quote.options || {}) as Record<string, any>;
+      const selectedKey = quote.selectedOption || Object.keys(opts)[0] || "better";
+      const currentSelectedPrice = Number(opts[selectedKey]?.price ?? opts[selectedKey] ?? quote.total ?? 0);
+
+      let updatedOptions = { ...opts };
+      if (currentSelectedPrice > 0 && Object.keys(opts).length > 0) {
+        for (const key of Object.keys(opts)) {
+          const tierVal = opts[key];
+          const tierPrice = Number(typeof tierVal === "object" ? tierVal?.price : tierVal) || 0;
+          if (key === selectedKey) {
+            updatedOptions[key] = typeof tierVal === "object"
+              ? { ...tierVal, price: sliderVal }
+              : sliderVal;
+          } else if (tierPrice > 0) {
+            const ratio = tierPrice / currentSelectedPrice;
+            const scaled = Math.round(ratio * sliderVal);
+            updatedOptions[key] = typeof tierVal === "object"
+              ? { ...tierVal, price: scaled }
+              : scaled;
+          }
+        }
+      }
+
+      await apiPut(`/api/quotes/${quoteId}`, { total: sliderVal, options: updatedOptions });
       queryClient.invalidateQueries({ queryKey: [`/api/quotes/${quoteId}`] });
       onPriceApplied(sliderVal);
+      onFlashTier(selectedKey);
       showToast("Price updated to $" + sliderVal.toLocaleString(), "success");
     } catch (e: any) {
       showToast(e?.message || "Failed to update price", "error");
@@ -166,62 +202,59 @@ function QuoteDoctorCard({ quote, details, addOns, quoteId, showToast, onPriceAp
           </div>
           {bm ? (
             <span style={{
-              background: badgeBg, border: "1px solid " + badgeColor + "60",
-              color: badgeColor, fontSize: 10, fontWeight: 700,
+              background: zc.bg, border: "1px solid " + zc.border,
+              color: zc.color, fontSize: 10, fontWeight: 700,
               padding: "3px 9px", borderRadius: 20,
-            }}>{diagLabel}</span>
+            }}>{zc.label}</span>
           ) : null}
         </div>
 
         {bm ? (
           <div style={{ marginBottom: 10 }}>
-            <div style={{ position:"relative", height:24, marginBottom:4 }}>
+            <div style={{ position:"relative", height:28, marginBottom:4 }}>
+              {/* Floating price label */}
               <div style={{
-                position:"absolute", bottom: "100%", marginBottom:4,
-                left: pricePct + "%",
-                transform:"translateX(-50%)",
-                background: thumbColor, color:"#fff",
-                fontSize:11, fontWeight:700,
-                padding:"2px 7px", borderRadius:8,
-                whiteSpace:"nowrap",
-                boxShadow:"0 1px 4px rgba(0,0,0,0.2)",
-                pointerEvents:"none",
-              }}>
-                {"$" + sliderVal.toLocaleString()}
-              </div>
-              <div style={{ position:"absolute", top:10, left:0, right:0, height:6, background:"rgba(255,255,255,0.15)", borderRadius:999 }}/>
-              <div style={{
-                position:"absolute", top:10, height:6,
-                left: lowPct + "%", width: (highPct - lowPct) + "%",
-                background:"linear-gradient(90deg,#34d399,#10b981,#34d399)",
-                borderRadius:999,
-              }}/>
+                position:"absolute", bottom:"100%", marginBottom:6,
+                left: pricePct + "%", transform:"translateX(-50%)",
+                background: zc.color, color:"#fff",
+                fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:8,
+                whiteSpace:"nowrap", boxShadow:"0 1px 4px rgba(0,0,0,0.25)",
+                pointerEvents:"none", transition:"left 0.05s",
+              }}>{"$" + sliderVal.toLocaleString()}</div>
+
+              {/* Base track */}
+              <div style={{ position:"absolute", top:12, left:0, right:0, height:6, background:"rgba(255,255,255,0.12)", borderRadius:999 }}/>
+
+              {/* Zone bands */}
+              {/* Below-market zone (amber tint) */}
+              <div style={{ position:"absolute", top:12, height:6, left:0, width: lowPct + "%", background:"rgba(245,158,11,0.35)", borderRadius:"999px 0 0 999px" }}/>
+              {/* Market range zone (green) */}
+              <div style={{ position:"absolute", top:12, height:6, left: lowPct + "%", width: (highPct - lowPct) + "%", background:"linear-gradient(90deg,#34d399,#10b981,#34d399)", borderRadius:999 }}/>
+              {/* Premium zone (violet tint) */}
+              <div style={{ position:"absolute", top:12, height:6, left: highPct + "%", width: (100 - highPct) + "%", background:"rgba(139,92,246,0.35)", borderRadius:"0 999px 999px 0" }}/>
+              {/* Avg tick mark */}
+              <div style={{ position:"absolute", top:8, height:14, left: avgPct + "%", transform:"translateX(-50%)", width:2, background:"#fff", opacity:0.5, borderRadius:999 }}/>
+
+              {/* Invisible range input */}
               <input
-                type="range"
-                min={sliderMin}
-                max={sliderMax}
-                step={5}
-                value={sliderVal}
-                onChange={(e) => setSliderVal(Number(e.target.value))}
-                style={{
-                  position:"absolute", top:0, left:0, right:0, width:"100%",
-                  height:24, opacity:0, cursor:"pointer", zIndex:3, margin:0,
-                  WebkitAppearance:"none" as any,
+                type="range" min={sliderMin} max={sliderMax} step={5} value={sliderVal}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setSliderVal(v);
+                  onSliderChange(v);  // Bug 2: live sync with BenchmarkBadge
                 }}
+                style={{ position:"absolute", top:0, left:0, right:0, width:"100%", height:28, opacity:0, cursor:"pointer", zIndex:3, margin:0 }}
               />
+              {/* Thumb */}
               <div style={{
-                position:"absolute", top:4,
-                left: pricePct + "%",
-                transform:"translateX(-50%)",
-                width:18, height:18,
-                background: thumbColor,
-                borderRadius:"50%",
-                border:"2.5px solid #fff",
-                boxShadow:"0 0 0 2px " + thumbColor + "40, 0 2px 6px rgba(0,0,0,0.3)",
-                pointerEvents:"none",
-                zIndex:2,
+                position:"absolute", top:6, left: pricePct + "%", transform:"translateX(-50%)",
+                width:18, height:18, background: zc.color, borderRadius:"50%",
+                border:"2.5px solid #fff", boxShadow:"0 0 0 2px " + zc.color + "40, 0 2px 6px rgba(0,0,0,0.3)",
+                pointerEvents:"none", zIndex:2, transition:"left 0.05s",
               }}/>
             </div>
+
+            {/* Zone labels */}
             <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, fontWeight:600, color:"rgba(255,255,255,0.45)" }}>
               <span>{"$" + Math.round(adjLow) + " low"}</span>
               <span style={{ color:"#34d399" }}>{"avg $" + Math.round(adjAvg)}</span>
@@ -247,10 +280,9 @@ function QuoteDoctorCard({ quote, details, addOns, quoteId, showToast, onPriceAp
               disabled={!priceChanged || applying}
               className="flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 transition-all"
               style={{
-                background: priceChanged ? thumbColor : "rgba(255,255,255,0.1)",
+                background: priceChanged ? zc.color : "rgba(255,255,255,0.1)",
                 color: priceChanged ? "#fff" : "rgba(255,255,255,0.35)",
-                border: "none",
-                cursor: priceChanged ? "pointer" : "not-allowed",
+                border: "none", cursor: priceChanged ? "pointer" : "not-allowed",
               }}
             >
               {applying ? <RefreshCw className="w-3 h-3 animate-spin"/> : <CheckCircle className="w-3 h-3"/>}
@@ -276,9 +308,10 @@ function QuoteDoctorCard({ quote, details, addOns, quoteId, showToast, onPriceAp
           adjLow={adjLow}
           adjAvg={adjAvg}
           adjHigh={adjHigh}
+          sliderVal={sliderVal}
+          zone={zone}
           quoteId={quoteId}
           showToast={showToast}
-          onApplied={(price) => { setSliderVal(price); onPriceApplied(price); setModalOpen(false); }}
           onClose={() => setModalOpen(false)}
         />
       ) : null}
@@ -286,7 +319,7 @@ function QuoteDoctorCard({ quote, details, addOns, quoteId, showToast, onPriceAp
   );
 }
 
-// ─── QuoteDoctor AI Modal ─────────────────────────────────────────────────────
+// ─── QuoteDoctor AI Rewrite Modal ──────────────────────────────────────────────
 
 interface QuoteDoctorModalProps {
   quote: any;
@@ -294,166 +327,138 @@ interface QuoteDoctorModalProps {
   adjLow: number;
   adjAvg: number;
   adjHigh: number;
+  sliderVal: number;
+  zone: "below" | "competitive" | "market" | "premium";
   quoteId: string;
   showToast: (msg: string, variant?: "success"|"error"|"info") => void;
-  onApplied: (price: number) => void;
   onClose: () => void;
 }
 
-function QuoteDoctorModal({ quote, details, adjLow, adjAvg, adjHigh, quoteId, showToast, onApplied, onClose }: QuoteDoctorModalProps) {
-  const [result, setResult] = useState<any>(null);
+function QuoteDoctorModal({ quote, details, adjLow, adjAvg, adjHigh, sliderVal, zone, quoteId, showToast, onClose }: QuoteDoctorModalProps) {
+  const [message, setMessage] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [applying, setApplying] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string|null>(null);
+
+  // Map zone to the 3-bucket the backend needs
+  const priceZone = zone === "below" ? "below" : zone === "premium" ? "above" : "at";
 
   useEffect(() => {
     let cancelled = false;
-    const run = async () => {
+    (async () => {
       try {
-        const data = await apiPost("/api/quote-doctor/analyze", {
-          quoteAmount: Number(quote.total || 0),
-          bedrooms: Number(details?.beds || 0),
-          bathrooms: Number(details?.baths || 0),
+        const data = await apiPost("/api/quote-doctor/justify", {
+          priceZone,
+          price: sliderVal,
+          adjAvg: Math.round(adjAvg),
+          beds: Number(details?.beds || 0),
           sqft: Number(details?.sqft || 0),
+          condition: details?.condition || "",
           frequency: quote.frequencySelected || "one-time",
-          city: "",
-          state: "",
         }) as any;
-        if (!cancelled) setResult(data);
+        if (!cancelled) setMessage(data.message || "");
       } catch (e: any) {
-        if (!cancelled) setError(e?.message || "AI analysis failed");
+        if (!cancelled) setError(e?.message || "AI generation failed");
       } finally {
         if (!cancelled) setLoading(false);
       }
-    };
-    run();
+    })();
     return () => { cancelled = true; };
   }, []);
 
-  const handleApply = async (price: number) => {
-    setApplying(true);
+  const handleCopyToQuote = async () => {
+    if (copying) return;
+    setCopying(true);
     try {
-      await apiPut(`/api/quotes/${quoteId}`, { total: price });
+      await apiPut(`/api/quotes/${quoteId}`, { notes: message });
       queryClient.invalidateQueries({ queryKey: [`/api/quotes/${quoteId}`] });
-      onApplied(price);
-      showToast("Price updated to $" + price.toLocaleString(), "success");
+      setCopied(true);
+      showToast("Message copied to quote notes", "success");
+      setTimeout(() => { setCopied(false); onClose(); }, 1200);
     } catch (e: any) {
-      showToast(e?.message || "Failed to update price", "error");
+      showToast("Failed to save to quote", "error");
     } finally {
-      setApplying(false);
+      setCopying(false);
     }
   };
 
-  const currentPrice  = Number(quote.total || 0);
-  const suggestedMid  = result ? Math.round((result.suggested_range_low + result.suggested_range_high) / 2) : 0;
-
-  const verdictColor  = !result ? "#94a3b8"
-    : result.verdict === "too_low" ? "#d97706"
-    : result.verdict === "too_high" ? "#dc2626"
-    : "#059669";
-  const verdictLabel  = !result ? ""
-    : result.verdict === "too_low" ? "Priced Too Low"
-    : result.verdict === "too_high" ? "Priced Too High"
-    : "Fair Price";
+  const zc = ZONE_CONFIG[zone];
+  const zoneLabels: Record<string, string> = {
+    below: "Value-Forward Message",
+    competitive: "Competitive Positioning",
+    market: "Confident Market Rate",
+    premium: "Premium Justification",
+  };
 
   return (
     <div
-      style={{
-        position:"fixed", inset:0, zIndex:1000,
-        background:"rgba(15,23,42,0.7)", backdropFilter:"blur(4px)",
-        display:"flex", alignItems:"center", justifyContent:"center",
-        padding:"20px",
-      }}
+      style={{ position:"fixed", inset:0, zIndex:1000, background:"rgba(15,23,42,0.7)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{
-        background:"#fff", borderRadius:20, maxWidth:460, width:"100%",
-        boxShadow:"0 24px 80px rgba(0,0,0,0.25)", overflow:"hidden",
-      }}>
-        <div style={{
-          background:"linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)",
-          padding:"18px 20px",
-          display:"flex", alignItems:"center", justifyContent:"space-between",
-        }}>
+      <div style={{ background:"#fff", borderRadius:20, maxWidth:500, width:"100%", boxShadow:"0 24px 80px rgba(0,0,0,0.25)", overflow:"hidden" }}>
+        {/* Header */}
+        <div style={{ background:"linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)", padding:"18px 20px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ background:"rgba(99,102,241,0.25)", borderRadius:8, padding:7 }}>
-              <Wand2 className="w-4 h-4 text-indigo-300"/>
-            </div>
+            <div style={{ background:"rgba(99,102,241,0.25)", borderRadius:8, padding:7 }}><Zap className="w-4 h-4 text-indigo-300"/></div>
             <div>
-              <p style={{ color:"#fff", fontWeight:700, fontSize:14 }}>QuoteDoctor Analysis</p>
-              <p style={{ color:"rgba(148,163,184,1)", fontSize:11, marginTop:1 }}>AI-powered pricing coach</p>
+              <p style={{ color:"#fff", fontWeight:700, fontSize:14 }}>AI Rewrite</p>
+              <p style={{ color:"rgba(148,163,184,1)", fontSize:11, marginTop:1 }}>{zoneLabels[zone]}</p>
             </div>
           </div>
           <button onClick={onClose} style={{ background:"rgba(255,255,255,0.1)", border:"none", borderRadius:8, padding:"6px 8px", color:"rgba(255,255,255,0.7)", cursor:"pointer", fontSize:16, lineHeight:1 }}>&#x2715;</button>
         </div>
 
-        <div style={{ padding:"22px 20px" }}>
+        <div style={{ padding:"20px 20px 22px" }}>
+          {/* Price zone badge */}
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+            <span style={{ background: zc.bg, border:"1px solid " + zc.border, color: zc.color, fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20 }}>{zc.label}</span>
+            <span style={{ fontSize:11, color:"#94a3b8" }}>
+              {"$" + Math.round(sliderVal) + " · national range $" + Math.round(adjLow) + "–$" + Math.round(adjHigh)}
+            </span>
+          </div>
+
           {loading ? (
-            <div style={{ textAlign:"center", padding:"40px 0" }}>
-              <div style={{ display:"inline-flex", flexDirection:"column", alignItems:"center", gap:12 }}>
-                <RefreshCw className="w-7 h-7 text-indigo-500 animate-spin"/>
-                <p style={{ color:"#64748b", fontSize:13, fontWeight:500 }}>Analyzing your quote…</p>
-                <p style={{ color:"#94a3b8", fontSize:11 }}>Comparing to national market data</p>
-              </div>
+            <div style={{ textAlign:"center", padding:"36px 0" }}>
+              <RefreshCw className="w-6 h-6 text-indigo-500 animate-spin mx-auto mb-3"/>
+              <p style={{ color:"#64748b", fontSize:13, fontWeight:500 }}>Writing your message…</p>
             </div>
           ) : error ? (
-            <div style={{ textAlign:"center", padding:"30px 0" }}>
-              <p style={{ color:"#dc2626", fontSize:13 }}>{error}</p>
-              <button onClick={onClose} style={{ marginTop:12, padding:"8px 16px", borderRadius:8, border:"1px solid #e2e8f0", background:"#fff", cursor:"pointer", fontSize:13 }}>Close</button>
-            </div>
-          ) : result ? (
-            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                <span style={{ fontSize:12, fontWeight:700, color:"#374151", textTransform:"uppercase", letterSpacing:"0.06em" }}>AI Verdict</span>
-                <span style={{ background: verdictColor + "15", color: verdictColor, border:"1px solid " + verdictColor + "30", fontSize:11, fontWeight:700, padding:"4px 12px", borderRadius:20 }}>{verdictLabel}</span>
+            <div style={{ color:"#dc2626", fontSize:13, textAlign:"center", padding:"20px 0" }}>{error}</div>
+          ) : (
+            <>
+              <div style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:12, padding:"14px 16px", marginBottom:16 }}>
+                <p style={{ fontSize:13, color:"#1e293b", lineHeight:1.65 }}>{message}</p>
               </div>
 
-              <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:10, alignItems:"center" }}>
-                <div style={{ background:"#f8fafc", borderRadius:12, padding:"12px 14px", textAlign:"center" }}>
-                  <p style={{ fontSize:10, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Current</p>
-                  <p style={{ fontSize:22, fontWeight:800, color:"#0f172a" }}>{"$" + currentPrice.toLocaleString()}</p>
-                </div>
-                <div style={{ color:"#94a3b8", fontSize:18 }}>&#8594;</div>
-                <div style={{ background: verdictColor + "10", border:"1px solid " + verdictColor + "30", borderRadius:12, padding:"12px 14px", textAlign:"center" }}>
-                  <p style={{ fontSize:10, fontWeight:700, color: verdictColor, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Suggested</p>
-                  <p style={{ fontSize:22, fontWeight:800, color: verdictColor }}>{"$" + suggestedMid.toLocaleString()}</p>
-                  <p style={{ fontSize:9, color:"#94a3b8", marginTop:2 }}>{"$" + result.suggested_range_low + "–$" + result.suggested_range_high + " range"}</p>
-                </div>
+              <div style={{ display:"flex", gap:10 }}>
+                <button
+                  onClick={handleCopyToQuote}
+                  disabled={copying}
+                  style={{
+                    flex:1, padding:"11px 0", borderRadius:10, border:"none",
+                    background: copied ? "#059669" : "#2563eb",
+                    color:"#fff", fontSize:13, fontWeight:700, cursor: copying ? "wait" : "pointer",
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                    transition:"background 0.2s",
+                  }}
+                >
+                  {copying
+                    ? <><RefreshCw className="w-4 h-4 animate-spin"/> Saving…</>
+                    : copied
+                    ? <><CheckCircle className="w-4 h-4"/> Saved to Quote</>
+                    : <><FileText className="w-4 h-4"/> Copy to Quote Notes</>
+                  }
+                </button>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(message); showToast("Message copied to clipboard"); }}
+                  style={{ padding:"11px 14px", borderRadius:10, border:"1px solid #e2e8f0", background:"#fff", color:"#475569", fontSize:13, fontWeight:600, cursor:"pointer" }}
+                >
+                  Copy
+                </button>
               </div>
-
-              {result.coaching_note ? (
-                <div style={{ background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:12, padding:"12px 14px" }}>
-                  <p style={{ fontSize:12, fontWeight:700, color:"#065f46", marginBottom:4 }}>Coaching Note</p>
-                  <p style={{ fontSize:12, color:"#047857", lineHeight:1.55 }}>{result.coaching_note}</p>
-                </div>
-              ) : null}
-
-              {adjAvg > 0 ? (
-                <div style={{ fontSize:11, color:"#64748b", background:"#f8fafc", borderRadius:10, padding:"10px 12px" }}>
-                  {"National range for " + (details?.beds || "?") + "bd: $" + Math.round(adjLow) + "–$" + Math.round(adjHigh) + " · avg $" + Math.round(adjAvg)}
-                </div>
-              ) : null}
-
-              <button
-                onClick={() => handleApply(suggestedMid)}
-                disabled={applying || suggestedMid === currentPrice}
-                style={{
-                  width:"100%", padding:"13px",
-                  background: applying || suggestedMid === currentPrice ? "#94a3b8" : verdictColor,
-                  color:"#fff", border:"none", borderRadius:12,
-                  fontSize:13, fontWeight:700, cursor: applying ? "wait" : "pointer",
-                  display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-                }}
-              >
-                {applying
-                  ? <><RefreshCw className="w-4 h-4 animate-spin"/> Applying…</>
-                  : suggestedMid === currentPrice
-                  ? "Price already matches suggestion"
-                  : <><CheckCircle className="w-4 h-4"/> {"Apply Recommended Price ($" + suggestedMid.toLocaleString() + ")"}</>
-                }
-              </button>
-            </div>
-          ) : null}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -502,6 +507,9 @@ export default function QuoteDetailPage() {
  const [toast, setToast] = useState<{ message: string; variant:"success"|"error"|"info"} | null>(null);
  const [stripeInvoiceSending, setStripeInvoiceSending] = useState(false);
  const [stripeInvoiceSuccess, setStripeInvoiceSuccess] = useState<string | null>(null);
+ // QuoteDoctor live sync state
+ const [livePrice, setLivePrice] = useState<number | null>(null);
+ const [flashTier, setFlashTier] = useState<string | null>(null);
 
  const showToast = (message: string, variant:"success"|"error"|"info"="success") => {
  setToast({ message, variant });
@@ -1110,11 +1118,14 @@ export default function QuoteDetailPage() {
  typeof val ==="object"&& val.scope ? val.scope :"";
  const isSelected = quote.selectedOption === key;
  const isRecommended = quote.recommendedOption === key;
+ const isFlashing = flashTier === key;
  return (
  <div
  key={key}
  className={`rounded-xl border-2 p-4 transition-all ${
- isSelected
+ isFlashing
+ ?"border-emerald-500 bg-emerald-50/60 shadow-md shadow-emerald-600/10"
+ : isSelected
  ?"border-primary-500 bg-primary-50/50 shadow-sm shadow-primary-600/5"
  :"border-slate-200 hover:border-slate-300"
  }`}
@@ -1443,9 +1454,14 @@ export default function QuoteDetailPage() {
  <span className="text-slate-500">
  {details?.quoteType ==="commercial"?"Monthly Total":"Total"}
  </span>
- <span className="text-2xl font-bold text-slate-900 tracking-tight">
- ${Number(quote.total || 0).toLocaleString()}
+ <div className="flex items-center gap-2">
+ {livePrice !== null && Math.abs(livePrice - Number(quote.total || 0)) > 0.5 ? (
+   <span className="text-xs text-slate-400 line-through">${Number(quote.total || 0).toLocaleString()}</span>
+ ) : null}
+ <span className={`text-2xl font-bold tracking-tight transition-colors ${livePrice !== null && Math.abs(livePrice - Number(quote.total || 0)) > 0.5 ? "text-indigo-700" : "text-slate-900"}`}>
+ ${(livePrice !== null ? livePrice : Number(quote.total || 0)).toLocaleString()}
  </span>
+ </div>
  </div>
  {quote.expiresAt ? (
  <div className="flex items-center gap-1.5 text-slate-500">
@@ -1464,10 +1480,10 @@ export default function QuoteDetailPage() {
  />
  ) : null}
 
- {/* National benchmark badge for residential quotes */}
+ {/* National benchmark badge for residential quotes — syncs with QuoteDoctor slider */}
  {details?.quoteType !=="commercial"&& details?.beds && Number(quote.total || 0) > 0 ? (
  <ResidentialBenchmarkBadge
- visitPrice={Number(quote.total || 0)}
+ visitPrice={livePrice !== null ? livePrice : Number(quote.total || 0)}
  beds={Number(details.beds)}
  frequency={quote.frequencySelected ?? undefined}
  size="full"
@@ -1510,8 +1526,14 @@ export default function QuoteDetailPage() {
    addOns={addOns}
    quoteId={id || ""}
    showToast={showToast}
-   onPriceApplied={(_newTotal) => {
+   onPriceApplied={(newTotal) => {
+     setLivePrice(null);
      queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
+   }}
+   onSliderChange={(val) => setLivePrice(val)}
+   onFlashTier={(tierKey) => {
+     setFlashTier(tierKey);
+     setTimeout(() => setFlashTier(null), 2000);
    }}
  />
  ) : null}

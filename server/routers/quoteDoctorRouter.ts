@@ -353,6 +353,72 @@ Return ONLY this JSON (no markdown, no explanation):
   }
 });
 
+// ─── Zone-aware customer-facing justification message ────────────────────────
+
+quoteDoctorRouter.post("/justify", requireAuth, async (req: Request, res: Response) => {
+  let priceZone: string | undefined, price: number | undefined, adjAvg: number | undefined,
+    beds: number | undefined, sqft: number | undefined, condition: string | undefined,
+    frequency: string | undefined;
+  try {
+    ({ priceZone, price, adjAvg, beds, sqft, condition, frequency } = req.body as {
+      priceZone?: string; price?: number; adjAvg?: number;
+      beds?: number; sqft?: number; condition?: string; frequency?: string;
+    });
+
+    const zonePhrases: Record<string, string> = {
+      below: "below market average (competitively priced)",
+      at: "right at market average",
+      above: "above typical market range (premium pricing)",
+    };
+    const zonePhrase = zonePhrases[priceZone || "at"] ?? zonePhrases["at"];
+
+    const toneMap: Record<string, string> = {
+      below: "Value-forward and reassuring. Help the customer see this is a fair, competitive price that reflects your commitment to earning repeat business. Emphasize reliability, attention to detail, and consistency.",
+      at: "Confident and professional. Highlight what a thorough, standard-rate clean covers. Reinforce reliability and quality without over-explaining.",
+      above: "Premium justification. Be specific to this job's size and details — mention the thoroughness required for this home, eco-friendly products if applicable, satisfaction guarantee, years of experience, and attention to detail. Never be generic. This is the most important message to get right.",
+    };
+    const tone = toneMap[priceZone || "at"] ?? toneMap["at"];
+
+    const jobDesc = [
+      beds ? `${beds}-bedroom home` : null,
+      sqft ? `${sqft.toLocaleString()} sq ft` : null,
+      condition ? `${condition} condition` : null,
+      frequency ? `${frequency} clean` : null,
+      price ? `quoted at $${price}` : null,
+    ].filter(Boolean).join(", ");
+
+    const prompt = `Write a 3–4 sentence customer-facing message for a residential cleaning business owner to include with their quote.
+
+Job: ${jobDesc || "standard residential clean"}. This price is ${zonePhrase}.
+
+Tone instruction: ${tone}
+
+Rules:
+- Address the customer warmly but without using a specific name
+- Do NOT use the word "pristine"
+- Be specific to the job details above — never generic
+- End with a clear, low-pressure call to action
+- Return ONLY the message text, no labels or preamble`;
+
+    const completion = await anthropic.messages.create({
+      model: "claude-sonnet-4-5",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 320,
+    });
+    const message = (completion.content[0] as any).text?.trim() ?? "";
+    console.log("[QuoteDoctor/justify] zone:", priceZone, "output length:", message.length);
+    return res.json({ message });
+  } catch (err: any) {
+    console.error("[QuoteDoctor/justify] error:", err?.message);
+    const fallbacks: Record<string, string> = {
+      below: "We believe in transparent, competitive pricing that reflects the quality of work we deliver. Every clean is performed with the same care and attention — because we want to earn your repeat business, not just a one-time job. If you have any questions about what's included, we're happy to walk you through it.",
+      at: "Our pricing reflects the going rate for a thorough, professional clean in your area — no hidden fees, just consistent quality. We take pride in showing up on time, communicating clearly, and leaving your home spotless. We'd love to get you on the schedule.",
+      above: `For a home of this size in this condition, this quote reflects the level of detail and time required to do the job right. We use professional-grade, eco-friendly products, and every clean comes with our satisfaction guarantee — if something's not right, we come back at no extra charge. Our experienced team treats your home like their own.`,
+    };
+    return res.json({ message: fallbacks[priceZone || "at"] ?? fallbacks["at"] });
+  }
+});
+
 // ─── AI adjust existing proposal ──────────────────────────────────────────────
 
 quoteDoctorRouter.post("/adjust", requireAuth, async (req: Request, res: Response) => {
