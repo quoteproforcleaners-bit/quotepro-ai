@@ -1740,18 +1740,121 @@ loadMonth(nextMo);
         } catch (_e) {}
       }
 
-      // Push: notify business owner that quote was accepted
+      // Push + Email: notify business owner that quote was accepted
       try {
         const business = await db_getBusinessById(q.businessId);
         if (business?.userId) {
           const customer = q.customerId ? await getCustomerById(q.customerId) : null;
           const customerName = customer ? `${customer.firstName} ${customer.lastName}`.trim() : acceptedName.trim();
+
+          // Push notification (mobile app)
           sendPush(business.userId, {
             title: "New job confirmed!",
             body: `${customerName} accepted your quote. Tap to schedule the job.`,
             data: { screen: "QuoteDetail", quoteId: q.id },
             channel: "quotes",
           }).catch(() => {});
+
+          // Email notification to the business owner
+          (async () => {
+            try {
+              const owner = await getUserById(business.userId);
+              if (!owner?.email) return;
+
+              const quoteTotal = Number(updateData.total ?? q.total ?? 0);
+              const formattedTotal = quoteTotal.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              const dashboardUrl = `${getPublicBaseUrl(req)}/app/quotes/${q.id}`;
+              const companyName = business.companyName || "QuotePro";
+
+              const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Quote Accepted</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 20px">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:540px">
+
+        <!-- Header -->
+        <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1e40af 100%);border-radius:16px 16px 0 0;padding:28px 32px">
+          <p style="margin:0;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-0.5px">${companyName}</p>
+          <p style="margin:6px 0 0;font-size:13px;color:rgba(148,163,184,1)">Powered by QuotePro</p>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="background:#ffffff;padding:32px">
+          <p style="margin:0 0 20px;font-size:28px">&#x2705;</p>
+          <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#0f172a">Quote Accepted!</h1>
+          <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6">
+            <strong style="color:#0f172a">${customerName}</strong> just accepted a quote. You have a new confirmed job.
+          </p>
+
+          <!-- Info card -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:28px">
+            <tr><td style="padding:20px 24px">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:8px 0;border-bottom:1px solid #e2e8f0">
+                    <span style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Client</span>
+                  </td>
+                  <td align="right" style="padding:8px 0;border-bottom:1px solid #e2e8f0">
+                    <span style="font-size:14px;font-weight:600;color:#0f172a">${customerName}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 0">
+                    <span style="font-size:12px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Quote Total</span>
+                  </td>
+                  <td align="right" style="padding:8px 0">
+                    <span style="font-size:20px;font-weight:800;color:#059669">${formattedTotal}</span>
+                  </td>
+                </tr>
+              </table>
+            </td></tr>
+          </table>
+
+          <!-- CTA button -->
+          <table cellpadding="0" cellspacing="0" style="margin:0 auto">
+            <tr><td align="center" style="background:#1d4ed8;border-radius:10px">
+              <a href="${dashboardUrl}" style="display:inline-block;padding:14px 32px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;letter-spacing:0.01em">
+                View Quote in Dashboard &#8594;
+              </a>
+            </td></tr>
+          </table>
+
+          <p style="margin:28px 0 0;font-size:12px;color:#94a3b8;text-align:center">
+            Accepted via quote link &middot; ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+          </p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background:#f8fafc;border-radius:0 0 16px 16px;padding:16px 32px;border-top:1px solid #e2e8f0">
+          <p style="margin:0;font-size:11px;color:#94a3b8;text-align:center">
+            You're receiving this because you have a QuotePro account. &middot; <a href="${getPublicBaseUrl(req)}/app/settings" style="color:#64748b">Manage notifications</a>
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+              await sendEmail({
+                to: owner.email,
+                subject: `\u2705 Quote Accepted \u2013 ${customerName}`,
+                html,
+                text: `${customerName} just accepted a quote for ${formattedTotal}.\n\nView it here: ${dashboardUrl}`,
+                fromName: "QuotePro",
+              });
+              console.log(`[quote-accept] Owner notification email sent to ${owner.email} for quote ${q.id}`);
+            } catch (mailErr: any) {
+              console.error("[quote-accept] Owner email notification failed:", mailErr?.message || mailErr);
+            }
+          })();
         }
       } catch (_notifErr) {}
 
