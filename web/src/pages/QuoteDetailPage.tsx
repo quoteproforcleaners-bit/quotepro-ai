@@ -46,7 +46,7 @@ import {
  Pencil,
  Wand2,
 } from"lucide-react";
-import { useState } from"react";
+import { useState, useEffect } from"react";
 import {
  PageHeader,
  Card,
@@ -66,6 +66,399 @@ import { QuickAddCleanPanel } from"../components/QuickAddCleanPanel";
 
 type MessagePurpose ="send_quote"|"follow_up"|"thank_you"|"reminder"|"upsell"|"review_request"|"payment_failed";
 type MessageChannel ="email"|"sms";
+
+
+// ─── QuoteDoctor Inline Card (interactive slider + AI modal) ─────────────────
+
+const RES_BM_DATA: Record<number,{low:number;high:number;avg:number}> = {
+  1:{low:75,high:110,avg:92}, 2:{low:100,high:155,avg:127},
+  3:{low:130,high:185,avg:157}, 4:{low:175,high:250,avg:212}, 5:{low:220,high:340,avg:278},
+};
+
+interface QuoteDoctorCardProps {
+  quote: any;
+  details: any;
+  addOns: any;
+  quoteId: string;
+  showToast: (msg: string, variant?: "success"|"error"|"info") => void;
+  onPriceApplied: (newTotal: number) => void;
+}
+
+function QuoteDoctorCard({ quote, details, addOns, quoteId, showToast, onPriceApplied }: QuoteDoctorCardProps) {
+  const beds = Number(details?.beds || 0);
+  const freq = quote.frequencySelected as string | undefined;
+  const bm = beds > 0 ? RES_BM_DATA[Math.min(5, Math.max(1, beds))] : null;
+  const adjLow  = bm ? ((freq==="weekly"||freq==="biweekly") ? bm.low*0.8  : bm.low)  : 0;
+  const adjHigh = bm ? ((freq==="weekly"||freq==="biweekly") ? bm.high*0.8 : bm.high) : 0;
+  const adjAvg  = bm ? (adjLow + adjHigh) / 2 : 0;
+
+  const sliderMin = Math.floor(bm ? adjLow * 0.8 : Number(quote.total||0) * 0.6);
+  const sliderMax = Math.ceil(bm ? adjHigh * 1.3 : Number(quote.total||0) * 1.5);
+
+  const [sliderVal, setSliderVal] = useState<number>(Number(quote.total || 0));
+  const [applying, setApplying] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  useEffect(() => { setSliderVal(Number(quote.total || 0)); }, [quote.total]);
+
+  const below    = bm ? sliderVal < adjLow : false;
+  const above    = bm ? sliderVal > adjHigh : false;
+  const pctVsAvg = bm && adjAvg > 0 ? Math.round(((sliderVal - adjAvg) / adjAvg) * 100) : 0;
+  const abs      = Math.abs(pctVsAvg);
+
+  const diagLabel  = below
+    ? (pctVsAvg < -20 ? "Priced too low" : "Below market avg")
+    : above ? (pctVsAvg > 20 ? "Above market range" : "Above market avg")
+    : "Market rate";
+  const thumbColor = below ? "#f59e0b" : above ? "#8b5cf6" : "#10b981";
+  const badgeColor = below ? "#d97706" : above ? "#7c3aed" : "#059669";
+  const badgeBg    = below ? "rgba(251,191,36,0.15)" : above ? "rgba(139,92,246,0.15)" : "rgba(16,185,129,0.15)";
+  const suggestion = below && bm
+    ? abs + "% below market — raise to $" + Math.round(adjAvg) + " to hit midpoint (+$" + Math.round(adjAvg - sliderVal) + ")"
+    : above && bm
+    ? "Currently $" + Math.round(sliderVal - adjAvg) + " above avg — be ready to justify premium value"
+    : bm ? "Your price is in the national sweet spot — well positioned" : "";
+
+  const toPct = (v: number) => {
+    const p = ((v - sliderMin) / (sliderMax - sliderMin)) * 100;
+    return Math.min(100, Math.max(0, p));
+  };
+  const lowPct   = toPct(adjLow);
+  const highPct  = toPct(adjHigh);
+  const pricePct = toPct(sliderVal);
+
+  const handleApply = async () => {
+    if (applying) return;
+    setApplying(true);
+    try {
+      await apiPut(`/api/quotes/${quoteId}`, { total: sliderVal });
+      queryClient.invalidateQueries({ queryKey: [`/api/quotes/${quoteId}`] });
+      onPriceApplied(sliderVal);
+      showToast("Price updated to $" + sliderVal.toLocaleString(), "success");
+    } catch (e: any) {
+      showToast(e?.message || "Failed to update price", "error");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const priceChanged = Math.abs(sliderVal - Number(quote.total || 0)) > 0.5;
+
+  return (
+    <>
+      <div style={{
+        background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)",
+        borderRadius: 14, padding: "16px 18px",
+        position: "relative", overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", top: -20, right: -20, width: 120, height: 120,
+          background: "radial-gradient(circle, rgba(99,102,241,0.35) 0%, transparent 70%)",
+          borderRadius: "50%", pointerEvents: "none",
+        }} />
+
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div style={{ background:"rgba(99,102,241,0.25)", borderRadius:8, padding:6 }}>
+              <Wand2 className="w-3.5 h-3.5 text-indigo-300"/>
+            </div>
+            <span className="text-white font-semibold text-sm">QuoteDoctor</span>
+          </div>
+          {bm ? (
+            <span style={{
+              background: badgeBg, border: "1px solid " + badgeColor + "60",
+              color: badgeColor, fontSize: 10, fontWeight: 700,
+              padding: "3px 9px", borderRadius: 20,
+            }}>{diagLabel}</span>
+          ) : null}
+        </div>
+
+        {bm ? (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ position:"relative", height:24, marginBottom:4 }}>
+              <div style={{
+                position:"absolute", bottom: "100%", marginBottom:4,
+                left: pricePct + "%",
+                transform:"translateX(-50%)",
+                background: thumbColor, color:"#fff",
+                fontSize:11, fontWeight:700,
+                padding:"2px 7px", borderRadius:8,
+                whiteSpace:"nowrap",
+                boxShadow:"0 1px 4px rgba(0,0,0,0.2)",
+                pointerEvents:"none",
+              }}>
+                {"$" + sliderVal.toLocaleString()}
+              </div>
+              <div style={{ position:"absolute", top:10, left:0, right:0, height:6, background:"rgba(255,255,255,0.15)", borderRadius:999 }}/>
+              <div style={{
+                position:"absolute", top:10, height:6,
+                left: lowPct + "%", width: (highPct - lowPct) + "%",
+                background:"linear-gradient(90deg,#34d399,#10b981,#34d399)",
+                borderRadius:999,
+              }}/>
+              <input
+                type="range"
+                min={sliderMin}
+                max={sliderMax}
+                step={5}
+                value={sliderVal}
+                onChange={(e) => setSliderVal(Number(e.target.value))}
+                style={{
+                  position:"absolute", top:0, left:0, right:0, width:"100%",
+                  height:24, opacity:0, cursor:"pointer", zIndex:3, margin:0,
+                  WebkitAppearance:"none" as any,
+                }}
+              />
+              <div style={{
+                position:"absolute", top:4,
+                left: pricePct + "%",
+                transform:"translateX(-50%)",
+                width:18, height:18,
+                background: thumbColor,
+                borderRadius:"50%",
+                border:"2.5px solid #fff",
+                boxShadow:"0 0 0 2px " + thumbColor + "40, 0 2px 6px rgba(0,0,0,0.3)",
+                pointerEvents:"none",
+                zIndex:2,
+              }}/>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, fontWeight:600, color:"rgba(255,255,255,0.45)" }}>
+              <span>{"$" + Math.round(adjLow) + " low"}</span>
+              <span style={{ color:"#34d399" }}>{"avg $" + Math.round(adjAvg)}</span>
+              <span>{"$" + Math.round(adjHigh) + " high"}</span>
+            </div>
+          </div>
+        ) : null}
+
+        {suggestion ? (
+          <p style={{ color:"rgba(203,213,225,1)", fontSize:11, lineHeight:1.45, marginBottom:12 }}>{suggestion}</p>
+        ) : (
+          <p style={{ color:"rgba(203,213,225,1)", fontSize:11, lineHeight:1.45, marginBottom:12 }}>
+            {quote.status === "draft"
+              ? "Drag the slider to adjust your price and see how it compares to the market."
+              : "Your quote is out. Use QuoteDoctor to rewrite it and close more jobs."}
+          </p>
+        )}
+
+        <div className="flex gap-2 flex-wrap">
+          {bm ? (
+            <button
+              onClick={handleApply}
+              disabled={!priceChanged || applying}
+              className="flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 transition-all"
+              style={{
+                background: priceChanged ? thumbColor : "rgba(255,255,255,0.1)",
+                color: priceChanged ? "#fff" : "rgba(255,255,255,0.35)",
+                border: "none",
+                cursor: priceChanged ? "pointer" : "not-allowed",
+              }}
+            >
+              {applying ? <RefreshCw className="w-3 h-3 animate-spin"/> : <CheckCircle className="w-3 h-3"/>}
+              {applying ? "Saving…" : "Apply $" + sliderVal.toLocaleString()}
+            </button>
+          ) : null}
+
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-white rounded-lg px-3 py-1.5 transition-all hover:opacity-90"
+            style={{ background:"rgba(99,102,241,0.55)", border:"1px solid rgba(99,102,241,0.7)" }}
+          >
+            <Zap className="w-3 h-3"/>
+            AI Rewrite
+          </button>
+        </div>
+      </div>
+
+      {modalOpen ? (
+        <QuoteDoctorModal
+          quote={quote}
+          details={details}
+          adjLow={adjLow}
+          adjAvg={adjAvg}
+          adjHigh={adjHigh}
+          quoteId={quoteId}
+          showToast={showToast}
+          onApplied={(price) => { setSliderVal(price); onPriceApplied(price); setModalOpen(false); }}
+          onClose={() => setModalOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+// ─── QuoteDoctor AI Modal ─────────────────────────────────────────────────────
+
+interface QuoteDoctorModalProps {
+  quote: any;
+  details: any;
+  adjLow: number;
+  adjAvg: number;
+  adjHigh: number;
+  quoteId: string;
+  showToast: (msg: string, variant?: "success"|"error"|"info") => void;
+  onApplied: (price: number) => void;
+  onClose: () => void;
+}
+
+function QuoteDoctorModal({ quote, details, adjLow, adjAvg, adjHigh, quoteId, showToast, onApplied, onClose }: QuoteDoctorModalProps) {
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string|null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const data = await apiPost("/api/quote-doctor/analyze", {
+          quoteAmount: Number(quote.total || 0),
+          bedrooms: Number(details?.beds || 0),
+          bathrooms: Number(details?.baths || 0),
+          sqft: Number(details?.sqft || 0),
+          frequency: quote.frequencySelected || "one-time",
+          city: "",
+          state: "",
+        }) as any;
+        if (!cancelled) setResult(data);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || "AI analysis failed");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleApply = async (price: number) => {
+    setApplying(true);
+    try {
+      await apiPut(`/api/quotes/${quoteId}`, { total: price });
+      queryClient.invalidateQueries({ queryKey: [`/api/quotes/${quoteId}`] });
+      onApplied(price);
+      showToast("Price updated to $" + price.toLocaleString(), "success");
+    } catch (e: any) {
+      showToast(e?.message || "Failed to update price", "error");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const currentPrice  = Number(quote.total || 0);
+  const suggestedMid  = result ? Math.round((result.suggested_range_low + result.suggested_range_high) / 2) : 0;
+
+  const verdictColor  = !result ? "#94a3b8"
+    : result.verdict === "too_low" ? "#d97706"
+    : result.verdict === "too_high" ? "#dc2626"
+    : "#059669";
+  const verdictLabel  = !result ? ""
+    : result.verdict === "too_low" ? "Priced Too Low"
+    : result.verdict === "too_high" ? "Priced Too High"
+    : "Fair Price";
+
+  return (
+    <div
+      style={{
+        position:"fixed", inset:0, zIndex:1000,
+        background:"rgba(15,23,42,0.7)", backdropFilter:"blur(4px)",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        padding:"20px",
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        background:"#fff", borderRadius:20, maxWidth:460, width:"100%",
+        boxShadow:"0 24px 80px rgba(0,0,0,0.25)", overflow:"hidden",
+      }}>
+        <div style={{
+          background:"linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)",
+          padding:"18px 20px",
+          display:"flex", alignItems:"center", justifyContent:"space-between",
+        }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ background:"rgba(99,102,241,0.25)", borderRadius:8, padding:7 }}>
+              <Wand2 className="w-4 h-4 text-indigo-300"/>
+            </div>
+            <div>
+              <p style={{ color:"#fff", fontWeight:700, fontSize:14 }}>QuoteDoctor Analysis</p>
+              <p style={{ color:"rgba(148,163,184,1)", fontSize:11, marginTop:1 }}>AI-powered pricing coach</p>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.1)", border:"none", borderRadius:8, padding:"6px 8px", color:"rgba(255,255,255,0.7)", cursor:"pointer", fontSize:16, lineHeight:1 }}>&#x2715;</button>
+        </div>
+
+        <div style={{ padding:"22px 20px" }}>
+          {loading ? (
+            <div style={{ textAlign:"center", padding:"40px 0" }}>
+              <div style={{ display:"inline-flex", flexDirection:"column", alignItems:"center", gap:12 }}>
+                <RefreshCw className="w-7 h-7 text-indigo-500 animate-spin"/>
+                <p style={{ color:"#64748b", fontSize:13, fontWeight:500 }}>Analyzing your quote…</p>
+                <p style={{ color:"#94a3b8", fontSize:11 }}>Comparing to national market data</p>
+              </div>
+            </div>
+          ) : error ? (
+            <div style={{ textAlign:"center", padding:"30px 0" }}>
+              <p style={{ color:"#dc2626", fontSize:13 }}>{error}</p>
+              <button onClick={onClose} style={{ marginTop:12, padding:"8px 16px", borderRadius:8, border:"1px solid #e2e8f0", background:"#fff", cursor:"pointer", fontSize:13 }}>Close</button>
+            </div>
+          ) : result ? (
+            <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontSize:12, fontWeight:700, color:"#374151", textTransform:"uppercase", letterSpacing:"0.06em" }}>AI Verdict</span>
+                <span style={{ background: verdictColor + "15", color: verdictColor, border:"1px solid " + verdictColor + "30", fontSize:11, fontWeight:700, padding:"4px 12px", borderRadius:20 }}>{verdictLabel}</span>
+              </div>
+
+              <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:10, alignItems:"center" }}>
+                <div style={{ background:"#f8fafc", borderRadius:12, padding:"12px 14px", textAlign:"center" }}>
+                  <p style={{ fontSize:10, fontWeight:700, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Current</p>
+                  <p style={{ fontSize:22, fontWeight:800, color:"#0f172a" }}>{"$" + currentPrice.toLocaleString()}</p>
+                </div>
+                <div style={{ color:"#94a3b8", fontSize:18 }}>&#8594;</div>
+                <div style={{ background: verdictColor + "10", border:"1px solid " + verdictColor + "30", borderRadius:12, padding:"12px 14px", textAlign:"center" }}>
+                  <p style={{ fontSize:10, fontWeight:700, color: verdictColor, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Suggested</p>
+                  <p style={{ fontSize:22, fontWeight:800, color: verdictColor }}>{"$" + suggestedMid.toLocaleString()}</p>
+                  <p style={{ fontSize:9, color:"#94a3b8", marginTop:2 }}>{"$" + result.suggested_range_low + "–$" + result.suggested_range_high + " range"}</p>
+                </div>
+              </div>
+
+              {result.coaching_note ? (
+                <div style={{ background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:12, padding:"12px 14px" }}>
+                  <p style={{ fontSize:12, fontWeight:700, color:"#065f46", marginBottom:4 }}>Coaching Note</p>
+                  <p style={{ fontSize:12, color:"#047857", lineHeight:1.55 }}>{result.coaching_note}</p>
+                </div>
+              ) : null}
+
+              {adjAvg > 0 ? (
+                <div style={{ fontSize:11, color:"#64748b", background:"#f8fafc", borderRadius:10, padding:"10px 12px" }}>
+                  {"National range for " + (details?.beds || "?") + "bd: $" + Math.round(adjLow) + "–$" + Math.round(adjHigh) + " · avg $" + Math.round(adjAvg)}
+                </div>
+              ) : null}
+
+              <button
+                onClick={() => handleApply(suggestedMid)}
+                disabled={applying || suggestedMid === currentPrice}
+                style={{
+                  width:"100%", padding:"13px",
+                  background: applying || suggestedMid === currentPrice ? "#94a3b8" : verdictColor,
+                  color:"#fff", border:"none", borderRadius:12,
+                  fontSize:13, fontWeight:700, cursor: applying ? "wait" : "pointer",
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                }}
+              >
+                {applying
+                  ? <><RefreshCw className="w-4 h-4 animate-spin"/> Applying…</>
+                  : suggestedMid === currentPrice
+                  ? "Price already matches suggestion"
+                  : <><CheckCircle className="w-4 h-4"/> {"Apply Recommended Price ($" + suggestedMid.toLocaleString() + ")"}</>
+                }
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function QuoteDetailPage() {
  const { id } = useParams();
@@ -1109,134 +1502,19 @@ export default function QuoteDetailPage() {
  </div>
  </Card>
 
- {/* QuoteDoctor — inline market intelligence */}
- {(quote.status === "draft" || quote.status === "sent") ? (() => {
- const _price = Number(quote.total || 0);
- const _beds = Number(details?.beds || 0);
- const _freq = quote.frequencySelected;
- const RES_BM: Record<number,{low:number;high:number;avg:number}> = {
-   1:{low:75,high:110,avg:92}, 2:{low:100,high:155,avg:127},
-   3:{low:130,high:185,avg:157}, 4:{low:175,high:250,avg:212}, 5:{low:220,high:340,avg:278},
- };
- const _bm = _beds > 0 ? RES_BM[Math.min(5, Math.max(1, _beds))] : null;
- const _adjLow = _bm ? ((_freq==="weekly"||_freq==="biweekly") ? _bm.low*0.8 : _bm.low) : 0;
- const _adjHigh = _bm ? ((_freq==="weekly"||_freq==="biweekly") ? _bm.high*0.8 : _bm.high) : 0;
- const _adjAvg = _bm ? (_adjLow + _adjHigh) / 2 : 0;
- const _pct = _bm && _adjAvg > 0 ? Math.round(((_price - _adjAvg) / _adjAvg) * 100) : 0;
- const _below = _bm ? _price < _adjLow : false;
- const _above = _bm ? _price > _adjHigh : false;
- const _diagLabel = _below
-   ? (_pct < -20 ? "Priced too low" : "Below market avg")
-   : _above ? (_pct > 20 ? "Above market range" : "Above market avg")
-   : "Market rate";
- const _thumbColor = _below ? "#f59e0b" : _above ? "#8b5cf6" : "#10b981";
- const _diagBadgeBg = _below ? "rgba(251,191,36,0.15)" : _above ? "rgba(139,92,246,0.15)" : "rgba(16,185,129,0.15)";
- const _diagBadgeColor = _below ? "#d97706" : _above ? "#7c3aed" : "#059669";
- const _suggestion = _below && _bm
-   ? "Raise to $" + Math.round(_adjAvg) + " to reach market midpoint (+$" + Math.round(_adjAvg - _price) + ")"
-   : _above && _bm
-   ? "Currently $" + Math.round(_price - _adjAvg) + " above avg — justify with premium service"
-   : _bm ? "Your price is in the national sweet spot — well positioned" : "";
-
- return (
- <div style={{
-   background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1e40af 100%)",
-   borderRadius: 14, padding: "16px 18px",
-   position: "relative", overflow: "hidden",
- }}>
-   <div style={{
-     position: "absolute", top: -20, right: -20, width: 120, height: 120,
-     background: "radial-gradient(circle, rgba(99,102,241,0.35) 0%, transparent 70%)",
-     borderRadius: "50%", pointerEvents: "none",
-   }} />
-
-   <div className="flex items-center justify-between mb-3">
-     <div className="flex items-center gap-2">
-       <div style={{ background:"rgba(99,102,241,0.25)", borderRadius:8, padding:6 }}>
-         <Wand2 className="w-3.5 h-3.5 text-indigo-300"/>
-       </div>
-       <span className="text-white font-semibold text-sm">QuoteDoctor</span>
-     </div>
-     {_bm ? (
-       <span style={{
-         background: _diagBadgeBg, border: "1px solid " + _diagBadgeColor + "60",
-         color: _diagBadgeColor, fontSize: 10, fontWeight: 700,
-         padding: "3px 9px", borderRadius: 20,
-       }}>{_diagLabel}</span>
-     ) : null}
-   </div>
-
-   {_bm ? (() => {
-     const _extMin = Math.min(_adjLow * 0.82, _price * 0.82);
-     const _extMax = Math.max(_adjHigh * 1.18, _price * 1.18);
-     const _span = _extMax - _extMin;
-     const _toPct = (v: number) => Math.min(94, Math.max(6, ((v - _extMin) / _span) * 100));
-     const _lowPct = _toPct(_adjLow);
-     const _highPct = _toPct(_adjHigh);
-     const _pricePct = _toPct(_price);
-     return (
-       <div style={{ marginBottom: 10 }}>
-         <div style={{ position:"relative", height:34 }}>
-           <div style={{ position:"absolute", top:15, left:0, right:0, height:5, background:"rgba(255,255,255,0.15)", borderRadius:999 }}/>
-           <div style={{ position:"absolute", top:15, height:5, left:_lowPct+"%", width:(_highPct-_lowPct)+"%", background:"linear-gradient(90deg,#34d399,#10b981,#34d399)", borderRadius:999 }}/>
-           <div style={{
-             position:"absolute", top:8, left:_pricePct+"%",
-             transform:"translateX(-50%)",
-             width:20, height:20,
-             background: _thumbColor, borderRadius:"50%",
-             border:"2.5px solid #fff",
-             boxShadow:"0 0 0 2px rgba(255,255,255,0.25), 0 2px 8px rgba(0,0,0,0.3)",
-             zIndex: 2,
-           }}/>
-           <div style={{
-             position:"absolute", bottom:0, left:0, right:0,
-             display:"flex", justifyContent:"space-between",
-             fontSize:9, color:"rgba(255,255,255,0.45)", fontWeight:600,
-           }}>
-             <span>{"$" + Math.round(_adjLow)}</span>
-             <span style={{ color:"#34d399" }}>{"avg $" + Math.round(_adjAvg)}</span>
-             <span>{"$" + Math.round(_adjHigh)}</span>
-           </div>
-         </div>
-       </div>
-     );
-   })() : null}
-
-   {_suggestion ? (
-     <p className="text-slate-300 text-xs leading-snug mb-3">{_suggestion}</p>
-   ) : (
-     <p className="text-slate-300 text-xs leading-snug mb-3">
-       {quote.status === "draft"
-         ? "AI-optimize your quote before sending — see how you compare to the market."
-         : "Your quote is out. Use QuoteDoctor to rewrite it and close more jobs."}
-     </p>
-   )}
-
-   <button
-     onClick={() => {
-       const _addOnList = Object.entries(addOns || {})
-         .filter(([,v]: any) => typeof v === 'object' ? v.selected : v)
-         .map(([k]: any) => k.replace(/([A-Z])/g,' $1').replace(/^./,(s:string)=>s.toUpperCase()))
-         .join(', ');
-       const _prefillText = [
-         quote.customerName ? 'Customer: ' + quote.customerName : '',
-         _beds > 0 ? 'Bedrooms: ' + _beds : '',
-         _freq ? 'Frequency: ' + _freq : '',
-         'Total: $' + _price.toLocaleString(),
-         _addOnList ? 'Add-Ons: ' + _addOnList : '',
-         'Service: Standard residential cleaning — Good / Better / Best pricing tiers.',
-       ].filter(Boolean).join('\n');
-       navigate('/quote-doctor', { state: { prefillText: _prefillText } });
-     }}
-     className="flex items-center gap-1.5 text-xs font-semibold text-white rounded-lg px-3 py-1.5 transition-all hover:opacity-90 active:scale-[0.97]"
-     style={{ background:"rgba(99,102,241,0.55)", border:"1px solid rgba(99,102,241,0.7)" }}
-   >
-     <Zap className="w-3.5 h-3.5"/>
-     Open QuoteDoctor — full AI rewrite
-   </button>
- </div>
- );
- })() : null}
+ {/* QuoteDoctor — inline interactive card */}
+ {(quote.status === "draft" || quote.status === "sent") ? (
+ <QuoteDoctorCard
+   quote={quote}
+   details={details}
+   addOns={addOns}
+   quoteId={id || ""}
+   showToast={showToast}
+   onPriceApplied={(_newTotal) => {
+     queryClient.invalidateQueries({ queryKey: [`/api/quotes/${id}`] });
+   }}
+ />
+ ) : null}
 
  {(details.customerAddress || quote.customerName) ? (
  <DispatchCard
