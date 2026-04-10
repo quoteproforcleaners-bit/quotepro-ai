@@ -224,13 +224,25 @@ export async function sendTestReminder(businessId: string): Promise<{ emailSent:
   const biz = bizRes.rows[0];
   const sendParams = getBusinessSendParams(biz);
 
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(9, 0, 0, 0);
-  const dateStr = formatDate(tomorrow);
+  // Use the actual configured reminder days (default to 1 if not set)
+  const emailDays = biz.customer_email_reminder_days ?? 1;
+  const smsDays = biz.customer_sms_reminder_days ?? emailDays;
+
+  const exampleDate = new Date();
+  exampleDate.setDate(exampleDate.getDate() + emailDays);
+  exampleDate.setHours(9, 0, 0, 0);
+  const dateStr = formatDate(exampleDate);
   const timeStr = "9:00 AM";
+  const label = daysLabel(emailDays);
   let emailSent = false;
   let smsSent = false;
+
+  // Subject reflects the configured schedule
+  const testSubject = emailDays === 0
+    ? `[TEST] Reminder: Your cleaning is TODAY at ${timeStr}`
+    : emailDays === 1
+    ? `[TEST] Reminder: Your cleaning appointment is tomorrow`
+    : `[TEST] Reminder: Your cleaning appointment is ${label}`;
 
   // Test email
   if (biz.email) {
@@ -247,11 +259,11 @@ export async function sendTestReminder(businessId: string): Promise<{ emailSent:
     <p style="margin:4px 0 0;color:#64748b;font-size:13px;">123 Example Street, Your City</p>
   </div>
   <p>If you need to reschedule or cancel, please reply to this message or call us at <strong>${biz.phone}</strong>.</p>
-  <p>See you tomorrow!<br/><strong>${sendParams.fromName}</strong><br/>${biz.company_name}</p>
+  <p>See you ${label}!<br/><strong>${sendParams.fromName}</strong><br/>${biz.company_name}</p>
 </div>`;
     await sendEmail({
       to: biz.email,
-      subject: "[TEST] Reminder: Your cleaning appointment is tomorrow",
+      subject: testSubject,
       html,
       fromName: sendParams.fromName,
       replyTo: sendParams.replyTo,
@@ -259,9 +271,10 @@ export async function sendTestReminder(businessId: string): Promise<{ emailSent:
     emailSent = true;
   }
 
-  // Test SMS
+  // Test SMS — use configured SMS days for the label
   if (biz.phone) {
-    const body = `[TEST] Hi [Customer]! Reminder: ${biz.company_name} is cleaning your home tomorrow at ${timeStr}. To reschedule call ${biz.phone}. Reply STOP to opt out.`;
+    const smsLabel = dayLabel(smsDays);
+    const body = `[TEST] Hi [Customer]! Reminder: ${biz.company_name} is cleaning your home ${smsLabel} at ${timeStr}. To reschedule call ${biz.phone}. Reply STOP to opt out.`;
     await sendSms(biz.phone, body.slice(0, 160));
     smsSent = true;
   }
