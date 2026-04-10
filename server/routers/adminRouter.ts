@@ -79,6 +79,76 @@ import { businessFiles, sequenceEnrollments, employees, schedulePublications, cl
 
 const router = Router();
 
+  // --- Phantom account management ---
+  const PHANTOM_EXEMPT_PATTERNS = [
+    "%quotepro.com%", "%quotepro.ai%", "%twomaidscleaning.com%",
+    "demo@pristinehomecleaning.com",
+  ];
+  const phantomExemptSql = PHANTOM_EXEMPT_PATTERNS
+    .map((_, i) => `LOWER(email) LIKE $${i + 1}`)
+    .join(" OR ");
+
+  router.get("/phantom-accounts", async (req: Request, res: Response) => {
+    const { secret } = req.query as { secret?: string };
+    const GRANT_PRO_SECRET = process.env.ADMIN_GRANT_PRO_SECRET;
+    if (!GRANT_PRO_SECRET || secret !== GRANT_PRO_SECRET) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const result = await pool.query(
+        `SELECT id, name, email, subscription_tier, stripe_subscription_status, stripe_customer_id, created_at, last_active_at
+         FROM users
+         WHERE subscription_tier IN ('starter','growth','pro')
+           AND (stripe_subscription_status IS NULL OR stripe_subscription_status NOT IN ('active','trialing'))
+           AND NOT (${phantomExemptSql})
+         ORDER BY subscription_tier DESC, created_at DESC`,
+        PHANTOM_EXEMPT_PATTERNS
+      );
+      return res.json({ accounts: result.rows, total: result.rows.length });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  router.post("/demote-phantoms", async (req: Request, res: Response) => {
+    const { secret } = req.query as { secret?: string };
+    const GRANT_PRO_SECRET = process.env.ADMIN_GRANT_PRO_SECRET;
+    if (!GRANT_PRO_SECRET || secret !== GRANT_PRO_SECRET) return res.status(403).json({ message: "Forbidden" });
+    try {
+      const result = await pool.query(
+        `UPDATE users
+         SET subscription_tier = 'free', updated_at = NOW()
+         WHERE subscription_tier IN ('starter','growth','pro')
+           AND (stripe_subscription_status IS NULL OR stripe_subscription_status NOT IN ('active','trialing'))
+           AND NOT (${phantomExemptSql})
+         RETURNING id, email, subscription_tier`,
+        PHANTOM_EXEMPT_PATTERNS
+      );
+      return res.json({ demoted: result.rows, total: result.rows.length });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  router.post("/grant-tier", async (req: Request, res: Response) => {
+    const { secret } = req.query as { secret?: string };
+    const GRANT_PRO_SECRET = process.env.ADMIN_GRANT_PRO_SECRET;
+    if (!GRANT_PRO_SECRET || secret !== GRANT_PRO_SECRET) return res.status(403).json({ message: "Forbidden" });
+    const { email, tier } = req.body as { email?: string; tier?: string };
+    if (!email || !["free","starter","growth","pro"].includes(tier || "")) {
+      return res.status(400).json({ message: "Missing or invalid email/tier" });
+    }
+    try {
+      const result = await pool.query(
+        `UPDATE users SET subscription_tier = $1, updated_at = NOW() WHERE LOWER(email) = LOWER($2) RETURNING id, email, subscription_tier`,
+        [tier, email]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ message: "User not found" });
+      return res.json({ user: result.rows[0] });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+  // --- End phantom account management ---
+
   router.get("/grant-pro", async (req: Request, res: Response) => {
     const { email, secret } = req.query as { email?: string; secret?: string };
     const GRANT_PRO_SECRET = process.env.ADMIN_GRANT_PRO_SECRET;

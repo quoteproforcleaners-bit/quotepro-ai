@@ -87,6 +87,7 @@ import RecurringSchedulesPage from "./pages/RecurringSchedulesPage";
 import StaffManagementPage from "./pages/StaffManagementPage";
 import BookingWidgetPage from "./pages/BookingWidgetPage";
 import NPSDashboardPage from "./pages/NPSDashboardPage";
+import PhantomAccountsPage from "./pages/PhantomAccountsPage";
 import WhatsNewModal from "./components/WhatsNewModal";
 
 function EmployeeGuard({ children }: { children: React.ReactNode }) {
@@ -202,6 +203,7 @@ export default function App() {
           <Route path="/lead-capture" element={<ProGate feature="Lead Capture Link"><LeadCapturePage /></ProGate>} />
           <Route path="/booking-widget" element={<BookingWidgetPage />} />
           <Route path="/nps-dashboard" element={<NPSDashboardPage />} />
+          <Route path="/phantom-accounts" element={<PhantomAccountsPage />} />
           <Route path="/lead-finder" element={<ProGate feature="Local Lead Finder"><LeadFinderPage /></ProGate>} />
           <Route path="/lead-finder/settings" element={<ProGate feature="Local Lead Finder"><LeadFinderSettingsPage /></ProGate>} />
           <Route path="/lead-finder/:id" element={<ProGate feature="Local Lead Finder"><LeadFinderDetailPage /></ProGate>} />
