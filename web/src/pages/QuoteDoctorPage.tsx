@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Zap, Copy, Download, Upload, FileText, Loader2, X, Check, ArrowRight, Share2, ChevronRight, Star, Wand2, ChevronDown, BookOpen } from "lucide-react";
 
 const FACILITY_TYPES_SCOPE = [
@@ -485,12 +486,23 @@ function generatePdfHtml(parsed: ParsedProposal): string {
 
 // ─── Main Page ──────────────────────────────────────────────────────────────────
 export default function QuoteDoctorPage() {
+  const location = useLocation();
+
   // ── Mode selector ──
   const [mode, setMode] = useState<"optimize" | "scope">("optimize");
 
   // ── Optimize-quote state ──
   const [tab, setTab] = useState<"paste" | "upload">("paste");
   const [quoteText, setQuoteText] = useState("");
+
+  useEffect(() => {
+    const state = location.state as { prefillText?: string } | null;
+    if (state?.prefillText) {
+      setQuoteText(state.prefillText);
+      setTab("paste");
+      setMode("optimize");
+    }
+  }, []);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageMimeType, setImageMimeType] = useState("image/jpeg");
   const [imagePreview, setImagePreview] = useState<string | null>(null);

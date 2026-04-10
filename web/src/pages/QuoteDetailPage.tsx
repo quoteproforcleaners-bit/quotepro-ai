@@ -768,7 +768,7 @@ export default function QuoteDetailPage() {
  typeof val ==="object"? val.selected : val;
  const price = typeof val ==="object"? val.price : 0;
  const label = key
- .replace(/([A-Z])/g,"$1")
+ .replace(/([A-Z])/g," $1")
  .replace(/^./, (s: string) => s.toUpperCase());
  return (
  <div
@@ -1067,7 +1067,7 @@ export default function QuoteDetailPage() {
  monthlyPrice={Number(quote.total || 0)}
  facilityType={details.facilityType}
  totalSqFt={Number(details.totalSqFt)}
- size="compact"
+ size="full"
  />
  ) : null}
 
@@ -1077,7 +1077,7 @@ export default function QuoteDetailPage() {
  visitPrice={Number(quote.total || 0)}
  beds={Number(details.beds)}
  frequency={quote.frequencySelected ?? undefined}
- size="compact"
+ size="full"
  />
  ) : null}
 
@@ -1144,12 +1144,24 @@ export default function QuoteDetailPage() {
  : "Your quote is out. Use QuoteDoctor to refine your next one and close more."}
  </p>
  <button
- onClick={() => navigate("/quote-doctor")}
+ onClick={() => {
+  const addOnList = Object.entries(addOns || {}).filter(([,v]: any) => typeof v === 'object' ? v.selected : v).map(([k]: any) => k.replace(/([A-Z])/g, ' $1').replace(/^./, (s: string) => s.toUpperCase())).join(', ');
+  const parts = [
+   quote.customerName ? 'Customer: ' + quote.customerName : '',
+   details?.beds ? 'Bedrooms: ' + details.beds : '',
+   quote.frequencySelected ? 'Frequency: ' + quote.frequencySelected : '',
+   'Total: $' + Number(quote.total || 0).toLocaleString(),
+   addOnList ? 'Add-Ons: ' + addOnList : '',
+   'Service: Standard residential cleaning — Good / Better / Best pricing tiers.',
+  ].filter(Boolean);
+  const prefillText = parts.join('\n');
+  navigate('/quote-doctor', { state: { prefillText } });
+ }}
  className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-white rounded-lg px-3 py-1.5 transition-all hover:opacity-90 active:scale-[0.97]"
  style={{ background: "rgba(99,102,241,0.55)", border: "1px solid rgba(99,102,241,0.7)" }}
  >
  <Zap className="w-3.5 h-3.5" />
- Open QuoteDoctor
+ Optimize with QuoteDoctor
  </button>
  </div>
  </div>
@@ -1434,16 +1446,16 @@ export default function QuoteDetailPage() {
  </Card>
 
  <Card>
- <CardHeader title="Payment Links"icon={CreditCard} />
+ <CardHeader title="Customer View"icon={Eye} />
  <div className="space-y-2">
  <Button
  variant="secondary"
- icon={CreditCard}
+ icon={Eye}
  onClick={() => window.open(quoteUrl,"_blank")}
  className="w-full justify-start"
  size="sm"
  >
- Stripe Checkout
+ Preview Customer Quote
  </Button>
  {venmoHandle ? (
  <Button
