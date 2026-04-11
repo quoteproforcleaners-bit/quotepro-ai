@@ -1518,6 +1518,43 @@ export default function QuoteDetailPage() {
  </div>
  </Card>
 
+ <Card>
+ <CardHeader title="Customer View"icon={Eye} />
+ <div className="space-y-2">
+ <Button
+ variant="secondary"
+ icon={Eye}
+ onClick={() => window.open(quoteUrl,"_blank")}
+ className="w-full justify-start"
+ size="sm"
+ >
+ Preview Customer Quote
+ </Button>
+ {venmoHandle ? (
+ <Button
+ variant="secondary"
+ icon={DollarSign}
+ onClick={() => window.open(`https://venmo.com/${venmoHandle}?txn=pay&amount=${quote.depositRequired ? quote.depositAmount : quote.total}`,"_blank")}
+ className="w-full justify-start"
+ size="sm"
+ >
+ Venmo ({venmoHandle})
+ </Button>
+ ) : null}
+ {cashAppTag ? (
+ <Button
+ variant="secondary"
+ icon={DollarSign}
+ onClick={() => window.open(`https://cash.app/${cashAppTag}/${quote.depositRequired ? quote.depositAmount : quote.total}`,"_blank")}
+ className="w-full justify-start"
+ size="sm"
+ >
+ Cash App ({cashAppTag})
+ </Button>
+ ) : null}
+ </div>
+ </Card>
+
  {/* QuoteDoctor — inline interactive card */}
  {(quote.status === "draft" || quote.status === "sent") ? (
  <QuoteDoctorCard
@@ -1813,43 +1850,6 @@ export default function QuoteDetailPage() {
  )}
  </div>
  )}
- </Card>
-
- <Card>
- <CardHeader title="Customer View"icon={Eye} />
- <div className="space-y-2">
- <Button
- variant="secondary"
- icon={Eye}
- onClick={() => window.open(quoteUrl,"_blank")}
- className="w-full justify-start"
- size="sm"
- >
- Preview Customer Quote
- </Button>
- {venmoHandle ? (
- <Button
- variant="secondary"
- icon={DollarSign}
- onClick={() => window.open(`https://venmo.com/${venmoHandle}?txn=pay&amount=${quote.depositRequired ? quote.depositAmount : quote.total}`,"_blank")}
- className="w-full justify-start"
- size="sm"
- >
- Venmo ({venmoHandle})
- </Button>
- ) : null}
- {cashAppTag ? (
- <Button
- variant="secondary"
- icon={DollarSign}
- onClick={() => window.open(`https://cash.app/${cashAppTag}/${quote.depositRequired ? quote.depositAmount : quote.total}`,"_blank")}
- className="w-full justify-start"
- size="sm"
- >
- Cash App ({cashAppTag})
- </Button>
- ) : null}
- </div>
  </Card>
 
  <Card>
