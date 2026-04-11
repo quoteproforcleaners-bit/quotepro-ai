@@ -5,7 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
-import { processDripQueue } from "./dripEmails";
+import { processDripQueue, processActivationNudges, backfillReactivationEmails, fixAppleRelayEmailsUnreachable } from "./dripEmails";
 import { sendOwnerDailyRecap } from "./mail";
 import { processSentQuoteFollowUps } from "./quoteFollowUpScheduler";
 import { processDraftQuoteNudges } from "./draftQuoteNudge";
@@ -580,6 +580,20 @@ async function seedToDoDemo() {
     }, 60 * 60 * 1000); // check every hour
   }
   scheduleDripCron();
+
+  // ─── Activation nudge cron: runs every 2 hours ───────────────────────────
+  // Sends 24h / 48h / 70h emails to free users who never created a quote.
+  processActivationNudges().catch((e: any) => console.error("[activation-nudge] Startup run failed:", e.message));
+  setInterval(() => {
+    processActivationNudges().catch((e: any) => console.error("[activation-nudge] Cron failed:", e.message));
+  }, 2 * 60 * 60 * 1000);
+  console.log("[activation-nudge] Cron scheduled (every 2h)");
+
+  // ─── One-time startup tasks ───────────────────────────────────────────────
+  // Fix Apple relay emails that predate the unreachable flag logic.
+  fixAppleRelayEmailsUnreachable().catch((e: any) => console.error("[apple-relay-fix] Failed:", e.message));
+  // Reactivate older users who were never enrolled in the drip sequence.
+  backfillReactivationEmails().catch((e: any) => console.error("[drip-backfill] Failed:", e.message));
 
   // ─── Churn signal cron: fires daily at 8am ───────────────────────────────
   function scheduleChurnCron() {

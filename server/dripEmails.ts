@@ -535,3 +535,343 @@ export async function processDripQueue(): Promise<void> {
     console.log(`[drip] Cron complete: ${processed} sent, ${skipped} skipped/completed`);
   }
 }
+
+/* ─── Activation nudges (24h / 48h / 70h) ──────────────────────────────────── */
+// Sent to free users who signed up but never created a quote.
+
+export async function processActivationNudges(): Promise<void> {
+  const now = new Date();
+
+  const result = await pool.query<{
+    id: string;
+    email: string;
+    contact_email: string | null;
+    name: string | null;
+    email_unreachable: boolean;
+    activation_nudge_24h_sent: boolean;
+    activation_nudge_48h_sent: boolean;
+    activation_nudge_70h_sent: boolean;
+    hours_since_signup: number;
+    quote_count: string;
+  }>(`
+    SELECT
+      u.id,
+      u.email,
+      u.contact_email,
+      u.name,
+      u.email_unreachable,
+      u.activation_nudge_24h_sent,
+      u.activation_nudge_48h_sent,
+      u.activation_nudge_70h_sent,
+      EXTRACT(EPOCH FROM (NOW() - u.created_at)) / 3600 AS hours_since_signup,
+      COUNT(q.id)::text AS quote_count
+    FROM users u
+    LEFT JOIN businesses b ON b.owner_user_id = u.id
+    LEFT JOIN quotes q ON q.business_id = b.id
+    WHERE u.subscription_tier = 'free'
+      AND u.email_unreachable = FALSE
+      AND u.trial_drip_unsubscribed = FALSE
+      AND (
+        u.activation_nudge_24h_sent = FALSE OR
+        u.activation_nudge_48h_sent = FALSE OR
+        u.activation_nudge_70h_sent = FALSE
+      )
+    GROUP BY u.id, u.email, u.contact_email, u.name, u.email_unreachable,
+             u.activation_nudge_24h_sent, u.activation_nudge_48h_sent,
+             u.activation_nudge_70h_sent, u.created_at
+    HAVING COUNT(q.id) = 0
+  `);
+
+  let sent = 0;
+  const APP_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
+
+  for (const user of result.rows) {
+    const firstName = getFirstName(user.name, user.email);
+    const effectiveEmail = user.contact_email || user.email;
+    const hours = user.hours_since_signup;
+    const unsubToken = generateUnsubscribeToken(user.id);
+    const unsubUrl = `${APP_URL}/api/drip/unsubscribe?uid=${user.id}&token=${unsubToken}`;
+    const ctaUrl = `${APP_URL}/app/quotes/new`;
+
+    try {
+      // 24h nudge — friendly first check-in
+      if (!user.activation_nudge_24h_sent && hours >= 24 && hours < 120) {
+        const subject = `${firstName}, your first quote is one click away`;
+        const html = layout({
+          preheader: "It takes under 2 minutes — and most people are surprised how good it looks.",
+          unsubscribeUrl: unsubUrl,
+          body: `
+            <p style="margin:0 0 16px;font-size:16px;color:#111827;font-weight:600;">Hey ${firstName} 👋</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+              You signed up for QuotePro AI yesterday — but haven't sent your first quote yet.
+            </p>
+            <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+              Here's the thing: the first one takes less than 2 minutes. Just enter a customer's home details, pick a price option, and hit send. That's it.
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Your customer gets a beautiful, professional quote they can accept with one tap — and you look like a pro before you've even cleaned a single room.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+              <tr>
+                <td align="center">
+                  <a href="${ctaUrl}" style="display:inline-block;padding:14px 32px;background:#4f46e5;color:#fff;font-weight:700;font-size:15px;border-radius:10px;text-decoration:none;">
+                    Create My First Quote →
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">
+              — Mike<br/>
+              <span style="font-size:13px;">QuotePro AI</span>
+            </p>
+          `,
+        });
+        await sendEmail({
+          to: effectiveEmail,
+          subject,
+          html,
+          text: `Hey ${firstName}, you haven't sent your first quote yet! Create one in under 2 minutes: ${ctaUrl}`,
+          fromName: "Mike at QuotePro",
+          replyTo: "mike@getquotepro.ai",
+        });
+        await pool.query(`UPDATE users SET activation_nudge_24h_sent = TRUE WHERE id = $1`, [user.id]);
+        sent++;
+        continue;
+      }
+
+      // 48h nudge — show what they're missing
+      if (!user.activation_nudge_48h_sent && hours >= 48 && hours < 144) {
+        const subject = `Here's what quoting could look like for you`;
+        const html = layout({
+          preheader: "Other cleaning businesses using QuotePro are closing more jobs — here's how.",
+          unsubscribeUrl: unsubUrl,
+          body: `
+            <p style="margin:0 0 16px;font-size:16px;color:#111827;font-weight:600;">Hi ${firstName},</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+              You've been in QuotePro for 2 days and haven't sent a quote yet. No pressure — but I wanted to share what other cleaning businesses are getting out of it:
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
+              <tr style="background:#f9fafb;">
+                <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">Quotes sent with one tap</td>
+                <td align="right" style="padding:12px 16px;font-size:14px;font-weight:700;color:#4f46e5;border-bottom:1px solid #e5e7eb;">✓</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">AI prices each job automatically</td>
+                <td align="right" style="padding:12px 16px;font-size:14px;font-weight:700;color:#4f46e5;border-bottom:1px solid #e5e7eb;">✓</td>
+              </tr>
+              <tr style="background:#f9fafb;">
+                <td style="padding:12px 16px;font-size:14px;color:#374151;">Follow-ups sent automatically</td>
+                <td align="right" style="padding:12px 16px;font-size:14px;font-weight:700;color:#4f46e5;">✓</td>
+              </tr>
+            </table>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              None of that is available until you send quote #1. It's literally the unlock.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+              <tr>
+                <td align="center">
+                  <a href="${ctaUrl}" style="display:inline-block;padding:14px 32px;background:#4f46e5;color:#fff;font-weight:700;font-size:15px;border-radius:10px;text-decoration:none;">
+                    Send My First Quote →
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">
+              — Mike<br/>
+              <span style="font-size:13px;">QuotePro AI</span>
+            </p>
+          `,
+        });
+        await sendEmail({
+          to: effectiveEmail,
+          subject,
+          html,
+          text: `Hi ${firstName}, see what other cleaning businesses are getting from QuotePro. Create your first quote: ${ctaUrl}`,
+          fromName: "Mike at QuotePro",
+          replyTo: "mike@getquotepro.ai",
+        });
+        await pool.query(`UPDATE users SET activation_nudge_48h_sent = TRUE WHERE id = $1`, [user.id]);
+        sent++;
+        continue;
+      }
+
+      // 70h nudge — last one, make it count
+      if (!user.activation_nudge_70h_sent && hours >= 70) {
+        const subject = `Last check-in from me, ${firstName}`;
+        const html = layout({
+          preheader: "If quoting isn't the right fit right now, no worries — but I wanted to ask.",
+          unsubscribeUrl: unsubUrl,
+          body: `
+            <p style="margin:0 0 16px;font-size:16px;color:#111827;font-weight:600;">Hey ${firstName},</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+              This is my last nudge — I promise.
+            </p>
+            <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+              You signed up for QuotePro but haven't created a quote yet. I'm curious — is something getting in the way? Too busy? Not sure where to start? Just reply to this email and I'll help personally.
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Or if you're ready, here's your direct link:
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+              <tr>
+                <td align="center">
+                  <a href="${ctaUrl}" style="display:inline-block;padding:14px 32px;background:#4f46e5;color:#fff;font-weight:700;font-size:15px;border-radius:10px;text-decoration:none;">
+                    Create a Quote Now →
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">
+              — Mike<br/>
+              <span style="font-size:13px;">QuotePro AI · <a href="${unsubUrl}" style="color:#9ca3af;">Unsubscribe</a></span>
+            </p>
+          `,
+        });
+        await sendEmail({
+          to: effectiveEmail,
+          subject,
+          html,
+          text: `Hey ${firstName}, this is my last nudge. Create your first quote: ${ctaUrl}`,
+          fromName: "Mike at QuotePro",
+          replyTo: "mike@getquotepro.ai",
+        });
+        await pool.query(`UPDATE users SET activation_nudge_70h_sent = TRUE WHERE id = $1`, [user.id]);
+        sent++;
+      }
+    } catch (err: any) {
+      console.error(`[activation-nudge] Failed for user ${user.id}:`, err.message);
+    }
+  }
+
+  if (sent > 0) {
+    console.log(`[activation-nudge] Sent ${sent} nudge(s)`);
+  }
+}
+
+/* ─── Backfill: enroll pre-drip users with a reactivation email ─────────────── */
+// Runs once at startup. Finds users who never got any drip email and sends them
+// a one-time "we missed you" reactivation, then marks them drip_completed so they
+// don't get the regular day-sequence (which would be confusing weeks after signup).
+
+export async function backfillReactivationEmails(): Promise<void> {
+  const APP_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
+
+  const result = await pool.query<{
+    id: string;
+    email: string;
+    contact_email: string | null;
+    name: string | null;
+    quote_count: string;
+    hours_since_signup: number;
+  }>(`
+    SELECT
+      u.id,
+      u.email,
+      u.contact_email,
+      u.name,
+      EXTRACT(EPOCH FROM (NOW() - u.created_at)) / 3600 AS hours_since_signup,
+      COUNT(q.id)::text AS quote_count
+    FROM users u
+    LEFT JOIN businesses b ON b.owner_user_id = u.id
+    LEFT JOIN quotes q ON q.business_id = b.id
+    WHERE u.trial_drip_enrolled_at IS NULL
+      AND u.email_unreachable = FALSE
+      AND u.subscription_tier = 'free'
+      AND u.created_at < NOW() - INTERVAL '3 days'
+    GROUP BY u.id, u.email, u.contact_email, u.name, u.created_at
+    HAVING COUNT(q.id) = 0
+    ORDER BY u.created_at DESC
+  `);
+
+  if (result.rows.length === 0) {
+    console.log("[drip-backfill] No unenrolled users to reactivate.");
+    return;
+  }
+
+  console.log(`[drip-backfill] Found ${result.rows.length} users to reactivate.`);
+  let sent = 0;
+
+  for (const user of result.rows) {
+    try {
+      const firstName = getFirstName(user.name, user.email);
+      const effectiveEmail = user.contact_email || user.email;
+      const unsubToken = generateUnsubscribeToken(user.id);
+      const unsubUrl = `${APP_URL}/api/drip/unsubscribe?uid=${user.id}&token=${unsubToken}`;
+      const ctaUrl = `${APP_URL}/app/quotes/new`;
+
+      // Mark enrolled + completed up front so we don't re-send if the cron fails mid-loop
+      await pool.query(
+        `UPDATE users
+         SET trial_drip_enrolled_at = NOW(),
+             trial_drip_last_sent_day = 0,
+             trial_drip_completed = TRUE,
+             trial_drip_unsubscribed = FALSE
+         WHERE id = $1`,
+        [user.id]
+      );
+
+      const subject = `${firstName}, your QuotePro account is waiting for you`;
+      const html = layout({
+        preheader: "You signed up a little while back — here's your quick-start link.",
+        unsubscribeUrl: unsubUrl,
+        body: `
+          <p style="margin:0 0 16px;font-size:16px;color:#111827;font-weight:600;">Hey ${firstName},</p>
+          <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+            You signed up for QuotePro AI a little while back — and your account is still sitting there ready to go.
+          </p>
+          <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+            If you're still running your cleaning business and looking to win more jobs without playing phone tag, this is a good time to try sending your first quote. It takes under 2 minutes.
+          </p>
+          <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+            Your account is free — no card needed — and everything is still saved exactly where you left it.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+            <tr>
+              <td align="center">
+                <a href="${ctaUrl}" style="display:inline-block;padding:14px 32px;background:#4f46e5;color:#fff;font-weight:700;font-size:15px;border-radius:10px;text-decoration:none;">
+                  Pick Up Where I Left Off →
+                </a>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">
+            — Mike<br/>
+            <span style="font-size:13px;">QuotePro AI · <a href="${unsubUrl}" style="color:#9ca3af;">Unsubscribe</a></span>
+          </p>
+        `,
+      });
+
+      await sendEmail({
+        to: effectiveEmail,
+        subject,
+        html,
+        text: `Hey ${firstName}, your QuotePro account is still waiting. Create your first quote here: ${ctaUrl}`,
+        fromName: "Mike at QuotePro",
+        replyTo: "mike@getquotepro.ai",
+      });
+
+      sent++;
+
+      // Throttle: 1 per second to avoid hammering the mail server
+      await new Promise((r) => setTimeout(r, 1000));
+    } catch (err: any) {
+      console.error(`[drip-backfill] Failed for user ${user.id}:`, err.message);
+    }
+  }
+
+  console.log(`[drip-backfill] Complete. Sent ${sent} reactivation emails.`);
+}
+
+/* ─── One-time fix: mark existing Apple relay users as unreachable ─────────── */
+
+export async function fixAppleRelayEmailsUnreachable(): Promise<void> {
+  const result = await pool.query(
+    `UPDATE users
+     SET email_unreachable = TRUE
+     WHERE email LIKE '%@privaterelay.appleid.com'
+       AND email_unreachable = FALSE`
+  );
+  if ((result.rowCount ?? 0) > 0) {
+    console.log(`[drip] Marked ${result.rowCount} Apple relay email(s) as unreachable.`);
+  }
+}

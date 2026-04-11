@@ -1645,6 +1645,51 @@ export default function DashboardPage() {
    </div>
  )}
 
+ {/* 1b. First-quote hero — shown to users with 0 quotes after onboarding */}
+ {isNewUser && (business as any)?.onboarding_complete ? (
+   <div
+     className="rounded-2xl overflow-hidden mb-6"
+     style={{ background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)", boxShadow: "0 4px 24px rgba(79,70,229,0.25)" }}
+   >
+     <div className="px-6 py-5">
+       <div className="flex items-start justify-between gap-4">
+         <div className="flex-1 min-w-0">
+           <div className="flex items-center gap-2 mb-2">
+             <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center">
+               <Sparkles className="w-3.5 h-3.5 text-white" />
+             </div>
+             <span className="text-xs font-semibold text-indigo-200 uppercase tracking-wider">Ready to go</span>
+           </div>
+           <h2 className="text-lg font-bold text-white mb-1 leading-snug">
+             Send your first quote in under 2 minutes
+           </h2>
+           <p className="text-sm text-indigo-200 leading-relaxed mb-4">
+             Enter a customer's home details, pick a price, and hit send. They get a professional quote they can accept with one tap.
+           </p>
+           <button
+             onClick={() => navigate("/quotes/new")}
+             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-indigo-700 font-bold text-sm hover:bg-indigo-50 transition-colors"
+             testID="button-create-first-quote"
+           >
+             Create My First Quote
+             <ArrowRight className="w-4 h-4" />
+           </button>
+         </div>
+         <div className="hidden sm:flex w-16 h-16 rounded-2xl bg-white/10 items-center justify-center shrink-0">
+           <Zap className="w-8 h-8 text-white/80" />
+         </div>
+       </div>
+     </div>
+     <div className="px-6 py-3 bg-black/10 flex items-center gap-4 text-xs text-indigo-200">
+       <span>No credit card needed</span>
+       <span className="w-1 h-1 rounded-full bg-indigo-300/50" />
+       <span>3 free quotes on the free plan</span>
+       <span className="w-1 h-1 rounded-full bg-indigo-300/50" />
+       <span>Takes under 2 minutes</span>
+     </div>
+   </div>
+ ) : null}
+
  {/* 2. Setup checklist — only shows when setup is incomplete */}
  {showChecklist ? (
  <StartHereChecklist
