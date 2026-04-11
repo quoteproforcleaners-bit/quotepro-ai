@@ -26,7 +26,7 @@ const STEPS = [
   { id: 3, label: "Grow" },
   { id: 4, label: "Tips" },
   { id: 5, label: "Pricing" },
-  { id: 6, label: "You're all set — unlock everything" },
+  { id: 6, label: "Go Live" },
 ];
 
 const EMAIL_OPTIONS = [

@@ -85,7 +85,7 @@ function RevenueContent() {
           <Zap className="w-5 h-5 text-violet-600" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-slate-900 text-sm">AI Sales Assistant</p>
+          <p className="font-semibold text-slate-900 text-sm">Sales Assistant</p>
           <p className="text-xs text-slate-500 mt-0.5">Get personalized insights and close more deals</p>
         </div>
         <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />

@@ -633,7 +633,7 @@ export default function WalkthroughAIPage() {
   if (!isGrowth) {
     return (
       <div>
-        <PageHeader title="Quote from Notes" subtitle="Paste messy notes and let AI build a quote draft" />
+        <PageHeader title="Voice-to-Quote" subtitle="Paste messy notes and let AI build a quote draft" />
         <Card>
           <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center">
@@ -657,8 +657,8 @@ export default function WalkthroughAIPage() {
   return (
     <div>
       <PageHeader
-        title="Quote from Notes"
-        subtitle="Paste walkthrough notes, texts, or property descriptions — AI extracts quote-ready details"
+        title="Voice-to-Quote"
+        subtitle="Paste walkthrough notes, texts, or property descriptions — AI extracts quote-ready details in seconds"
       />
 
       <WebAIConsentGate>

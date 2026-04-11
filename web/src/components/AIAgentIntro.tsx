@@ -194,7 +194,7 @@ export default function AIAgentIntro({ onComplete, userId }: Props) {
             onClick={handleOpenAI}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all"
           >
-            Open AI Assistant <ArrowRight className="w-4 h-4" />
+            Open Sales Assistant <ArrowRight className="w-4 h-4" />
           </button>
           <button
             onClick={handleSkip}

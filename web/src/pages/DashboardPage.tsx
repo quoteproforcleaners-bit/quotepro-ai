@@ -816,7 +816,7 @@ function AIGrowthTools({ navigate }: { navigate: (path: string) => void }) {
  onClick={() => navigate("/ai-assistant")}
  className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700 bg-white border border-indigo-200 px-3 py-1.5 rounded-lg transition-all duration-150 hover:shadow-sm active:scale-95"
  >
- Open AI <ArrowRight className="w-3 h-3"/>
+ Open Sales Assistant <ArrowRight className="w-3 h-3"/>
  </button>
  </div>
  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">

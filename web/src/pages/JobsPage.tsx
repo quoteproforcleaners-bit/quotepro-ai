@@ -58,8 +58,8 @@ export default function JobsPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Briefcase}
-            title="No jobs found"
-            description="Jobs are created from accepted quotes"
+            title="No jobs scheduled"
+            description="Accept a quote to book your first cleaning job, or create one manually."
           />
         ) : (
           <div className="overflow-x-auto">

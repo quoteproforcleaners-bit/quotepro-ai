@@ -147,10 +147,47 @@ Session-based authentication supports email/password, Apple, and Google SSO.
 - Added `AUTOPILOT_ENABLED` tracking to `autopilotRouter.ts`
 - Added `BOOKING_WIDGET_CONFIGURED` tracking to `bookingWidgetRouter.ts`
 
+### Phase 3 — Onboarding Copy Polish
+- Step 6 label shortened: "You're all set — unlock everything" → "Go Live" (fits the progress indicator)
+- `PLAN_LABELS` already derived from `shared/plans.ts` (no hardcoded prices)
+
+### Phase 4 — Quote Engine Review
+- `QuoteCreatePage.tsx` reviewed — copy, placeholders, step flow all correct. No changes needed.
+
+### Phase 5 — Follow-up Automation Improvements
+- Renamed "Marketing Mode" → "Growth Autopilot" with updated description: "runs your follow-ups, win-backs, review requests, and rebooking nudges automatically"
+- Renamed "Weekly Reactivation" → "Win-Back Campaigns" 
+- All 6 automation descriptions rewritten to be specific and outcome-focused (e.g., "most deals close within 48 hours of a nudge")
+
+### Phase 7 — UX Copy Pass
+- "Open AI Assistant" → "Open Sales Assistant" in `AIAgentIntro.tsx`
+- "Open AI" → "Open Sales Assistant" in Dashboard AI Revenue Assist widget
+
+### Phase 8 — Dashboard Refinements
+- Revenue Moves action items reviewed — copy is punchy and specific, no changes needed
+- Dashboard "Open AI" button label fixed to "Open Sales Assistant"
+
+### Phase 9 — Jobs Workflow
+- Empty state: "No jobs found" / "Jobs are created from accepted quotes" → "No jobs scheduled" / "Accept a quote to book your first cleaning job, or create one manually."
+- Tab label bug fixed (Tabs component): `replace(/[-_]/g, "")` → `replace(/[-_]/g, " ")` — "inprogress" → "In Progress"
+
+### Phase 10 — Customer-Facing / Public Pages
+- Server-rendered `/q/:token` (Book Your Clean), `/q/:token/accept` (You're All Set!), and `/rate/:token` pages reviewed — copy is customer-friendly and accurate. No changes needed.
+- Lead Link microsite and customer portal reviewed — production-ready.
+
+### Phase 11 — AI Feature Naming Consistency
+- "AI Assistant" card header in `CustomerDetailPage.tsx` → "Sales Assistant"
+- "AI Sales Assistant" in `RevenuePage.tsx` → "Sales Assistant"
+- `WalkthroughAIPage.tsx` page titles: "Quote from Notes" → "Voice-to-Quote" (matches nav label)
+
+### Phase 12 — Empty States
+- `OpportunitiesPage` dormant: "All your customers are active. Great job!" → "Customers who haven't booked in 60+ days will appear here so you can win them back."
+- `OpportunitiesPage` lost: "All your quotes are performing well" → "Declined or expired quotes will appear here so you can reach back out and recover the job."
+- `OpportunitiesPage` growth tasks: "Send more quotes..." → specific description of what triggers tasks
+
 ### Phase 14 — Codebase Hygiene
 - Surfaced 4 orphaned pages (1790 lines) into nav: `/tasks-queue` (Task Queue → Automation), `/weekly-recap` (Weekly Recap → Intelligence), `/growth` (Growth Dashboard → Intelligence)
 - Renamed Route Title: "Growth Hub" → "Growth Dashboard", "Tasks Queue" → "Task Queue"
-- Fixed `Tabs` component bug: `replace(/[-_]/g, "")` → `replace(/[-_]/g, " ")` — fixes "inprogress" label on Jobs page
 
 ### Phase 15 — Security / Multi-Tenancy
 - Added `businessId` ownership checks to 5 routes previously missing them:

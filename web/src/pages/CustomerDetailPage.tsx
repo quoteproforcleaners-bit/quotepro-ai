@@ -514,7 +514,7 @@ export default function CustomerDetailPage() {
           ) : null}
 
           <Card>
-            <CardHeader title="AI Assistant" icon={Sparkles} />
+            <CardHeader title="Sales Assistant" icon={Sparkles} />
             <Button
               variant="secondary"
               icon={MessageSquare}

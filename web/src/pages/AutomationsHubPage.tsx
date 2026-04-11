@@ -61,12 +61,12 @@ const AUTOMATIONS: {
   label: string;
   description: string;
 }[] = [
-  { key: "abandonedQuoteRecovery", icon: RotateCcw, label: "Abandoned Quote Recovery", description: "Follow up on quotes that weren't accepted" },
-  { key: "weeklyReactivation", icon: Users, label: "Weekly Reactivation", description: "Re-engage customers who haven't booked recently" },
-  { key: "reviewRequestWorkflow", icon: Star, label: "Review Request Workflow", description: "Ask happy customers for reviews after jobs" },
-  { key: "referralAskWorkflow", icon: Gift, label: "Referral Ask Workflow", description: "Request referrals from satisfied customers" },
-  { key: "rebookNudges", icon: Calendar, label: "Rebook Nudges", description: "Remind customers to schedule their next cleaning" },
-  { key: "upsellTriggers", icon: TrendingUp, label: "Upsell Triggers", description: "Suggest additional services based on history" },
+  { key: "abandonedQuoteRecovery", icon: RotateCcw, label: "Abandoned Quote Recovery", description: "Automatically follow up with leads whose quotes went cold — most deals close within 48 hours of a nudge." },
+  { key: "weeklyReactivation", icon: Users, label: "Win-Back Campaigns", description: "Send a personalized message to customers who haven't booked in 60+ days to bring them back." },
+  { key: "reviewRequestWorkflow", icon: Star, label: "Review Request Workflow", description: "Request a Google review 24 hours after every completed job while the experience is still fresh." },
+  { key: "referralAskWorkflow", icon: Gift, label: "Referral Ask Workflow", description: "Automatically ask satisfied customers to refer a friend — your best source of high-quality leads." },
+  { key: "rebookNudges", icon: Calendar, label: "Rebook Nudges", description: "Remind customers to schedule their next cleaning when their usual interval approaches." },
+  { key: "upsellTriggers", icon: TrendingUp, label: "Upsell Triggers", description: "Suggest add-on services (deep clean, inside fridge, etc.) to customers most likely to upgrade." },
 ];
 
 function AutomationsContent() {
@@ -113,9 +113,9 @@ function AutomationsContent() {
               <Zap className="w-5 h-5 text-primary-600" />
             </div>
             <div>
-              <p className="font-semibold text-slate-900">Marketing Mode</p>
+              <p className="font-semibold text-slate-900">Growth Autopilot</p>
               <p className="text-sm text-slate-500 mt-0.5">
-                When enabled, QuotePro will automatically create growth tasks for your business.
+                When enabled, QuotePro runs your follow-ups, win-backs, review requests, and rebooking nudges automatically.
               </p>
             </div>
           </div>

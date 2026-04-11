@@ -102,8 +102,8 @@ export default function OpportunitiesPage() {
             <Card>
               <EmptyState
                 icon={UserMinus}
-                title="No dormant customers"
-                description="All your customers are active. Great job!"
+                title="No dormant customers yet"
+                description="Customers who haven't booked in 60+ days will appear here so you can win them back."
               />
             </Card>
           ) : (
@@ -151,7 +151,7 @@ export default function OpportunitiesPage() {
               <EmptyState
                 icon={TrendingDown}
                 title="No lost quotes"
-                description="All your quotes are performing well"
+                description="Declined or expired quotes will appear here so you can reach back out and recover the job."
               />
             </Card>
           ) : (
@@ -191,8 +191,8 @@ export default function OpportunitiesPage() {
             <Card>
               <EmptyState
                 icon={Target}
-                title="No growth tasks"
-                description="Send more quotes and complete more jobs to unlock AI-powered growth suggestions"
+                title="No growth tasks right now"
+                description="As your pipeline grows, AI-powered suggestions for upsells, rebooking nudges, and referral requests will appear here."
               />
             </Card>
           ) : (
