@@ -557,6 +557,15 @@ async function seedToDoDemo() {
   // Analytics events TTL cleanup is scheduled via node-cron in server/routes.ts
   // (daily at 2am: "0 2 * * *") — no duplicate scheduler here.
 
+  // ─── Customer email sequence cron: fires every hour ─────────────────────
+  import("./sequenceEmails").then(({ processSequenceQueue }) => {
+    processSequenceQueue().catch((e: any) => console.error("[sequences] Initial queue run failed:", e.message));
+    setInterval(() => {
+      processSequenceQueue().catch((e: any) => console.error("[sequences] Cron failed:", e.message));
+    }, 60 * 60 * 1000);
+    console.log("[sequences] Auto-send cron scheduled (hourly)");
+  }).catch((e: any) => console.error("[sequences] Failed to load sequenceEmails:", e.message));
+
   // ─── Trial drip email cron: fires daily at 9am ────────────────────────────
   function scheduleDripCron() {
     setInterval(async () => {

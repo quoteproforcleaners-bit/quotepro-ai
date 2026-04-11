@@ -27,6 +27,7 @@ import {
  AlertCircle,
  Search,
  Filter,
+ Calendar,
 } from"lucide-react";
 import { PageHeader, Card, Spinner, Badge } from"../components/ui";
 import { apiRequest } from"../lib/api";
@@ -569,20 +570,50 @@ export default function EmailSequencesPage() {
  </div>
  </div>
 
- {/* Steps completed */}
+ {/* Sent email history (audit log) */}
  {Array.isArray(enrollment.stepsCompleted) && enrollment.stepsCompleted.length > 0 && (
- <div className="flex flex-wrap gap-1">
- {enrollment.stepsCompleted.map((step, i) => (
- <div
- key={i}
- className="flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs"
- >
- <CheckCircle size={11} />
- <span>Email {step.stepIndex + 1} sent</span>
+ <div className="border border-slate-100 rounded-lg overflow-hidden">
+ <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100">
+ <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Sent History</p>
+ </div>
+ <div className="divide-y divide-slate-50">
+ {enrollment.stepsCompleted
+ .slice()
+ .sort((a, b) => a.stepIndex - b.stepIndex)
+ .map((step, i) => (
+ <div key={i} className="flex items-center justify-between px-3 py-2 gap-2">
+ <div className="flex items-center gap-2 min-w-0">
+ <div className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
+ <CheckCircle size={11} className="text-green-600" />
+ </div>
+ <span className="text-xs text-slate-700 truncate">{step.subject}</span>
+ </div>
+ <span className="text-xs text-slate-400 flex-shrink-0 whitespace-nowrap">
+ {new Date(step.sentAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+ </span>
  </div>
  ))}
  </div>
+ </div>
  )}
+
+ {/* Next scheduled email */}
+ {!isComplete && !isCancelled && enrollment.status === "active" && enrollment.lastSentAt && seq && enrollment.currentStep < seq.steps.length && (() => {
+ const nextStep = seq.steps[enrollment.currentStep];
+ if (!nextStep || !nextStep.delayDays) return null;
+ const dueAt = new Date(new Date(enrollment.lastSentAt).getTime() + nextStep.delayDays * 24 * 60 * 60 * 1000);
+ const isPast = dueAt <= new Date();
+ return (
+ <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${isPast ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700"}`}>
+ <Calendar size={12} className="flex-shrink-0" />
+ <span className="min-w-0">
+ {isPast ? "Next email sending soon..." : `Next email scheduled ${dueAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
+ {" — "}
+ <span className="opacity-75 truncate">{nextStep.subject}</span>
+ </span>
+ </div>
+ );
+ })()}
  </div>
  </Card>
  );
@@ -728,7 +759,7 @@ export default function EmailSequencesPage() {
  <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
  <p className="font-medium mb-1">How it works</p>
  <p className="text-blue-700 text-xs">
- After enrolling, go to the Enrollments tab and click"Send Next"to manually send each email in the sequence. This gives you full control over timing.
+ The first email sends automatically the moment you enroll a contact. Follow-up emails go out on their own schedule — check the Enrollments tab to see sent history and upcoming sends. You can always send the next email early by clicking "Send Next."
  </p>
  </div>
 

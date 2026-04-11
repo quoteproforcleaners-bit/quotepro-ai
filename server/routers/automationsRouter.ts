@@ -1099,6 +1099,7 @@ Respond with valid JSON only: {"reply": string}`,
         return res.status(400).json({ message: "At least one contact required" });
       }
 
+      const { sendSequenceStep } = await import("../sequenceEmails");
       const results = [];
       for (const contact of contacts) {
         const { customerName, customerEmail, customerId } = contact;
@@ -1126,6 +1127,12 @@ Respond with valid JSON only: {"reply": string}`,
           stepsCompleted: [],
           notes: notes || "",
         }).returning();
+
+        // Auto-send step 0 immediately (all sequences start with delayDays: 0)
+        sendSequenceStep(enrollment.id).catch(e =>
+          console.error("[enroll] Auto-send step 0 failed for", enrollment.id, e?.message)
+        );
+
         results.push(enrollment);
       }
 
