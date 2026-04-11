@@ -13,11 +13,17 @@ export const AnalyticsEvents = {
   INVALID_FILE_UPLOAD_REJECTED: "invalid_file_upload_rejected",
 
   // ─── Activation (first value moments) ──────────────────────────────────────
+  ONBOARDING_COMPLETED: "onboarding_completed",
   FIRST_QUOTE_CREATED: "first_quote_created",
   FIRST_QUOTE_SENT: "first_quote_sent",
   FIRST_QUOTE_VIEWED_BY_CUSTOMER: "first_quote_viewed",
   FIRST_QUOTE_ACCEPTED: "first_quote_accepted",
   FIRST_JOB_COMPLETED: "first_job_completed",
+  PRICING_CONFIGURED: "pricing_configured",
+  FOLLOW_UP_ENABLED: "follow_up_enabled",
+  AUTOPILOT_ENABLED: "autopilot_enabled",
+  BOOKING_WIDGET_CONFIGURED: "booking_widget_configured",
+  LEAD_LINK_VIEWED: "lead_link_viewed",
 
   // ─── Engagement ─────────────────────────────────────────────────────────────
   AI_AGENT_OPENED: "ai_agent_opened",
@@ -26,6 +32,8 @@ export const AnalyticsEvents = {
   AI_FOLLOWUP_SENT: "ai_followup_sent",
   AI_FOLLOWUP_CONVERTED: "ai_followup_converted",
   CALCULATOR_USED: "calculator_used",
+  QUOTE_DOCTOR_USED: "quote_doctor_used",
+  WALKTHROUGH_AI_USED: "walkthrough_ai_used",
 
   // ─── Revenue ────────────────────────────────────────────────────────────────
   UPGRADE_CLICKED: "upgrade_clicked",

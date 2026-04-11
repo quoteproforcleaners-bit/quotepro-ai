@@ -189,8 +189,10 @@ const router = Router();
 
   router.get("/quotes/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
       const q = await getQuoteById(req.params.id);
-      if (!q) return res.status(404).json({ message: "Quote not found" });
+      if (!q || q.businessId !== business.id) return res.status(404).json({ message: "Quote not found" });
       const lineItems = await getLineItemsByQuote(q.id);
       let customerAddress = "";
       let customerName = "";
@@ -280,6 +282,11 @@ const router = Router();
 
   router.put("/quotes/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const oldQuote = await getQuoteById(req.params.id);
+      if (!oldQuote || oldQuote.businessId !== business.id) return res.status(404).json({ message: "Quote not found" });
+
       const { lineItems, ...data } = req.body;
       const dateFields = ["acceptedAt", "declinedAt", "sentAt", "expiresAt", "lastContactAt"] as const;
       for (const field of dateFields) {
@@ -294,8 +301,6 @@ const router = Router();
         delete data.total;
         delete data.subtotal;
       }
-
-      const oldQuote = await getQuoteById(req.params.id);
       let q = await updateQuote(req.params.id, data);
 
       if (lineItems) {
@@ -485,6 +490,10 @@ const router = Router();
 
   router.delete("/quotes/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const q = await getQuoteById(req.params.id);
+      if (!q || q.businessId !== business.id) return res.status(404).json({ message: "Quote not found" });
       await deleteQuoteRow(req.params.id);
       return res.json({ message: "Deleted" });
     } catch (error: any) {

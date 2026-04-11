@@ -362,7 +362,7 @@ export function Tabs({
  <div className="flex items-center gap-1 overflow-x-auto pb-px">
  {tabs.map((t) => {
  const id = typeof t ==="string"? t : t.id;
- const label = typeof t ==="string"? t.replace(/[-_]/g,"") : t.label;
+ const label = typeof t === "string" ? t.replace(/[-_]/g, " ") : t.label;
  return (
  <button
  key={id}

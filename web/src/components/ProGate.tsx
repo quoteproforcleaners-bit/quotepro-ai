@@ -1,6 +1,7 @@
-import { useSubscription } from"../lib/subscription";
-import { useNavigate } from"react-router-dom";
-import { ArrowRight, Lock, Zap } from"lucide-react";
+import { useSubscription } from "../lib/subscription";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Lock, Zap } from "lucide-react";
+import { PLAN_META, formatPlanPrice } from "../../../shared/plans";
 
 const FEATURE_CONFIG: Record<string, { headline: string; bullets: string[]; emoji: string }> = {
   "Automations": {
@@ -123,15 +124,15 @@ const FEATURE_CONFIG: Record<string, { headline: string; bullets: string[]; emoj
 };
 
 const TIER_PRICE: Record<string, string> = {
-  starter: "$19/mo",
-  growth: "$49/mo",
-  pro: "$99/mo",
+  starter: formatPlanPrice("starter"),
+  growth: formatPlanPrice("growth"),
+  pro: formatPlanPrice("pro"),
 };
 
 const TIER_LABEL: Record<string, string> = {
-  starter: "Starter",
-  growth: "Growth",
-  pro: "Pro",
+  starter: PLAN_META.starter.label,
+  growth: PLAN_META.growth.label,
+  pro: PLAN_META.pro.label,
 };
 
 export function ProGate({
@@ -238,7 +239,7 @@ export function StarterGate({
           {feature} requires a subscription
         </h2>
         <p className="text-slate-500 mb-4 text-sm">
-          Pick a plan to start using {feature.toLowerCase()} — plans start at $19/mo.
+          Pick a plan to start using {feature.toLowerCase()} — plans start at {formatPlanPrice("starter")}.
         </p>
         <button
           onClick={() => navigate("/pricing")}

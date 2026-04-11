@@ -18,7 +18,7 @@ import {
   RefreshCw, CheckSquare, BarChart2, Star, Layers, BookOpen, Sliders,
   Clipboard, PlugZap, FolderOpen, MailOpen, Brain, UserCog, Globe,
   Search, Plus, ChevronRight, ChevronDown, LifeBuoy, CircleUser,
-  Repeat2, TrendingDown, Gift, MapPin, type LucideIcon,
+  Repeat2, TrendingDown, Gift, MapPin, ListChecks, type LucideIcon,
 } from "lucide-react";
 import { LocationSwitcher } from "./LocationSwitcher";
 import { SupportModal } from "./SupportModal";
@@ -71,6 +71,7 @@ const OPERATIONS_NAV_ITEMS: NavItem[] = [
 // AUTOMATION — everything that converts and retains customers while you sleep
 const GROWTH_NAV_ITEMS: NavItem[] = [
   { to: "/follow-ups",        label: "Follow-Ups",        icon: Bell,       description: "Every quote that needs a follow-up, ranked by priority. Never let a lead go cold." },
+  { to: "/tasks-queue",       label: "Task Queue",        icon: ListChecks, pro: true, description: "AI-ranked action list — highest-impact tasks, stale quotes, and win-back opportunities surfaced every week." },
   { to: "/autopilot",         label: "Autopilot",         icon: PlugZap,    pro: true, beta: true, description: "4-step AI pipeline: qualify leads, send quotes, follow up, and request reviews — all automatically." },
   { to: "/email-sequences",   label: "Email Campaigns",   icon: MailOpen,   pro: true, description: "Automated email sequences that nurture leads, win back lost customers, and keep clients engaged." },
   { to: "/automations",       label: "Automations",       icon: Cpu,        pro: true, description: "Custom automation rules for follow-ups, review requests, and client lifecycle events." },
@@ -84,6 +85,8 @@ const TOOLS_NAV_ITEMS: NavItem[] = [
   { to: "/walkthrough-ai",    label: "Voice-to-Quote",    icon: Wand2,               description: "Paste your walkthrough notes and let AI generate a complete, ready-to-send quote instantly." },
   { to: "/revenue",           label: "Revenue",           icon: DollarSign, pro: true, description: "Full revenue reporting — monthly totals, job type breakdown, and trends vs. prior periods." },
   { to: "/win-loss",          label: "Win/Loss",          icon: TrendingDown, pro: true, description: "See why prospects didn't book — automated feedback emails surface pricing and conversion insights." },
+  { to: "/weekly-recap",      label: "Weekly Recap",      icon: BarChart2,  pro: true, description: "60-second Monday morning summary: quotes sent, jobs completed, revenue earned, and growth trend." },
+  { to: "/growth",            label: "Growth Dashboard",  icon: TrendingUp, pro: true, description: "Pipeline health, close rate trends, and revenue momentum at a glance." },
   { to: "/ai-assistant",      label: "Sales Assistant",   icon: Bot,        pro: true, description: "Your always-on AI business coach — ask anything about pricing, sales, operations, or growth." },
   { to: "/closing-assistant", label: "Handle Objections", icon: Target,     pro: true, description: "AI coach that gives you word-for-word responses to price pushback and sales objections." },
 ];
@@ -131,7 +134,7 @@ const NAV_LABEL_KEYS: Record<string, string> = {
   "/walkthrough-ai":    "Voice-to-Quote",
   "/ai-assistant":      "Sales Assistant",
   "/revenue":           "Revenue",
-  "/growth":            "Growth Hub",
+  "/growth":            "Growth Dashboard",
   "/follow-ups":        "Follow-Ups",
   "/opportunities":     "Win-Back",
   "/lead-finder":       "Lead Radar",
@@ -140,10 +143,10 @@ const NAV_LABEL_KEYS: Record<string, string> = {
   "/reactivation":      "Win-Back",
   "/win-loss":          "Win/Loss Analysis",
   "/referral":          "Refer & Earn",
-  "/email-sequences":   "Email Sequences",
+  "/email-sequences":   "Email Campaigns",
   "/reviews-referrals": "Reviews & Referrals",
   "/weekly-recap":      "Weekly Recap",
-  "/tasks-queue":       "Tasks Queue",
+  "/tasks-queue":       "Task Queue",
   "/automations":       "Automations",
   "/file-library":      "File Library",
   "/toolkit":           "Toolkit",

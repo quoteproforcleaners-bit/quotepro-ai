@@ -9,11 +9,15 @@ import {
   Upload, Check, Sparkles, Mail, MessageSquare, Link2, Gift,
 } from "lucide-react";
 import AIAgentIntro from "../components/AIAgentIntro";
+import { track } from "../lib/analytics";
+import { AnalyticsEvents } from "../../../shared/analytics-events";
+
+import { PLAN_META as _PLAN_META, formatPlanPrice as _formatPlanPrice } from "../../../shared/plans";
 
 const PLAN_LABELS: Record<string, { name: string; price: string }> = {
-  starter: { name: "Starter", price: "$19/mo" },
-  growth:  { name: "Growth",  price: "$49/mo" },
-  pro:     { name: "Pro",     price: "$99/mo" },
+  starter: { name: _PLAN_META.starter.label, price: _formatPlanPrice("starter") },
+  growth:  { name: _PLAN_META.growth.label,  price: _formatPlanPrice("growth") },
+  pro:     { name: _PLAN_META.pro.label,     price: _formatPlanPrice("pro") },
 };
 
 const STEPS = [
@@ -186,6 +190,7 @@ export default function OnboardingWizardPage() {
     setSaving(true);
     try {
       await apiPatch("/api/business", { onboardingComplete: true });
+      track(AnalyticsEvents.ONBOARDING_COMPLETED, { skippedAIIntro: false });
       await refresh();
       setShowAIIntro(true);
     } finally {

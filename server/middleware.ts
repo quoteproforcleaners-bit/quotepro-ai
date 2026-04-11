@@ -14,15 +14,19 @@ import type { Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import { pool } from "./db";
 import { getUserById } from "./storage";
+import {
+  isGrowthOrAbove as _isGrowthOrAbove,
+  isStarterOrAbove as _isStarterOrAbove,
+} from "../shared/plans";
 
-// ─── Tier helpers ─────────────────────────────────────────────────────────────
+// ─── Tier helpers — re-exported from shared/plans for backwards compat ─────────
 
 export function isStarterOrAbove(tier: string | null | undefined): boolean {
-  return tier === "starter" || tier === "growth" || tier === "pro";
+  return _isStarterOrAbove(tier);
 }
 
 export function isGrowthOrAbove(tier: string | null | undefined): boolean {
-  return tier === "growth" || tier === "pro";
+  return _isGrowthOrAbove(tier);
 }
 
 export function isProTier(tier: string | null | undefined): boolean {

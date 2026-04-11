@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSubscription, type PlanTier, type BillingInterval } from "../lib/subscription";
 import { useAuth } from "../lib/auth";
 import { Check, Zap, TrendingUp, Crown, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
+import { PLAN_META } from "../../../shared/plans";
 
 const FEATURES = {
   starter: [
@@ -148,9 +149,21 @@ export default function PricingPage() {
   };
 
   const prices = {
-    starter: { monthly: 19, annual: 19, annualTotal: 228 },
-    growth: { monthly: 49, annual: 41, annualTotal: 490 },
-    pro: { monthly: 99, annual: 83, annualTotal: 990 },
+    starter: {
+      monthly: PLAN_META.starter.monthlyPrice!,
+      annual: PLAN_META.starter.annualMonthlyPrice!,
+      annualTotal: PLAN_META.starter.annualMonthlyPrice! * 12,
+    },
+    growth: {
+      monthly: PLAN_META.growth.monthlyPrice!,
+      annual: PLAN_META.growth.annualMonthlyPrice!,
+      annualTotal: PLAN_META.growth.annualMonthlyPrice! * 12,
+    },
+    pro: {
+      monthly: PLAN_META.pro.monthlyPrice!,
+      annual: PLAN_META.pro.annualMonthlyPrice!,
+      annualTotal: PLAN_META.pro.annualMonthlyPrice! * 12,
+    },
   };
 
   const displayPrice = (plan: "starter" | "growth" | "pro") =>

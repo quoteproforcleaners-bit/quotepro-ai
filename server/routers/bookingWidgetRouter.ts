@@ -21,6 +21,8 @@ import { eq, and, gte, lt } from "drizzle-orm";
 import { requireAuth } from "../middleware";
 import { sendEmail } from "../mail";
 import { getBusinessByOwner } from "../storage";
+import { trackEvent } from "../analytics";
+import { AnalyticsEvents } from "../../shared/analytics-events";
 
 const router = Router();
 
@@ -355,6 +357,10 @@ router.patch("/settings", requireAuth, async (req: Request, res: Response) => {
         updatedAt: new Date(),
       })
       .where(eq(businesses.id, businessId));
+
+    if (enabled === true && req.session.userId) {
+      trackEvent(req.session.userId, AnalyticsEvents.BOOKING_WIDGET_CONFIGURED, {}).catch(() => {});
+    }
 
     return res.json({ success: true });
   } catch (err) {

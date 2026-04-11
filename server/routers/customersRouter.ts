@@ -142,8 +142,10 @@ const router = Router();
 
   router.get("/customers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
       const c = await getCustomerById(req.params.id);
-      if (!c) return res.status(404).json({ message: "Customer not found" });
+      if (!c || c.businessId !== business.id) return res.status(404).json({ message: "Customer not found" });
       return res.json(c);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get customer" });
@@ -178,6 +180,10 @@ const router = Router();
 
   router.put("/customers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const existing = await getCustomerById(req.params.id);
+      if (!existing || existing.businessId !== business.id) return res.status(404).json({ message: "Customer not found" });
       const c = await updateCustomer(req.params.id, req.body);
       return res.json(c);
     } catch (error: any) {
@@ -187,6 +193,10 @@ const router = Router();
 
   router.delete("/customers/:id", requireAuth, async (req: Request, res: Response) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const existing = await getCustomerById(req.params.id);
+      if (!existing || existing.businessId !== business.id) return res.status(404).json({ message: "Customer not found" });
       await deleteCustomer(req.params.id);
       return res.json({ message: "Deleted" });
     } catch (error: any) {
@@ -196,8 +206,10 @@ const router = Router();
 
   router.put("/customers/:id/do-not-contact", requireAuth, async (req: Request, res: Response) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
       const customer = await getCustomerById(req.params.id);
-      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      if (!customer || customer.businessId !== business.id) return res.status(404).json({ message: "Customer not found" });
       const updated = await updateCustomer(req.params.id, {
         smsOptOut: !customer.smsOptOut,
       });

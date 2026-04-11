@@ -2,18 +2,18 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./auth";
 import { apiPost } from "./api";
+import { PLAN_META, FREE_TRIAL_DAYS } from "../../../shared/plans";
 
-export type PlanTier = "free" | "starter" | "growth" | "pro";
+export type { PlanTier } from "../../../shared/plans";
 export type BillingInterval = "monthly" | "annual";
 
-export const PLAN_LIMITS: Record<PlanTier, { quotesPerMonth: number; label: string }> = {
-  free: { quotesPerMonth: 3, label: "Free" },
-  starter: { quotesPerMonth: 20, label: "Starter" },
-  growth: { quotesPerMonth: Infinity, label: "Growth" },
-  pro: { quotesPerMonth: Infinity, label: "Pro" },
+/** Legacy alias — prefer importing PLAN_META from shared/plans.ts directly. */
+export const PLAN_LIMITS: Record<string, { quotesPerMonth: number; label: string }> = {
+  free: { quotesPerMonth: PLAN_META.free.quotesPerMonth, label: PLAN_META.free.label },
+  starter: { quotesPerMonth: PLAN_META.starter.quotesPerMonth, label: PLAN_META.starter.label },
+  growth: { quotesPerMonth: PLAN_META.growth.quotesPerMonth, label: PLAN_META.growth.label },
+  pro: { quotesPerMonth: PLAN_META.pro.quotesPerMonth, label: PLAN_META.pro.label },
 };
-
-const FREE_TRIAL_DAYS = 14;
 
 /** What triggered the paywall — drives contextual copy in UpgradeModal */
 export type PaywallTrigger =

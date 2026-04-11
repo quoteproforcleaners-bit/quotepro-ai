@@ -121,6 +121,47 @@ Session-based authentication supports email/password, Apple, and Google SSO.
 - **Tests**: `server/mcp/test.ts` — 21 assertions covering all 3 tools. Run with `npx tsx server/mcp/test.ts`.
 - **README**: MCP section added with Claude Desktop config and example prompts.
 
+## Product Audit — Phases 1–15
+
+### Phase 1 — Navigation Restructure
+- Renamed 5 sidebar sections: Pipeline→"Leads & Quotes", Operations→"Customers & Jobs", Growth→"Automation", Tools→"Intelligence"
+- Promoted Quotes to position 1 in Leads & Quotes
+- Moved Email Campaigns + Automations from Tools → Automation
+- Moved Revenue + Win/Loss from Growth → Intelligence
+- Unified Team & Staff under one nav entry (removed duplicate `/employees`)
+- Renamed "Email Sequences" → "Email Campaigns" throughout nav and ROUTE_TITLES
+
+### Phase 2 — Single Source of Truth
+- Created `shared/plans.ts` as the canonical source for all plan tier definitions, pricing, quotas, and helper functions (`isGrowthOrAbove`, `isStarterOrAbove`, `getQuoteCap`, `formatPlanPrice`)
+- Updated `server/middleware.ts` to import tier helpers from `shared/plans.ts`
+- Updated `web/src/lib/subscription.tsx` to import `PLAN_META` and `FREE_TRIAL_DAYS` from `shared/plans.ts`
+- Updated `web/src/components/ProGate.tsx` pricing from `shared/plans.ts`
+- Updated `web/src/components/UpgradeModal.tsx` pricing from `shared/plans.ts`
+- Updated `web/src/pages/PricingPage.tsx` pricing from `shared/plans.ts`
+- Updated `web/src/pages/OnboardingWizardPage.tsx` PLAN_LABELS from `shared/plans.ts`
+- Pricing (authoritative): Starter $19/mo, Growth $49/mo ($41 annual), Pro $99/mo ($83 annual)
+
+### Phase 13 — Analytics Events
+- Added 9 missing activation events to `shared/analytics-events.ts`: `ONBOARDING_COMPLETED`, `PRICING_CONFIGURED`, `FOLLOW_UP_ENABLED`, `AUTOPILOT_ENABLED`, `BOOKING_WIDGET_CONFIGURED`, `LEAD_LINK_VIEWED`, `QUOTE_DOCTOR_USED`, `WALKTHROUGH_AI_USED`
+- Added `ONBOARDING_COMPLETED` tracking to `OnboardingWizardPage.tsx`
+- Added `AUTOPILOT_ENABLED` tracking to `autopilotRouter.ts`
+- Added `BOOKING_WIDGET_CONFIGURED` tracking to `bookingWidgetRouter.ts`
+
+### Phase 14 — Codebase Hygiene
+- Surfaced 4 orphaned pages (1790 lines) into nav: `/tasks-queue` (Task Queue → Automation), `/weekly-recap` (Weekly Recap → Intelligence), `/growth` (Growth Dashboard → Intelligence)
+- Renamed Route Title: "Growth Hub" → "Growth Dashboard", "Tasks Queue" → "Task Queue"
+- Fixed `Tabs` component bug: `replace(/[-_]/g, "")` → `replace(/[-_]/g, " ")` — fixes "inprogress" label on Jobs page
+
+### Phase 15 — Security / Multi-Tenancy
+- Added `businessId` ownership checks to 5 routes previously missing them:
+  - `GET /api/quotes/:id` — now verifies quote belongs to requesting user's business
+  - `PUT /api/quotes/:id` — same
+  - `DELETE /api/quotes/:id` — same
+  - `GET /api/customers/:id` — now verifies customer belongs to requesting user's business
+  - `PUT /api/customers/:id` — same
+  - `DELETE /api/customers/:id` — same
+  - `PUT /api/customers/:id/do-not-contact` — same
+
 ## Sprint 25 — Product Audit Improvements
 - **ProGate (T001)**: Context-aware upgrade prompts in `web/src/components/ProGate.tsx`. Shows feature-specific benefit bullets, exact tier price badge ("$49/mo"), and feature name in headline.
 - **WhatsNewModal (T002)**: Version-gated changelog modal in `web/src/components/WhatsNewModal.tsx`. Fires once per version key (`CURRENT_VERSION = "2026.04"`) via `localStorage`. Rendered in `App.tsx` for authenticated users only.

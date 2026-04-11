@@ -9,6 +9,8 @@ import {
 } from "../services/autopilotService";
 import { isGrowthOrAbove, isProTier } from "../middleware";
 import { getStripe } from "../clients";
+import { trackEvent } from "../analytics";
+import { AnalyticsEvents } from "../../shared/analytics-events";
 
 const router = Router();
 
@@ -212,6 +214,7 @@ router.post("/settings", requireAuth, async (req: Request, res: Response) => {
       // When toggling ON, back-enroll any existing pending quote requests
       // so they enter the pipeline immediately (fire-and-forget)
       if (autopilotEnabled) {
+        trackEvent(req.session.userId!, AnalyticsEvents.AUTOPILOT_ENABLED, {}).catch(() => {});
         getBusinessByOwner(req.session.userId!).then((biz) => {
           if (biz) {
             enrollAllPendingIntakeRequests(req.session.userId!, biz.id).catch((err) =>

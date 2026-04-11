@@ -1,13 +1,29 @@
 import { useState } from "react";
 import { X, Zap, TrendingUp, Crown, Check, ArrowRight, Sparkles, Calendar } from "lucide-react";
 import { useSubscription, type PlanTier, type BillingInterval, type PaywallTrigger } from "../lib/subscription";
+import { PLAN_META } from "../../../shared/plans";
 
-/* ─── Pricing data ────────────────────────────────────────────────────────── */
+/* ─── Pricing data — sourced from shared/plans.ts ─────────────────────────── */
 
 const PRICES = {
-  starter: { monthly: 19, annual: 19, annualTotal: 228, annualSavings: 0 },
-  growth:  { monthly: 49, annual: 41, annualTotal: 490, annualSavings: 98 },
-  pro:     { monthly: 99, annual: 83, annualTotal: 990, annualSavings: 198 },
+  starter: {
+    monthly: PLAN_META.starter.monthlyPrice!,
+    annual: PLAN_META.starter.annualMonthlyPrice!,
+    annualTotal: PLAN_META.starter.annualMonthlyPrice! * 12,
+    annualSavings: (PLAN_META.starter.monthlyPrice! - PLAN_META.starter.annualMonthlyPrice!) * 12,
+  },
+  growth: {
+    monthly: PLAN_META.growth.monthlyPrice!,
+    annual: PLAN_META.growth.annualMonthlyPrice!,
+    annualTotal: PLAN_META.growth.annualMonthlyPrice! * 12,
+    annualSavings: (PLAN_META.growth.monthlyPrice! - PLAN_META.growth.annualMonthlyPrice!) * 12,
+  },
+  pro: {
+    monthly: PLAN_META.pro.monthlyPrice!,
+    annual: PLAN_META.pro.annualMonthlyPrice!,
+    annualTotal: PLAN_META.pro.annualMonthlyPrice! * 12,
+    annualSavings: (PLAN_META.pro.monthlyPrice! - PLAN_META.pro.annualMonthlyPrice!) * 12,
+  },
 };
 
 const PLANS: Array<{
