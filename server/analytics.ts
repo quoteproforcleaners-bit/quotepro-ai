@@ -53,7 +53,7 @@ export async function trackEvent(
 
 const DRIP_REPLY_TO = "mike@getquotepro.ai";
 const CHURN_FROM_NAME = "Mike at QuotePro";
-const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://getquotepro.ai";
+const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
 
 function churnLayout(body: string): string {
   return `<!DOCTYPE html>
