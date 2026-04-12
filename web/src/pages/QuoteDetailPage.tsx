@@ -729,6 +729,26 @@ export default function QuoteDetailPage() {
  return;
  }
  setAiCommsSending(true);
+
+ // SMS: copy to clipboard + open native SMS app — no server-side SMS delivery
+ if (msgChannel === "sms") {
+   try {
+     const content = draft.trim();
+     await navigator.clipboard.writeText(content);
+     const phone = quoteCustomer?.phone || quote?.propertyDetails?.customerPhone || "";
+     if (phone) {
+       const smsUrl = `sms:${phone}?body=${encodeURIComponent(content)}`;
+       window.open(smsUrl, "_self");
+     }
+     showToast("Message copied! Opening SMS app…", "success");
+     setAiDrafts((prev) => ({ ...prev, [currentDraftKey]: "" }));
+   } catch {
+     showToast("Could not copy message to clipboard", "error");
+   }
+   setAiCommsSending(false);
+   return;
+ }
+
  try {
  // Extract subject line if the draft starts with"Subject: ..."
  const subjectMatch = draft.match(/^Subject:\s*(.+)/i);
@@ -744,7 +764,7 @@ export default function QuoteDetailPage() {
  ...(msgChannel ==="email"? { subject } : {}),
  ...(msgPurpose ==="send_quote"&& msgChannel ==="email"? { quoteId: quote.id } : {}),
  });
- showToast(`${msgChannel ==="sms"?"SMS":"Email"} sent!`,"success");
+ showToast("Email sent!","success");
  setAiDrafts((prev) => ({ ...prev, [currentDraftKey]:""}));
  } catch (e: any) {
  showToast(e?.message ||"Failed to send","error");
