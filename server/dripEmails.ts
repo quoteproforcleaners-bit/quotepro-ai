@@ -953,3 +953,88 @@ export async function sendPersonalOutreach(
   console.log(`[personal-outreach] Done — sent: ${sent}, failed: ${failed}, skipped: ${skipped}`);
   return { sent, failed, skipped };
 }
+
+/* ─── Capterra review blast ───────────────────────────────────────────────── */
+// Sends a personal review-request email to every user with a reachable email.
+
+export async function sendCapterraReviewBlast(): Promise<{ sent: number; failed: number; skipped: number }> {
+  const APP_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
+  let sent = 0, failed = 0, skipped = 0;
+
+  const result = await pool.query<{
+    id: string;
+    email: string;
+    contact_email: string | null;
+    name: string | null;
+    email_unreachable: boolean;
+    trial_drip_unsubscribed: boolean;
+  }>(`
+    SELECT id, email, contact_email, name, email_unreachable, trial_drip_unsubscribed
+    FROM users
+    WHERE email IS NOT NULL
+      AND email <> ''
+      AND email NOT LIKE '%@privaterelay.appleid.com'
+      AND email_unreachable = FALSE
+      AND trial_drip_unsubscribed = FALSE
+    ORDER BY created_at ASC
+  `);
+
+  console.log(`[capterra-blast] Sending to ${result.rows.length} users...`);
+
+  for (const user of result.rows) {
+    try {
+      const effectiveEmail = user.contact_email || user.email;
+      const rawFirst = getFirstName(user.name, user.email);
+      const greeting = rawFirst && rawFirst.toLowerCase() !== "there" ? `Hi ${rawFirst},` : "Hello,";
+      const unsubToken = generateUnsubscribeToken(user.id);
+      const unsubUrl = `${APP_URL}/api/email/unsubscribe?uid=${user.id}&token=${unsubToken}`;
+
+      const subject = "A quick favor — would you leave us a review?";
+
+      const plainText = `${greeting}
+
+I built QuotePro after losing cleaning jobs to competitors who just quoted faster than me. I run two cleaning franchise locations — so everything in the software came from real frustration in the field.
+
+If QuotePro has helped your business at all, I'd really appreciate a quick review on Capterra. Takes about 2 minutes and it helps other cleaning business owners find us.
+
+https://reviews.capterra.com/products/new/db6a5b19-843b-40a9-9c2c-90efe0f1dba2/
+
+No pressure — and thank you for being a QuotePro customer.
+
+Mike Quealy
+Founder, QuotePro AI for Cleaners
+
+---
+Unsubscribe: ${unsubUrl}`;
+
+      const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:15px;color:#111827;line-height:1.75;max-width:520px;">
+        <p style="margin:0 0 16px">${greeting}</p>
+        <p style="margin:0 0 16px">I built QuotePro after losing cleaning jobs to competitors who just quoted faster than me. I run two cleaning franchise locations — so everything in the software came from real frustration in the field.</p>
+        <p style="margin:0 0 16px">If QuotePro has helped your business at all, I'd really appreciate a quick review on Capterra. Takes about 2 minutes and it helps other cleaning business owners find us.</p>
+        <p style="margin:0 0 16px"><a href="https://reviews.capterra.com/products/new/db6a5b19-843b-40a9-9c2c-90efe0f1dba2/" style="color:#1d3557;font-weight:600;">Leave a Capterra review →</a></p>
+        <p style="margin:0 0 16px">No pressure — and thank you for being a QuotePro customer.</p>
+        <p style="margin:0 0 4px">Mike Quealy</p>
+        <p style="margin:0 0 24px;color:#6b7280;font-size:13px;">Founder, QuotePro AI for Cleaners</p>
+        <p style="margin:0;font-size:11px;color:#9ca3af;"><a href="${unsubUrl}" style="color:#9ca3af;">Unsubscribe</a></p>
+      </div>`;
+
+      await sendEmail({
+        to: effectiveEmail,
+        subject,
+        html,
+        text: plainText,
+        fromName: "Mike at QuotePro",
+        replyTo: "mike@getquotepro.ai",
+      });
+
+      sent++;
+      await new Promise((r) => setTimeout(r, 600));
+    } catch (err: any) {
+      console.error(`[capterra-blast] Failed for user ${user.id}:`, err.message);
+      failed++;
+    }
+  }
+
+  console.log(`[capterra-blast] Done — sent: ${sent}, failed: ${failed}, skipped: ${skipped}`);
+  return { sent, failed, skipped };
+}

@@ -1044,4 +1044,15 @@ router.post("/personal-outreach", async (req: Request, res: Response) => {
   return res.json({ sent: totalSent, failed: totalFailed, skipped: totalSkipped });
 });
 
+// ─── Capterra review blast ───────────────────────────────────────────────────
+router.post("/capterra-blast", async (req: Request, res: Response) => {
+  const ADMIN_KEY = process.env.ADMIN_API_KEY || process.env.ADMIN_GRANT_PRO_SECRET || "";
+  const key = req.headers["x-admin-key"];
+  if (!ADMIN_KEY || key !== ADMIN_KEY) return res.status(403).json({ message: "Forbidden" });
+
+  const { sendCapterraReviewBlast } = await import("../dripEmails");
+  const result = await sendCapterraReviewBlast();
+  return res.json(result);
+});
+
 export default router;
