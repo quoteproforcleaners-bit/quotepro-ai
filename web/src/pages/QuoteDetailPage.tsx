@@ -1375,6 +1375,30 @@ export default function QuoteDetailPage() {
  ))}
  </div>
 
+ {/* Channel toggle */}
+ <div className="flex items-center gap-1 self-start">
+ <button
+ onClick={() => setMsgChannel("email")}
+ className={`flex items-center gap-1.5 px-3 py-1.5 rounded-l-lg text-xs font-semibold border transition-all ${
+ msgChannel === "email"
+ ? "bg-primary-600 text-white border-primary-600"
+ : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+ }`}
+ >
+ Email
+ </button>
+ <button
+ onClick={() => setMsgChannel("sms")}
+ className={`flex items-center gap-1.5 px-3 py-1.5 rounded-r-lg text-xs font-semibold border border-l-0 transition-all ${
+ msgChannel === "sms"
+ ? "bg-primary-600 text-white border-primary-600"
+ : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+ }`}
+ >
+ SMS
+ </button>
+ </div>
+
  <Button
  variant="secondary"
  icon={Sparkles}
