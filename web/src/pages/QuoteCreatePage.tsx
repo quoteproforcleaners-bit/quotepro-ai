@@ -1267,6 +1267,54 @@ export default function QuoteCreatePage() {
           <div className="space-y-6">
             <CardHeader title="Review & Create" icon={Check} />
 
+            {/* ── AI Tools ── */}
+            <style>{`
+              @keyframes neon-pulse-green {
+                0%, 100% { box-shadow: 0 0 6px 1px rgba(0,255,148,0.35), inset 0 0 0 1.5px rgba(0,255,148,0.35); }
+                50%       { box-shadow: 0 0 18px 4px rgba(0,255,148,0.80), 0 0 32px 8px rgba(0,255,148,0.25), inset 0 0 0 1.5px rgba(0,255,148,0.70); }
+              }
+              @keyframes neon-pulse-gold {
+                0%, 100% { box-shadow: 0 0 6px 1px rgba(201,146,10,0.40), inset 0 0 0 1.5px rgba(201,146,10,0.40); }
+                50%       { box-shadow: 0 0 18px 4px rgba(255,185,0,0.80), 0 0 32px 8px rgba(201,146,10,0.30), inset 0 0 0 1.5px rgba(255,185,0,0.70); }
+              }
+              .ai-btn-green { animation: neon-pulse-green 1.8s ease-in-out infinite; }
+              .ai-btn-gold  { animation: neon-pulse-gold  1.8s ease-in-out infinite; }
+              .ai-btn-green:hover { animation: none; box-shadow: 0 0 22px 6px rgba(0,255,148,0.90), inset 0 0 0 1.5px rgba(0,255,148,0.85); }
+              .ai-btn-gold:hover  { animation: none; box-shadow: 0 0 22px 6px rgba(255,185,0,0.90),  inset 0 0 0 1.5px rgba(255,185,0,0.85); }
+            `}</style>
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold tracking-[0.18em] text-slate-400 uppercase px-0.5">AI Tools</p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={generateAiScopes}
+                  disabled={aiScopesLoading}
+                  className="ai-btn-green flex items-center gap-2 px-5 text-white font-semibold text-sm transition-transform active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{ background: "#1A1F1C", borderRadius: 9999, height: 44, border: "1px solid rgba(0,255,148,0.5)" }}
+                >
+                  {aiScopesLoading ? (
+                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  ) : (
+                    <Sparkles className="w-4 h-4 text-[#00FF94]" />
+                  )}
+                  <span>{aiScopes ? "Regenerate Descriptions" : "AI Describe Tiers"}</span>
+                </button>
+
+                <button
+                  onClick={generateAiPricing}
+                  disabled={aiPricingLoading}
+                  className="ai-btn-gold flex items-center gap-2 px-5 font-semibold text-sm transition-transform active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{ background: "#C9920A", borderRadius: 9999, height: 44, color: "#fff", border: "1px solid rgba(201,146,10,0.6)" }}
+                >
+                  {aiPricingLoading ? (
+                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  ) : (
+                    <Sparkles className="w-4 h-4 text-yellow-100" />
+                  )}
+                  <span>{aiPricing ? "Refresh Price Insight" : "AI Suggest Prices"}</span>
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {(["good", "better", "best"] as const).map((tier) => {
                 const data = quote[tier];
@@ -1476,29 +1524,8 @@ export default function QuoteCreatePage() {
               </div>
             ) : null}
 
-            {/* AI Tools Row */}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={Sparkles}
-                onClick={generateAiScopes}
-                loading={aiScopesLoading}
-                className="!border-blue-400 !text-blue-700 hover:!border-blue-500 hover:!bg-blue-50"
-              >
-                {aiScopes ? "Regenerate Descriptions" : "AI Describe Tiers"}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={FileText}
-                onClick={generateAiPricing}
-                loading={aiPricingLoading}
-                className="!border-emerald-400 !text-emerald-700 hover:!border-emerald-500 hover:!bg-emerald-50"
-              >
-                {aiPricing ? "Refresh Price Insight" : "AI Suggest Prices"}
-              </Button>
-              {aiPriceOverrides ? (
+            {aiPriceOverrides ? (
+              <div className="flex">
                 <Button
                   variant="secondary"
                   size="sm"
@@ -1506,8 +1533,8 @@ export default function QuoteCreatePage() {
                 >
                   Reset to Calculated Prices
                 </Button>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
 
             {/* AI Pricing Suggestion Panel */}
             {aiPricing ? (
