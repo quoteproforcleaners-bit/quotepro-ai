@@ -590,7 +590,7 @@ export async function processActivationNudges(): Promise<void> {
     const effectiveEmail = user.contact_email || user.email;
     const hours = user.hours_since_signup;
     const unsubToken = generateUnsubscribeToken(user.id);
-    const unsubUrl = `${APP_URL}/api/drip/unsubscribe?uid=${user.id}&token=${unsubToken}`;
+    const unsubUrl = `${APP_URL}/api/email/unsubscribe?uid=${user.id}&token=${unsubToken}`;
     const ctaUrl = `${APP_URL}/app/quotes/new`;
 
     try {
@@ -796,7 +796,7 @@ export async function backfillReactivationEmails(): Promise<void> {
       const firstName = getFirstName(user.name, user.email);
       const effectiveEmail = user.contact_email || user.email;
       const unsubToken = generateUnsubscribeToken(user.id);
-      const unsubUrl = `${APP_URL}/api/drip/unsubscribe?uid=${user.id}&token=${unsubToken}`;
+      const unsubUrl = `${APP_URL}/api/email/unsubscribe?uid=${user.id}&token=${unsubToken}`;
       const ctaUrl = `${APP_URL}/app/quotes/new`;
 
       // Mark enrolled + completed up front so we don't re-send if the cron fails mid-loop
@@ -913,7 +913,7 @@ export async function sendPersonalOutreach(
       const effectiveEmail = user.contact_email || user.email;
       const quoteCount = parseInt(user.quote_count || "0", 10);
       const unsubToken = generateUnsubscribeToken(userId);
-      const unsubUrl = `${APP_URL}/api/drip/unsubscribe?uid=${userId}&token=${unsubToken}`;
+      const unsubUrl = `${APP_URL}/api/email/unsubscribe?uid=${userId}&token=${unsubToken}`;
 
       let subject: string;
       let plainText: string;

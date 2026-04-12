@@ -417,7 +417,7 @@ export async function runCleanerNotificationScheduler(): Promise<void> {
 
         // Fetch checklist items
         const clRes = await pool.query(
-          `SELECT label FROM checklist_items WHERE job_id=$1 ORDER BY sort_order ASC, id ASC`,
+          `SELECT label FROM job_checklist_items WHERE job_id=$1 ORDER BY sort_order ASC, id ASC`,
           [job.id]
         );
         const checklistItems = clRes.rows.map((r: any) => r.label);
@@ -599,7 +599,7 @@ export async function sendWorkOrderEmail(
 
   // Fetch checklist
   const clRes = await pool.query(
-    `SELECT label FROM checklist_items WHERE job_id=$1 ORDER BY sort_order ASC, id ASC`,
+    `SELECT label FROM job_checklist_items WHERE job_id=$1 ORDER BY sort_order ASC, id ASC`,
     [jobId]
   );
   const checklistItems = clRes.rows.map((r: any) => r.label);

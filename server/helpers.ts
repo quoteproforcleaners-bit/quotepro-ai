@@ -1954,8 +1954,8 @@ export async function sendWinLossFollowUps(): Promise<void> {
         TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS customer_name,
         c.email            AS customer_email,
         b.id               AS business_id,
-        b.name             AS business_name,
-        COALESCE(b.email_from_name, b.name, 'Your Cleaning Company') AS business_from_name,
+        b.company_name     AS business_name,
+        COALESCE(b.email_from_name, b.company_name, 'Your Cleaning Company') AS business_from_name,
         COALESCE(b.email_from_address, b.email, $1)                  AS business_from_email,
         q.total            AS quote_total
       FROM quotes q
