@@ -26,6 +26,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
+import { SmsSendModal } from "@/components/SmsSendModal";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { ProGate } from "@/components/ProGate";
@@ -198,6 +199,7 @@ export default function JobDetailScreen() {
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [reviewSending, setReviewSending] = useState(false);
   const [sendUpdateModalVisible, setSendUpdateModalVisible] = useState(false);
+  const [smsModalOpen, setSmsModalOpen] = useState(false);
   const [updateLink, setUpdateLink] = useState<string | null>(null);
   const [aiDraft, setAiDraft] = useState("");
   const [aiDraftType, setAiDraftType] = useState<"sms" | "email">("sms");
@@ -574,9 +576,21 @@ export default function JobDetailScreen() {
             </View>
 
             {customerName ? (
-              <View style={styles.detailRow}>
-                <Feather name="user" size={14} color={theme.textSecondary} style={styles.detailIcon} />
-                <ThemedText type="small" style={{ color: theme.textSecondary }}>{customerName}</ThemedText>
+              <View style={[styles.detailRow, { justifyContent: "space-between" }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <Feather name="user" size={14} color={theme.textSecondary} style={styles.detailIcon} />
+                  <ThemedText type="small" style={{ color: theme.textSecondary }}>{customerName}</ThemedText>
+                </View>
+                {job.customer?.phone ? (
+                  <Pressable
+                    onPress={() => setSmsModalOpen(true)}
+                    style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9999, borderWidth: 1, borderColor: theme.primary, backgroundColor: theme.primarySoft }}
+                    testID="job-send-text"
+                  >
+                    <Feather name="message-circle" size={13} color={theme.primary} />
+                    <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginLeft: 4 }}>Text</ThemedText>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
 
@@ -1201,6 +1215,16 @@ export default function JobDetailScreen() {
             </ScrollView>
           </View>
         </Modal>
+
+      {job?.customer?.phone ? (
+        <SmsSendModal
+          isOpen={smsModalOpen}
+          onClose={() => setSmsModalOpen(false)}
+          clientName={customerName || "Customer"}
+          clientPhone={job.customer.phone}
+          serviceDate={job.startDatetime ? new Date(job.startDatetime).toLocaleDateString() : undefined}
+        />
+      ) : null}
       </View>
     </ProGate>
   );

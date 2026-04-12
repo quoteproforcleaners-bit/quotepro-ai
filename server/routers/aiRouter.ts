@@ -1851,4 +1851,47 @@ Respond ONLY with valid JSON in this exact format:
     }
   );
 
+// ─── SMS draft generation (no tier gate — basic utility for all users) ────────
+router.post("/sms/generate-draft", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { clientName, context, quoteAmount, serviceDate, companyName, customNote } = req.body as {
+      clientName: string;
+      context: "follow_up" | "quote_sent" | "booking_confirm" | "review_request" | "custom";
+      quoteAmount?: number;
+      serviceDate?: string;
+      companyName: string;
+      customNote?: string;
+    };
+
+    const contextDescriptions: Record<string, string> = {
+      follow_up: "following up after a quote or inquiry — check if they have questions",
+      quote_sent: "a quote was just sent and you want to let them know it is ready to review",
+      booking_confirm: "confirming an upcoming cleaning appointment",
+      review_request: "requesting a review after a completed cleaning job",
+      custom: customNote || "general business communication",
+    };
+
+    const details = [
+      quoteAmount ? `Quote amount: $${quoteAmount}` : null,
+      serviceDate ? `Service date: ${serviceDate}` : null,
+    ].filter(Boolean).join(". ");
+
+    const userMessage = `Write a short SMS for a cleaning business. Client name: ${clientName}. Context: ${contextDescriptions[context] || context}.${details ? " " + details : ""} Keep it under 140 characters.`;
+
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 100,
+      system: "You are a helpful assistant for a cleaning business. Write a short, friendly, professional SMS message under 140 characters. No emojis unless natural. Be warm but concise. Do not include a signature. Return only the message text, nothing else.",
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    const text = (response.content[0] as { type: string; text: string }).text.trim();
+    const draft = `${text}\n- ${companyName}`;
+    return res.json({ draft });
+  } catch (err: any) {
+    console.error("[sms/generate-draft] error:", err?.message || err);
+    return res.status(500).json({ message: "Failed to generate SMS draft." });
+  }
+});
+
 export default router;

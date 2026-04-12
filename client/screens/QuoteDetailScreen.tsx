@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl, getPublicBaseUrl } from "@/lib/query-client";
 import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
+import { SmsSendModal } from "@/components/SmsSendModal";
 import { SectionHeader } from "@/components/SectionHeader";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
@@ -83,6 +84,7 @@ export default function QuoteDetailScreen() {
   const queryClient = useQueryClient();
   const { startTour, hasCompletedTour, isActive: tourActive } = useTutorial();
 
+  const [smsModalOpen, setSmsModalOpen] = useState(false);
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const [aiDraftType, setAiDraftType] = useState<"email" | "sms">("email");
   const [aiDraftPurpose, setAiDraftPurpose] = useState<DraftPurpose>("initial_quote");
@@ -1152,12 +1154,19 @@ export default function QuoteDetailScreen() {
             </View>
           </View>
           {quote.propertyDetails?.customerPhone ? (
-            <ThemedText
-              type="small"
-              style={{ color: theme.textSecondary, marginTop: 4 }}
-            >
-              {quote.propertyDetails.customerPhone}
-            </ThemedText>
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, gap: Spacing.sm }}>
+              <ThemedText type="small" style={{ color: theme.textSecondary, flex: 1 }}>
+                {quote.propertyDetails.customerPhone}
+              </ThemedText>
+              <Pressable
+                onPress={() => setSmsModalOpen(true)}
+                style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9999, borderWidth: 1, borderColor: theme.primary, backgroundColor: theme.primarySoft }}
+                testID="quote-send-text"
+              >
+                <Feather name="message-circle" size={13} color={theme.primary} />
+                <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginLeft: 4 }}>Text</ThemedText>
+              </Pressable>
+            </View>
           ) : null}
           {quote.propertyDetails?.customerEmail ? (
             <ThemedText
@@ -3237,6 +3246,16 @@ export default function QuoteDetailScreen() {
         } : undefined}
       />
 
+    {quote?.propertyDetails?.customerPhone ? (
+      <SmsSendModal
+        isOpen={smsModalOpen}
+        onClose={() => setSmsModalOpen(false)}
+        clientName={quote.propertyDetails.customerName || "Customer"}
+        clientPhone={quote.propertyDetails.customerPhone}
+        context="quote_sent"
+        quoteAmount={quote.total ?? undefined}
+      />
+    ) : null}
     </View>
   );
 }

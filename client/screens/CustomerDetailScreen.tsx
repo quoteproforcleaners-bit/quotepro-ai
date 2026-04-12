@@ -24,6 +24,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { Input } from "@/components/Input";
 import { Button } from "@/components/Button";
+import { SmsSendModal } from "@/components/SmsSendModal";
 import { SectionHeader } from "@/components/SectionHeader";
 import { useApp } from "@/context/AppContext";
 import { useSubscription } from "@/context/SubscriptionContext";
@@ -78,6 +79,7 @@ export default function CustomerDetailScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [aiDrafting, setAiDrafting] = useState(false);
   const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [smsModalOpen, setSmsModalOpen] = useState(false);
 
   const { data: customer, isLoading } = useQuery<Customer>({
     queryKey: ["/api/customers", customerId],
@@ -450,21 +452,33 @@ export default function CustomerDetailScreen() {
             </View>
 
             {customer.phone ? (
-              <Pressable
-                onPress={handleCall}
-                style={styles.contactRow}
-                testID="customer-phone"
-              >
-                <Feather
-                  name="phone"
-                  size={16}
-                  color={theme.primary}
-                  style={styles.contactIcon}
-                />
-                <ThemedText type="body" style={{ color: theme.primary }}>
-                  {customer.phone}
-                </ThemedText>
-              </Pressable>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+                <Pressable
+                  onPress={handleCall}
+                  style={[styles.contactRow, { flex: 1 }]}
+                  testID="customer-phone"
+                >
+                  <Feather
+                    name="phone"
+                    size={16}
+                    color={theme.primary}
+                    style={styles.contactIcon}
+                  />
+                  <ThemedText type="body" style={{ color: theme.primary }}>
+                    {customer.phone}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => setSmsModalOpen(true)}
+                  style={[styles.smsChip, { backgroundColor: theme.primarySoft, borderColor: theme.primary }]}
+                  testID="customer-send-text"
+                >
+                  <Feather name="message-circle" size={14} color={theme.primary} />
+                  <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600", marginLeft: 4 }}>
+                    Text
+                  </ThemedText>
+                </Pressable>
+              </View>
             ) : null}
 
             {customer.email ? (
@@ -1179,6 +1193,15 @@ export default function CustomerDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {customer?.phone ? (
+        <SmsSendModal
+          isOpen={smsModalOpen}
+          onClose={() => setSmsModalOpen(false)}
+          clientName={`${customer.firstName} ${customer.lastName}`.trim()}
+          clientPhone={customer.phone}
+        />
+      ) : null}
       </View>
     </ProGate>
   );
@@ -1241,6 +1264,14 @@ const styles = StyleSheet.create({
   },
   contactIcon: {
     marginRight: Spacing.sm,
+  },
+  smsChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 5,
+    borderRadius: 9999,
+    borderWidth: 1,
   },
   statusButtons: {
     flexDirection: "row",
