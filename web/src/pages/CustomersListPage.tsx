@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Star, TrendingUp } from "lucide-react";
+import { Plus, Users, Star, TrendingUp, Upload } from "lucide-react";
 import {
   PageHeader,
   Card,
@@ -13,12 +13,14 @@ import {
   Spinner,
 } from "../components/ui";
 import { formatCurrency } from "../utils/currency";
+import CsvImportModal from "../components/CsvImportModal";
 
 export default function CustomersListPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"recent" | "ltv">("recent");
+  const [showImport, setShowImport] = useState(false);
 
   const { data: customers = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/customers"],
@@ -62,9 +64,18 @@ export default function CustomersListPage() {
         title="Customers"
         subtitle={`${customers.length} total customers`}
         actions={
-          <Button icon={Plus} onClick={() => navigate("/customers/new")}>
-            Add Customer
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Import CSV
+            </button>
+            <Button icon={Plus} onClick={() => navigate("/customers/new")}>
+              Add Customer
+            </Button>
+          </div>
         }
       />
 
@@ -223,6 +234,13 @@ export default function CustomersListPage() {
           </div>
         )}
       </Card>
+
+      {showImport && (
+        <CsvImportModal
+          onClose={() => setShowImport(false)}
+          onSuccess={() => setShowImport(false)}
+        />
+      )}
     </div>
   );
 }

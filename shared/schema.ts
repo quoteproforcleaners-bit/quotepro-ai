@@ -155,6 +155,7 @@ export const customers = pgTable("customers", {
   smsOptOut: boolean("sms_opt_out").notNull().default(false),
   isVip: boolean("is_vip").notNull().default(false),
   preferredLanguage: varchar("preferred_language", { length: 10 }),
+  importedAt: timestamp("imported_at"),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

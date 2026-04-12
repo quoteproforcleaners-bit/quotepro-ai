@@ -165,6 +165,91 @@ const router = Router();
     }
   });
 
+  router.post("/customers/import", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+
+      const { customers: rows } = req.body as { customers: Array<{
+        firstName?: string; lastName?: string; email?: string; phone?: string;
+        notes?: string; status?: string;
+      }> };
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ message: "No customers provided" });
+      }
+      if (rows.length > 500) {
+        return res.status(400).json({ message: "Max 500 rows per import" });
+      }
+
+      const normalizePhone = (raw: string): string => {
+        let p = (raw || "").replace(/[\s\-().+]/g, "");
+        if (p.length === 11 && p.startsWith("1")) p = p.slice(1);
+        return p;
+      };
+
+      const mapStatus = (raw?: string): string => {
+        const v = (raw || "").toLowerCase().trim();
+        if (["active","client","customer","existing"].includes(v)) return "active";
+        if (["inactive","old","past","former","lost"].includes(v)) return "inactive";
+        if (["lead","prospect","inquiry"].includes(v)) return "lead";
+        return "lead";
+      };
+
+      const existing = await db
+        .select({ email: customers.email, phone: customers.phone })
+        .from(customers)
+        .where(and(eq(customers.businessId, business.id), isNull(customers.deletedAt)));
+
+      const existingEmails = new Set(existing.map(c => (c.email || "").toLowerCase().trim()).filter(Boolean));
+      const existingPhones = new Set(existing.map(c => normalizePhone(c.phone)).filter(p => p.length >= 10));
+
+      const importedAt = new Date();
+      let imported = 0;
+      let duplicates = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const email = (row.email || "").toLowerCase().trim();
+        const rawPhone = normalizePhone(row.phone || "");
+        const phone = rawPhone.length >= 10 ? rawPhone : "";
+
+        if (!email && !phone) { failed++; errors.push(`Row ${i + 1}: missing email and phone`); continue; }
+        if (rawPhone && rawPhone.length < 10) { failed++; errors.push(`Row ${i + 1}: invalid phone number`); continue; }
+
+        if ((email && existingEmails.has(email)) || (phone && existingPhones.has(phone))) {
+          duplicates++; continue;
+        }
+
+        try {
+          await db.insert(customers).values({
+            businessId: business.id,
+            firstName: (row.firstName || "").trim(),
+            lastName: (row.lastName || "").trim(),
+            email: email,
+            phone: phone,
+            notes: (row.notes || "").trim(),
+            status: mapStatus(row.status),
+            importedAt,
+          });
+          if (email) existingEmails.add(email);
+          if (phone) existingPhones.add(phone);
+          imported++;
+        } catch (e: any) {
+          failed++;
+          errors.push(`Row ${i + 1}: ${e.message}`);
+        }
+      }
+
+      return res.json({ imported, duplicates, failed, errors });
+    } catch (error: any) {
+      console.error("Import customers error:", error);
+      return res.status(500).json({ message: "Failed to import customers" });
+    }
+  });
+
   router.post("/customers", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
