@@ -760,9 +760,10 @@ export default function SettingsPage() {
 
   const patchLanguage = useMutation({
     mutationFn: (data: { appLanguage?: string; commLanguage?: string }) =>
-      apiPatch("/api/business", data),
-    onSuccess: () => {
-      refresh();
+      apiPut<{ appLanguage: string; commLanguage: string }>("/api/settings/language", data),
+    onSuccess: (response) => {
+      if (response?.appLanguage) setAppLanguage(response.appLanguage);
+      if (response?.commLanguage) setCommLanguage(response.commLanguage);
       showSaved("features");
     },
   });
@@ -1883,8 +1884,8 @@ export default function SettingsPage() {
                       key={c.code}
                       onClick={() => {
                         setCurrency(c.code);
-                        apiPatch("/api/business", { currency: c.code }).then(() => {
-                          refresh();
+                        apiPut<{ currency: string }>("/api/settings/language", { currency: c.code }).then((res) => {
+                          if (res?.currency) setCurrency(res.currency as SupportedCurrency);
                           showSaved("features");
                         });
                       }}
