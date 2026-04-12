@@ -875,3 +875,81 @@ export async function fixAppleRelayEmailsUnreachable(): Promise<void> {
     console.log(`[drip] Marked ${result.rowCount} Apple relay email(s) as unreachable.`);
   }
 }
+
+/* ─── Personal one-line outreach campaign ────────────────────────────────────── */
+// Sends a hand-crafted personal email to segmented non-paying users.
+// bucket: "never_quoted" | "quoted_no_pay"
+
+export async function sendPersonalOutreach(
+  userIds: string[],
+  bucket: "never_quoted" | "quoted_no_pay"
+): Promise<{ sent: number; failed: number; skipped: number }> {
+  const APP_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
+  let sent = 0, failed = 0, skipped = 0;
+
+  for (const userId of userIds) {
+    try {
+      const result = await pool.query<{
+        email: string;
+        contact_email: string | null;
+        name: string | null;
+        email_unreachable: boolean;
+        trial_drip_unsubscribed: boolean;
+        quote_count: string;
+      }>(`
+        SELECT u.email, u.contact_email, u.name, u.email_unreachable, u.trial_drip_unsubscribed,
+               COUNT(q.id)::text AS quote_count
+        FROM users u
+        LEFT JOIN businesses b ON b.owner_user_id = u.id
+        LEFT JOIN quotes q ON q.business_id = b.id
+        WHERE u.id = $1
+        GROUP BY u.email, u.contact_email, u.name, u.email_unreachable, u.trial_drip_unsubscribed
+      `, [userId]);
+
+      const user = result.rows[0];
+      if (!user || user.email_unreachable || user.trial_drip_unsubscribed) { skipped++; continue; }
+
+      const firstName = getFirstName(user.name, user.email);
+      const effectiveEmail = user.contact_email || user.email;
+      const quoteCount = parseInt(user.quote_count || "0", 10);
+      const unsubToken = generateUnsubscribeToken(userId);
+      const unsubUrl = `${APP_URL}/api/drip/unsubscribe?uid=${userId}&token=${unsubToken}`;
+
+      let subject: string;
+      let plainText: string;
+
+      if (bucket === "never_quoted") {
+        subject = `quick question, ${firstName}`;
+        plainText = `Hey ${firstName}, noticed you signed up but never got a quote out — what got in the way?\n\n— Mike\nhttps://app.getquotepro.ai\n\nUnsubscribe: ${unsubUrl}`;
+      } else {
+        const q = quoteCount === 1 ? "a quote" : `${quoteCount} quotes`;
+        subject = `quick question, ${firstName}`;
+        plainText = `Hey ${firstName}, you sent ${q} but never upgraded — what stopped you?\n\n— Mike\nhttps://app.getquotepro.ai\n\nUnsubscribe: ${unsubUrl}`;
+      }
+
+      // Plain text only — keeps it feeling personal, not automated
+      const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;font-size:15px;color:#111827;line-height:1.7;max-width:480px;">
+        <p>${plainText.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>
+      </div>`;
+
+      await sendEmail({
+        to: effectiveEmail,
+        subject,
+        html,
+        text: plainText,
+        fromName: "Mike at QuotePro",
+        replyTo: "mike@getquotepro.ai",
+      });
+
+      sent++;
+      // Throttle to avoid rate limits
+      await new Promise((r) => setTimeout(r, 800));
+    } catch (err: any) {
+      console.error(`[personal-outreach] Failed for user ${userId}:`, err.message);
+      failed++;
+    }
+  }
+
+  console.log(`[personal-outreach] Done — sent: ${sent}, failed: ${failed}, skipped: ${skipped}`);
+  return { sent, failed, skipped };
+}

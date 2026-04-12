@@ -1014,4 +1014,34 @@ router.get("/events/stream", requireAuth, async (req: Request, res: Response) =>
   }
 });
 
+// ─── Personal outreach campaign ─────────────────────────────────────────────
+router.post("/personal-outreach", async (req: Request, res: Response) => {
+  const ADMIN_KEY = process.env.ADMIN_API_KEY || process.env.ADMIN_GRANT_PRO_SECRET || "";
+  const key = req.headers["x-admin-key"];
+  if (!ADMIN_KEY || key !== ADMIN_KEY) return res.status(403).json({ message: "Forbidden" });
+
+  const { neverQuotedIds, quotedNoPayIds } = req.body as {
+    neverQuotedIds: string[];
+    quotedNoPayIds: string[];
+  };
+  if (!Array.isArray(neverQuotedIds) || !Array.isArray(quotedNoPayIds)) {
+    return res.status(400).json({ message: "neverQuotedIds and quotedNoPayIds must be arrays" });
+  }
+
+  const { sendPersonalOutreach } = await import("../dripEmails");
+
+  let totalSent = 0, totalFailed = 0, totalSkipped = 0;
+
+  if (neverQuotedIds.length > 0) {
+    const r1 = await sendPersonalOutreach(neverQuotedIds, "never_quoted");
+    totalSent += r1.sent; totalFailed += r1.failed; totalSkipped += r1.skipped;
+  }
+  if (quotedNoPayIds.length > 0) {
+    const r2 = await sendPersonalOutreach(quotedNoPayIds, "quoted_no_pay");
+    totalSent += r2.sent; totalFailed += r2.failed; totalSkipped += r2.skipped;
+  }
+
+  return res.json({ sent: totalSent, failed: totalFailed, skipped: totalSkipped });
+});
+
 export default router;
