@@ -1777,8 +1777,10 @@ The email should:
 
   router.get("/invoice-packets/:id", requireAuth, async (req: any, res) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
       const packet = await getInvoicePacketById(req.params.id);
-      if (!packet || packet.businessId !== req.businessId) return res.status(404).json({ error: "Not found" });
+      if (!packet || packet.businessId !== business.id) return res.status(404).json({ error: "Not found" });
       res.json(packet);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -1787,8 +1789,10 @@ The email should:
 
   router.get("/invoice-packets/:id/csv", requireAuth, async (req: any, res) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
       const packet = await getInvoicePacketById(req.params.id);
-      if (!packet || packet.businessId !== req.businessId) return res.status(404).json({ error: "Not found" });
+      if (!packet || packet.businessId !== business.id) return res.status(404).json({ error: "Not found" });
       const csv = (packet as any).csvText || "";
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename="invoice-${(packet as any).invoiceNumber || packet.id}.csv"`);
@@ -1800,8 +1804,10 @@ The email should:
 
   router.get("/invoice-packets/:id/pdf", requireAuth, async (req: any, res) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
       const packet = await getInvoicePacketById(req.params.id);
-      if (!packet || packet.businessId !== req.businessId) return res.status(404).json({ error: "Not found" });
+      if (!packet || packet.businessId !== business.id) return res.status(404).json({ error: "Not found" });
       const html = (packet as any).pdfHtml || "<p>No invoice content</p>";
       res.setHeader("Content-Type", "text/html");
       res.send(html);
@@ -1812,8 +1818,10 @@ The email should:
 
   router.post("/quotes/:id/calendar-event", requireAuth, async (req: any, res) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
       const quote = await getQuoteById(req.params.id);
-      if (!quote || quote.businessId !== req.businessId) return res.status(404).json({ error: "Quote not found" });
+      if (!quote || quote.businessId !== business.id) return res.status(404).json({ error: "Quote not found" });
 
       const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
       const { startDatetime, durationMinutes = 120 } = req.body;
@@ -1853,7 +1861,7 @@ The email should:
       const stub = await createCalendarEventStub({
         quoteId: quote.id,
         userId: req.session.userId!,
-        businessId: req.businessId,
+        businessId: business.id,
         startDatetime: start,
         endDatetime: end,
         location,
@@ -1865,7 +1873,7 @@ The email should:
 
       const gcalUrl = buildGoogleCalendarUrl({ title, description, location, start, end });
 
-      await dispatchWebhook(req.businessId, req.session.userId!, "calendar_stub.created", { calendarEventId: stub.id, quoteId: quote.id });
+      await dispatchWebhook(business.id, req.session.userId!, "calendar_stub.created", { calendarEventId: stub.id, quoteId: quote.id });
 
       res.json({ success: true, stub, icsContent, googleCalendarUrl: gcalUrl });
     } catch (e: any) {
@@ -1885,11 +1893,12 @@ The email should:
 
   router.get("/reminder-templates/:quoteId", requireAuth, async (req: any, res) => {
     try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ error: "Business not found" });
       const quote = await getQuoteById(req.params.quoteId);
-      if (!quote || quote.businessId !== req.businessId) return res.status(404).json({ error: "Quote not found" });
+      if (!quote || quote.businessId !== business.id) return res.status(404).json({ error: "Quote not found" });
       const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
       const customerName = customer ? (customer.firstName || "there") : "there";
-      const business = await getBusinessByOwner(req.session.userId!);
       const bName = business?.companyName || "us";
 
       const templates = [
