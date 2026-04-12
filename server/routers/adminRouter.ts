@@ -132,14 +132,20 @@ const router = Router();
     const { secret } = req.query as { secret?: string };
     const GRANT_PRO_SECRET = process.env.ADMIN_GRANT_PRO_SECRET;
     if (!GRANT_PRO_SECRET || secret !== GRANT_PRO_SECRET) return res.status(403).json({ message: "Forbidden" });
-    const { email, tier } = req.body as { email?: string; tier?: string };
+    const { email, tier, expiresAt } = req.body as { email?: string; tier?: string; expiresAt?: string };
     if (!email || !["free","starter","growth","pro"].includes(tier || "")) {
       return res.status(400).json({ message: "Missing or invalid email/tier" });
     }
     try {
+      const expiryValue = expiresAt ? new Date(expiresAt) : null;
       const result = await pool.query(
-        `UPDATE users SET subscription_tier = $1, updated_at = NOW() WHERE LOWER(email) = LOWER($2) RETURNING id, email, subscription_tier`,
-        [tier, email]
+        `UPDATE users
+         SET subscription_tier = $1,
+             subscription_expires_at = $3,
+             updated_at = NOW()
+         WHERE LOWER(email) = LOWER($2)
+         RETURNING id, email, subscription_tier, subscription_expires_at`,
+        [tier, email, expiryValue]
       );
       if (result.rows.length === 0) return res.status(404).json({ message: "User not found" });
       return res.json({ user: result.rows[0] });
@@ -1042,6 +1048,22 @@ router.post("/personal-outreach", async (req: Request, res: Response) => {
   }
 
   return res.json({ sent: totalSent, failed: totalFailed, skipped: totalSkipped });
+});
+
+// ─── One-off admin email send ─────────────────────────────────────────────────
+router.post("/send-email", async (req: Request, res: Response) => {
+  const { secret } = req.query as { secret?: string };
+  const GRANT_PRO_SECRET = process.env.ADMIN_GRANT_PRO_SECRET;
+  if (!GRANT_PRO_SECRET || secret !== GRANT_PRO_SECRET) return res.status(403).json({ message: "Forbidden" });
+  const { to, toName, subject, html } = req.body as { to?: string; toName?: string; subject?: string; html?: string };
+  if (!to || !subject || !html) return res.status(400).json({ message: "Missing to, subject, or html" });
+  try {
+    const { sendEmail, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME, MIKE_EMAIL } = await import("../mail");
+    await sendEmail({ to, subject, html, fromName: PLATFORM_FROM_NAME, fromEmail: PLATFORM_FROM_EMAIL, replyTo: MIKE_EMAIL });
+    return res.json({ ok: true, to, subject });
+  } catch (e: any) {
+    return res.status(500).json({ message: e.message });
+  }
 });
 
 // ─── Capterra review blast ───────────────────────────────────────────────────
