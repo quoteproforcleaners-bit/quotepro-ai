@@ -805,27 +805,48 @@ export default function QuoteDetailPage() {
  };
 
  const sendPlayMessage = async (rec: any, recIndex: number) => {
- const channel = playChannels[recIndex] ||"sms";
+ const channel = playChannels[recIndex] || "sms";
  const draft = playDrafts[recIndex];
  if (!draft?.trim()) return;
  if (!quote?.customerId) {
- showToast("No customer linked to this quote","error");
- return;
+   showToast("No customer linked to this quote", "error");
+   return;
  }
  setPlaySending((prev) => ({ ...prev, [recIndex]: true }));
+
+ // SMS: copy to clipboard + open native SMS app
+ if (channel === "sms") {
+   try {
+     const content = draft.trim();
+     await navigator.clipboard.writeText(content);
+     const phone = quoteCustomer?.phone || quote?.propertyDetails?.customerPhone || "";
+     if (phone) {
+       window.open(`sms:${phone}?body=${encodeURIComponent(content)}`, "_self");
+     }
+     recMutation.mutate({ recId: rec.id, status: "done" });
+     showToast("Message copied! Opening SMS app…", "success");
+     setPlayDrafts((prev) => ({ ...prev, [recIndex]: "" }));
+     setExpandedRec(null);
+   } catch {
+     showToast("Could not copy message to clipboard", "error");
+   }
+   setPlaySending((prev) => ({ ...prev, [recIndex]: false }));
+   return;
+ }
+
  try {
- await apiPost("/api/communications/send-direct", {
- customerId: quote.customerId,
- channel,
- content: draft,
- ...(channel ==="email"? { subject: rec.title ||"A message from us"} : {}),
- });
- recMutation.mutate({ recId: rec.id, status:"done"});
- showToast(`${channel ==="sms"?"SMS":"Email"} sent!`,"success");
- setPlayDrafts((prev) => ({ ...prev, [recIndex]:""}));
- setExpandedRec(null);
+   await apiPost("/api/communications/send-direct", {
+     customerId: quote.customerId,
+     channel,
+     content: draft,
+     subject: rec.title || "A message from us",
+   });
+   recMutation.mutate({ recId: rec.id, status: "done" });
+   showToast("Email sent!", "success");
+   setPlayDrafts((prev) => ({ ...prev, [recIndex]: "" }));
+   setExpandedRec(null);
  } catch (e: any) {
- showToast(e?.message ||"Failed to send","error");
+   showToast(e?.message || "Failed to send", "error");
  }
  setPlaySending((prev) => ({ ...prev, [recIndex]: false }));
  };
