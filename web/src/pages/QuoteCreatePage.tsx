@@ -1269,18 +1269,10 @@ export default function QuoteCreatePage() {
 
             {/* ── AI Tools ── */}
             <style>{`
-              @keyframes neon-pulse-green {
-                0%, 100% { box-shadow: 0 0 6px 1px rgba(0,255,148,0.35), inset 0 0 0 1.5px rgba(0,255,148,0.35); }
-                50%       { box-shadow: 0 0 18px 4px rgba(0,255,148,0.80), 0 0 32px 8px rgba(0,255,148,0.25), inset 0 0 0 1.5px rgba(0,255,148,0.70); }
-              }
-              @keyframes neon-pulse-gold {
-                0%, 100% { box-shadow: 0 0 6px 1px rgba(201,146,10,0.40), inset 0 0 0 1.5px rgba(201,146,10,0.40); }
-                50%       { box-shadow: 0 0 18px 4px rgba(255,185,0,0.80), 0 0 32px 8px rgba(201,146,10,0.30), inset 0 0 0 1.5px rgba(255,185,0,0.70); }
-              }
-              .ai-btn-green { animation: neon-pulse-green 1.8s ease-in-out infinite; }
-              .ai-btn-gold  { animation: neon-pulse-gold  1.8s ease-in-out infinite; }
-              .ai-btn-green:hover { animation: none; box-shadow: 0 0 22px 6px rgba(0,255,148,0.90), inset 0 0 0 1.5px rgba(0,255,148,0.85); }
-              .ai-btn-gold:hover  { animation: none; box-shadow: 0 0 22px 6px rgba(255,185,0,0.90),  inset 0 0 0 1.5px rgba(255,185,0,0.85); }
+              .ai-btn-green { box-shadow: 0 0 12px 2px rgba(0,255,148,0.55), inset 0 0 0 1.5px rgba(0,255,148,0.50); }
+              .ai-btn-gold  { box-shadow: 0 0 12px 2px rgba(255,185,0,0.55),  inset 0 0 0 1.5px rgba(201,146,10,0.50); }
+              .ai-btn-green:hover { box-shadow: 0 0 22px 6px rgba(0,255,148,0.85), inset 0 0 0 1.5px rgba(0,255,148,0.80); }
+              .ai-btn-gold:hover  { box-shadow: 0 0 22px 6px rgba(255,185,0,0.85),  inset 0 0 0 1.5px rgba(255,185,0,0.80); }
             `}</style>
             <div className="space-y-2">
               <p className="text-[10px] font-bold tracking-[0.18em] text-slate-400 uppercase px-0.5">AI Tools</p>
