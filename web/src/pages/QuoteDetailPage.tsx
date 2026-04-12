@@ -477,6 +477,7 @@ export default function QuoteDetailPage() {
  const [deleteOpen, setDeleteOpen] = useState(false);
  const [aiDrafts, setAiDrafts] = useState<Record<string, string>>({});
  const [aiDraftLoading, setAiDraftLoading] = useState<string | null>(null);
+ const [smsEditMode, setSmsEditMode] = useState(false);
  const [depositEditing, setDepositEditing] = useState(false);
  const [depositAmount, setDepositAmount] = useState("");
  const [depositRequired, setDepositRequired] = useState(false);
@@ -1452,18 +1453,48 @@ export default function QuoteDetailPage() {
 
  {aiDrafts[currentDraftKey] ? (
  <div className="rounded-xl border border-violet-200 bg-violet-50 overflow-hidden">
- <div className="flex items-center gap-2 px-4 pt-3 pb-2">
- <Sparkles className="w-3.5 h-3.5 text-violet-500"/>
- <p className="text-xs font-semibold text-violet-700">
- AI {msgChannel ==="email"?"Email":"SMS"} Draft — edit before sending
- </p>
+ <div className="flex items-center justify-between px-4 pt-3 pb-2">
+   <div className="flex items-center gap-2">
+     <Sparkles className="w-3.5 h-3.5 text-violet-500"/>
+     <p className="text-xs font-semibold text-violet-700">
+       AI {msgChannel === "email" ? "Email" : "SMS"} Draft — edit before sending
+     </p>
+   </div>
+   {msgChannel === "sms" && !smsEditMode && (
+     <button
+       onClick={() => setSmsEditMode(true)}
+       className="text-xs text-violet-500 underline hover:text-violet-700"
+     >
+       Edit
+     </button>
+   )}
  </div>
- <textarea
- value={aiDrafts[currentDraftKey]}
- onChange={(e) => setAiDrafts((prev) => ({ ...prev, [currentDraftKey]: e.target.value }))}
- rows={8}
- className="w-full px-4 pb-3 bg-transparent text-sm text-slate-800 focus:outline-none resize-none leading-relaxed"
- />
+ {msgChannel === "sms" && !smsEditMode ? (
+   <div className="px-4 pb-3 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap min-h-[8rem]">
+     {(() => {
+       const parts = aiDrafts[currentDraftKey].split(/(https?:\/\/[^\s]+)/g);
+       return parts.map((part, i) =>
+         /^https?:\/\//.test(part) ? (
+           <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+             className="font-semibold text-violet-600 underline">
+             SEE QUOTE
+           </a>
+         ) : (
+           <span key={i}>{part}</span>
+         )
+       );
+     })()}
+   </div>
+ ) : (
+   <textarea
+     value={aiDrafts[currentDraftKey]}
+     onChange={(e) => setAiDrafts((prev) => ({ ...prev, [currentDraftKey]: e.target.value }))}
+     onBlur={() => { if (msgChannel === "sms") setSmsEditMode(false); }}
+     rows={8}
+     autoFocus={msgChannel === "sms" && smsEditMode}
+     className="w-full px-4 pb-3 bg-transparent text-sm text-slate-800 focus:outline-none resize-none leading-relaxed"
+   />
+ )}
  <div className="px-4 pb-4 flex gap-2 border-t border-violet-200 pt-3">
  <Button
  size="sm"
@@ -1478,7 +1509,7 @@ export default function QuoteDetailPage() {
  <Button
  size="sm"
  variant="ghost"
- onClick={() => setAiDrafts((prev) => ({ ...prev, [currentDraftKey]:""}))}
+ onClick={() => { setAiDrafts((prev) => ({ ...prev, [currentDraftKey]:""})); setSmsEditMode(false); }}
  disabled={aiCommsSending}
  >
  Clear
