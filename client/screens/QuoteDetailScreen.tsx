@@ -147,6 +147,11 @@ export default function QuoteDetailScreen() {
     queryKey: ['/api/quotes', route.params.quoteId],
   });
 
+  const { data: linkedCustomer } = useQuery<any>({
+    queryKey: ['/api/customers', quote?.customerId],
+    enabled: !!quote?.customerId,
+  });
+
   const { data: stats } = useQuery<any>({
     queryKey: ['/api/reports/stats'],
   });
@@ -571,8 +576,8 @@ export default function QuoteDetailScreen() {
   const handleSendDraft = async () => {
     if (!aiDraft || !quote) return;
 
-    const recipientEmail = quote.propertyDetails?.customerEmail;
-    const recipientPhone = quote.propertyDetails?.customerPhone;
+    const recipientEmail = quote.propertyDetails?.customerEmail || linkedCustomer?.email;
+    const recipientPhone = quote.propertyDetails?.customerPhone || linkedCustomer?.phone;
 
     if (aiDraftType === "email" && !businessProfile?.email) {
       Alert.alert("Business Email Required", "Please add your email address in Settings before sending emails. This ensures customer replies go directly to you.");
@@ -713,7 +718,7 @@ export default function QuoteDetailScreen() {
 
   const handleSendNativeSms = async () => {
     if (!quote) return;
-    const phone = quote.propertyDetails?.customerPhone;
+    const phone = quote.propertyDetails?.customerPhone || linkedCustomer?.phone;
     const name = quote.propertyDetails?.customerName || "there";
     const company = businessProfile?.companyName || "us";
     const price = quote.total || 0;
@@ -748,7 +753,7 @@ export default function QuoteDetailScreen() {
 
   const handleSendReviewRequest = async () => {
     if (!quote || !growthSettings?.googleReviewLink?.trim()) return;
-    const phone = quote.propertyDetails?.customerPhone;
+    const phone = quote.propertyDetails?.customerPhone || linkedCustomer?.phone;
     const name = quote.propertyDetails?.customerName || "there";
     const company = businessProfile?.companyName || "us";
     const reviewLink = growthSettings.googleReviewLink.trim();
@@ -779,7 +784,7 @@ export default function QuoteDetailScreen() {
 
   const handleSendReferralOffer = async () => {
     if (!quote) return;
-    const phone = quote.propertyDetails?.customerPhone;
+    const phone = quote.propertyDetails?.customerPhone || linkedCustomer?.phone;
     const name = quote.propertyDetails?.customerName || "there";
     const amount = growthSettings?.referralOfferAmount || 25;
     const bookingLink = growthSettings?.referralBookingLink?.trim() || businessProfile?.bookingLink || "";
