@@ -1158,10 +1158,10 @@ export default function QuoteDetailScreen() {
               </ThemedText>
             </View>
           </View>
-          {quote.propertyDetails?.customerPhone ? (
+          {(quote.propertyDetails?.customerPhone || linkedCustomer?.phone) ? (
             <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, gap: Spacing.sm }}>
               <ThemedText type="small" style={{ color: theme.textSecondary, flex: 1 }}>
-                {quote.propertyDetails.customerPhone}
+                {quote.propertyDetails?.customerPhone || linkedCustomer?.phone}
               </ThemedText>
               <Pressable
                 onPress={() => setSmsModalOpen(true)}
@@ -3251,12 +3251,12 @@ export default function QuoteDetailScreen() {
         } : undefined}
       />
 
-    {quote?.propertyDetails?.customerPhone ? (
+    {(quote?.propertyDetails?.customerPhone || linkedCustomer?.phone) ? (
       <SmsSendModal
         isOpen={smsModalOpen}
         onClose={() => setSmsModalOpen(false)}
-        clientName={quote.propertyDetails.customerName || "Customer"}
-        clientPhone={quote.propertyDetails.customerPhone}
+        clientName={quote.propertyDetails?.customerName || `${linkedCustomer?.firstName || ""} ${linkedCustomer?.lastName || ""}`.trim() || "Customer"}
+        clientPhone={quote.propertyDetails?.customerPhone || linkedCustomer?.phone}
         context="quote_sent"
         quoteAmount={quote.total ?? undefined}
       />
