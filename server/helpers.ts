@@ -1577,6 +1577,7 @@ export function formatBusiness(b: any) {
     appLanguage: b.appLanguage || "en",
     commLanguage: b.commLanguage || "en",
     currency: b.currency || "USD",
+    languageSelected: b.languageSelected ?? false,
   };
 }
 

@@ -1,4 +1,63 @@
 {
+  "onboarding": {
+    "welcome": "Bem-vindo ao QuotePro",
+    "subtitle": "Qual idioma você prefere usar?",
+    "hint": "Você pode alterar isso a qualquer momento em Configurações",
+    "continue": "Continuar"
+  },
+  "customers": {
+    "title": "Clientes",
+    "addCustomer": "Adicionar cliente",
+    "importCsv": "Importar CSV",
+    "totalRevenue": "Receita total",
+    "avgLtv": "LTV médio",
+    "payingClients": "Clientes ativos",
+    "searchPlaceholder": "Buscar por nome, e-mail ou telefone...",
+    "noCustomers": "Nenhum cliente ainda",
+    "noResults": "Nenhum cliente corresponde à sua busca",
+    "noResultsHint": "Tente um termo de busca diferente",
+    "addFirst": "Adicione seu primeiro cliente para começar",
+    "totalCount": "{{count}} clientes no total",
+    "sortRecent": "Recentes",
+    "sortTopValue": "Maior valor",
+    "tabs": {
+      "all": "Todos",
+      "active": "Ativos",
+      "lead": "Leads",
+      "inactive": "Inativos"
+    },
+    "table": {
+      "name": "Nome",
+      "email": "E-mail",
+      "phone": "Telefone",
+      "quotes": "Orçamentos",
+      "lifetimeValue": "Valor vitalício",
+      "noContact": "Sem contato"
+    }
+  },
+  "quotes": {
+    "title": "Orçamentos",
+    "newQuote": "Novo orçamento",
+    "quoteNumber": "Orçamento #{{number}}",
+    "noQuotes": "Nenhum orçamento ainda",
+    "noResults": "Nenhum orçamento corresponde à sua busca",
+    "status": {
+      "draft": "Rascunho",
+      "sent": "Enviado",
+      "accepted": "Aceito",
+      "declined": "Recusado",
+      "expired": "Expirado"
+    }
+  },
+  "dashboard": {
+    "title": "Painel",
+    "totalRevenue": "Receita total",
+    "quotesCreated": "Orçamentos criados",
+    "acceptanceRate": "Taxa de aceitação",
+    "activeCustomers": "Clientes ativos",
+    "recentActivity": "Atividade recente",
+    "noActivity": "Nenhuma atividade recente"
+  },
   "nav": {
     "dashboard": "Painel",
     "quotes": "Orçamentos",

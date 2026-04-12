@@ -1,4 +1,63 @@
 {
+  "onboarding": {
+    "welcome": "Welcome to QuotePro",
+    "subtitle": "What language would you like to use?",
+    "hint": "You can change this anytime in Settings",
+    "continue": "Continue"
+  },
+  "customers": {
+    "title": "Customers",
+    "addCustomer": "Add Customer",
+    "importCsv": "Import CSV",
+    "totalRevenue": "Total Revenue",
+    "avgLtv": "Avg LTV",
+    "payingClients": "Paying Clients",
+    "searchPlaceholder": "Search by name, email, or phone...",
+    "noCustomers": "No customers yet",
+    "noResults": "No customers match your search",
+    "noResultsHint": "Try a different search term",
+    "addFirst": "Add your first customer to get started",
+    "totalCount": "{{count}} total customers",
+    "sortRecent": "Recent",
+    "sortTopValue": "Top Value",
+    "tabs": {
+      "all": "All",
+      "active": "Active",
+      "lead": "Lead",
+      "inactive": "Inactive"
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "quotes": "Quotes",
+      "lifetimeValue": "Lifetime Value",
+      "noContact": "No contact"
+    }
+  },
+  "quotes": {
+    "title": "Quotes",
+    "newQuote": "New Quote",
+    "quoteNumber": "Quote #{{number}}",
+    "noQuotes": "No quotes yet",
+    "noResults": "No quotes match your search",
+    "status": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "expired": "Expired"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "totalRevenue": "Total Revenue",
+    "quotesCreated": "Quotes Created",
+    "acceptanceRate": "Acceptance Rate",
+    "activeCustomers": "Active Customers",
+    "recentActivity": "Recent Activity",
+    "noActivity": "No recent activity"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "quotes": "Quotes",

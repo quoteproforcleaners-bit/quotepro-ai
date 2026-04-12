@@ -1,4 +1,63 @@
 {
+  "onboarding": {
+    "welcome": "Добро пожаловать в QuotePro",
+    "subtitle": "На каком языке вы хотите работать?",
+    "hint": "Вы можете изменить это в любое время в Настройках",
+    "continue": "Продолжить"
+  },
+  "customers": {
+    "title": "Клиенты",
+    "addCustomer": "Добавить клиента",
+    "importCsv": "Импорт CSV",
+    "totalRevenue": "Общая выручка",
+    "avgLtv": "Средний LTV",
+    "payingClients": "Активные клиенты",
+    "searchPlaceholder": "Поиск по имени, email или телефону...",
+    "noCustomers": "Клиентов пока нет",
+    "noResults": "Клиентов по вашему запросу не найдено",
+    "noResultsHint": "Попробуйте другой запрос",
+    "addFirst": "Добавьте первого клиента для начала работы",
+    "totalCount": "{{count}} клиентов всего",
+    "sortRecent": "Последние",
+    "sortTopValue": "По ценности",
+    "tabs": {
+      "all": "Все",
+      "active": "Активные",
+      "lead": "Лиды",
+      "inactive": "Неактивные"
+    },
+    "table": {
+      "name": "Имя",
+      "email": "Email",
+      "phone": "Телефон",
+      "quotes": "КП",
+      "lifetimeValue": "Ценность",
+      "noContact": "Нет контакта"
+    }
+  },
+  "quotes": {
+    "title": "Коммерческие предложения",
+    "newQuote": "Новое КП",
+    "quoteNumber": "КП #{{number}}",
+    "noQuotes": "КП пока нет",
+    "noResults": "По вашему запросу КП не найдено",
+    "status": {
+      "draft": "Черновик",
+      "sent": "Отправлено",
+      "accepted": "Принято",
+      "declined": "Отклонено",
+      "expired": "Истекло"
+    }
+  },
+  "dashboard": {
+    "title": "Панель управления",
+    "totalRevenue": "Общая выручка",
+    "quotesCreated": "Созданных КП",
+    "acceptanceRate": "Коэффициент принятия",
+    "activeCustomers": "Активных клиентов",
+    "recentActivity": "Последние действия",
+    "noActivity": "Нет последних действий"
+  },
   "nav": {
     "dashboard": "Панель управления",
     "quotes": "Коммерческие предложения",

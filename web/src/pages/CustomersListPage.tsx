@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Plus, Users, Star, TrendingUp, Upload } from "lucide-react";
@@ -16,6 +17,7 @@ import { formatCurrency } from "../utils/currency";
 import CsvImportModal from "../components/CsvImportModal";
 
 export default function CustomersListPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -61,8 +63,8 @@ export default function CustomersListPage() {
   return (
     <div>
       <PageHeader
-        title="Customers"
-        subtitle={`${customers.length} total customers`}
+        title={t("customers.title")}
+        subtitle={t("customers.totalCount", { count: customers.length })}
         actions={
           <div className="flex items-center gap-2">
             <button
@@ -70,10 +72,10 @@ export default function CustomersListPage() {
               className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-colors"
             >
               <Upload className="w-4 h-4" />
-              Import CSV
+              {t("customers.importCsv")}
             </button>
             <Button icon={Plus} onClick={() => navigate("/customers/new")}>
-              Add Customer
+              {t("customers.addCustomer")}
             </Button>
           </div>
         }
@@ -84,15 +86,15 @@ export default function CustomersListPage() {
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="bg-white rounded-xl border border-slate-200 p-3.5 text-center shadow-sm">
             <p className="text-lg font-black text-emerald-600">{formatCurrency(totalLTV, "USD")}</p>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Total Revenue</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{t("customers.totalRevenue")}</p>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-3.5 text-center shadow-sm">
             <p className="text-lg font-black text-slate-900">{formatCurrency(avgLTV, "USD")}</p>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Avg LTV</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{t("customers.avgLtv")}</p>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-3.5 text-center shadow-sm">
             <p className="text-lg font-black text-blue-600">{customers.filter((c: any) => (c.lifetimeValue || 0) > 0).length}</p>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Paying Clients</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{t("customers.payingClients")}</p>
           </div>
         </div>
       )}
@@ -105,7 +107,7 @@ export default function CustomersListPage() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
-                placeholder="Search by name, email, or phone..."
+                placeholder={t("customers.searchPlaceholder")}
               />
             </div>
             <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 shrink-0">
@@ -113,13 +115,13 @@ export default function CustomersListPage() {
                 onClick={() => setSortBy("recent")}
                 className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${sortBy === "recent" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
               >
-                Recent
+                {t("customers.sortRecent")}
               </button>
               <button
                 onClick={() => setSortBy("ltv")}
                 className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${sortBy === "ltv" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
               >
-                <TrendingUp className="w-3 h-3" /> Top Value
+                <TrendingUp className="w-3 h-3" /> {t("customers.sortTopValue")}
               </button>
             </div>
           </div>
@@ -130,16 +132,16 @@ export default function CustomersListPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Users}
-            title={search ? "No customers match your search" : "No customers yet"}
+            title={search ? t("customers.noResults") : t("customers.noCustomers")}
             description={
               search
-                ? "Try a different search term"
-                : "Add your first customer to get started"
+                ? t("customers.noResultsHint")
+                : t("customers.addFirst")
             }
             action={
               !search ? (
                 <Button icon={Plus} onClick={() => navigate("/customers/new")}>
-                  Add Customer
+                  {t("customers.addCustomer")}
                 </Button>
               ) : undefined
             }
@@ -150,19 +152,19 @@ export default function CustomersListPage() {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Name
+                    {t("customers.table.name")}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden sm:table-cell">
-                    Email
+                    {t("customers.table.email")}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell">
-                    Phone
+                    {t("customers.table.phone")}
                   </th>
                   <th className="text-right px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden lg:table-cell">
-                    Quotes
+                    {t("customers.table.quotes")}
                   </th>
                   <th className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Lifetime Value
+                    {t("customers.table.lifetimeValue")}
                   </th>
                 </tr>
               </thead>
@@ -191,7 +193,7 @@ export default function CustomersListPage() {
                               ) : null}
                             </p>
                             <p className="text-xs text-slate-400 sm:hidden">
-                              {c.email || c.phone || "No contact"}
+                              {c.email || c.phone || t("customers.table.noContact")}
                             </p>
                           </div>
                         </div>

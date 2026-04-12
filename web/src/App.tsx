@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import { isLoggedIn } from "./lib/employeeApi";
-import i18n from "./lib/i18n";
+import { applyLanguage } from "./lib/i18n";
+import LanguagePickerModal from "./components/LanguagePickerModal";
 import { SubscriptionProvider } from "./lib/subscription";
 import { ThemeProvider } from "./lib/theme";
 import { WalkthroughProvider } from "./lib/walkthrough";
@@ -99,10 +100,8 @@ export default function App() {
   const { isAuthenticated, isLoading, business, needsOnboarding } = useAuth();
 
   useEffect(() => {
-    const lang = (business as any)?.appLanguage || "en";
-    if (i18n.language !== lang) {
-      i18n.changeLanguage(lang);
-    }
+    const lang = (business as any)?.appLanguage;
+    if (lang) applyLanguage(lang);
   }, [business]);
 
   // Employee portal uses PIN-based JWT — never wait for admin session check
@@ -269,6 +268,7 @@ export default function App() {
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
       </Routes>
       {isAuthenticated && <WhatsNewModal />}
+      {isAuthenticated && <LanguagePickerModal />}
     </WebAIConsentProvider>
     </SubscriptionProvider>
     </WalkthroughProvider>

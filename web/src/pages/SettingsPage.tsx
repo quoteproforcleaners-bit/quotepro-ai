@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
 import { apiPut, apiPost, apiGet, apiDelete, apiPatch } from "../lib/api";
+import { applyLanguage } from "../lib/i18n";
 import { CURRENCIES, type SupportedCurrency } from "../utils/currency";
 import { queryClient } from "../lib/queryClient";
 import {
@@ -760,9 +761,15 @@ export default function SettingsPage() {
 
   const patchLanguage = useMutation({
     mutationFn: (data: { appLanguage?: string; commLanguage?: string }) =>
-      apiPut<{ appLanguage: string; commLanguage: string }>("/api/settings/language", data),
+      apiPut<{ appLanguage: string; commLanguage: string }>("/api/settings/language", {
+        ...data,
+        languageSelected: true,
+      }),
     onSuccess: (response) => {
-      if (response?.appLanguage) setAppLanguage(response.appLanguage);
+      if (response?.appLanguage) {
+        setAppLanguage(response.appLanguage);
+        applyLanguage(response.appLanguage as any);
+      }
       if (response?.commLanguage) setCommLanguage(response.commLanguage);
       showSaved("features");
     },

@@ -1,4 +1,63 @@
 {
+  "onboarding": {
+    "welcome": "Bienvenido a QuotePro",
+    "subtitle": "¿En qué idioma te gustaría usar la app?",
+    "hint": "Puedes cambiar esto en Configuración en cualquier momento",
+    "continue": "Continuar"
+  },
+  "customers": {
+    "title": "Clientes",
+    "addCustomer": "Agregar cliente",
+    "importCsv": "Importar CSV",
+    "totalRevenue": "Ingresos totales",
+    "avgLtv": "LTV promedio",
+    "payingClients": "Clientes activos",
+    "searchPlaceholder": "Buscar por nombre, correo o teléfono...",
+    "noCustomers": "Aún no hay clientes",
+    "noResults": "Ningún cliente coincide con tu búsqueda",
+    "noResultsHint": "Prueba un término de búsqueda diferente",
+    "addFirst": "Agrega tu primer cliente para comenzar",
+    "totalCount": "{{count}} clientes en total",
+    "sortRecent": "Recientes",
+    "sortTopValue": "Mayor valor",
+    "tabs": {
+      "all": "Todos",
+      "active": "Activos",
+      "lead": "Prospectos",
+      "inactive": "Inactivos"
+    },
+    "table": {
+      "name": "Nombre",
+      "email": "Correo",
+      "phone": "Teléfono",
+      "quotes": "Cotizaciones",
+      "lifetimeValue": "Valor de vida",
+      "noContact": "Sin contacto"
+    }
+  },
+  "quotes": {
+    "title": "Cotizaciones",
+    "newQuote": "Nueva cotización",
+    "quoteNumber": "Cotización #{{number}}",
+    "noQuotes": "Aún no hay cotizaciones",
+    "noResults": "Ninguna cotización coincide con tu búsqueda",
+    "status": {
+      "draft": "Borrador",
+      "sent": "Enviada",
+      "accepted": "Aceptada",
+      "declined": "Rechazada",
+      "expired": "Vencida"
+    }
+  },
+  "dashboard": {
+    "title": "Panel de control",
+    "totalRevenue": "Ingresos totales",
+    "quotesCreated": "Cotizaciones creadas",
+    "acceptanceRate": "Tasa de aceptación",
+    "activeCustomers": "Clientes activos",
+    "recentActivity": "Actividad reciente",
+    "noActivity": "Sin actividad reciente"
+  },
   "nav": {
     "dashboard": "Panel de control",
     "quotes": "Cotizaciones",

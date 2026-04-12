@@ -128,17 +128,20 @@ const router = Router();
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const { appLanguage, commLanguage, currency } = req.body as { appLanguage?: string; commLanguage?: string; currency?: string };
+      const { appLanguage, commLanguage, currency, languageSelected } = req.body as { appLanguage?: string; commLanguage?: string; currency?: string; languageSelected?: boolean };
       const validCodes = ["en", "es", "pt", "ru"];
       const validCurrencies = ["USD", "CAD", "GBP"];
       const safeApp = validCodes.includes(appLanguage || "") ? appLanguage! : (business as any).appLanguage || "en";
       const safeComm = validCodes.includes(commLanguage || "") ? commLanguage! : (business as any).commLanguage || "en";
       const safeCurrency = validCurrencies.includes(currency || "") ? currency! : (business as any).currency || "USD";
-      const updated = await updateBusiness(business.id, { appLanguage: safeApp, commLanguage: safeComm, currency: safeCurrency } as any);
+      const updatePayload: any = { appLanguage: safeApp, commLanguage: safeComm, currency: safeCurrency };
+      if (languageSelected === true) updatePayload.languageSelected = true;
+      const updated = await updateBusiness(business.id, updatePayload);
       return res.json({
         appLanguage: (updated as any).appLanguage,
         commLanguage: (updated as any).commLanguage,
         currency: (updated as any).currency,
+        languageSelected: (updated as any).languageSelected,
       });
     } catch (error) {
       console.error("Language settings error:", error);
