@@ -12,30 +12,30 @@
 import { Router, Request, Response } from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { pool } from "../db";
 import { sendEmail, PLATFORM_FROM_EMAIL } from "../mail";
 
 const router = Router();
 
-// ─── Serve booking HTML page ──────────────────────────────────────────────────
+// ─── Serve booking page via SPA (React handles /book/:token) ─────────────────
 
-const bookingHtmlPath = path.join(process.cwd(), "server/templates/booking.html");
+const webIndexPath = path.join(process.cwd(), "web", "dist", "index.html");
+const legacyBookingHtmlPath = path.join(process.cwd(), "server/templates/booking.html");
 
 router.get("/book/:token", (_req: Request, res: Response) => {
+  const spaPath = fs.existsSync(webIndexPath) ? webIndexPath : legacyBookingHtmlPath;
   try {
-    const html = fs.readFileSync(bookingHtmlPath, "utf-8");
-    res.setHeader("Content-Type", "text/html");
-    return res.send(html);
+    return res.sendFile(spaPath);
   } catch {
     return res.status(500).send("Page unavailable.");
   }
 });
 
 router.get("/book/:token/confirmed", (_req: Request, res: Response) => {
+  const spaPath = fs.existsSync(webIndexPath) ? webIndexPath : legacyBookingHtmlPath;
   try {
-    const html = fs.readFileSync(bookingHtmlPath, "utf-8");
-    res.setHeader("Content-Type", "text/html");
-    return res.send(html);
+    return res.sendFile(spaPath);
   } catch {
     return res.status(500).send("Page unavailable.");
   }
@@ -458,8 +458,9 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
       // Lock and fetch token
       const tokenRes = await client.query(
         `SELECT bt.*, l.contact, l.home, l.quote, l.quote_type, l.id AS lead_id,
-                b.company_name, b.logo_uri, b.primary_color, b.phone AS business_phone,
-                b.email AS business_email, u.id AS operator_user_id
+                b.id AS business_id, b.company_name, b.logo_uri, b.primary_color,
+                b.phone AS business_phone, b.email AS business_email,
+                u.id AS operator_user_id
          FROM booking_tokens bt
          JOIN leads l ON l.id = bt.lead_id
          JOIN businesses b ON b.owner_user_id = bt.user_id
@@ -507,13 +508,20 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
         [token]
       );
 
-      // Create a booking record
+      // Extract data
       const contact = row.contact as any;
       const home = row.home as any;
       const quote = row.quote as any;
       const customerName = `${contact.firstName || ""} ${contact.lastName || ""}`.trim();
-      const quoteAmount = quote?.exactAmount || (quote?.rangeMin ? (quote.rangeMin + (quote.rangeMax || quote.rangeMin)) / 2 : null);
+      const quoteAmount = quote?.exactAmount || (quote?.rangeMin ? Math.round((quote.rangeMin + (quote.rangeMax || quote.rangeMin)) / 2) : null);
+      const jobTypeLabels: Record<string, string> = {
+        standard: "Standard Clean", deep: "Deep Clean",
+        move: "Move In / Move Out", post_construction: "Post-Construction Clean",
+      };
+      const jobType = jobTypeLabels[home.serviceType] || home.serviceType || "Standard Clean";
+      const jobAddress = address || [contact.street, contact.apt, contact.city, contact.state, contact.zip].filter(Boolean).join(", ") || null;
 
+      // ── 1. Create booking record (legacy autopilot table — keeps existing reports working)
       const bookingRes = await client.query(
         `INSERT INTO bookings
            (user_id, scheduled_date, scheduled_time, customer_name, customer_email,
@@ -521,25 +529,75 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'confirmed', $10)
          RETURNING *`,
         [
-          row.operator_user_id,
-          datePart,
-          timePart,
-          customerName,
-          contact.email,
-          contact.phone || null,
-          home.serviceType,
-          address || null,
-          quoteAmount,
-          notes || null,
+          row.operator_user_id, datePart, timePart, customerName,
+          contact.email, contact.phone || null, home.serviceType,
+          jobAddress, quoteAmount, notes || null,
         ]
       );
       const booking = bookingRes.rows[0];
 
-      // Update lead
-      await client.query(
-        `UPDATE leads SET status = 'booked', booking_confirmed_at = NOW() WHERE id = $1`,
-        [row.lead_id]
-      );
+      // ── 2. Find or create customer record
+      let customerId: string | null = null;
+      try {
+        if (contact.email && row.business_id) {
+          const existingCustomer = await client.query(
+            `SELECT id FROM customers WHERE business_id = $1 AND email = $2 LIMIT 1`,
+            [row.business_id, contact.email]
+          );
+          if (existingCustomer.rows.length > 0) {
+            customerId = existingCustomer.rows[0].id;
+          } else {
+            const newCustId = crypto.randomUUID();
+            await client.query(
+              `INSERT INTO customers (id, business_id, first_name, last_name, email, phone, address, status, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', NOW(), NOW())`,
+              [newCustId, row.business_id, contact.firstName || "", contact.lastName || "",
+               contact.email, contact.phone || null, jobAddress]
+            );
+            customerId = newCustId;
+          }
+        }
+      } catch (custErr: any) {
+        console.warn("[bookingToken] customer create warning:", custErr.message);
+      }
+
+      // ── 3. Create job record (appears on operator calendar)
+      let jobId: string | null = null;
+      try {
+        if (row.business_id) {
+          const startDatetime = new Date(`${datePart}T${timePart}:00`);
+          const endDatetime = new Date(startDatetime.getTime() + 2 * 60 * 60 * 1000);
+          jobId = crypto.randomUUID();
+          await client.query(
+            `INSERT INTO jobs (id, business_id, customer_id, job_type, status,
+               start_datetime, end_datetime, address, total, special_requests,
+               created_at, updated_at)
+             VALUES ($1, $2, $3, $4, 'scheduled', $5, $6, $7, $8, $9, NOW(), NOW())`,
+            [
+              jobId, row.business_id, customerId || null, jobType,
+              startDatetime.toISOString(), endDatetime.toISOString(),
+              jobAddress, quoteAmount, notes || null,
+            ]
+          );
+          console.log(`[bookingToken] Job ${jobId} created for business ${row.business_id} on ${datePart} ${timePart}`);
+        }
+      } catch (jobErr: any) {
+        console.warn("[bookingToken] job create warning:", jobErr.message);
+        jobId = null;
+      }
+
+      // ── 4. Update lead with job reference and booked status
+      if (jobId) {
+        await client.query(
+          `UPDATE leads SET status = 'booked', booking_confirmed_at = NOW(), job_id = $1 WHERE id = $2`,
+          [jobId, row.lead_id]
+        );
+      } else {
+        await client.query(
+          `UPDATE leads SET status = 'booked', booking_confirmed_at = NOW() WHERE id = $1`,
+          [row.lead_id]
+        );
+      }
 
       await client.query("COMMIT");
 
