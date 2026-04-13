@@ -232,15 +232,35 @@ router.post("/send-card-request", requireAuth, async (req: Request, res: Respons
     const customer = custRes.rows[0];
     if (!customer.email) return res.status(400).json({ message: "Customer has no email" });
 
+    // Get or create the customer's portal token so the card-save link is customer-specific
+    const { getPortalTokenForCustomer } = await import("./portalRouter");
+    const portalToken = await getPortalTokenForCustomer(customerId, business.id);
+    if (!portalToken) return res.status(500).json({ message: "Could not generate secure link" });
+
     const domain = process.env.REPLIT_DOMAINS?.split(",")[0]
       ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
       : "https://app.getquotepro.ai";
+    const cardSaveUrl = `${domain}/save-card?token=${portalToken}`;
+
     const { fromName } = getBusinessSendParams(business);
+    const bizName = business.companyName || business.company_name || "Your cleaning company";
     const name = [customer.first_name, customer.last_name].filter(Boolean).join(" ") || "there";
+
     await sendEmail({
       to: customer.email,
-      subject: `${business.companyName || business.company_name} — Save your card for easy payment`,
-      html: `<p>Hi ${name},</p><p>${business.companyName || business.company_name} would like to save a payment method on file to streamline your future cleaning payments.</p><p>This is a secure, one-time setup. Your card will only be charged after each service.</p><p><a href="${domain}/portal" style="display:inline-block;padding:12px 24px;background:#16a34a;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Save Payment Method</a></p><p style="color:#64748b;font-size:13px;">If you have questions, reply to this email.</p><p>— ${fromName}</p>`,
+      subject: `${bizName} — Save your card for easy payment`,
+      html: `
+        <p>Hi ${name},</p>
+        <p>${bizName} would like to save a payment method on file to streamline your future cleaning payments.</p>
+        <p>This is a secure, one-time setup — your card will only be charged after each completed service.</p>
+        <p style="margin:24px 0;">
+          <a href="${cardSaveUrl}"
+             style="display:inline-block;padding:13px 28px;background:#4f46e5;color:#fff;border-radius:10px;text-decoration:none;font-weight:600;font-size:15px;">
+            Save Payment Method
+          </a>
+        </p>
+        <p style="color:#64748b;font-size:13px;">If you have questions, simply reply to this email.</p>
+        <p>— ${fromName}</p>`,
       fromName,
     });
     return res.json({ success: true });

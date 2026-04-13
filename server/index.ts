@@ -335,6 +335,16 @@ function configureExpoAndLanding(app: express.Application) {
       res.status(404).send("Not found");
     });
 
+    // /save-card — standalone Stripe card setup page (served as static HTML, uses CDN Stripe.js)
+    app.get("/save-card", (_req: Request, res: Response) => {
+      const htmlPath = path.join(process.cwd(), "server/templates/save-card.html");
+      if (fs.existsSync(htmlPath)) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.sendFile(htmlPath);
+      }
+      res.status(404).send("Not found");
+    });
+
     // /employee/* — Employee portal (PIN-auth SPA routes, all sub-paths)
     app.use("/employee", (_req: Request, res: Response) => {
       const indexPath = path.join(webDistPath, "index.html");

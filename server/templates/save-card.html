@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Save Payment Method</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #f0f4ff 0%, #fafbff 100%);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      color: #1a1f36;
+    }
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 40px 36px;
+      max-width: 460px; width: 100%;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .logo-row { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+    .biz-name { font-size: 17px; font-weight: 700; color: #1a1f36; }
+    .biz-sub { font-size: 13px; color: #64748b; margin-top: 1px; }
+    .info-box {
+      background: #f0fdf4; border: 1px solid #bbf7d0;
+      border-radius: 12px; padding: 14px 16px; margin-bottom: 28px;
+    }
+    .info-box p { font-size: 14px; color: #166534; line-height: 1.55; }
+    h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .subtitle { font-size: 14px; color: #64748b; margin-bottom: 28px; }
+    .field-label {
+      font-size: 12px; font-weight: 600; color: #374151;
+      letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 8px;
+    }
+    #card-element {
+      border: 1.5px solid #e2e8f0; border-radius: 10px;
+      padding: 14px 14px; background: #f8fafc;
+      transition: border-color 0.15s;
+    }
+    #card-element.StripeElement--focus { border-color: #6366f1; background: #fff; }
+    #card-element.StripeElement--invalid { border-color: #ef4444; }
+    #card-error {
+      margin-top: 8px; font-size: 13px; color: #ef4444;
+      min-height: 20px; display: none;
+    }
+    .btn {
+      display: block; width: 100%; margin-top: 20px;
+      padding: 15px 24px; font-size: 15px; font-weight: 600;
+      background: #4f46e5; color: #fff;
+      border: none; border-radius: 12px; cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn:hover:not(:disabled) { background: #4338ca; }
+    .btn:active:not(:disabled) { transform: scale(0.98); }
+    .btn:disabled { background: #a5b4fc; cursor: not-allowed; }
+    .security-row {
+      display: flex; align-items: center; justify-content: center;
+      gap: 18px; margin-top: 20px;
+    }
+    .security-row span { font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
+    .success { text-align: center; padding: 12px 0; }
+    .success .check { font-size: 52px; margin-bottom: 16px; line-height: 1; }
+    .success h3 { font-size: 20px; font-weight: 700; color: #15803d; margin-bottom: 8px; }
+    .success p { font-size: 14px; color: #64748b; line-height: 1.6; }
+    .error-page { text-align: center; padding: 12px 0; }
+    .error-page .icon { font-size: 48px; margin-bottom: 16px; }
+    .error-page h3 { font-size: 18px; font-weight: 700; color: #dc2626; margin-bottom: 8px; }
+    .error-page p { font-size: 14px; color: #64748b; line-height: 1.6; }
+    .loading { text-align: center; padding: 40px 0; color: #94a3b8; font-size: 14px; }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid #e2e8f0;
+      border-top-color: #6366f1; border-radius: 50%;
+      animation: spin 0.7s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="card" id="app">
+  <div class="loading">
+    <div class="spinner"></div>
+    Loading secure payment form...
+  </div>
+</div>
+
+<script>
+(async function () {
+  const app = document.getElementById("app");
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
+
+  function showError(title, body) {
+    app.innerHTML = `
+      <div class="error-page">
+        <div class="icon">&#128274;</div>
+        <h3>${title}</h3>
+        <p>${body}</p>
+      </div>`;
+  }
+
+  if (!token) {
+    showError("Invalid Link", "This link is missing a token. Please use the link from your email.");
+    return;
+  }
+
+  let setup;
+  try {
+    const res = await fetch(`/api/public/portal/${encodeURIComponent(token)}/card-setup`);
+    setup = await res.json();
+  } catch (e) {
+    showError("Connection Error", "Could not load the payment form. Please check your connection and try again.");
+    return;
+  }
+
+  if (setup.error === "expired") {
+    showError("Link Expired", "This link has expired or already been used. Please contact us for a new link.");
+    return;
+  }
+  if (setup.error) {
+    showError("Something Went Wrong", setup.message || "Could not load payment form. Please contact support.");
+    return;
+  }
+
+  const firstName = (setup.customerName || "").split(" ")[0] || "there";
+
+  // Build the card form
+  app.innerHTML = `
+    <div class="logo-row">
+      <div>
+        <div class="biz-name">${setup.businessName}</div>
+        <div class="biz-sub">Secure Payment Setup</div>
+      </div>
+    </div>
+    <div class="info-box">
+      <p>Hi ${firstName}! Save your card once and we'll handle payment automatically after each cleaning — no more manual payments needed.</p>
+    </div>
+    <div class="field-label">Card Details</div>
+    <div id="card-element"></div>
+    <div id="card-error"></div>
+    <button class="btn" id="submit-btn">Save Payment Method</button>
+    <div class="security-row">
+      <span>&#128274; 256-bit SSL</span>
+      <span>Powered by Stripe</span>
+      <span>PCI Compliant</span>
+    </div>`;
+
+  const stripe = Stripe(setup.publishableKey, { stripeAccount: setup.stripeAccountId });
+  const elements = stripe.elements({ clientSecret: setup.clientSecret });
+  const cardElement = elements.create("card", {
+    style: {
+      base: { fontSize: "15px", color: "#1a1f36", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", "::placeholder": { color: "#94a3b8" } },
+      invalid: { color: "#ef4444" },
+    },
+    hidePostalCode: false,
+  });
+  cardElement.mount("#card-element");
+
+  const errorDiv = document.getElementById("card-error");
+  cardElement.on("change", (event) => {
+    if (event.error) {
+      errorDiv.textContent = event.error.message;
+      errorDiv.style.display = "block";
+    } else {
+      errorDiv.textContent = "";
+      errorDiv.style.display = "none";
+    }
+  });
+
+  const btn = document.getElementById("submit-btn");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Saving...";
+    errorDiv.style.display = "none";
+
+    const { setupIntent, error } = await stripe.confirmCardSetup(setup.clientSecret, {
+      payment_method: {
+        card: cardElement,
+        billing_details: { name: setup.customerName },
+      },
+    });
+
+    if (error) {
+      errorDiv.textContent = error.message;
+      errorDiv.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Save Payment Method";
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/public/portal/${encodeURIComponent(token)}/save-card`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentMethodId: setupIntent.payment_method }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        app.innerHTML = `
+          <div class="success">
+            <div class="check">&#10004;&#65039;</div>
+            <h3>Card saved successfully!</h3>
+            <p>Your ${data.cardBrand || "card"} ending in ${data.last4 || "****"} is now on file. You'll be charged automatically after each cleaning — no action needed from you.</p>
+          </div>`;
+      } else {
+        errorDiv.textContent = data.message || "Failed to save card. Please try again.";
+        errorDiv.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "Save Payment Method";
+      }
+    } catch (e) {
+      errorDiv.textContent = "Something went wrong. Please try again.";
+      errorDiv.style.display = "block";
+      btn.disabled = false;
+      btn.textContent = "Save Payment Method";
+    }
+  });
+})();
+</script>
+</body>
+</html>

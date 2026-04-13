@@ -2877,6 +2877,123 @@ router.get("/api/public/quote-status/:leadId", async (req: Request, res: Respons
   }
 });
 
+// ─── GET /api/public/portal/:token/card-setup ─────────────────────────────────
+// Public: creates a Stripe SetupIntent for a customer using their portal token.
+router.get("/api/public/portal/:token/card-setup", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const portalRes = await pool.query(
+      `SELECT cp.customer_id, cp.business_id,
+              c.first_name, c.last_name, c.email, c.stripe_customer_id,
+              b.company_name, b.stripe_account_id, b.stripe_onboarding_complete
+       FROM customer_portals cp
+       JOIN customers c ON c.id = cp.customer_id
+       JOIN businesses b ON b.id = cp.business_id
+       WHERE cp.token = $1 LIMIT 1`,
+      [token]
+    );
+    if (!portalRes.rows.length) {
+      return res.status(404).json({ error: "not_found", message: "Link not found." });
+    }
+    const p = portalRes.rows[0];
+    if (!p.stripe_account_id || !p.stripe_onboarding_complete) {
+      return res.status(400).json({ error: "not_configured", message: "Payments not configured for this business." });
+    }
+
+    const stripe = getStripe();
+    if (!stripe) return res.status(503).json({ error: "stripe_unavailable", message: "Stripe not available." });
+
+    let stripeCustomerId = p.stripe_customer_id;
+    if (!stripeCustomerId) {
+      const sc = await stripe.customers.create(
+        { name: [p.first_name, p.last_name].filter(Boolean).join(" "), email: p.email || undefined, metadata: { customerId: p.customer_id } },
+        { stripeAccount: p.stripe_account_id }
+      );
+      stripeCustomerId = sc.id;
+      await pool.query(`UPDATE customers SET stripe_customer_id=$1 WHERE id=$2`, [stripeCustomerId, p.customer_id]);
+    }
+
+    const intent = await stripe.setupIntents.create(
+      { customer: stripeCustomerId, payment_method_types: ["card"], metadata: { customerId: p.customer_id, businessId: p.business_id } },
+      { stripeAccount: p.stripe_account_id }
+    );
+
+    const { getStripePublishableKey } = await import("../stripeClient");
+    const publishableKey = await getStripePublishableKey();
+
+    return res.json({
+      clientSecret: intent.client_secret,
+      publishableKey,
+      stripeAccountId: p.stripe_account_id,
+      customerName: [p.first_name, p.last_name].filter(Boolean).join(" ") || "Customer",
+      businessName: p.company_name || "Your cleaning company",
+    });
+  } catch (err: any) {
+    console.error("[public/card-setup] error:", err.message);
+    return res.status(500).json({ error: "server_error", message: "Failed to initialize payment setup." });
+  }
+});
+
+// ─── POST /api/public/portal/:token/save-card ─────────────────────────────────
+// Public: saves the confirmed payment method to the customer record.
+router.post("/api/public/portal/:token/save-card", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { paymentMethodId } = req.body;
+    if (!paymentMethodId) return res.status(400).json({ message: "paymentMethodId required" });
+
+    const portalRes = await pool.query(
+      `SELECT cp.customer_id, cp.business_id,
+              c.first_name, c.email,
+              b.company_name, b.stripe_account_id
+       FROM customer_portals cp
+       JOIN customers c ON c.id = cp.customer_id
+       JOIN businesses b ON b.id = cp.business_id
+       WHERE cp.token = $1 LIMIT 1`,
+      [token]
+    );
+    if (!portalRes.rows.length) return res.status(404).json({ message: "Link not found." });
+    const p = portalRes.rows[0];
+
+    const stripe = getStripe();
+    if (!stripe) return res.status(503).json({ message: "Stripe not available." });
+
+    const pm = await stripe.paymentMethods.retrieve(paymentMethodId, { stripeAccount: p.stripe_account_id });
+
+    await pool.query(
+      `UPDATE customers SET stripe_payment_method_id=$1, has_payment_method=true,
+          payment_method_last4=$2, payment_method_brand=$3, updated_at=NOW()
+       WHERE id=$4`,
+      [paymentMethodId, pm.card?.last4 ?? null, pm.card?.brand ?? null, p.customer_id]
+    );
+
+    await pool.query(
+      `INSERT INTO payment_events (job_id, business_id, customer_id, event_type, stripe_id)
+       VALUES (NULL, $1, $2, 'card_added', $3)`,
+      [p.business_id, p.customer_id, paymentMethodId]
+    );
+
+    const { sendEmail, getBusinessSendParams } = await import("../mail");
+    try {
+      if (p.email) {
+        const firstName = p.first_name || "there";
+        const brand = pm.card?.brand ? pm.card.brand.charAt(0).toUpperCase() + pm.card.brand.slice(1) : "Card";
+        const last4 = pm.card?.last4 || "****";
+        await sendEmail({
+          to: p.email,
+          subject: `Payment method saved — ${p.company_name}`,
+          html: `<p>Hi ${firstName},</p><p>Your ${brand} ending in ${last4} has been saved securely. You'll be charged automatically after each cleaning — no action needed.</p><p>— ${p.company_name}</p>`,
+        });
+      }
+    } catch (_) {}
+
+    return res.json({ success: true, cardBrand: pm.card?.brand ?? null, last4: pm.card?.last4 ?? null });
+  } catch (err: any) {
+    console.error("[public/save-card] error:", err.message);
+    return res.status(500).json({ message: "Failed to save card. Please try again." });
+  }
+});
+
 router.get("/api/public/biz-info/:slug", async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
