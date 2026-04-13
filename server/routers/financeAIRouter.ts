@@ -5,7 +5,7 @@
  */
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware";
-import { getBusinessByOwner } from "../helpers";
+import { getBusinessByOwner } from "../storage";
 import { anthropic } from "../clients";
 import { buildFinanceSnapshot } from "./paymentsRouter";
 

@@ -7,7 +7,8 @@ import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware";
 import { pool } from "../db";
 import { getStripe } from "../clients";
-import { getBusinessByOwner, updateBusiness } from "../helpers";
+import { getBusinessByOwner } from "../storage";
+import { updateBusiness } from "../helpers";
 import { sendEmail, getBusinessSendParams } from "../mail";
 
 const router = Router();
