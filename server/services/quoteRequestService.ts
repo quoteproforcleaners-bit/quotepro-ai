@@ -139,24 +139,22 @@ export async function processQuoteRequest(leadId: string): Promise<void> {
     const aiQuote = await generateAIQuote(home, contact, pricingConfig);
     console.log(`[Quote] ✅ AI response at ${Date.now() - t0}ms — confidence: ${aiQuote.confidence}, amount: ${aiQuote.exactAmount ?? `$${aiQuote.rangeMin}-${aiQuote.rangeMax}`}`);
 
-    // Determine display type based on quoteMode and confidence
-    let finalQuoteType: "exact" | "range";
-    if (quoteMode === "exact") {
-      finalQuoteType = "exact";
-    } else if (quoteMode === "range") {
-      finalQuoteType = "range";
-    } else {
-      // smart
-      finalQuoteType = aiQuote.confidence === "high" ? "exact" : "range";
-    }
+    // Always show range for customer-facing lead capture quotes
+    const finalQuoteType: "exact" | "range" = "range";
 
-    // If range but we only have exact, derive range
-    if (finalQuoteType === "range" && !aiQuote.rangeMin && aiQuote.exactAmount) {
-      aiQuote.rangeMin = Math.round(aiQuote.exactAmount * 0.92);
-      aiQuote.rangeMax = Math.round(aiQuote.exactAmount * 1.08);
-    }
-    if (finalQuoteType === "exact" && !aiQuote.exactAmount && aiQuote.rangeMin) {
-      aiQuote.exactAmount = Math.round((aiQuote.rangeMin + (aiQuote.rangeMax || aiQuote.rangeMin)) / 2);
+    // Normalize range: derive midpoint, then apply -15%/+20% rounded to nearest $5
+    const midpoint = aiQuote.exactAmount
+      || (aiQuote.rangeMin && aiQuote.rangeMax ? Math.round((aiQuote.rangeMin + aiQuote.rangeMax) / 2) : 0);
+    if (midpoint > 0) {
+      aiQuote.rangeMin = Math.round((midpoint * 0.85) / 5) * 5;
+      aiQuote.rangeMax = Math.round((midpoint * 1.20) / 5) * 5;
+      aiQuote.quoteType = "range";
+    } else if (aiQuote.rangeMin && aiQuote.rangeMax) {
+      // AI returned a range directly — re-apply formula from its midpoint
+      const mid = Math.round((aiQuote.rangeMin + aiQuote.rangeMax) / 2);
+      aiQuote.rangeMin = Math.round((mid * 0.85) / 5) * 5;
+      aiQuote.rangeMax = Math.round((mid * 1.20) / 5) * 5;
+      aiQuote.quoteType = "range";
     }
 
     // Save quote to lead
@@ -209,38 +207,40 @@ async function generateAIQuote(
   contact: LeadContact,
   pricingConfig: any
 ): Promise<AIQuote> {
+  const hasOperatorPricing = pricingConfig && Object.keys(pricingConfig).length > 0 &&
+    (pricingConfig.settings || pricingConfig.baseRates || pricingConfig.standardClean);
+
   const systemPrompt = `You are an AI pricing assistant for a professional cleaning business.
 Calculate an accurate cleaning quote based on the home details provided.
-Use the operator's pricing configuration as your baseline.
+${hasOperatorPricing ? "Use the operator's pricing configuration as your baseline for the midpoint price." : "Use the HomeAdvisor/Angi market baseline rates below."}
 Return ONLY a JSON object — no explanation, no preamble, no markdown.
 
-Operator pricing config:
-${JSON.stringify(pricingConfig, null, 2)}
+IMPORTANT: Always return quoteType "range". Never return "exact".
+The range should be -15% to +20% around the midpoint, rounded to nearest $5.
+
+${hasOperatorPricing ? `Operator pricing config (use as midpoint baseline):
+${JSON.stringify(pricingConfig, null, 2)}` : `Market baseline rates (HomeAdvisor/Angi national averages):
+Standard Clean: 1BR=$120, 2BR=$155, 3BR=$190, 4BR=$235, 5BR+=$280
+Deep Clean: 1BR=$170, 2BR=$220, 3BR=$270, 4BR=$330, 5BR+=$390
+Move In/Out: 1BR=$200, 2BR=$260, 3BR=$320, 4BR=$390, 5BR+=$460
+Post-Construction: 1BR=$240, 2BR=$310, 3BR=$380, 4BR=$460, 5BR+=$540
+Bathroom surcharge: +$25 per full bath above 1.5, +$15 per half bath above 1.5
+Condition: Well maintained=+0%, Needs extra attention=+15%, Very dirty=+30%
+Extras: Inside oven +$40, Inside fridge +$35, Interior windows +$50, Laundry +$30, Garage +$55, Basement +$65, Pets in home +$20, Has carpet +$25`}
 
 Return format:
 {
-  "quoteType": "exact" or "range",
-  "exactAmount": number (if quoteType is exact),
-  "rangeMin": number (if quoteType is range),
-  "rangeMax": number (if quoteType is range),
+  "quoteType": "range",
+  "rangeMin": number (midpoint × 0.85, rounded to nearest $5),
+  "rangeMax": number (midpoint × 1.20, rounded to nearest $5),
   "estimatedDuration": string (e.g. "2.5-3 hours"),
   "breakdown": [
-    { "item": "Base cleaning (3BR/2BA)", "amount": 180 },
-    { "item": "Deep clean surcharge", "amount": 60 }
+    { "item": "Base cleaning (3BR/2BA)", "amount": 190 },
+    { "item": "Deep clean surcharge", "amount": 80 }
   ],
   "notes": "1-2 sentences about the quote, personalized to their home",
   "confidence": "high" | "medium" | "low"
-}
-
-Typical price ranges (use as baseline if no config):
-- Standard clean 2BR/1BA: $120-$160
-- Standard clean 3BR/2BA: $160-$200
-- Deep clean: add 50-75%
-- Move in/out: add 60-80%
-- Post-construction: add 80-100%
-- Inside oven: +$35, Inside fridge: +$25, Windows: +$40
-- Laundry: +$20, Garage: +$50, Basement: +$45
-- Pets: +$15, Carpet: +$30`;
+}`;
 
   const userMessage = `Generate a quote for:
 Service: ${home.serviceType}
@@ -278,23 +278,51 @@ ZIP code: ${contact.zip}`;
 }
 
 function fallbackQuote(home: LeadHome): AIQuote {
-  const beds = Number(home.bedrooms) || 2;
+  const beds = Math.min(Number(home.bedrooms) || 2, 5);
   const baths = Number(home.bathrooms) || 1;
-  const base = 80 + beds * 30 + baths * 20;
-  const multiplier =
-    home.serviceType === "deep" ? 1.6
-    : home.serviceType === "move" ? 1.7
-    : home.serviceType === "post_construction" ? 1.85
-    : 1.0;
-  const min = Math.round(base * multiplier * 0.92);
-  const max = Math.round(base * multiplier * 1.08);
+
+  // HomeAdvisor/Angi market-aligned base rates
+  const MARKET_BASE_RATES: Record<string, Record<number, number>> = {
+    standard: { 1: 120, 2: 155, 3: 190, 4: 235, 5: 280 },
+    deep:     { 1: 170, 2: 220, 3: 270, 4: 330, 5: 390 },
+    move:     { 1: 200, 2: 260, 3: 320, 4: 390, 5: 460 },
+    post_construction: { 1: 240, 2: 310, 3: 380, 4: 460, 5: 540 },
+  };
+  const EXTRA_PRICES: Record<string, number> = {
+    "inside oven": 40, "inside fridge": 35, "interior windows": 50,
+    "laundry": 30, "garage": 55, "basement": 65, "pets in home": 20, "has carpet": 25,
+  };
+
+  const serviceKey = (home.serviceType || "standard").toLowerCase();
+  const rateTable = MARKET_BASE_RATES[serviceKey] || MARKET_BASE_RATES.standard;
+  let base = rateTable[beds] || rateTable[5];
+
+  // Bathroom surcharge (+$25 per full bath above 1.5, +$15 per half bath)
+  const extraBaths = Math.max(0, baths - 1.5);
+  base += Math.floor(extraBaths) * 25;
+
+  // Condition surcharge
+  const condition = (home.condition || "").toLowerCase();
+  if (condition.includes("extra attention")) base = Math.round(base * 1.15);
+  else if (condition.includes("dirty")) base = Math.round(base * 1.30);
+
+  // Extras
+  const extras = (home.extras || []).map((e: string) => e.toLowerCase());
+  for (const [key, price] of Object.entries(EXTRA_PRICES)) {
+    if (extras.some((e) => e.includes(key))) base += price;
+  }
+
+  // -15%/+20% range rounded to nearest $5
+  const rangeMin = Math.round((base * 0.85) / 5) * 5;
+  const rangeMax = Math.round((base * 1.20) / 5) * 5;
+
   return {
     quoteType: "range",
-    rangeMin: min,
-    rangeMax: max,
+    rangeMin,
+    rangeMax,
     estimatedDuration: `${2 + Math.floor(beds / 2)}-${3 + Math.floor(beds / 2)} hours`,
-    breakdown: [{ item: `Base cleaning (${beds}BR/${baths}BA)`, amount: Math.round(base * multiplier) }],
-    notes: "This is a preliminary estimate based on your home details. Final price confirmed at time of service.",
+    breakdown: [{ item: `Base cleaning (${beds}BR/${baths}BA)`, amount: base }],
+    notes: "Your final price will be confirmed before your appointment based on your home's exact condition.",
     confidence: "medium",
   };
 }
@@ -521,6 +549,7 @@ async function sendQuoteEmail(
       <div style="margin:12px 0;">
         <div style="font-size:13px; color:#6B7280; margin-bottom:6px;">Your Quote:</div>
         <div style="display:inline-block; background:${color}; color:#fff; border-radius:10px; padding:12px 24px; font-size:32px; font-weight:800; letter-spacing:-0.5px;">${priceStr}</div>
+        ${quoteType === "range" ? `<div style="font-size:12px; color:#6B7280; margin-top:8px;">Final price confirmed before your appointment</div>` : ""}
       </div>
       ${quote.breakdown?.length > 0 ? `
       <div style="margin-top:16px; border-top:1px solid #E5E7EB; padding-top:16px;">

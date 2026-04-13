@@ -373,9 +373,9 @@ function QuoteCard({ quote, color }: { quote: QuoteData; color: string }) {
         {priceStr}
       </div>
 
-      {quote.quoteType === "range" && quote.exactAmount && (
-        <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 4 }}>
-          Best estimate: ${(quote.exactAmount).toLocaleString()}
+      {quote.quoteType === "range" && (
+        <div style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>
+          Final price confirmed before your appointment
         </div>
       )}
 
