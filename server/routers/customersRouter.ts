@@ -359,6 +359,8 @@ const router = Router();
         convertedQuoteId: r.converted_quote_id,
         createdAt: r.created_at,
         reviewedAt: r.reviewed_at,
+        autopilotEnrolled: r.autopilot_enrolled ?? false,
+        autopilotEnrolledAt: r.autopilot_enrolled_at ?? null,
       })));
     } catch (e: any) {
       res.status(500).json({ message: e.message });

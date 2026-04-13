@@ -63,7 +63,14 @@ router.post("/enroll-intake/:intakeId", requireAuth, requireAutopilot, async (re
     }
 
     const jobId = await enrollLead(req.session.userId!, business.id, intakeId);
-    return res.json({ jobId, message: "Lead enrolled in Autopilot" });
+
+    // Persist enrollment on the intake_requests row so GET returns it reliably
+    await pool.query(
+      `UPDATE intake_requests SET autopilot_enrolled=true, autopilot_enrolled_at=NOW() WHERE id=$1`,
+      [intakeId]
+    );
+
+    return res.json({ jobId, autopilotEnrolled: true, message: "Lead enrolled in Autopilot" });
   } catch (err: any) {
     console.error("[autopilot] enroll-intake error:", err.message);
     return res.status(500).json({ message: "Failed to enroll lead" });
