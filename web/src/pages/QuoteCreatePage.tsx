@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
 import { buildAddress } from "../lib/address";
+import AddressAutocomplete from "../components/AddressAutocomplete";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiPost, apiRequest } from "../lib/api";
 import { queryClient } from "../lib/queryClient";
@@ -223,11 +224,13 @@ export default function QuoteCreatePage() {
     email: "",
     phone: "",
     street: "",
+    apt: "",
     city: "",
     state: "",
     zip: "",
     country: "",
   });
+  const [customerCoords, setCustomerCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [property, setProperty] = useState<PropertyState>({
     beds: 3,
     halfBaths: 0,
@@ -441,10 +444,12 @@ export default function QuoteCreatePage() {
     let cid = customerId;
     if (newCustomer) {
       try {
-        const { street, city, state, zip, country, ...formRest } = customerForm;
+        const { street, apt, city, state, zip, country, ...formRest } = customerForm;
+        const streetWithApt = apt?.trim() ? `${street}, ${apt}` : street;
         const c: any = await createCustomerMutation.mutateAsync({
           ...formRest,
-          address: buildAddress({ street, city, state, zip, country }),
+          address: buildAddress({ street: streetWithApt, city, state, zip, country }),
+          ...(customerCoords ? { addressLat: customerCoords.lat, addressLng: customerCoords.lng } : {}),
         });
         cid = c.id;
       } catch {
@@ -906,47 +911,15 @@ export default function QuoteCreatePage() {
                 ))}
                 <div>
                   <p className="text-sm font-medium text-slate-700 mb-2">Property Address</p>
-                  <div className="space-y-2.5">
-                    <input
-                      type="text"
-                      placeholder="Street"
-                      value={customerForm.street}
-                      onChange={(e) => setCustomerForm((p) => ({ ...p, street: e.target.value }))}
-                      className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
-                    />
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <input
-                        type="text"
-                        placeholder="City"
-                        value={customerForm.city}
-                        onChange={(e) => setCustomerForm((p) => ({ ...p, city: e.target.value }))}
-                        className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
-                      />
-                      <input
-                        type="text"
-                        placeholder="State"
-                        value={customerForm.state}
-                        onChange={(e) => setCustomerForm((p) => ({ ...p, state: e.target.value }))}
-                        className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <input
-                        type="text"
-                        placeholder="Zip / Postal Code"
-                        value={customerForm.zip}
-                        onChange={(e) => setCustomerForm((p) => ({ ...p, zip: e.target.value }))}
-                        className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Country (US)"
-                        value={customerForm.country}
-                        onChange={(e) => setCustomerForm((p) => ({ ...p, country: e.target.value }))}
-                        className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
-                      />
-                    </div>
-                  </div>
+                  <AddressAutocomplete
+                    street={customerForm.street}
+                    apt={customerForm.apt}
+                    city={customerForm.city}
+                    state={customerForm.state}
+                    zip={customerForm.zip}
+                    onChange={(field, val) => setCustomerForm((p) => ({ ...p, [field]: val }))}
+                    onCoords={(lat, lng) => setCustomerCoords({ lat, lng })}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">

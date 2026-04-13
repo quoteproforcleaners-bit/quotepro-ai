@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { LoadScript } from "@react-google-maps/api";
 import { useAuth } from "./lib/auth";
 import { isLoggedIn } from "./lib/employeeApi";
 import { applyLanguage } from "./lib/i18n";
@@ -95,6 +96,22 @@ import PhantomAccountsPage from "./pages/PhantomAccountsPage";
 import WhatsNewModal from "./components/WhatsNewModal";
 import FinancePage from "./pages/FinancePage";
 
+const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+const MAPS_LIBRARIES: ("places")[] = ["places"];
+
+function GoogleMapsProvider({ children }: { children: React.ReactNode }) {
+  if (!MAPS_KEY) return <>{children}</>;
+  return (
+    <LoadScript
+      googleMapsApiKey={MAPS_KEY}
+      libraries={MAPS_LIBRARIES}
+      loadingElement={<>{children}</>}
+    >
+      {children}
+    </LoadScript>
+  );
+}
+
 function EmployeeGuard({ children }: { children: React.ReactNode }) {
   if (!isLoggedIn()) return <Navigate to="/employee/login" replace />;
   return <>{children}</>;
@@ -123,6 +140,7 @@ export default function App() {
   }
 
   return (
+    <GoogleMapsProvider>
     <ThemeProvider>
     <WalkthroughProvider>
     <SubscriptionProvider>
@@ -286,5 +304,6 @@ export default function App() {
     </SubscriptionProvider>
     </WalkthroughProvider>
     </ThemeProvider>
+    </GoogleMapsProvider>
   );
 }

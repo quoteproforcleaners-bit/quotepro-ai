@@ -994,5 +994,15 @@
   "referAndEarn": {
     "title": "Referidos",
     "description": "Gana un 50% de comisión recurrente por cada negocio que refieras."
+  },
+  "address": {
+    "street": "Calle",
+    "apt": "Apto.",
+    "city": "Ciudad",
+    "state": "Estado",
+    "zip": "Código Postal",
+    "streetPlaceholder": "Empieza a escribir tu dirección...",
+    "cityPlaceholder": "Ciudad",
+    "verified": "Dirección verificada"
   }
 }

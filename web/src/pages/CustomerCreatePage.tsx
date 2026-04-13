@@ -6,6 +6,7 @@ import { queryClient } from "../lib/queryClient";
 import { PageHeader, Card, CardHeader, Input, Button, Alert } from "../components/ui";
 import { UserPlus, AlertCircle } from "lucide-react";
 import { buildAddress } from "../lib/address";
+import AddressAutocomplete from "../components/AddressAutocomplete";
 
 export default function CustomerCreatePage() {
   const navigate = useNavigate();
@@ -15,11 +16,13 @@ export default function CustomerCreatePage() {
     email: "",
     phone: "",
     street: "",
+    apt: "",
     city: "",
     state: "",
     zip: "",
     country: "",
   });
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [error, setError] = useState("");
 
   const mutation = useMutation({
@@ -38,10 +41,12 @@ export default function CustomerCreatePage() {
       setError("First name is required");
       return;
     }
-    const { street, city, state, zip, country, ...rest } = form;
+    const { street, apt, city, state, zip, country, ...rest } = form;
+    const streetWithApt = apt.trim() ? `${street}, ${apt}` : street;
     mutation.mutate({
       ...rest,
-      address: buildAddress({ street, city, state, zip, country }),
+      address: buildAddress({ street: streetWithApt, city, state, zip, country }),
+      ...(coords ? { addressLat: coords.lat, addressLng: coords.lng } : {}),
     });
   };
 
@@ -95,42 +100,15 @@ export default function CustomerCreatePage() {
 
             <div className="pt-1">
               <p className="text-sm font-semibold text-slate-700 mb-3">Service Address</p>
-              <div className="space-y-3">
-                <Input
-                  label="Street"
-                  value={form.street}
-                  onChange={set("street")}
-                  placeholder="123 Main St"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    label="City"
-                    value={form.city}
-                    onChange={set("city")}
-                    placeholder="Springfield"
-                  />
-                  <Input
-                    label="State"
-                    value={form.state}
-                    onChange={set("state")}
-                    placeholder="IL"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    label="Zip / Postal Code"
-                    value={form.zip}
-                    onChange={set("zip")}
-                    placeholder="62701"
-                  />
-                  <Input
-                    label="Country"
-                    value={form.country}
-                    onChange={set("country")}
-                    placeholder="US"
-                  />
-                </div>
-              </div>
+              <AddressAutocomplete
+                street={form.street}
+                apt={form.apt}
+                city={form.city}
+                state={form.state}
+                zip={form.zip}
+                onChange={(field, val) => setForm((p) => ({ ...p, [field]: val }))}
+                onCoords={(lat, lng) => setCoords({ lat, lng })}
+              />
             </div>
 
             <div className="flex gap-3 pt-3 border-t border-slate-100">

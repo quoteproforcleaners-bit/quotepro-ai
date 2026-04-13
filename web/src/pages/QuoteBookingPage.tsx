@@ -10,6 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import AddressAutocompleteLine from "../components/AddressAutocompleteLine";
 import { CheckCircle, Loader2, AlertCircle, Calendar, Clock, Home, MapPin, Check, ChevronRight } from "lucide-react";
 
 const API_BASE = typeof window !== "undefined" ? window.location.origin : "";
@@ -283,16 +284,12 @@ export default function QuoteBookingPage() {
               {/* Address */}
               <div style={{ marginBottom: 16 }}>
                 <label style={lbl}>Service address (optional)</label>
-                <div style={{ position: "relative" }}>
-                  <MapPin size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF" }} />
-                  <input
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="123 Main St, City, State"
-                    style={{ width: "100%", padding: "11px 14px 11px 36px", border: "1.5px solid #D1D5DB", borderRadius: 10, fontSize: 15, color: "#111827", background: "#fff", outline: "none" }}
-                    autoComplete="street-address"
-                  />
-                </div>
+                <AddressAutocompleteLine
+                  value={address}
+                  onChange={setAddress}
+                  placeholder="123 Main St, City, State"
+                  inputStyle={{ width: "100%", padding: "11px 14px 11px 36px", border: "1.5px solid #D1D5DB", borderRadius: 10, fontSize: 15, color: "#111827", background: "#fff", outline: "none" }}
+                />
               </div>
 
               {/* Notes */}

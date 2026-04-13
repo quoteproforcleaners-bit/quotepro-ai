@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import AddressAutocompleteLine from "../components/AddressAutocompleteLine";
 import {
   MapPin,
   Plus,
@@ -114,13 +115,11 @@ function LocationModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">Address</label>
-            <input
-              type="text"
+            <AddressAutocompleteLine
+              label="Address"
               value={form.address}
-              onChange={(e) => set("address", e.target.value)}
+              onChange={(val) => setForm((p) => ({ ...p, address: val }))}
               placeholder="123 Main St, Philadelphia, PA"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           <div>

@@ -307,6 +307,8 @@ export async function createCustomer(data: {
   phone?: string;
   email?: string;
   address?: string;
+  addressLat?: number | null;
+  addressLng?: number | null;
   notes?: string;
   tags?: string[];
   leadSource?: string;
@@ -321,6 +323,8 @@ export async function createCustomer(data: {
       phone: data.phone || "",
       email: data.email || "",
       address: data.address || "",
+      addressLat: data.addressLat ?? null,
+      addressLng: data.addressLng ?? null,
       notes: data.notes || "",
       tags: data.tags || [],
       leadSource: data.leadSource || null,
@@ -338,6 +342,8 @@ export async function updateCustomer(
     phone: string;
     email: string;
     address: string;
+    addressLat: number | null;
+    addressLng: number | null;
     notes: string;
     tags: string[];
     leadSource: string;

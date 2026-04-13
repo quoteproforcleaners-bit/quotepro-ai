@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import AddressAutocompleteLine from "../components/AddressAutocompleteLine";
 import {
   CheckCircle, ChevronRight, ChevronLeft, Sparkles, Home, User, Phone,
   Mail, MessageSquare, Loader2, AlertCircle, MapPin, AlertTriangle, HelpCircle,
@@ -355,16 +356,11 @@ export default function IntakePage() {
                   <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                     Home Address <span className="text-slate-400 font-normal">(optional)</span>
                   </label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                      style={ringStyle}
-                      placeholder="123 Main St, City, State"
-                      value={address}
-                      onChange={e => setAddress(e.target.value)}
-                    />
-                  </div>
+                  <AddressAutocompleteLine
+                    value={address}
+                    onChange={setAddress}
+                    placeholder="123 Main St, City, State"
+                  />
                 </div>
               </div>
               {contactError && (
@@ -552,16 +548,11 @@ export default function IntakePage() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1.5">Address (optional)</label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                      <input
-                        className="w-full pl-8 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
-                        style={ringStyle}
-                        placeholder="Home address"
-                        value={fields.address || address || ""}
-                        onChange={e => setFields(f => ({ ...f, address: e.target.value || null }))}
-                      />
-                    </div>
+                    <AddressAutocompleteLine
+                      value={fields.address || address || ""}
+                      onChange={(val) => setFields(f => ({ ...f, address: val || null }))}
+                      placeholder="Home address"
+                    />
                   </div>
                 </div>
 

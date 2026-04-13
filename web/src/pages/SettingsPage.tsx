@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import AddressAutocompleteLine from "../components/AddressAutocompleteLine";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
@@ -949,12 +950,10 @@ export default function SettingsPage() {
                   </p>
                 </div>
               </div>
-              <Input
+              <AddressAutocompleteLine
                 label={t("settings.business.address")}
                 value={businessForm.address}
-                onChange={(e) =>
-                  setBusinessForm((p) => ({ ...p, address: e.target.value }))
-                }
+                onChange={(val) => setBusinessForm((p) => ({ ...p, address: val }))}
               />
               <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
                 <Button

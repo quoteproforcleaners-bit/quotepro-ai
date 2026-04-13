@@ -994,5 +994,15 @@
   "referAndEarn": {
     "title": "Indicações",
     "description": "Ganhe 50% de comissão recorrente por cada negócio que você indicar."
+  },
+  "address": {
+    "street": "Endereço",
+    "apt": "Apto.",
+    "city": "Cidade",
+    "state": "Estado",
+    "zip": "CEP",
+    "streetPlaceholder": "Comece a digitar seu endereço...",
+    "cityPlaceholder": "Cidade",
+    "verified": "Endereço verificado"
   }
 }
