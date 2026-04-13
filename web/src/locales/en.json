@@ -996,11 +996,11 @@
     "description": "Earn 50% recurring commission for every business you refer."
   },
   "address": {
-    "street": "Street",
-    "apt": "Apt.",
+    "street": "Address",
+    "apt": "Apt. No.",
     "city": "City",
     "state": "State",
-    "zip": "Zip / Postal Code",
+    "zip": "ZIP Code",
     "streetPlaceholder": "Start typing your address...",
     "cityPlaceholder": "City",
     "verified": "Address verified"

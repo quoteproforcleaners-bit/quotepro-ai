@@ -34,7 +34,10 @@ export default function AddressAutocompleteLine({
     setValue,
     clearSuggestions,
   } = usePlacesAutocomplete({
-    requestOptions: { types: ["address"] },
+    requestOptions: {
+      types: ["address"],
+      componentRestrictions: { country: ["us", "ca", "gb"] },
+    },
     debounce: 300,
   });
 
