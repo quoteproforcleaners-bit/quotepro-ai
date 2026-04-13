@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -60,12 +61,12 @@ import {
 } from "../components/ui";
 
 const STATUS_FLOW = [
-  { key: "scheduled", label: "Scheduled", icon: Calendar },
-  { key: "en_route", label: "En Route", icon: Truck },
-  { key: "service_started", label: "Started", icon: Play },
-  { key: "in_progress", label: "In Progress", icon: Wrench },
-  { key: "final_touches", label: "Final Touches", icon: Sparkles },
-  { key: "completed", label: "Completed", icon: CheckCircle },
+  { key: "scheduled", icon: Calendar },
+  { key: "en_route", icon: Truck },
+  { key: "service_started", icon: Play },
+  { key: "in_progress", icon: Wrench },
+  { key: "final_touches", icon: Sparkles },
+  { key: "completed", icon: CheckCircle },
 ];
 
 // Auto-computed stages — not manually tappable
@@ -77,6 +78,7 @@ function getStatusIndex(status: string): number {
 }
 
 export default function JobDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { business } = useAuth();
@@ -186,7 +188,7 @@ export default function JobDetailPage() {
       setGeneratedMessage(data.message || "");
     },
     onError: () => {
-      setMessageError("Failed to generate message. Please try again.");
+      setMessageError(t("jobs.detail.generateMessageError"));
     },
   });
 
@@ -203,8 +205,8 @@ export default function JobDetailPage() {
     return (
       <EmptyState
         icon={Briefcase}
-        title="Job not found"
-        description="This job may have been deleted"
+        title={t("jobs.notFound")}
+        description={t("jobs.notFoundDesc")}
       />
     );
   }
@@ -247,7 +249,7 @@ export default function JobDetailPage() {
   return (
     <div>
       <PageHeader
-        title={job.title || "Cleaning Job"}
+        title={job.title || t("jobs.cleaningJob")}
         subtitle={job.address || undefined}
         backTo="/jobs"
         badge={<Badge status={detailedStatus} dot />}
@@ -259,7 +261,7 @@ export default function JobDetailPage() {
                 onClick={handleAdvanceStatus}
                 size="sm"
               >
-                Advance Status
+                {t("jobs.detail.advanceStatus")}
               </Button>
             ) : null}
           </div>
@@ -349,7 +351,7 @@ export default function JobDetailPage() {
       <Modal
         open={statusModal}
         onClose={() => setStatusModal(false)}
-        title="Update Status"
+        title={t("jobs.detail.updateStatus")}
         size="sm"
       >
         <div className="space-y-4">
@@ -360,10 +362,10 @@ export default function JobDetailPage() {
             </span>
           </p>
           <Textarea
-            label="Note (optional)"
+            label={t("jobs.detail.statusNote")}
             value={statusNote}
             onChange={(e) => setStatusNote(e.target.value)}
-            placeholder="Add a note about this status change..."
+            placeholder={t("jobs.detail.statusNoteHint")}
             rows={3}
           />
           <div className="flex gap-2 pt-2">
@@ -372,7 +374,7 @@ export default function JobDetailPage() {
               onClick={() => setStatusModal(false)}
               size="sm"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() =>
@@ -393,27 +395,27 @@ export default function JobDetailPage() {
       <Modal
         open={messageModal}
         onClose={() => { setMessageModal(false); setGeneratedMessage(""); setMessageError(""); }}
-        title="AI Message Draft"
+        title={t("jobs.detail.aiMessageDraft")}
         size="md"
       >
         <div className="space-y-4">
           <div className="flex gap-2 flex-wrap">
-            {(["en_route", "started", "in_progress", "completed"] as const).map((t) => (
+            {(["en_route", "started", "in_progress", "completed"] as const).map((msgType) => (
               <button
-                key={t}
+                key={msgType}
                 onClick={() => {
-                  setMessageType(t);
+                  setMessageType(msgType);
                   setGeneratedMessage("");
                   setMessageError("");
-                  generateMessageMutation.mutate(t);
+                  generateMessageMutation.mutate(msgType);
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
-                  messageType === t
+                  messageType === msgType
                     ? "bg-primary-50 text-primary-700 ring-1 ring-primary-200"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                {t.replace(/_/g, " ")}
+                {msgType.replace(/_/g, " ")}
               </button>
             ))}
           </div>
@@ -434,7 +436,7 @@ export default function JobDetailPage() {
               <button
                 onClick={() => copyToClipboard(generatedMessage)}
                 className="absolute top-2 right-2 p-1.5 rounded-md bg-white shadow-sm hover:bg-slate-100 transition-colors"
-                title="Copy to clipboard"
+                title={t("jobs.detail.copyToClipboard")}
               >
                 <Copy className="w-3.5 h-3.5 text-slate-500" />
               </button>
@@ -476,6 +478,7 @@ function OverviewTab({
   jobCustomer,
   onToast,
 }: any) {
+  const { t } = useTranslation();
   const [ratingValue, setRatingValue] = useState(job.satisfactionRating || 0);
   const [skipConfirm, setSkipConfirm] = useState(false);
 
@@ -511,10 +514,10 @@ function OverviewTab({
   });
 
   const FREQ_LABEL: Record<string, string> = {
-    weekly: "Every week",
-    biweekly: "Every 2 weeks",
-    monthly: "Every month",
-    custom: "Custom interval",
+    weekly: t("jobs.detail.recurrence.weekly"),
+    biweekly: t("jobs.detail.recurrence.biweekly"),
+    monthly: t("jobs.detail.recurrence.monthly"),
+    custom: t("jobs.detail.recurrence.custom"),
   };
 
   return (
@@ -632,7 +635,7 @@ function OverviewTab({
                     : portalPrefs.preferences.accessMethod === "hide_key"
                     ? `Key: ${portalPrefs.preferences.accessLocation || "see notes"}`
                     : portalPrefs.preferences.accessMethod === "key_mat"
-                    ? "Key under mat"
+                    ? t("jobs.detail.keyUnderMat")
                     : portalPrefs.preferences.accessMethod}
                 </span>
               </div>
@@ -739,19 +742,19 @@ function OverviewTab({
           {!job.skipped && job.status !== "completed" ? (
             skipConfirm ? (
               <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-600 flex-1">Skip this occurrence?</p>
+                <p className="text-xs text-slate-600 flex-1">{t("jobs.detail.skipOccurrence")}</p>
                 <button
                   onClick={() => skipMutation.mutate()}
                   disabled={skipMutation.isPending}
                   className="text-xs font-semibold px-3 py-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
                 >
-                  {skipMutation.isPending ? "Skipping…" : "Yes, skip"}
+                  {skipMutation.isPending ? t("jobs.detail.skipping") : t("jobs.detail.yesSkip")}
                 </button>
                 <button
                   onClick={() => setSkipConfirm(false)}
                   className="text-xs font-semibold px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </div>
             ) : (
@@ -808,14 +811,14 @@ function OverviewTab({
           <Textarea
             value={noteContent}
             onChange={(e) => setNoteContent(e.target.value)}
-            placeholder="Add a note..."
+            placeholder={t("jobs.detail.addNoteHint")}
             rows={2}
           />
           <div className="flex items-center justify-between">
             <Toggle
               checked={noteCustomerVisible}
               onChange={setNoteCustomerVisible}
-              label="Customer visible"
+              label={t("jobs.detail.visibleToCustomer")}
             />
             <Button
               size="xs"
@@ -824,7 +827,7 @@ function OverviewTab({
               loading={addNoteMutation.isPending}
               disabled={!noteContent.trim()}
             >
-              Add Note
+              {t("jobs.detail.addNote")}
             </Button>
           </div>
         </div>
@@ -872,10 +875,11 @@ function ProgressTab({
   onGenerateMessage,
   copyToClipboard,
 }: any) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-medium text-slate-700 mb-4">Status Flow</p>
+        <p className="text-sm font-medium text-slate-700 mb-4">{t("jobs.detail.statusFlow")}</p>
         <div className="flex items-center gap-1 overflow-x-auto pb-2">
           {STATUS_FLOW.map((step, i) => {
             const Icon = step.icon;
@@ -890,7 +894,7 @@ function ProgressTab({
                     if (isClickable) onUpdateStatus(step.key);
                   }}
                   disabled={!isClickable}
-                  title={isAutoStage && !isActive ? "This stage updates automatically" : undefined}
+                  title={isAutoStage && !isActive ? t("jobs.detail.autoStageDesc") : undefined}
                   className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-lg transition-all min-w-[80px] ${
                     isCurrent
                       ? "bg-primary-50 ring-2 ring-primary-200"
@@ -929,7 +933,7 @@ function ProgressTab({
                         : "text-slate-400"
                     }`}
                   >
-                    {step.label}
+                    {t(`jobs.status.${step.key}`)}
                   </span>
                   {isAutoStage && !isActive ? (
                     <span className="text-[9px] text-sky-400 font-medium">auto</span>
@@ -988,7 +992,7 @@ function ProgressTab({
                   )
                 }
                 className="p-1.5 rounded-md bg-white shadow-sm hover:bg-slate-100 transition-colors shrink-0"
-                title="Copy link"
+                title={t("jobs.detail.copyLink")}
               >
                 <Copy className="w-3.5 h-3.5 text-slate-500" />
               </button>
@@ -1079,14 +1083,15 @@ function ChecklistTab({
   checklistPct,
   toggleChecklistMutation,
 }: any) {
+  const { t } = useTranslation();
   const groups = Object.keys(roomGroups);
 
   if (totalItems === 0) {
     return (
       <EmptyState
         icon={CheckCircle}
-        title="No checklist items"
-        description="Checklist items are created when the job is set up"
+        title={t("jobs.detail.noChecklist")}
+        description={t("jobs.detail.noChecklistDesc")}
       />
     );
   }
@@ -1179,6 +1184,7 @@ function PhotosTab({
   jobCustomer,
   onRefetch,
 }: any) {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<"grid" | "compare">("grid");
   const [photoFilter, setPhotoFilter] = useState("all");
   const [lightbox, setLightbox] = useState<{ photos: any[]; idx: number } | null>(null);
@@ -1213,7 +1219,7 @@ function PhotosTab({
       const compressed = await compressImage(file);
       setPreview(compressed);
     } catch {
-      setUploadError("Could not read image. Please try another file.");
+      setUploadError(t("jobs.detail.imageReadError"));
     }
   };
 
@@ -1234,7 +1240,7 @@ function PhotosTab({
       setCustomerVisible(true);
       onRefetch();
     } catch (err: any) {
-      setUploadError(err?.message || "Upload failed. Please try again.");
+      setUploadError(err?.message || t("jobs.detail.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -1316,7 +1322,7 @@ function PhotosTab({
               type="text"
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              placeholder="Caption (optional)…"
+              placeholder={t("jobs.detail.captionOptional")}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
 
@@ -1330,7 +1336,7 @@ function PhotosTab({
                 </div>
                 <span className="text-xs font-medium text-slate-600 flex items-center gap-1">
                   {customerVisible ? <Eye className="w-3.5 h-3.5 text-primary-500" /> : <EyeOff className="w-3.5 h-3.5 text-slate-400" />}
-                  {customerVisible ? "Send to customer" : "Internal only"}
+                  {customerVisible ? t("jobs.detail.sendToCustomer") : t("jobs.detail.internalOnly")}
                 </span>
               </label>
               <Button
@@ -1339,7 +1345,7 @@ function PhotosTab({
                 size="sm"
                 icon={uploading ? undefined : Camera}
               >
-                {uploading ? "Uploading…" : "Upload"}
+                {uploading ? t("common.uploading") : t("common.upload")}
               </Button>
             </div>
 
@@ -1401,7 +1407,7 @@ function PhotosTab({
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all"
               >
                 <Mail className="w-3.5 h-3.5" />
-                {sendingEmail ? "Sending…" : "Send to Customer"}
+                {sendingEmail ? t("common.sending") : t("jobs.detail.sendToCustomer")}
               </button>
             )}
           </div>
@@ -1458,8 +1464,8 @@ function PhotosTab({
       ) : photos.length === 0 ? (
         <EmptyState
           icon={Camera}
-          title="No photos yet"
-          description="Upload before and after photos to document your work"
+          title={t("jobs.detail.noPhotos")}
+          description={t("jobs.detail.noPhotosDesc")}
         />
       ) : (
         /* ── Grid View ─────────────────────────────────────────── */
@@ -1576,7 +1582,7 @@ function PhotosTab({
       <Modal
         open={emailModalOpen}
         onClose={() => { setEmailModalOpen(false); setOverrideEmail(""); }}
-        title="Enter Customer Email"
+        title={t("jobs.detail.enterCustomerEmail")}
         size="sm"
       >
         <div className="space-y-4">
@@ -1596,7 +1602,7 @@ function PhotosTab({
               disabled={!overrideEmail.includes("@") || sendingEmail}
               size="sm"
             >
-              {sendingEmail ? "Sending…" : "Send Photos"}
+              {sendingEmail ? t("common.sending") : t("jobs.detail.sendPhotos")}
             </Button>
           </div>
         </div>

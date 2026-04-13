@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "../lib/api";
 import {
@@ -73,14 +74,6 @@ const TABS = [
 ] as const;
 type Tab = typeof TABS[number]["id"];
 
-const SUGGESTED_QUESTIONS = [
-  "What's my collection rate this month?",
-  "Which customers owe money?",
-  "How much revenue have I missed from failed charges?",
-  "Show me a summary of my payment activity",
-  "Which jobs were charged this week?",
-];
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtMoney(cents: number) {
@@ -108,6 +101,7 @@ function jobAmount(j: AuditJob) {
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ snapshot }: { snapshot: FinanceSnapshot }) {
+  const { t } = useTranslation();
   const collectionRate =
     snapshot.totalCollectedCount + snapshot.totalUncharged > 0
       ? Math.round((snapshot.totalCollectedCount / (snapshot.totalCollectedCount + snapshot.totalUncharged + snapshot.totalFailed)) * 100)
@@ -115,29 +109,29 @@ function OverviewTab({ snapshot }: { snapshot: FinanceSnapshot }) {
 
   const cards = [
     {
-      label: "Collected (90d)",
+      label: t("finance.metrics.collected"),
       value: fmtMoneyDollar(snapshot.totalCollected),
       icon: CheckCircle,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
     },
     {
-      label: "Uncharged Jobs",
+      label: t("finance.metrics.unchargedJobs"),
       value: `${snapshot.totalUncharged} jobs`,
-      sub: fmtMoneyDollar(snapshot.unchargedValue) + " pending",
+      sub: fmtMoneyDollar(snapshot.unchargedValue) + " " + t("finance.metrics.pending"),
       icon: DollarSign,
       color: "text-amber-600",
       bg: "bg-amber-50",
     },
     {
-      label: "Failed Charges",
+      label: t("finance.metrics.failedCharges"),
       value: snapshot.totalFailed.toString(),
       icon: XCircle,
       color: "text-red-600",
       bg: "bg-red-50",
     },
     {
-      label: "Collection Rate",
+      label: t("finance.metrics.collectionRate"),
       value: `${collectionRate}%`,
       icon: TrendingUp,
       color: "text-violet-600",
@@ -180,7 +174,7 @@ function OverviewTab({ snapshot }: { snapshot: FinanceSnapshot }) {
 
       {/* Weekly revenue bar chart */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <p className="text-sm font-semibold text-slate-800 mb-4">Revenue Collected — Last 4 Weeks</p>
+        <p className="text-sm font-semibold text-slate-800 mb-4">{t("finance.chart.revenueLastWeeks")}</p>
         <div className="flex items-end gap-3 h-32">
           {Object.entries(weeks).map(([label, cents]) => {
             const pct = maxBar > 0 ? (cents / maxBar) * 100 : 0;
@@ -202,10 +196,10 @@ function OverviewTab({ snapshot }: { snapshot: FinanceSnapshot }) {
 
       {/* Recent activity feed */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <p className="text-sm font-semibold text-slate-800 mb-3">Recent Activity</p>
+        <p className="text-sm font-semibold text-slate-800 mb-3">{t("finance.activity.title")}</p>
         <div className="space-y-2">
           {snapshot.recentEvents.length === 0 ? (
-            <p className="text-sm text-slate-400">No payment events yet.</p>
+            <p className="text-sm text-slate-400">{t("finance.activity.noEvents")}</p>
           ) : (
             snapshot.recentEvents.slice(0, 8).map((e, i) => {
               const icon =
@@ -239,6 +233,7 @@ function OverviewTab({ snapshot }: { snapshot: FinanceSnapshot }) {
 // ─── Audit Tab ────────────────────────────────────────────────────────────────
 
 function AuditTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery<AuditData>({ queryKey: ["/api/payments/audit"] });
 
@@ -257,7 +252,7 @@ function AuditTab() {
     onSuccess: () => {},
   });
 
-  if (isLoading) return <div className="text-center py-12 text-slate-400">Loading audit data...</div>;
+  if (isLoading) return <div className="text-center py-12 text-slate-400">{t("finance.audit.loadingData")}</div>;
 
   const failed = data?.failed || [];
   const uncharged = data?.uncharged || [];
@@ -269,13 +264,13 @@ function AuditTab() {
       <div>
         <div className="flex items-center gap-2 mb-3">
           <XCircle className="w-4 h-4 text-red-500" />
-          <h3 className="text-sm font-semibold text-slate-800">Failed Charges</h3>
+          <h3 className="text-sm font-semibold text-slate-800">{t("finance.audit.failedCharges")}</h3>
           {failed.length > 0 ? (
             <span className="ml-1 bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-medium">{failed.length}</span>
           ) : null}
         </div>
         {failed.length === 0 ? (
-          <div className="bg-emerald-50 rounded-xl p-4 text-sm text-emerald-700">No failed charges.</div>
+          <div className="bg-emerald-50 rounded-xl p-4 text-sm text-emerald-700">{t("finance.audit.noFailedCharges")}</div>
         ) : (
           <div className="space-y-2">
             {failed.map((j) => (
@@ -294,14 +289,14 @@ function AuditTab() {
                       disabled={retryMutation.isPending}
                       className="text-xs px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors font-medium"
                     >
-                      Retry
+                      {t("finance.audit.retry")}
                     </button>
                     <button
                       onClick={() => waiveMutation.mutate(j.id)}
                       disabled={waiveMutation.isPending}
                       className="text-xs px-2 py-1 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
                     >
-                      Waive
+                      {t("finance.audit.waive")}
                     </button>
                   </div>
                 </div>
@@ -315,13 +310,13 @@ function AuditTab() {
       <div>
         <div className="flex items-center gap-2 mb-3">
           <DollarSign className="w-4 h-4 text-amber-500" />
-          <h3 className="text-sm font-semibold text-slate-800">Uncharged Completed Jobs (7+ days)</h3>
+          <h3 className="text-sm font-semibold text-slate-800">{t("finance.audit.unchargedJobs")}</h3>
           {uncharged.length > 0 ? (
             <span className="ml-1 bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">{uncharged.length}</span>
           ) : null}
         </div>
         {uncharged.length === 0 ? (
-          <div className="bg-emerald-50 rounded-xl p-4 text-sm text-emerald-700">No uncharged jobs.</div>
+          <div className="bg-emerald-50 rounded-xl p-4 text-sm text-emerald-700">{t("finance.audit.noUnchargedJobs")}</div>
         ) : (
           <div className="space-y-2">
             {uncharged.map((j) => (
@@ -330,9 +325,9 @@ function AuditTab() {
                   <p className="text-sm font-semibold text-slate-900">{customerName(j)}</p>
                   <p className="text-xs text-slate-400">{fmtDate(j.start_datetime)} · {jobAmount(j)}</p>
                   {j.has_payment_method ? (
-                    <span className="text-xs text-emerald-600 font-medium">Card on file</span>
+                    <span className="text-xs text-emerald-600 font-medium">{t("finance.audit.cardOnFile")}</span>
                   ) : (
-                    <span className="text-xs text-slate-400">No card</span>
+                    <span className="text-xs text-slate-400">{t("finance.audit.noCard")}</span>
                   )}
                 </div>
                 {j.has_payment_method ? (
@@ -341,7 +336,7 @@ function AuditTab() {
                     disabled={retryMutation.isPending}
                     className="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors font-medium shrink-0"
                   >
-                    Charge Now
+                    {t("finance.audit.chargeNow")}
                   </button>
                 ) : null}
               </div>
@@ -354,13 +349,13 @@ function AuditTab() {
       <div>
         <div className="flex items-center gap-2 mb-3">
           <CreditCard className="w-4 h-4 text-slate-400" />
-          <h3 className="text-sm font-semibold text-slate-800">Customers Without Card on File</h3>
+          <h3 className="text-sm font-semibold text-slate-800">{t("finance.audit.missingCard")}</h3>
           {missingCard.length > 0 ? (
             <span className="ml-1 bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full font-medium">{missingCard.length}</span>
           ) : null}
         </div>
         {missingCard.length === 0 ? (
-          <div className="bg-emerald-50 rounded-xl p-4 text-sm text-emerald-700">All customers have a card on file.</div>
+          <div className="bg-emerald-50 rounded-xl p-4 text-sm text-emerald-700">{t("finance.audit.allHaveCard")}</div>
         ) : (
           <div className="space-y-2">
             {missingCard.map((c) => (
@@ -376,7 +371,7 @@ function AuditTab() {
                     className="text-xs px-2 py-1 bg-violet-50 text-violet-700 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors font-medium flex items-center gap-1 shrink-0"
                   >
                     <Send className="w-3 h-3" />
-                    Request Card
+                    {t("finance.audit.requestCard")}
                   </button>
                 ) : null}
               </div>
@@ -391,6 +386,7 @@ function AuditTab() {
 // ─── Reports Tab ──────────────────────────────────────────────────────────────
 
 function ReportsTab({ snapshot }: { snapshot: FinanceSnapshot }) {
+  const { t } = useTranslation();
   const jobs = snapshot.jobs;
 
   // Revenue summary by status
@@ -445,13 +441,13 @@ function ReportsTab({ snapshot }: { snapshot: FinanceSnapshot }) {
     <div className="space-y-6">
       <div className="flex justify-end">
         <Button size="sm" variant="secondary" icon={Download} onClick={exportCSV}>
-          Export CSV
+          {t("finance.reports.exportCsv")}
         </Button>
       </div>
 
       {/* Revenue summary */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <p className="text-sm font-semibold text-slate-800 mb-4">Revenue Summary (90 days)</p>
+        <p className="text-sm font-semibold text-slate-800 mb-4">{t("finance.reports.revenueSummary")}</p>
         <div className="space-y-2">
           {Object.entries(byStatus).map(([status, data]) => (
             <div key={status} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
@@ -473,7 +469,7 @@ function ReportsTab({ snapshot }: { snapshot: FinanceSnapshot }) {
 
       {/* Collection efficiency */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <p className="text-sm font-semibold text-slate-800 mb-2">Collection Efficiency</p>
+        <p className="text-sm font-semibold text-slate-800 mb-2">{t("finance.reports.collectionEfficiency")}</p>
         <div className="flex items-center gap-3">
           <div className="flex-1 bg-slate-100 rounded-full h-3">
             <div
@@ -484,17 +480,17 @@ function ReportsTab({ snapshot }: { snapshot: FinanceSnapshot }) {
           <span className="text-lg font-bold text-slate-800">{efficiency}%</span>
         </div>
         <p className="text-xs text-slate-500 mt-2">
-          {fmtMoney(chargedCents)} collected of {fmtMoney(totalBillableCents)} billed
+          {fmtMoney(chargedCents)} {t("finance.reports.collected")} {fmtMoney(totalBillableCents)} {t("finance.reports.billed")}
         </p>
       </div>
 
       {/* AR Aging */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <p className="text-sm font-semibold text-slate-800 mb-4">Accounts Receivable Aging</p>
+        <p className="text-sm font-semibold text-slate-800 mb-4">{t("finance.reports.arAging")}</p>
         <div className="space-y-2">
           {Object.entries(agingBuckets).map(([bucket, cents]) => (
             <div key={bucket} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0">
-              <span className="text-sm text-slate-600">{bucket} days</span>
+              <span className="text-sm text-slate-600">{bucket} {t("finance.reports.days")}</span>
               <span className={`text-sm font-semibold ${cents > 0 ? "text-amber-700" : "text-slate-400"}`}>
                 {fmtMoney(cents)}
               </span>
@@ -509,6 +505,7 @@ function ReportsTab({ snapshot }: { snapshot: FinanceSnapshot }) {
 // ─── Ask AI Tab ───────────────────────────────────────────────────────────────
 
 function AskAITab() {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -567,7 +564,7 @@ function AskAITab() {
       setMessages((prev) => [...prev, { role: "assistant", content: full }]);
       setStreamBuffer("");
     } catch (err: any) {
-      setMessages((prev) => [...prev, { role: "assistant", content: "Sorry, I ran into an error. Please try again." }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: t("finance.askAi.error") }]);
     } finally {
       setStreaming(false);
     }
@@ -587,20 +584,23 @@ function AskAITab() {
               <div className="inline-flex items-center justify-center w-14 h-14 bg-violet-100 rounded-2xl mb-3">
                 <Bot className="w-7 h-7 text-violet-600" />
               </div>
-              <p className="text-base font-semibold text-slate-800">Finance AI Assistant</p>
-              <p className="text-sm text-slate-500 mt-1">Ask anything about your payments and revenue</p>
+              <p className="text-base font-semibold text-slate-800">{t("finance.askAi.title")}</p>
+              <p className="text-sm text-slate-500 mt-1">{t("finance.askAi.subtitle")}</p>
             </div>
             <div className="space-y-2">
-              {SUGGESTED_QUESTIONS.map((q) => (
-                <button
-                  key={q}
-                  onClick={() => sendMessage(q)}
-                  className="w-full text-left text-sm text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-3 hover:border-violet-300 hover:bg-violet-50 transition-colors flex items-center justify-between group"
-                >
-                  {q}
-                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-violet-400 shrink-0" />
-                </button>
-              ))}
+              {(Object.keys(t("finance.askAi.suggestedQuestions", { returnObjects: true })) as string[]).map((key) => {
+                const q = t(`finance.askAi.suggestedQuestions.${key}`);
+                return (
+                  <button
+                    key={key}
+                    onClick={() => sendMessage(q)}
+                    className="w-full text-left text-sm text-slate-700 bg-white border border-slate-200 rounded-xl px-4 py-3 hover:border-violet-300 hover:bg-violet-50 transition-colors flex items-center justify-between group"
+                  >
+                    {q}
+                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-violet-400 shrink-0" />
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : (
@@ -632,7 +632,7 @@ function AskAITab() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage(input)}
-            placeholder="Ask about your finances..."
+            placeholder={t("finance.askAi.placeholder")}
             disabled={streaming}
             className="flex-1 text-sm border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 disabled:bg-slate-50"
           />
@@ -643,7 +643,7 @@ function AskAITab() {
             disabled={!input.trim() || streaming}
             className="px-4"
           >
-            Send
+            {t("finance.askAi.send")}
           </Button>
         </div>
       </div>
@@ -654,6 +654,7 @@ function AskAITab() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function FinancePage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
   const { data: snapshot, isLoading: snapshotLoading } = useQuery<FinanceSnapshot>({
@@ -669,8 +670,8 @@ export default function FinancePage() {
   return (
     <div className="max-w-4xl mx-auto px-4 pb-16">
       <PageHeader
-        title="Finance"
-        description="Collect payments, track revenue, and get AI-powered financial insights"
+        title={t("finance.title")}
+        description={t("finance.description")}
         icon={DollarSign}
       />
 
@@ -687,7 +688,7 @@ export default function FinancePage() {
               }`}
             >
               <tab.icon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="hidden sm:inline">{t(`finance.tabs.${tab.id === "ask-ai" ? "askAi" : tab.id}`)}</span>
               {tab.id === "audit" && badgeCount > 0 ? (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                   {badgeCount > 9 ? "9+" : badgeCount}
@@ -700,7 +701,7 @@ export default function FinancePage() {
 
       {/* Tab content */}
       {snapshotLoading ? (
-        <div className="text-center py-16 text-slate-400">Loading financial data...</div>
+        <div className="text-center py-16 text-slate-400">{t("finance.loading")}</div>
       ) : snapshot ? (
         <>
           {activeTab === "overview" ? <OverviewTab snapshot={snapshot} /> : null}
@@ -709,7 +710,7 @@ export default function FinancePage() {
           {activeTab === "ask-ai" ? <AskAITab /> : null}
         </>
       ) : (
-        <div className="text-center py-16 text-slate-400">Unable to load financial data.</div>
+        <div className="text-center py-16 text-slate-400">{t("finance.loadError")}</div>
       )}
     </div>
   );

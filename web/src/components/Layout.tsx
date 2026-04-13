@@ -225,10 +225,10 @@ function NavDivider() {
 const NAV_TOOLTIPS_KEY = "qp_nav_tooltips";
 
 function NavItemWithTooltip({
-  item, enabled, intakeNewCount, quoteResponseCount, isPro, setSidebarOpen, t,
+  item, enabled, intakeNewCount, quoteResponseCount, financeBadgeCount, isPro, setSidebarOpen, t,
 }: {
   item: NavItem; enabled: boolean; intakeNewCount: number; quoteResponseCount: number;
-  isPro: boolean; setSidebarOpen: (v: boolean) => void; t: (k: string) => string;
+  financeBadgeCount: number; isPro: boolean; setSidebarOpen: (v: boolean) => void; t: (k: string) => string;
 }) {
   const [tooltipTop, setTooltipTop] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -304,6 +304,11 @@ function NavItemWithTooltip({
         {item.to === "/intake-requests" && intakeNewCount > 0 ? (
           <span className="nav-badge" style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626" }}>
             {intakeNewCount > 99 ? "99+" : intakeNewCount}
+          </span>
+        ) : null}
+        {item.to === "/finance" && financeBadgeCount > 0 ? (
+          <span className="nav-badge" style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626" }}>
+            {financeBadgeCount > 99 ? "99+" : financeBadgeCount}
           </span>
         ) : null}
 
@@ -573,6 +578,7 @@ function renderNavItems(
     enabled: boolean;
     intakeNewCount: number;
     quoteResponseCount: number;
+    financeBadgeCount: number;
     isPro: boolean;
     setSidebarOpen: (v: boolean) => void;
     t: (k: string) => string;
@@ -648,6 +654,13 @@ export function Layout() {
   });
   const quoteResponseCount = quoteResponseData?.count ?? 0;
 
+  const { data: financeAuditData } = useQuery<{ badgeCount: number }>({
+    queryKey: ["/api/payments/audit"],
+    refetchInterval: 120_000,
+    select: (d) => ({ badgeCount: d.badgeCount ?? 0 }),
+  });
+  const financeBadgeCount = financeAuditData?.badgeCount ?? 0;
+
   useEffect(() => {
     if (location.pathname === "/quotes" || location.pathname.startsWith("/quotes/")) {
       try {
@@ -698,6 +711,7 @@ export function Layout() {
     enabled: navTooltipsEnabled,
     intakeNewCount,
     quoteResponseCount,
+    financeBadgeCount,
     isPro,
     setSidebarOpen,
     t,

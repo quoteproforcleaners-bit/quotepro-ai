@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import { useSubscription } from "../lib/subscription";
 import { apiPut, apiPost, apiGet, apiDelete, apiPatch } from "../lib/api";
 import { applyLanguage } from "../lib/i18n";
+import { useTranslation } from "react-i18next";
 import { CURRENCIES, type SupportedCurrency } from "../utils/currency";
 import { queryClient } from "../lib/queryClient";
 import {
@@ -83,6 +84,7 @@ function IntegrationCard({
   color?: string;
   beta?: boolean;
 }) {
+  const { t } = useTranslation();
   const { data, isLoading, refetch } = useQuery<any>({
     queryKey: [statusUrl],
     retry: false,
@@ -158,7 +160,7 @@ function IntegrationCard({
           <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
         ) : connected ? (
           <>
-            <Badge status="accepted" label="Connected" dot />
+            <Badge status="accepted" label={t("common.connected")} dot />
             {disconnectUrl ? (
               <Button
                 variant="ghost"
@@ -266,6 +268,7 @@ const LANGUAGE_OPTIONS = [
 ];
 
 function ReferralTab() {
+  const { t } = useTranslation();
   const { tier, startCheckout } = useSubscription();
   const [copied, setCopied] = useState(false);
   const { data, isLoading } = useQuery({ queryKey: ["/api/referrals"] });
@@ -282,9 +285,9 @@ function ReferralTab() {
   return (
     <div className="max-w-2xl space-y-6">
       <Card>
-        <CardHeader title="Your Referral Link" icon={Gift} />
+        <CardHeader title={t("settings.referrals.yourLink")} icon={Gift} />
         <p className="text-sm text-slate-500 mb-5">
-          Share your referral link with other cleaning company owners. When they subscribe to any paid plan, you earn one free month of QuotePro.
+          {t("settings.referrals.yourLinkDesc")}
         </p>
 
         {isLoading ? (
@@ -292,49 +295,49 @@ function ReferralTab() {
         ) : (
           <div className="flex items-center gap-3">
             <div className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 font-mono truncate">
-              {referrals?.referralUrl || "Generating your link..."}
+              {referrals?.referralUrl || t("settings.referrals.generatingLink")}
             </div>
             <button
               onClick={handleCopy}
               className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
             >
               {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("settings.referrals.copied") : t("settings.referrals.copy")}
             </button>
           </div>
         )}
 
         <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
-          Your referral code: <strong>{referrals?.referralCode || "..."}</strong>
+          {t("settings.referrals.yourCode")} <strong>{referrals?.referralCode || "..."}</strong>
         </div>
       </Card>
 
       <Card>
-        <CardHeader title="Referral Stats" icon={TrendingUp} />
+        <CardHeader title={t("settings.referrals.stats")} icon={TrendingUp} />
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center p-4 bg-slate-50 rounded-xl">
             <p className="text-2xl font-bold text-slate-900">{referrals?.referredCount ?? 0}</p>
-            <p className="text-xs text-slate-500 mt-1">Signed up</p>
+            <p className="text-xs text-slate-500 mt-1">{t("settings.referrals.signedUp")}</p>
           </div>
           <div className="text-center p-4 bg-slate-50 rounded-xl">
             <p className="text-2xl font-bold text-slate-900">{referrals?.paidReferrals ?? 0}</p>
-            <p className="text-xs text-slate-500 mt-1">Converted to paid</p>
+            <p className="text-xs text-slate-500 mt-1">{t("settings.referrals.convertedPaid")}</p>
           </div>
           <div className="text-center p-4 bg-emerald-50 rounded-xl">
             <p className="text-2xl font-bold text-emerald-700">{referrals?.creditsEarned ?? 0}</p>
-            <p className="text-xs text-slate-500 mt-1">Free months earned</p>
+            <p className="text-xs text-slate-500 mt-1">{t("settings.referrals.freeMonths")}</p>
           </div>
         </div>
       </Card>
 
       <Card>
-        <CardHeader title="How It Works" icon={Star} />
+        <CardHeader title={t("settings.referrals.howItWorks")} icon={Star} />
         <ol className="space-y-3">
           {[
-            "Copy your unique referral link above",
-            "Share it with other residential cleaning company owners",
-            "They sign up and subscribe to any paid plan",
-            "You automatically earn one free month of QuotePro",
+            t("settings.referrals.step1"),
+            t("settings.referrals.step2"),
+            t("settings.referrals.step3"),
+            t("settings.referrals.step4"),
           ].map((step, i) => (
             <li key={i} className="flex items-start gap-3">
               <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center mt-0.5">
@@ -350,6 +353,7 @@ function ReferralTab() {
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const { user, business, refresh } = useAuth();
   const { isPro, isGrowth, isStarter, tier, startCheckout, checkoutLoading } = useSubscription();
   const navigate = useNavigate();
@@ -860,23 +864,23 @@ export default function SettingsPage() {
   };
 
   const settingsTabs = [
-    "business",
-    "branding",
-    "payments",
-    "automations",
-    "reminders",
-    "reviews",
-    "tips",
-    "features",
-    "booking",
-    "integrations",
-    "referrals",
-    "developer",
+    { id: "business",     label: t("settings.tabs.business") },
+    { id: "branding",     label: t("settings.tabs.branding") },
+    { id: "payments",     label: t("settings.tabs.payments") },
+    { id: "automations",  label: t("settings.tabs.automations") },
+    { id: "reminders",    label: t("settings.tabs.reminders") },
+    { id: "reviews",      label: t("settings.tabs.reviews") },
+    { id: "tips",         label: t("settings.tabs.tips") },
+    { id: "features",     label: t("settings.tabs.features") },
+    { id: "booking",      label: t("settings.tabs.booking") },
+    { id: "integrations", label: t("settings.tabs.integrations") },
+    { id: "referrals",    label: t("settings.tabs.referrals") },
+    { id: "developer",    label: t("settings.tabs.developer") },
   ];
 
   return (
     <div>
-      <PageHeader title="Settings" subtitle="Manage your business, pricing, and integrations" />
+      <PageHeader title={t("settings.title")} subtitle={t("settings.subtitle2")} />
 
       <div className="mb-6">
         <Tabs tabs={settingsTabs} active={tab} onChange={setTab} />
@@ -885,17 +889,17 @@ export default function SettingsPage() {
       {saved ? (
         <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 animate-scale-in">
           <CheckCircle className="w-4 h-4 text-emerald-600" />
-          <span className="text-sm font-medium text-emerald-700">Settings saved successfully</span>
+          <span className="text-sm font-medium text-emerald-700">{t("settings.savedSuccessfully")}</span>
         </div>
       ) : null}
 
       {tab === "business" ? (
         <div className="max-w-2xl space-y-6">
           <Card>
-            <CardHeader title="Business Profile" icon={Building2} />
+            <CardHeader title={t("settings.business.profile")} icon={Building2} />
             <div className="space-y-4">
               <Input
-                label="Company name"
+                label={t("settings.business.companyName")}
                 value={businessForm.companyName}
                 onChange={(e) =>
                   setBusinessForm((p) => ({
@@ -906,14 +910,14 @@ export default function SettingsPage() {
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="Phone"
+                  label={t("settings.business.phone")}
                   value={businessForm.phone}
                   onChange={(e) =>
                     setBusinessForm((p) => ({ ...p, phone: e.target.value }))
                   }
                 />
                 <Input
-                  label="Business Email"
+                  label={t("settings.business.businessEmail")}
                   type="email"
                   value={businessForm.email}
                   onChange={(e) =>
@@ -925,28 +929,28 @@ export default function SettingsPage() {
               {/* Email sending info */}
               <div className="rounded-xl border border-slate-200 overflow-hidden">
                 <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
-                  <p className="font-semibold text-slate-800 text-sm">How Your Emails Are Sent</p>
+                  <p className="font-semibold text-slate-800 text-sm">{t("settings.business.emailSentTitle")}</p>
                 </div>
                 <div className="p-4 space-y-3 text-sm text-slate-600 leading-relaxed">
                   <p>
-                    When you send quotes, confirmations, or follow-ups, customers see your company name as the sender —
-                    <strong className="text-slate-800"> {businessForm.companyName || "your company name"}</strong>.
+                    {t("settings.business.emailSentDesc1")}
+                    <strong className="text-slate-800"> {businessForm.companyName || t("settings.business.companyName")}</strong>.
                   </p>
                   <p>
-                    Customer replies go directly to your business email:
+                    {t("settings.business.emailSentDesc2")}
                     {businessForm.email ? (
                       <strong className="text-slate-800"> {businessForm.email}</strong>
                     ) : (
-                      <span className="text-amber-600 font-medium"> (add your email above so customers can reply to you)</span>
+                      <span className="text-amber-600 font-medium"> {t("settings.business.emailSentNoEmail")}</span>
                     )}
                   </p>
                   <p className="text-slate-400 text-xs">
-                    No extra setup needed — just keep your business name and email up to date above.
+                    {t("settings.business.emailSentFooter")}
                   </p>
                 </div>
               </div>
               <Input
-                label="Address"
+                label={t("settings.business.address")}
                 value={businessForm.address}
                 onChange={(e) =>
                   setBusinessForm((p) => ({ ...p, address: e.target.value }))
@@ -959,21 +963,21 @@ export default function SettingsPage() {
                   loading={updateBusiness.isPending}
                   size="sm"
                 >
-                  Save Changes
+                  {t("settings.business.saveChanges")}
                 </Button>
               </div>
             </div>
           </Card>
 
           <Card>
-            <CardHeader title="Pricing Configuration" icon={DollarSign} />
+            <CardHeader title={t("settings.business.pricingConfig")} icon={DollarSign} />
             <div className="space-y-5">
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Residential Base Pricing</p>
-                <p className="text-xs text-slate-500 mb-3">These values are used by Live Quote Preview and all residential quote calculations. Changes affect future quotes.</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{t("settings.business.residentialBasePricing")}</p>
+                <p className="text-xs text-slate-500 mb-3">{t("settings.business.residentialBasePricingDesc")}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Input
-                    label="Price per 1,000 sq ft ($)"
+                    label={t("settings.business.pricePerSqft")}
                     type="number"
                     value={pricingForm.pricePerSqft}
                     onChange={(e) =>
@@ -981,7 +985,7 @@ export default function SettingsPage() {
                     }
                   />
                   <Input
-                    label="Price per Bedroom ($)"
+                    label={t("settings.business.pricePerBedroom")}
                     type="number"
                     value={pricingForm.pricePerBedroom}
                     onChange={(e) =>
@@ -989,7 +993,7 @@ export default function SettingsPage() {
                     }
                   />
                   <Input
-                    label="Price per Bathroom ($)"
+                    label={t("settings.business.pricePerBathroom")}
                     type="number"
                     value={pricingForm.pricePerBathroom}
                     onChange={(e) =>
@@ -999,10 +1003,10 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Other Pricing</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{t("settings.business.otherPricing")}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Input
-                    label="Hourly Rate — Pets & Estimates ($)"
+                    label={t("settings.business.hourlyRate")}
                     type="number"
                     value={pricingForm.hourlyRate}
                     onChange={(e) =>
@@ -1010,7 +1014,7 @@ export default function SettingsPage() {
                     }
                   />
                   <Input
-                    label="Minimum Job Price ($)"
+                    label={t("settings.business.minimumJobPrice")}
                     type="number"
                     value={pricingForm.minimumTicket}
                     onChange={(e) =>
@@ -1018,7 +1022,7 @@ export default function SettingsPage() {
                     }
                   />
                   <Input
-                    label="Tax Rate (%)"
+                    label={t("settings.business.taxRate")}
                     type="number"
                     value={pricingForm.taxRate}
                     onChange={(e) =>
@@ -1033,14 +1037,14 @@ export default function SettingsPage() {
                 loading={updatePricing.isPending}
                 size="sm"
               >
-                Save Pricing
+                {t("settings.business.savePricing")}
               </Button>
             </div>
           </Card>
 
           {pricing?.serviceTypes ? (
             <Card>
-              <CardHeader title="Service Types" />
+              <CardHeader title={t("settings.business.serviceTypes")} />
               <div className="space-y-3">
                 {(pricing.serviceTypes as any[]).map((st: any) => (
                   <div
@@ -1066,7 +1070,7 @@ export default function SettingsPage() {
 
           {pricing?.frequencyDiscounts ? (
             <Card>
-              <CardHeader title="Frequency Discounts" />
+              <CardHeader title={t("settings.business.frequencyDiscounts")} />
               <div className="grid grid-cols-3 gap-4">
                 {Object.entries(pricing.frequencyDiscounts).map(
                   ([key, val]: any) => (
@@ -1088,25 +1092,25 @@ export default function SettingsPage() {
           ) : null}
 
           <Card>
-            <CardHeader title="Add-on Pricing" icon={Plus} />
-            <p className="text-xs text-slate-500 mb-4">Set default prices for add-on services included in quotes.</p>
+            <CardHeader title={t("settings.business.addonPricing")} icon={Plus} />
+            <p className="text-xs text-slate-500 mb-4">{t("settings.business.addonPricingDesc")}</p>
             <div className="space-y-3">
-              {[
-                { key: "insideFridge", label: "Inside Fridge" },
-                { key: "insideOven", label: "Inside Oven" },
-                { key: "insideWindows", label: "Inside Windows" },
-                { key: "insideCabinets", label: "Inside Cabinets" },
-                { key: "laundry", label: "Laundry" },
-                { key: "dishes", label: "Dishes" },
-                { key: "organizing", label: "Organizing" },
-                { key: "garage", label: "Garage" },
-                { key: "baseboards", label: "Baseboards" },
-                { key: "blinds", label: "Blinds" },
-                { key: "carpetCleaning", label: "Carpet Cleaning" },
-                { key: "wallWashing", label: "Wall Washing" },
-              ].map((addon) => (
+              {([
+                { key: "insideFridge",   labelKey: "settings.business.addons.insideFridge" },
+                { key: "insideOven",     labelKey: "settings.business.addons.insideOven" },
+                { key: "insideWindows",  labelKey: "settings.business.addons.insideWindows" },
+                { key: "insideCabinets", labelKey: "settings.business.addons.insideCabinets" },
+                { key: "laundry",        labelKey: "settings.business.addons.laundry" },
+                { key: "dishes",         labelKey: "settings.business.addons.dishes" },
+                { key: "organizing",     labelKey: "settings.business.addons.organizing" },
+                { key: "garage",         labelKey: "settings.business.addons.garage" },
+                { key: "baseboards",     labelKey: "settings.business.addons.baseboards" },
+                { key: "blinds",         labelKey: "settings.business.addons.blinds" },
+                { key: "carpetCleaning", labelKey: "settings.business.addons.carpetCleaning" },
+                { key: "wallWashing",    labelKey: "settings.business.addons.wallWashing" },
+              ] as { key: string; labelKey: string }[]).map((addon) => (
                 <div key={addon.key} className="flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0">
-                  <span className="text-sm font-medium text-slate-700">{addon.label}</span>
+                  <span className="text-sm font-medium text-slate-700">{t(addon.labelKey)}</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-slate-400">$</span>
                     <input
@@ -1133,7 +1137,7 @@ export default function SettingsPage() {
                 loading={updatePricing.isPending}
                 size="sm"
               >
-                Save Add-on Prices
+                {t("settings.business.saveAddonPrices")}
               </Button>
             </div>
           </Card>
@@ -1144,9 +1148,9 @@ export default function SettingsPage() {
         <div className="max-w-2xl space-y-6">
           {/* ─── Business Logo ─── */}
           <Card>
-            <CardHeader title="Business Logo" icon={Image} />
+            <CardHeader title={t("settings.branding.businessLogo")} icon={Image} />
             <p className="text-sm text-slate-500 mb-5">
-              Your logo appears on customer-facing quotes when the "Show Logo" toggle is enabled in Quote Preferences.
+              {t("settings.branding.businessLogoDesc")}
             </p>
 
             {/* Current logo preview */}
@@ -1158,14 +1162,14 @@ export default function SettingsPage() {
                   className="h-16 w-16 rounded-xl object-contain border border-slate-200 bg-white p-1"
                 />
                 <div>
-                  <p className="text-sm font-medium text-slate-700">Current logo</p>
+                  <p className="text-sm font-medium text-slate-700">{t("settings.branding.currentLogo")}</p>
                   <button
                     onClick={() => uploadLogo(null)}
                     disabled={logoUploading}
                     className="mt-1 flex items-center gap-1 text-xs text-red-500 hover:text-red-700"
                   >
                     <Trash2 size={12} />
-                    Remove logo
+                    {t("settings.branding.removeLogo")}
                   </button>
                 </div>
               </div>
@@ -1173,7 +1177,7 @@ export default function SettingsPage() {
 
             {/* Preset icons */}
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-              Preset cleaning icons
+              {t("settings.branding.presetIcons")}
             </p>
             <div className="flex flex-wrap gap-3 mb-5">
               {PRESET_LOGOS.map((preset) => {
@@ -1203,13 +1207,13 @@ export default function SettingsPage() {
 
             {/* Custom upload */}
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-              Upload your own logo
+              {t("settings.branding.uploadOwn")}
             </p>
             <label
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white text-sm font-medium text-slate-700 cursor-pointer hover:bg-slate-50 transition-colors ${logoUploading ? "opacity-50 pointer-events-none" : ""}`}
             >
               <Upload size={16} />
-              {logoUploading ? "Uploading…" : "Choose image (PNG, JPG, SVG)"}
+              {logoUploading ? t("settings.branding.uploading") : t("settings.branding.chooseImage")}
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
@@ -1218,46 +1222,46 @@ export default function SettingsPage() {
                 disabled={logoUploading}
               />
             </label>
-            <p className="mt-2 text-xs text-slate-400">Max recommended size: 400×400 px</p>
+            <p className="mt-2 text-xs text-slate-400">{t("settings.branding.maxSize")}</p>
           </Card>
 
           <Card>
-            <CardHeader title="Sender Identity" icon={User} />
+            <CardHeader title={t("settings.branding.senderIdentity")} icon={User} />
             <p className="text-sm text-slate-500 mb-4">
-              How your name and title appear on quotes and emails.
+              {t("settings.branding.senderIdentityDesc")}
             </p>
             <div className="space-y-4">
               <Input
-                label="Sender Name"
+                label={t("settings.branding.senderName")}
                 value={brandingForm.senderName}
                 onChange={(e) => setBrandingForm((p) => ({ ...p, senderName: e.target.value }))}
                 placeholder="e.g. Sarah Johnson"
               />
               <Input
-                label="Sender Title"
+                label={t("settings.branding.senderTitle")}
                 value={brandingForm.senderTitle}
                 onChange={(e) => setBrandingForm((p) => ({ ...p, senderTitle: e.target.value }))}
                 placeholder="e.g. Owner & Lead Cleaner"
               />
               <Input
-                label="Booking Link"
+                label={t("settings.branding.bookingLink")}
                 value={brandingForm.bookingLink}
                 onChange={(e) => setBrandingForm((p) => ({ ...p, bookingLink: e.target.value }))}
                 placeholder="https://calendly.com/your-link"
-                helper="Included in quotes and follow-up messages"
+                helper={t("settings.branding.bookingLinkHelper")}
               />
             </div>
           </Card>
 
           <Card>
-            <CardHeader title="Signatures" icon={Edit3} />
+            <CardHeader title={t("settings.branding.signatures")} icon={Edit3} />
             <p className="text-sm text-slate-500 mb-4">
-              Custom signature appended to your outgoing emails.
+              {t("settings.branding.signaturesDesc")}
             </p>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Email Signature
+                  {t("settings.branding.emailSignature")}
                 </label>
                 <textarea
                   value={brandingForm.emailSignature}
@@ -1277,7 +1281,7 @@ export default function SettingsPage() {
               loading={updateBusiness.isPending}
               size="sm"
             >
-              Save Branding
+              {t("settings.branding.saveBranding")}
             </Button>
           </div>
         </div>
@@ -1286,13 +1290,13 @@ export default function SettingsPage() {
       {tab === "payments" ? (
         <div className="max-w-2xl space-y-6">
           <Card>
-            <CardHeader title="Payment Handles" icon={DollarSign} />
+            <CardHeader title={t("settings.payments.paymentHandles")} icon={DollarSign} />
             <p className="text-sm text-slate-500 mb-4">
-              Add your payment handles so customers can pay you directly.
+              {t("settings.payments.paymentHandlesDesc")}
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Venmo Handle</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">{t("settings.payments.venmoHandle")}</label>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400 text-sm font-medium">@</span>
                   <input
@@ -1304,7 +1308,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Cash App Tag</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">{t("settings.payments.cashAppTag")}</label>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400 text-sm font-medium">$</span>
                   <input
@@ -1319,9 +1323,9 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Accepted Payment Methods" icon={CreditCard} />
+            <CardHeader title={t("settings.payments.acceptedMethods")} icon={CreditCard} />
             <p className="text-sm text-slate-500 mb-4">
-              Choose which payment methods you accept. These are shown on your quotes.
+              {t("settings.payments.acceptedMethodsDesc")}
             </p>
             <div className="space-y-1">
               {PAYMENT_METHODS.map((m) => (
@@ -1336,9 +1340,9 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Payment Notes" />
+            <CardHeader title={t("settings.payments.paymentNotes")} />
             <p className="text-sm text-slate-500 mb-3">
-              Additional notes shown on quotes regarding payment terms.
+              {t("settings.payments.paymentNotesDesc")}
             </p>
             <textarea
               value={paymentForm.paymentNotes}
@@ -1356,33 +1360,33 @@ export default function SettingsPage() {
               loading={updateBusiness.isPending}
               size="sm"
             >
-              Save Payment Settings
+              {t("settings.payments.savePaymentSettings")}
             </Button>
           </div>
 
           {/* ─── Stripe Connect Status ── */}
           {stripeConnectStatus?.connected ? (
             <Card className="mt-2">
-              <CardHeader title="Stripe Connect Status" icon={CreditCard} />
+              <CardHeader title={t("settings.payments.stripeConnectStatus")} icon={CreditCard} />
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between py-2 border-b border-slate-50">
-                  <span className="text-slate-600">Account</span>
+                  <span className="text-slate-600">{t("settings.payments.account")}</span>
                   <span className="font-medium text-slate-900">{stripeConnectStatus.displayName || stripeConnectStatus.accountId}</span>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-50">
-                  <span className="text-slate-600">Charges Enabled</span>
+                  <span className="text-slate-600">{t("settings.payments.chargesEnabled")}</span>
                   <span className={stripeConnectStatus.chargesEnabled ? "text-emerald-600 font-medium" : "text-red-500"}>
-                    {stripeConnectStatus.chargesEnabled ? "Yes" : "No — action required"}
+                    {stripeConnectStatus.chargesEnabled ? t("settings.payments.yes") : t("settings.payments.noActionRequired")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-2 border-b border-slate-50">
-                  <span className="text-slate-600">Payouts Enabled</span>
+                  <span className="text-slate-600">{t("settings.payments.payoutsEnabled")}</span>
                   <span className={stripeConnectStatus.payoutsEnabled ? "text-emerald-600 font-medium" : "text-amber-500"}>
-                    {stripeConnectStatus.payoutsEnabled ? "Yes" : "Pending"}
+                    {stripeConnectStatus.payoutsEnabled ? t("settings.payments.yes") : t("settings.payments.pending")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-slate-600">Country / Currency</span>
+                  <span className="text-slate-600">{t("settings.payments.countryCurrency")}</span>
                   <span className="font-medium text-slate-900">{[stripeConnectStatus.country, stripeConnectStatus.currency?.toUpperCase()].filter(Boolean).join(" · ")}</span>
                 </div>
               </div>
@@ -1391,24 +1395,23 @@ export default function SettingsPage() {
 
           {/* ─── Auto-Charge Settings ── */}
           <Card className="mt-2">
-            <CardHeader title="Auto-Charge" icon={CreditCard} />
+            <CardHeader title={t("settings.payments.autoCharge")} icon={CreditCard} />
             <p className="text-sm text-slate-500 mb-4">
-              Automatically charge all completed, unpaid jobs with a card on file at a set time each day.
-              Requires Stripe Connect to be set up.
+              {t("settings.payments.autoChargeDesc")}
             </p>
             {autoChargeSaved ? (
               <div className="mb-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-sm text-emerald-700">
                 <CheckCircle className="w-4 h-4" />
-                Auto-charge settings saved
+                {t("settings.payments.autoChargeSaved")}
               </div>
             ) : null}
-            <SettingRow label="Enable auto-charge">
+            <SettingRow label={t("settings.payments.enableAutoCharge")}>
               <Toggle checked={autoChargeEnabled} onChange={setAutoChargeEnabled} />
             </SettingRow>
             {autoChargeEnabled ? (
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Charge Time</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">{t("settings.payments.chargeTime")}</label>
                   <input
                     type="time"
                     value={autoChargeTime}
@@ -1417,7 +1420,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Timezone</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">{t("settings.payments.timezone")}</label>
                   <select
                     value={autoChargeTimezone}
                     onChange={(e) => setAutoChargeTimezone(e.target.value)}
@@ -1435,7 +1438,7 @@ export default function SettingsPage() {
             ) : null}
             <div className="mt-4">
               <Button size="sm" icon={Save} onClick={handleSaveAutoCharge}>
-                Save Auto-Charge Settings
+                {t("settings.payments.saveAutoCharge")}
               </Button>
             </div>
           </Card>
@@ -1445,12 +1448,12 @@ export default function SettingsPage() {
       {tab === "automations" ? (
         <div className="max-w-2xl space-y-6">
           <Card>
-            <CardHeader title="Daily Follow-Up Reminder" icon={Bell} />
+            <CardHeader title={t("settings.automations.dailyFollowUp")} icon={Bell} />
             <p className="text-sm text-slate-500 mb-4">
-              Get a daily notification reminding you to follow up with pending quotes.
+              {t("settings.automations.dailyFollowUpDesc")}
             </p>
             <div className="space-y-4">
-              <SettingRow label="Enable daily pulse" description="Receive a daily follow-up reminder notification">
+              <SettingRow label={t("settings.automations.enableDailyPulse")} description={t("settings.automations.enableDailyPulseDesc")}>
                 <Toggle
                   checked={prefsForm.dailyPulseEnabled}
                   onChange={(v) => setPrefsForm((p) => ({ ...p, dailyPulseEnabled: v }))}
@@ -1458,7 +1461,7 @@ export default function SettingsPage() {
               </SettingRow>
               {prefsForm.dailyPulseEnabled ? (
                 <Select
-                  label="Reminder Time"
+                  label={t("settings.automations.reminderTime")}
                   value={prefsForm.dailyPulseTime}
                   onChange={(e) => setPrefsForm((p) => ({ ...p, dailyPulseTime: e.target.value }))}
                   options={TIME_OPTIONS}
@@ -1468,12 +1471,12 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Weekly Recap" icon={Calendar} />
+            <CardHeader title={t("settings.automations.weeklyRecap")} icon={Calendar} />
             <p className="text-sm text-slate-500 mb-4">
-              Receive a weekly summary of your quotes, revenue, and performance.
+              {t("settings.automations.weeklyRecapDesc")}
             </p>
             <div className="space-y-4">
-              <SettingRow label="Enable weekly recap" description="Get a weekly performance summary">
+              <SettingRow label={t("settings.automations.enableWeeklyRecap")} description={t("settings.automations.enableWeeklyRecapDesc")}>
                 <Toggle
                   checked={prefsForm.weeklyRecapEnabled}
                   onChange={(v) => setPrefsForm((p) => ({ ...p, weeklyRecapEnabled: v }))}
@@ -1481,7 +1484,7 @@ export default function SettingsPage() {
               </SettingRow>
               {prefsForm.weeklyRecapEnabled ? (
                 <Select
-                  label="Recap Day"
+                  label={t("settings.automations.recapDay")}
                   value={String(prefsForm.weeklyRecapDay)}
                   onChange={(e) => setPrefsForm((p) => ({ ...p, weeklyRecapDay: Number(e.target.value) }))}
                   options={DAY_OPTIONS}
@@ -1491,12 +1494,12 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Quiet Hours" icon={Moon} />
+            <CardHeader title={t("settings.automations.quietHours")} icon={Moon} />
             <p className="text-sm text-slate-500 mb-4">
-              Pause all automated messages during these hours.
+              {t("settings.automations.quietHoursDesc")}
             </p>
             <div className="space-y-4">
-              <SettingRow label="Enable quiet hours" description="No automated messages during quiet hours">
+              <SettingRow label={t("settings.automations.enableQuietHours")} description={t("settings.automations.enableQuietHoursDesc")}>
                 <Toggle
                   checked={prefsForm.quietHoursEnabled}
                   onChange={(v) => setPrefsForm((p) => ({ ...p, quietHoursEnabled: v }))}
@@ -1505,13 +1508,13 @@ export default function SettingsPage() {
               {prefsForm.quietHoursEnabled ? (
                 <div className="grid grid-cols-2 gap-4">
                   <Input
-                    label="Start Time"
+                    label={t("settings.automations.startTime")}
                     value={prefsForm.quietHoursStart}
                     onChange={(e) => setPrefsForm((p) => ({ ...p, quietHoursStart: e.target.value }))}
                     placeholder="21:00"
                   />
                   <Input
-                    label="End Time"
+                    label={t("settings.automations.endTime")}
                     value={prefsForm.quietHoursEnd}
                     onChange={(e) => setPrefsForm((p) => ({ ...p, quietHoursEnd: e.target.value }))}
                     placeholder="08:00"
@@ -1522,29 +1525,29 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Follow-Up Behavior" icon={Clock} />
+            <CardHeader title={t("settings.automations.followUpBehavior")} icon={Clock} />
             <div className="space-y-4">
               <Select
-                label="Dormant Customer Threshold"
+                label={t("settings.automations.dormantThreshold")}
                 value={String(prefsForm.dormantThresholdDays)}
                 onChange={(e) => setPrefsForm((p) => ({ ...p, dormantThresholdDays: Number(e.target.value) }))}
                 options={[
-                  { value: "30", label: "30 days" },
-                  { value: "60", label: "60 days" },
-                  { value: "90", label: "90 days" },
-                  { value: "120", label: "120 days" },
-                  { value: "180", label: "180 days" },
+                  { value: "30", label: t("settings.automations.days", { count: 30 }) },
+                  { value: "60", label: t("settings.automations.days", { count: 60 }) },
+                  { value: "90", label: t("settings.automations.days", { count: 90 }) },
+                  { value: "120", label: t("settings.automations.days", { count: 120 }) },
+                  { value: "180", label: t("settings.automations.days", { count: 180 }) },
                 ]}
               />
               <Select
-                label="Max Follow-Ups Per Day"
+                label={t("settings.automations.maxFollowUps")}
                 value={String(prefsForm.maxFollowUpsPerDay)}
                 onChange={(e) => setPrefsForm((p) => ({ ...p, maxFollowUpsPerDay: Number(e.target.value) }))}
                 options={[
-                  { value: "1", label: "1 per day" },
-                  { value: "2", label: "2 per day" },
-                  { value: "3", label: "3 per day" },
-                  { value: "5", label: "5 per day" },
+                  { value: "1", label: t("settings.automations.perDay", { count: 1 }) },
+                  { value: "2", label: t("settings.automations.perDay", { count: 2 }) },
+                  { value: "3", label: t("settings.automations.perDay", { count: 3 }) },
+                  { value: "5", label: t("settings.automations.perDay", { count: 5 }) },
                 ]}
               />
             </div>
@@ -1557,7 +1560,7 @@ export default function SettingsPage() {
               loading={updatePreferences.isPending}
               size="sm"
             >
-              Save Automation Settings
+              {t("settings.automations.saveAutomation")}
             </Button>
           </div>
         </div>
@@ -1567,33 +1570,33 @@ export default function SettingsPage() {
         <div className="max-w-2xl space-y-6">
           {/* Header card */}
           <Card>
-            <CardHeader title="Automated Customer Reminders" icon={Bell} />
+            <CardHeader title={t("settings.reminders.automatedReminders")} icon={Bell} />
             <p className="text-sm text-slate-500 mb-6">
-              Remind customers before their appointments automatically — reducing no-shows and saving you hours of manual outreach.
+              {t("settings.reminders.automatedRemindersDesc")}
             </p>
 
             {/* Email */}
             <div className="mb-5">
               <div className="flex items-center gap-2 mb-2">
                 <Mail className="w-4 h-4 text-blue-500" />
-                <span className="text-sm font-semibold text-slate-800">Email Reminder</span>
+                <span className="text-sm font-semibold text-slate-800">{t("settings.reminders.emailReminder")}</span>
               </div>
               <select
                 value={reminderEmailDays}
                 onChange={(e) => setReminderEmailDays(e.target.value)}
                 className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="1">Email them one day before appointment</option>
-                <option value="2">Email them two days before appointment</option>
-                <option value="3">Email them three days before appointment</option>
-                <option value="7">Email them one week before appointment</option>
-                <option value="null">Don't send email reminders</option>
+                <option value="1">{t("settings.reminders.emailOneDay")}</option>
+                <option value="2">{t("settings.reminders.emailTwoDays")}</option>
+                <option value="3">{t("settings.reminders.emailThreeDays")}</option>
+                <option value="7">{t("settings.reminders.emailOneWeek")}</option>
+                <option value="null">{t("settings.reminders.emailNone")}</option>
               </select>
             </div>
 
             <div className="flex items-center gap-3">
               <Button icon={Save} onClick={handleSaveReminders} loading={reminderSaving} size="sm">
-                Save Reminder Settings
+                {t("settings.reminders.saveReminders")}
               </Button>
             </div>
           </Card>
@@ -1601,8 +1604,8 @@ export default function SettingsPage() {
           {/* Preview card */}
           {reminderEmailDays !== "null" && (
             <Card>
-              <CardHeader title="Message Preview" icon={Mail} />
-              <p className="text-sm text-slate-500 mb-4">This is what your customers will receive:</p>
+              <CardHeader title={t("settings.reminders.messagePreview")} icon={Mail} />
+              <p className="text-sm text-slate-500 mb-4">{t("settings.reminders.messagePreviewDesc")}</p>
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Mail className="w-3.5 h-3.5 text-blue-500" />
@@ -1624,13 +1627,13 @@ export default function SettingsPage() {
 
           {/* Test send card */}
           <Card>
-            <CardHeader title="Send a Test" icon={Zap} />
+            <CardHeader title={t("settings.reminders.sendTest")} icon={Zap} />
             <p className="text-sm text-slate-500 mb-4">
-              Send a test reminder to your own phone and email so you can see exactly what customers receive.
+              {t("settings.reminders.sendTestDesc")}
             </p>
             {reminderTestSent ? (
               <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium">
-                <CheckCircle className="w-4 h-4" /> Test sent! Check your phone and email.
+                <CheckCircle className="w-4 h-4" /> {t("settings.reminders.testSent")}
               </div>
             ) : (
               <Button
@@ -1640,23 +1643,23 @@ export default function SettingsPage() {
                 onClick={handleTestReminder}
                 loading={reminderTestSending}
               >
-                Send me a test reminder
+                {t("settings.reminders.sendTestBtn")}
               </Button>
             )}
           </Card>
 
           {/* Team Notifications section */}
           <Card>
-            <CardHeader title="Cleaner Job Notifications" icon={Bell} />
+            <CardHeader title={t("settings.reminders.cleanerNotifications")} icon={Bell} />
             <p className="text-sm text-slate-500 mb-5">
-              Automatically notify your team about upcoming jobs via email and text.
+              {t("settings.reminders.cleanerNotificationsDesc")}
             </p>
 
             {/* Master toggle */}
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-sm font-semibold text-slate-800">Notify cleaners automatically</p>
-                <p className="text-xs text-slate-400">Send job details to assigned team members</p>
+                <p className="text-sm font-semibold text-slate-800">{t("settings.reminders.notifyCleaners")}</p>
+                <p className="text-xs text-slate-400">{t("settings.reminders.notifyCleanersDesc")}</p>
               </div>
               <button
                 onClick={() => setCleanerEnabled(!cleanerEnabled)}
@@ -1672,7 +1675,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between py-2.5 border-t border-slate-100">
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm text-slate-700">Send email notifications</span>
+                    <span className="text-sm text-slate-700">{t("settings.reminders.sendEmailNotifications")}</span>
                   </div>
                   <button
                     onClick={() => setCleanerEmail(!cleanerEmail)}
@@ -1684,15 +1687,15 @@ export default function SettingsPage() {
 
                 {/* Timing */}
                 <div className="py-2.5 border-t border-slate-100">
-                  <p className="text-sm font-medium text-slate-700 mb-2">Notify cleaners:</p>
+                  <p className="text-sm font-medium text-slate-700 mb-2">{t("settings.reminders.notifyCleanersWhen")}</p>
                   <select
                     value={cleanerTiming}
                     onChange={(e) => setCleanerTiming(e.target.value)}
                     className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-400"
                   >
-                    <option value="assign">When job is assigned (immediately)</option>
-                    <option value="day_before">Day before the job</option>
-                    <option value="both">Both — when assigned AND day before</option>
+                    <option value="assign">{t("settings.reminders.timingAssign")}</option>
+                    <option value="day_before">{t("settings.reminders.timingDayBefore")}</option>
+                    <option value="both">{t("settings.reminders.timingBoth")}</option>
                   </select>
                 </div>
               </div>
@@ -1700,7 +1703,7 @@ export default function SettingsPage() {
 
             <div className="mt-4 flex items-center gap-3">
               <Button icon={Save} onClick={handleSaveCleanerNotifications} loading={cleanerSaving} size="sm">
-                Save Cleaner Settings
+                {t("settings.reminders.saveCleanerSettings")}
               </Button>
             </div>
           </Card>
@@ -1708,8 +1711,8 @@ export default function SettingsPage() {
           {/* Team member list */}
           {teamMembers.length > 0 ? (
             <Card>
-              <CardHeader title="Team Member Notifications" icon={Bell} />
-              <p className="text-sm text-slate-500 mb-4">Send a test notification to a specific team member.</p>
+              <CardHeader title={t("settings.reminders.teamMemberNotifications")} icon={Bell} />
+              <p className="text-sm text-slate-500 mb-4">{t("settings.reminders.teamMemberNotificationsDesc")}</p>
               <div className="space-y-3">
                 {teamMembers.map((emp: any) => (
                   <div key={emp.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
@@ -1725,7 +1728,7 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-3 text-xs text-slate-500">
                           {emp.phone ? <span>{emp.phone}</span> : null}
                           {emp.email ? <span>{emp.email}</span> : (
-                            <span className="text-amber-600 font-medium">No email on file</span>
+                            <span className="text-amber-600 font-medium">{t("settings.reminders.noEmailOnFile")}</span>
                           )}
                         </div>
                       </div>
@@ -1736,14 +1739,14 @@ export default function SettingsPage() {
                       onClick={() => handleTestCleanerNotification(emp.id)}
                       loading={cleanerTestSending}
                     >
-                      Send test
+                      {t("settings.reminders.sendTest")}
                     </Button>
                   </div>
                 ))}
               </div>
               {cleanerTestSent ? (
                 <div className="mt-4 flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 font-medium">
-                  <CheckCircle className="w-4 h-4" /> Test sent! Check their email.
+                  <CheckCircle className="w-4 h-4" /> {t("settings.reminders.teamTestSent")}
                 </div>
               ) : null}
             </Card>
@@ -1754,31 +1757,31 @@ export default function SettingsPage() {
       {tab === "reviews" ? (
         <div className="max-w-2xl space-y-6">
           <Card>
-            <CardHeader title="Google Reviews" icon={Star} />
+            <CardHeader title={t("settings.reviews.googleReviews")} icon={Star} />
             <p className="text-sm text-slate-500 mb-4">
-              Configure your Google review link and how reviews are requested.
+              {t("settings.reviews.googleReviewsDesc")}
             </p>
             <div className="space-y-4">
               <Input
-                label="Google Review URL"
+                label={t("settings.reviews.googleReviewUrl")}
                 value={growthForm.googleReviewLink}
                 onChange={(e) => setGrowthForm((p) => ({ ...p, googleReviewLink: e.target.value }))}
                 placeholder="https://g.page/r/your-business/review"
-                helper="Paste your Google Business review link"
+                helper={t("settings.reviews.googleReviewUrlHelper")}
               />
-              <SettingRow label="Include review link on PDF quotes" description="Add a review request to the bottom of quote PDFs">
+              <SettingRow label={t("settings.reviews.includeOnPdf")} description={t("settings.reviews.includeOnPdfDesc")}>
                 <Toggle
                   checked={growthForm.includeReviewOnPdf}
                   onChange={(v) => setGrowthForm((p) => ({ ...p, includeReviewOnPdf: v }))}
                 />
               </SettingRow>
-              <SettingRow label="Include review link in messages" description="Add a review request to follow-up messages">
+              <SettingRow label={t("settings.reviews.includeInMessages")} description={t("settings.reviews.includeInMessagesDesc")}>
                 <Toggle
                   checked={growthForm.includeReviewInMessages}
                   onChange={(v) => setGrowthForm((p) => ({ ...p, includeReviewInMessages: v }))}
                 />
               </SettingRow>
-              <SettingRow label="Ask for review after job completion" description="Automatically prompt for a review when a job is marked complete">
+              <SettingRow label={t("settings.reviews.askAfterJob")} description={t("settings.reviews.askAfterJobDesc")}>
                 <Toggle
                   checked={growthForm.askReviewAfterComplete}
                   onChange={(v) => setGrowthForm((p) => ({ ...p, askReviewAfterComplete: v }))}
@@ -1788,24 +1791,24 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Referral Program" icon={Gift} />
+            <CardHeader title={t("settings.reviews.referralProgram")} icon={Gift} />
             <p className="text-sm text-slate-500 mb-4">
-              Set up your referral offer to encourage customers to refer friends.
+              {t("settings.reviews.referralProgramDesc")}
             </p>
             <div className="space-y-4">
               <Input
-                label="Referral Offer Amount ($)"
+                label={t("settings.reviews.referralOfferAmount")}
                 type="number"
                 value={growthForm.referralOfferAmount}
                 onChange={(e) => setGrowthForm((p) => ({ ...p, referralOfferAmount: Number(e.target.value) }))}
-                helper="Discount offered to customers who refer new clients"
+                helper={t("settings.reviews.referralOfferAmountHelper")}
               />
               <Input
-                label="Referral Booking Link"
+                label={t("settings.reviews.referralBookingLink")}
                 value={growthForm.referralBookingLink}
                 onChange={(e) => setGrowthForm((p) => ({ ...p, referralBookingLink: e.target.value }))}
                 placeholder="https://your-booking-link.com"
-                helper="Link included in referral messages for easy booking"
+                helper={t("settings.reviews.referralBookingLinkHelper")}
               />
             </div>
           </Card>
@@ -1817,7 +1820,7 @@ export default function SettingsPage() {
               loading={updateGrowthSettings.isPending}
               size="sm"
             >
-              Save Review & Referral Settings
+              {t("settings.reviews.saveReviewSettings")}
             </Button>
           </div>
         </div>
@@ -1828,18 +1831,18 @@ export default function SettingsPage() {
 
           {/* Customer Portal */}
           <Card>
-            <CardHeader title="Customer Portal" icon={Home} />
+            <CardHeader title={t("settings.features.customerPortal")} icon={Home} />
             <p className="text-sm text-slate-500 mb-4">
-              Give each customer a personal "My Home" portal — they can view upcoming cleans, after photos, and set home preferences.
+              {t("settings.features.customerPortalDesc")}
             </p>
 
             {/* Stats row */}
             {portalStats && (
               <div className="grid grid-cols-3 gap-3 mb-5">
                 {[
-                  { label: "Active Portals", value: portalStats.totalPortals },
-                  { label: "Viewed This Month", value: portalStats.viewedThisMonth },
-                  { label: "Total Views", value: portalStats.viewedPortals },
+                  { label: t("settings.features.activePortals"), value: portalStats.totalPortals },
+                  { label: t("settings.features.viewedThisMonth"), value: portalStats.viewedThisMonth },
+                  { label: t("settings.features.totalViews"), value: portalStats.viewedPortals },
                 ].map((s) => (
                   <div key={s.label} className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
                     <p className="text-2xl font-bold text-primary-600">{s.value}</p>
@@ -1853,16 +1856,16 @@ export default function SettingsPage() {
               {/* Toggle */}
               <div className="flex items-center justify-between py-2 border-b border-slate-100">
                 <div>
-                  <p className="text-sm font-medium text-slate-800">Enable Customer Portals</p>
-                  <p className="text-xs text-slate-500">Customers can access their portal at /home/[unique-token]</p>
+                  <p className="text-sm font-medium text-slate-800">{t("settings.features.enablePortals")}</p>
+                  <p className="text-xs text-slate-500">{t("settings.features.enablePortalsDesc")}</p>
                 </div>
                 <Toggle checked={portalEnabled} onChange={setPortalEnabled} />
               </div>
 
               {/* Brand color */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Portal Accent Color</label>
-                <p className="text-xs text-slate-500 mb-2">Hex color used for the portal header and buttons. Defaults to your primary brand color.</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.features.portalAccentColor")}</label>
+                <p className="text-xs text-slate-500 mb-2">{t("settings.features.portalAccentColorDesc")}</p>
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
@@ -1881,8 +1884,8 @@ export default function SettingsPage() {
 
               {/* Welcome message */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Welcome Message</label>
-                <p className="text-xs text-slate-500 mb-2">Shown to customers at the top of their portal. Keep it warm and personal.</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.features.welcomeMessage")}</label>
+                <p className="text-xs text-slate-500 mb-2">{t("settings.features.welcomeMessageDesc")}</p>
                 <textarea
                   value={portalWelcomeMessage}
                   onChange={(e) => setPortalWelcomeMessage(e.target.value)}
@@ -1895,7 +1898,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between pt-2">
                 <p className="text-xs text-slate-400 flex items-center gap-1">
                   <Users className="w-3.5 h-3.5" />
-                  Share links from any Customer Detail page
+                  {t("settings.features.shareLinksHint")}
                 </p>
                 <Button
                   icon={Save}
@@ -1903,21 +1906,21 @@ export default function SettingsPage() {
                   disabled={savePortalSettings.isPending}
                   size="sm"
                 >
-                  {saved && savedSection === "portal" ? "Saved!" : "Save Portal Settings"}
+                  {saved && savedSection === "portal" ? t("common.saved") : t("settings.features.savePortalSettings")}
                 </Button>
               </div>
             </div>
           </Card>
 
           <Card>
-            <CardHeader title="Features" icon={Sliders} />
+            <CardHeader title={t("settings.features.featuresTitle")} icon={Sliders} />
             <p className="text-sm text-slate-500 mb-4">
-              Enable or disable app features.
+              {t("settings.features.featuresTitleDesc")}
             </p>
             <div className="space-y-1">
               <SettingRow
-                label="Enable Commercial Quoting"
-                description="Create quotes for commercial facilities with labor estimates, tiered pricing, and proposals"
+                label={t("settings.features.enableCommercial")}
+                description={t("settings.features.enableCommercialDesc")}
               >
                 <Toggle
                   checked={commercialEnabled}
@@ -1928,15 +1931,15 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Language & Currency" icon={Globe} />
+            <CardHeader title={t("settings.features.languageCurrency")} icon={Globe} />
             <p className="text-sm text-slate-500 mb-4">
-              Choose the language and currency used across your account, quotes, and customer communications.
+              {t("settings.features.languageCurrencyDesc")}
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">App Language</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.features.appLanguage")}</label>
                 <p className="text-xs text-slate-500 mb-2">
-                  Sets your preferred language. The app interface is currently English only — full translation coming soon.
+                  {t("settings.features.appLanguageDesc")}
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {LANGUAGE_OPTIONS.map((lang) => (
@@ -1963,8 +1966,8 @@ export default function SettingsPage() {
               </div>
               <Divider />
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Communication Language</label>
-                <p className="text-xs text-slate-500 mb-2">Language used for AI-generated quotes and emails sent to customers</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.features.commLanguage")}</label>
+                <p className="text-xs text-slate-500 mb-2">{t("settings.features.commLanguageDesc")}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {LANGUAGE_OPTIONS.map((lang) => (
                     <button
@@ -1990,8 +1993,8 @@ export default function SettingsPage() {
               </div>
               <Divider />
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Currency</label>
-                <p className="text-xs text-slate-500 mb-2">Used for all pricing displays, quotes, and revenue figures throughout the app</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.features.currency")}</label>
+                <p className="text-xs text-slate-500 mb-2">{t("settings.features.currencyDesc")}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {CURRENCIES.map((c) => (
                     <button
@@ -2029,24 +2032,24 @@ export default function SettingsPage() {
             <div className="px-4 py-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
               <Calendar className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
               <div>
-                <p className="text-sm font-semibold text-amber-800">Growth or Pro plan required</p>
-                <p className="text-sm text-amber-700 mt-0.5">Self-booking lets accepted customers pick their own appointment time. Upgrade to enable it.</p>
-                <Button size="sm" className="mt-3" onClick={() => startCheckout("growth")}>Upgrade to Growth</Button>
+                <p className="text-sm font-semibold text-amber-800">{t("settings.booking.planRequired")}</p>
+                <p className="text-sm text-amber-700 mt-0.5">{t("settings.booking.planRequiredDesc")}</p>
+                <Button size="sm" className="mt-3" onClick={() => startCheckout("growth")}>{t("settings.booking.upgradeToGrowth")}</Button>
               </div>
             </div>
           ) : null}
           <Card>
-            <CardHeader title="Self-Booking Portal" icon={Calendar} />
+            <CardHeader title={t("settings.booking.selfBooking")} icon={Calendar} />
             <p className="text-sm text-slate-500 mb-4">
-              When enabled, customers who accept a quote will see a calendar and can book their own appointment — no back-and-forth needed.
+              {t("settings.booking.selfBookingDesc")}
             </p>
             {bookingLoading ? (
               <div className="flex items-center gap-2 text-sm text-slate-400 py-4">
                 <div className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
-                Loading...
+                {t("common.loading")}
               </div>
             ) : (
-              <SettingRow label="Enable self-booking" description="Customers can schedule their own appointment after accepting a quote">
+              <SettingRow label={t("settings.booking.enableSelfBooking")} description={t("settings.booking.enableSelfBookingDesc")}>
                 <Toggle
                   checked={bookingForm.enabled}
                   onChange={(v) => {
@@ -2059,8 +2062,8 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Available Days" icon={Calendar} />
-            <p className="text-sm text-slate-500 mb-4">Which days of the week can customers book appointments?</p>
+            <CardHeader title={t("settings.booking.availableDays")} icon={Calendar} />
+            <p className="text-sm text-slate-500 mb-4">{t("settings.booking.availableDaysDesc")}</p>
             <div className="flex flex-wrap gap-2">
               {DAY_NAMES.map((name, idx) => {
                 const selected = bookingForm.allowedDays.includes(idx);
@@ -2089,14 +2092,14 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Time Windows" icon={Clock} />
-            <p className="text-sm text-slate-500 mb-4">Set the hours when appointments can be booked. You can add multiple windows per day.</p>
+            <CardHeader title={t("settings.booking.timeWindows")} icon={Clock} />
+            <p className="text-sm text-slate-500 mb-4">{t("settings.booking.timeWindowsDesc")}</p>
             <div className="space-y-3">
               {bookingForm.timeWindows.map((win, idx) => (
                 <div key={idx} className="flex items-center gap-3">
                   <div className="flex-1 grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">Start</label>
+                      <label className="block text-xs text-slate-500 mb-1">{t("settings.booking.start")}</label>
                       <Input
                         type="time"
                         value={win.start}
@@ -2108,7 +2111,7 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">End</label>
+                      <label className="block text-xs text-slate-500 mb-1">{t("settings.booking.end")}</label>
                       <Input
                         type="time"
                         value={win.end}
@@ -2124,7 +2127,7 @@ export default function SettingsPage() {
                     <button
                       onClick={() => setBookingForm((f) => ({ ...f, timeWindows: f.timeWindows.filter((_, i) => i !== idx) }))}
                       className="text-red-400 hover:text-red-600 transition-colors mt-4 text-lg"
-                      title="Remove"
+                      title={t("common.remove")}
                     >
                       ×
                     </button>
@@ -2135,7 +2138,7 @@ export default function SettingsPage() {
                 onClick={() => setBookingForm((f) => ({ ...f, timeWindows: [...f.timeWindows, { start: "08:00", end: "17:00" }] }))}
                 className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1 mt-1"
               >
-                <Plus size={14} /> Add time window
+                <Plus size={14} /> {t("settings.booking.addTimeWindow")}
               </button>
             </div>
 
@@ -2143,8 +2146,8 @@ export default function SettingsPage() {
 
             <div className="grid grid-cols-2 gap-4 mt-2">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Slot duration (hrs)</label>
-                <p className="text-xs text-slate-400 mb-2">How long is each job slot?</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.booking.slotDuration")}</label>
+                <p className="text-xs text-slate-400 mb-2">{t("settings.booking.slotDurationDesc")}</p>
                 <Input
                   type="number"
                   min={1}
@@ -2155,8 +2158,8 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Slot interval (hrs)</label>
-                <p className="text-xs text-slate-400 mb-2">Gap between available start times</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.booking.slotInterval")}</label>
+                <p className="text-xs text-slate-400 mb-2">{t("settings.booking.slotIntervalDesc")}</p>
                 <Input
                   type="number"
                   min={0.5}
@@ -2170,11 +2173,11 @@ export default function SettingsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Booking Rules" icon={Settings} />
+            <CardHeader title={t("settings.booking.bookingRules")} icon={Settings} />
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Minimum notice (hours)</label>
-                <p className="text-xs text-slate-400 mb-2">How far in advance must customers book?</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.booking.minNotice")}</label>
+                <p className="text-xs text-slate-400 mb-2">{t("settings.booking.minNoticeDesc")}</p>
                 <Input
                   type="number"
                   min={1}
@@ -2184,8 +2187,8 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Max bookings per day</label>
-                <p className="text-xs text-slate-400 mb-2">Maximum number of jobs that can be scheduled on the same day</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.booking.maxPerDay")}</label>
+                <p className="text-xs text-slate-400 mb-2">{t("settings.booking.maxPerDayDesc")}</p>
                 <Input
                   type="number"
                   min={1}
@@ -2198,8 +2201,8 @@ export default function SettingsPage() {
               <Divider />
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Blackout dates</label>
-                <p className="text-xs text-slate-400 mb-2">Dates when no bookings are available (holidays, vacations, etc.)</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.booking.blackoutDates")}</label>
+                <p className="text-xs text-slate-400 mb-2">{t("settings.booking.blackoutDatesDesc")}</p>
                 <div className="flex gap-2 mb-2">
                   <Input
                     type="date"
@@ -2238,18 +2241,18 @@ export default function SettingsPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400 italic">No blackout dates set</p>
+                  <p className="text-xs text-slate-400 italic">{t("settings.booking.noBlackoutDates")}</p>
                 )}
               </div>
             </div>
           </Card>
 
           <Card>
-            <CardHeader title="Customer Messaging" icon={Mail} />
+            <CardHeader title={t("settings.booking.customerMessaging")} icon={Mail} />
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Confirmation message</label>
-                <p className="text-xs text-slate-400 mb-2">Shown to customers after they book and included in the confirmation email</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.booking.confirmationMessage")}</label>
+                <p className="text-xs text-slate-400 mb-2">{t("settings.booking.confirmationMessageDesc")}</p>
                 <Textarea
                   value={bookingForm.confirmationMessage}
                   onChange={(e) => setBookingForm((f) => ({ ...f, confirmationMessage: e.target.value }))}
@@ -2258,8 +2261,8 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Service area notes</label>
-                <p className="text-xs text-slate-400 mb-2">Optional note shown on the booking page (e.g., "We service the Denver metro area")</p>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("settings.booking.serviceAreaNotes")}</label>
+                <p className="text-xs text-slate-400 mb-2">{t("settings.booking.serviceAreaNotesDesc")}</p>
                 <Input
                   value={bookingForm.serviceAreaNotes}
                   onChange={(e) => setBookingForm((f) => ({ ...f, serviceAreaNotes: e.target.value }))}
@@ -2280,7 +2283,7 @@ export default function SettingsPage() {
                   Saving...
                 </span>
               ) : (
-                <span className="flex items-center gap-2"><Save size={14} /> Save Booking Settings</span>
+                <span className="flex items-center gap-2"><Save size={14} /> {t("settings.booking.saveBookingSettings")}</span>
               )}
             </Button>
           </div>
@@ -2290,7 +2293,7 @@ export default function SettingsPage() {
       {tab === "integrations" ? (
         <div className="max-w-2xl space-y-6">
           <Card>
-            <CardHeader title="Payment & Accounting" icon={CreditCard} />
+            <CardHeader title={t("settings.integrations.paymentAccounting")} icon={CreditCard} />
             <IntegrationCard
               name="Stripe"
               description="Accept online payments, process deposits, and manage subscriptions"
@@ -2314,7 +2317,7 @@ export default function SettingsPage() {
             />
           </Card>
           <Card>
-            <CardHeader title="Operations & Scheduling" icon={Calendar} />
+            <CardHeader title={t("settings.integrations.operationsScheduling")} icon={Calendar} />
             <IntegrationCard
               name="Google Calendar"
               description="Sync jobs and appointments to your Google Calendar"
@@ -2329,8 +2332,8 @@ export default function SettingsPage() {
           </Card>
           <Card className="bg-slate-50 border-dashed border-slate-300">
             <div className="text-center py-6">
-              <p className="text-sm text-slate-500 mb-1">More integrations coming soon</p>
-              <p className="text-xs text-slate-400">ServiceTitan, Housecall Pro, Square, and more</p>
+              <p className="text-sm text-slate-500 mb-1">{t("settings.integrations.comingSoon")}</p>
+              <p className="text-xs text-slate-400">{t("settings.integrations.comingSoonDesc")}</p>
             </div>
           </Card>
         </div>
@@ -2341,21 +2344,20 @@ export default function SettingsPage() {
           {tipsSaved ? (
             <div className="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 animate-scale-in">
               <CheckCircle className="w-4 h-4 text-emerald-600" />
-              <span className="text-sm font-medium text-emerald-700">Tip settings saved</span>
+              <span className="text-sm font-medium text-emerald-700">{t("settings.tips.tipsSaved")}</span>
             </div>
           ) : null}
 
           <Card>
-            <CardHeader title="Automated Tip Collection" icon={Gift} />
+            <CardHeader title={t("settings.tips.automatedTips")} icon={Gift} />
             <p className="text-sm text-slate-500 mb-4">
-              When enabled, QuotePro automatically sends your customer a personalized tip link after each completed job.
-              Customers can tip securely via Stripe — no awkward cash conversations needed.
+              {t("settings.tips.automatedTipsDesc")}
             </p>
 
             <div className="flex items-center justify-between py-3 border-b border-slate-100 mb-4">
               <div>
-                <p className="text-sm font-medium text-slate-800">Enable tip requests</p>
-                <p className="text-xs text-slate-500 mt-0.5">Send a tip link to customers after job completion</p>
+                <p className="text-sm font-medium text-slate-800">{t("settings.tips.enableTips")}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{t("settings.tips.enableTipsDesc")}</p>
               </div>
               <Toggle
                 checked={tipsForm.tipsEnabled}
@@ -2364,8 +2366,8 @@ export default function SettingsPage() {
             </div>
 
             <div className="mb-4">
-              <p className="text-sm font-medium text-slate-700 mb-2">Suggested tip percentages</p>
-              <p className="text-xs text-slate-500 mb-3">Customers will see preset tip amounts based on their job total.</p>
+              <p className="text-sm font-medium text-slate-700 mb-2">{t("settings.tips.suggestedPercentages")}</p>
+              <p className="text-xs text-slate-500 mb-3">{t("settings.tips.suggestedPercentagesDesc")}</p>
               <div className="flex flex-wrap gap-2">
                 {[10, 15, 18, 20, 22, 25, 30].map((pct) => {
                   const isSelected = tipsForm.tipPercentageOptions.includes(pct);
@@ -2390,39 +2392,39 @@ export default function SettingsPage() {
                 })}
               </div>
               {tipsForm.tipPercentageOptions.length === 0 ? (
-                <p className="text-xs text-red-500 mt-1">Select at least one percentage</p>
+                <p className="text-xs text-red-500 mt-1">{t("settings.tips.selectAtLeastOne")}</p>
               ) : null}
             </div>
 
             <div className="mb-5">
-              <p className="text-sm font-medium text-slate-700 mb-2">Send tip request</p>
+              <p className="text-sm font-medium text-slate-700 mb-2">{t("settings.tips.sendTipRequest")}</p>
               <Select
                 value={String(tipsForm.tipRequestDelay)}
                 onChange={(e) => setTipsForm((f) => ({ ...f, tipRequestDelay: Number((e.target as HTMLSelectElement).value) }))}
                 options={[
-                  { value: "1", label: "1 hour after job completion" },
-                  { value: "2", label: "2 hours after job completion" },
-                  { value: "4", label: "4 hours after job completion" },
-                  { value: "8", label: "8 hours after job completion" },
-                  { value: "24", label: "24 hours after job completion" },
+                  { value: "1", label: t("settings.tips.tipDelayOptions.1h") },
+                  { value: "2", label: t("settings.tips.tipDelayOptions.2h") },
+                  { value: "4", label: t("settings.tips.tipDelayOptions.4h") },
+                  { value: "8", label: t("settings.tips.tipDelayOptions.8h") },
+                  { value: "24", label: t("settings.tips.tipDelayOptions.24h") },
                 ]}
               />
             </div>
 
             <Button variant="primary" icon={Save} onClick={saveTipSettings}>
-              Save tip settings
+              {t("settings.tips.saveTipSettings")}
             </Button>
           </Card>
 
           <Card>
-            <CardHeader title="Tip History" icon={DollarSign} />
+            <CardHeader title={t("settings.tips.tipHistory")} icon={DollarSign} />
             {tipHistory.length === 0 ? (
               <div className="py-8 text-center">
                 <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
                   <Gift className="w-6 h-6 text-slate-400" />
                 </div>
-                <p className="text-slate-500 text-sm">No tips received yet.</p>
-                <p className="text-slate-400 text-xs mt-1">Tips will appear here once customers start tipping.</p>
+                <p className="text-slate-500 text-sm">{t("settings.tips.noTipsYet")}</p>
+                <p className="text-slate-400 text-xs mt-1">{t("settings.tips.tipsWillAppear")}</p>
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
@@ -2447,7 +2449,7 @@ export default function SettingsPage() {
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-slate-100 text-slate-500"
                       }`}>
-                        {tip.status === "paid" ? "Paid" : "Pending"}
+                        {tip.status === "paid" ? t("common.paid") : t("common.pending")}
                       </span>
                     </div>
                   </div>
@@ -2465,12 +2467,12 @@ export default function SettingsPage() {
       {tab === "developer" ? (
         <div className="max-w-2xl space-y-6">
           <Card>
-            <CardHeader title="API Keys" icon={Key} />
+            <CardHeader title={t("settings.developer.apiKeys")} icon={Key} />
             <p className="text-sm text-slate-500 mb-4">
-              Use API keys to access QuotePro data from external applications.
+              {t("settings.developer.apiKeysDesc")}
             </p>
             {apiKeys.length === 0 ? (
-              <p className="text-sm text-slate-400 py-4">No API keys yet.</p>
+              <p className="text-sm text-slate-400 py-4">{t("settings.developer.noApiKeys")}</p>
             ) : (
               <div className="space-y-2 mb-4">
                 {apiKeys.map((key: any) => (
@@ -2504,15 +2506,14 @@ export default function SettingsPage() {
                 } catch {}
               }}
             >
-              Generate API Key
+              {t("settings.developer.generateApiKey")}
             </Button>
           </Card>
 
           <Card>
-            <CardHeader title="Webhooks" icon={Webhook} />
+            <CardHeader title={t("settings.developer.webhooks")} icon={Webhook} />
             <p className="text-sm text-slate-500">
-              Configure webhook endpoints to receive real-time events from
-              QuotePro.
+              {t("settings.developer.webhooksDesc")}
             </p>
           </Card>
         </div>
