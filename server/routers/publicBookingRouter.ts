@@ -18,6 +18,26 @@ import { sendEmail, PLATFORM_FROM_EMAIL } from "../mail";
 
 const router = Router();
 
+/**
+ * Convert a wall-clock datetime in a given IANA timezone to a UTC Date.
+ * e.g. wallClockToUTC("2026-04-27", "08:00", "America/New_York") → 12:00 UTC
+ */
+function wallClockToUTC(datePart: string, timePart: string, timezone: string): Date {
+  const [y, mo, d] = datePart.split("-").map(Number);
+  const [h, mi] = timePart.split(":").map(Number);
+  // Naive date as if the wall-clock time were UTC
+  const naive = new Date(Date.UTC(y, mo - 1, d, h, mi, 0));
+  // Render this UTC instant in the target timezone so we know the local offset
+  const localStr = naive.toLocaleString("en-US", { timeZone: timezone, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  // Parse the rendered local string back to a UTC epoch (Node runs in UTC)
+  const localAsUTC = new Date(localStr);
+  // Offset = naive_UTC − localAsUTC  (positive when timezone is behind UTC, e.g. EDT = +4h)
+  const offsetMs = naive.getTime() - localAsUTC.getTime();
+  return new Date(naive.getTime() + offsetMs);
+}
+
 // ─── Serve booking page via SPA (React handles /book/:token) ─────────────────
 
 const webIndexPath = path.join(process.cwd(), "web", "dist", "index.html");
@@ -483,6 +503,7 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
         `SELECT bt.*, l.contact, l.home, l.quote, l.quote_type, l.id AS lead_id,
                 b.id AS business_id, b.company_name, b.logo_uri, b.primary_color,
                 b.phone AS business_phone, b.email AS business_email,
+                b.timezone AS business_timezone,
                 u.id AS operator_user_id
          FROM booking_tokens bt
          JOIN leads l ON l.id = bt.lead_id
@@ -595,7 +616,8 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
       try {
         if (row.business_id) {
           await client.query("SAVEPOINT sp_job");
-          const startDatetime = new Date(`${datePart}T${timePart}:00`);
+          const tz = row.business_timezone || "America/New_York";
+          const startDatetime = wallClockToUTC(datePart, timePart, tz);
           const endDatetime = new Date(startDatetime.getTime() + 2 * 60 * 60 * 1000);
           jobId = crypto.randomUUID();
           await client.query(
