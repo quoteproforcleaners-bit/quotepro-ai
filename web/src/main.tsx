@@ -20,6 +20,7 @@ import "./styles/apple.css";
 //   — top-level routes for direct navigation and ad conversion tracking
 const TOP_LEVEL_PATHS = [
   "/intake/", "/request/", "/schedule-ack/", "/q/", "/home/", "/tip/",
+  "/book/",
   "/pricing", "/subscription", "/register",
   "/login", "/dashboard", "/onboarding", "/upgrade", "/quote-doctor",
   "/employee", "/checkin/",
