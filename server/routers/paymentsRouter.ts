@@ -423,11 +423,11 @@ export async function buildFinanceSnapshot(businessId: string, business: any) {
     ),
     pool.query(
       `SELECT
-         COUNT(*) FILTER (WHERE payment_status='charged') as total_charged_count,
-         COALESCE(SUM(charge_amount) FILTER (WHERE payment_status='charged'), 0) as total_collected_cents,
-         COUNT(*) FILTER (WHERE payment_status='failed') as total_failed_count,
-         COUNT(*) FILTER (WHERE status='completed' AND payment_status='unpaid') as total_uncharged_count,
-         COALESCE(SUM(COALESCE(charge_amount, q.total*100)) FILTER (WHERE status='completed' AND payment_status='unpaid'), 0) as uncharged_value_cents
+         COUNT(*) FILTER (WHERE j.payment_status='charged') as total_charged_count,
+         COALESCE(SUM(j.charge_amount) FILTER (WHERE j.payment_status='charged'), 0) as total_collected_cents,
+         COUNT(*) FILTER (WHERE j.payment_status='failed') as total_failed_count,
+         COUNT(*) FILTER (WHERE j.status='completed' AND j.payment_status='unpaid') as total_uncharged_count,
+         COALESCE(SUM(COALESCE(j.charge_amount, q.total*100)) FILTER (WHERE j.status='completed' AND j.payment_status='unpaid'), 0) as uncharged_value_cents
        FROM jobs j
        LEFT JOIN quotes q ON q.id = j.quote_id
        WHERE j.business_id=$1 AND j.start_datetime > NOW() - INTERVAL '90 days'`,
