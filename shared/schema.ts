@@ -1606,3 +1606,60 @@ export const autoChargeLog = pgTable("auto_charge_log", {
 
 export type AutoChargeLog = typeof autoChargeLog.$inferSelect;
 export type InsertAutoChargeLog = typeof autoChargeLog.$inferInsert;
+
+// ─── Autopilot Leads (new quote-request flow) ─────────────────────────────────
+export const leads = pgTable("leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  businessSlug: text("business_slug").notNull(),
+  status: text("status").notNull().default("new"), // new | processing | quoted | opened | booked | expired | cancelled
+  contact: jsonb("contact").notNull().default(sql`'{}'::jsonb`),
+  home: jsonb("home").notNull().default(sql`'{}'::jsonb`),
+  preferences: jsonb("preferences").notNull().default(sql`'{}'::jsonb`),
+  quote: jsonb("quote").default(sql`'{}'::jsonb`),
+  quoteType: text("quote_type"), // exact | range
+  jobId: varchar("job_id").references(() => jobs.id, { onDelete: "set null" }),
+  submissionReceivedAt: timestamp("submission_received_at").defaultNow().notNull(),
+  autopilotTriggeredAt: timestamp("autopilot_triggered_at"),
+  quoteGeneratedAt: timestamp("quote_generated_at"),
+  quoteEmailSentAt: timestamp("quote_email_sent_at"),
+  emailOpenedAt: timestamp("email_opened_at"),
+  bookingConfirmedAt: timestamp("booking_confirmed_at"),
+  followupSentAt: timestamp("followup_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+export type Lead = typeof leads.$inferSelect;
+export type InsertLead = typeof leads.$inferInsert;
+
+// ─── Booking Tokens ───────────────────────────────────────────────────────────
+export const bookingTokens = pgTable("booking_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  quoteSnapshot: jsonb("quote_snapshot").notNull().default(sql`'{}'::jsonb`),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").notNull().default(false),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type BookingToken = typeof bookingTokens.$inferSelect;
+export type InsertBookingToken = typeof bookingTokens.$inferInsert;
+
+// ─── Booked Slots ─────────────────────────────────────────────────────────────
+export const bookedSlots = pgTable(
+  "booked_slots",
+  {
+    id: serial("id").primaryKey(),
+    userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    date: text("date").notNull(), // YYYY-MM-DD
+    timeSlot: varchar("time_slot", { length: 10 }).notNull(), // HH:MM
+    jobId: varchar("job_id").references(() => jobs.id, { onDelete: "set null" }),
+    leadId: varchar("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("booked_slots_user_date_time_idx").on(t.userId, t.date, t.timeSlot)]
+);
+export type BookedSlot = typeof bookedSlots.$inferSelect;
+export type InsertBookedSlot = typeof bookedSlots.$inferInsert;

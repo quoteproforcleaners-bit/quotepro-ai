@@ -2781,4 +2781,129 @@ router.post("/api/public/tip-page/:token/checkout", async (req: Request, res: Re
   }
 });
 
+// ─── Quote Request (Autopilot Booking Flow) ───────────────────────────────────
+
+const quoteRequestLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10 });
+
+router.post("/api/public/quote-request", quoteRequestLimiter, async (req: Request, res: Response) => {
+  try {
+    const { businessSlug, contact, home, preferences } = req.body;
+
+    if (!businessSlug || !contact?.email || !contact?.firstName) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    // Find business by slug
+    const bizRes = await pool.query(
+      `SELECT b.id, b.owner_user_id, u.id AS user_id, b.company_name
+       FROM businesses b
+       JOIN users u ON u.id = b.owner_user_id
+       WHERE b.public_quote_slug = $1 LIMIT 1`,
+      [businessSlug]
+    );
+
+    if (bizRes.rows.length === 0) {
+      return res.status(404).json({ message: "Business not found" });
+    }
+
+    const biz = bizRes.rows[0];
+
+    // Check if autopilot is enabled
+    const userRes = await pool.query(
+      `SELECT autopilot_enabled FROM users WHERE id = $1`,
+      [biz.user_id]
+    );
+    const autopilotEnabled = userRes.rows[0]?.autopilot_enabled ?? false;
+
+    // Create lead record
+    const leadRes = await pool.query(
+      `INSERT INTO leads (user_id, business_slug, contact, home, preferences, status)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
+      [biz.user_id, businessSlug, JSON.stringify(contact), JSON.stringify(home), JSON.stringify(preferences), "new"]
+    );
+    const leadId = leadRes.rows[0].id;
+
+    if (autopilotEnabled) {
+      // Fire-and-forget: process async (no Redis needed)
+      setImmediate(async () => {
+        try {
+          const { processQuoteRequest } = await import("../services/quoteRequestService");
+          await processQuoteRequest(leadId);
+        } catch (err: any) {
+          console.error("[quote-request] async processing failed:", err.message);
+        }
+      });
+
+      return res.json({
+        success: true,
+        leadId,
+        autopilot: true,
+        estimatedResponseSeconds: 55,
+        message: "We're preparing your quote — check your email in under a minute!",
+      });
+    } else {
+      return res.json({
+        success: true,
+        leadId,
+        autopilot: false,
+        message: "Your request has been received. We'll be in touch shortly!",
+      });
+    }
+  } catch (err: any) {
+    console.error("[POST /api/public/quote-request]", err.message);
+    return res.status(500).json({ message: "Failed to submit request" });
+  }
+});
+
+router.get("/api/public/quote-status/:leadId", async (req: Request, res: Response) => {
+  try {
+    const { leadId } = req.params;
+    const result = await pool.query(
+      `SELECT status, quote_email_sent_at, quote_generated_at FROM leads WHERE id = $1`,
+      [leadId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+    const row = result.rows[0];
+    return res.json({
+      status: row.status,
+      emailSent: !!row.quote_email_sent_at,
+      quoteReady: !!row.quote_generated_at,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ message: "Failed to fetch status" });
+  }
+});
+
+router.get("/api/public/biz-info/:slug", async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const result = await pool.query(
+      `SELECT b.company_name, b.logo_uri, b.primary_color, b.phone, b.email, b.address,
+              b.public_quote_slug, u.autopilot_enabled
+       FROM businesses b
+       JOIN users u ON u.id = b.owner_user_id
+       WHERE b.public_quote_slug = $1 LIMIT 1`,
+      [slug]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Business not found" });
+    }
+    const b = result.rows[0];
+    return res.json({
+      companyName: b.company_name,
+      logoUri: b.logo_uri || null,
+      primaryColor: b.primary_color || "#2563EB",
+      phone: b.phone || null,
+      email: b.email || null,
+      address: b.address || null,
+      autopilotEnabled: b.autopilot_enabled,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ message: "Failed to fetch business info" });
+  }
+});
+
 export default router;

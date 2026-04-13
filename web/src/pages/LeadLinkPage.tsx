@@ -1,1436 +1,565 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
-  ChevronRight, ChevronLeft, Check, Loader2, AlertCircle, Shield,
-  Share2, Clock, Star, Home, Wind, RefreshCw, ArrowRight, Plus, Minus, Zap, AlertTriangle,
+  ChevronRight, ChevronLeft, Check, Loader2, AlertCircle,
+  Sparkles, Calendar, Phone, Mail, MapPin,
+  Clock, MessageSquare, Star,
 } from "lucide-react";
-import { calculateLeadLinkEstimate } from "../lib/leadLinkPricingEngine";
-import type { LeadLinkPricingConfig, QuoteInputs, AddOnKey } from "../lib/leadLinkPricingEngine";
 
 const API_BASE = typeof window !== "undefined" ? window.location.origin : "";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface BookingSlot {
-  date: string;
-  startTime: string;
-  endTime: string;
-  startDatetime: string;
-  endDatetime: string;
-}
-
-interface LeadLinkConfig {
-  slug: string;
-  businessId: string;
+interface BizInfo {
   companyName: string;
   logoUri?: string;
   primaryColor: string;
-  senderName?: string;
-  rating?: number;
-  pricing: {
-    hourlyRate: number;
-    minimumTicket: number;
-    sqftFactor?: number;
-  };
-  pricingConfig?: LeadLinkPricingConfig;
-  pricingConfigured: boolean;
-  usingDefaultPricing: boolean;
-  pricingCompletionPercent: number;
-  pricingMissingItems: string[];
-  isPricingComplete: boolean;
-  hasInstantMode: boolean;
-  availability?: {
-    enabled: boolean;
-    allowedDays: number[];
-    timeWindows: { start: string; end: string }[];
-    slotDurationHours: number;
-    slotIntervalHours: number;
-    minNoticeHours: number;
-    maxJobsPerDay: number;
-  } | null;
+  phone?: string;
+  email?: string;
+  address?: string;
+  autopilotEnabled: boolean;
 }
 
-type FlowStep = "step1" | "calculating" | "reveal" | "slot_pick" | "step2" | "step3" | "step4";
-type ServiceType = "standard" | "deep" | "move" | "recurring";
-type Condition = "great" | "average" | "needs_work";
-type SqftRange = "under1000" | "1000_1500" | "1500_2000" | "2000_2500" | "2500_3000" | "3000plus";
-
-interface Step2Data {
-  sqft: SqftRange | null;
-  condition: Condition | null;
-  pets: boolean;
-  petCount: number;
-  addOns: Record<string, boolean>;
-  preferredDate: string;
+interface FormData {
+  firstName: string; lastName: string; email: string; phone: string; zip: string;
+  serviceType: string;
+  bedrooms: number; bathrooms: number; sqft: string; condition: string; extras: string[];
+  preferredDate: string; preferredTime: string; source: string; notes: string;
 }
 
-// ─── Analytics ───────────────────────────────────────────────────────────────
+const EXTRAS = [
+  { id: "oven", label: "Inside oven" },
+  { id: "fridge", label: "Inside fridge" },
+  { id: "windows", label: "Interior windows" },
+  { id: "laundry", label: "Laundry" },
+  { id: "garage", label: "Garage" },
+  { id: "basement", label: "Basement" },
+  { id: "pets", label: "Pets in home" },
+  { id: "carpet", label: "Has carpet" },
+];
 
-function getSessionId(): string {
-  const key = "ll_session";
-  let id = sessionStorage.getItem(key);
-  if (!id) {
-    id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    sessionStorage.setItem(key, id);
-  }
-  return id;
-}
+const SERVICE_TYPES = [
+  { id: "standard", label: "Standard Clean", desc: "Regular recurring or one-time clean" },
+  { id: "deep", label: "Deep Clean", desc: "Thorough top-to-bottom cleaning" },
+  { id: "move", label: "Move In/Out", desc: "Moving into or out of a home" },
+  { id: "post_construction", label: "Post-Construction", desc: "After renovation or construction" },
+];
 
-async function trackEvent(slug: string, eventType: string) {
-  try {
-    await fetch(`${API_BASE}/api/public/lead-link-event`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug, eventType, sessionId: getSessionId() }),
-    });
-  } catch {}
-}
+const CONDITIONS = [
+  { id: "great", label: "Well maintained", emoji: "✨" },
+  { id: "average", label: "Needs extra attention", emoji: "🧹" },
+  { id: "needs_work", label: "Very dirty / long overdue", emoji: "⚠️" },
+];
 
-async function trackEventWithMeta(slug: string, eventType: string, usedDefaultPricing: boolean) {
-  try {
-    await fetch(`${API_BASE}/api/public/lead-link-event`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug, eventType, sessionId: getSessionId(), usedDefaultPricing }),
-    });
-  } catch {}
-}
+const SQFT_OPTIONS = [
+  { id: "", label: "Not sure" },
+  { id: "under1000", label: "Under 1,000 sq ft" },
+  { id: "1000_1500", label: "1,000 – 1,500 sq ft" },
+  { id: "1500_2000", label: "1,500 – 2,000 sq ft" },
+  { id: "2000_2500", label: "2,000 – 2,500 sq ft" },
+  { id: "2500_3000", label: "2,500 – 3,000 sq ft" },
+  { id: "3000plus", label: "3,000+ sq ft" },
+];
 
-// ─── Price Calculation ───────────────────────────────────────────────────────
-
-const SQFT_MIDPOINTS: Record<SqftRange, number> = {
-  under1000: 900,
-  "1000_1500": 1250,
-  "1500_2000": 1750,
-  "2000_2500": 2250,
-  "2500_3000": 2750,
-  "3000plus": 3500,
-};
-
-function calcPriceRange(
-  beds: number,
-  baths: number,
-  serviceType: ServiceType,
-  pricing: LeadLinkConfig["pricing"],
-  sqft?: SqftRange | null,
-  condition?: Condition | null,
-  pets?: boolean,
-  petCount?: number,
-): { low: number; high: number } {
-  const hourlyRate = pricing.hourlyRate || 40;
-  const minTicket = pricing.minimumTicket || 80;
-  const sqftFactor = pricing.sqftFactor || 0.0085;
-
-  const sqftMid = sqft ? SQFT_MIDPOINTS[sqft] : beds * 450 + baths * 100;
-  let baseHours = sqftMid * sqftFactor + beds * 0.25 + baths * 0.4;
-
-  const typeMultiplier: Record<ServiceType, number> = {
-    standard: 1.0,
-    deep: 1.55,
-    move: 2.1,
-    recurring: 0.88,
-  };
-  baseHours *= typeMultiplier[serviceType];
-
-  const condMultiplier: Record<Condition, number> = {
-    great: 1.0,
-    average: 1.1,
-    needs_work: 1.3,
-  };
-  if (condition) baseHours *= condMultiplier[condition];
-
-  if (pets) {
-    const pc = petCount || 1;
-    baseHours *= pc === 1 ? 1.06 : pc === 2 ? 1.12 : 1.18;
-  }
-
-  const base = hourlyRate * baseHours;
-  const low = Math.round(Math.max(minTicket, base * 0.85) / 5) * 5;
-  const high = Math.round(base * 1.25 / 5) * 5;
-  return { low, high };
-}
-
-// ─── Count-up Animation Hook ─────────────────────────────────────────────────
-
-function useCountUp(target: number, active: boolean, duration = 700) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    if (!active || target === 0) return;
-    const start = Date.now();
-    let frame: number;
-    const tick = () => {
-      const elapsed = Date.now() - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.round(ease * target));
-      if (progress < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [target, active, duration]);
-  return value;
-}
-
-// ─── Sub-Components ───────────────────────────────────────────────────────────
-
-function ProgressDots({ step }: { step: FlowStep }) {
-  const steps: FlowStep[] = ["step1", "reveal", "step2", "step3"];
-  const labels = ["Home Info", "Your Price", "Details", "Contact"];
-  const normalizedStep = step === "calculating" ? "reveal" : step === "slot_pick" ? "step2" : step;
-  const cur = steps.indexOf(normalizedStep);
-  return (
-    <div className="flex items-center gap-2 justify-center mb-6">
-      {steps.map((s, i) => (
-        <div key={s} className="flex items-center gap-2">
-          <div className="flex flex-col items-center">
-            <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
-              style={{
-                background: i < cur ? "#10b981" : i === cur ? "#2563eb" : "#e2e8f0",
-                color: i <= cur ? "#fff" : "#94a3b8",
-              }}
-            >
-              {i < cur ? <Check className="w-3.5 h-3.5" /> : i + 1}
-            </div>
-            <span className="text-[9px] mt-1 font-medium" style={{ color: i === cur ? "#2563eb" : "#94a3b8" }}>
-              {labels[i]}
-            </span>
-          </div>
-          {i < steps.length - 1 && (
-            <div className="w-8 h-0.5 mb-4" style={{ background: i < cur ? "#10b981" : "#e2e8f0" }} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PillSelector({
-  options, value, onChange, primary,
-}: {
-  options: { value: string; label: string }[];
-  value: string | null;
-  onChange: (v: string) => void;
-  primary: string;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((opt) => {
-        const selected = value === opt.value;
-        return (
-          <button
-            key={opt.value}
-            onClick={() => onChange(opt.value)}
-            className="px-4 py-2.5 rounded-full text-sm font-semibold border-2 transition-all min-h-[44px]"
-            style={{
-              borderColor: selected ? primary : "#e2e8f0",
-              background: selected ? primary : "#fff",
-              color: selected ? "#fff" : "#374151",
-            }}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ServiceCard({
-  value, label, icon: Icon, selected, primary, onClick,
-}: {
-  value: ServiceType;
-  label: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  icon: React.ComponentType<any>;
-  selected: boolean;
-  primary: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left min-h-[60px]"
-      style={{
-        borderColor: selected ? primary : "#e2e8f0",
-        background: selected ? `${primary}10` : "#fff",
-      }}
-    >
-      <div
-        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-        style={{ background: selected ? primary : "#f1f5f9" }}
-      >
-        <Icon className="w-4 h-4" style={{ color: selected ? "#fff" : "#94a3b8" }} />
-      </div>
-      <span className="text-sm font-semibold" style={{ color: selected ? primary : "#374151" }}>{label}</span>
-    </button>
-  );
-}
-
-function ConditionCard({
-  value, emoji, label, desc, selected, primary, onClick,
-}: {
-  value: Condition;
-  emoji: string;
-  label: string;
-  desc: string;
-  selected: boolean;
-  primary: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex flex-col items-start p-3.5 rounded-xl border-2 transition-all text-left"
-      style={{
-        borderColor: selected ? primary : "#e2e8f0",
-        background: selected ? `${primary}10` : "#fff",
-      }}
-    >
-      <span className="text-xl mb-1">{emoji}</span>
-      <span className="text-sm font-bold" style={{ color: selected ? primary : "#374151" }}>{label}</span>
-      <span className="text-xs text-slate-400 mt-0.5 leading-tight">{desc}</span>
-    </button>
-  );
-}
-
-function PriceBadge({ low, high, flash = false }: { low: number; high: number; flash?: boolean }) {
-  const [flashing, setFlashing] = useState(false);
-  useEffect(() => {
-    if (flash) {
-      setFlashing(true);
-      setTimeout(() => setFlashing(false), 600);
-    }
-  }, [low, high, flash]);
-  return (
-    <div
-      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl mb-5"
-      style={{
-        background: "#eff6ff",
-        transition: "background 0.3s",
-        ...(flashing ? { background: "#dbeafe" } : {}),
-      }}
-    >
-      <Zap className="w-3.5 h-3.5 shrink-0" style={{ color: "#2563eb" }} />
-      <span className="text-sm font-bold" style={{ color: "#1e40af" }}>
-        Estimate: ${low.toLocaleString()}–${high.toLocaleString()}
-      </span>
-    </div>
-  );
-}
+const TIME_OPTIONS = [
+  { id: "morning", label: "Morning (8am–12pm)" },
+  { id: "afternoon", label: "Afternoon (12pm–4pm)" },
+  { id: "flexible", label: "Flexible" },
+];
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function LeadLinkPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [config, setConfig] = useState<LeadLinkConfig | null>(null);
-  const [configError, setConfigError] = useState(false);
-  const [configLoading, setConfigLoading] = useState(true);
+  const navigate = useNavigate();
 
-  const [step, setStep] = useState<FlowStep>("step1");
+  const [biz, setBiz] = useState<BizInfo | null>(null);
+  const [bizLoading, setBizLoading] = useState(true);
+  const [bizError, setBizError] = useState<string | null>(null);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Step 1
-  const [beds, setBeds] = useState<string | null>(null);
-  const [baths, setBaths] = useState<string | null>(null);
-  const [serviceType, setServiceType] = useState<ServiceType | null>(null);
-
-  // Price reveal
-  const [priceRange, setPriceRange] = useState<{ low: number; high: number } | null>(null);
-  const [priceFlash, setPriceFlash] = useState(false);
-  const [accuracyTooltip, setAccuracyTooltip] = useState(false);
-  const [showWhyRange, setShowWhyRange] = useState(false);
-  const prevSpreadRef = useRef<number | null>(null);
-  const lowCount = useCountUp(priceRange?.low ?? 0, step === "reveal");
-  const highCount = useCountUp(priceRange?.high ?? 0, step === "reveal");
-
-  // Step 2
-  const [s2, setS2] = useState<Step2Data>({
-    sqft: null, condition: null, pets: false, petCount: 1, addOns: {}, preferredDate: "",
+  const [form, setForm] = useState<FormData>({
+    firstName: "", lastName: "", email: "", phone: "", zip: "",
+    serviceType: "standard",
+    bedrooms: 3, bathrooms: 2, sqft: "", condition: "great", extras: [],
+    preferredDate: "", preferredTime: "flexible", source: "", notes: "",
   });
 
-  // Step 3
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [formError, setFormError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState("");
-
-  // Instant mode / slot picker
-  const [slots, setSlots] = useState<BookingSlot[]>([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<BookingSlot | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-
-  const scrollTopRef = useRef<HTMLDivElement>(null);
-
-  function scrollToTop() {
-    setTimeout(() => scrollTopRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-  }
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
 
   useEffect(() => {
     if (!slug) return;
-    fetch(`${API_BASE}/api/public/lead-link-config/${slug}`)
+    fetch(`${API_BASE}/api/public/biz-info/${slug}`)
       .then((r) => r.json())
-      .then((d) => {
-        if (d.error || d.message) { setConfigError(true); return; }
-        setConfig(d);
-        document.title = `${d.companyName} — Get a Free Quote`;
-        trackEventWithMeta(slug, "leadlink_visit", !!d.usingDefaultPricing);
+      .then((data) => {
+        if (data.message) setBizError("Business not found");
+        else setBiz(data);
       })
-      .catch(() => setConfigError(true))
-      .finally(() => setConfigLoading(false));
+      .catch(() => setBizError("Failed to load page"))
+      .finally(() => setBizLoading(false));
   }, [slug]);
 
-  const primary = config?.primaryColor || "#2563eb";
-  const step1Valid = beds !== null && baths !== null && serviceType !== null;
+  const minDate = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const color = biz?.primaryColor || "#2563EB";
 
-  const computePrice = useCallback(
-    (sqft?: SqftRange | null, cond?: Condition | null, pets?: boolean, petCount?: number) => {
-      if (!config || beds === null || baths === null || serviceType === null) return null;
-
-      // Use the new engine when pricingConfig is available
-      if (config.pricingConfig) {
-        const condMap: Record<Condition, QuoteInputs["conditionLevel"]> = {
-          great: "excellent", average: "average", needs_work: "dirty",
-        };
-        const cleaningTypeMap: Record<ServiceType, QuoteInputs["cleaningType"]> = {
-          standard: "standard", deep: "deep", move: "moveinout", recurring: "recurring",
-        };
-        const sqftMid = sqft ? SQFT_MIDPOINTS[sqft] : null;
-        const inputs: QuoteInputs = {
-          bedrooms: parseInt(beds),
-          bathrooms: parseFloat(baths),
-          sqft: sqftMid,
-          cleaningType: cleaningTypeMap[serviceType],
-          frequency: serviceType === "recurring" ? "biweekly" : "onetime",
-          conditionLevel: cond ? condMap[cond] : "good",
-          petCount: pets ? (petCount ?? 1) : 0,
-          addOns: [] as AddOnKey[],
-          usingDefaultPricing: config.usingDefaultPricing,
-        };
-        const estimate = calculateLeadLinkEstimate(inputs, config.pricingConfig);
-        return { low: estimate.lowEstimate, high: estimate.highEstimate };
-      }
-
-      // Legacy fallback
-      return calcPriceRange(
-        parseInt(beds), parseFloat(baths), serviceType, config.pricing,
-        sqft, cond, pets, petCount,
-      );
-    },
-    [config, beds, baths, serviceType],
-  );
-
-  async function fetchSlots(slugVal: string) {
-    setSlotsLoading(true);
-    try {
-      const r = await fetch(`${API_BASE}/api/public/lead-link/${slugVal}/slots`);
-      const data = await r.json();
-      if (data.enabled && Array.isArray(data.slots)) {
-        setSlots(data.slots);
-        if (data.slots.length > 0) {
-          setSelectedDate(data.slots[0].date);
-        }
-      }
-    } catch {}
-    setSlotsLoading(false);
+  function validateStep1(): boolean {
+    const e: Partial<Record<keyof FormData, string>> = {};
+    if (!form.firstName.trim()) e.firstName = "Required";
+    if (!form.lastName.trim()) e.lastName = "Required";
+    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
+    if (!form.zip.trim() || !/^\d{5}/.test(form.zip)) e.zip = "Valid ZIP required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
   }
 
-  function goToReveal() {
-    if (!step1Valid || !config) return;
-    const price = computePrice();
-    if (!price) return;
-    setPriceRange(price);
-    setStep("calculating");
-    trackEventWithMeta(slug!, "leadlink_step1_complete", !!config?.usingDefaultPricing);
-    if (config.hasInstantMode && config.availability?.enabled) {
-      fetchSlots(slug!);
-    }
-    setTimeout(() => setStep("reveal"), 900);
-    scrollToTop();
+  function validateStep2(): boolean {
+    const e: Partial<Record<keyof FormData, string>> = {};
+    if (!form.condition) e.condition = "Please select a condition";
+    setErrors(e);
+    return Object.keys(e).length === 0;
   }
 
-  function goToStep2() {
-    // If instant mode and we have slots but haven't picked one, go to slot picker first
-    if (config?.hasInstantMode && config.availability?.enabled && slots.length > 0 && step === "reveal") {
-      setStep("slot_pick");
-      scrollToTop();
-      return;
-    }
-    setStep("step2");
-    trackEvent(slug!, "leadlink_step2_start");
-    scrollToTop();
+  function handleNext() {
+    if (step === 1 && validateStep1()) setStep(2);
+    else if (step === 2 && validateStep2()) setStep(3);
   }
 
-  function goToStep2FromSlot() {
-    setStep("step2");
-    trackEvent(slug!, "leadlink_step2_start");
-    scrollToTop();
+  function handleBack() {
+    if (step === 2) setStep(1);
+    else if (step === 3) setStep(2);
   }
 
-  function handleStep2Change(updates: Partial<Step2Data>) {
-    setS2((prev) => {
-      const next = { ...prev, ...updates };
-      const price = computePrice(next.sqft, next.condition, next.pets, next.petCount);
-      if (price) {
-        const newSpread = price.high - price.low;
-        const prevSpread = prevSpreadRef.current;
-        if (prevSpread !== null && newSpread < prevSpread) {
-          setAccuracyTooltip(true);
-          setTimeout(() => setAccuracyTooltip(false), 1500);
-        }
-        prevSpreadRef.current = newSpread;
-        setPriceRange(price);
-        setPriceFlash(true);
-        setTimeout(() => setPriceFlash(false), 700);
-      }
-      return next;
-    });
-  }
-
-  function goToStep3() {
-    setStep("step3");
-    trackEvent(slug!, "leadlink_step2_complete");
-    scrollToTop();
-  }
-
-  async function handleSubmit() {
-    setFormError("");
-    if (!name.trim()) { setFormError("Please enter your name."); return; }
-    if (!phone.trim()) { setFormError("Phone number is required so we can send your quote."); return; }
-    if (!address.trim()) { setFormError("Please enter your home address."); return; }
-    if (!config) return;
-
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setSubmitting(true);
-    setSubmitError("");
+    setSubmitError(null);
     try {
-      const extractedFields = {
-        serviceType: serviceType === "standard" ? "standard_cleaning"
-          : serviceType === "deep" ? "deep_clean"
-          : serviceType === "move" ? "move_in_out"
-          : "recurring",
-        beds: beds ? parseInt(beds) : null,
-        baths: baths ? parseFloat(baths) : null,
-        sqft: s2.sqft ? SQFT_MIDPOINTS[s2.sqft] : null,
-        frequency: serviceType === "recurring" ? "biweekly" : "one-time",
-        pets: s2.pets,
-        addOns: s2.addOns,
-        condition: s2.condition,
-        preferredDate: s2.preferredDate || null,
-        confidence: beds && baths && s2.sqft ? "high" : "medium",
-        missingFields: [],
-      };
-
-      // Use instant booking endpoint when a slot is selected
-      if (selectedSlot) {
-        const r = await fetch(`${API_BASE}/api/public/lead-link/${slug}/instant-book`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customerName: name.trim(),
-            customerPhone: phone.trim(),
-            customerEmail: email.trim(),
-            customerAddress: address.trim(),
-            slotStart: selectedSlot.startDatetime,
-            slotEnd: selectedSlot.endDatetime,
-            serviceType: extractedFields.serviceType,
-            priceRange,
-            extractedFields,
-          }),
-        });
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({}));
-          throw new Error(err.error || err.message || "Booking failed. Please try again.");
-        }
-        trackEventWithMeta(slug!, "leadlink_instant_booked", false);
-        setStep("step4");
-        scrollToTop();
-        return;
-      }
-
-      const r = await fetch(`${API_BASE}/api/public/intake/${config.businessId}`, {
+      const resp = await fetch(`${API_BASE}/api/public/quote-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerName: name.trim(),
-          customerPhone: phone.trim(),
-          customerEmail: email.trim(),
-          customerAddress: address.trim(),
-          extractedFields,
-          priceRange: priceRange,
-          source: "lead_link",
+          businessSlug: slug,
+          contact: {
+            firstName: form.firstName.trim(), lastName: form.lastName.trim(),
+            email: form.email.trim().toLowerCase(),
+            phone: form.phone.trim() || undefined, zip: form.zip.trim(),
+          },
+          home: {
+            serviceType: form.serviceType, bedrooms: form.bedrooms,
+            bathrooms: form.bathrooms, sqft: form.sqft || undefined,
+            condition: form.condition, extras: form.extras,
+          },
+          preferences: {
+            preferredDate: form.preferredDate || undefined,
+            preferredTime: form.preferredTime,
+            notes: form.notes.trim() || undefined,
+            source: form.source || undefined,
+          },
         }),
       });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        throw new Error(err.message || "Submission failed. Please try again.");
-      }
-      trackEventWithMeta(slug!, "leadlink_submitted", !!config?.usingDefaultPricing);
-      setStep("step4");
-      scrollToTop();
-    } catch (e: any) {
-      setSubmitError(e.message || "Something went wrong. Please try again.");
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.message || "Submission failed");
+      navigate(
+        `/request/${slug}/pending?leadId=${data.leadId}&email=${encodeURIComponent(form.email)}${data.autopilot ? "" : "&mode=manual"}`
+      );
+    } catch (err: any) {
+      setSubmitError(err.message || "Failed to submit. Please try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (configLoading) {
+  function setField<K extends keyof FormData>(key: K, value: FormData[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+    setErrors((e) => ({ ...e, [key]: undefined }));
+  }
+
+  function toggleExtra(id: string) {
+    setForm((f) => ({
+      ...f,
+      extras: f.extras.includes(id) ? f.extras.filter((x) => x !== id) : [...f.extras, id],
+    }));
+  }
+
+  if (bizLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: primary }} />
+      <div style={centered}>
+        <Loader2 size={36} style={{ color: "#9CA3AF", animation: "spin 1s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
     );
   }
 
-  if (configError || !config) {
+  if (bizError || !biz) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-        <div className="text-center p-8 max-w-sm">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Page Not Found</h2>
-          <p className="text-slate-500 text-sm">This quote link may be invalid or no longer active. Contact the business directly.</p>
-        </div>
+      <div style={{ ...centered, padding: 24 }}>
+        <AlertCircle size={48} style={{ color: "#EF4444", marginBottom: 16 }} />
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 8px" }}>Page not found</h2>
+        <p style={{ color: "#6B7280", margin: 0 }}>This quote request page doesn't exist or is no longer available.</p>
       </div>
     );
   }
+
+  const steps = ["Contact Info", "Home Details", "Preferences"];
 
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ background: "linear-gradient(160deg, #f8faff 0%, #eff6ff 100%)" }}
-    >
-      {/* Soft pricing note — only when pricing is not fully configured */}
-      {!config.isPricingComplete && step !== "step4" && (
-        <div
-          style={{
-            position: "sticky", top: 0, zIndex: 30,
-            background: "#eff6ff",
-            borderBottom: "1px solid #bfdbfe",
-            padding: "8px 16px",
-            fontSize: 12,
-            textAlign: "center",
-            color: "#1d4ed8",
-          }}
-        >
-          <Clock className="inline w-3 h-3 mr-1 mb-0.5" style={{ color: "#3b82f6" }} />
-          Estimates are based on local market data. {config.companyName} will review your details and follow up with your personalized quote.
-        </div>
-      )}
+    <div style={{ minHeight: "100vh", background: "#F3F4F6", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes fadeUp { from { opacity:0;transform:translateY(10px) } to { opacity:1;transform:translateY(0) } }
+        * { box-sizing: border-box; }
+        input,select,textarea { font-family: inherit; }
+        .ll-btn:hover { filter: brightness(0.92); }
+        .ll-btn:active { transform: scale(0.98); }
+      `}</style>
 
-      {/* Scroll target */}
-      <div ref={scrollTopRef} />
-
-      {/* Sticky top header */}
-      <div
-        className="sticky top-0 z-20 flex items-center gap-3 px-4 py-3 border-b border-slate-100"
-        style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)" }}
-      >
-        {config.logoUri ? (
-          <img src={config.logoUri} alt={config.companyName} className="w-8 h-8 rounded-lg object-cover shrink-0" />
+      {/* Header */}
+      <div style={{ background: color, padding: "22px 16px 18px", textAlign: "center" }}>
+        {biz.logoUri ? (
+          <img src={biz.logoUri} alt={biz.companyName} style={{ maxHeight: 52, maxWidth: 180, objectFit: "contain", marginBottom: 6 }} />
         ) : (
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
-            style={{ background: primary }}
-          >
-            {config.companyName.charAt(0).toUpperCase()}
+          <div style={{ fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 2 }}>{biz.companyName}</div>
+        )}
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Request your free cleaning quote</div>
+      </div>
+
+      {/* Progress */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 16px" }}>
+        <div style={{ maxWidth: 540, margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+            {steps.map((label, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{
+                  width: 26, height: 26, borderRadius: "50%",
+                  background: step > i + 1 ? color : step === i + 1 ? color : "#E5E7EB",
+                  color: step >= i + 1 ? "#fff" : "#9CA3AF",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 12, fontWeight: 700, flexShrink: 0, transition: "all .2s",
+                }}>
+                  {step > i + 1 ? <Check size={13} /> : i + 1}
+                </div>
+                <span style={{ fontSize: 12, fontWeight: step === i + 1 ? 700 : 400, color: step === i + 1 ? "#111827" : "#9CA3AF" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ height: 4, background: "#E5E7EB", borderRadius: 2 }}>
+            <div style={{ height: 4, background: color, borderRadius: 2, width: `${((step - 1) / 2) * 100}%`, transition: "width .35s ease" }} />
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ maxWidth: 540, margin: "0 auto", padding: "24px 16px 56px" }}>
+
+        {/* ── STEP 1 ── */}
+        {step === 1 && (
+          <div style={{ animation: "fadeUp .2s ease" }}>
+            <h2 style={h2}>Tell us who you are</h2>
+            <p style={subtext}>We'll send your personalized quote to your email.</p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <Field label="First name *" error={errors.firstName}>
+                <input value={form.firstName} onChange={(e) => setField("firstName", e.target.value)}
+                  placeholder="Jane" style={inp(!!errors.firstName, color)} autoComplete="given-name" />
+              </Field>
+              <Field label="Last name *" error={errors.lastName}>
+                <input value={form.lastName} onChange={(e) => setField("lastName", e.target.value)}
+                  placeholder="Smith" style={inp(!!errors.lastName, color)} autoComplete="family-name" />
+              </Field>
+            </div>
+
+            <Field label="Email address *" error={errors.email} mb={12}>
+              <InputIcon icon={<Mail size={15} />}>
+                <input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)}
+                  placeholder="jane@example.com" style={inp(!!errors.email, color)} autoComplete="email" />
+              </InputIcon>
+            </Field>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 28 }}>
+              <Field label="Phone (optional)">
+                <InputIcon icon={<Phone size={15} />}>
+                  <input type="tel" value={form.phone} onChange={(e) => setField("phone", e.target.value)}
+                    placeholder="(555) 000-0000" style={inp(false, color)} autoComplete="tel" />
+                </InputIcon>
+              </Field>
+              <Field label="ZIP code *" error={errors.zip}>
+                <InputIcon icon={<MapPin size={15} />}>
+                  <input value={form.zip} onChange={(e) => setField("zip", e.target.value)}
+                    placeholder="90210" maxLength={10} style={inp(!!errors.zip, color)} autoComplete="postal-code" />
+                </InputIcon>
+              </Field>
+            </div>
+
+            <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap", marginBottom: 28, padding: "14px 16px", background: rgba(color, 0.06), borderRadius: 12 }}>
+              {[
+                { icon: <Sparkles size={14} />, label: "AI-Powered Quote" },
+                { icon: <Clock size={14} />, label: "Ready in < 60 Seconds" },
+                { icon: <Star size={14} />, label: "No Obligation" },
+              ].map((b, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#374151", fontWeight: 600 }}>
+                  <span style={{ color }}>{b.icon}</span>{b.label}
+                </div>
+              ))}
+            </div>
+
+            <Btn color={color} onClick={handleNext} type="button">
+              Continue <ChevronRight size={18} />
+            </Btn>
           </div>
         )}
-        <span className="font-semibold text-slate-800 text-sm truncate">{config.companyName}</span>
-        <div className="ml-auto shrink-0">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: `${primary}15`, color: primary }}>
-            Free Quote
-          </span>
-        </div>
-      </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex items-start justify-center px-4 py-6 pb-24">
-        <div className="w-full" style={{ maxWidth: 480 }}>
+        {/* ── STEP 2 ── */}
+        {step === 2 && (
+          <div style={{ animation: "fadeUp .2s ease" }}>
+            <h2 style={h2}>Tell us about your home</h2>
+            <p style={subtext}>This helps us give you an accurate quote.</p>
 
-          {/* ─── STEP 1: 3 Core Fields ─── */}
-          {step === "step1" && (
-            <div>
-              <ProgressDots step="step1" />
-
-              <div className="text-center mb-6">
-                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: primary, letterSpacing: "1.5px" }}>
-                  Step 1 of 3
-                </p>
-                <h1 className="text-2xl font-bold text-slate-900 mb-1">Get Your Price Estimate</h1>
-                <p className="text-sm text-slate-500">Takes 60 seconds — see your range instantly</p>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-6">
-                {/* Bedrooms */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-3">Bedrooms</label>
-                  <PillSelector
-                    primary={primary}
-                    value={beds}
-                    onChange={setBeds}
-                    options={[
-                      { value: "0", label: "Studio" },
-                      { value: "1", label: "1" },
-                      { value: "2", label: "2" },
-                      { value: "3", label: "3" },
-                      { value: "4", label: "4" },
-                      { value: "5", label: "5+" },
-                    ]}
-                  />
-                </div>
-
-                {/* Bathrooms */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-3">Bathrooms</label>
-                  <PillSelector
-                    primary={primary}
-                    value={baths}
-                    onChange={setBaths}
-                    options={[
-                      { value: "1", label: "1" },
-                      { value: "1.5", label: "1.5" },
-                      { value: "2", label: "2" },
-                      { value: "2.5", label: "2.5" },
-                      { value: "3", label: "3" },
-                      { value: "4", label: "4+" },
-                    ]}
-                  />
-                </div>
-
-                {/* Cleaning Type */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-3">Cleaning Type</label>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <ServiceCard value="standard" label="Standard Clean" icon={Home} selected={serviceType === "standard"} primary={primary} onClick={() => setServiceType("standard")} />
-                    <ServiceCard value="deep" label="Deep Clean" icon={Star} selected={serviceType === "deep"} primary={primary} onClick={() => setServiceType("deep")} />
-                    <ServiceCard value="move" label="Move In/Out" icon={Wind} selected={serviceType === "move"} primary={primary} onClick={() => setServiceType("move")} />
-                    <ServiceCard value="recurring" label="Recurring" icon={RefreshCw} selected={serviceType === "recurring"} primary={primary} onClick={() => setServiceType("recurring")} />
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={goToReveal}
-                disabled={!step1Valid}
-                className="w-full mt-5 flex items-center justify-center gap-2 font-bold text-white rounded-2xl transition-all"
-                style={{
-                  height: 56,
-                  fontSize: 16,
-                  background: step1Valid
-                    ? `linear-gradient(135deg, ${primary}, #06b6d4)`
-                    : "#e2e8f0",
-                  color: step1Valid ? "#fff" : "#94a3b8",
-                  transform: step1Valid ? "scale(1)" : "scale(0.98)",
-                  boxShadow: step1Valid ? `0 0 24px ${primary}40` : "none",
-                  transition: "all 0.2s ease",
-                  cursor: step1Valid ? "pointer" : "not-allowed",
-                }}
-              >
-                See My Price <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          {/* ─── CALCULATING ─── */}
-          {step === "calculating" && (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
-                style={{ background: `${primary}15` }}
-              >
-                <Loader2 className="w-7 h-7 animate-spin" style={{ color: primary }} />
-              </div>
-              <p className="text-base font-semibold text-slate-600">Calculating your estimate...</p>
-              <p className="text-sm text-slate-400 mt-1">Based on local pricing data</p>
-            </div>
-          )}
-
-          {/* ─── PRICE REVEAL ─── */}
-          {step === "reveal" && priceRange && (
-            <div>
-              <ProgressDots step="reveal" />
-
-              <div className="text-center mb-4">
-                <p className="text-sm text-slate-500 mb-3">
-                  Estimate for your{" "}
-                  <span className="font-semibold text-slate-700">
-                    {beds === "0" ? "Studio" : `${beds} bed`} / {baths} bath home
-                  </span>
-                </p>
-              </div>
-
-              {/* Move-in/out info note */}
-              {(serviceType === "move") && (
-                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 mb-4 flex gap-2">
-                  <Clock className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-700 leading-relaxed">
-                    Move in/out cleans typically take 2–3x longer than standard cleans — every surface is cleaned from scratch.
-                  </p>
-                </div>
-              )}
-
-              {/* Big price reveal */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 mb-5">
-                <div className="text-center">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4" style={{ letterSpacing: "1.5px" }}>
-                    {serviceType === "standard" ? "Standard Clean"
-                      : serviceType === "deep" ? "Deep Clean"
-                      : serviceType === "move" ? "Move In/Out Clean"
-                      : "Recurring Clean"} &middot; {config.isPricingComplete ? "Estimated range" : "Market-based estimate"}
-                  </p>
-
-                  <div
-                    className="font-black leading-none mb-3"
-                    style={{ fontSize: "clamp(40px, 12vw, 64px)", color: primary, letterSpacing: "-0.02em" }}
-                  >
-                    ${lowCount.toLocaleString()} – ${highCount.toLocaleString()}
-                  </div>
-
-                  {/* Context line */}
-                  <p className="text-sm text-slate-500 mb-4">
-                    Estimated for a{" "}
-                    <span className="font-medium text-slate-700">
-                      {beds === "0" ? "studio" : `${beds} bed`} / {baths} bath{" "}
-                      {serviceType === "standard" ? "Standard Clean"
-                        : serviceType === "deep" ? "Deep Clean"
-                        : serviceType === "move" ? "Move In/Out"
-                        : "Recurring Clean"}
-                    </span>
-                  </p>
-
-                  {/* Trust signals */}
-                  <div className="flex items-center justify-center gap-4 flex-wrap mb-4">
-                    {[
-                      "No hidden fees",
-                      "Free to get a quote",
-                      `${config.companyName} rated ${config.rating ?? 4.9}★`,
-                    ].map((t) => (
-                      <div key={t} className="flex items-center gap-1 text-xs text-slate-500">
-                        <Check className="w-3 h-3 text-emerald-500 shrink-0" />
-                        <span>{t}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Why this range? */}
-                  <div className="border-t border-slate-100 pt-4">
-                    <button
-                      onClick={() => setShowWhyRange((v) => !v)}
-                      className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 mx-auto transition-colors"
-                    >
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      How is this calculated?
-                      <ChevronRight className={`w-3 h-3 transition-transform ${showWhyRange ? "rotate-90" : ""}`} />
-                    </button>
-                    {showWhyRange && (
-                      <div className="mt-3 text-xs text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3 text-left">
-                        This range is calculated from typical cleaning hours for a{" "}
-                        {beds === "0" ? "studio" : `${beds}-bedroom`} home, using {config.companyName}'s{" "}
-                        rates and local market data. Your final quote will be tailored to your home after review.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={goToStep2}
-                className="w-full flex items-center justify-center gap-2 font-bold text-white rounded-2xl"
-                style={{
-                  height: 56,
-                  fontSize: 16,
-                  background: `linear-gradient(135deg, ${primary}, #06b6d4)`,
-                  boxShadow: `0 0 24px ${primary}40`,
-                }}
-              >
-                {config.hasInstantMode && config.availability?.enabled && slots.length > 0
-                  ? <><Clock className="w-4 h-4" /> Pick a Time</>
-                  : <>Get My Exact Quote <ArrowRight className="w-4 h-4" /></>}
-              </button>
-
-              <button
-                onClick={() => setStep("step1")}
-                className="w-full mt-3 py-3 text-sm text-slate-400 hover:text-slate-600 flex items-center justify-center gap-1"
-              >
-                <ChevronLeft className="w-4 h-4" /> Change my answers
-              </button>
-            </div>
-          )}
-
-          {/* ─── SLOT PICKER ─── */}
-          {step === "slot_pick" && priceRange && (
-            <div>
-              <ProgressDots step="slot_pick" />
-
-              <div className="text-center mb-5">
-                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: primary, letterSpacing: "1.5px" }}>
-                  Choose Your Time
-                </p>
-                <h2 className="text-xl font-bold text-slate-900">When works for you?</h2>
-                <p className="text-sm text-slate-500 mt-1">Select a time slot and we'll hold it for you</p>
-              </div>
-
-              {/* Price badge */}
-              <div className="flex items-center justify-center gap-2 py-2 px-4 rounded-xl mb-5" style={{ background: "#eff6ff" }}>
-                <Zap className="w-3.5 h-3.5 shrink-0" style={{ color: primary }} />
-                <span className="text-sm font-bold" style={{ color: "#1e40af" }}>
-                  Estimate: ${priceRange.low.toLocaleString()}–${priceRange.high.toLocaleString()}
-                </span>
-              </div>
-
-              {slotsLoading ? (
-                <div className="flex flex-col items-center py-12 text-slate-400">
-                  <Loader2 className="w-6 h-6 animate-spin mb-2" />
-                  <p className="text-sm">Loading available times...</p>
-                </div>
-              ) : slots.length === 0 ? (
-                <div className="text-center py-8 bg-white rounded-2xl border border-slate-100">
-                  <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-slate-600">No available slots right now</p>
-                  <p className="text-xs text-slate-400 mt-1">We'll contact you to schedule manually</p>
-                </div>
-              ) : (
-                <>
-                  {/* Date tabs */}
-                  <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
-                    {Array.from(new Set(slots.map((s) => s.date))).slice(0, 14).map((date) => {
-                      const d = new Date(date + "T00:00:00");
-                      const isSelected = selectedDate === date;
-                      return (
-                        <button
-                          key={date}
-                          onClick={() => { setSelectedDate(date); setSelectedSlot(null); }}
-                          className="flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all min-w-[56px]"
-                          style={{
-                            borderColor: isSelected ? primary : "#e2e8f0",
-                            background: isSelected ? `${primary}12` : "#fff",
-                            color: isSelected ? primary : "#475569",
-                          }}
-                        >
-                          <span style={{ fontSize: 10, opacity: 0.7 }}>
-                            {d.toLocaleDateString("en-US", { weekday: "short" })}
-                          </span>
-                          <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2, marginTop: 2 }}>
-                            {d.getDate()}
-                          </span>
-                          <span style={{ fontSize: 10, opacity: 0.7 }}>
-                            {d.toLocaleDateString("en-US", { month: "short" })}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Time slots for selected date */}
-                  <div className="grid grid-cols-2 gap-2 mb-6">
-                    {slots.filter((s) => s.date === selectedDate).map((slot) => {
-                      const isSelected = selectedSlot?.startDatetime === slot.startDatetime;
-                      return (
-                        <button
-                          key={slot.startDatetime}
-                          onClick={() => setSelectedSlot(slot)}
-                          className="py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all"
-                          style={{
-                            borderColor: isSelected ? primary : "#e2e8f0",
-                            background: isSelected ? `${primary}12` : "#fff",
-                            color: isSelected ? primary : "#374151",
-                          }}
-                        >
-                          {slot.startTime}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              <div className="fixed bottom-0 left-0 right-0 px-4 pb-5 pt-3" style={{ background: "linear-gradient(to top, rgba(248,250,255,1) 60%, transparent)" }}>
-                <div style={{ maxWidth: 480, margin: "0 auto" }}>
-                  <button
-                    onClick={goToStep2FromSlot}
-                    disabled={slots.length > 0 && !selectedSlot}
-                    className="w-full flex items-center justify-center gap-2 font-bold text-white rounded-2xl transition-all"
-                    style={{
-                      height: 56,
-                      fontSize: 16,
-                      background: (slots.length > 0 && !selectedSlot)
-                        ? "#e2e8f0"
-                        : `linear-gradient(135deg, ${primary}, #06b6d4)`,
-                      color: (slots.length > 0 && !selectedSlot) ? "#94a3b8" : "#fff",
-                      boxShadow: (slots.length > 0 && !selectedSlot) ? "none" : `0 0 24px ${primary}40`,
-                      cursor: (slots.length > 0 && !selectedSlot) ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {slots.length === 0 ? "Continue Without a Time" : "Confirm This Slot"} <ArrowRight className="w-4 h-4" />
+            {/* Service type */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={lbl}>Service type</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {SERVICE_TYPES.map((s) => (
+                  <button key={s.id} type="button" onClick={() => setField("serviceType", s.id)}
+                    style={card(form.serviceType === s.id, color)}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 2 }}>{s.label}</div>
+                    <div style={{ fontSize: 11, color: "#6B7280" }}>{s.desc}</div>
                   </button>
-                  <button
-                    onClick={() => setStep("reveal")}
-                    className="w-full mt-2 py-2 text-sm text-slate-400 hover:text-slate-600 text-center"
-                  >
-                    <ChevronLeft className="inline w-4 h-4" /> Back
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ─── STEP 2: Details ─── */}
-          {step === "step2" && priceRange && (
-            <div>
-              <ProgressDots step="step2" />
-
-              {/* Persistent price bar */}
-              <PriceBadge low={priceRange.low} high={priceRange.high} flash={priceFlash} />
-
-              {/* "Getting more accurate" tooltip — fades in/out when range narrows */}
-              <div
-                style={{
-                  overflow: "hidden",
-                  maxHeight: accuracyTooltip ? "32px" : "0px",
-                  opacity: accuracyTooltip ? 1 : 0,
-                  transition: "max-height 0.25s ease, opacity 0.25s ease",
-                  marginBottom: accuracyTooltip ? "12px" : "0px",
-                  textAlign: "center",
-                }}
-              >
-                <span
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
-                  style={{ background: "#dbeafe", color: "#1d4ed8" }}
-                >
-                  <Zap className="w-3 h-3" />
-                  Getting more accurate…
-                </span>
-              </div>
-
-              <div className="text-center mb-5">
-                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: primary, letterSpacing: "1.5px" }}>
-                  Step 2 of 3
-                </p>
-                <h2 className="text-xl font-bold text-slate-900">A Few More Details</h2>
-                <p className="text-sm text-slate-500 mt-1">Helps narrow your estimate</p>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-6">
-
-                {/* Home size */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-3">Home Size</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { value: "under1000", label: "Under 1,000 sq ft" },
-                      { value: "1000_1500", label: "1,000–1,500" },
-                      { value: "1500_2000", label: "1,500–2,000" },
-                      { value: "2000_2500", label: "2,000–2,500" },
-                      { value: "2500_3000", label: "2,500–3,000" },
-                      { value: "3000plus", label: "3,000+ sq ft" },
-                    ].map((opt) => {
-                      const sel = s2.sqft === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          onClick={() => handleStep2Change({ sqft: opt.value as SqftRange })}
-                          className="py-3 px-3 rounded-xl border-2 text-sm font-semibold transition-all min-h-[44px]"
-                          style={{
-                            borderColor: sel ? primary : "#e2e8f0",
-                            background: sel ? `${primary}10` : "#fff",
-                            color: sel ? primary : "#374151",
-                          }}
-                        >
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Condition */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-3">Home Condition</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <ConditionCard
-                      value="great" emoji="✨" label="Great shape"
-                      desc="Recently cleaned, well maintained"
-                      selected={s2.condition === "great"} primary={primary}
-                      onClick={() => handleStep2Change({ condition: "great" })}
-                    />
-                    <ConditionCard
-                      value="average" emoji="😐" label="Average"
-                      desc="Normal everyday mess"
-                      selected={s2.condition === "average"} primary={primary}
-                      onClick={() => handleStep2Change({ condition: "average" })}
-                    />
-                    <ConditionCard
-                      value="needs_work" emoji="🧹" label="Needs work"
-                      desc="Hasn't been cleaned in a while"
-                      selected={s2.condition === "needs_work"} primary={primary}
-                      onClick={() => handleStep2Change({ condition: "needs_work" })}
-                    />
-                  </div>
-                </div>
-
-                {/* Pets */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-bold text-slate-700">Do you have pets?</label>
-                    <button
-                      onClick={() => handleStep2Change({ pets: !s2.pets })}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all"
-                      style={{
-                        borderColor: s2.pets ? primary : "#e2e8f0",
-                        background: s2.pets ? `${primary}10` : "#f8fafc",
-                        color: s2.pets ? primary : "#94a3b8",
-                      }}
-                    >
-                      {s2.pets ? "Yes" : "No"}
-                    </button>
-                  </div>
-                  {s2.pets && (
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-sm text-slate-600">How many?</span>
-                      <div className="flex items-center gap-2 ml-auto">
-                        <button
-                          onClick={() => handleStep2Change({ petCount: Math.max(1, s2.petCount - 1) })}
-                          className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:border-slate-400 transition-colors"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="w-6 text-center font-bold text-slate-800">{s2.petCount}</span>
-                        <button
-                          onClick={() => handleStep2Change({ petCount: Math.min(5, s2.petCount + 1) })}
-                          className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:border-slate-400 transition-colors"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Add-ons */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">
-                    Anything extra?{" "}
-                    <span className="font-normal text-slate-400">(optional)</span>
-                  </label>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {[
-                      { key: "insideFridge", label: "Inside Fridge" },
-                      { key: "insideOven", label: "Inside Oven" },
-                      { key: "interiorWindows", label: "Interior Windows" },
-                      { key: "baseboardsDetail", label: "Baseboards" },
-                      { key: "laundryFoldOnly", label: "Laundry Fold" },
-                      { key: "insideCabinets", label: "Inside Cabinets" },
-                    ].map((addon) => {
-                      const sel = !!s2.addOns[addon.key];
-                      return (
-                        <button
-                          key={addon.key}
-                          onClick={() => handleStep2Change({ addOns: { ...s2.addOns, [addon.key]: !sel } })}
-                          className="px-3.5 py-2 rounded-full text-xs font-semibold border-2 transition-all min-h-[36px]"
-                          style={{
-                            borderColor: sel ? primary : "#e2e8f0",
-                            background: sel ? `${primary}15` : "#fff",
-                            color: sel ? primary : "#64748b",
-                          }}
-                        >
-                          {sel ? "✓ " : ""}{addon.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Preferred date */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">
-                    When were you thinking?{" "}
-                    <span className="font-normal text-slate-400">(optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={s2.preferredDate}
-                    onChange={(e) => setS2((prev) => ({ ...prev, preferredDate: e.target.value }))}
-                    placeholder="e.g. Next week, ASAP, specific date"
-                    className="w-full mt-2 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 outline-none transition-colors"
-                    style={{ minHeight: 48, fontSize: 16 }}
-                    onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = primary; }}
-                    onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"; }}
-                  />
-                </div>
-              </div>
-
-              {/* Sticky CTA */}
-              <div className="fixed bottom-0 left-0 right-0 px-4 pb-5 pt-3" style={{ background: "linear-gradient(to top, rgba(248,250,255,1) 60%, transparent)" }}>
-                <div style={{ maxWidth: 480, margin: "0 auto" }}>
-                  <button
-                    onClick={goToStep3}
-                    className="w-full flex items-center justify-center gap-2 font-bold text-white rounded-2xl"
-                    style={{
-                      height: 56,
-                      fontSize: 16,
-                      background: `linear-gradient(135deg, ${primary}, #06b6d4)`,
-                      boxShadow: `0 0 24px ${primary}40`,
-                    }}
-                  >
-                    Almost done <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ─── STEP 3: Contact Info ─── */}
-          {step === "step3" && priceRange && (
-            <div>
-              <ProgressDots step="step3" />
-
-              {/* Final price display */}
-              <div className="text-center mb-5">
-                <p className="text-xs font-semibold uppercase tracking-widest mb-2 text-slate-400" style={{ letterSpacing: "1.5px" }}>
-                  Your Quote Is Ready
-                </p>
-                <div
-                  className="font-black leading-none mb-2"
-                  style={{ fontSize: "clamp(36px, 10vw, 52px)", color: primary, letterSpacing: "-0.02em" }}
-                >
-                  ${priceRange.low.toLocaleString()} – ${priceRange.high.toLocaleString()}
-                </div>
-                <p className="text-sm text-slate-500">
-                  Enter your info and {config.companyName} will send your exact quote within minutes.
-                </p>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Full Name <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors"
-                    style={{ minHeight: 52, fontSize: 16 }}
-                    onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = primary; }}
-                    onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"; }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Phone Number <span className="text-red-500">*</span></label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Best number to reach you"
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors"
-                    style={{ minHeight: 52, fontSize: 16 }}
-                    onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = primary; }}
-                    onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"; }}
-                  />
-                  <p className="text-xs text-slate-400 mt-1">Your quote will be sent by text</p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                    Email <span className="text-slate-400 font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email (optional)"
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors"
-                    style={{ minHeight: 52, fontSize: 16 }}
-                    onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = primary; }}
-                    onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"; }}
-                  />
-                  <p className="text-xs text-slate-400 mt-1">Also send quote to my email</p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Home Address <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Home address"
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors"
-                    style={{ minHeight: 52, fontSize: 16 }}
-                    onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = primary; }}
-                    onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"; }}
-                  />
-                  <p className="text-xs text-slate-400 mt-1">So we can confirm we serve your area</p>
-                </div>
-
-                {(formError || submitError) && (
-                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-3">
-                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                    <p className="text-xs text-red-600 font-medium">{formError || submitError}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Trust block */}
-              <div className="flex items-center gap-2 px-4 py-3 mt-4 bg-slate-50 rounded-xl border border-slate-100">
-                <Shield className="w-4 h-4 text-slate-400 shrink-0" />
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Your info is never shared or sold. QuotePro is used by 127+ cleaning businesses.
-                </p>
-              </div>
-
-              {/* Sticky submit */}
-              <div className="fixed bottom-0 left-0 right-0 px-4 pb-5 pt-3" style={{ background: "linear-gradient(to top, rgba(248,250,255,1) 60%, transparent)" }}>
-                <div style={{ maxWidth: 480, margin: "0 auto" }}>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl font-bold text-white transition-all"
-                    style={{
-                      height: 56,
-                      fontSize: 18,
-                      background: submitting ? "#94a3b8" : `linear-gradient(135deg, #2563eb, #06b6d4)`,
-                      boxShadow: submitting ? "none" : "0 0 24px rgba(37,99,235,0.35)",
-                      cursor: submitting ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {submitting
-                      ? <><Loader2 className="w-5 h-5 animate-spin" /> Sending your request...</>
-                      : <>Send Me My Quote <ArrowRight className="w-5 h-5" /></>}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ─── STEP 4: Confirmation ─── */}
-          {step === "step4" && (
-            <div className="text-center py-4">
-              {/* Animated checkmark */}
-              <div className="flex justify-center mb-6">
-                <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center"
-                  style={{
-                    background: "linear-gradient(135deg, #10b981, #059669)",
-                    boxShadow: "0 0 32px rgba(16,185,129,0.4)",
-                    animation: "popIn 0.5s cubic-bezier(0.34,1.56,0.64,1)",
-                  }}
-                >
-                  <Check className="w-10 h-10 text-white" strokeWidth={3} />
-                </div>
-              </div>
-
-              <h1 className="text-2xl font-black text-slate-900 mb-2">
-                {selectedSlot ? "You're booked!" : `You're all set, ${name.split(" ")[0]}!`}
-              </h1>
-              <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto leading-relaxed">
-                {selectedSlot
-                  ? `Your appointment with ${config.companyName} is confirmed. We'll see you on ${new Date(selectedSlot.startDatetime).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${selectedSlot.startTime}.`
-                  : `${config.companyName} has your details and is preparing your quote now. You'll receive a text at ${phone} shortly.`}
-              </p>
-
-              {/* Urgency / Booking confirmed */}
-              {selectedSlot ? (
-                <div
-                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl mb-6"
-                  style={{ background: "#dcfce7", border: "1px solid #86efac" }}
-                >
-                  <Check className="w-4 h-4 shrink-0" style={{ color: "#16a34a" }} />
-                  <span className="text-sm font-semibold" style={{ color: "#15803d" }}>
-                    Booking confirmed — {selectedSlot.startTime}
-                  </span>
-                </div>
-              ) : (
-                <div
-                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl mb-6"
-                  style={{ background: "#fffbeb", border: "1px solid #fde68a" }}
-                >
-                  <Clock className="w-4 h-4 shrink-0" style={{ color: "#d97706" }} />
-                  <span className="text-sm font-semibold" style={{ color: "#92400e" }}>
-                    Most quotes arrive in under 10 minutes
-                  </span>
-                </div>
-              )}
-
-              {/* What happens next */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 text-left mb-6">
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4" style={{ letterSpacing: "1.2px" }}>
-                  What happens next
-                </p>
-                {(selectedSlot ? [
-                  `${config.companyName} will reach out to confirm your appointment`,
-                  "You'll receive a reminder the day before",
-                  "Enjoy your professionally cleaned home!",
-                ] : [
-                  `${config.companyName} reviews your home details`,
-                  "You receive your personalized quote by text",
-                  "Book directly from the quote link",
-                ]).map((item, i) => (
-                  <div key={i} className="flex items-start gap-3 mb-3 last:mb-0">
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5"
-                      style={{ background: primary }}
-                    >
-                      {i + 1}
-                    </div>
-                    <p className="text-sm text-slate-700 leading-relaxed">{item}</p>
-                  </div>
                 ))}
               </div>
-
-              {/* Share prompt */}
-              <SharePrompt companyName={config.companyName} url={window.location.href} />
             </div>
-          )}
-        </div>
-      </div>
 
-      <style>{`
-        @keyframes popIn {
-          from { transform: scale(0.5); opacity: 0; }
-          to   { transform: scale(1);   opacity: 1; }
-        }
-      `}</style>
+            {/* Beds & baths */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+              <div>
+                <label style={lbl}>Bedrooms</label>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} type="button" onClick={() => setField("bedrooms", n)}
+                      style={chip(form.bedrooms === n, color)}>{n === 5 ? "5+" : n}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Bathrooms</label>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[1, 1.5, 2, 2.5, 3, 4].map((n) => (
+                    <button key={n} type="button" onClick={() => setField("bathrooms", n)}
+                      style={chip(form.bathrooms === n, color)}>{n === 4 ? "4+" : n}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Sqft */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={lbl}>Home size (optional)</label>
+              <select value={form.sqft} onChange={(e) => setField("sqft", e.target.value)} style={sel()}>
+                {SQFT_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+            </div>
+
+            {/* Condition */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={lbl}>
+                Home condition *
+                {errors.condition && <span style={{ color: "#EF4444", marginLeft: 6, fontWeight: 400 }}>{errors.condition}</span>}
+              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {CONDITIONS.map((c) => (
+                  <button key={c.id} type="button" onClick={() => setField("condition", c.id)}
+                    style={{ ...card(form.condition === c.id, color), display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
+                    <span style={{ fontSize: 22 }}>{c.emoji}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{c.label}</span>
+                    {form.condition === c.id && <Check size={16} style={{ color, marginLeft: "auto" }} />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Extras */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={lbl}>Add-ons (optional — may affect price)</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {EXTRAS.map((ex) => {
+                  const on = form.extras.includes(ex.id);
+                  return (
+                    <button key={ex.id} type="button" onClick={() => toggleExtra(ex.id)}
+                      style={{ padding: "7px 14px", border: `2px solid ${on ? color : "#D1D5DB"}`, borderRadius: 20, background: on ? rgba(color, 0.08) : "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: on ? color : "#374151", display: "flex", alignItems: "center", gap: 5, transition: "all .15s" }}>
+                      {on && <Check size={12} />}{ex.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <BackBtn onClick={handleBack} />
+              <Btn color={color} onClick={handleNext} type="button" flex>
+                Continue <ChevronRight size={18} />
+              </Btn>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 3 ── */}
+        {step === 3 && (
+          <div style={{ animation: "fadeUp .2s ease" }}>
+            <h2 style={h2}>Almost there!</h2>
+            <p style={subtext}>A few last details and your quote will be on its way.</p>
+
+            {/* Date */}
+            <Field label="Preferred start date (optional)" mb={14}>
+              <InputIcon icon={<Calendar size={15} />}>
+                <input type="date" value={form.preferredDate} min={minDate}
+                  onChange={(e) => setField("preferredDate", e.target.value)}
+                  style={inp(false, color)} />
+              </InputIcon>
+              <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>Must be at least 48 hours from today</div>
+            </Field>
+
+            {/* Time */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={lbl}>Preferred time</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {TIME_OPTIONS.map((t) => (
+                  <button key={t.id} type="button" onClick={() => setField("preferredTime", t.id)}
+                    style={{ flex: 1, padding: "10px 8px", border: `2px solid ${form.preferredTime === t.id ? color : "#D1D5DB"}`, borderRadius: 10, background: form.preferredTime === t.id ? rgba(color, 0.08) : "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, color: form.preferredTime === t.id ? color : "#374151", transition: "all .15s", textAlign: "center" }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Source */}
+            <Field label="How did you hear about us? (optional)" mb={14}>
+              <select value={form.source} onChange={(e) => setField("source", e.target.value)} style={sel()}>
+                <option value="">Select…</option>
+                <option value="google">Google</option>
+                <option value="yelp">Yelp</option>
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+                <option value="nextdoor">Nextdoor</option>
+                <option value="referral">Friend / Referral</option>
+                <option value="other">Other</option>
+              </select>
+            </Field>
+
+            {/* Notes */}
+            <Field label="Special instructions (optional)" mb={24}>
+              <InputIcon icon={<MessageSquare size={15} />} top>
+                <textarea value={form.notes} onChange={(e) => setField("notes", e.target.value)}
+                  placeholder="Gate code, pets, areas to focus on…" rows={3}
+                  style={{ ...inp(false, color), paddingTop: 10, paddingBottom: 10, resize: "vertical" }} />
+              </InputIcon>
+            </Field>
+
+            {submitError && (
+              <div style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 10, alignItems: "center" }}>
+                <AlertCircle size={16} style={{ color: "#EF4444", flexShrink: 0 }} />
+                <span style={{ fontSize: 14, color: "#B91C1C" }}>{submitError}</span>
+              </div>
+            )}
+
+            {/* AI quote banner */}
+            <div style={{ background: rgba(color, 0.07), border: `1px solid ${rgba(color, 0.25)}`, borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <Sparkles size={18} style={{ color, flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 3 }}>
+                    {biz.autopilotEnabled ? "Your quote will be ready in under 60 seconds" : "We'll reach out with your quote shortly"}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
+                    {biz.autopilotEnabled
+                      ? "Our AI calculates a personalized quote and emails it to you with available booking times — no waiting on hold."
+                      : "Your request has been received. We'll review the details and be in touch soon."}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <BackBtn onClick={handleBack} />
+              <button type="submit" disabled={submitting} className="ll-btn"
+                style={{ flex: 1, padding: "14px 20px", background: submitting ? "#9CA3AF" : color, color: "#fff", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "background .2s" }}>
+                {submitting ? (
+                  <><Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> Submitting…</>
+                ) : (
+                  <><Sparkles size={18} /> Get My Free Quote</>
+                )}
+              </button>
+            </div>
+            <p style={{ textAlign: "center", fontSize: 11, color: "#9CA3AF", marginTop: 12 }}>
+              No obligation &bull; No credit card required
+            </p>
+          </div>
+        )}
+      </form>
     </div>
   );
 }
 
-// ─── Share Prompt ─────────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-function SharePrompt({ companyName, url }: { companyName: string; url: string }) {
-  const [visible, setVisible] = useState(false);
-  const [shared, setShared] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setVisible(true), 3000); return () => clearTimeout(t); }, []);
-  if (!visible) return null;
-
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: `Get a cleaning quote from ${companyName}`, url });
-        setShared(true);
-      } catch {}
-    } else {
-      await navigator.clipboard.writeText(url).catch(() => {});
-      setShared(true);
-    }
-  };
-
+function Field({ label, error, children, mb }: { label?: string; error?: string; children: React.ReactNode; mb?: number }) {
   return (
-    <div
-      className="rounded-2xl border border-slate-100 shadow-sm p-5 text-center"
-      style={{ animation: "slideUp 0.4s ease" }}
-    >
-      <p className="text-sm font-semibold text-slate-700 mb-3">Know someone who needs cleaning?</p>
-      <button
-        onClick={handleShare}
-        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold text-white transition-all"
-        style={{ background: shared ? "#10b981" : "#1e293b" }}
-      >
-        {shared ? <><Check className="w-4 h-4" /> Shared!</> : <><Share2 className="w-4 h-4" /> Share This Link</>}
-      </button>
+    <div style={{ marginBottom: mb ?? 0 }}>
+      {label && <label style={lbl}>{label}</label>}
+      {children}
+      {error && <div style={{ fontSize: 12, color: "#EF4444", marginTop: 4 }}>{error}</div>}
     </div>
   );
+}
+
+function InputIcon({ icon, children, top }: { icon: React.ReactNode; children: React.ReactNode; top?: boolean }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <span style={{ position: "absolute", left: 12, top: top ? 12 : "50%", transform: top ? undefined : "translateY(-50%)", color: "#9CA3AF", pointerEvents: "none" }}>{icon}</span>
+      {children}
+    </div>
+  );
+}
+
+function Btn({ color, onClick, type, children, flex }: { color: string; onClick?: () => void; type: "button" | "submit"; children: React.ReactNode; flex?: boolean }) {
+  return (
+    <button type={type} onClick={onClick} className="ll-btn"
+      style={{ width: flex ? undefined : "100%", flex: flex ? 1 : undefined, padding: "14px 20px", background: color, color: "#fff", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+      {children}
+    </button>
+  );
+}
+
+function BackBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="ll-btn"
+      style={{ padding: "14px 18px", border: "2px solid #D1D5DB", borderRadius: 12, background: "#fff", fontSize: 15, fontWeight: 600, color: "#374151", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+      <ChevronLeft size={16} /> Back
+    </button>
+  );
+}
+
+// ─── Style atoms ──────────────────────────────────────────────────────────────
+
+const h2: React.CSSProperties = { fontSize: 22, fontWeight: 800, color: "#111827", margin: "0 0 4px" };
+const subtext: React.CSSProperties = { color: "#6B7280", margin: "0 0 24px", fontSize: 14 };
+const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 };
+const centered: React.CSSProperties = { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F3F4F6", flexDirection: "column" };
+
+function inp(err: boolean, color: string): React.CSSProperties {
+  return { width: "100%", padding: "11px 14px 11px 36px", border: `1.5px solid ${err ? "#EF4444" : "#D1D5DB"}`, borderRadius: 10, fontSize: 15, color: "#111827", background: "#fff", outline: "none" };
+}
+function sel(): React.CSSProperties {
+  return { width: "100%", padding: "11px 14px", border: "1.5px solid #D1D5DB", borderRadius: 10, fontSize: 15, color: "#111827", background: "#fff", outline: "none", appearance: "none" };
+}
+function chip(on: boolean, color: string): React.CSSProperties {
+  return { padding: "7px 13px", border: `2px solid ${on ? color : "#D1D5DB"}`, borderRadius: 8, background: on ? rgba(color, 0.08) : "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700, color: on ? color : "#374151", transition: "all .15s" };
+}
+function card(on: boolean, color: string): React.CSSProperties {
+  return { width: "100%", padding: "12px 14px", border: `2px solid ${on ? color : "#E5E7EB"}`, borderRadius: 10, background: on ? rgba(color, 0.08) : "#fff", cursor: "pointer", textAlign: "left", transition: "all .15s" };
+}
+function rgba(hex: string, a: number): string {
+  const c = hex.replace("#", "");
+  if (c.length < 6) return `rgba(37,99,235,${a})`;
+  const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
 }

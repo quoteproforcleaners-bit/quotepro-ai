@@ -372,5 +372,272 @@ function buildOwnerNotificationEmail({
 </body></html>`;
 }
 
+// ─── NEW: Quote-Request Booking Token Flow ────────────────────────────────────
+// Used when lead clicks a slot button in the quote email
+
+router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+
+    const tokenRes = await pool.query(
+      `SELECT bt.*, l.contact, l.home, l.preferences, l.quote, l.quote_type,
+              b.company_name, b.logo_uri, b.primary_color, b.phone AS business_phone,
+              b.email AS business_email, b.address AS business_address,
+              u.id AS operator_user_id
+       FROM booking_tokens bt
+       JOIN leads l ON l.id = bt.lead_id
+       JOIN businesses b ON b.owner_user_id = bt.user_id
+       JOIN users u ON u.id = bt.user_id
+       WHERE bt.token = $1 LIMIT 1`,
+      [token]
+    );
+
+    if (tokenRes.rows.length === 0) {
+      return res.status(404).json({ message: "Booking link not found" });
+    }
+
+    const row = tokenRes.rows[0];
+
+    if (row.expires_at && new Date(row.expires_at) < new Date()) {
+      return res.status(410).json({ message: "This booking link has expired" });
+    }
+
+    if (row.used) {
+      return res.status(409).json({ message: "This booking has already been confirmed" });
+    }
+
+    return res.json({
+      token,
+      used: row.used,
+      expiresAt: row.expires_at,
+      contact: row.contact,
+      home: row.home,
+      preferences: row.preferences,
+      quote: row.quote,
+      quoteType: row.quote_type,
+      business: {
+        companyName: row.company_name,
+        logoUri: row.logo_uri,
+        primaryColor: row.primary_color || "#2563EB",
+        phone: row.business_phone,
+        email: row.business_email,
+        address: row.business_address,
+        userId: row.operator_user_id,
+      },
+    });
+  } catch (err: any) {
+    console.error("[bookingToken] GET error:", err.message);
+    return res.status(500).json({ message: "Failed to load booking" });
+  }
+});
+
+router.post("/api/booking-token/:token/confirm", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const { slot, address, notes } = req.body; // slot = "YYYY-MM-DDTHH:MM"
+
+    if (!slot) {
+      return res.status(400).json({ message: "Slot is required" });
+    }
+
+    // Parse slot
+    const [datePart, timePart] = slot.split("T");
+    if (!datePart || !timePart) {
+      return res.status(400).json({ message: "Invalid slot format" });
+    }
+
+    // Fetch token record (with transaction to prevent double-booking)
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Lock and fetch token
+      const tokenRes = await client.query(
+        `SELECT bt.*, l.contact, l.home, l.quote, l.quote_type, l.id AS lead_id,
+                b.company_name, b.logo_uri, b.primary_color, b.phone AS business_phone,
+                b.email AS business_email, u.id AS operator_user_id
+         FROM booking_tokens bt
+         JOIN leads l ON l.id = bt.lead_id
+         JOIN businesses b ON b.owner_user_id = bt.user_id
+         JOIN users u ON u.id = bt.user_id
+         WHERE bt.token = $1
+         FOR UPDATE`,
+        [token]
+      );
+
+      if (tokenRes.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Booking link not found" });
+      }
+
+      const row = tokenRes.rows[0];
+
+      if (row.used) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({ message: "This slot has already been booked" });
+      }
+
+      if (row.expires_at && new Date(row.expires_at) < new Date()) {
+        await client.query("ROLLBACK");
+        return res.status(410).json({ message: "This booking link has expired" });
+      }
+
+      // Try to claim the slot (unique constraint prevents double-booking)
+      try {
+        await client.query(
+          `INSERT INTO booked_slots (user_id, date, time_slot, lead_id)
+           VALUES ($1, $2, $3, $4)`,
+          [row.operator_user_id, datePart, timePart, row.lead_id]
+        );
+      } catch (slotErr: any) {
+        if (slotErr.code === "23505") {
+          await client.query("ROLLBACK");
+          return res.status(409).json({ message: "This time slot is no longer available. Please choose another." });
+        }
+        throw slotErr;
+      }
+
+      // Mark token as used
+      await client.query(
+        `UPDATE booking_tokens SET used = true, used_at = NOW() WHERE token = $1`,
+        [token]
+      );
+
+      // Create a booking record
+      const contact = row.contact as any;
+      const home = row.home as any;
+      const quote = row.quote as any;
+      const customerName = `${contact.firstName || ""} ${contact.lastName || ""}`.trim();
+      const quoteAmount = quote?.exactAmount || (quote?.rangeMin ? (quote.rangeMin + (quote.rangeMax || quote.rangeMin)) / 2 : null);
+
+      const bookingRes = await client.query(
+        `INSERT INTO bookings
+           (user_id, scheduled_date, scheduled_time, customer_name, customer_email,
+            customer_phone, service_type, address, quote_amount, status, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'confirmed', $10)
+         RETURNING *`,
+        [
+          row.operator_user_id,
+          datePart,
+          timePart,
+          customerName,
+          contact.email,
+          contact.phone || null,
+          home.serviceType,
+          address || null,
+          quoteAmount,
+          notes || null,
+        ]
+      );
+      const booking = bookingRes.rows[0];
+
+      // Update lead
+      await client.query(
+        `UPDATE leads SET status = 'booked', booking_confirmed_at = NOW() WHERE id = $1`,
+        [row.lead_id]
+      );
+
+      await client.query("COMMIT");
+
+      // Format display values
+      const displayDate = new Date(datePart + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "long", month: "long", day: "numeric", year: "numeric",
+      });
+      const [hStr, mStr] = timePart.split(":");
+      const h = parseInt(hStr, 10);
+      const m = parseInt(mStr, 10);
+      const period = h >= 12 ? "PM" : "AM";
+      const h12 = h % 12 || 12;
+      const displayTime = `${h12}:${String(m).padStart(2, "0")} ${period}`;
+
+      const serviceLabels: Record<string, string> = {
+        standard: "Standard Clean", deep: "Deep Clean",
+        move: "Move In / Move Out", post_construction: "Post-Construction Clean",
+      };
+      const serviceLabel = serviceLabels[home.serviceType] || home.serviceType || "Cleaning";
+
+      // Confirmation email to customer
+      if (contact.email) {
+        const color = (row.primary_color || "#2563EB").replace(/[^#a-fA-F0-9]/g, "");
+        sendEmail({
+          to: contact.email,
+          subject: `Your Cleaning is Confirmed! — ${row.company_name}`,
+          html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:-apple-system,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+  <tr><td style="background:${color};padding:28px 36px;text-align:center;">
+    <div style="font-size:22px;font-weight:800;color:#fff;">${row.company_name}</div>
+  </td></tr>
+  <tr><td style="padding:32px 36px;">
+    <p style="font-size:22px;font-weight:700;color:#111827;margin:0 0 8px;">You're all set, ${contact.firstName}! &#127881;</p>
+    <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 24px;">Your cleaning appointment has been confirmed. Here are your details:</p>
+    <div style="background:#F9FAFB;border-radius:12px;padding:20px;margin-bottom:24px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#374151;">&#128197; <strong>${displayDate}</strong></p>
+      <p style="margin:0 0 8px;font-size:14px;color:#374151;">&#128336; <strong>${displayTime}</strong></p>
+      <p style="margin:0 0 8px;font-size:14px;color:#374151;">&#127968; <strong>${serviceLabel}</strong> &bull; ${home.bedrooms}BR / ${home.bathrooms}BA</p>
+      ${address ? `<p style="margin:0;font-size:14px;color:#374151;">&#128205; ${address}</p>` : ""}
+    </div>
+    <p style="font-size:14px;color:#6B7280;line-height:1.6;margin:0;">Questions? Reply to this email${row.business_phone ? ` or call <strong>${row.business_phone}</strong>` : ""}.</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+          fromName: row.company_name,
+          replyTo: row.business_email || null,
+        }).catch((e: any) => console.error("[bookingToken] customer email error:", e.message));
+      }
+
+      // Notification email to operator
+      if (row.business_email) {
+        const color = (row.primary_color || "#2563EB").replace(/[^#a-fA-F0-9]/g, "");
+        sendEmail({
+          to: row.business_email,
+          subject: `New Booking — ${customerName || contact.email} on ${displayDate}`,
+          html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:-apple-system,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+  <tr><td style="background:${color};padding:28px 36px;">
+    <div style="font-size:13px;color:rgba(255,255,255,0.8);font-weight:600;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">QuotePro Autopilot</div>
+    <div style="font-size:22px;font-weight:800;color:#fff;">New Booking Confirmed</div>
+  </td></tr>
+  <tr><td style="padding:32px 36px;">
+    <p style="font-size:16px;color:#374151;line-height:1.6;margin:0 0 20px;"><strong>${customerName || "A customer"}</strong> just confirmed a booking through your Autopilot quote.</p>
+    <div style="background:#F9FAFB;border-radius:12px;padding:20px;margin-bottom:20px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#374151;"><strong>Customer:</strong> ${customerName}${contact.email ? ` &bull; ${contact.email}` : ""}${contact.phone ? ` &bull; ${contact.phone}` : ""}</p>
+      <p style="margin:0 0 8px;font-size:14px;color:#374151;"><strong>Date:</strong> ${displayDate} at ${displayTime}</p>
+      <p style="margin:0 0 8px;font-size:14px;color:#374151;"><strong>Service:</strong> ${serviceLabel} &bull; ${home.bedrooms}BR / ${home.bathrooms}BA</p>
+      ${quoteAmount ? `<p style="margin:0;font-size:14px;color:#374151;"><strong>Quote:</strong> $${Math.round(quoteAmount)}</p>` : ""}
+    </div>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+          fromName: "QuotePro Autopilot",
+          replyTo: null,
+        }).catch((e: any) => console.error("[bookingToken] owner email error:", e.message));
+      }
+
+      return res.json({
+        success: true,
+        booking: { id: booking.id, date: datePart, time: timePart, displayDate, displayTime },
+      });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err: any) {
+    console.error("[bookingToken] POST error:", err.message);
+    return res.status(500).json({ message: "Failed to confirm booking" });
+  }
+});
+
 export { buildCustomerConfirmationEmail, buildOwnerNotificationEmail };
 export default router;

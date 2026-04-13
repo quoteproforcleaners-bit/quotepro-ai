@@ -73,6 +73,8 @@ import TipPage from "./pages/TipPage";
 import OnboardingWizardPage from "./pages/OnboardingWizardPage";
 import QuoteDoctorPage from "./pages/QuoteDoctorPage";
 import JobCheckinPage from "./pages/JobCheckinPage";
+import LeadPendingPage from "./pages/LeadPendingPage";
+import QuoteBookingPage from "./pages/QuoteBookingPage";
 import CustomerPortalPage from "./pages/CustomerPortalPage";
 import PreferencesPage from "./pages/portal/PreferencesPage";
 import ReschedulePage from "./pages/portal/ReschedulePage";
@@ -245,6 +247,10 @@ export default function App() {
 
         {/* Lead Link microsite — slug-based branded quote request page */}
         <Route path="/request/:slug" element={<LeadLinkPage />} />
+        <Route path="/request/:slug/pending" element={<LeadPendingPage />} />
+
+        {/* Quote email booking — token-based slot confirmation */}
+        <Route path="/book/:token" element={<QuoteBookingPage />} />
 
         {/* Public cleaner schedule acknowledgment page */}
         <Route path="/schedule-ack/:token" element={<ScheduleAckPage />} />

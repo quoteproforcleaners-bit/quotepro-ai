@@ -306,4 +306,43 @@ router.post("/checkout", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// ─── New Quote-Request Leads (from the /request/:slug flow) ──────────────────
+
+router.get("/leads", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const result = await pool.query(
+      `SELECT id, status, contact, home, quote, quote_type,
+              submission_received_at, autopilot_triggered_at,
+              quote_generated_at, quote_email_sent_at,
+              booking_confirmed_at, created_at
+       FROM leads
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 100`,
+      [userId]
+    );
+    return res.json({ leads: result.rows });
+  } catch (err: any) {
+    console.error("[autopilot] leads error:", err.message);
+    return res.status(500).json({ message: "Failed to fetch leads" });
+  }
+});
+
+// ─── Available Slots (public-accessible via separate middleware in routes.ts) ──
+
+router.get("/available-slots", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const preferredDate = req.query.preferredDate as string | undefined;
+    const { getAvailableSlots } = await import("../services/quoteRequestService");
+    const slots = await getAvailableSlots(userId, preferredDate);
+    return res.json({ slots });
+  } catch (err: any) {
+    console.error("[autopilot] available-slots error:", err.message);
+    return res.status(500).json({ message: "Failed to fetch available slots" });
+  }
+});
+
+// Public version — by business slug (no auth required)
 export default router;
