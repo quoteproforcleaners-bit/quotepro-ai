@@ -26,7 +26,13 @@ interface LeadContact {
   lastName: string;
   email: string;
   phone?: string;
+  street?: string;
+  apt?: string;
+  city?: string;
+  state?: string;
   zip: string;
+  lat?: number;
+  lng?: number;
 }
 
 interface LeadHome {
@@ -242,6 +248,7 @@ Bedrooms: ${home.bedrooms}, Bathrooms: ${home.bathrooms}
 Home size: ${home.sqft || "not specified"} sq ft
 Condition: ${home.condition}
 Extras requested: ${home.extras?.length > 0 ? home.extras.join(", ") : "none"}
+Location: ${[contact.street, contact.apt, contact.city, contact.state].filter(Boolean).join(", ") || contact.zip}
 ZIP code: ${contact.zip}`;
 
   const controller = new AbortController();

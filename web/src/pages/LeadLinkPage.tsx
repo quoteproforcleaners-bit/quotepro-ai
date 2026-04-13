@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChatWidget } from "../components/public/ChatWidget";
 import {
   ChevronRight, ChevronLeft, Check, Loader2, AlertCircle,
   Sparkles, Calendar, Phone, Mail, MapPin,
-  Clock, MessageSquare, Star,
+  Clock, MessageSquare, Star, Home,
 } from "lucide-react";
+import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
 const API_BASE = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -25,11 +26,15 @@ interface BizInfo {
 }
 
 interface FormData {
-  firstName: string; lastName: string; email: string; phone: string; zip: string;
+  firstName: string; lastName: string; email: string; phone: string;
+  street: string; apt: string; city: string; state: string; zip: string;
+  lat: number | null; lng: number | null;
   serviceType: string;
   bedrooms: number; bathrooms: number; sqft: string; condition: string; extras: string[];
   preferredDate: string; preferredTime: string; source: string; notes: string;
 }
+
+type FormErrors = Partial<Record<keyof FormData, string>>;
 
 const EXTRAS = [
   { id: "oven", label: "Inside oven" },
@@ -85,13 +90,15 @@ export default function LeadLinkPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormData>({
-    firstName: "", lastName: "", email: "", phone: "", zip: "",
+    firstName: "", lastName: "", email: "", phone: "",
+    street: "", apt: "", city: "", state: "", zip: "",
+    lat: null, lng: null,
     serviceType: "standard",
     bedrooms: 3, bathrooms: 2, sqft: "", condition: "great", extras: [],
     preferredDate: "", preferredTime: "flexible", source: "", notes: "",
   });
 
-  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [errors, setErrors] = useState<FormErrors>({});
 
   useEffect(() => {
     if (!slug) return;
@@ -109,17 +116,19 @@ export default function LeadLinkPage() {
   const color = biz?.primaryColor || "#2563EB";
 
   function validateStep1(): boolean {
-    const e: Partial<Record<keyof FormData, string>> = {};
+    const e: FormErrors = {};
     if (!form.firstName.trim()) e.firstName = "Required";
     if (!form.lastName.trim()) e.lastName = "Required";
     if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
+    if (!form.street.trim()) e.street = "Street address is required";
+    if (!form.city.trim()) e.city = "City is required";
     if (!form.zip.trim() || !/^\d{5}/.test(form.zip)) e.zip = "Valid ZIP required";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   function validateStep2(): boolean {
-    const e: Partial<Record<keyof FormData, string>> = {};
+    const e: FormErrors = {};
     if (!form.condition) e.condition = "Please select a condition";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -146,9 +155,17 @@ export default function LeadLinkPage() {
         body: JSON.stringify({
           businessSlug: slug,
           contact: {
-            firstName: form.firstName.trim(), lastName: form.lastName.trim(),
+            firstName: form.firstName.trim(),
+            lastName: form.lastName.trim(),
             email: form.email.trim().toLowerCase(),
-            phone: form.phone.trim() || undefined, zip: form.zip.trim(),
+            phone: form.phone.trim() || undefined,
+            street: form.street.trim() || undefined,
+            apt: form.apt.trim() || undefined,
+            city: form.city.trim() || undefined,
+            state: form.state.trim() || undefined,
+            zip: form.zip.trim(),
+            lat: form.lat ?? undefined,
+            lng: form.lng ?? undefined,
           },
           home: {
             serviceType: form.serviceType, bedrooms: form.bedrooms,
@@ -178,6 +195,21 @@ export default function LeadLinkPage() {
   function setField<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => ({ ...e, [key]: undefined }));
+  }
+
+  function handleAddressSelect(parsed: {
+    street: string; city: string; state: string; zip: string; lat: number; lng: number;
+  }) {
+    setForm((f) => ({
+      ...f,
+      street: parsed.street,
+      city: parsed.city,
+      state: parsed.state,
+      zip: parsed.zip || f.zip,
+      lat: parsed.lat,
+      lng: parsed.lng,
+    }));
+    setErrors((e) => ({ ...e, street: undefined, city: undefined, zip: undefined }));
   }
 
   function toggleExtra(id: string) {
@@ -217,9 +249,9 @@ export default function LeadLinkPage() {
         input,select,textarea { font-family: inherit; }
         .ll-btn:hover { filter: brightness(0.92); }
         .ll-btn:active { transform: scale(0.98); }
+        .addr-item:hover { background: #f0fdf4; }
       `}</style>
 
-      {/* Header */}
       <div style={{ background: color, padding: "22px 16px 18px", textAlign: "center" }}>
         {biz.logoUri ? (
           <img src={biz.logoUri} alt={biz.companyName} style={{ maxHeight: 52, maxWidth: 180, objectFit: "contain", marginBottom: 6 }} />
@@ -229,7 +261,6 @@ export default function LeadLinkPage() {
         <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Request your free cleaning quote</div>
       </div>
 
-      {/* Progress */}
       <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 16px" }}>
         <div style={{ maxWidth: 540, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
@@ -280,18 +311,39 @@ export default function LeadLinkPage() {
               </InputIcon>
             </Field>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 28 }}>
-              <Field label="Phone (optional)">
-                <InputIcon icon={<Phone size={15} />}>
-                  <input type="tel" value={form.phone} onChange={(e) => setField("phone", e.target.value)}
-                    placeholder="(555) 000-0000" style={inp(false, color)} autoComplete="tel" />
-                </InputIcon>
+            <Field label="Phone (optional)" mb={12}>
+              <InputIcon icon={<Phone size={15} />}>
+                <input type="tel" value={form.phone} onChange={(e) => setField("phone", e.target.value)}
+                  placeholder="(555) 000-0000" style={inp(false, color)} autoComplete="tel" />
+              </InputIcon>
+            </Field>
+
+            {/* Address row */}
+            <AddressAutocompleteField
+              color={color}
+              value={form.street}
+              error={errors.street}
+              onStreetChange={(v) => setField("street", v)}
+              onAddressSelect={handleAddressSelect}
+            />
+
+            <Field label="Apt / Unit (optional)" mb={12}>
+              <input value={form.apt} onChange={(e) => setField("apt", e.target.value)}
+                placeholder="Apt 2B" style={inpNoIcon(false, color)} autoComplete="address-line2" />
+            </Field>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 10, marginBottom: 12 }}>
+              <Field label="City *" error={errors.city}>
+                <input value={form.city} onChange={(e) => setField("city", e.target.value)}
+                  placeholder="Brooklyn" style={inpNoIcon(!!errors.city, color)} autoComplete="address-level2" />
               </Field>
-              <Field label="ZIP code *" error={errors.zip}>
-                <InputIcon icon={<MapPin size={15} />}>
-                  <input value={form.zip} onChange={(e) => setField("zip", e.target.value)}
-                    placeholder="90210" maxLength={10} style={inp(!!errors.zip, color)} autoComplete="postal-code" />
-                </InputIcon>
+              <Field label="State">
+                <input value={form.state} onChange={(e) => setField("state", e.target.value)}
+                  placeholder="NY" maxLength={2} style={inpNoIcon(false, color)} autoComplete="address-level1" />
+              </Field>
+              <Field label="ZIP *" error={errors.zip}>
+                <input value={form.zip} onChange={(e) => setField("zip", e.target.value)}
+                  placeholder="10001" maxLength={10} style={inpNoIcon(!!errors.zip, color)} autoComplete="postal-code" />
               </Field>
             </div>
 
@@ -319,7 +371,14 @@ export default function LeadLinkPage() {
             <h2 style={h2}>Tell us about your home</h2>
             <p style={subtext}>This helps us give you an accurate quote.</p>
 
-            {/* Service type */}
+            {/* Address summary */}
+            {form.street && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: rgba(color, 0.07), borderRadius: 10, padding: "10px 14px", marginBottom: 20 }}>
+                <Home size={15} style={{ color, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: "#374151" }}>{form.street}{form.apt ? `, ${form.apt}` : ""}, {form.city}, {form.state} {form.zip}</span>
+              </div>
+            )}
+
             <div style={{ marginBottom: 20 }}>
               <label style={lbl}>Service type</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -333,7 +392,6 @@ export default function LeadLinkPage() {
               </div>
             </div>
 
-            {/* Beds & baths */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
               <div>
                 <label style={lbl}>Bedrooms</label>
@@ -355,7 +413,6 @@ export default function LeadLinkPage() {
               </div>
             </div>
 
-            {/* Sqft */}
             <div style={{ marginBottom: 20 }}>
               <label style={lbl}>Home size (optional)</label>
               <select value={form.sqft} onChange={(e) => setField("sqft", e.target.value)} style={sel()}>
@@ -363,7 +420,6 @@ export default function LeadLinkPage() {
               </select>
             </div>
 
-            {/* Condition */}
             <div style={{ marginBottom: 20 }}>
               <label style={lbl}>
                 Home condition *
@@ -381,7 +437,6 @@ export default function LeadLinkPage() {
               </div>
             </div>
 
-            {/* Extras */}
             <div style={{ marginBottom: 24 }}>
               <label style={lbl}>Add-ons (optional — may affect price)</label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -412,7 +467,6 @@ export default function LeadLinkPage() {
             <h2 style={h2}>Almost there!</h2>
             <p style={subtext}>A few last details and your quote will be on its way.</p>
 
-            {/* Date */}
             <Field label="Preferred start date (optional)" mb={14}>
               <InputIcon icon={<Calendar size={15} />}>
                 <input type="date" value={form.preferredDate} min={minDate}
@@ -422,7 +476,6 @@ export default function LeadLinkPage() {
               <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>Must be at least 48 hours from today</div>
             </Field>
 
-            {/* Time */}
             <div style={{ marginBottom: 16 }}>
               <label style={lbl}>Preferred time</label>
               <div style={{ display: "flex", gap: 8 }}>
@@ -435,7 +488,6 @@ export default function LeadLinkPage() {
               </div>
             </div>
 
-            {/* Source */}
             <Field label="How did you hear about us? (optional)" mb={14}>
               <select value={form.source} onChange={(e) => setField("source", e.target.value)} style={sel()}>
                 <option value="">Select…</option>
@@ -449,7 +501,6 @@ export default function LeadLinkPage() {
               </select>
             </Field>
 
-            {/* Notes */}
             <Field label="Special instructions (optional)" mb={24}>
               <InputIcon icon={<MessageSquare size={15} />} top>
                 <textarea value={form.notes} onChange={(e) => setField("notes", e.target.value)}
@@ -465,7 +516,6 @@ export default function LeadLinkPage() {
               </div>
             )}
 
-            {/* AI quote banner */}
             <div style={{ background: rgba(color, 0.07), border: `1px solid ${rgba(color, 0.25)}`, borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <Sparkles size={18} style={{ color, flexShrink: 0, marginTop: 2 }} />
@@ -507,6 +557,123 @@ export default function LeadLinkPage() {
           primaryColor={biz.chatWidgetColor || biz.primaryColor || "#0F6E56"}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Address Autocomplete Field ───────────────────────────────────────────────
+
+function AddressAutocompleteField({
+  color, value, error, onStreetChange, onAddressSelect,
+}: {
+  color: string;
+  value: string;
+  error?: string;
+  onStreetChange: (v: string) => void;
+  onAddressSelect: (parsed: { street: string; city: string; state: string; zip: string; lat: number; lng: number }) => void;
+}) {
+  const {
+    ready,
+    value: inputVal,
+    suggestions: { status, data },
+    setValue,
+    clearSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      componentRestrictions: { country: ["us", "ca", "gb"] },
+      types: ["address"],
+    },
+    debounce: 300,
+    defaultValue: value,
+  });
+
+  // Keep in sync when parent resets
+  const prevValue = useRef(value);
+  useEffect(() => {
+    if (value !== prevValue.current && value !== inputVal) {
+      setValue(value, false);
+    }
+    prevValue.current = value;
+  }, [value]);
+
+  const handleSelect = async (description: string) => {
+    setValue(description, false);
+    clearSuggestions();
+    try {
+      const results = await getGeocode({ address: description });
+      const comps = results[0].address_components;
+      const get = (type: string, short = false) => {
+        const c = comps.find((c: any) => c.types.includes(type));
+        return c ? (short ? c.short_name : c.long_name) : "";
+      };
+      const streetNum = get("street_number");
+      const route = get("route");
+      const street = [streetNum, route].filter(Boolean).join(" ");
+      const city = get("locality") || get("sublocality") || get("administrative_area_level_3");
+      const state = get("administrative_area_level_1", true);
+      const zip = get("postal_code");
+      const { lat, lng } = await getLatLng(results[0]);
+      onAddressSelect({ street, city, state, zip, lat, lng });
+    } catch {
+      // fallback: just keep what was typed
+      onStreetChange(description);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={lbl}>
+        Street address *{error && <span style={{ color: "#EF4444", fontWeight: 400, marginLeft: 6 }}>{error}</span>}
+      </label>
+      <div style={{ position: "relative" }}>
+        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9CA3AF", pointerEvents: "none" }}>
+          <MapPin size={15} />
+        </span>
+        <input
+          value={inputVal}
+          onChange={(e) => {
+            setValue(e.target.value);
+            onStreetChange(e.target.value);
+          }}
+          disabled={!ready}
+          placeholder={ready ? "123 Main St" : "Loading…"}
+          autoComplete="off"
+          style={inp(!!error, color)}
+        />
+
+        {status === "OK" && (
+          <ul style={{
+            position: "absolute", top: "100%", left: 0, right: 0,
+            zIndex: 9999, background: "white",
+            border: "1px solid #E5E7EB", borderRadius: 10,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            listStyle: "none", margin: "4px 0 0", padding: "4px 0",
+            maxHeight: 240, overflowY: "auto",
+          }}>
+            {data.map(({ place_id, description, structured_formatting: sf }) => (
+              <li
+                key={place_id}
+                className="addr-item"
+                onClick={() => handleSelect(description)}
+                style={{ padding: "10px 14px", cursor: "pointer", display: "flex", gap: 10, alignItems: "flex-start" }}
+              >
+                <MapPin size={14} style={{ color, flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{sf.main_text}</div>
+                  <div style={{ fontSize: 12, color: "#6B7280" }}>{sf.secondary_text}</div>
+                </div>
+              </li>
+            ))}
+            <li style={{ padding: "6px 14px", textAlign: "right", borderTop: "1px solid #F3F4F6" }}>
+              <img
+                src="https://maps.gstatic.com/mapfiles/api-3/images/powered-by-google-on-white3.png"
+                alt="Powered by Google"
+                style={{ height: 14, opacity: 0.7 }}
+              />
+            </li>
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -559,6 +726,9 @@ const centered: React.CSSProperties = { minHeight: "100vh", display: "flex", ali
 
 function inp(err: boolean, color: string): React.CSSProperties {
   return { width: "100%", padding: "11px 14px 11px 36px", border: `1.5px solid ${err ? "#EF4444" : "#D1D5DB"}`, borderRadius: 10, fontSize: 15, color: "#111827", background: "#fff", outline: "none" };
+}
+function inpNoIcon(err: boolean, _color: string): React.CSSProperties {
+  return { width: "100%", padding: "11px 14px", border: `1.5px solid ${err ? "#EF4444" : "#D1D5DB"}`, borderRadius: 10, fontSize: 15, color: "#111827", background: "#fff", outline: "none" };
 }
 function sel(): React.CSSProperties {
   return { width: "100%", padding: "11px 14px", border: "1.5px solid #D1D5DB", borderRadius: 10, fontSize: 15, color: "#111827", background: "#fff", outline: "none", appearance: "none" };
