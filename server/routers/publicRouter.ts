@@ -2994,12 +2994,190 @@ router.post("/api/public/portal/:token/save-card", async (req: Request, res: Res
   }
 });
 
+// ─── POST /api/public/chat — Claude-powered chat widget (no auth) ────────────
+
+const chatRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many messages. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+function buildPricingContext(settings: any): string {
+  if (!settings) return `- 1BR/1BA standard clean: ~$100-120
+- 2BR/2BA standard clean: ~$140-170
+- 3BR/2BA standard clean: ~$170-210
+- Deep clean: add 35-40%
+- Move in/out: add 50-60%
+- Always say "starting from" and recommend exact quote`;
+  const lines: string[] = [];
+  const base = settings.basePrice || 120;
+  lines.push(`- 1BR/1BA standard clean: ~$${Math.round(base * 0.85)}-${Math.round(base)}`);
+  lines.push(`- 2BR/2BA standard clean: ~$${Math.round(base)}-${Math.round(base * 1.3)}`);
+  lines.push(`- 3BR/2BA standard clean: ~$${Math.round(base * 1.3)}-${Math.round(base * 1.7)}`);
+  if (settings.deepCleanMultiplier) lines.push(`- Deep clean: add ${Math.round((settings.deepCleanMultiplier - 1) * 100)}%`);
+  return lines.join("\n");
+}
+
+function formatWorkingHours(hours: any): string {
+  if (!hours) return "Monday-Friday 8am-5pm";
+  try {
+    const h = typeof hours === "string" ? JSON.parse(hours) : hours;
+    return Object.entries(h)
+      .filter(([, v]: any) => v && v.start)
+      .map(([day, v]: any) => `${day}: ${v.start}-${v.end}`)
+      .join(", ") || "Monday-Friday 8am-5pm";
+  } catch { return "Monday-Friday 8am-5pm"; }
+}
+
+router.post("/api/public/chat", chatRateLimit, async (req: Request, res: Response) => {
+  const { messages, businessSlug, sessionId } = req.body;
+
+  if (!messages || !businessSlug) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+  if (!Array.isArray(messages) || messages.length > 20) {
+    return res.status(400).json({ error: "Conversation too long" });
+  }
+
+  try {
+    const bizRes = await pool.query(
+      `SELECT b.id, b.company_name, b.phone, b.primary_color, b.public_quote_slug,
+              b.chat_widget_enabled,
+              u.id AS user_id, u.email AS operator_email
+       FROM businesses b
+       JOIN users u ON u.id = b.owner_user_id
+       WHERE b.public_quote_slug = $1 LIMIT 1`,
+      [businessSlug]
+    );
+
+    if (bizRes.rows.length === 0) {
+      return res.status(404).json({ error: "Business not found" });
+    }
+
+    const biz = bizRes.rows[0];
+
+    if (biz.chat_widget_enabled === false) {
+      return res.status(403).json({ error: "Chat not available for this business" });
+    }
+
+    // Load pricing settings for context
+    const pricingRes = await pool.query(
+      `SELECT settings FROM pricing_settings WHERE business_id = $1 LIMIT 1`,
+      [biz.id]
+    );
+    const pricingContext = buildPricingContext(pricingRes.rows[0]?.settings || null);
+
+    const appUrl = process.env.APP_URL || "https://app.getquotepro.ai";
+    const bookingUrl = `${appUrl}/request/${biz.public_quote_slug}`;
+
+    const systemPrompt = `You are a helpful virtual assistant for ${biz.company_name}, a professional cleaning company.
+
+PERSONALITY: Warm, friendly, concise. Like a helpful receptionist.
+RESPONSE LENGTH: 1-3 sentences max. This is a chat widget.
+
+YOUR GOALS (in order):
+1. Answer the visitor's question helpfully
+2. Understand what they need (service type, home size)
+3. Give a rough price estimate if asked
+4. Capture their contact info naturally
+5. Direct them to get an exact quote: ${bookingUrl}
+
+BUSINESS INFO:
+- Name: ${biz.company_name}
+- Phone: ${biz.phone || "Available on request"}
+- Services: Standard Clean, Deep Clean, Move-In/Out, Recurring, Airbnb Turnover
+
+PRICING (rough estimates — always say "starting from"):
+${pricingContext}
+
+LEAD CAPTURE RULES:
+- Ask for name naturally (e.g. "What's your name so I can help you better?")
+- Ask for email or phone to "send them more info" or "confirm availability"
+- NEVER ask for name, email, AND phone in the same message — one at a time
+- Once you have name + (email OR phone), output this EXACTLY on its own line:
+  CAPTURED:{"name":"[name]","email":"[email or null]","phone":"[phone or null]","interest":"[what they want]"}
+
+BOOKING PUSH RULES:
+- If they ask about availability or want to book: "I'd love to get you scheduled! The quickest way is to fill out our short quote form here: ${bookingUrl} — takes 60 seconds and you'll get an instant price."
+- If they say "too expensive": acknowledge, explain the value, offer to check if there's a better package
+- If they say "just browsing": that's fine, stay helpful
+
+NEVER:
+- Reveal that you are an AI unless directly asked
+- Make up specific availability ("Tuesday at 2pm is open")
+- Promise a price without saying "starting from" or "approximately"
+- Send more than one question at a time`;
+
+    const { generateText } = await import("../services/ai.service");
+    let reply = await generateText({
+      system: systemPrompt,
+      messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
+      maxTokens: 250,
+    });
+
+    // Check for lead capture signal
+    let leadCaptured = false;
+    const captureMatch = reply.match(/CAPTURED:(\{[^}]+\})/);
+
+    if (captureMatch) {
+      try {
+        const leadData = JSON.parse(captureMatch[1]);
+        const firstName = leadData.name?.split(" ")[0] || leadData.name || "Unknown";
+        const lastName = leadData.name?.split(" ").slice(1).join(" ") || "";
+
+        await pool.query(
+          `INSERT INTO intake_requests
+             (business_id, customer_name, customer_email, customer_phone,
+              extracted_fields, source, status, confidence, missing_field_flags, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, 'chat_widget', 'new', 'medium', '{}', NOW(), NOW())
+           ON CONFLICT DO NOTHING`,
+          [
+            biz.id,
+            `${firstName} ${lastName}`.trim(),
+            leadData.email || null,
+            leadData.phone?.replace(/\D/g, "") || null,
+            JSON.stringify({ notes: leadData.interest || "" }),
+          ]
+        );
+        leadCaptured = true;
+
+        // Notify operator (non-blocking)
+        sendEmail({
+          to: biz.operator_email,
+          subject: `New chat lead — ${leadData.name}`,
+          html: `<p><strong>${leadData.name}</strong> just chatted on your QuotePro page.</p>
+<p>Interest: ${leadData.interest || "Not specified"}</p>
+<p>Email: ${leadData.email || "not provided"}</p>
+<p>Phone: ${leadData.phone || "not provided"}</p>
+<p><a href="${appUrl}/app/intake-requests">View in QuotePro &rarr;</a></p>`,
+          fromName: "QuotePro",
+        }).catch(console.error);
+      } catch (e) {
+        console.error("[chat-widget] Failed to parse/save lead:", e);
+      }
+
+      // Strip CAPTURED line from visible reply
+      reply = reply.replace(/\nCAPTURED:\{[^}]+\}/g, "").replace(/CAPTURED:\{[^}]+\}/g, "").trim();
+    }
+
+    return res.json({ reply, leadCaptured });
+  } catch (err: any) {
+    console.error("[chat-widget] Error:", err.message);
+    return res.status(500).json({
+      error: "Failed to get response",
+      reply: "Sorry, I'm having trouble right now. Please fill out the quote form or call us directly.",
+    });
+  }
+});
+
 router.get("/api/public/biz-info/:slug", async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
     const result = await pool.query(
       `SELECT b.company_name, b.logo_uri, b.primary_color, b.phone, b.email, b.address,
-              b.public_quote_slug, u.autopilot_enabled
+              b.public_quote_slug, b.chat_widget_enabled, b.chat_widget_color, u.autopilot_enabled
        FROM businesses b
        JOIN users u ON u.id = b.owner_user_id
        WHERE b.public_quote_slug = $1 LIMIT 1`,
@@ -3016,7 +3194,10 @@ router.get("/api/public/biz-info/:slug", async (req: Request, res: Response) => 
       phone: b.phone || null,
       email: b.email || null,
       address: b.address || null,
+      publicQuoteSlug: b.public_quote_slug || slug,
       autopilotEnabled: b.autopilot_enabled,
+      chatWidgetEnabled: b.chat_widget_enabled ?? true,
+      chatWidgetColor: b.chat_widget_color || null,
     });
   } catch (err: any) {
     return res.status(500).json({ message: "Failed to fetch business info" });

@@ -13,6 +13,7 @@ import {
   Building2,
   CreditCard,
   Link2,
+  MessageSquare,
   Save,
   CheckCircle,
   TrendingUp,
@@ -655,6 +656,20 @@ export default function SettingsPage() {
     confirmationMessage: "",
   });
   const [newBlackout, setNewBlackout] = useState("");
+
+  const [chatWidgetForm, setChatWidgetForm] = useState({ enabled: true, color: "" });
+  const { data: chatWidgetData } = useQuery<any>({
+    queryKey: ["/api/business/chat-widget"],
+  });
+  useEffect(() => {
+    if (chatWidgetData) {
+      setChatWidgetForm({ enabled: chatWidgetData.enabled ?? true, color: chatWidgetData.color || "" });
+    }
+  }, [chatWidgetData]);
+  const saveChatWidget = useMutation({
+    mutationFn: (data: any) => apiPatch("/api/business/chat-widget", data),
+    onSuccess: () => showSaved("chatWidget"),
+  });
 
   const { data: bookingAvailability, isLoading: bookingLoading } = useQuery<any>({
     queryKey: ["/api/booking-availability"],
@@ -2268,6 +2283,57 @@ export default function SettingsPage() {
                   placeholder="We service Denver, Aurora, Lakewood, and surrounding areas"
                 />
               </div>
+            </div>
+          </Card>
+
+          {/* Chat Widget */}
+          <Card>
+            <CardHeader title="AI Chat Widget" icon={MessageSquare} />
+            <p className="text-sm text-slate-500 mb-4">
+              Add a chat assistant to your public quote page. It answers questions, gives price estimates, and captures leads automatically.
+            </p>
+            <div className="space-y-4">
+              <SettingRow label="Enable chat widget" description="Show the chat bubble on your public quote request page">
+                <Toggle
+                  checked={chatWidgetForm.enabled}
+                  onChange={(v) => setChatWidgetForm((f) => ({ ...f, enabled: v }))}
+                />
+              </SettingRow>
+              {chatWidgetForm.enabled && (
+                <SettingRow label="Widget accent color" description="Match your brand color (defaults to your primary color)">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={chatWidgetForm.color || (business as any)?.primaryColor || "#0F6E56"}
+                      onChange={(e) => setChatWidgetForm((f) => ({ ...f, color: e.target.value }))}
+                      style={{ width: 40, height: 36, padding: 2, border: "1px solid #e2e8f0", borderRadius: 8, cursor: "pointer" }}
+                    />
+                    <span className="text-sm text-slate-500">{chatWidgetForm.color || (business as any)?.primaryColor || "#0F6E56"}</span>
+                    {chatWidgetForm.color && (
+                      <button
+                        className="text-xs text-slate-400 hover:text-slate-600 underline"
+                        onClick={() => setChatWidgetForm((f) => ({ ...f, color: "" }))}
+                      >
+                        Reset to primary
+                      </button>
+                    )}
+                  </div>
+                </SettingRow>
+              )}
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <Button
+                size="sm"
+                onClick={() => saveChatWidget.mutate({ enabled: chatWidgetForm.enabled, color: chatWidgetForm.color || null })}
+                disabled={saveChatWidget.isPending}
+              >
+                {saveChatWidget.isPending ? "Saving..." : <><Save size={13} /> Save widget settings</>}
+              </Button>
+              {savedSection === "chatWidget" && (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <CheckCircle size={14} /> Saved
+                </span>
+              )}
             </div>
           </Card>
 

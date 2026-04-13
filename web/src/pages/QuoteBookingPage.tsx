@@ -10,6 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { ChatWidget } from "../components/public/ChatWidget";
 import AddressAutocompleteLine from "../components/AddressAutocompleteLine";
 import { CheckCircle, Loader2, AlertCircle, Calendar, Clock, Home, MapPin, Check, ChevronRight } from "lucide-react";
 
@@ -365,6 +366,14 @@ export default function QuoteBookingPage() {
           </div>
         )}
       </div>
+
+      {data?.business?.chatWidgetEnabled !== false && data?.business?.publicQuoteSlug && (
+        <ChatWidget
+          businessName={data.business.companyName}
+          businessSlug={data.business.publicQuoteSlug}
+          primaryColor={data.business.chatWidgetColor || data.business.primaryColor || "#0F6E56"}
+        />
+      )}
     </div>
   );
 }

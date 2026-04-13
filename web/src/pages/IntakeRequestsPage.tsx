@@ -260,6 +260,11 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
               {f.frequency && f.frequency !== "one-time" && (
                 <Badge status="success" label={FREQ_LABELS[f.frequency] || f.frequency} />
               )}
+              {req.source === "chat_widget" && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: 11, fontWeight: 600, background: "rgba(99,102,241,0.1)", color: "#5856d6", border: "0.5px solid rgba(99,102,241,0.25)", borderRadius: "20px", padding: "1px 8px" }}>
+                  Chat
+                </span>
+              )}
               {req.status === "converted" && <Badge status="success" label="Converted" />}
               {req.status === "dismissed" && <Badge status="draft" label="Dismissed" />}
             </div>

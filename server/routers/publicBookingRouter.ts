@@ -383,6 +383,7 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
       `SELECT bt.*, l.contact, l.home, l.preferences, l.quote, l.quote_type,
               b.company_name, b.logo_uri, b.primary_color, b.phone AS business_phone,
               b.email AS business_email, b.address AS business_address,
+              b.public_quote_slug, b.chat_widget_enabled, b.chat_widget_color,
               u.id AS operator_user_id
        FROM booking_tokens bt
        JOIN leads l ON l.id = bt.lead_id
@@ -423,6 +424,9 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
         email: row.business_email,
         address: row.business_address,
         userId: row.operator_user_id,
+        publicQuoteSlug: row.public_quote_slug || null,
+        chatWidgetEnabled: row.chat_widget_enabled ?? true,
+        chatWidgetColor: row.chat_widget_color || null,
       },
     });
   } catch (err: any) {

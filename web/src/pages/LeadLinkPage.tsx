@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { ChatWidget } from "../components/public/ChatWidget";
 import {
   ChevronRight, ChevronLeft, Check, Loader2, AlertCircle,
   Sparkles, Calendar, Phone, Mail, MapPin,
@@ -18,6 +19,9 @@ interface BizInfo {
   email?: string;
   address?: string;
   autopilotEnabled: boolean;
+  chatWidgetEnabled?: boolean;
+  chatWidgetColor?: string;
+  publicQuoteSlug?: string;
 }
 
 interface FormData {
@@ -495,6 +499,14 @@ export default function LeadLinkPage() {
           </div>
         )}
       </form>
+
+      {biz.chatWidgetEnabled !== false && biz.publicQuoteSlug && (
+        <ChatWidget
+          businessName={biz.companyName}
+          businessSlug={biz.publicQuoteSlug}
+          primaryColor={biz.chatWidgetColor || biz.primaryColor || "#0F6E56"}
+        />
+      )}
     </div>
   );
 }

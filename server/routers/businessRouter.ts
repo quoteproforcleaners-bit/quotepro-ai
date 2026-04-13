@@ -1400,6 +1400,40 @@ const router = Router();
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
+  // ─── Chat Widget Settings ──────────────────────────────────────────────────
+  router.get("/business/chat-widget", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const row = await pool.query(
+        "SELECT chat_widget_enabled, chat_widget_color FROM businesses WHERE id = $1 LIMIT 1",
+        [business.id]
+      );
+      const r = row.rows[0] || {};
+      return res.json({
+        enabled: r.chat_widget_enabled ?? true,
+        color: r.chat_widget_color || null,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  router.patch("/business/chat-widget", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const { enabled, color } = req.body as { enabled?: boolean; color?: string };
+      const sets: string[] = ["updated_at=NOW()"];
+      const vals: any[] = [business.id];
+      if (typeof enabled === "boolean") { sets.push(`chat_widget_enabled=$${vals.length + 1}`); vals.push(enabled); }
+      if (color !== undefined) {
+        const hex = typeof color === "string" && /^#[0-9a-fA-F]{6}$/.test(color) ? color : null;
+        sets.push(`chat_widget_color=$${vals.length + 1}`); vals.push(hex);
+      }
+      await pool.query(`UPDATE businesses SET ${sets.join(",")} WHERE id=$1`, vals);
+      return res.json({ enabled: enabled ?? true, color: color ?? null });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // ─── Lead Link Pricing Status ─────────────────────────────────────────────
   router.get("/lead-link/pricing-status", requireAuth, async (req: Request, res: Response) => {
     try {
