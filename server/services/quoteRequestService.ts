@@ -122,8 +122,8 @@ export async function processQuoteRequest(leadId: string): Promise<void> {
 
     // Fetch operator pricing config
     const pricingRes = await pool.query(
-      `SELECT * FROM pricing_settings WHERE user_id = $1 LIMIT 1`,
-      [business.userId]
+      `SELECT * FROM pricing_settings WHERE business_id = $1 LIMIT 1`,
+      [business.id]
     );
     const pricingConfig = pricingRes.rows[0] || {};
 

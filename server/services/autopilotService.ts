@@ -186,7 +186,7 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
   console.log(`[Autopilot] ▶ step1 started for job: ${jobId}`);
 
   const jobRes = await pool.query(
-    `SELECT aj.*, b.company_name, b.email as business_email, b.sender_name, b.reply_to_email,
+    `SELECT aj.*, b.company_name, b.email as business_email, b.sender_name,
             b.primary_color, b.id as bid
      FROM autopilot_jobs aj
      JOIN businesses b ON b.id = aj.business_id
