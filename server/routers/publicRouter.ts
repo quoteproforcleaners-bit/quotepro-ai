@@ -2860,17 +2860,37 @@ router.get("/api/public/quote-status/:leadId", async (req: Request, res: Respons
   try {
     const { leadId } = req.params;
     const result = await pool.query(
-      `SELECT status, quote_email_sent_at, quote_generated_at FROM leads WHERE id = $1`,
+      `SELECT l.status, l.quote, l.quote_type,
+              l.quote_generated_at, l.quote_email_sent_at,
+              bt.token AS booking_token
+       FROM leads l
+       LEFT JOIN booking_tokens bt ON bt.lead_id = l.id
+       WHERE l.id = $1
+       ORDER BY bt.created_at DESC NULLS LAST
+       LIMIT 1`,
       [leadId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ message: "Lead not found" });
     }
     const row = result.rows[0];
+
+    let quoteData: any = null;
+    if (row.quote) {
+      try {
+        const parsed = typeof row.quote === "string" ? JSON.parse(row.quote) : row.quote;
+        quoteData = { ...parsed, quoteType: row.quote_type };
+      } catch {
+        // ignore parse errors — quoteData stays null
+      }
+    }
+
     return res.json({
       status: row.status,
+      quoteData,
       emailSent: !!row.quote_email_sent_at,
       quoteReady: !!row.quote_generated_at,
+      bookingToken: row.booking_token || null,
     });
   } catch (err: any) {
     return res.status(500).json({ message: "Failed to fetch status" });
