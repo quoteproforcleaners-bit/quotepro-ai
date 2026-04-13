@@ -24,9 +24,10 @@ import {
   Copy,
   Phone,
   BarChart3,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
-import { apiPost, apiPut } from "../lib/api";
+import { apiPost, apiPut, apiRequest } from "../lib/api";
 import {
   PageHeader,
   Card,
@@ -73,6 +74,9 @@ export default function GrowthDashboardPage() {
   const [newCampaign, setNewCampaign] = useState({ name: "", segment: "dormant", channel: "email" });
   const [generatingContent, setGeneratingContent] = useState<string | null>(null);
   const [generatedContent, setGeneratedContent] = useState<Record<string, { subject?: string; content: string }>>({});
+  const [previewCampaignId, setPreviewCampaignId] = useState<string | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const { data: growthTasks = [], isLoading: loadingTasks } = useQuery<any[]>({ queryKey: ["/api/growth-tasks"] });
   const { data: forecast } = useQuery<any>({ queryKey: ["/api/forecast"] });
@@ -138,6 +142,21 @@ export default function GrowthDashboardPage() {
     mutationFn: async (id: string) => apiPost(`/api/campaigns/${id}/send`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] }),
   });
+
+  const handlePreviewCampaign = async (id: string) => {
+    setLoadingPreview(true);
+    setPreviewCampaignId(id);
+    setPreviewHtml(null);
+    try {
+      const res = await apiRequest("POST", `/api/campaigns/${id}/preview`) as any;
+      const data = await res.json();
+      setPreviewHtml(data.html);
+    } catch {
+      setPreviewHtml("<p style='padding:20px;color:red;'>Failed to load preview.</p>");
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
 
   const scoreColor = growthScore >= 70 ? "emerald" : growthScore >= 40 ? "amber" : "red";
 
@@ -428,15 +447,26 @@ export default function GrowthDashboardPage() {
                               Generate
                             </Button>
                             {campaign.messageContent || generatedContent[campaign.id] ? (
-                              <Button
-                                variant="primary"
-                                icon={Send}
-                                size="sm"
-                                loading={sendCampaignMutation.isPending}
-                                onClick={() => sendCampaignMutation.mutate(campaign.id)}
-                              >
-                                Send
-                              </Button>
+                              <>
+                                <Button
+                                  variant="secondary"
+                                  icon={Eye}
+                                  size="sm"
+                                  loading={loadingPreview && previewCampaignId === campaign.id}
+                                  onClick={() => handlePreviewCampaign(campaign.id)}
+                                >
+                                  Preview
+                                </Button>
+                                <Button
+                                  variant="primary"
+                                  icon={Send}
+                                  size="sm"
+                                  loading={sendCampaignMutation.isPending}
+                                  onClick={() => sendCampaignMutation.mutate(campaign.id)}
+                                >
+                                  Send
+                                </Button>
+                              </>
                             ) : null}
                           </>
                         ) : null}
@@ -676,6 +706,44 @@ export default function GrowthDashboardPage() {
             ]}
           />
         </div>
+      </Modal>
+
+      {/* Email Preview Modal */}
+      <Modal
+        open={previewCampaignId !== null}
+        onClose={() => { setPreviewCampaignId(null); setPreviewHtml(null); }}
+        title="Email Preview"
+        size="xl"
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => { setPreviewCampaignId(null); setPreviewHtml(null); }}>Close</Button>
+            <Button
+              variant="primary"
+              icon={Send}
+              loading={sendCampaignMutation.isPending}
+              onClick={() => {
+                if (previewCampaignId) sendCampaignMutation.mutate(previewCampaignId);
+                setPreviewCampaignId(null);
+                setPreviewHtml(null);
+              }}
+            >
+              Confirm & Send
+            </Button>
+          </>
+        }
+      >
+        {loadingPreview ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+            <Spinner />
+          </div>
+        ) : previewHtml ? (
+          <iframe
+            srcDoc={previewHtml}
+            style={{ width: "100%", height: 520, border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
+            title="Email Preview"
+            sandbox="allow-same-origin"
+          />
+        ) : null}
       </Modal>
     </div>
   );

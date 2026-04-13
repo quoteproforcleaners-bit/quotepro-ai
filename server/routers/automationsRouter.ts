@@ -8,6 +8,7 @@ import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql }
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
 import { sanitizeForPrompt } from "../promptSanitizer";
+import { buildCampaignEmail, getCampaignCtaText, getCampaignFooterNote } from "../emails/campaignTemplate";
 import {
   buildJobCardEmail, buildCleanerEmailHtml, buildCleanerUpdateEmailHtml,
   getAutoProgressTiming, computeAutoProgressStatus,
@@ -966,6 +967,50 @@ Respond with valid JSON only: {"reply": string}`,
     }
   });
 
+  // POST /campaigns/:id/preview — returns rendered HTML so operator can inspect before sending
+  router.post("/campaigns/:id/preview", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const campaign = await getCampaignById(req.params.id);
+      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+      if (!campaign.messageContent) return res.status(400).json({ message: "Campaign has no message content." });
+
+      const { fromName } = getBusinessSendParams(business);
+      const appUrl = process.env.APP_URL || "https://app.getquotepro.ai";
+      const publicSlug = await ensurePublicSlug(business.id, business.companyName || "my-cleaning-co");
+      const ctaUrl = `${appUrl}/request/${publicSlug}?utm_source=quotepro&utm_medium=email&utm_campaign=${campaign.templateKey || "campaign"}&utm_content=preview`;
+      const ctaText = getCampaignCtaText(campaign.templateKey);
+      const footerNote = getCampaignFooterNote(campaign.templateKey);
+
+      const operatorRow = await pool.query(
+        `SELECT first_name FROM users WHERE id = $1 LIMIT 1`,
+        [business.ownerUserId]
+      );
+      const operatorFirstName = operatorRow.rows[0]?.first_name || fromName;
+
+      const subject = campaign.messageSubject || `Message from ${fromName}`;
+      const html = buildCampaignEmail({
+        recipientName: "John Smith",
+        recipientEmail: "preview@example.com",
+        businessName: business.companyName || fromName,
+        businessColor: business.primaryColor || "#0F6E56",
+        operatorFirstName,
+        subject,
+        bodyText: campaign.messageContent,
+        ctaText,
+        ctaUrl,
+        footerNote,
+        unsubscribeUrl: `${appUrl}/unsubscribe?preview=1`,
+      });
+
+      return res.json({ html, subject, ctaUrl, ctaText });
+    } catch (error: any) {
+      console.error("Campaign preview error:", error);
+      return res.status(500).json({ message: "Failed to generate preview" });
+    }
+  });
+
   router.post("/campaigns/:id/send", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
@@ -1012,6 +1057,20 @@ Respond with valid JSON only: {"reply": string}`,
       if (isEmail) {
         const { fromName, replyTo: replyToEmail } = getBusinessSendParams(business);
 
+        // Build CTA URL once — points to business's lead-capture / booking page
+        const appUrl = process.env.APP_URL || "https://app.getquotepro.ai";
+        const publicSlug = await ensurePublicSlug(business.id, business.companyName || "my-cleaning-co");
+        const ctaBaseUrl = `${appUrl}/request/${publicSlug}`;
+        const ctaText = getCampaignCtaText(campaign.templateKey);
+        const footerNote = getCampaignFooterNote(campaign.templateKey);
+
+        // Operator first name for signature
+        const operatorRow = await pool.query(
+          `SELECT first_name FROM users WHERE id = $1 LIMIT 1`,
+          [business.ownerUserId]
+        );
+        const operatorFirstName = operatorRow.rows[0]?.first_name || fromName;
+
         for (const customer of targetCustomers) {
           const email = customer.email;
           if (!email) { failCount++; continue; }
@@ -1020,32 +1079,43 @@ Respond with valid JSON only: {"reply": string}`,
           const personalizedContent = campaign.messageContent.replace(/\[Customer\]/gi, customerName);
           const personalizedSubject = (campaign.messageSubject || `Message from ${fromName}`).replace(/\[Customer\]/gi, customerName);
 
-          const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-        <tr><td style="background:linear-gradient(135deg,${business.primaryColor || "#007AFF"},#5856D6);padding:24px 32px;">
-          <h2 style="color:#ffffff;margin:0;font-size:20px;">${fromName}</h2>
-        </td></tr>
-        <tr><td style="padding:32px;">
-          ${personalizedContent.split('\n').map((line: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333333;">${line}</p>`).join('')}
-        </td></tr>
-        <tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;">
-          <p style="margin:0;font-size:12px;color:#999999;">Sent via QuotePro</p>
-          <p style="margin:4px 0 0;font-size:11px;color:#bbbbbb;">If you no longer wish to receive these emails, please reply with "unsubscribe".</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`;
+          // CTA URL with per-customer UTM tracking
+          const utm = new URLSearchParams({
+            utm_source: "quotepro",
+            utm_medium: "email",
+            utm_campaign: campaign.templateKey || "campaign",
+            utm_content: customer.id || "cta",
+          });
+          const ctaUrl = `${ctaBaseUrl}?${utm.toString()}`;
+
+          // Build proper email HTML with visible CTA button
+          let htmlBody: string;
+          try {
+            htmlBody = buildCampaignEmail({
+              recipientName: customerName,
+              recipientEmail: email,
+              businessName: business.companyName || fromName,
+              businessColor: business.primaryColor || "#0F6E56",
+              operatorFirstName,
+              subject: personalizedSubject,
+              bodyText: personalizedContent,
+              ctaText,
+              ctaUrl,
+              footerNote,
+              unsubscribeUrl: `${appUrl}/unsubscribe?bid=${business.id}&cid=${customer.id}`,
+            });
+          } catch (templateErr) {
+            console.error("Campaign template error:", templateErr);
+            failCount++;
+            continue;
+          }
 
           try {
             await sendEmail({
               to: email,
               subject: personalizedSubject,
               html: htmlBody,
-              text: personalizedContent,
+              text: `${personalizedContent}\n\nBook now: ${ctaUrl}`,
               fromName,
               replyTo: replyToEmail,
             });
