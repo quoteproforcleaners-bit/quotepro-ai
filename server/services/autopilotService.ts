@@ -12,6 +12,9 @@ import { pool } from "../db";
 import { callAI } from "../aiClient";
 import { sendEmail, getBusinessSendParams } from "../mail";
 
+// Haiku is 5x faster than Sonnet for the qualification JSON — sufficient for this task
+const HAIKU_MODEL = "claude-haiku-4-5";
+
 const QUALIFICATION_SYSTEM_PROMPT = `You are the QuotePro Autopilot, an AI assistant for professional cleaning
 business owners. Your job is to qualify an incoming lead and prepare a
 personalized outreach message.
@@ -179,6 +182,9 @@ async function updateIntakeRequestStatus(leadId: string, fields: Record<string, 
 }
 
 export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
+  const t0 = Date.now();
+  console.log(`[Autopilot] ▶ step1 started for job: ${jobId}`);
+
   const jobRes = await pool.query(
     `SELECT aj.*, b.company_name, b.email as business_email, b.sender_name, b.reply_to_email,
             b.primary_color, b.id as bid
@@ -200,8 +206,11 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
       autopilotStatus: "failed",
       autopilotError: "No email address on file",
     });
+    console.warn(`[Autopilot] ✗ step1 aborted — no email for job ${jobId}`);
     return;
   }
+
+  console.log(`[Autopilot] Lead: ${lead.fullName} <${lead.email}>`);
 
   const leadContext = JSON.stringify({
     name: lead.fullName,
@@ -213,14 +222,16 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
 
   let qualification: any = {};
   try {
+    console.log(`[Autopilot] ⏳ Calling AI at ${Date.now() - t0}ms…`);
     const { content } = await callAI(
       [
         { role: "system", content: QUALIFICATION_SYSTEM_PROMPT },
         { role: "user", content: `Lead submission:\n${leadContext}` },
       ],
-      { maxTokens: 600, responseFormat: "json_object" }
+      { model: HAIKU_MODEL, maxTokens: 400, responseFormat: "json_object" }
     );
     qualification = JSON.parse(content.trim());
+    console.log(`[Autopilot] ✅ AI response at ${Date.now() - t0}ms — score: ${qualification.qualificationScore}`);
   } catch (err: any) {
     qualification = {
       qualificationScore: 5,
@@ -231,7 +242,7 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
       redFlags: [],
       suggestedFollowUpAngle: "Follow up to see if they still need cleaning services.",
     };
-    console.warn(`[autopilot] Claude qualification failed for job ${jobId}:`, err.message);
+    console.warn(`[Autopilot] ⚠ Claude qualification failed at ${Date.now() - t0}ms for job ${jobId}:`, err.message);
   }
 
   const pricingRes = await pool.query(
@@ -290,6 +301,7 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
     bookingUrl,
   });
 
+  console.log(`[Autopilot] ⏳ Sending email to ${lead.email} at ${Date.now() - t0}ms…`);
   try {
     await sendEmail({
       to: lead.email,
@@ -298,7 +310,9 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
       fromName,
       replyTo,
     });
+    console.log(`[Autopilot] ✅ Email sent to ${lead.email} at ${Date.now() - t0}ms`);
   } catch (err: any) {
+    console.error(`[Autopilot] ✗ EMAIL SEND FAILED at ${Date.now() - t0}ms:`, err.message, err);
     await logAction(jobId, "step1", "Email send failed", err.message);
     await updateIntakeRequestStatus(job.lead_id, {
       autopilotStatus: "failed",
@@ -335,6 +349,7 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
   });
 
   await logAction(jobId, "step1", `Quote emailed to ${lead.email} — ${tierLabel} $${estimatedTotal}`, "ok");
+  console.log(`[Autopilot] ✅ COMPLETE — step1 for job ${jobId} in ${Date.now() - t0}ms`);
 }
 
 export async function step2_followUp(jobId: string): Promise<void> {

@@ -11,6 +11,9 @@ import { anthropic } from "../clients";
 
 export const MODEL = "claude-sonnet-4-5";
 
+/** Faster/cheaper model — use for quote generation, classification, structured JSON tasks. */
+export const HAIKU_MODEL = "claude-haiku-4-5";
+
 // Re-export the singleton so callers that need raw SDK access (e.g. vision
 // calls with array content) can do so without importing from clients directly.
 export { anthropic };

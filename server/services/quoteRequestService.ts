@@ -16,6 +16,9 @@ import crypto from "crypto";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Use Haiku for quote generation — 5x faster than Sonnet, more than sufficient for structured JSON
+const QUOTE_MODEL = "claude-haiku-4-5";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface LeadContact {
@@ -62,8 +65,11 @@ interface AvailableSlot {
 // ─── Main Entry Point ─────────────────────────────────────────────────────────
 
 export async function processQuoteRequest(leadId: string): Promise<void> {
+  const t0 = Date.now();
   let leadRow: any;
   let business: any;
+
+  console.log(`[Quote] ▶ Started for lead: ${leadId}`);
 
   try {
     // Fetch lead + business
@@ -80,7 +86,7 @@ export async function processQuoteRequest(leadId: string): Promise<void> {
     );
 
     if (leadRes.rows.length === 0) {
-      console.error(`[quoteRequest] Lead ${leadId} not found`);
+      console.error(`[Quote] ✗ Lead ${leadId} not found in DB`);
       return;
     }
 
@@ -100,6 +106,8 @@ export async function processQuoteRequest(leadId: string): Promise<void> {
     const home: LeadHome = leadRow.home;
     const preferences: LeadPreferences = leadRow.preferences;
 
+    console.log(`[Quote] Lead found: ${contact?.firstName} ${contact?.lastName} <${contact?.email}> — ${home?.serviceType} ${home?.bedrooms}BR/${home?.bathrooms}BA`);
+
     // Update status to processing
     await pool.query(
       `UPDATE leads SET status = 'processing', autopilot_triggered_at = NOW() WHERE id = $1`,
@@ -117,11 +125,13 @@ export async function processQuoteRequest(leadId: string): Promise<void> {
     const settingsRes = await pool.query(
       `SELECT quote_mode FROM user_preferences WHERE user_id = $1 LIMIT 1`,
       [business.userId]
-    );
+    ).catch(() => ({ rows: [] as any[] }));
     const quoteMode = settingsRes.rows[0]?.quote_mode || "smart";
 
-    // Generate AI quote
+    // Generate AI quote (Haiku model — ~3s)
+    console.log(`[Quote] ⏳ Calling AI at ${Date.now() - t0}ms…`);
     const aiQuote = await generateAIQuote(home, contact, pricingConfig);
+    console.log(`[Quote] ✅ AI response at ${Date.now() - t0}ms — confidence: ${aiQuote.confidence}, amount: ${aiQuote.exactAmount ?? `$${aiQuote.rangeMin}-${aiQuote.rangeMax}`}`);
 
     // Determine display type based on quoteMode and confidence
     let finalQuoteType: "exact" | "range";
@@ -150,9 +160,11 @@ export async function processQuoteRequest(leadId: string): Promise<void> {
        WHERE id = $3`,
       [JSON.stringify(aiQuote), finalQuoteType, leadId]
     );
+    console.log(`[Quote] DB quote saved at ${Date.now() - t0}ms`);
 
     // Fetch available slots
-    const slots = await getAvailableSlots(business.userId, preferences.preferredDate);
+    const slots = await getAvailableSlots(business.userId, preferences?.preferredDate);
+    console.log(`[Quote] Slots fetched (${slots.length} days) at ${Date.now() - t0}ms`);
 
     // Generate booking token
     const token = crypto.randomBytes(32).toString("hex");
@@ -160,12 +172,16 @@ export async function processQuoteRequest(leadId: string): Promise<void> {
 
     await pool.query(
       `INSERT INTO booking_tokens (lead_id, user_id, token, quote_snapshot, expires_at)
-       VALUES ($1, $2, $3, $4, $5)`,
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT DO NOTHING`,
       [leadId, business.userId, token, JSON.stringify({ aiQuote, finalQuoteType, home, contact }), expiresAt]
     );
+    console.log(`[Quote] Booking token created at ${Date.now() - t0}ms`);
 
     // Send quote email
+    console.log(`[Quote] ⏳ Sending email to ${contact.email}…`);
     await sendQuoteEmail(leadId, token, contact, home, business, aiQuote, finalQuoteType, slots);
+    console.log(`[Quote] ✅ Email sent at ${Date.now() - t0}ms`);
 
     // Update lead status to 'quoted'
     await pool.query(
@@ -173,9 +189,9 @@ export async function processQuoteRequest(leadId: string): Promise<void> {
       [leadId]
     );
 
-    console.log(`[quoteRequest] Successfully processed lead ${leadId} in ${Date.now() - new Date(leadRow.submission_received_at).getTime()}ms`);
+    console.log(`[Quote] ✅ COMPLETE — lead ${leadId} processed in ${Date.now() - t0}ms`);
   } catch (err: any) {
-    console.error(`[quoteRequest] Error processing lead ${leadId}:`, err.message);
+    console.error(`[Quote] ✗ FAILED for lead ${leadId} at ${Date.now() - t0}ms:`, err.message, err.stack?.split("\n")[1]);
     await pool.query(`UPDATE leads SET status = 'new' WHERE id = $1`, [leadId]).catch(() => {});
   }
 }
@@ -228,20 +244,28 @@ Condition: ${home.condition}
 Extras requested: ${home.extras?.length > 0 ? home.extras.join(", ") : "none"}
 ZIP code: ${contact.zip}`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
   try {
-    const resp = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 600,
-      messages: [{ role: "user", content: userMessage }],
-      system: systemPrompt,
-    });
+    const resp = await anthropic.messages.create(
+      {
+        model: QUOTE_MODEL,
+        max_tokens: 400,
+        messages: [{ role: "user", content: userMessage }],
+        system: systemPrompt,
+      },
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
 
     const text = resp.content[0].type === "text" ? resp.content[0].text.trim() : "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in AI response");
     return JSON.parse(jsonMatch[0]) as AIQuote;
   } catch (err: any) {
-    console.error("[generateAIQuote] AI failed, using fallback:", err.message);
+    clearTimeout(timeout);
+    console.error("[Quote] generateAIQuote failed, using fallback:", err.message);
     return fallbackQuote(home);
   }
 }
@@ -407,7 +431,8 @@ async function sendQuoteEmail(
   quoteType: "exact" | "range",
   slots: AvailableSlot[]
 ): Promise<void> {
-  const appUrl = process.env.APP_URL || `https://${process.env.REPL_SLUG}.replit.app`;
+  const appDomain = process.env.EXPO_PUBLIC_DOMAIN || process.env.APP_DOMAIN || "app.getquotepro.ai";
+  const appUrl = `https://${appDomain}`;
   const color = (business.primaryColor || "#2563EB").replace(/[^#a-fA-F0-9]/g, "");
 
   // Format price string
@@ -541,13 +566,19 @@ async function sendQuoteEmail(
 
   const { fromName, replyTo } = getBusinessSendParams(business);
 
-  await sendEmail({
-    to: contact.email,
-    subject: `Your cleaning quote from ${business.companyName} — Book your spot`,
-    html,
-    fromName,
-    replyTo,
-  });
+  try {
+    await sendEmail({
+      to: contact.email,
+      subject: `Your cleaning quote from ${business.companyName} — Book your spot`,
+      html,
+      fromName,
+      replyTo,
+    });
+    console.log(`[Quote] sendQuoteEmail delivered to ${contact.email}`);
+  } catch (err: any) {
+    console.error(`[Quote] ✗ EMAIL SEND FAILED to ${contact.email}:`, err.message, err);
+    throw err; // re-throw so processQuoteRequest sees the failure
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

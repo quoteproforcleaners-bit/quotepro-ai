@@ -1931,6 +1931,40 @@ router.post("/cleaner-notification-preferences/test", requireAuth, async (req: a
   }
 });
 
+// ── Test Email Delivery ───────────────────────────────────────────────────────
+
+router.post("/test-email", requireAuth, async (req: any, res: Response) => {
+  try {
+    const bizRes = await pool.query(
+      `SELECT id, company_name, email, sender_name, reply_to_email FROM businesses WHERE owner_user_id=$1 LIMIT 1`,
+      [req.session.userId]
+    );
+    if (!bizRes.rows.length) return res.status(404).json({ message: "Business not found" });
+    const biz = bizRes.rows[0];
+    const { sendEmail, getBusinessSendParams } = await import("../mail");
+    const target = req.body.email || biz.email;
+    const { fromName, replyTo } = getBusinessSendParams({
+      senderName: biz.sender_name,
+      replyToEmail: biz.reply_to_email,
+      companyName: biz.company_name,
+    });
+    const t0 = Date.now();
+    await sendEmail({
+      to: target,
+      subject: `QuotePro test email — delivery confirmed`,
+      html: `<p>Hello from <strong>${biz.company_name}</strong>. If you received this, email delivery is working correctly.</p><p>Sent at ${new Date().toISOString()}</p>`,
+      fromName,
+      replyTo,
+    });
+    const elapsed = Date.now() - t0;
+    console.log(`[TestEmail] Delivered to ${target} in ${elapsed}ms`);
+    res.json({ success: true, to: target, elapsedMs: elapsed });
+  } catch (e: any) {
+    console.error("[TestEmail] FAILED:", e.message, e);
+    res.status(500).json({ message: e.message, stack: e.stack });
+  }
+});
+
 // ── Reminder Preferences ─────────────────────────────────────────────────────
 
 router.get("/reminder-preferences", requireAuth, async (req: any, res: Response) => {
