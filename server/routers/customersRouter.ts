@@ -361,6 +361,10 @@ const router = Router();
         reviewedAt: r.reviewed_at,
         autopilotEnrolled: r.autopilot_enrolled ?? false,
         autopilotEnrolledAt: r.autopilot_enrolled_at ?? null,
+        autopilotStatus: r.autopilot_status ?? null,
+        autopilotError: r.autopilot_error ?? null,
+        autopilotQuoteSentAt: r.autopilot_quote_sent_at ?? null,
+        quoteEmailSentAt: r.quote_email_sent_at ?? null,
       })));
     } catch (e: any) {
       res.status(500).json({ message: e.message });

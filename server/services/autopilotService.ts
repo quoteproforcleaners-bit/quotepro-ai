@@ -148,6 +148,36 @@ export async function enrollLead(userId: string, businessId: string, leadId: str
   return jobId;
 }
 
+// Helper: update intake_requests status if lead_id points to one
+async function updateIntakeRequestStatus(leadId: string, fields: Record<string, any>) {
+  try {
+    const sets: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+    const colMap: Record<string, string> = {
+      autopilotStatus: "autopilot_status",
+      autopilotError: "autopilot_error",
+      autopilotQuoteSentAt: "autopilot_quote_sent_at",
+      quoteGeneratedAt: "quote_generated_at",
+      quoteEmailSentAt: "quote_email_sent_at",
+    };
+    for (const [key, val] of Object.entries(fields)) {
+      const col = colMap[key] || key.replace(/([A-Z])/g, "_$1").toLowerCase();
+      sets.push(`${col} = $${idx}`);
+      values.push(val);
+      idx++;
+    }
+    if (sets.length === 0) return;
+    values.push(leadId);
+    await pool.query(
+      `UPDATE intake_requests SET ${sets.join(", ")} WHERE id = $${idx}`,
+      values
+    );
+  } catch {
+    // Silently skip — lead_id might not be an intake_requests row
+  }
+}
+
 export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
   const jobRes = await pool.query(
     `SELECT aj.*, b.company_name, b.email as business_email, b.sender_name, b.reply_to_email,
@@ -160,9 +190,16 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
   const job = jobRes.rows[0];
   if (!job) return;
 
+  // Mark as generating on the intake_requests row (if applicable)
+  await updateIntakeRequestStatus(job.lead_id, { autopilotStatus: "generating" });
+
   const lead = await getLeadData(job.lead_id);
   if (!lead || !lead.email) {
     await logAction(jobId, "step1", "Skipped — no lead or email", "skipped");
+    await updateIntakeRequestStatus(job.lead_id, {
+      autopilotStatus: "failed",
+      autopilotError: "No email address on file",
+    });
     return;
   }
 
@@ -263,6 +300,10 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
     });
   } catch (err: any) {
     await logAction(jobId, "step1", "Email send failed", err.message);
+    await updateIntakeRequestStatus(job.lead_id, {
+      autopilotStatus: "failed",
+      autopilotError: `Email send failed: ${err.message}`,
+    });
     return;
   }
 
@@ -284,6 +325,13 @@ export async function step1_qualifyAndQuote(jobId: string): Promise<void> {
     lastActionAt: new Date(),
     nextActionAt: next,
     metadata: meta,
+  });
+
+  // Mirror final status onto intake_requests row
+  await updateIntakeRequestStatus(job.lead_id, {
+    autopilotStatus: "quote_sent",
+    autopilotQuoteSentAt: new Date(),
+    quoteEmailSentAt: new Date(),
   });
 
   await logAction(jobId, "step1", `Quote emailed to ${lead.email} — ${tierLabel} $${estimatedTotal}`, "ok");

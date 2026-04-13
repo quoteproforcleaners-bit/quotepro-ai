@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
@@ -7,6 +7,7 @@ import { PageHeader, Card, Badge, Button, EmptyState, Avatar } from "../componen
 import {
   Inbox, User, Phone, Mail, Home, RefreshCw, Trash2, ChevronRight, ChevronDown, Sparkles,
   Clock, CheckCircle, Copy, ExternalLink, Flag, AlertTriangle, Send, X, Edit3, FileText, Zap,
+  XCircle, Loader2,
 } from "lucide-react";
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -82,6 +83,10 @@ interface IntakeRequest {
   createdAt: string;
   autopilotEnrolled?: boolean;
   autopilotEnrolledAt?: string | null;
+  autopilotStatus?: "queued" | "generating" | "quote_sent" | "failed" | null;
+  autopilotError?: string | null;
+  autopilotQuoteSentAt?: string | null;
+  quoteEmailSentAt?: string | null;
 }
 
 type TabKey = "new" | "review" | "done";
@@ -100,6 +105,20 @@ function ConfidenceBadge({ level }: { level: "high" | "medium" | "low" }) {
   );
 }
 
+// Helper: minimum viability check for autopilot enrollment
+function canEnrollInAutopilot(r: IntakeRequest): { ok: boolean; reason: string } {
+  if (!r.customerEmail) return { ok: false, reason: "No email address — autopilot requires an email to send the quote" };
+  return { ok: true, reason: "" };
+}
+
+// Status config for the autopilot status badge
+const AUTOPILOT_STATUS_CFG = {
+  queued:      { label: "Queued...",          icon: Loader2,      spin: true,  color: "#6366f1", bg: "rgba(99,102,241,0.1)", border: "rgba(99,102,241,0.25)" },
+  generating:  { label: "Generating quote...", icon: Loader2,      spin: true,  color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "rgba(245,158,11,0.25)" },
+  quote_sent:  { label: "Quote sent",          icon: CheckCircle,  spin: false, color: "#1a7f37", bg: "rgba(52,199,89,0.12)", border: "rgba(52,199,89,0.25)" },
+  failed:      { label: "Failed",              icon: XCircle,      spin: false, color: "#dc2626", bg: "rgba(220,38,38,0.08)", border: "rgba(220,38,38,0.2)" },
+};
+
 function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; onRefresh: () => void }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -109,10 +128,52 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
   const [editFields, setEditFields] = useState({ ...req.extractedFields });
   const [enrollError, setEnrollError] = useState<string | null>(null);
 
-  // Initialize from server data so the enrolled state survives page refreshes
-  const [enrolledJobId, setEnrolledJobId] = useState<string | null>(
-    req.autopilotEnrolled ? "enrolled" : null
-  );
+  // Track autopilot status locally so polling updates work without refetching the list
+  const [apStatus, setApStatus] = useState<string | null>(req.autopilotStatus ?? (req.autopilotEnrolled ? "queued" : null));
+  const [apError, setApError] = useState<string | null>(req.autopilotError ?? null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollCountRef = useRef(0);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    pollCountRef.current = 0;
+    pollRef.current = setInterval(async () => {
+      pollCountRef.current++;
+      if (pollCountRef.current > 24) { // 2 minutes max
+        stopPolling();
+        return;
+      }
+      try {
+        const data: any = await apiRequest("GET", `/api/autopilot/intake-status/${req.id}`).then(r => r.json());
+        if (data.autopilotStatus) {
+          setApStatus(data.autopilotStatus);
+          setApError(data.autopilotError ?? null);
+          if (data.autopilotStatus === "quote_sent" || data.autopilotStatus === "failed") {
+            stopPolling();
+            // Refresh the list query so data is consistent
+            qc.invalidateQueries({ queryKey: ["/api/intake-requests"] });
+          }
+        }
+      } catch {
+        // Silently ignore poll errors
+      }
+    }, 5000);
+  }, [req.id, qc, stopPolling]);
+
+  // Start polling automatically if already in-progress state on mount
+  useEffect(() => {
+    if (apStatus === "queued" || apStatus === "generating") {
+      startPolling();
+    }
+    return stopPolling;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dismiss = useMutation({
     mutationFn: () => apiRequest("DELETE", `/api/intake-requests/${req.id}`),
@@ -127,9 +188,10 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
   const enrollAutopilot = useMutation({
     mutationFn: () => apiRequest("POST", `/api/autopilot/enroll-intake/${req.id}`).then(r => r.json()),
     onSuccess: (data: any) => {
-      setEnrolledJobId(data?.jobId || "enrolled");
+      setApStatus(data?.autopilotStatus ?? "queued");
+      setApError(null);
       setEnrollError(null);
-      // Refresh intake list so autopilotEnrolled=true is returned from server
+      startPolling();
       qc.invalidateQueries({ queryKey: ["/api/intake-requests"] });
       qc.invalidateQueries({ queryKey: ["/api/autopilot/jobs"] });
     },
@@ -141,6 +203,8 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
       }
     },
   });
+
+  const enrollability = canEnrollInAutopilot(req);
 
   function buildQueryString(fields: typeof req.extractedFields) {
     const p = new URLSearchParams();
@@ -372,31 +436,60 @@ function IntakeCard({ req, tab, onRefresh }: { req: IntakeRequest; tab: TabKey; 
             >
               <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Build Quote
             </Button>
-            <button
-              onClick={() => {
-                if (enrolledJobId) {
-                  navigate("/autopilot");
-                } else {
-                  setEnrollError(null);
-                  enrollAutopilot.mutate();
-                }
-              }}
-              disabled={enrollAutopilot.isPending}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: "4px",
-                fontSize: "11px", fontWeight: 600,
-                padding: "4px 10px", borderRadius: "8px",
-                background: enrolledJobId ? "rgba(52,199,89,0.12)" : "rgba(0,122,255,0.08)",
-                color: enrolledJobId ? "#1a7f37" : "var(--blue)",
-                border: `0.5px solid ${enrolledJobId ? "rgba(52,199,89,0.25)" : "rgba(0,122,255,0.18)"}`,
-                cursor: "pointer",
-                flexShrink: 0,
-                opacity: enrollAutopilot.isPending ? 0.6 : 1,
-              }}
-            >
-              <Zap style={{ width: "11px", height: "11px" }} />
-              {enrolledJobId ? "In Autopilot" : enrollAutopilot.isPending ? "Enrolling…" : "Enroll in Autopilot"}
-            </button>
+            {(() => {
+              const cfg = apStatus ? AUTOPILOT_STATUS_CFG[apStatus as keyof typeof AUTOPILOT_STATUS_CFG] : null;
+              const isInProgress = apStatus === "queued" || apStatus === "generating";
+              const isTerminal = apStatus === "quote_sent" || apStatus === "failed";
+              const canEnroll = enrollability.ok;
+
+              if (cfg && (isInProgress || isTerminal)) {
+                const Icon = cfg.icon;
+                return (
+                  <button
+                    onClick={apStatus === "quote_sent" ? () => navigate("/autopilot") : (apStatus === "failed" ? () => { setApStatus(null); setApError(null); } : undefined)}
+                    title={apStatus === "failed" ? (apError || "Failed — click to retry") : cfg.label}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: "5px",
+                      fontSize: "11px", fontWeight: 600,
+                      padding: "4px 10px", borderRadius: "8px",
+                      background: cfg.bg, color: cfg.color, border: `0.5px solid ${cfg.border}`,
+                      cursor: apStatus === "failed" ? "pointer" : apStatus === "quote_sent" ? "pointer" : "default",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon style={{ width: "11px", height: "11px" }} className={cfg.spin ? "animate-spin" : ""} />
+                    {cfg.label}
+                    {apStatus === "failed" && <span style={{ fontSize: "10px", opacity: 0.8 }}>(retry)</span>}
+                  </button>
+                );
+              }
+
+              return (
+                <button
+                  onClick={() => {
+                    if (!canEnroll) return;
+                    setEnrollError(null);
+                    enrollAutopilot.mutate();
+                  }}
+                  disabled={enrollAutopilot.isPending || !canEnroll}
+                  title={!canEnroll ? enrollability.reason : "Send an AI-personalized quote via email automatically"}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: "4px",
+                    fontSize: "11px", fontWeight: 600,
+                    padding: "4px 10px", borderRadius: "8px",
+                    background: canEnroll ? "rgba(0,122,255,0.08)" : "rgba(0,0,0,0.04)",
+                    color: canEnroll ? "var(--blue)" : "#94a3b8",
+                    border: `0.5px solid ${canEnroll ? "rgba(0,122,255,0.18)" : "rgba(0,0,0,0.08)"}`,
+                    cursor: canEnroll ? "pointer" : "not-allowed",
+                    flexShrink: 0,
+                    opacity: enrollAutopilot.isPending ? 0.6 : 1,
+                  }}
+                >
+                  <Zap style={{ width: "11px", height: "11px" }} />
+                  {enrollAutopilot.isPending ? "Enrolling…" : "Enroll in Autopilot"}
+                </button>
+              );
+            })()}
             {tab === "new" && (
               <button
                 onClick={() => patch.mutate({ status: "needs_review" })}
@@ -466,10 +559,15 @@ export default function IntakeRequestsPage() {
     queryKey: ["/api/intake-requests/count"],
   });
 
-  const [enrolledAll, setEnrolledAll] = useState(false);
+  const qc = useQueryClient();
+  const [enrollAllResult, setEnrollAllResult] = useState<{ enrolled: number; message: string } | null>(null);
   const enrollAll = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/autopilot/settings", { autopilotEnabled: true }),
-    onSuccess: () => setEnrolledAll(true),
+    mutationFn: () => apiRequest("POST", "/api/autopilot/enroll-all-intake", {}).then(r => r.json()),
+    onSuccess: (data: any) => {
+      setEnrollAllResult({ enrolled: data.enrolled || 0, message: data.message || "Done!" });
+      qc.invalidateQueries({ queryKey: ["/api/intake-requests"] });
+      setTimeout(() => setEnrollAllResult(null), 6000);
+    },
   });
 
   const { data: linkData } = useQuery<{ url: string; code: string; businessName: string }>({
@@ -617,39 +715,80 @@ export default function IntakeRequestsPage() {
         ))}
       </div>
 
-      {/* Alert banner — leads waiting >2hrs */}
-      {activeTab === "new" && requests.filter((r: IntakeRequest) => {
-        const hrs = (Date.now() - new Date(r.createdAt).getTime()) / 3600000;
-        return hrs >= 2;
-      }).length > 0 ? (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px",
-          background: "rgba(255,149,0,0.08)",
-          border: "0.5px solid rgba(255,149,0,0.20)",
-          borderRadius: "var(--r12)", padding: "11px 16px",
-        }}>
-          <p style={{ fontSize: "12px", color: "var(--t2)", margin: 0 }}>
-            <span style={{ fontWeight: 600, color: "#c47400" }}>
-              {requests.filter((r: IntakeRequest) => (Date.now() - new Date(r.createdAt).getTime()) / 3600000 >= 2).length} lead{requests.filter((r: IntakeRequest) => (Date.now() - new Date(r.createdAt).getTime()) / 3600000 >= 2).length !== 1 ? "s" : ""}
-            </span>
-            {" "}waiting more than 2 hours — respond to close more business.
-          </p>
-          <button
-            onClick={() => enrolledAll ? (window.location.href = "/autopilot") : enrollAll.mutate()}
-            disabled={enrollAll.isPending}
-            style={{
-              fontSize: "11px", fontWeight: 600,
-              color: enrolledAll ? "#1a7f37" : "#c47400",
-              background: enrolledAll ? "rgba(52,199,89,0.12)" : "rgba(255,149,0,0.12)",
-              border: `0.5px solid ${enrolledAll ? "rgba(52,199,89,0.25)" : "rgba(255,149,0,0.25)"}`,
-              borderRadius: "8px", padding: "4px 10px", cursor: "pointer", flexShrink: 0,
-              opacity: enrollAll.isPending ? 0.6 : 1,
-            }}
-          >
-            {enrolledAll ? "Enrolled — View Pipeline" : enrollAll.isPending ? "Enrolling…" : "Enroll All in Autopilot"}
-          </button>
-        </div>
-      ) : null}
+      {/* Alert banner — leads waiting >2hrs OR success after bulk enroll */}
+      {activeTab === "new" && (() => {
+        const staleleads = requests.filter((r: IntakeRequest) => {
+          const hrs = (Date.now() - new Date(r.createdAt).getTime()) / 3600000;
+          return hrs >= 2 && !r.autopilotEnrolled;
+        });
+        const eligibleLeads = requests.filter((r: IntakeRequest) => !r.autopilotEnrolled && !!r.customerEmail);
+
+        if (enrollAllResult) {
+          return (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px",
+              background: "rgba(52,199,89,0.08)", border: "0.5px solid rgba(52,199,89,0.2)",
+              borderRadius: "var(--r12)", padding: "11px 16px",
+            }}>
+              <p style={{ fontSize: "12px", color: "#1a7f37", fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                <CheckCircle style={{ width: "14px", height: "14px" }} />
+                {enrollAllResult.message}
+              </p>
+              <button onClick={() => setEnrollAllResult(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: "2px" }}>
+                <X style={{ width: "14px", height: "14px" }} />
+              </button>
+            </div>
+          );
+        }
+
+        if (staleleads.length > 0 || eligibleLeads.length > 0) {
+          const count = eligibleLeads.length;
+          return (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px",
+              background: staleleads.length > 0 ? "rgba(255,149,0,0.08)" : "rgba(99,102,241,0.06)",
+              border: `0.5px solid ${staleleads.length > 0 ? "rgba(255,149,0,0.20)" : "rgba(99,102,241,0.18)"}`,
+              borderRadius: "var(--r12)", padding: "11px 16px",
+            }}>
+              <p style={{ fontSize: "12px", color: "var(--t2)", margin: 0 }}>
+                {staleleads.length > 0 ? (
+                  <>
+                    <span style={{ fontWeight: 600, color: "#c47400" }}>
+                      {staleleads.length} lead{staleleads.length !== 1 ? "s" : ""}
+                    </span>
+                    {" "}waiting more than 2 hours — let Autopilot send quotes while you focus on other work.
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontWeight: 600, color: "#6366f1" }}>
+                      {count} lead{count !== 1 ? "s" : ""}
+                    </span>
+                    {" "}ready for Autopilot — send AI-personalized quotes instantly.
+                  </>
+                )}
+              </p>
+              <button
+                onClick={() => enrollAll.mutate()}
+                disabled={enrollAll.isPending || count === 0}
+                style={{
+                  fontSize: "11px", fontWeight: 600,
+                  color: staleleads.length > 0 ? "#c47400" : "#6366f1",
+                  background: staleleads.length > 0 ? "rgba(255,149,0,0.12)" : "rgba(99,102,241,0.1)",
+                  border: `0.5px solid ${staleleads.length > 0 ? "rgba(255,149,0,0.25)" : "rgba(99,102,241,0.25)"}`,
+                  borderRadius: "8px", padding: "4px 10px", cursor: count > 0 ? "pointer" : "default",
+                  flexShrink: 0, opacity: enrollAll.isPending || count === 0 ? 0.6 : 1,
+                  display: "inline-flex", alignItems: "center", gap: "5px",
+                }}
+              >
+                <Zap style={{ width: "11px", height: "11px" }} />
+                {enrollAll.isPending ? "Enrolling…" : `Enroll All${count > 0 ? ` (${count})` : ""}`}
+              </button>
+            </div>
+          );
+        }
+
+        return null;
+      })()}
 
       {/* List */}
       {isLoading ? (

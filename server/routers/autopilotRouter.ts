@@ -64,16 +64,104 @@ router.post("/enroll-intake/:intakeId", requireAuth, requireAutopilot, async (re
 
     const jobId = await enrollLead(req.session.userId!, business.id, intakeId);
 
-    // Persist enrollment on the intake_requests row so GET returns it reliably
+    // Persist enrollment + status on the intake_requests row
     await pool.query(
-      `UPDATE intake_requests SET autopilot_enrolled=true, autopilot_enrolled_at=NOW() WHERE id=$1`,
+      `UPDATE intake_requests 
+       SET autopilot_enrolled=true, autopilot_enrolled_at=NOW(), autopilot_status='queued'
+       WHERE id=$1`,
       [intakeId]
     );
 
-    return res.json({ jobId, autopilotEnrolled: true, message: "Lead enrolled in Autopilot" });
+    return res.json({ jobId, autopilotEnrolled: true, autopilotStatus: "queued", message: "Lead enrolled — quote being generated now" });
   } catch (err: any) {
     console.error("[autopilot] enroll-intake error:", err.message);
     return res.status(500).json({ message: "Failed to enroll lead" });
+  }
+});
+
+// ─── GET /status/:intakeId — poll autopilot status for a single intake request ──
+router.get("/intake-status/:intakeId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const business = await getBusinessByOwner(req.session.userId!);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+
+    const r = await pool.query(
+      `SELECT autopilot_enrolled, autopilot_status, autopilot_error,
+              autopilot_enrolled_at, autopilot_quote_sent_at, quote_email_sent_at
+       FROM intake_requests WHERE id=$1 AND business_id=$2`,
+      [req.params.intakeId, business.id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ message: "Not found" });
+    const row = r.rows[0];
+    return res.json({
+      autopilotEnrolled: row.autopilot_enrolled ?? false,
+      autopilotStatus: row.autopilot_status ?? null,
+      autopilotError: row.autopilot_error ?? null,
+      autopilotEnrolledAt: row.autopilot_enrolled_at ?? null,
+      autopilotQuoteSentAt: row.autopilot_quote_sent_at ?? null,
+      quoteEmailSentAt: row.quote_email_sent_at ?? null,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ message: "Failed to fetch status" });
+  }
+});
+
+// ─── POST /enroll-all-intake — bulk enroll all eligible intake requests ─────────
+router.post("/enroll-all-intake", requireAuth, requireAutopilot, async (req: Request, res: Response) => {
+  try {
+    const business = await getBusinessByOwner(req.session.userId!);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+
+    // Get all new leads that aren't already enrolled and have an email
+    const leads = await pool.query(
+      `SELECT id FROM intake_requests
+       WHERE business_id=$1
+         AND status NOT IN ('dismissed', 'converted')
+         AND (autopilot_enrolled = false OR autopilot_enrolled IS NULL)
+         AND customer_email IS NOT NULL AND customer_email <> ''
+       ORDER BY created_at DESC LIMIT 50`,
+      [business.id]
+    );
+
+    if (leads.rows.length === 0) {
+      return res.json({ success: true, enrolled: 0, message: "No eligible leads to enroll" });
+    }
+
+    let enrolled = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const lead of leads.rows) {
+      try {
+        await pool.query(
+          `UPDATE intake_requests SET autopilot_enrolled=true, autopilot_enrolled_at=NOW(), autopilot_status='queued' WHERE id=$1`,
+          [lead.id]
+        );
+        enrollLead(req.session.userId!, business.id, lead.id).catch((err: any) => {
+          console.warn(`[autopilot] bulk-enroll failed for ${lead.id}:`, err.message);
+          pool.query(
+            `UPDATE intake_requests SET autopilot_status='failed', autopilot_error=$1 WHERE id=$2`,
+            [err.message, lead.id]
+          ).catch(() => {});
+        });
+        enrolled++;
+        // Stagger sends slightly
+        await new Promise(r => setTimeout(r, 300));
+      } catch (err: any) {
+        skipped++;
+        errors.push(`${lead.id}: ${err.message}`);
+      }
+    }
+
+    return res.json({
+      success: true,
+      enrolled,
+      skipped,
+      message: `${enrolled} lead${enrolled === 1 ? "" : "s"} enrolled — quotes on the way!`,
+    });
+  } catch (err: any) {
+    console.error("[autopilot] enroll-all-intake error:", err.message);
+    return res.status(500).json({ message: "Failed to bulk enroll leads" });
   }
 });
 
