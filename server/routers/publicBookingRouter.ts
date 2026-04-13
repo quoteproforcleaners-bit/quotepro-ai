@@ -439,16 +439,37 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
         `SELECT settings FROM pricing_settings WHERE business_id = $1 LIMIT 1`,
         [row.business_id]
       );
+      // Base quote amount (use midpoint for range quotes)
+      const quote = row.quote || {};
+      const baseMid = quote.exactAmount
+        ? Number(quote.exactAmount)
+        : ((Number(quote.rangeMin) || 0) + (Number(quote.rangeMax) || 0)) / 2;
+      const currentServiceId: string = (row.home?.serviceType || "standard").toLowerCase();
+
+      // Default service types used when operator hasn't configured custom types
+      const DEFAULT_SERVICE_TYPES = [
+        { id: "standard",    name: "Standard Clean",    multiplier: 1.00 },
+        { id: "deep",        name: "Deep Clean",        multiplier: 1.85 },
+        { id: "moveinout",   name: "Move In / Move Out", multiplier: 2.20 },
+      ];
+
+      // Static descriptions for common service types (shared across all branches)
+      const DESCRIPTIONS: Record<string, string> = {
+        standard: "Routine maintenance clean of all common areas",
+        deep: "Detailed top-to-bottom scrub including walls, baseboards & more",
+        moveinout: "Complete vacant property clean ready for new occupants",
+        move: "Complete vacant property clean ready for new occupants",
+        post_construction: "Heavy-duty removal of dust, debris & construction residue",
+        postconstruct: "Heavy-duty removal of dust, debris & construction residue",
+        airbnb: "Quick efficient reset between guests",
+        recurring: "Scheduled maintenance to keep your home spotless",
+      };
+
       if (psRes.rows.length > 0) {
         const ps = psRes.rows[0].settings;
-        const allTypes: Array<{ id: string; name: string; multiplier: number }> = ps.serviceTypes || [];
-        const currentServiceId: string = (row.home?.serviceType || "standard").toLowerCase();
-
-        // Base quote amount (use midpoint for range quotes)
-        const quote = row.quote || {};
-        const baseMid = quote.exactAmount
-          ? Number(quote.exactAmount)
-          : ((Number(quote.rangeMin) || 0) + (Number(quote.rangeMax) || 0)) / 2;
+        const configuredTypes: Array<{ id: string; name: string; multiplier: number }> = ps.serviceTypes || [];
+        // Use configured service types if available, otherwise fall back to defaults
+        const allTypes = configuredTypes.length >= 2 ? configuredTypes : DEFAULT_SERVICE_TYPES;
 
         const currentType = allTypes.find(
           (st) => st.id.toLowerCase() === currentServiceId ||
@@ -456,18 +477,6 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
         ) || allTypes.find((st) => st.multiplier === 1) || allTypes[0];
 
         const currentMultiplier = currentType?.multiplier || 1;
-
-        // Static descriptions for common service types
-        const DESCRIPTIONS: Record<string, string> = {
-          standard: "Routine maintenance clean of all common areas",
-          deep: "Detailed top-to-bottom scrub including walls, baseboards & more",
-          moveinout: "Complete vacant property clean ready for new occupants",
-          move: "Complete vacant property clean ready for new occupants",
-          post_construction: "Heavy-duty removal of dust, debris & construction residue",
-          postconstruct: "Heavy-duty removal of dust, debris & construction residue",
-          airbnb: "Quick efficient reset between guests",
-          recurring: "Scheduled maintenance to keep your home spotless",
-        };
 
         // Determine which service types to show: good/better/best if configured, else all
         const goodId = ps.goodOptionId;
@@ -505,6 +514,25 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
             priceMax: newMax,
             tag: tierTags[st.id],
             isCurrent: st.id === currentType?.id,
+          };
+        });
+      } else {
+        // No pricing settings at all — build tiers from defaults using the base quote price
+        const currentType = DEFAULT_SERVICE_TYPES.find((st) => st.id === currentServiceId)
+          || DEFAULT_SERVICE_TYPES[0];
+        const currentMultiplier = currentType.multiplier;
+        const tierTags: Record<string, string> = { standard: "Good", deep: "Better", moveinout: "Best" };
+        serviceTiers = DEFAULT_SERVICE_TYPES.map((st) => {
+          const ratio = st.multiplier / currentMultiplier;
+          const newMid = baseMid * ratio;
+          const newMin = Math.max(50, Math.round((newMid * 0.88) / 5) * 5);
+          const newMax = Math.round((newMid * 1.15) / 5) * 5;
+          return {
+            id: st.id, name: st.name,
+            description: DESCRIPTIONS[st.id] || st.name,
+            priceMin: newMin, priceMax: newMax,
+            tag: tierTags[st.id],
+            isCurrent: st.id === currentType.id,
           };
         });
       }
