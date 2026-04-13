@@ -439,8 +439,9 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
         `SELECT settings FROM pricing_settings WHERE business_id = $1 LIMIT 1`,
         [row.business_id]
       );
-      // Base quote amount (use midpoint for range quotes)
-      const quote = row.quote || {};
+      // Base quote amount — prefer quote_snapshot (booking_tokens) over leads.quote
+      // leads.quote is often empty {}; quote_snapshot holds the AI-generated price
+      const quote = (Object.keys(row.quote_snapshot || {}).length > 0 ? row.quote_snapshot : row.quote) || {};
       const baseMid = quote.exactAmount
         ? Number(quote.exactAmount)
         : ((Number(quote.rangeMin) || 0) + (Number(quote.rangeMax) || 0)) / 2;
@@ -547,7 +548,7 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
       contact: row.contact,
       home: row.home,
       preferences: row.preferences,
-      quote: row.quote,
+      quote: (Object.keys(row.quote_snapshot || {}).length > 0 ? row.quote_snapshot : row.quote) || {},
       quoteType: row.quote_type,
       serviceTiers: serviceTiers.length > 1 ? serviceTiers : [],
       business: {
