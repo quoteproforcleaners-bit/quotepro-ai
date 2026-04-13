@@ -91,12 +91,25 @@
     "setupChecklist": "Setup Checklist",
     "quickbooks": "QuickBooks Online",
     "productTour": "Product Tour",
+    "bookingWidget": "Booking Widget",
+    "winLoss": "Win/Loss Analysis",
+    "referral": "Refer & Earn",
+    "npsDashboard": "NPS Dashboard",
+    "teamStatus": "Field Status",
+    "autopilot": "Autopilot",
+    "locations": "Locations",
+    "recurring": "Recurring Schedules",
+    "finance": "Finance",
     "sections": {
+      "leadsQuotes": "Leads & Quotes",
+      "customersJobs": "Customers & Jobs",
+      "automation": "Automation",
       "operations": "Operations",
       "intelligence": "Intelligence",
       "growth": "Growth",
       "workspace": "Workspace",
-      "integrations": "Integrations"
+      "integrations": "Integrations",
+      "settings": "Settings"
     }
   },
   "common": {

@@ -1,3 +1,4 @@
+import "./lib/i18n";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
@@ -8,7 +9,6 @@ import { WebErrorBoundary } from "./components/WebErrorBoundary";
 import App from "./App";
 import "./index.css";
 import "./styles/apple.css";
-import "./lib/i18n";
 
 // Some paths live outside the /app prefix and need basename "/":
 // - /intake/:id       — public lead capture links (legacy)

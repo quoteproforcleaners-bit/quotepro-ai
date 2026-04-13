@@ -91,12 +91,25 @@
     "setupChecklist": "Список настройки",
     "quickbooks": "QuickBooks Online",
     "productTour": "Тур по продукту",
+    "bookingWidget": "Виджет бронирования",
+    "winLoss": "Анализ Выигрышей/Потерь",
+    "referral": "Реферальная программа",
+    "npsDashboard": "Панель NPS",
+    "teamStatus": "Статус команды",
+    "autopilot": "Автопилот",
+    "locations": "Локации",
+    "recurring": "Регулярные услуги",
+    "finance": "Финансы",
     "sections": {
+      "leadsQuotes": "Лиды и предложения",
+      "customersJobs": "Клиенты и задания",
+      "automation": "Автоматизация",
       "operations": "Операции",
       "intelligence": "Аналитика",
       "growth": "Рост",
       "workspace": "Рабочее пространство",
-      "integrations": "Интеграции"
+      "integrations": "Интеграции",
+      "settings": "Настройки"
     }
   },
   "common": {

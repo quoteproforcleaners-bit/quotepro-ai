@@ -101,8 +101,11 @@ export default function App() {
   const { isAuthenticated, isLoading, business, needsOnboarding } = useAuth();
 
   useEffect(() => {
-    const lang = (business as any)?.appLanguage;
-    if (lang) applyLanguage(lang);
+    const dbLang = (business as any)?.appLanguage;
+    const languageSelected = (business as any)?.languageSelected;
+    if (languageSelected && dbLang) {
+      applyLanguage(dbLang);
+    }
   }, [business]);
 
   // Employee portal uses PIN-based JWT — never wait for admin session check

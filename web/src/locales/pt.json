@@ -91,12 +91,25 @@
     "setupChecklist": "Lista de configuração",
     "quickbooks": "QuickBooks Online",
     "productTour": "Tour do produto",
+    "bookingWidget": "Widget de agendamento",
+    "winLoss": "Análise Ganho/Perda",
+    "referral": "Indicações",
+    "npsDashboard": "Painel NPS",
+    "teamStatus": "Status da equipe",
+    "autopilot": "Piloto automático",
+    "locations": "Locais",
+    "recurring": "Serviços recorrentes",
+    "finance": "Finanças",
     "sections": {
+      "leadsQuotes": "Leads e orçamentos",
+      "customersJobs": "Clientes e serviços",
+      "automation": "Automação",
       "operations": "Operações",
       "intelligence": "Inteligência",
       "growth": "Crescimento",
       "workspace": "Espaço de trabalho",
-      "integrations": "Integrações"
+      "integrations": "Integrações",
+      "settings": "Configurações"
     }
   },
   "common": {

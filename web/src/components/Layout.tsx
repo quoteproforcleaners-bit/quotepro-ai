@@ -118,60 +118,62 @@ const navSections: NavSection[] = [
 /* ─── Nav Translation Keys ────────────────────────────────────────────────── */
 
 const NAV_LABEL_KEYS: Record<string, string> = {
-  "/dashboard":         "Dashboard",
-  "/quotes":            "Quotes",
-  "/customers":         "Customers",
-  "/jobs":              "Jobs",
-  "/employees":         "Team Members",
-  "/staff":             "Staff",
-  "/calendar":          "Schedule",
-  "/commercial-quote":  "Commercial",
-  "/intake-requests":   "Quote Requests",
-  "/pricing-logic":     "Pricing Engine",
-  "/quote-preferences": "Quote Settings",
-  "/settings":          "Price Settings",
-  "/closing-assistant": "Handle Objections",
-  "/sales-strategy":    "Sales Strategy",
-  "/walkthrough-ai":    "Voice-to-Quote",
-  "/ai-assistant":      "Sales Assistant",
-  "/revenue":           "Revenue",
-  "/growth":            "Growth Dashboard",
-  "/follow-ups":        "Follow-Ups",
-  "/opportunities":     "Win-Back",
-  "/lead-finder":       "Lead Radar",
-  "/lead-capture":      "Lead Capture",
-  "/booking-widget":    "Booking Widget",
-  "/reactivation":      "Win-Back",
-  "/win-loss":          "Win/Loss Analysis",
-  "/referral":          "Refer & Earn",
-  "/email-sequences":   "Email Campaigns",
-  "/reviews-referrals": "Reviews & Referrals",
-  "/weekly-recap":      "Weekly Recap",
-  "/tasks-queue":       "Task Queue",
-  "/automations":       "Automations",
-  "/file-library":      "File Library",
-  "/toolkit":           "Toolkit",
-  "/pro-setup":         "Setup Checklist",
-  "/nps-dashboard":     "NPS Dashboard",
-  "/qbo-settings":      "QuickBooks",
-  "/account-settings":  "Account",
-  "/team":              "Field Status",
-  "/autopilot":         "Autopilot",
-  "/locations":         "Locations",
-  "/recurring-schedules": "Recurring",
+  "/dashboard":         "nav.dashboard",
+  "/quotes":            "nav.quotes",
+  "/customers":         "nav.customers",
+  "/jobs":              "nav.jobs",
+  "/employees":         "nav.team",
+  "/staff":             "nav.team",
+  "/calendar":          "nav.schedule",
+  "/commercial-quote":  "nav.commercial",
+  "/intake-requests":   "nav.quoteRequests",
+  "/pricing-logic":     "nav.pricingEngine",
+  "/quote-preferences": "nav.quoteSettings",
+  "/settings":          "nav.priceSettings",
+  "/closing-assistant": "nav.objectionAssistant",
+  "/sales-strategy":    "nav.salesStrategy",
+  "/walkthrough-ai":    "nav.quoteFromNotes",
+  "/ai-assistant":      "nav.salesAssistant",
+  "/revenue":           "nav.revenue",
+  "/growth":            "nav.growthHub",
+  "/follow-ups":        "nav.followUps",
+  "/opportunities":     "nav.opportunities",
+  "/lead-finder":       "nav.leadRadar",
+  "/lead-capture":      "nav.leadCapture",
+  "/booking-widget":    "nav.bookingWidget",
+  "/reactivation":      "nav.reactivation",
+  "/win-loss":          "nav.winLoss",
+  "/referral":          "nav.referral",
+  "/email-sequences":   "nav.emailSequences",
+  "/reviews-referrals": "nav.reviewsReferrals",
+  "/weekly-recap":      "nav.weeklyRecap",
+  "/tasks-queue":       "nav.tasksQueue",
+  "/automations":       "nav.automations",
+  "/file-library":      "nav.fileLibrary",
+  "/toolkit":           "nav.toolkit",
+  "/pro-setup":         "nav.setupChecklist",
+  "/nps-dashboard":     "nav.npsDashboard",
+  "/qbo-settings":      "nav.quickbooks",
+  "/account-settings":  "settings.account",
+  "/team":              "nav.teamStatus",
+  "/autopilot":         "nav.autopilot",
+  "/locations":         "nav.locations",
+  "/recurring-schedules": "nav.recurring",
+  "/finance":           "nav.finance",
 };
 
 const SECTION_LABEL_KEYS: Record<string, string> = {
-  "Leads & Quotes":   "Leads & Quotes",
-  "Customers & Jobs": "Customers & Jobs",
-  "Automation":       "Automation",
-  "Intelligence":     "Intelligence",
-  "Settings":         "Settings",
+  "Leads & Quotes":   "nav.sections.leadsQuotes",
+  "Customers & Jobs": "nav.sections.customersJobs",
+  "Automation":       "nav.sections.automation",
+  "Intelligence":     "nav.sections.intelligence",
+  "Settings":         "nav.sections.settings",
 };
 
 /* ─── Section label ──────────────────────────────────────────────────────── */
 
 function SectionLabel({ label }: { label: string }) {
+  const { t } = useTranslation();
   return (
     <p style={{
       fontSize: "10px",
@@ -183,7 +185,7 @@ function SectionLabel({ label }: { label: string }) {
       margin: "0 0 2px",
       userSelect: "none",
     }}>
-      {label}
+      {t(label)}
     </p>
   );
 }
@@ -191,6 +193,7 @@ function SectionLabel({ label }: { label: string }) {
 function CollapsibleSectionLabel({
   label, open, onToggle,
 }: { label: string; open: boolean; onToggle: () => void }) {
+  const { t } = useTranslation();
   return (
     <button
       onClick={onToggle}
@@ -198,7 +201,7 @@ function CollapsibleSectionLabel({
       style={{ background: "none", border: "none", cursor: "pointer", padding: "0 10px 2px", marginBottom: "2px" }}
     >
       <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--t4)", letterSpacing: ".08em", textTransform: "uppercase", flex: 1, textAlign: "left" }}>
-        {label}
+        {t(label)}
       </span>
       <ChevronDown
         style={{
@@ -877,7 +880,7 @@ export function Layout() {
 
               {/* Leads & Quotes */}
               <div style={{ marginBottom: "4px" }}>
-                <SectionLabel label="Leads & Quotes" />
+                <SectionLabel label="nav.sections.leadsQuotes" />
                 {renderNavItems(PIPELINE_NAV_ITEMS, navItemProps)}
               </div>
 
@@ -885,7 +888,7 @@ export function Layout() {
 
               {/* Customers & Jobs */}
               <div style={{ marginBottom: "4px" }}>
-                <SectionLabel label="Customers & Jobs" />
+                <SectionLabel label="nav.sections.customersJobs" />
                 {renderNavItems(OPERATIONS_NAV_ITEMS, navItemProps)}
               </div>
 
@@ -893,7 +896,7 @@ export function Layout() {
 
               {/* Automation */}
               <div style={{ marginBottom: "4px" }}>
-                <SectionLabel label="Automation" />
+                <SectionLabel label="nav.sections.automation" />
                 {renderNavItems(GROWTH_NAV_ITEMS, navItemProps)}
               </div>
 
@@ -901,7 +904,7 @@ export function Layout() {
 
               {/* Intelligence — collapsible */}
               <div style={{ marginBottom: "4px" }}>
-                <CollapsibleSectionLabel label="Intelligence" open={toolsOpen} onToggle={toggleToolsNav} />
+                <CollapsibleSectionLabel label="nav.sections.intelligence" open={toolsOpen} onToggle={toggleToolsNav} />
                 {toolsOpen ? (
                   <div>
                     {renderNavItems(TOOLS_NAV_ITEMS, navItemProps)}
@@ -954,7 +957,7 @@ export function Layout() {
                   <span className="nav-icon-sq">
                     <Settings style={{ width: "13px", height: "13px" }} />
                   </span>
-                  <span style={{ fontSize: "12.5px", flex: 1 }}>Settings</span>
+                  <span style={{ fontSize: "12.5px", flex: 1 }}>{t("nav.sections.settings")}</span>
                   <ChevronDown style={{
                     width: "11px", height: "11px", color: "var(--t4)",
                     transform: settingsOpen ? "rotate(0deg)" : "rotate(-90deg)",
