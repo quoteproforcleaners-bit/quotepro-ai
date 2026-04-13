@@ -82,12 +82,11 @@ export default function QuoteBookingPage() {
       });
   }, [token]);
 
-  async function fetchSlots(userId: string, preferredDate?: string) {
+  async function fetchSlots(_userId: string, preferredDate?: string) {
     try {
-      // Use the autopilot available-slots endpoint (authenticated) — fall back gracefully
       const url = preferredDate
-        ? `/api/autopilot/available-slots?preferredDate=${preferredDate}`
-        : `/api/autopilot/available-slots`;
+        ? `${API_BASE}/api/booking-token/${token}/slots?preferredDate=${preferredDate}`
+        : `${API_BASE}/api/booking-token/${token}/slots`;
       const r = await fetch(url);
       if (r.ok) {
         const d = await r.json();

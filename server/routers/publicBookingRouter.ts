@@ -435,6 +435,29 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
   }
 });
 
+// ─── GET /api/booking-token/:token/slots — public available slots for a token ──
+router.get("/api/booking-token/:token/slots", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    const preferredDate = req.query.preferredDate as string | undefined;
+
+    const tokenRes = await pool.query(
+      `SELECT bt.user_id FROM booking_tokens bt WHERE bt.token = $1 LIMIT 1`,
+      [token]
+    );
+    if (tokenRes.rows.length === 0) {
+      return res.status(404).json({ message: "Booking link not found" });
+    }
+    const { user_id } = tokenRes.rows[0];
+    const { getAvailableSlots } = await import("../services/quoteRequestService");
+    const slots = await getAvailableSlots(user_id, preferredDate);
+    return res.json({ slots });
+  } catch (err: any) {
+    console.error("[bookingToken] slots error:", err.message);
+    return res.status(500).json({ message: "Failed to fetch available slots" });
+  }
+});
+
 router.post("/api/booking-token/:token/confirm", async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
@@ -536,10 +559,11 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
       );
       const booking = bookingRes.rows[0];
 
-      // ── 2. Find or create customer record
+      // ── 2. Find or create customer record (SAVEPOINT so failure can't abort main tx)
       let customerId: string | null = null;
       try {
         if (contact.email && row.business_id) {
+          await client.query("SAVEPOINT sp_customer");
           const existingCustomer = await client.query(
             `SELECT id FROM customers WHERE business_id = $1 AND email = $2 LIMIT 1`,
             [row.business_id, contact.email]
@@ -551,20 +575,26 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
             await client.query(
               `INSERT INTO customers (id, business_id, first_name, last_name, email, phone, address, status, created_at, updated_at)
                VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', NOW(), NOW())`,
-              [newCustId, row.business_id, contact.firstName || "", contact.lastName || "",
-               contact.email, contact.phone || null, jobAddress]
+              [newCustId, row.business_id,
+               contact.firstName || "", contact.lastName || "",
+               contact.email || "",
+               contact.phone || "",
+               jobAddress || ""]
             );
             customerId = newCustId;
           }
+          await client.query("RELEASE SAVEPOINT sp_customer");
         }
       } catch (custErr: any) {
         console.warn("[bookingToken] customer create warning:", custErr.message);
+        await client.query("ROLLBACK TO SAVEPOINT sp_customer").catch(() => {});
       }
 
-      // ── 3. Create job record (appears on operator calendar)
+      // ── 3. Create job record (appears on operator calendar) — also SAVEPOINT protected
       let jobId: string | null = null;
       try {
         if (row.business_id) {
+          await client.query("SAVEPOINT sp_job");
           const startDatetime = new Date(`${datePart}T${timePart}:00`);
           const endDatetime = new Date(startDatetime.getTime() + 2 * 60 * 60 * 1000);
           jobId = crypto.randomUUID();
@@ -576,13 +606,15 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
             [
               jobId, row.business_id, customerId || null, jobType,
               startDatetime.toISOString(), endDatetime.toISOString(),
-              jobAddress, quoteAmount, notes || null,
+              jobAddress || "", quoteAmount, notes || null,
             ]
           );
+          await client.query("RELEASE SAVEPOINT sp_job");
           console.log(`[bookingToken] Job ${jobId} created for business ${row.business_id} on ${datePart} ${timePart}`);
         }
       } catch (jobErr: any) {
         console.warn("[bookingToken] job create warning:", jobErr.message);
+        await client.query("ROLLBACK TO SAVEPOINT sp_job").catch(() => {});
         jobId = null;
       }
 
