@@ -385,6 +385,13 @@ export default function SettingsPage() {
   });
 
   const [paymentMethods, setPaymentMethods] = useState<Record<string, boolean>>({});
+  const [autoChargeEnabled, setAutoChargeEnabled] = useState(false);
+  const [autoChargeTime, setAutoChargeTime] = useState("17:00");
+  const [autoChargeTimezone, setAutoChargeTimezone] = useState("America/New_York");
+  const [autoChargeSaved, setAutoChargeSaved] = useState(false);
+
+  const { data: autoChargeSettings } = useQuery<any>({ queryKey: ["/api/payments/auto-charge-settings"] });
+  const { data: stripeConnectStatus } = useQuery<any>({ queryKey: ["/api/payments/stripe-connect-status"] });
 
   const { data: pricing } = useQuery<any>({ queryKey: ["/api/pricing"] });
   const { data: quotePrefs } = useQuery<any>({
@@ -720,6 +727,14 @@ export default function SettingsPage() {
   }, [preferences]);
 
   useEffect(() => {
+    if (autoChargeSettings) {
+      setAutoChargeEnabled(autoChargeSettings.enabled ?? false);
+      setAutoChargeTime(autoChargeSettings.time ?? "17:00");
+      setAutoChargeTimezone(autoChargeSettings.timezone ?? "America/New_York");
+    }
+  }, [autoChargeSettings]);
+
+  useEffect(() => {
     if (growthSettings) {
       setGrowthForm({
         googleReviewLink: growthSettings.googleReviewLink || "",
@@ -819,6 +834,18 @@ export default function SettingsPage() {
       paymentNotes: paymentForm.paymentNotes || null,
       paymentOptions: opts,
     });
+  };
+
+  const handleSaveAutoCharge = async () => {
+    try {
+      await apiPatch("/api/payments/auto-charge-settings", {
+        enabled: autoChargeEnabled,
+        time: autoChargeTime,
+        timezone: autoChargeTimezone,
+      });
+      setAutoChargeSaved(true);
+      setTimeout(() => setAutoChargeSaved(false), 2500);
+    } catch {}
   };
 
   const handleSavePreferences = () => {
@@ -1332,6 +1359,86 @@ export default function SettingsPage() {
               Save Payment Settings
             </Button>
           </div>
+
+          {/* ─── Stripe Connect Status ── */}
+          {stripeConnectStatus?.connected ? (
+            <Card className="mt-2">
+              <CardHeader title="Stripe Connect Status" icon={CreditCard} />
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between py-2 border-b border-slate-50">
+                  <span className="text-slate-600">Account</span>
+                  <span className="font-medium text-slate-900">{stripeConnectStatus.displayName || stripeConnectStatus.accountId}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-50">
+                  <span className="text-slate-600">Charges Enabled</span>
+                  <span className={stripeConnectStatus.chargesEnabled ? "text-emerald-600 font-medium" : "text-red-500"}>
+                    {stripeConnectStatus.chargesEnabled ? "Yes" : "No — action required"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-slate-50">
+                  <span className="text-slate-600">Payouts Enabled</span>
+                  <span className={stripeConnectStatus.payoutsEnabled ? "text-emerald-600 font-medium" : "text-amber-500"}>
+                    {stripeConnectStatus.payoutsEnabled ? "Yes" : "Pending"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-slate-600">Country / Currency</span>
+                  <span className="font-medium text-slate-900">{[stripeConnectStatus.country, stripeConnectStatus.currency?.toUpperCase()].filter(Boolean).join(" · ")}</span>
+                </div>
+              </div>
+            </Card>
+          ) : null}
+
+          {/* ─── Auto-Charge Settings ── */}
+          <Card className="mt-2">
+            <CardHeader title="Auto-Charge" icon={CreditCard} />
+            <p className="text-sm text-slate-500 mb-4">
+              Automatically charge all completed, unpaid jobs with a card on file at a set time each day.
+              Requires Stripe Connect to be set up.
+            </p>
+            {autoChargeSaved ? (
+              <div className="mb-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-sm text-emerald-700">
+                <CheckCircle className="w-4 h-4" />
+                Auto-charge settings saved
+              </div>
+            ) : null}
+            <SettingRow label="Enable auto-charge">
+              <Toggle checked={autoChargeEnabled} onChange={setAutoChargeEnabled} />
+            </SettingRow>
+            {autoChargeEnabled ? (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Charge Time</label>
+                  <input
+                    type="time"
+                    value={autoChargeTime}
+                    onChange={(e) => setAutoChargeTime(e.target.value)}
+                    className="h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Timezone</label>
+                  <select
+                    value={autoChargeTimezone}
+                    onChange={(e) => setAutoChargeTimezone(e.target.value)}
+                    className="w-full h-11 px-3.5 rounded-lg border border-slate-200 hover:border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  >
+                    <option value="America/New_York">Eastern (ET)</option>
+                    <option value="America/Chicago">Central (CT)</option>
+                    <option value="America/Denver">Mountain (MT)</option>
+                    <option value="America/Los_Angeles">Pacific (PT)</option>
+                    <option value="America/Anchorage">Alaska (AKT)</option>
+                    <option value="Pacific/Honolulu">Hawaii (HT)</option>
+                  </select>
+                </div>
+              </div>
+            ) : null}
+            <div className="mt-4">
+              <Button size="sm" icon={Save} onClick={handleSaveAutoCharge}>
+                Save Auto-Charge Settings
+              </Button>
+            </div>
+          </Card>
         </div>
       ) : null}
 

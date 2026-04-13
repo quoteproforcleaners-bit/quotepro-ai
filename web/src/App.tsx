@@ -90,6 +90,7 @@ import BookingWidgetPage from "./pages/BookingWidgetPage";
 import NPSDashboardPage from "./pages/NPSDashboardPage";
 import PhantomAccountsPage from "./pages/PhantomAccountsPage";
 import WhatsNewModal from "./components/WhatsNewModal";
+import FinancePage from "./pages/FinancePage";
 
 function EmployeeGuard({ children }: { children: React.ReactNode }) {
   if (!isLoggedIn()) return <Navigate to="/employee/login" replace />;
@@ -206,6 +207,7 @@ export default function App() {
           <Route path="/lead-finder" element={<ProGate feature="Local Lead Finder"><LeadFinderPage /></ProGate>} />
           <Route path="/lead-finder/settings" element={<ProGate feature="Local Lead Finder"><LeadFinderSettingsPage /></ProGate>} />
           <Route path="/lead-finder/:id" element={<ProGate feature="Local Lead Finder"><LeadFinderDetailPage /></ProGate>} />
+          <Route path="/finance" element={<FinancePage />} />
           <Route path="/revenue" element={<ProGate feature="Revenue Intelligence"><RevenuePage /></ProGate>} />
           <Route path="/quote-doctor" element={<QuoteDoctorPage />} />
           <Route path="/closing-assistant" element={<ClosingAssistantPage />} />

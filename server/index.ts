@@ -557,6 +557,11 @@ async function seedToDoDemo() {
   // Analytics events TTL cleanup is scheduled via node-cron in server/routes.ts
   // (daily at 2am: "0 2 * * *") — no duplicate scheduler here.
 
+  // ─── Auto-charge cron: runs every minute ─────────────────────────────────
+  import("./cron/autoCharge").then(({ startAutoChargeCron }) => {
+    startAutoChargeCron();
+  }).catch((e: any) => console.error("[auto-charge] Failed to load cron:", e.message));
+
   // ─── Customer email sequence cron: fires every hour ─────────────────────
   import("./sequenceEmails").then(({ processSequenceQueue }) => {
     processSequenceQueue().catch((e: any) => console.error("[sequences] Initial queue run failed:", e.message));

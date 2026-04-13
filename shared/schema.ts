@@ -106,6 +106,10 @@ export const businesses = pgTable("businesses", {
   sendgridApiKey: text("sendgrid_api_key"),
   stripeAccountId: text("stripe_account_id"),
   stripeOnboardingComplete: boolean("stripe_onboarding_complete").notNull().default(false),
+  autoChargeEnabled: boolean("auto_charge_enabled").notNull().default(false),
+  autoChargeTime: varchar("auto_charge_time", { length: 5 }).default("17:00"),
+  autoChargeTimezone: text("auto_charge_timezone").default("America/New_York"),
+  autoChargeLastRunAt: timestamp("auto_charge_last_run_at"),
   venmoHandle: text("venmo_handle"),
   cashappHandle: text("cashapp_handle"),
   paymentOptions: jsonb("payment_options"),
@@ -158,6 +162,12 @@ export const customers = pgTable("customers", {
   preferredLanguage: varchar("preferred_language", { length: 10 }),
   importedAt: timestamp("imported_at"),
   deletedAt: timestamp("deleted_at"),
+  // Stripe Connect (customer payment methods on connected account)
+  stripeCustomerId: text("stripe_customer_id"),
+  stripePaymentMethodId: text("stripe_payment_method_id"),
+  hasPaymentMethod: boolean("has_payment_method").notNull().default(false),
+  paymentMethodLast4: varchar("payment_method_last4", { length: 4 }),
+  paymentMethodBrand: varchar("payment_method_brand", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -350,6 +360,13 @@ export const jobs = pgTable("jobs", {
   estimatedDurationMinutes: integer("estimated_duration_minutes"),
   roomCount: integer("room_count"),
   squareFootage: integer("square_footage"),
+  // Payment tracking
+  paymentStatus: text("payment_status").notNull().default("unpaid"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  chargedAt: timestamp("charged_at"),
+  chargeAmount: integer("charge_amount"), // in cents
+  chargeFailureReason: text("charge_failure_reason"),
+  receiptEmailSent: boolean("receipt_email_sent").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -1558,3 +1575,34 @@ export const bookings = pgTable("bookings", {
 
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = typeof bookings.$inferInsert;
+
+// ─── Payment Events ────────────────────────────────────────────────────────────
+export const paymentEvents = pgTable("payment_events", {
+  id: serial("id").primaryKey(),
+  jobId: varchar("job_id").references(() => jobs.id, { onDelete: "set null" }),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  customerId: varchar("customer_id").references(() => customers.id, { onDelete: "set null" }),
+  eventType: text("event_type").notNull(), // charge_success | charge_failed | refund | receipt_sent | card_added | waived
+  amountCents: integer("amount_cents"),
+  stripeId: text("stripe_id"),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type PaymentEvent = typeof paymentEvents.$inferSelect;
+export type InsertPaymentEvent = typeof paymentEvents.$inferInsert;
+
+// ─── Auto-Charge Log ──────────────────────────────────────────────────────────
+export const autoChargeLog = pgTable("auto_charge_log", {
+  id: serial("id").primaryKey(),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  runDate: text("run_date").notNull(), // YYYY-MM-DD in business timezone
+  jobsAttempted: integer("jobs_attempted").notNull().default(0),
+  jobsCharged: integer("jobs_charged").notNull().default(0),
+  jobsFailed: integer("jobs_failed").notNull().default(0),
+  totalAmountCents: integer("total_amount_cents").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type AutoChargeLog = typeof autoChargeLog.$inferSelect;
+export type InsertAutoChargeLog = typeof autoChargeLog.$inferInsert;

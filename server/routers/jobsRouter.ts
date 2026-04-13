@@ -650,11 +650,17 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
         jobs.map(async (j) => {
           let customerName = "";
           let customerPhone = "";
+          let hasPaymentMethod = false;
+          let paymentMethodLast4: string | null = null;
+          let paymentMethodBrand: string | null = null;
           if (j.customerId) {
             const c = await getCustomerById(j.customerId);
             if (c) {
               customerName = `${c.firstName} ${c.lastName}`.trim();
               customerPhone = c.phone || "";
+              hasPaymentMethod = (c as any).hasPaymentMethod ?? false;
+              paymentMethodLast4 = (c as any).paymentMethodLast4 ?? null;
+              paymentMethodBrand = (c as any).paymentMethodBrand ?? null;
             }
           }
           // If no customer name, try to get from linked quote
@@ -662,7 +668,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
             const q = await getQuoteById(j.quoteId);
             if (q) customerName = (q as any).customerName || "";
           }
-          return { ...j, customerName, customerPhone };
+          return { ...j, customerName, customerPhone, hasPaymentMethod, paymentMethodLast4, paymentMethodBrand };
         })
       );
       return res.json(enriched);

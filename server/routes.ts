@@ -37,6 +37,10 @@ import {
   sendWinLossFollowUps,
 } from "./helpers";
 
+// ─── Payment + Intelligence routers ──────────────────────────────────────────
+import paymentsRouter from "./routers/paymentsRouter";     // → /api/payments
+import financeAIRouter from "./routers/financeAIRouter";   // → /api/intelligence
+
 // ─── Group A — pure single-domain routers ─────────────────────────────────────
 import adminRouter from "./routers/adminRouter";           // → /api/admin
 import npsRouter from "./routers/npsRouter";               // → /api/nps
@@ -146,6 +150,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(publicBookingRouter);
 
   // 4. Mount Group B — multi-domain routers at /api
+  app.use("/api/payments", paymentsRouter);
+  app.use("/api/intelligence", financeAIRouter);
   app.use("/api", authRouter);
   app.use("/api", quotesRouter);
   app.use("/api", customersRouter);

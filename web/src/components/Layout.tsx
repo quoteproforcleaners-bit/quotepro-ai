@@ -83,6 +83,7 @@ const GROWTH_NAV_ITEMS: NavItem[] = [
 const TOOLS_NAV_ITEMS: NavItem[] = [
   { to: "/quote-doctor",      label: "Quote Doctor",      icon: Zap,        free: true, description: "Free AI tool — analyze any quote against market rates and get an optimized version that converts more jobs." },
   { to: "/walkthrough-ai",    label: "Voice-to-Quote",    icon: Wand2,               description: "Paste your walkthrough notes and let AI generate a complete, ready-to-send quote instantly." },
+  { to: "/finance",           label: "Finance",           icon: DollarSign,          description: "Collect payments via Stripe, audit failed/uncharged jobs, and get AI-powered financial insights." },
   { to: "/revenue",           label: "Revenue",           icon: DollarSign, pro: true, description: "Full revenue reporting — monthly totals, job type breakdown, and trends vs. prior periods." },
   { to: "/win-loss",          label: "Win/Loss",          icon: TrendingDown, pro: true, description: "See why prospects didn't book — automated feedback emails surface pricing and conversion insights." },
   { to: "/weekly-recap",      label: "Weekly Recap",      icon: BarChart2,  pro: true, description: "60-second Monday morning summary: quotes sent, jobs completed, revenue earned, and growth trend." },

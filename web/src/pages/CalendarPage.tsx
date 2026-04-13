@@ -22,6 +22,10 @@ import {
   Users,
   RefreshCw,
   History,
+  CreditCard,
+  CheckCircle,
+  XCircle,
+  Ban,
 } from "lucide-react";
 import { PageHeader, Card, Button } from "../components/ui";
 import { QuickAddCleanPanel } from "../components/QuickAddCleanPanel";
@@ -43,6 +47,14 @@ interface CalendarJob {
   internalNotes: string;
   customerName: string;
   customerPhone: string;
+  // Payment fields
+  paymentStatus: string;
+  chargeAmount: number | null;
+  chargeFailureReason: string | null;
+  chargedAt: string | null;
+  hasPaymentMethod: boolean;
+  paymentMethodLast4: string | null;
+  paymentMethodBrand: string | null;
 }
 
 interface UnscheduledQuote {
@@ -437,15 +449,52 @@ function JobDrawer({
   onClose,
   onReschedule,
   onNavigate,
+  onPaymentAction,
 }: {
   job: CalendarJob;
   onClose: () => void;
   onReschedule: (job: CalendarJob) => void;
   onNavigate: (jobId: string) => void;
+  onPaymentAction: () => void;
 }) {
   const colors = jobColor(job);
   const start = new Date(job.startDatetime);
   const end = job.endDatetime ? new Date(job.endDatetime) : null;
+  const queryClient = useQueryClient();
+  const [chargeConfirm, setChargeConfirm] = useState(false);
+
+  const chargeMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/payments/charge-job", { jobId: job.id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs/calendar"] });
+      setChargeConfirm(false);
+      onPaymentAction();
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/payments/retry-charge", { jobId: job.id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs/calendar"] });
+      onPaymentAction();
+    },
+  });
+
+  const waiveMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", `/api/payments/waive/${job.id}`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs/calendar"] });
+      onPaymentAction();
+    },
+  });
+
+  const amountDisplay = job.chargeAmount
+    ? `$${(job.chargeAmount / 100).toFixed(2)}`
+    : job.total
+    ? `$${job.total.toFixed(2)}`
+    : null;
+
+  const ps = job.paymentStatus || "unpaid";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -478,10 +527,102 @@ function JobDrawer({
               </div>
             </div>
 
-            {job.total ? (
-              <div className="flex items-center gap-3 bg-emerald-50 rounded-xl p-3">
-                <DollarSign className="w-4 h-4 text-emerald-600 shrink-0" />
-                <p className="text-sm font-semibold text-emerald-800">{formatMoney(job.total)}</p>
+            {/* ─── Payment Status Panel ─── */}
+            {ps === "charged" ? (
+              <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-emerald-800">Payment collected</p>
+                  {amountDisplay ? <p className="text-xs text-emerald-600">{amountDisplay} charged</p> : null}
+                </div>
+              </div>
+            ) : ps === "failed" ? (
+              <div className="space-y-2">
+                <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-3">
+                  <XCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-red-800">Charge failed</p>
+                    {job.chargeFailureReason ? (
+                      <p className="text-xs text-red-600 truncate">{job.chargeFailureReason}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={RefreshCw}
+                    onClick={() => retryMutation.mutate()}
+                    loading={retryMutation.isPending}
+                    className="flex-1 justify-center text-red-700 border-red-200 hover:bg-red-50"
+                  >
+                    Retry
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={Ban}
+                    onClick={() => waiveMutation.mutate()}
+                    loading={waiveMutation.isPending}
+                    className="flex-1 justify-center text-slate-600"
+                  >
+                    Waive
+                  </Button>
+                </div>
+              </div>
+            ) : ps === "waived" ? (
+              <div className="flex items-center gap-3 bg-slate-100 rounded-xl p-3">
+                <Ban className="w-4 h-4 text-slate-500 shrink-0" />
+                <p className="text-sm text-slate-600 font-medium">Payment waived</p>
+              </div>
+            ) : amountDisplay ? (
+              /* unpaid */
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 bg-emerald-50 rounded-xl p-3">
+                  <DollarSign className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <p className="text-sm font-semibold text-emerald-800">{amountDisplay}</p>
+                </div>
+                {chargeConfirm ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                    <p className="text-sm font-medium text-amber-900">Charge {amountDisplay} now?</p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => chargeMutation.mutate()}
+                        loading={chargeMutation.isPending}
+                        className="flex-1 justify-center bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        Confirm
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => setChargeConfirm(false)} className="flex-1 justify-center">
+                        Cancel
+                      </Button>
+                    </div>
+                    {chargeMutation.isError ? (
+                      <p className="text-xs text-red-600">{(chargeMutation.error as any)?.message || "Charge failed"}</p>
+                    ) : null}
+                  </div>
+                ) : job.hasPaymentMethod ? (
+                  <Button
+                    size="sm"
+                    icon={CreditCard}
+                    onClick={() => setChargeConfirm(true)}
+                    className="w-full justify-center bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    Charge {amountDisplay}
+                    {job.paymentMethodLast4 ? ` · ···${job.paymentMethodLast4}` : ""}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={CreditCard}
+                    onClick={() => onNavigate(job.id)}
+                    className="w-full justify-center text-violet-700 border-violet-200 hover:bg-violet-50"
+                  >
+                    Add Card to Charge
+                  </Button>
+                )}
               </div>
             ) : null}
 
@@ -1392,6 +1533,7 @@ export default function CalendarPage() {
           onClose={() => setSelectedJob(null)}
           onReschedule={(j) => { setRescheduleJob(j); setSelectedJob(null); }}
           onNavigate={(id) => { setSelectedJob(null); navigate(`/jobs/${id}`); }}
+          onPaymentAction={() => setSelectedJob(null)}
         />
       ) : null}
 
