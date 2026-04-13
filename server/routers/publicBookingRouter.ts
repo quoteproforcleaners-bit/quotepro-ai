@@ -401,8 +401,9 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
 
     const tokenRes = await pool.query(
       `SELECT bt.*, l.contact, l.home, l.preferences, l.quote, l.quote_type,
-              b.company_name, b.logo_uri, b.primary_color, b.phone AS business_phone,
-              b.email AS business_email, b.address AS business_address,
+              b.id AS business_id, b.company_name, b.logo_uri, b.primary_color,
+              b.phone AS business_phone, b.email AS business_email,
+              b.address AS business_address,
               b.public_quote_slug, b.chat_widget_enabled, b.chat_widget_color,
               u.id AS operator_user_id
        FROM booking_tokens bt
@@ -427,6 +428,90 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
       return res.status(409).json({ message: "This booking has already been confirmed" });
     }
 
+    // ── Build service tiers from pricing settings ──────────────────────────────
+    let serviceTiers: Array<{
+      id: string; name: string; description: string;
+      priceMin: number; priceMax: number; tag?: string; isCurrent: boolean;
+    }> = [];
+
+    try {
+      const psRes = await pool.query(
+        `SELECT settings FROM pricing_settings WHERE business_id = $1 LIMIT 1`,
+        [row.business_id]
+      );
+      if (psRes.rows.length > 0) {
+        const ps = psRes.rows[0].settings;
+        const allTypes: Array<{ id: string; name: string; multiplier: number }> = ps.serviceTypes || [];
+        const currentServiceId: string = (row.home?.serviceType || "standard").toLowerCase();
+
+        // Base quote amount (use midpoint for range quotes)
+        const quote = row.quote || {};
+        const baseMid = quote.exactAmount
+          ? Number(quote.exactAmount)
+          : ((Number(quote.rangeMin) || 0) + (Number(quote.rangeMax) || 0)) / 2;
+
+        const currentType = allTypes.find(
+          (st) => st.id.toLowerCase() === currentServiceId ||
+                  st.name.toLowerCase().replace(/\s+/g, "_") === currentServiceId
+        ) || allTypes.find((st) => st.multiplier === 1) || allTypes[0];
+
+        const currentMultiplier = currentType?.multiplier || 1;
+
+        // Static descriptions for common service types
+        const DESCRIPTIONS: Record<string, string> = {
+          standard: "Routine maintenance clean of all common areas",
+          deep: "Detailed top-to-bottom scrub including walls, baseboards & more",
+          moveinout: "Complete vacant property clean ready for new occupants",
+          move: "Complete vacant property clean ready for new occupants",
+          post_construction: "Heavy-duty removal of dust, debris & construction residue",
+          postconstruct: "Heavy-duty removal of dust, debris & construction residue",
+          airbnb: "Quick efficient reset between guests",
+          recurring: "Scheduled maintenance to keep your home spotless",
+        };
+
+        // Determine which service types to show: good/better/best if configured, else all
+        const goodId = ps.goodOptionId;
+        const betterId = ps.betterOptionId;
+        const bestId = ps.bestOptionId;
+
+        let tiersToShow: typeof allTypes;
+        const tierTags: Record<string, string> = {};
+
+        if (goodId && betterId && bestId) {
+          const ids = [goodId, betterId, bestId];
+          tiersToShow = ids
+            .map((id) => allTypes.find((st) => st.id === id))
+            .filter(Boolean) as typeof allTypes;
+          tierTags[goodId] = "Good";
+          tierTags[betterId] = "Better";
+          tierTags[bestId] = "Best";
+        } else {
+          // Show all service types sorted by multiplier
+          tiersToShow = [...allTypes].sort((a, b) => a.multiplier - b.multiplier);
+        }
+
+        serviceTiers = tiersToShow.map((st) => {
+          const ratio = st.multiplier / currentMultiplier;
+          const newMid = baseMid * ratio;
+          const newMin = Math.max(50, Math.round((newMid * 0.88) / 5) * 5);
+          const newMax = Math.round((newMid * 1.15) / 5) * 5;
+          const descKey = st.id.toLowerCase().replace(/[\s-]+/g, "_");
+          const desc = DESCRIPTIONS[descKey] || DESCRIPTIONS[st.id.toLowerCase()] || st.name;
+          return {
+            id: st.id,
+            name: st.name,
+            description: desc,
+            priceMin: newMin,
+            priceMax: newMax,
+            tag: tierTags[st.id],
+            isCurrent: st.id === currentType?.id,
+          };
+        });
+      }
+    } catch (pErr: any) {
+      console.warn("[bookingToken] pricing settings fetch error:", pErr.message);
+    }
+
     return res.json({
       token,
       used: row.used,
@@ -436,6 +521,7 @@ router.get("/api/booking-token/:token", async (req: Request, res: Response) => {
       preferences: row.preferences,
       quote: row.quote,
       quoteType: row.quote_type,
+      serviceTiers: serviceTiers.length > 1 ? serviceTiers : [],
       business: {
         companyName: row.company_name,
         logoUri: row.logo_uri,
@@ -481,7 +567,7 @@ router.get("/api/booking-token/:token/slots", async (req: Request, res: Response
 router.post("/api/booking-token/:token/confirm", async (req: Request, res: Response) => {
   try {
     const { token } = req.params;
-    const { slot, address, notes } = req.body; // slot = "YYYY-MM-DDTHH:MM"
+    const { slot, address, notes, serviceType: chosenServiceType, upgradedPrice } = req.body; // slot = "YYYY-MM-DDTHH:MM"
 
     if (!slot) {
       return res.status(400).json({ message: "Slot is required" });
@@ -552,17 +638,21 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
         [token]
       );
 
-      // Extract data
+      // Extract data — honor chosen service tier if customer upgraded
       const contact = row.contact as any;
       const home = row.home as any;
       const quote = row.quote as any;
       const customerName = `${contact.firstName || ""} ${contact.lastName || ""}`.trim();
-      const quoteAmount = quote?.exactAmount || (quote?.rangeMin ? Math.round((quote.rangeMin + (quote.rangeMax || quote.rangeMin)) / 2) : null);
+      const baseQuoteAmount = quote?.exactAmount || (quote?.rangeMin ? Math.round((quote.rangeMin + (quote.rangeMax || quote.rangeMin)) / 2) : null);
+      const quoteAmount = upgradedPrice ? Number(upgradedPrice) : baseQuoteAmount;
       const jobTypeLabels: Record<string, string> = {
         standard: "Standard Clean", deep: "Deep Clean",
-        move: "Move In / Move Out", post_construction: "Post-Construction Clean",
+        move: "Move In / Move Out", moveinout: "Move In / Move Out",
+        post_construction: "Post-Construction Clean", postconstruct: "Post-Construction Clean",
+        airbnb: "Airbnb Turnover",
       };
-      const jobType = jobTypeLabels[home.serviceType] || home.serviceType || "Standard Clean";
+      const effectiveServiceType = chosenServiceType || home.serviceType;
+      const jobType = jobTypeLabels[effectiveServiceType?.toLowerCase?.()] || effectiveServiceType || "Standard Clean";
       const jobAddress = address || [contact.street, contact.apt, contact.city, contact.state, contact.zip].filter(Boolean).join(", ") || null;
 
       // ── 1. Create booking record (legacy autopilot table — keeps existing reports working)
@@ -574,7 +664,7 @@ router.post("/api/booking-token/:token/confirm", async (req: Request, res: Respo
          RETURNING *`,
         [
           row.operator_user_id, datePart, timePart, customerName,
-          contact.email, contact.phone || null, home.serviceType,
+          contact.email, contact.phone || null, effectiveServiceType,
           jobAddress, quoteAmount, notes || null,
         ]
       );

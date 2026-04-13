@@ -1,20 +1,33 @@
 /**
  * QuoteBookingPage.tsx
  *
- * Shown when a lead clicks a time slot in the quote email.
- * Route: /book/:token?slot=YYYY-MM-DDTHH:MM
- *
- * Also serves as the general "pick a slot" page when navigated to without
- * a pre-selected slot (i.e., "See more times →" link).
+ * Customer-facing booking flow:
+ *   1. Load token → pick_slot (or pre-selected slot)
+ *   2. service_upgrade — Good / Better / Best tier picker
+ *   3. address — confirm details
+ *   4. confirmed
  */
 
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { ChatWidget } from "../components/public/ChatWidget";
 import AddressAutocompleteLine from "../components/AddressAutocompleteLine";
-import { CheckCircle, Loader2, AlertCircle, Calendar, Clock, Home, MapPin, Check, ChevronRight } from "lucide-react";
+import {
+  CheckCircle, Loader2, AlertCircle, Calendar, Clock, Home,
+  Check, ChevronRight, Star, ArrowLeft,
+} from "lucide-react";
 
 const API_BASE = typeof window !== "undefined" ? window.location.origin : "";
+
+interface ServiceTier {
+  id: string;
+  name: string;
+  description: string;
+  priceMin: number;
+  priceMax: number;
+  tag?: string;   // "Good" | "Better" | "Best" | undefined
+  isCurrent: boolean;
+}
 
 interface BookingData {
   token: string;
@@ -25,30 +38,30 @@ interface BookingData {
   quote: {
     exactAmount?: number; rangeMin?: number; rangeMax?: number;
     estimatedDuration?: string; breakdown?: { item: string; amount: number }[];
-    confidence?: string;
   };
   quoteType: "exact" | "range";
-  business: { companyName: string; logoUri?: string; primaryColor: string; phone?: string; email?: string; address?: string; userId: string };
+  serviceTiers: ServiceTier[];
+  business: {
+    companyName: string; logoUri?: string; primaryColor: string;
+    phone?: string; email?: string; address?: string; userId: string;
+    publicQuoteSlug?: string; chatWidgetEnabled?: boolean; chatWidgetColor?: string;
+  };
 }
 
 interface AvailableSlot { date: string; dayLabel: string; times: string[] }
 
-const SERVICE_LABELS: Record<string, string> = {
-  standard: "Standard Clean", deep: "Deep Clean",
-  move: "Move In / Move Out", post_construction: "Post-Construction Clean",
-};
-
-type Phase = "loading" | "confirm_slot" | "pick_slot" | "address" | "confirming" | "confirmed" | "expired" | "error";
+type Phase = "loading" | "pick_slot" | "service_upgrade" | "address" | "confirming" | "confirmed" | "expired" | "error";
 
 export default function QuoteBookingPage() {
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
-  const preSlot = searchParams.get("slot"); // "YYYY-MM-DDTHH:MM"
+  const preSlot = searchParams.get("slot");
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [data, setData] = useState<BookingData | null>(null);
   const [slots, setSlots] = useState<AvailableSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(preSlot);
+  const [selectedTier, setSelectedTier] = useState<ServiceTier | null>(null);
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -56,8 +69,6 @@ export default function QuoteBookingPage() {
 
   useEffect(() => {
     if (!token) { setPhase("error"); return; }
-
-    // Try new booking_tokens flow
     fetch(`${API_BASE}/api/booking-token/${token}`)
       .then(async (r) => {
         if (r.status === 404) throw new Error("not_found");
@@ -66,53 +77,66 @@ export default function QuoteBookingPage() {
         if (!r.ok) throw new Error("fetch_error");
         const d: BookingData = await r.json();
         setData(d);
+        // Default selected tier = the tier that matches their original service
+        const defaultTier = d.serviceTiers?.find((t) => t.isCurrent) || d.serviceTiers?.[0] || null;
+        setSelectedTier(defaultTier);
         if (preSlot) {
           setSelectedSlot(preSlot);
-          setPhase("address");
+          setPhase(d.serviceTiers?.length > 1 ? "service_upgrade" : "address");
         } else {
-          // No pre-selected slot → fetch available slots and let user pick
-          await fetchSlots(d.business.userId, d.preferences?.preferredDate);
+          await fetchSlots(token, d.preferences?.preferredDate);
           setPhase("pick_slot");
         }
       })
-      .catch((err) => {
-        console.error("[QuoteBookingPage] load error:", err);
+      .catch(() => {
         setPhase("error");
         setErrorMsg("Unable to load booking page. This link may be invalid or expired.");
       });
   }, [token]);
 
-  async function fetchSlots(_userId: string, preferredDate?: string) {
+  async function fetchSlots(tok: string, preferredDate?: string) {
     try {
       const url = preferredDate
-        ? `${API_BASE}/api/booking-token/${token}/slots?preferredDate=${preferredDate}`
-        : `${API_BASE}/api/booking-token/${token}/slots`;
+        ? `${API_BASE}/api/booking-token/${tok}/slots?preferredDate=${preferredDate}`
+        : `${API_BASE}/api/booking-token/${tok}/slots`;
       const r = await fetch(url);
       if (r.ok) {
         const d = await r.json();
         setSlots(d.slots || []);
       }
-    } catch {
-      // Slots unavailable — just show manual contact
-    }
+    } catch { /* slots unavailable */ }
+  }
+
+  function handleSlotSelect(slotValue: string) {
+    setSelectedSlot(slotValue);
+    setPhase(data?.serviceTiers?.length > 1 ? "service_upgrade" : "address");
   }
 
   async function handleConfirm() {
     if (!selectedSlot || !token) return;
     setPhase("confirming");
     try {
+      const body: Record<string, unknown> = {
+        slot: selectedSlot,
+        address: address.trim() || undefined,
+        notes: notes.trim() || undefined,
+      };
+      if (selectedTier && !selectedTier.isCurrent) {
+        body.serviceType = selectedTier.id;
+        body.upgradedPrice = Math.round((selectedTier.priceMin + selectedTier.priceMax) / 2);
+      }
       const resp = await fetch(`${API_BASE}/api/booking-token/${token}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slot: selectedSlot, address: address.trim() || undefined, notes: notes.trim() || undefined }),
+        body: JSON.stringify(body),
       });
       const result = await resp.json();
       if (!resp.ok) {
         if (resp.status === 409) {
-          setErrorMsg("This slot was just taken by someone else. Please choose another time.");
+          setErrorMsg("This slot was just taken. Please choose another time.");
           setPhase("pick_slot");
           setSelectedSlot(null);
-          if (data) fetchSlots(data.business.userId, data.preferences?.preferredDate);
+          if (token) fetchSlots(token, data?.preferences?.preferredDate);
         } else {
           throw new Error(result.message || "Confirmation failed");
         }
@@ -128,7 +152,7 @@ export default function QuoteBookingPage() {
 
   const color = data?.business.primaryColor || "#2563EB";
 
-  function parseSlot(slot: string): { date: string; time: string } {
+  function parseSlot(slot: string) {
     const [date, time] = slot.split("T");
     if (!date || !time) return { date: slot, time: "" };
     const [h, m] = time.split(":").map(Number);
@@ -146,7 +170,20 @@ export default function QuoteBookingPage() {
         ? `$${(data.quote.exactAmount || 0).toLocaleString()}`
         : `$${(data.quote.rangeMin || 0).toLocaleString()} – $${(data.quote.rangeMax || 0).toLocaleString()}`)
     : "";
-  const serviceLabel = data ? (SERVICE_LABELS[data.home.serviceType] || data.home.serviceType) : "";
+  const SERVICE_LABELS: Record<string, string> = {
+    standard: "Standard Clean", deep: "Deep Clean",
+    move: "Move In / Move Out", moveinout: "Move In / Move Out",
+    post_construction: "Post-Construction Clean", postconstruct: "Post-Construction",
+    airbnb: "Airbnb Turnover",
+  };
+  const serviceLabel = data
+    ? (selectedTier?.name || SERVICE_LABELS[data.home.serviceType] || data.home.serviceType)
+    : "";
+
+  // Price display for confirmation
+  const displayPrice = selectedTier
+    ? (selectedTier.isCurrent ? quoteStr : `$${selectedTier.priceMin.toLocaleString()} – $${selectedTier.priceMax.toLocaleString()}`)
+    : quoteStr;
 
   return (
     <div style={{ minHeight: "100vh", background: "#F3F4F6", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
@@ -155,9 +192,9 @@ export default function QuoteBookingPage() {
         @keyframes fadeUp { from { opacity:0;transform:translateY(10px) } to { opacity:1;transform:translateY(0) } }
         * { box-sizing: border-box; }
         input,textarea { font-family: inherit; }
-        .qb-slot:hover { border-color: var(--color) !important; background: rgba(37,99,235,0.05) !important; }
+        .qb-slot:hover { border-color: ${color} !important; background: ${rgba(color, 0.05)} !important; }
+        .qb-tier:hover { border-color: ${color} !important; box-shadow: 0 0 0 3px ${rgba(color, 0.1)} !important; }
       `}</style>
-      <style>{`* { --color: ${color}; }`}</style>
 
       {/* Header */}
       <div style={{ background: color, padding: "20px 16px", textAlign: "center" }}>
@@ -192,7 +229,7 @@ export default function QuoteBookingPage() {
           <Card>
             <AlertCircle size={48} style={{ color: "#F59E0B", display: "block", margin: "0 auto 20px" }} />
             <h2 style={h2}>Link Expired</h2>
-            <p style={sub}>This booking link has expired (links are valid for 48 hours). Please contact {data?.business.companyName || "the business"} to request a new quote.</p>
+            <p style={sub}>This booking link has expired (links are valid for 48 hours). Please contact {data?.business.companyName || "the business"} to get a new quote.</p>
             {data?.business.phone && <ContactInfo phone={data.business.phone} email={data.business.email} />}
           </Card>
         )}
@@ -206,7 +243,7 @@ export default function QuoteBookingPage() {
           </Card>
         )}
 
-        {/* Confirmed ✓ */}
+        {/* Confirmed */}
         {phase === "confirmed" && (
           <div style={{ animation: "fadeUp .3s ease" }}>
             <Card>
@@ -242,15 +279,149 @@ export default function QuoteBookingPage() {
           </div>
         )}
 
-        {/* Address step */}
-        {(phase === "address") && data && slotInfo && (
+        {/* ── Pick a slot ───────────────────────────────────────────────────── */}
+        {phase === "pick_slot" && data && (
           <div style={{ animation: "fadeUp .25s ease" }}>
-            {errorMsg && (
-              <div style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 10 }}>
-                <AlertCircle size={16} style={{ color: "#EF4444", flexShrink: 0 }} />
-                <span style={{ fontSize: 14, color: "#B91C1C" }}>{errorMsg}</span>
+            {errorMsg && <ErrorBanner msg={errorMsg} />}
+            <Card>
+              <h2 style={h2}>Pick a time that works</h2>
+              <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
+                <div style={{ fontSize: 13, color: "#6B7280" }}>{SERVICE_LABELS[data.home.serviceType] || data.home.serviceType} &bull; {data.home.bedrooms}BR / {data.home.bathrooms}BA</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color }}>{quoteStr}</div>
               </div>
-            )}
+
+              {slots.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px 0" }}>
+                  <p style={{ color: "#6B7280", fontSize: 14 }}>No available slots found. Please contact us to schedule.</p>
+                  {data.business.phone && <ContactInfo phone={data.business.phone} email={data.business.email} />}
+                </div>
+              ) : (
+                slots.map((day) => (
+                  <div key={day.date} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{day.dayLabel}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {day.times.map((t) => {
+                        const slotValue = `${day.date}T${to24(t)}`;
+                        const isSelected = selectedSlot === slotValue;
+                        return (
+                          <button
+                            key={t} className="qb-slot"
+                            onClick={() => handleSlotSelect(slotValue)}
+                            style={{ padding: "9px 16px", border: `2px solid ${isSelected ? color : "#D1D5DB"}`, borderRadius: 8, background: isSelected ? rgba(color, 0.08) : "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, color: isSelected ? color : "#374151", display: "flex", alignItems: "center", gap: 6, transition: "all .15s" }}>
+                            {isSelected && <Check size={13} />}
+                            {t}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* ── Service Upgrade ───────────────────────────────────────────────── */}
+        {phase === "service_upgrade" && data && slotInfo && (
+          <div style={{ animation: "fadeUp .25s ease" }}>
+            {/* Slot summary pill */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", borderRadius: 12, padding: "12px 16px", marginBottom: 16, boxShadow: "0 1px 6px rgba(0,0,0,0.06)" }}>
+              <button
+                onClick={() => setPhase("pick_slot")}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "#6B7280", display: "flex", alignItems: "center" }}>
+                <ArrowLeft size={16} />
+              </button>
+              <Calendar size={15} style={{ color, flexShrink: 0 }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{slotInfo.date}</span>
+              <Clock size={15} style={{ color, flexShrink: 0 }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{slotInfo.time}</span>
+            </div>
+
+            <Card>
+              <h2 style={h2}>Choose your service</h2>
+              <p style={{ ...sub, marginBottom: 20 }}>
+                All prices are estimates based on your {data.home.bedrooms}BR / {data.home.bathrooms}BA home.
+                Final quote confirmed after your clean.
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+                {data.serviceTiers.map((tier) => {
+                  const isSelected = selectedTier?.id === tier.id;
+                  const tagColors: Record<string, { bg: string; text: string; border: string }> = {
+                    Good:   { bg: "#F0FDF4", text: "#166534", border: "#86EFAC" },
+                    Better: { bg: "#EFF6FF", text: "#1D4ED8", border: "#93C5FD" },
+                    Best:   { bg: "#FDF4FF", text: "#7E22CE", border: "#D8B4FE" },
+                  };
+                  const tagStyle = tier.tag ? tagColors[tier.tag] : null;
+
+                  return (
+                    <button
+                      key={tier.id}
+                      className="qb-tier"
+                      onClick={() => setSelectedTier(tier)}
+                      style={{
+                        width: "100%", textAlign: "left", padding: "16px 18px",
+                        border: `2px solid ${isSelected ? color : "#E5E7EB"}`,
+                        borderRadius: 14, background: isSelected ? rgba(color, 0.04) : "#fff",
+                        cursor: "pointer", transition: "all .15s",
+                        boxShadow: isSelected ? `0 0 0 3px ${rgba(color, 0.12)}` : "none",
+                        position: "relative",
+                      }}>
+
+                      {/* Selected check */}
+                      {isSelected && (
+                        <div style={{ position: "absolute", top: 14, right: 14, width: 22, height: 22, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <Check size={13} color="#fff" strokeWidth={3} />
+                        </div>
+                      )}
+
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{tier.name}</span>
+                            {tier.tag && tagStyle && (
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: tagStyle.bg, color: tagStyle.text, border: `1px solid ${tagStyle.border}`, letterSpacing: "0.03em" }}>
+                                {tier.tag === "Best" && <Star size={9} style={{ verticalAlign: "middle", marginRight: 2 }} />}
+                                {tier.tag}
+                              </span>
+                            )}
+                            {tier.isCurrent && !tier.tag && (
+                              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: "#F3F4F6", color: "#6B7280" }}>Your quote</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.4 }}>{tier.description}</div>
+                        </div>
+                        <div style={{ flexShrink: 0, textAlign: "right" }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: isSelected ? color : "#111827" }}>
+                            ${tier.priceMin.toLocaleString()}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#9CA3AF" }}>
+                            – ${tier.priceMax.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setPhase("address")}
+                disabled={!selectedTier}
+                style={{ width: "100%", padding: "14px", background: selectedTier ? color : "#D1D5DB", color: "#fff", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: selectedTier ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                Continue <ChevronRight size={18} />
+              </button>
+              <p style={{ textAlign: "center", fontSize: 11, color: "#9CA3AF", marginTop: 10, marginBottom: 0 }}>
+                Prices are estimates — final price confirmed after inspection
+              </p>
+            </Card>
+          </div>
+        )}
+
+        {/* ── Address / Confirm ─────────────────────────────────────────────── */}
+        {phase === "address" && data && slotInfo && (
+          <div style={{ animation: "fadeUp .25s ease" }}>
+            {errorMsg && <ErrorBanner msg={errorMsg} />}
 
             <Card>
               <h2 style={h2}>Confirm your booking</h2>
@@ -258,15 +429,20 @@ export default function QuoteBookingPage() {
 
               {/* Quote summary */}
               <div style={{ background: "#F9FAFB", borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
                   <div>
-                    <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 2 }}>{serviceLabel} &bull; {data.home.bedrooms}BR / {data.home.bathrooms}BA</div>
-                    <div style={{ fontSize: 26, fontWeight: 800, color }}>{quoteStr}</div>
+                    <div style={{ fontSize: 13, color: "#6B7280", marginBottom: 2 }}>
+                      {serviceLabel} &bull; {data.home.bedrooms}BR / {data.home.bathrooms}BA
+                    </div>
+                    <div style={{ fontSize: 26, fontWeight: 800, color }}>{displayPrice}</div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 12, color: "#9CA3AF" }}>Duration</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{data.quote.estimatedDuration || "2–3 hrs"}</div>
-                  </div>
+                  {data.serviceTiers.length > 1 && (
+                    <button
+                      onClick={() => setPhase("service_upgrade")}
+                      style={{ fontSize: 13, color, background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0, textDecoration: "underline" }}>
+                      Change
+                    </button>
+                  )}
                 </div>
 
                 <div style={{ borderTop: "1px solid #E5E7EB", paddingTop: 10 }}>
@@ -316,54 +492,6 @@ export default function QuoteBookingPage() {
             </Card>
           </div>
         )}
-
-        {/* Pick a slot */}
-        {phase === "pick_slot" && data && (
-          <div style={{ animation: "fadeUp .25s ease" }}>
-            {errorMsg && (
-              <div style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 10 }}>
-                <AlertCircle size={16} style={{ color: "#EF4444", flexShrink: 0 }} />
-                <span style={{ fontSize: 14, color: "#B91C1C" }}>{errorMsg}</span>
-              </div>
-            )}
-
-            <Card>
-              <h2 style={h2}>Pick a time that works</h2>
-              <div style={{ background: "#F9FAFB", borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
-                <div style={{ fontSize: 13, color: "#6B7280" }}>{serviceLabel} &bull; {data.home.bedrooms}BR / {data.home.bathrooms}BA</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color }}>{quoteStr}</div>
-              </div>
-
-              {slots.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "24px 0" }}>
-                  <p style={{ color: "#6B7280", fontSize: 14 }}>No available slots found. Please contact us to schedule.</p>
-                  {data.business.phone && <ContactInfo phone={data.business.phone} email={data.business.email} />}
-                </div>
-              ) : (
-                slots.map((day) => (
-                  <div key={day.date} style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{day.dayLabel}</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {day.times.map((t) => {
-                        const slotValue = `${day.date}T${to24(t)}`;
-                        const isSelected = selectedSlot === slotValue;
-                        return (
-                          <button
-                            key={t} className="qb-slot"
-                            onClick={() => { setSelectedSlot(slotValue); setPhase("address"); }}
-                            style={{ padding: "9px 16px", border: `2px solid ${isSelected ? color : "#D1D5DB"}`, borderRadius: 8, background: isSelected ? rgba(color, 0.08) : "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600, color: isSelected ? color : "#374151", display: "flex", alignItems: "center", gap: 6, transition: "all .15s" }}>
-                            {isSelected && <Check size={13} />}
-                            {t}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))
-              )}
-            </Card>
-          </div>
-        )}
       </div>
 
       {data?.business?.chatWidgetEnabled !== false && data?.business?.publicQuoteSlug && (
@@ -387,6 +515,15 @@ function Card({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ErrorBanner({ msg }: { msg: string }) {
+  return (
+    <div style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", gap: 10 }}>
+      <AlertCircle size={16} style={{ color: "#EF4444", flexShrink: 0 }} />
+      <span style={{ fontSize: 14, color: "#B91C1C" }}>{msg}</span>
+    </div>
+  );
+}
+
 function ContactInfo({ phone, email }: { phone?: string; email?: string }) {
   return (
     <div style={{ marginTop: 16, fontSize: 13, color: "#6B7280" }}>
@@ -397,7 +534,6 @@ function ContactInfo({ phone, email }: { phone?: string; email?: string }) {
 }
 
 // ─── Style atoms ──────────────────────────────────────────────────────────────
-
 const h2: React.CSSProperties = { fontSize: 22, fontWeight: 800, color: "#111827", margin: "0 0 10px" };
 const sub: React.CSSProperties = { fontSize: 14, color: "#6B7280", lineHeight: 1.6, margin: "0 0 20px" };
 const lbl: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 };
