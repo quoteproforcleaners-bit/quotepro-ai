@@ -671,8 +671,7 @@ export default function FinancePage() {
     <div className="max-w-4xl mx-auto px-4 pb-16">
       <PageHeader
         title={t("finance.title")}
-        description={t("finance.description")}
-        icon={DollarSign}
+        subtitle={t("finance.description")}
       />
 
       {/* Tabs */}

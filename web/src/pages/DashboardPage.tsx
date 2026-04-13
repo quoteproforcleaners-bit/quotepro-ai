@@ -1117,6 +1117,7 @@ function PowerFeatureTips({
 
 export default function DashboardPage() {
  const navigate = useNavigate();
+ const { t } = useTranslation();
  const { user, business, trialExpired, pendingPlanIntent, consumePlanIntent, needsOnboarding } = useAuth();
  const fmt = makeFmt((business as any)?.currency ||"USD");
  const { isInFreeTrial, freeTrialDaysLeft, startCheckout, checkoutLoading } = useSubscription();
