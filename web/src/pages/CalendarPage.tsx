@@ -28,6 +28,7 @@ import {
   Ban,
 } from "lucide-react";
 import { PageHeader, Card, Button } from "../components/ui";
+import { getLocale, fmtDate } from "../lib/locale";
 import { QuickAddCleanPanel } from "../components/QuickAddCleanPanel";
 import { useSubscription } from "../lib/subscription";
 
@@ -102,7 +103,7 @@ function startOfWeek(d: Date) {
 }
 function formatTime(dateStr: string) {
   const d = new Date(dateStr);
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  return d.toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit", hour12: true });
 }
 function formatMoney(n: number | null) {
   if (!n) return "";
@@ -415,7 +416,7 @@ function ScheduleModal({
                   {recFrequency === "biweekly" && "Repeats every 2 weeks"}
                   {recFrequency === "monthly" && "Repeats monthly"}
                   {recFrequency === "custom" && `Repeats every ${recInterval || 1} ${recUnit}${(parseInt(recInterval) || 1) > 1 ? "s" : ""}`}
-                  {recHasEnd && recEndDate ? ` · until ${new Date(recEndDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : " · ongoing"}
+                  {recHasEnd && recEndDate ? ` · until ${fmtDate(recEndDate + "T12:00:00", { month: "short", day: "numeric", year: "numeric" })}` : " · ongoing"}
                 </p>
               </div>
             ) : null}
@@ -518,7 +519,7 @@ function JobDrawer({
               <Clock className="w-4 h-4 text-slate-400 shrink-0" />
               <div>
                 <p className="text-sm font-medium text-slate-900">
-                  {start.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                  {fmtDate(start, { weekday: "long", month: "long", day: "numeric" })}
                 </p>
                 <p className="text-xs text-slate-500">
                   {formatTime(job.startDatetime)}
@@ -671,7 +672,7 @@ function JobDrawer({
 function RescheduleModal({ job, onClose, onSaved }: { job: CalendarJob; onClose: () => void; onSaved: () => void }) {
   const [date, setDate] = useState(new Date(job.startDatetime).toISOString().slice(0, 10));
   const [time, setTime] = useState(
-    new Date(job.startDatetime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })
+    new Date(job.startDatetime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" }) // time picker value always uses 24h format
   );
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
@@ -1380,7 +1381,7 @@ export default function CalendarPage() {
         return `${MONTHS[ws.getMonth()]} ${ws.getDate()}–${we.getDate()}, ${ws.getFullYear()}`;
       return `${MONTHS[ws.getMonth()]} ${ws.getDate()} – ${MONTHS[we.getMonth()]} ${we.getDate()}, ${ws.getFullYear()}`;
     }
-    return currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    return fmtDate(currentDate, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }, [view, currentDate]);
 
   const handleDayClick = (day: Date) => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -16,21 +17,34 @@ import {
   EmptyState,
   Spinner,
 } from "../components/ui";
+import { useDateFormat } from "../lib/useDateFormat";
+
+const TAB_IDS = ["all", "scheduled", "in_progress", "completed"] as const;
 
 export default function JobsPage() {
+  const { t } = useTranslation();
+  const { formatDateShort } = useDateFormat();
   const navigate = useNavigate();
   const [filter, setFilter] = useState("all");
   const { data: jobs = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/jobs"],
   });
 
-  const tabs = ["all", "scheduled", "in_progress", "completed"];
+  const tabKeyMap: Record<string, string> = {
+    "all": "jobs.tabs.all",
+    "scheduled": "jobs.tabs.scheduled",
+    "in_progress": "jobs.tabs.inProgress",
+    "completed": "jobs.tabs.completed",
+  };
+
+  const tabs = TAB_IDS.map((id) => ({ id, label: t(tabKeyMap[id] || id) }));
+
   const counts: Record<string, number> = {};
-  for (const t of tabs) {
-    counts[t] =
-      t === "all"
+  for (const tab of TAB_IDS) {
+    counts[tab] =
+      tab === "all"
         ? jobs.length
-        : jobs.filter((j: any) => j.status === t).length;
+        : jobs.filter((j: any) => j.status === tab).length;
   }
 
   const filtered = jobs
@@ -44,8 +58,8 @@ export default function JobsPage() {
   return (
     <div>
       <PageHeader
-        title="Jobs"
-        subtitle={`${jobs.length} total jobs`}
+        title={t("jobs.title")}
+        subtitle={t("jobs.totalCount", { count: jobs.length })}
       />
 
       <Card padding={false}>
@@ -58,8 +72,8 @@ export default function JobsPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Briefcase}
-            title="No jobs scheduled"
-            description="Accept a quote to book your first cleaning job, or create one manually."
+            title={t("jobs.noJobs")}
+            description={t("jobs.noJobsDesc")}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -67,19 +81,19 @@ export default function JobsPage() {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Job
+                    {t("jobs.table.job")}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden sm:table-cell">
-                    Customer
+                    {t("jobs.table.customer")}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Status
+                    {t("jobs.table.status")}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell">
-                    Scheduled
+                    {t("jobs.table.scheduled")}
                   </th>
                   <th className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden lg:table-cell">
-                    Amount
+                    {t("jobs.table.amount")}
                   </th>
                 </tr>
               </thead>
@@ -92,7 +106,7 @@ export default function JobsPage() {
                   >
                     <td className="px-5 lg:px-6 py-3.5">
                       <p className="font-medium text-slate-900">
-                        {j.customerName || j.title || "Cleaning Job"}
+                        {j.customerName || j.title || t("jobs.cleaningJob")}
                       </p>
                       {j.address ? (
                         <p className="text-xs text-slate-400 mt-0.5 hidden sm:block flex items-center gap-1">
@@ -118,7 +132,7 @@ export default function JobsPage() {
                       {j.scheduledDate ? (
                         <span className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          {new Date(j.scheduledDate).toLocaleDateString()}
+                          {formatDateShort(j.scheduledDate)}
                         </span>
                       ) : (
                         <span className="text-slate-300">&mdash;</span>

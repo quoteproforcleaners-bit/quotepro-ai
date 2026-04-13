@@ -1,9 +1,110 @@
 {
   "onboarding": {
     "welcome": "Bem-vindo ao QuotePro",
-    "subtitle": "Qual idioma você prefere usar?",
-    "hint": "Você pode alterar isso a qualquer momento em Configurações",
+    "subtitle": "Em qual idioma você gostaria de usar o app?",
+    "hint": "Você pode mudar isso a qualquer momento nas Configurações",
     "continue": "Continuar"
+  },
+  "auth": {
+    "signIn": "Entrar",
+    "signOut": "Sair",
+    "email": "Endereço de e-mail",
+    "password": "Senha",
+    "forgotPassword": "Esqueceu a senha?",
+    "noAccount": "Não tem uma conta?",
+    "signUp": "Cadastre-se"
+  },
+  "dashboard": {
+    "title": "Painel",
+    "goodMorning": "Bom dia,",
+    "goodAfternoon": "Boa tarde,",
+    "goodEvening": "Boa noite,",
+    "todaySummary": "Você tem {{count}} serviço hoje · {{revenue}} ganhos até agora",
+    "todaySummaryPlural": "Você tem {{count}} serviços hoje · {{revenue}} ganhos até agora",
+    "noJobsScheduled": "Nenhum serviço agendado hoje",
+    "noJobsRevenue": "Sem novos serviços · {{revenue}} ganhos hoje",
+    "trialLeft": "Teste: {{days}}d restantes",
+    "quotesNeedFollowUp": "{{count}} orçamento precisa de acompanhamento",
+    "quotesNeedFollowUpPlural": "{{count}} orçamentos precisam de acompanhamento",
+    "atRisk": "{{amount}} em risco · Mais antigo {{days}}d",
+    "actNow": "Agir agora",
+    "stats": {
+      "todayRevenue": "Receita de hoje",
+      "jobsThisWeek": "Serviços esta semana",
+      "quotesWon": "Orçamentos ganhos",
+      "needFollowUp": "Precisam de acompanhamento",
+      "clear": "Em dia",
+      "noneYet": "Ainda nenhum"
+    },
+    "setup": {
+      "title": "Complete a configuração para desbloquear a automação",
+      "stepsComplete": "{{done}} de {{total}} etapas concluídas · {{remaining}} restantes",
+      "steps": {
+        "setRates": "Defina suas tarifas de limpeza",
+        "firstQuote": "Crie seu primeiro orçamento",
+        "firstClient": "Adicione seu primeiro cliente",
+        "automation": "Ative o acompanhamento automático"
+      }
+    },
+    "unlockMore": "Desbloquear mais valor",
+    "totalRevenue": "Receita total",
+    "quotesCreated": "Orçamentos criados",
+    "acceptanceRate": "Taxa de aceitação",
+    "activeCustomers": "Clientes ativos",
+    "recentActivity": "Atividade recente",
+    "noActivity": "Sem atividade recente",
+    "widgets": {
+      "embedForm": "Incorpore seu formulário de orçamento",
+      "embedFormDesc": "Adicione um widget de agendamento ao seu site. Os visitantes podem solicitar orçamentos sem ligar.",
+      "shareLink": "Compartilhe um link de orçamento",
+      "shareLinkDesc": "Envie um link com sua marca que permite qualquer cliente em potencial solicitar um orçamento de IA em 60 segundos."
+    }
+  },
+  "quotes": {
+    "title": "Orçamentos",
+    "newQuote": "Novo orçamento",
+    "quoteNumber": "Orçamento #{{number}}",
+    "searchPlaceholder": "Buscar por nome do cliente...",
+    "totalCount": "{{count}} orçamentos no total",
+    "noQuotes": "Ainda sem orçamentos",
+    "noResults": "Nenhum orçamento corresponde à sua busca",
+    "createFirst": "Crie seu primeiro orçamento para começar",
+    "tryDifferent": "Tente um termo de busca diferente",
+    "createQuote": "Criar orçamento",
+    "noCustomer": "Sem cliente",
+    "today": "Hoje",
+    "yesterday": "Ontem",
+    "daysAgo": "há {{days}}d",
+    "tabs": {
+      "all": "Todos",
+      "draft": "Rascunho",
+      "sent": "Enviados",
+      "viewed": "Visualizados",
+      "accepted": "Aceitos",
+      "awaitingPayment": "Aguardando pagamento",
+      "declined": "Recusados",
+      "expired": "Expirados"
+    },
+    "table": {
+      "customer": "Cliente",
+      "type": "Tipo",
+      "total": "Total",
+      "status": "Status",
+      "invoice": "Fatura",
+      "created": "Criado"
+    },
+    "invoice": {
+      "paid": "Pago",
+      "sent": "Enviado",
+      "overdue": "Vencido"
+    },
+    "status": {
+      "draft": "Rascunho",
+      "sent": "Enviado",
+      "accepted": "Aceito",
+      "declined": "Recusado",
+      "expired": "Expirado"
+    }
   },
   "customers": {
     "title": "Clientes",
@@ -13,7 +114,7 @@
     "avgLtv": "LTV médio",
     "payingClients": "Clientes ativos",
     "searchPlaceholder": "Buscar por nome, e-mail ou telefone...",
-    "noCustomers": "Nenhum cliente ainda",
+    "noCustomers": "Ainda sem clientes",
     "noResults": "Nenhum cliente corresponde à sua busca",
     "noResultsHint": "Tente um termo de busca diferente",
     "addFirst": "Adicione seu primeiro cliente para começar",
@@ -23,7 +124,7 @@
     "tabs": {
       "all": "Todos",
       "active": "Ativos",
-      "lead": "Leads",
+      "lead": "Lead",
       "inactive": "Inativos"
     },
     "table": {
@@ -35,28 +136,125 @@
       "noContact": "Sem contato"
     }
   },
-  "quotes": {
-    "title": "Orçamentos",
-    "newQuote": "Novo orçamento",
-    "quoteNumber": "Orçamento #{{number}}",
-    "noQuotes": "Nenhum orçamento ainda",
-    "noResults": "Nenhum orçamento corresponde à sua busca",
+  "jobs": {
+    "title": "Serviços",
+    "newJob": "Novo serviço",
+    "totalCount": "{{count}} serviços no total",
+    "noJobs": "Sem serviços agendados",
+    "noJobsDesc": "Aceite um orçamento para agendar seu primeiro serviço, ou crie um manualmente.",
+    "cleaningJob": "Serviço de limpeza",
+    "tabs": {
+      "all": "Todos",
+      "scheduled": "Agendados",
+      "inProgress": "Em andamento",
+      "completed": "Concluídos",
+      "cancelled": "Cancelados"
+    },
+    "table": {
+      "job": "Serviço",
+      "customer": "Cliente",
+      "status": "Status",
+      "scheduled": "Agendado",
+      "amount": "Valor"
+    },
     "status": {
-      "draft": "Rascunho",
-      "sent": "Enviado",
-      "accepted": "Aceito",
-      "declined": "Recusado",
-      "expired": "Expirado"
+      "scheduled": "Agendado",
+      "in_progress": "Em andamento",
+      "completed": "Concluído",
+      "cancelled": "Cancelado"
     }
   },
-  "dashboard": {
-    "title": "Painel",
-    "totalRevenue": "Receita total",
-    "quotesCreated": "Orçamentos criados",
-    "acceptanceRate": "Taxa de aceitação",
-    "activeCustomers": "Clientes ativos",
-    "recentActivity": "Atividade recente",
-    "noActivity": "Nenhuma atividade recente"
+  "schedule": {
+    "title": "Agenda",
+    "today": "Hoje",
+    "noJobs": "Sem serviços agendados",
+    "jobModal": {
+      "reschedule": "Reagendar",
+      "viewJob": "Ver serviço",
+      "chargeNow": "Cobrar {{amount}}",
+      "addCard": "Adicionar cartão",
+      "paid": "Pago {{amount}}",
+      "chargeFailed": "Cobrança falhou",
+      "retry": "Tentar novamente",
+      "waive": "Dispensar",
+      "viewReceipt": "Ver recibo"
+    }
+  },
+  "quoteSettings": {
+    "heading": "Preferências de orçamento",
+    "subheading": "Personalize o que aparece nos seus orçamentos para clientes",
+    "save": "Salvar alterações",
+    "saving": "Salvando...",
+    "saved": "Salvo!",
+    "sections": {
+      "businessInfo": "Informações do negócio no orçamento",
+      "quoteDetails": "Detalhes do orçamento",
+      "brandColor": "Cor da marca",
+      "brandColorDesc": "Defina uma cor de marca que aparece nos seus orçamentos para clientes.",
+      "serviceTiers": "Descrições dos níveis de serviço",
+      "serviceTiersDesc": "Essas descrições aparecem na página de orçamento do cliente sob cada opção. Use 1-3 frases para explicar o que está incluído.",
+      "addOns": "Serviços adicionais residenciais",
+      "addOnPrices": "Preços padrão dos serviços adicionais",
+      "addOnPricesDesc": "Defina o nome e preço padrão de cada serviço adicional mostrado nos orçamentos residenciais."
+    },
+    "fields": {
+      "showLogo": "Mostrar logotipo",
+      "showLogoDesc": "Exibir o logotipo do seu negócio no orçamento",
+      "showCompanyName": "Mostrar nome da empresa",
+      "showCompanyNameDesc": "Exibir o nome da sua empresa no topo",
+      "showAddress": "Mostrar endereço da empresa",
+      "showAddressDesc": "Incluir o endereço do seu negócio no orçamento",
+      "showPhone": "Mostrar número de telefone",
+      "showPhoneDesc": "Exibir seu número de telefone para contato do cliente",
+      "showEmail": "Mostrar e-mail",
+      "showEmailDesc": "Incluir seu endereço de e-mail no orçamento",
+      "showSignature": "Mostrar linha de assinatura",
+      "showSignatureDesc": "Adicionar uma linha para o cliente assinar",
+      "showEstimatedTime": "Mostrar tempo estimado",
+      "showEstimatedTimeDesc": "Exibir o tempo estimado para concluir o serviço",
+      "showPaymentOptions": "Mostrar opções de pagamento",
+      "showPaymentOptionsDesc": "Listar os métodos de pagamento aceitos no orçamento",
+      "showBookingLink": "Mostrar link de agendamento",
+      "showBookingLinkDesc": "Incluir um link para os clientes agendarem diretamente",
+      "showTerms": "Mostrar termos e condições",
+      "showTermsDesc": "Exibir o texto dos seus termos e condições"
+    },
+    "tiers": {
+      "good": "Bom",
+      "better": "Melhor",
+      "best": "Excelente"
+    },
+    "expiration": {
+      "label": "Validade do orçamento",
+      "7": "7 dias",
+      "14": "14 dias",
+      "30": "30 dias",
+      "0": "Sem validade"
+    },
+    "resetAddons": "Restaurar padrões"
+  },
+  "team": {
+    "title": "Equipe",
+    "addMember": "Adicionar membro",
+    "roles": {
+      "admin": "Administrador",
+      "cleaner": "Faxineiro",
+      "manager": "Gerente"
+    }
+  },
+  "intelligence": {
+    "title": "Inteligência",
+    "finance": {
+      "title": "Finanças",
+      "tabs": {
+        "overview": "Visão geral",
+        "audit": "Auditoria",
+        "reports": "Relatórios",
+        "askAi": "Perguntar à IA"
+      },
+      "loadError": "Não foi possível carregar os dados financeiros.",
+      "loading": "Carregando dados financeiros..."
+    }
   },
   "nav": {
     "dashboard": "Painel",
@@ -121,6 +319,7 @@
     "edit": "Editar",
     "view": "Ver",
     "search": "Buscar",
+    "filter": "Filtrar",
     "loading": "Carregando...",
     "error": "Algo deu errado",
     "yes": "Sim",
@@ -139,17 +338,30 @@
     "refresh": "Atualizar",
     "optional": "opcional",
     "required": "obrigatório",
-    "upgrade": "Melhorar",
+    "upgrade": "Atualizar plano",
     "viewAll": "Ver todos",
-    "searchOrJump": "Buscar ou navegar..."
+    "searchOrJump": "Buscar ou ir para...",
+    "on": "Ativado",
+    "off": "Desativado",
+    "enabled": "Ativado",
+    "disabled": "Desativado",
+    "learnMore": "Saiba mais",
+    "complete": "Concluir",
+    "confirm": "Confirmar",
+    "noResults": "Sem resultados",
+    "success": "Sucesso",
+    "download": "Baixar no iPhone",
+    "referAndEarn": "Indicações",
+    "helpSupport": "Ajuda e suporte",
+    "tourProduct": "Tour do produto"
   },
   "language": {
     "title": "Configurações de idioma",
-    "appLanguage": "Idioma do app",
+    "appLanguage": "Idioma do aplicativo",
     "appLanguageDesc": "Controla o idioma da interface do QuotePro para sua conta.",
-    "outboundLanguage": "Idioma padrão das mensagens aos clientes",
+    "outboundLanguage": "Idioma padrão para mensagens ao cliente",
     "outboundLanguageDesc": "Controla o idioma usado para orçamentos, e-mails, mensagens e lembretes enviados aos seus clientes.",
-    "separation": "Essas duas configurações são independentes — você pode usar o QuotePro em inglês e enviar comunicações aos clientes em português, por exemplo.",
+    "separation": "Essas duas configurações são independentes — você pode usar o QuotePro em português enquanto envia comunicações aos clientes em inglês, por exemplo.",
     "customerLanguage": "Idioma preferido do cliente",
     "customerLanguageDesc": "Substitui o idioma padrão para mensagens enviadas a este cliente específico.",
     "noOverride": "Usar padrão do negócio",
@@ -160,17 +372,26 @@
     "ru": "Russo"
   },
   "settings": {
+    "title": "Configurações",
     "account": "Conta",
     "subtitle": "Gerencie os detalhes da sua conta, assinatura e preferências",
     "accountDetails": "Detalhes da conta",
     "subscription": "Assinatura",
     "privacyLegal": "Privacidade e jurídico",
-    "dangerZone": "Zona de risco",
+    "dangerZone": "Zona de perigo",
     "signOut": "Sair",
     "deleteAccount": "Excluir conta",
     "manageSubscription": "Gerenciar assinatura",
     "upgradePlan": "Ver planos",
     "email": "E-mail",
     "name": "Nome"
+  },
+  "pricing": {
+    "title": "Configurações de preços",
+    "priceEngine": "Motor de precificação"
+  },
+  "referAndEarn": {
+    "title": "Indicações",
+    "description": "Ganhe 50% de comissão recorrente por cada negócio que você indicar."
   }
 }

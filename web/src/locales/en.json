@@ -5,6 +5,107 @@
     "hint": "You can change this anytime in Settings",
     "continue": "Continue"
   },
+  "auth": {
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "email": "Email address",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "Don't have an account?",
+    "signUp": "Sign up"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "goodMorning": "Good morning,",
+    "goodAfternoon": "Good afternoon,",
+    "goodEvening": "Good evening,",
+    "todaySummary": "You have {{count}} job today · {{revenue}} earned so far",
+    "todaySummaryPlural": "You have {{count}} jobs today · {{revenue}} earned so far",
+    "noJobsScheduled": "No jobs scheduled today",
+    "noJobsRevenue": "No new jobs scheduled · {{revenue}} earned today",
+    "trialLeft": "Trial: {{days}}d left",
+    "quotesNeedFollowUp": "{{count}} quote needs follow-up",
+    "quotesNeedFollowUpPlural": "{{count}} quotes need follow-up",
+    "atRisk": "{{amount}} at risk · Oldest {{days}}d",
+    "actNow": "Act now",
+    "stats": {
+      "todayRevenue": "Today's Revenue",
+      "jobsThisWeek": "Jobs This Week",
+      "quotesWon": "Quotes Won",
+      "needFollowUp": "Need Follow-Up",
+      "clear": "Clear",
+      "noneYet": "None yet"
+    },
+    "setup": {
+      "title": "Complete setup to unlock full automation",
+      "stepsComplete": "{{done}} of {{total}} steps done · {{remaining}} remaining",
+      "steps": {
+        "setRates": "Set your cleaning rates",
+        "firstQuote": "Create your first cleaning quote",
+        "firstClient": "Add your first cleaning client",
+        "automation": "Activate follow-up automation"
+      }
+    },
+    "unlockMore": "Unlock More Value",
+    "totalRevenue": "Total Revenue",
+    "quotesCreated": "Quotes Created",
+    "acceptanceRate": "Acceptance Rate",
+    "activeCustomers": "Active Customers",
+    "recentActivity": "Recent Activity",
+    "noActivity": "No recent activity",
+    "widgets": {
+      "embedForm": "Embed your quote form",
+      "embedFormDesc": "Put a booking widget on your website. Visitors can request quotes without calling you.",
+      "shareLink": "Share a quote link",
+      "shareLinkDesc": "Send a branded link that lets any prospect request an instant AI quote from you in 60 seconds."
+    }
+  },
+  "quotes": {
+    "title": "Quotes",
+    "newQuote": "New Quote",
+    "quoteNumber": "Quote #{{number}}",
+    "searchPlaceholder": "Search by customer name...",
+    "totalCount": "{{count}} total quotes",
+    "noQuotes": "No quotes yet",
+    "noResults": "No quotes match your search",
+    "createFirst": "Create your first quote to get started",
+    "tryDifferent": "Try a different search term",
+    "createQuote": "Create Quote",
+    "noCustomer": "No customer",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{days}}d ago",
+    "tabs": {
+      "all": "All",
+      "draft": "Draft",
+      "sent": "Sent",
+      "viewed": "Viewed",
+      "accepted": "Accepted",
+      "awaitingPayment": "Awaiting Payment",
+      "declined": "Declined",
+      "expired": "Expired"
+    },
+    "table": {
+      "customer": "Customer",
+      "type": "Type",
+      "total": "Total",
+      "status": "Status",
+      "invoice": "Invoice",
+      "created": "Created"
+    },
+    "invoice": {
+      "paid": "Paid",
+      "sent": "Sent",
+      "overdue": "Overdue"
+    },
+    "status": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "expired": "Expired"
+    }
+  },
   "customers": {
     "title": "Customers",
     "addCustomer": "Add Customer",
@@ -35,28 +136,125 @@
       "noContact": "No contact"
     }
   },
-  "quotes": {
-    "title": "Quotes",
-    "newQuote": "New Quote",
-    "quoteNumber": "Quote #{{number}}",
-    "noQuotes": "No quotes yet",
-    "noResults": "No quotes match your search",
+  "jobs": {
+    "title": "Jobs",
+    "newJob": "New Job",
+    "totalCount": "{{count}} total jobs",
+    "noJobs": "No jobs scheduled",
+    "noJobsDesc": "Accept a quote to book your first cleaning job, or create one manually.",
+    "cleaningJob": "Cleaning Job",
+    "tabs": {
+      "all": "All",
+      "scheduled": "Scheduled",
+      "inProgress": "In Progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "table": {
+      "job": "Job",
+      "customer": "Customer",
+      "status": "Status",
+      "scheduled": "Scheduled",
+      "amount": "Amount"
+    },
     "status": {
-      "draft": "Draft",
-      "sent": "Sent",
-      "accepted": "Accepted",
-      "declined": "Declined",
-      "expired": "Expired"
+      "scheduled": "Scheduled",
+      "in_progress": "In Progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
     }
   },
-  "dashboard": {
-    "title": "Dashboard",
-    "totalRevenue": "Total Revenue",
-    "quotesCreated": "Quotes Created",
-    "acceptanceRate": "Acceptance Rate",
-    "activeCustomers": "Active Customers",
-    "recentActivity": "Recent Activity",
-    "noActivity": "No recent activity"
+  "schedule": {
+    "title": "Schedule",
+    "today": "Today",
+    "noJobs": "No jobs scheduled",
+    "jobModal": {
+      "reschedule": "Reschedule",
+      "viewJob": "View Job",
+      "chargeNow": "Charge {{amount}}",
+      "addCard": "Add Card",
+      "paid": "Paid {{amount}}",
+      "chargeFailed": "Charge Failed",
+      "retry": "Retry",
+      "waive": "Waive",
+      "viewReceipt": "View Receipt"
+    }
+  },
+  "quoteSettings": {
+    "heading": "Quote Preferences",
+    "subheading": "Customize what appears on your customer-facing quotes",
+    "save": "Save Changes",
+    "saving": "Saving...",
+    "saved": "Saved!",
+    "sections": {
+      "businessInfo": "Business Info on Quote",
+      "quoteDetails": "Quote Details",
+      "brandColor": "Brand Color",
+      "brandColorDesc": "Set a brand color that appears on your customer-facing quotes.",
+      "serviceTiers": "Service Tier Descriptions",
+      "serviceTiersDesc": "These descriptions appear on your customer-facing quote page under each option. Use 1–3 sentences to explain what's included so customers can choose with confidence.",
+      "addOns": "Residential Add-On Services",
+      "addOnPrices": "Default Add-On Prices",
+      "addOnPricesDesc": "Set the default name and price for each optional add-on shown in residential quotes. Toggle to enable or disable each add-on for new quotes."
+    },
+    "fields": {
+      "showLogo": "Show Logo",
+      "showLogoDesc": "Display your business logo on the quote",
+      "showCompanyName": "Show Company Name",
+      "showCompanyNameDesc": "Display your company name at the top",
+      "showAddress": "Show Company Address",
+      "showAddressDesc": "Include your business address on the quote",
+      "showPhone": "Show Phone Number",
+      "showPhoneDesc": "Display your phone number for customer contact",
+      "showEmail": "Show Email",
+      "showEmailDesc": "Include your email address on the quote",
+      "showSignature": "Show Signature Line",
+      "showSignatureDesc": "Add a line for the customer to sign",
+      "showEstimatedTime": "Show Estimated Time",
+      "showEstimatedTimeDesc": "Display estimated time to complete the job",
+      "showPaymentOptions": "Show Payment Options",
+      "showPaymentOptionsDesc": "List accepted payment methods on the quote",
+      "showBookingLink": "Show Booking Link",
+      "showBookingLinkDesc": "Include a link for customers to book directly",
+      "showTerms": "Show Terms & Conditions",
+      "showTermsDesc": "Display your terms and conditions text"
+    },
+    "tiers": {
+      "good": "Good",
+      "better": "Better",
+      "best": "Best"
+    },
+    "expiration": {
+      "label": "Quote Expiration",
+      "7": "7 days",
+      "14": "14 days",
+      "30": "30 days",
+      "0": "No expiration"
+    },
+    "resetAddons": "Reset to defaults"
+  },
+  "team": {
+    "title": "Team",
+    "addMember": "Add Team Member",
+    "roles": {
+      "admin": "Admin",
+      "cleaner": "Cleaner",
+      "manager": "Manager"
+    }
+  },
+  "intelligence": {
+    "title": "Intelligence",
+    "finance": {
+      "title": "Finance",
+      "tabs": {
+        "overview": "Overview",
+        "audit": "Audit",
+        "reports": "Reports",
+        "askAi": "Ask AI"
+      },
+      "loadError": "Unable to load financial data.",
+      "loading": "Loading financial data..."
+    }
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -121,6 +319,7 @@
     "edit": "Edit",
     "view": "View",
     "search": "Search",
+    "filter": "Filter",
     "loading": "Loading...",
     "error": "Something went wrong",
     "yes": "Yes",
@@ -141,7 +340,20 @@
     "required": "required",
     "upgrade": "Upgrade",
     "viewAll": "View all",
-    "searchOrJump": "Search or jump to..."
+    "searchOrJump": "Search or jump to...",
+    "on": "On",
+    "off": "Off",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "learnMore": "Learn more",
+    "complete": "Complete",
+    "confirm": "Confirm",
+    "noResults": "No results found",
+    "success": "Success",
+    "download": "Download on iPhone",
+    "referAndEarn": "Refer & Earn",
+    "helpSupport": "Help & Support",
+    "tourProduct": "Tour the product"
   },
   "language": {
     "title": "Language Settings",
@@ -160,6 +372,7 @@
     "ru": "Russian"
   },
   "settings": {
+    "title": "Settings",
     "account": "Account",
     "subtitle": "Manage your account details, subscription, and preferences",
     "accountDetails": "Account Details",
@@ -172,5 +385,13 @@
     "upgradePlan": "View plans",
     "email": "Email",
     "name": "Name"
+  },
+  "pricing": {
+    "title": "Pricing Settings",
+    "priceEngine": "Price Engine"
+  },
+  "referAndEarn": {
+    "title": "Refer & Earn",
+    "description": "Earn 50% recurring commission for every business you refer."
   }
 }

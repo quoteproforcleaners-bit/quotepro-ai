@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, FileText, ArrowUpDown, Sparkles, X } from "lucide-react";
@@ -12,10 +13,12 @@ import {
   EmptyState,
   Spinner,
 } from "../components/ui";
+import { useDateFormat } from "../lib/useDateFormat";
 
-const tabs = ["all", "draft", "sent", "viewed", "accepted", "awaiting-payment", "declined", "expired"];
+const TAB_IDS = ["all", "draft", "sent", "viewed", "accepted", "awaiting-payment", "declined", "expired"] as const;
 
 function AIQuotesNudge({ quotesCount }: { quotesCount: number }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [dismissed, setDismissed] = useState(() => {
     try { return localStorage.getItem("qp_ai_nudge_quotes") === "1"; } catch { return false; }
@@ -48,7 +51,7 @@ function AIQuotesNudge({ quotesCount }: { quotesCount: number }) {
         <Sparkles className="w-3.5 h-3.5" style={{ color: "#818cf8" }} />
       </div>
       <p className="text-sm flex-1" style={{ color: "#64748b" }}>
-        <span className="font-medium" style={{ color: "#4f46e5" }}>Ask AI: </span>
+        <span className="font-medium" style={{ color: "#4f46e5" }}>{t("common.search")}: </span>
         <span className="group-hover:underline">{prompt}</span>
       </p>
       <button onClick={dismiss} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -59,6 +62,8 @@ function AIQuotesNudge({ quotesCount }: { quotesCount: number }) {
 }
 
 export default function QuotesListPage() {
+  const { t } = useTranslation();
+  const { formatDateShort } = useDateFormat();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [filter, setFilter] = useState(searchParams.get("status") || "all");
@@ -69,14 +74,27 @@ export default function QuotesListPage() {
     queryKey: ["/api/quotes"],
   });
 
+  const tabKeyMap: Record<string, string> = {
+    "all": "quotes.tabs.all",
+    "draft": "quotes.tabs.draft",
+    "sent": "quotes.tabs.sent",
+    "viewed": "quotes.tabs.viewed",
+    "accepted": "quotes.tabs.accepted",
+    "awaiting-payment": "quotes.tabs.awaitingPayment",
+    "declined": "quotes.tabs.declined",
+    "expired": "quotes.tabs.expired",
+  };
+
+  const tabs = TAB_IDS.map((id) => ({ id, label: t(tabKeyMap[id] || id) }));
+
   const counts: Record<string, number> = {};
-  for (const t of tabs) {
-    counts[t] =
-      t === "all"
+  for (const tab of TAB_IDS) {
+    counts[tab] =
+      tab === "all"
         ? quotes.length
-        : t === "awaiting-payment"
+        : tab === "awaiting-payment"
           ? quotes.filter((q: any) => q.status === "accepted" && q.stripeInvoiceStatus && q.stripeInvoiceStatus !== "paid").length
-          : quotes.filter((q: any) => q.status === t).length;
+          : quotes.filter((q: any) => q.status === tab).length;
   }
 
   const filtered = quotes
@@ -115,19 +133,19 @@ export default function QuotesListPage() {
     const days = Math.floor(
       (Date.now() - new Date(date).getTime()) / (1000 * 60 * 60 * 24)
     );
-    if (days === 0) return "Today";
-    if (days === 1) return "Yesterday";
-    return `${days}d ago`;
+    if (days === 0) return t("quotes.today");
+    if (days === 1) return t("quotes.yesterday");
+    return t("quotes.daysAgo", { days });
   };
 
   return (
     <div>
       <PageHeader
-        title="Quotes"
-        subtitle={`${quotes.length} total quotes`}
+        title={t("quotes.title")}
+        subtitle={t("quotes.totalCount", { count: quotes.length })}
         actions={
           <Button icon={Plus} onClick={() => navigate("/quotes/new")}>
-            New Quote
+            {t("quotes.newQuote")}
           </Button>
         }
       />
@@ -140,7 +158,7 @@ export default function QuotesListPage() {
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="Search by customer name..."
+            placeholder={t("quotes.searchPlaceholder")}
           />
         </div>
 
@@ -149,16 +167,16 @@ export default function QuotesListPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={FileText}
-            title={search ? "No quotes match your search" : "No quotes found"}
+            title={search ? t("quotes.noResults") : t("quotes.noQuotes")}
             description={
               search
-                ? "Try a different search term"
-                : "Create your first quote to get started"
+                ? t("quotes.tryDifferent")
+                : t("quotes.createFirst")
             }
             action={
               !search ? (
                 <Button icon={Plus} onClick={() => navigate("/quotes/new")}>
-                  Create Quote
+                  {t("quotes.createQuote")}
                 </Button>
               ) : undefined
             }
@@ -169,32 +187,32 @@ export default function QuotesListPage() {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Customer
+                    {t("quotes.table.customer")}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden sm:table-cell">
-                    Type
+                    {t("quotes.table.type")}
                   </th>
                   <th
                     onClick={() => toggleSort("amount")}
                     className="text-right px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 select-none"
                   >
                     <span className="inline-flex items-center gap-1">
-                      Total
+                      {t("quotes.table.total")}
                       <ArrowUpDown className="w-3 h-3" />
                     </span>
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Status
+                    {t("quotes.table.status")}
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden lg:table-cell">
-                    Invoice
+                    {t("quotes.table.invoice")}
                   </th>
                   <th
                     onClick={() => toggleSort("date")}
                     className="text-right px-5 lg:px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell cursor-pointer hover:text-slate-700 select-none"
                   >
                     <span className="inline-flex items-center gap-1">
-                      Created
+                      {t("quotes.table.created")}
                       <ArrowUpDown className="w-3 h-3" />
                     </span>
                   </th>
@@ -209,7 +227,7 @@ export default function QuotesListPage() {
                   >
                     <td className="px-5 lg:px-6 py-3.5">
                       <p className="font-medium text-slate-900">
-                        {q.customerName || "No customer"}
+                        {q.customerName || t("quotes.noCustomer")}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5 md:hidden">
                         {getDaysSince(q.createdAt)}
@@ -241,9 +259,9 @@ export default function QuotesListPage() {
                               : q.stripeInvoiceStatus === "overdue" ? "bg-red-500"
                               : "bg-slate-400"
                           }`} />
-                          {q.stripeInvoiceStatus === "paid" ? "Paid"
-                            : q.stripeInvoiceStatus === "sent" ? "Sent"
-                            : q.stripeInvoiceStatus === "overdue" ? "Overdue"
+                          {q.stripeInvoiceStatus === "paid" ? t("quotes.invoice.paid")
+                            : q.stripeInvoiceStatus === "sent" ? t("quotes.invoice.sent")
+                            : q.stripeInvoiceStatus === "overdue" ? t("quotes.invoice.overdue")
                             : q.stripeInvoiceStatus}
                         </span>
                       ) : (
@@ -251,7 +269,7 @@ export default function QuotesListPage() {
                       )}
                     </td>
                     <td className="px-5 lg:px-6 py-3.5 text-right text-slate-500 hidden md:table-cell">
-                      {new Date(q.createdAt).toLocaleDateString()}
+                      {formatDateShort(q.createdAt)}
                     </td>
                   </tr>
                 ))}

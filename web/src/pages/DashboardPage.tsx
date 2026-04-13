@@ -1,8 +1,10 @@
 import { useMemo, useState, useEffect } from"react";
+import { useTranslation } from"react-i18next";
 import { useQuery } from"@tanstack/react-query";
 import { useNavigate } from"react-router-dom";
 import { useAuth } from"../lib/auth";
 import { useSubscription } from"../lib/subscription";
+import { useDateFormat } from"../lib/useDateFormat";
 import {
  FileText,
  Users,
@@ -59,15 +61,11 @@ function getHour() {
  return new Date().getHours();
 }
 
-function greeting() {
+function getGreetingKey() {
  const h = getHour();
- if (h < 12) return"Good morning";
- if (h < 17) return"Good afternoon";
- return"Good evening";
-}
-
-function todayLabel() {
- return new Date().toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric"});
+ if (h < 12) return"dashboard.goodMorning";
+ if (h < 17) return"dashboard.goodAfternoon";
+ return"dashboard.goodEvening";
 }
 
 // ─── Command Header ──────────────────────────────────────────────────────────
@@ -107,14 +105,18 @@ function CommandHeader({
  navigate: (path: string) => void;
 }) {
  const hasRisk = followUpQueueCount > 0;
- const dayStr = new Date().toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric"});
+ const { t } = useTranslation();
+ const { formatDateLong } = useDateFormat();
+ const dayStr = formatDateLong(new Date());
 
  const contextLine = (() => {
  if (todayJobsCount > 0) {
- const base = `You have ${todayJobsCount} job${todayJobsCount !== 1 ?"s":""} today`;
- return todayRevenue > 0 ? `${base} · ${fmt(todayRevenue)} earned so far` : base;
+ const key = todayJobsCount !== 1 ?"dashboard.todaySummaryPlural":"dashboard.todaySummary";
+ return t(key, { count: todayJobsCount, revenue: fmt(todayRevenue) });
  }
- return todayRevenue > 0 ? `No new jobs scheduled · ${fmt(todayRevenue)} earned today` :"No jobs scheduled today";
+ return todayRevenue > 0
+ ? t("dashboard.noJobsRevenue", { revenue: fmt(todayRevenue) })
+ : t("dashboard.noJobsScheduled");
  })();
 
  const statTiles = [
@@ -122,9 +124,9 @@ function CommandHeader({
  icon: DollarSign,
  iconColor:"text-emerald-500",
  iconBg:"bg-emerald-50",
- label:"Today's Revenue",
+ label: t("dashboard.stats.todayRevenue"),
  value: todayRevenue > 0 ? fmt(todayRevenue) : null,
- emptyValue:"None yet",
+ emptyValue: t("dashboard.stats.noneYet"),
  clickable: false,
  path:"",
  },
@@ -132,7 +134,7 @@ function CommandHeader({
  icon: Briefcase,
  iconColor:"text-blue-500",
  iconBg:"bg-blue-50",
- label:"Jobs This Week",
+ label: t("dashboard.stats.jobsThisWeek"),
  value: String(weekJobs),
  emptyValue: null,
  clickable: false,
@@ -142,9 +144,9 @@ function CommandHeader({
  icon: Target,
  iconColor:"text-violet-500",
  iconBg:"bg-violet-50",
- label:"Quotes Won",
+ label: t("dashboard.stats.quotesWon"),
  value: totalSentCount > 0 ? `${acceptedCount} of ${totalSentCount}` : null,
- emptyValue:"None yet",
+ emptyValue: t("dashboard.stats.noneYet"),
  clickable: totalSentCount > 0,
  path:"/quotes",
  },
@@ -152,7 +154,7 @@ function CommandHeader({
  icon: followUpQueueCount > 0 ? PhoneMissed : CheckCircle,
  iconColor: followUpQueueCount > 0 ?"text-amber-500":"text-emerald-500",
  iconBg: followUpQueueCount > 0 ?"bg-amber-50":"bg-emerald-50",
- label:"Need Follow-Up",
+ label: t("dashboard.stats.needFollowUp"),
  value: followUpQueueCount > 0 ? String(followUpQueueCount) :"clear",
  emptyValue: null,
  clickable: followUpQueueCount > 0,
@@ -172,7 +174,7 @@ function CommandHeader({
  <div>
  <p className="text-slate-400 text-sm font-normal mb-1">{dayStr}</p>
  <h1 className="leading-tight"style={{ letterSpacing:"-0.02em"}}>
- <span className="text-xl font-normal text-slate-500">{greeting()},</span>
+ <span className="text-xl font-normal text-slate-500">{t(getGreetingKey())}</span>
  {business?.companyName ? (
  <><br /><span className="text-3xl font-bold text-slate-900">{business.companyName}</span></>
  ) : null}
@@ -185,7 +187,7 @@ function CommandHeader({
  onClick={() => navigate("/pricing")}
  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-indigo-200 bg-white text-indigo-600 whitespace-nowrap transition-all duration-150 hover:bg-indigo-50 active:scale-95"
  >
- Trial: {freeTrialDaysLeft}d left
+ {t("dashboard.trialLeft", { days: freeTrialDaysLeft })}
  </button>
  </div>
  ) : null}
@@ -204,7 +206,7 @@ function CommandHeader({
  </div>
  {stat.value ==="clear"? (
  <span className="inline-flex items-center bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full text-sm mb-1">
- Clear
+ {t("dashboard.stats.clear")}
  </span>
  ) : stat.value !== null ? (
  <p className="text-3xl font-bold text-slate-900 leading-none tracking-tight stat-number">
@@ -231,13 +233,15 @@ function CommandHeader({
  >
  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500"/>
  <span className="text-[12.5px] font-semibold flex-1 text-amber-800">
- {followUpQueueCount} quote{followUpQueueCount > 1 ?"s":""} need follow-up
+ {followUpQueueCount > 1
+ ? t("dashboard.quotesNeedFollowUpPlural", { count: followUpQueueCount })
+ : t("dashboard.quotesNeedFollowUp", { count: followUpQueueCount })}
  <span className="text-amber-600 font-normal">
- {""}· {fmt(amountAtRisk)} at risk · Oldest {oldestQuoteDays}d
+ {" "}· {t("dashboard.atRisk", { amount: fmt(amountAtRisk), days: oldestQuoteDays })}
  </span>
  </span>
  <span className="flex items-center gap-1 text-[11px] font-semibold whitespace-nowrap text-amber-700 group-hover:gap-1.5 transition-all">
- Act now <ArrowRight className="w-3 h-3"/>
+ {t("dashboard.actNow")} <ArrowRight className="w-3 h-3"/>
  </span>
  </button>
  ) : null}

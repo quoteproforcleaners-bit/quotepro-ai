@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../lib/api";
 import { PageHeader } from "../components/ui";
 import { Users, RefreshCw, LogIn, LogOut, Clock } from "lucide-react";
+import { getLocale, fmtDate } from "../lib/locale";
 
 type AssignmentStatus = "assigned" | "en_route" | "checked_in" | "completed" | "no_show";
 
@@ -34,7 +35,7 @@ function initials(name: string) {
 
 function formatTime(dt: string | null): string {
   if (!dt) return "—";
-  return new Date(dt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  return new Date(dt).toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 function formatDuration(mins: number | null): string {
@@ -141,7 +142,7 @@ export default function FieldStatusPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         title="Field Status"
-        subtitle={`${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} · ${totalJobs} assignment${totalJobs !== 1 ? "s" : ""}`}
+        subtitle={`${fmtDate(new Date(), { weekday: "long", month: "long", day: "numeric" })} · ${totalJobs} assignment${totalJobs !== 1 ? "s" : ""}`}
         actions={
           <button
             onClick={() => refetch()}
@@ -272,7 +273,7 @@ export default function FieldStatusPage() {
 
                   <div className="text-right shrink-0">
                     <div className="text-xs font-medium text-slate-600">
-                      {new Date(ev.timestamp).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+                      {new Date(ev.timestamp).toLocaleTimeString(getLocale(), { hour: "numeric", minute: "2-digit", hour12: true })}
                     </div>
                     {ev.durationMinutes !== null && ev.durationMinutes > 0 && (
                       <div className="text-xs text-slate-400">{formatDuration(ev.durationMinutes)}</div>

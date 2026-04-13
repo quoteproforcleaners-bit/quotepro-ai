@@ -5,6 +5,107 @@
     "hint": "Puedes cambiar esto en Configuración en cualquier momento",
     "continue": "Continuar"
   },
+  "auth": {
+    "signIn": "Iniciar sesión",
+    "signOut": "Cerrar sesión",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "noAccount": "¿No tienes cuenta?",
+    "signUp": "Regístrate"
+  },
+  "dashboard": {
+    "title": "Panel de control",
+    "goodMorning": "Buenos días,",
+    "goodAfternoon": "Buenas tardes,",
+    "goodEvening": "Buenas noches,",
+    "todaySummary": "Tienes {{count}} trabajo hoy · {{revenue}} ganados hasta ahora",
+    "todaySummaryPlural": "Tienes {{count}} trabajos hoy · {{revenue}} ganados hasta ahora",
+    "noJobsScheduled": "Sin trabajos programados hoy",
+    "noJobsRevenue": "Sin trabajos nuevos · {{revenue}} ganados hoy",
+    "trialLeft": "Prueba: {{days}}d restantes",
+    "quotesNeedFollowUp": "{{count}} cotización necesita seguimiento",
+    "quotesNeedFollowUpPlural": "{{count}} cotizaciones necesitan seguimiento",
+    "atRisk": "{{amount}} en riesgo · Más antigua {{days}}d",
+    "actNow": "Actuar ahora",
+    "stats": {
+      "todayRevenue": "Ingresos de hoy",
+      "jobsThisWeek": "Trabajos esta semana",
+      "quotesWon": "Cotizaciones ganadas",
+      "needFollowUp": "Necesitan seguimiento",
+      "clear": "Al día",
+      "noneYet": "Aún ninguno"
+    },
+    "setup": {
+      "title": "Completa la configuración para desbloquear la automatización",
+      "stepsComplete": "{{done}} de {{total}} pasos completados · {{remaining}} restantes",
+      "steps": {
+        "setRates": "Establece tus tarifas de limpieza",
+        "firstQuote": "Crea tu primera cotización",
+        "firstClient": "Agrega tu primer cliente",
+        "automation": "Activa el seguimiento automático"
+      }
+    },
+    "unlockMore": "Desbloquear más valor",
+    "totalRevenue": "Ingresos totales",
+    "quotesCreated": "Cotizaciones creadas",
+    "acceptanceRate": "Tasa de aceptación",
+    "activeCustomers": "Clientes activos",
+    "recentActivity": "Actividad reciente",
+    "noActivity": "Sin actividad reciente",
+    "widgets": {
+      "embedForm": "Integra tu formulario de cotización",
+      "embedFormDesc": "Agrega un widget de reservas a tu sitio web. Los visitantes pueden pedir cotizaciones sin llamarte.",
+      "shareLink": "Comparte un enlace de cotización",
+      "shareLinkDesc": "Envía un enlace de marca que permite a cualquier prospecto solicitar una cotización de IA en 60 segundos."
+    }
+  },
+  "quotes": {
+    "title": "Cotizaciones",
+    "newQuote": "Nueva cotización",
+    "quoteNumber": "Cotización #{{number}}",
+    "searchPlaceholder": "Buscar por nombre del cliente...",
+    "totalCount": "{{count}} cotizaciones en total",
+    "noQuotes": "Aún no hay cotizaciones",
+    "noResults": "Ninguna cotización coincide con tu búsqueda",
+    "createFirst": "Crea tu primera cotización para comenzar",
+    "tryDifferent": "Prueba un término de búsqueda diferente",
+    "createQuote": "Crear cotización",
+    "noCustomer": "Sin cliente",
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "daysAgo": "hace {{days}}d",
+    "tabs": {
+      "all": "Todas",
+      "draft": "Borrador",
+      "sent": "Enviadas",
+      "viewed": "Vistas",
+      "accepted": "Aceptadas",
+      "awaitingPayment": "En espera de pago",
+      "declined": "Rechazadas",
+      "expired": "Vencidas"
+    },
+    "table": {
+      "customer": "Cliente",
+      "type": "Tipo",
+      "total": "Total",
+      "status": "Estado",
+      "invoice": "Factura",
+      "created": "Creada"
+    },
+    "invoice": {
+      "paid": "Pagada",
+      "sent": "Enviada",
+      "overdue": "Vencida"
+    },
+    "status": {
+      "draft": "Borrador",
+      "sent": "Enviada",
+      "accepted": "Aceptada",
+      "declined": "Rechazada",
+      "expired": "Vencida"
+    }
+  },
   "customers": {
     "title": "Clientes",
     "addCustomer": "Agregar cliente",
@@ -35,28 +136,125 @@
       "noContact": "Sin contacto"
     }
   },
-  "quotes": {
-    "title": "Cotizaciones",
-    "newQuote": "Nueva cotización",
-    "quoteNumber": "Cotización #{{number}}",
-    "noQuotes": "Aún no hay cotizaciones",
-    "noResults": "Ninguna cotización coincide con tu búsqueda",
+  "jobs": {
+    "title": "Trabajos",
+    "newJob": "Nuevo trabajo",
+    "totalCount": "{{count}} trabajos en total",
+    "noJobs": "Sin trabajos programados",
+    "noJobsDesc": "Acepta una cotización para reservar tu primer trabajo, o crea uno manualmente.",
+    "cleaningJob": "Trabajo de limpieza",
+    "tabs": {
+      "all": "Todos",
+      "scheduled": "Programados",
+      "inProgress": "En progreso",
+      "completed": "Completados",
+      "cancelled": "Cancelados"
+    },
+    "table": {
+      "job": "Trabajo",
+      "customer": "Cliente",
+      "status": "Estado",
+      "scheduled": "Programado",
+      "amount": "Monto"
+    },
     "status": {
-      "draft": "Borrador",
-      "sent": "Enviada",
-      "accepted": "Aceptada",
-      "declined": "Rechazada",
-      "expired": "Vencida"
+      "scheduled": "Programado",
+      "in_progress": "En progreso",
+      "completed": "Completado",
+      "cancelled": "Cancelado"
     }
   },
-  "dashboard": {
-    "title": "Panel de control",
-    "totalRevenue": "Ingresos totales",
-    "quotesCreated": "Cotizaciones creadas",
-    "acceptanceRate": "Tasa de aceptación",
-    "activeCustomers": "Clientes activos",
-    "recentActivity": "Actividad reciente",
-    "noActivity": "Sin actividad reciente"
+  "schedule": {
+    "title": "Agenda",
+    "today": "Hoy",
+    "noJobs": "Sin trabajos programados",
+    "jobModal": {
+      "reschedule": "Reprogramar",
+      "viewJob": "Ver trabajo",
+      "chargeNow": "Cobrar {{amount}}",
+      "addCard": "Agregar tarjeta",
+      "paid": "Pagado {{amount}}",
+      "chargeFailed": "Cobro fallido",
+      "retry": "Reintentar",
+      "waive": "Exonerar",
+      "viewReceipt": "Ver recibo"
+    }
+  },
+  "quoteSettings": {
+    "heading": "Preferencias de cotización",
+    "subheading": "Personaliza lo que aparece en tus cotizaciones para clientes",
+    "save": "Guardar cambios",
+    "saving": "Guardando...",
+    "saved": "¡Guardado!",
+    "sections": {
+      "businessInfo": "Información del negocio en la cotización",
+      "quoteDetails": "Detalles de la cotización",
+      "brandColor": "Color de marca",
+      "brandColorDesc": "Establece un color de marca que aparece en tus cotizaciones para clientes.",
+      "serviceTiers": "Descripciones de niveles de servicio",
+      "serviceTiersDesc": "Estas descripciones aparecen en la página de cotización para el cliente bajo cada opción. Usa 1-3 oraciones para explicar qué incluye.",
+      "addOns": "Servicios adicionales residenciales",
+      "addOnPrices": "Precios predeterminados de servicios adicionales",
+      "addOnPricesDesc": "Establece el nombre y precio predeterminado de cada servicio adicional en cotizaciones residenciales."
+    },
+    "fields": {
+      "showLogo": "Mostrar logotipo",
+      "showLogoDesc": "Muestra el logotipo de tu empresa en la cotización",
+      "showCompanyName": "Mostrar nombre de la empresa",
+      "showCompanyNameDesc": "Muestra el nombre de tu empresa en la parte superior",
+      "showAddress": "Mostrar dirección de la empresa",
+      "showAddressDesc": "Incluye la dirección de tu negocio en la cotización",
+      "showPhone": "Mostrar número de teléfono",
+      "showPhoneDesc": "Muestra tu número de teléfono para contacto del cliente",
+      "showEmail": "Mostrar correo electrónico",
+      "showEmailDesc": "Incluye tu correo electrónico en la cotización",
+      "showSignature": "Mostrar línea de firma",
+      "showSignatureDesc": "Agrega una línea para que el cliente firme",
+      "showEstimatedTime": "Mostrar tiempo estimado",
+      "showEstimatedTimeDesc": "Muestra el tiempo estimado para completar el trabajo",
+      "showPaymentOptions": "Mostrar opciones de pago",
+      "showPaymentOptionsDesc": "Lista los métodos de pago aceptados en la cotización",
+      "showBookingLink": "Mostrar enlace de reserva",
+      "showBookingLinkDesc": "Incluye un enlace para que los clientes reserven directamente",
+      "showTerms": "Mostrar términos y condiciones",
+      "showTermsDesc": "Muestra el texto de tus términos y condiciones"
+    },
+    "tiers": {
+      "good": "Bueno",
+      "better": "Mejor",
+      "best": "Excelente"
+    },
+    "expiration": {
+      "label": "Vencimiento de la cotización",
+      "7": "7 días",
+      "14": "14 días",
+      "30": "30 días",
+      "0": "Sin vencimiento"
+    },
+    "resetAddons": "Restablecer valores predeterminados"
+  },
+  "team": {
+    "title": "Equipo",
+    "addMember": "Agregar miembro",
+    "roles": {
+      "admin": "Administrador",
+      "cleaner": "Limpiador",
+      "manager": "Gerente"
+    }
+  },
+  "intelligence": {
+    "title": "Inteligencia",
+    "finance": {
+      "title": "Finanzas",
+      "tabs": {
+        "overview": "Resumen",
+        "audit": "Auditoría",
+        "reports": "Reportes",
+        "askAi": "Preguntar a IA"
+      },
+      "loadError": "No se pudieron cargar los datos financieros.",
+      "loading": "Cargando datos financieros..."
+    }
   },
   "nav": {
     "dashboard": "Panel de control",
@@ -121,6 +319,7 @@
     "edit": "Editar",
     "view": "Ver",
     "search": "Buscar",
+    "filter": "Filtrar",
     "loading": "Cargando...",
     "error": "Algo salió mal",
     "yes": "Sí",
@@ -141,7 +340,20 @@
     "required": "requerido",
     "upgrade": "Mejorar",
     "viewAll": "Ver todos",
-    "searchOrJump": "Buscar o ir a..."
+    "searchOrJump": "Buscar o ir a...",
+    "on": "Activado",
+    "off": "Desactivado",
+    "enabled": "Activado",
+    "disabled": "Desactivado",
+    "learnMore": "Más información",
+    "complete": "Completar",
+    "confirm": "Confirmar",
+    "noResults": "Sin resultados",
+    "success": "Éxito",
+    "download": "Descargar en iPhone",
+    "referAndEarn": "Referidos",
+    "helpSupport": "Ayuda y soporte",
+    "tourProduct": "Tour del producto"
   },
   "language": {
     "title": "Configuración de idioma",
@@ -160,6 +372,7 @@
     "ru": "Ruso"
   },
   "settings": {
+    "title": "Configuración",
     "account": "Cuenta",
     "subtitle": "Administra los detalles de tu cuenta, suscripción y preferencias",
     "accountDetails": "Detalles de la cuenta",
@@ -172,5 +385,13 @@
     "upgradePlan": "Ver planes",
     "email": "Correo electrónico",
     "name": "Nombre"
+  },
+  "pricing": {
+    "title": "Configuración de precios",
+    "priceEngine": "Motor de precios"
+  },
+  "referAndEarn": {
+    "title": "Referidos",
+    "description": "Gana un 50% de comisión recurrente por cada negocio que refieras."
   }
 }

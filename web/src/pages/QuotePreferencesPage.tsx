@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Save, DollarSign, RefreshCw } from "lucide-react";
 
@@ -87,30 +88,24 @@ const BRAND_COLORS = [
   "#6366F1", "#4F46E5", "#1E3A5F", "#1E293B", "#374151", "#6B7280",
 ];
 
-const BUSINESS_INFO_TOGGLES: { key: keyof QuotePreferences; label: string; description: string }[] = [
-  { key: "showLogo", label: "Show Logo", description: "Display your business logo on the quote" },
-  { key: "showCompanyName", label: "Show Company Name", description: "Display your company name at the top" },
-  { key: "showAddress", label: "Show Company Address", description: "Include your business address on the quote" },
-  { key: "showPhone", label: "Show Phone Number", description: "Display your phone number for customer contact" },
-  { key: "showEmail", label: "Show Email", description: "Include your email address on the quote" },
+const BUSINESS_INFO_TOGGLE_KEYS: { key: keyof QuotePreferences; labelKey: string; descKey: string }[] = [
+  { key: "showLogo", labelKey: "quoteSettings.fields.showLogo", descKey: "quoteSettings.fields.showLogoDesc" },
+  { key: "showCompanyName", labelKey: "quoteSettings.fields.showCompanyName", descKey: "quoteSettings.fields.showCompanyNameDesc" },
+  { key: "showAddress", labelKey: "quoteSettings.fields.showAddress", descKey: "quoteSettings.fields.showAddressDesc" },
+  { key: "showPhone", labelKey: "quoteSettings.fields.showPhone", descKey: "quoteSettings.fields.showPhoneDesc" },
+  { key: "showEmail", labelKey: "quoteSettings.fields.showEmail", descKey: "quoteSettings.fields.showEmailDesc" },
 ];
 
-const QUOTE_DETAIL_TOGGLES: { key: keyof QuotePreferences; label: string; description: string }[] = [
-  { key: "showSignatureLine", label: "Show Signature Line", description: "Add a line for the customer to sign" },
-  { key: "showEstimatedTime", label: "Show Estimated Time", description: "Display estimated time to complete the job" },
-  { key: "showPaymentOptions", label: "Show Payment Options", description: "List accepted payment methods on the quote" },
-  { key: "showBookingLink", label: "Show Booking Link", description: "Include a link for customers to book directly" },
-  { key: "showTerms", label: "Show Terms & Conditions", description: "Display your terms and conditions text" },
-];
-
-const EXPIRATION_OPTIONS = [
-  { days: 7, label: "7 days" },
-  { days: 14, label: "14 days" },
-  { days: 30, label: "30 days" },
-  { days: 0, label: "No expiration" },
+const QUOTE_DETAIL_TOGGLE_KEYS: { key: keyof QuotePreferences; labelKey: string; descKey: string }[] = [
+  { key: "showSignatureLine", labelKey: "quoteSettings.fields.showSignature", descKey: "quoteSettings.fields.showSignatureDesc" },
+  { key: "showEstimatedTime", labelKey: "quoteSettings.fields.showEstimatedTime", descKey: "quoteSettings.fields.showEstimatedTimeDesc" },
+  { key: "showPaymentOptions", labelKey: "quoteSettings.fields.showPaymentOptions", descKey: "quoteSettings.fields.showPaymentOptionsDesc" },
+  { key: "showBookingLink", labelKey: "quoteSettings.fields.showBookingLink", descKey: "quoteSettings.fields.showBookingLinkDesc" },
+  { key: "showTerms", labelKey: "quoteSettings.fields.showTerms", descKey: "quoteSettings.fields.showTermsDesc" },
 ];
 
 export default function QuotePreferencesPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data: serverPrefs, isLoading } = useQuery<QuotePreferences>({
@@ -122,7 +117,6 @@ export default function QuotePreferencesPage() {
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
-  // Add-on config (localStorage, not server)
   const [addonConfigs, setAddonConfigs] = useState<ResidentialAddonConfig[]>(() => readAddonDefaults());
 
   const saveAddon = (idx: number, patch: Partial<ResidentialAddonConfig>) => {
@@ -163,6 +157,19 @@ export default function QuotePreferencesPage() {
     setSaving(false);
   };
 
+  const EXPIRATION_OPTIONS = [
+    { days: 7, label: t("quoteSettings.expiration.7") },
+    { days: 14, label: t("quoteSettings.expiration.14") },
+    { days: 30, label: t("quoteSettings.expiration.30") },
+    { days: 0, label: t("quoteSettings.expiration.0") },
+  ];
+
+  const SERVICE_TIERS = [
+    { key: "goodDescription" as const, labelKey: "quoteSettings.tiers.good", color: "#64748B" },
+    { key: "betterDescription" as const, labelKey: "quoteSettings.tiers.better", color: "#2563EB" },
+    { key: "bestDescription" as const, labelKey: "quoteSettings.tiers.best", color: "#059669" },
+  ];
+
   if (isLoading) {
     return (
       <div className="p-6 flex justify-center py-20">
@@ -175,8 +182,8 @@ export default function QuotePreferencesPage() {
     <div className="p-6 max-w-3xl mx-auto space-y-6 pb-24">
       <div className="flex items-start justify-between gap-4">
         <PageHeader
-          title="Quote Preferences"
-          subtitle="Customize what appears on your customer-facing quotes"
+          title={t("quoteSettings.heading")}
+          subtitle={t("quoteSettings.subheading")}
         />
         {hasChanges && (
           <div className="flex-shrink-0 pt-1">
@@ -187,20 +194,20 @@ export default function QuotePreferencesPage() {
               disabled={saving}
               size="sm"
             >
-              {saving ? "Saving..." : savedFlash ? "Saved!" : "Save Changes"}
+              {saving ? t("quoteSettings.saving") : savedFlash ? t("quoteSettings.saved") : t("quoteSettings.save")}
             </Button>
           </div>
         )}
       </div>
 
       <div>
-        <SectionLabel>Business Info on Quote</SectionLabel>
+        <SectionLabel>{t("quoteSettings.sections.businessInfo")}</SectionLabel>
         <Card className="mt-3 divide-y divide-slate-100 p-0">
-          {BUSINESS_INFO_TOGGLES.map((toggle) => (
+          {BUSINESS_INFO_TOGGLE_KEYS.map((toggle) => (
             <div key={toggle.key} className="flex items-center justify-between gap-4 px-4 py-3.5">
               <div>
-                <p className="text-sm font-medium text-slate-900">{toggle.label}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{toggle.description}</p>
+                <p className="text-sm font-medium text-slate-900">{t(toggle.labelKey)}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{t(toggle.descKey)}</p>
               </div>
               <Toggle
                 checked={prefs[toggle.key] as boolean}
@@ -212,13 +219,13 @@ export default function QuotePreferencesPage() {
       </div>
 
       <div>
-        <SectionLabel>Quote Details</SectionLabel>
+        <SectionLabel>{t("quoteSettings.sections.quoteDetails")}</SectionLabel>
         <Card className="mt-3 divide-y divide-slate-100 p-0">
-          {QUOTE_DETAIL_TOGGLES.map((toggle) => (
+          {QUOTE_DETAIL_TOGGLE_KEYS.map((toggle) => (
             <div key={toggle.key} className="flex items-center justify-between gap-4 px-4 py-3.5">
               <div>
-                <p className="text-sm font-medium text-slate-900">{toggle.label}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{toggle.description}</p>
+                <p className="text-sm font-medium text-slate-900">{t(toggle.labelKey)}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{t(toggle.descKey)}</p>
               </div>
               <Toggle
                 checked={prefs[toggle.key] as boolean}
@@ -230,10 +237,10 @@ export default function QuotePreferencesPage() {
       </div>
 
       <div>
-        <SectionLabel>Brand Color</SectionLabel>
+        <SectionLabel>{t("quoteSettings.sections.brandColor")}</SectionLabel>
         <Card className="mt-3 space-y-4">
           <p className="text-sm text-slate-500">
-            Set a brand color that appears on your customer-facing quotes.
+            {t("quoteSettings.sections.brandColorDesc")}
           </p>
           <div className="flex flex-wrap gap-2">
             {BRAND_COLORS.map((color) => {
@@ -270,31 +277,25 @@ export default function QuotePreferencesPage() {
       </div>
 
       <div>
-        <SectionLabel>Service Tier Descriptions</SectionLabel>
+        <SectionLabel>{t("quoteSettings.sections.serviceTiers")}</SectionLabel>
         <Card className="mt-3 space-y-5">
           <p className="text-sm text-slate-500">
-            These descriptions appear on your customer-facing quote page under each option. Use 1–3 sentences to explain what's included so customers can choose with confidence.
+            {t("quoteSettings.sections.serviceTiersDesc")}
           </p>
-          {(
-            [
-              { key: "goodDescription" as const, label: "Good", color: "#64748B" },
-              { key: "betterDescription" as const, label: "Better", color: "#2563EB" },
-              { key: "bestDescription" as const, label: "Best", color: "#059669" },
-            ]
-          ).map(({ key, label, color }) => (
+          {SERVICE_TIERS.map(({ key, labelKey, color }) => (
             <div key={key}>
               <div className="flex items-center gap-2 mb-1.5">
                 <span
                   className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold text-white"
                   style={{ backgroundColor: color }}
                 >
-                  {label}
+                  {t(labelKey)}
                 </span>
               </div>
               <Textarea
                 value={prefs[key]}
                 onChange={(e) => updatePref(key, e.target.value)}
-                placeholder={`Describe what's included in the ${label} option...`}
+                placeholder={`${t(labelKey)}...`}
                 rows={3}
               />
             </div>
@@ -302,14 +303,13 @@ export default function QuotePreferencesPage() {
         </Card>
       </div>
 
-      {/* ── Residential Add-On Defaults ───────────────────────────────── */}
       <div>
-        <SectionLabel>Residential Add-On Services</SectionLabel>
+        <SectionLabel>{t("quoteSettings.sections.addOns")}</SectionLabel>
         <Card className="mt-3">
-          <CardHeader title="Default Add-On Prices" icon={DollarSign} />
+          <CardHeader title={t("quoteSettings.sections.addOnPrices")} icon={DollarSign} />
           <div className="px-5 pb-5 space-y-4">
             <p className="text-sm text-slate-500">
-              Set the default name and price for each optional add-on shown in residential quotes. Toggle to enable or disable each add-on for new quotes.
+              {t("quoteSettings.sections.addOnPricesDesc")}
             </p>
             <div className="space-y-3">
               {addonConfigs.map((addon, idx) => (
@@ -353,7 +353,7 @@ export default function QuotePreferencesPage() {
                 onClick={resetAddons}
                 className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-primary-600 font-medium transition-colors"
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Reset to defaults
+                <RefreshCw className="w-3.5 h-3.5" /> {t("quoteSettings.resetAddons")}
               </button>
               <span className="text-xs text-slate-400">Stored locally per device</span>
             </div>
@@ -377,7 +377,7 @@ export default function QuotePreferencesPage() {
       </div>
 
       <div>
-        <SectionLabel>Quote Expiration</SectionLabel>
+        <SectionLabel>{t("quoteSettings.expiration.label")}</SectionLabel>
         <Card className="mt-3 space-y-3">
           <p className="text-sm text-slate-500">
             Set a default expiration period for new quotes. Expired quotes are automatically marked and shown to customers.
@@ -407,7 +407,7 @@ export default function QuotePreferencesPage() {
       {hasChanges && (
         <div className="fixed bottom-6 right-6">
           <Button variant="primary" icon={saving ? undefined : Save} onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save Changes"}
+            {saving ? t("quoteSettings.saving") : t("quoteSettings.save")}
           </Button>
         </div>
       )}
