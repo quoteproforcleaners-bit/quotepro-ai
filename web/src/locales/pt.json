@@ -307,11 +307,11 @@
       "best": "Excelente"
     },
     "expiration": {
-      "label": "Validade do orçamento",
+      "0": "Sem validade",
       "7": "7 dias",
       "14": "14 dias",
       "30": "30 dias",
-      "0": "Sem validade"
+      "label": "Validade do orçamento"
     },
     "resetAddons": "Restaurar padrões"
   },
@@ -392,7 +392,9 @@
         "paymentSummary": "Mostre-me um resumo da minha atividade de pagamentos",
         "chargedThisWeek": "Quais serviços foram cobrados esta semana?"
       }
-    }
+    },
+    "loading": "Carregando dados financeiros...",
+    "loadError": "Falha ao carregar dados financeiros"
   },
   "nav": {
     "dashboard": "Painel",
@@ -598,7 +600,8 @@
         "blinds": "Persianas",
         "carpetCleaning": "Limpeza de carpete",
         "wallWashing": "Lavagem de paredes"
-      }
+      },
+      "minimumJobPrice": "Preço Mínimo do Serviço"
     },
     "branding": {
       "logo": "Logotipo do negócio",
@@ -619,7 +622,10 @@
       "signatures": "Assinaturas",
       "signaturesDesc": "Assinatura personalizada adicionada aos seus e-mails enviados.",
       "emailSignature": "Assinatura de e-mail",
-      "saveBranding": "Salvar marca"
+      "saveBranding": "Salvar marca",
+      "businessLogo": "Logo da Empresa",
+      "businessLogoDesc": "Seu logo aparece em orçamentos, notas fiscais e no portal do cliente.",
+      "uploadOwn": "Carregar Seu Próprio"
     },
     "payments": {
       "paymentHandles": "Identificadores de pagamento",
@@ -660,7 +666,13 @@
         "zelle": "Zelle",
         "credit_card": "Cartão de crédito",
         "stripe": "Stripe online"
-      }
+      },
+      "stripeConnectStatus": "Status da Conexão Stripe",
+      "account": "Conta",
+      "yes": "Sim",
+      "noActionRequired": "Ação Necessária",
+      "pending": "Pendente",
+      "enableAutoCharge": "Ativar Cobrança Automática"
     },
     "automations": {
       "dailyReminder": "Lembrete diário de acompanhamento",
@@ -693,7 +705,11 @@
         "sat": "Sábado"
       },
       "perDay": "{{n}} por dia",
-      "xDays": "{{n}} dias"
+      "xDays": "{{n}} dias",
+      "dailyFollowUp": "Acompanhamento Diário",
+      "dailyFollowUpDesc": "Faça acompanhamento automático com leads que não responderam.",
+      "maxFollowUps": "Máximo de Acompanhamentos",
+      "saveAutomation": "Salvar Automação"
     },
     "reminders": {
       "automated": "Lembretes automatizados para clientes",
@@ -729,7 +745,22 @@
       "teamMemberNotificationsDesc": "Envie uma notificação de teste para um membro específico da equipe.",
       "sendTest2": "Enviar teste",
       "testSentEmail": "Teste enviado! Verifique o e-mail deles.",
-      "noEmail": "Sem e-mail cadastrado"
+      "noEmail": "Sem e-mail cadastrado",
+      "automatedReminders": "Lembretes Automatizados",
+      "automatedRemindersDesc": "Envie lembretes automáticos aos clientes antes da limpeza agendada.",
+      "emailOneDay": "1 dia antes",
+      "emailTwoDays": "2 dias antes",
+      "emailThreeDays": "3 dias antes",
+      "emailOneWeek": "1 semana antes",
+      "emailNone": "Sem lembrete por email",
+      "saveReminders": "Salvar Lembretes",
+      "sendTestBtn": "Enviar Teste",
+      "notifyCleanersWhen": "Notificar Limpadores Quando",
+      "timingAssign": "Quando atribuído",
+      "timingDayBefore": "Dia anterior ao serviço",
+      "timingBoth": "Ambos",
+      "noEmailOnFile": "Nenhum email registrado",
+      "teamTestSent": "Teste enviado!"
     },
     "reviews": {
       "googleReviews": "Avaliações do Google",
@@ -748,7 +779,13 @@
       "referralOfferHelper": "Desconto oferecido a clientes que indicam novos clientes",
       "referralBookingLink": "Link de agendamento por indicação",
       "referralBookingHelper": "Link incluído nas mensagens de indicação para facilitar o agendamento",
-      "saveReviews": "Salvar configurações de avaliações e indicações"
+      "saveReviews": "Salvar configurações de avaliações e indicações",
+      "googleReviewUrlHelper": "Cole o link que os clientes clicam para deixar uma avaliação no Google.",
+      "askAfterJob": "Solicitar Após Serviço",
+      "askAfterJobDesc": "Solicite automaticamente uma avaliação dos clientes após cada serviço concluído.",
+      "referralOfferAmountHelper": "Valor em reais para oferecer aos clientes que indicarem um novo cliente.",
+      "referralBookingLinkHelper": "Link onde os clientes indicados podem agendar seu primeiro atendimento.",
+      "saveReviewSettings": "Salvar Configurações de Avaliação"
     },
     "tips": {
       "automatedTips": "Coleta automática de gorjetas",
@@ -797,7 +834,12 @@
       "commLanguage": "Idioma de comunicação",
       "commLanguageDesc": "Idioma usado para orçamentos e e-mails gerados por IA enviados aos clientes",
       "currency": "Moeda",
-      "currencyDesc": "Usado para todos os preços, orçamentos e receitas no app"
+      "currencyDesc": "Usado para todos os preços, orçamentos e receitas no app",
+      "portalAccentColor": "Cor de Destaque do Portal",
+      "portalAccentColorDesc": "Personalize a cor dos botões e destaques no portal do cliente.",
+      "shareLinksHint": "Compartilhe links do portal no perfil de cada cliente",
+      "featuresTitleDesc": "Ative ou desative recursos do app conforme seu fluxo de trabalho.",
+      "appLanguageDesc": "Defina o idioma do seu painel e das comunicações enviadas."
     },
     "booking": {
       "upgradeBanner": "Plano Growth ou Pro necessário",
@@ -840,7 +882,9 @@
         "thu": "Qui",
         "fri": "Sex",
         "sat": "Sáb"
-      }
+      },
+      "planRequired": "Upgrade Necessário",
+      "planRequiredDesc": "Agendamento online requer o plano Growth ou superior."
     },
     "integrations": {
       "paymentAccounting": "Pagamentos e contabilidade",

@@ -307,11 +307,11 @@
       "best": "Best"
     },
     "expiration": {
-      "label": "Quote Expiration",
+      "0": "No expiration",
       "7": "7 days",
       "14": "14 days",
       "30": "30 days",
-      "0": "No expiration"
+      "label": "Quote Expiration"
     },
     "resetAddons": "Reset to defaults"
   },
@@ -392,7 +392,9 @@
         "paymentSummary": "Show me a summary of my payment activity",
         "chargedThisWeek": "Which jobs were charged this week?"
       }
-    }
+    },
+    "loading": "Loading financial data...",
+    "loadError": "Failed to load financial data"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -598,7 +600,8 @@
         "blinds": "Blinds",
         "carpetCleaning": "Carpet Cleaning",
         "wallWashing": "Wall Washing"
-      }
+      },
+      "minimumJobPrice": "Minimum Job Price"
     },
     "branding": {
       "logo": "Business Logo",
@@ -619,7 +622,10 @@
       "signatures": "Signatures",
       "signaturesDesc": "Custom signature appended to your outgoing emails.",
       "emailSignature": "Email Signature",
-      "saveBranding": "Save Branding"
+      "saveBranding": "Save Branding",
+      "businessLogo": "Business Logo",
+      "businessLogoDesc": "Your logo appears on quotes, invoices, and your customer portal.",
+      "uploadOwn": "Upload Your Own"
     },
     "payments": {
       "paymentHandles": "Payment Handles",
@@ -660,7 +666,13 @@
         "zelle": "Zelle",
         "credit_card": "Credit Card",
         "stripe": "Stripe Online"
-      }
+      },
+      "stripeConnectStatus": "Stripe Connect Status",
+      "account": "Account",
+      "yes": "Yes",
+      "noActionRequired": "Action Required",
+      "pending": "Pending",
+      "enableAutoCharge": "Enable Auto-Charge"
     },
     "automations": {
       "dailyReminder": "Daily Follow-Up Reminder",
@@ -693,7 +705,11 @@
         "sat": "Saturday"
       },
       "perDay": "{{n}} per day",
-      "xDays": "{{n}} days"
+      "xDays": "{{n}} days",
+      "dailyFollowUp": "Daily Follow-Up",
+      "dailyFollowUpDesc": "Automatically follow up with leads who have not responded.",
+      "maxFollowUps": "Max Follow-Ups",
+      "saveAutomation": "Save Automation"
     },
     "reminders": {
       "automated": "Automated Customer Reminders",
@@ -729,7 +745,22 @@
       "teamMemberNotificationsDesc": "Send a test notification to a specific team member.",
       "sendTest2": "Send test",
       "testSentEmail": "Test sent! Check their email.",
-      "noEmail": "No email on file"
+      "noEmail": "No email on file",
+      "automatedReminders": "Automated Reminders",
+      "automatedRemindersDesc": "Send automatic reminders to customers before their scheduled cleaning.",
+      "emailOneDay": "1 day before",
+      "emailTwoDays": "2 days before",
+      "emailThreeDays": "3 days before",
+      "emailOneWeek": "1 week before",
+      "emailNone": "No email reminder",
+      "saveReminders": "Save Reminders",
+      "sendTestBtn": "Send Test",
+      "notifyCleanersWhen": "Notify Cleaners When",
+      "timingAssign": "When assigned",
+      "timingDayBefore": "Day before job",
+      "timingBoth": "Both",
+      "noEmailOnFile": "No email on file",
+      "teamTestSent": "Test sent!"
     },
     "reviews": {
       "googleReviews": "Google Reviews",
@@ -748,7 +779,13 @@
       "referralOfferHelper": "Discount offered to customers who refer new clients",
       "referralBookingLink": "Referral Booking Link",
       "referralBookingHelper": "Link included in referral messages for easy booking",
-      "saveReviews": "Save Review & Referral Settings"
+      "saveReviews": "Save Review & Referral Settings",
+      "googleReviewUrlHelper": "Paste the link customers click to leave a Google review.",
+      "askAfterJob": "Ask After Job",
+      "askAfterJobDesc": "Automatically ask customers for a review after each completed job.",
+      "referralOfferAmountHelper": "Dollar amount to offer customers who refer a new client.",
+      "referralBookingLinkHelper": "Link where referred customers can book their first appointment.",
+      "saveReviewSettings": "Save Review Settings"
     },
     "tips": {
       "automatedTips": "Automated Tip Collection",
@@ -797,7 +834,12 @@
       "commLanguage": "Communication Language",
       "commLanguageDesc": "Language used for AI-generated quotes and emails sent to customers",
       "currency": "Currency",
-      "currencyDesc": "Used for all pricing displays, quotes, and revenue figures throughout the app"
+      "currencyDesc": "Used for all pricing displays, quotes, and revenue figures throughout the app",
+      "portalAccentColor": "Portal Accent Color",
+      "portalAccentColorDesc": "Customize the color of buttons and highlights in the customer portal.",
+      "shareLinksHint": "Share portal links from each customer's profile",
+      "featuresTitleDesc": "Enable or disable app features based on your workflow.",
+      "appLanguageDesc": "Set the language for your dashboard and outgoing communications."
     },
     "booking": {
       "upgradeBanner": "Growth or Pro plan required",
@@ -840,7 +882,9 @@
         "thu": "Thu",
         "fri": "Fri",
         "sat": "Sat"
-      }
+      },
+      "planRequired": "Upgrade Required",
+      "planRequiredDesc": "Online booking requires the Growth plan or higher."
     },
     "integrations": {
       "paymentAccounting": "Payment & Accounting",

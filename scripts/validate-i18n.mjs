@@ -100,7 +100,19 @@ for (const lng of LOCALES.filter((l) => l !== "en")) {
 const files = getAllSourceFiles(SRC_DIR);
 const usedKeys = extractUsedKeys(files);
 
-const missingFromLocales = [...usedKeys].filter((k) => !(k in en));
+// A key is valid if it is a leaf key OR a parent of leaf keys (returnObjects usage)
+const enParentPrefixes = new Set(
+  enKeys.flatMap((k) =>
+    k.split(".").reduce((acc, _, i, arr) => {
+      if (i > 0) acc.push(arr.slice(0, i).join("."));
+      return acc;
+    }, [])
+  )
+);
+
+const missingFromLocales = [...usedKeys].filter(
+  (k) => !(k in en) && !enParentPrefixes.has(k)
+);
 const unusedInSource = enKeys.filter((k) => !usedKeys.has(k));
 
 console.log(`\n── Source scan (${files.length} files) ──`);

@@ -307,11 +307,11 @@
       "best": "Excelente"
     },
     "expiration": {
-      "label": "Vencimiento de la cotización",
+      "0": "Sin vencimiento",
       "7": "7 días",
       "14": "14 días",
       "30": "30 días",
-      "0": "Sin vencimiento"
+      "label": "Vencimiento de la cotización"
     },
     "resetAddons": "Restablecer valores predeterminados"
   },
@@ -392,7 +392,9 @@
         "paymentSummary": "Muéstrame un resumen de mi actividad de pagos",
         "chargedThisWeek": "¿Qué trabajos se cobraron esta semana?"
       }
-    }
+    },
+    "loading": "Cargando datos financieros...",
+    "loadError": "No se pudieron cargar los datos financieros"
   },
   "nav": {
     "dashboard": "Panel de control",
@@ -598,7 +600,8 @@
         "blinds": "Persianas",
         "carpetCleaning": "Limpieza de alfombras",
         "wallWashing": "Lavado de paredes"
-      }
+      },
+      "minimumJobPrice": "Precio Mínimo por Trabajo"
     },
     "branding": {
       "logo": "Logotipo del negocio",
@@ -619,7 +622,10 @@
       "signatures": "Firmas",
       "signaturesDesc": "Firma personalizada que se agrega a tus correos salientes.",
       "emailSignature": "Firma de correo",
-      "saveBranding": "Guardar marca"
+      "saveBranding": "Guardar marca",
+      "businessLogo": "Logo de tu Negocio",
+      "businessLogoDesc": "Tu logo aparece en presupuestos, facturas y el portal de clientes.",
+      "uploadOwn": "Sube tu Propio Logo"
     },
     "payments": {
       "paymentHandles": "Identificadores de pago",
@@ -660,7 +666,13 @@
         "zelle": "Zelle",
         "credit_card": "Tarjeta de crédito",
         "stripe": "Stripe en línea"
-      }
+      },
+      "stripeConnectStatus": "Estado de Stripe Connect",
+      "account": "Cuenta",
+      "yes": "Sí",
+      "noActionRequired": "Se Requiere Acción",
+      "pending": "Pendiente",
+      "enableAutoCharge": "Activar Cobro Automático"
     },
     "automations": {
       "dailyReminder": "Recordatorio diario de seguimiento",
@@ -693,7 +705,11 @@
         "sat": "Sábado"
       },
       "perDay": "{{n}} por día",
-      "xDays": "{{n}} días"
+      "xDays": "{{n}} días",
+      "dailyFollowUp": "Seguimiento Diario",
+      "dailyFollowUpDesc": "Haz seguimiento automático con clientes potenciales que no han respondido.",
+      "maxFollowUps": "Máximo de Seguimientos",
+      "saveAutomation": "Guardar Automatización"
     },
     "reminders": {
       "automated": "Recordatorios automatizados para clientes",
@@ -729,7 +745,22 @@
       "teamMemberNotificationsDesc": "Envía una notificación de prueba a un miembro específico del equipo.",
       "sendTest2": "Enviar prueba",
       "testSentEmail": "¡Prueba enviada! Revisa su correo.",
-      "noEmail": "Sin correo registrado"
+      "noEmail": "Sin correo registrado",
+      "automatedReminders": "Recordatorios Automáticos",
+      "automatedRemindersDesc": "Envía recordatorios automáticos a tus clientes antes de su limpieza programada.",
+      "emailOneDay": "1 día antes",
+      "emailTwoDays": "2 días antes",
+      "emailThreeDays": "3 días antes",
+      "emailOneWeek": "1 semana antes",
+      "emailNone": "Sin recordatorio por email",
+      "saveReminders": "Guardar Recordatorios",
+      "sendTestBtn": "Enviar Prueba",
+      "notifyCleanersWhen": "Notificar a los Limpiadores Cuando",
+      "timingAssign": "Se asigne el trabajo",
+      "timingDayBefore": "Un día antes del trabajo",
+      "timingBoth": "Ambos",
+      "noEmailOnFile": "Sin email registrado",
+      "teamTestSent": "¡Prueba enviada!"
     },
     "reviews": {
       "googleReviews": "Reseñas de Google",
@@ -748,7 +779,13 @@
       "referralOfferHelper": "Descuento ofrecido a clientes que refieren nuevos clientes",
       "referralBookingLink": "Enlace de reserva por referencia",
       "referralBookingHelper": "Enlace incluido en mensajes de referencia para facilitar la reserva",
-      "saveReviews": "Guardar configuración de reseñas y referencias"
+      "saveReviews": "Guardar configuración de reseñas y referencias",
+      "googleReviewUrlHelper": "Pega el link que los clientes usan para dejar una reseña en Google.",
+      "askAfterJob": "Pedir Reseña Después del Trabajo",
+      "askAfterJobDesc": "Pide automáticamente una reseña a tus clientes después de cada trabajo completado.",
+      "referralOfferAmountHelper": "Cantidad en dólares que ofreces a clientes que refieran un nuevo cliente.",
+      "referralBookingLinkHelper": "Link donde los clientes referidos pueden agendar su primera cita.",
+      "saveReviewSettings": "Guardar Configuración de Reseñas"
     },
     "tips": {
       "automatedTips": "Cobro automático de propinas",
@@ -797,7 +834,12 @@
       "commLanguage": "Idioma de comunicación",
       "commLanguageDesc": "Idioma usado para cotizaciones y correos generados por IA enviados a clientes",
       "currency": "Moneda",
-      "currencyDesc": "Usado para todos los precios, cotizaciones e ingresos en la app"
+      "currencyDesc": "Usado para todos los precios, cotizaciones e ingresos en la app",
+      "portalAccentColor": "Color de Acento del Portal",
+      "portalAccentColorDesc": "Personaliza el color de los botones y destacados en el portal de clientes.",
+      "shareLinksHint": "Comparte los links del portal desde el perfil de cada cliente",
+      "featuresTitleDesc": "Activa o desactiva funciones de la app según tu flujo de trabajo.",
+      "appLanguageDesc": "Establece el idioma para tu panel y comunicaciones salientes."
     },
     "booking": {
       "upgradeBanner": "Se requiere plan Growth o Pro",
@@ -840,7 +882,9 @@
         "thu": "Jue",
         "fri": "Vie",
         "sat": "Sáb"
-      }
+      },
+      "planRequired": "Actualización Requerida",
+      "planRequiredDesc": "Las reservas en línea requieren el plan Growth o superior."
     },
     "integrations": {
       "paymentAccounting": "Pagos y contabilidad",
