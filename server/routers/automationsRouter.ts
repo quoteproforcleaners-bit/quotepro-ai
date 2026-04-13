@@ -1238,21 +1238,59 @@ Respond with valid JSON only: {"reply": string}`,
 
       const step = seq.steps[stepIndex];
 
-      const bookingLink = business.bookingLink || "";
       const senderName = business.senderName || business.companyName || "Your Cleaning Team";
       const businessName = business.companyName || "Your Cleaning Company";
       const { fromName: seqFromName, replyTo: seqReplyTo } = getBusinessSendParams(business);
+
+      // Build CTA URL — use public intake slug, fall back to business id
+      const seqAppUrl = process.env.APP_URL || "https://app.getquotepro.ai";
+      const seqPublicSlug = await ensurePublicSlug(business.id, business.companyName || "my-cleaning-co");
+      const ctaUrl = business.bookingLink
+        || (seqPublicSlug ? `${seqAppUrl}/request/${seqPublicSlug}` : `${seqAppUrl}/request/${business.id}`);
+
+      console.log("CTA URL being used:", ctaUrl);
+
+      if (!ctaUrl) {
+        console.error("BLOCKED: Attempted to send campaign email without ctaUrl");
+        return res.status(400).json({ message: "Cannot send — no booking link available for this business" });
+      }
 
       const replacePlaceholders = (text: string) =>
         text
           .replace(/\{\{customerName\}\}/g, enrollment.customerName)
           .replace(/\{\{businessName\}\}/g, businessName)
           .replace(/\{\{senderName\}\}/g, senderName)
-          .replace(/\{\{bookingLink\}\}/g, bookingLink);
+          .replace(/\{\{bookingLink\}\}/g, ctaUrl);
 
       const subject = replacePlaceholders(step.subject);
       const bodyText = replacePlaceholders(step.body);
-      const htmlBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;line-height:1.6;">${bodyText.replace(/\n/g, "<br>")}</div>`;
+
+      // Convert body to HTML and inject a real CTA button where {{bookingLink}} was
+      // (placeholder is now replaced with the URL, so we strip the raw URL line and add the button)
+      const ctaButton = `
+<!-- CTA BUTTON — table layout required for Gmail -->
+<table cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
+  <tr>
+    <td bgcolor="${business.primaryColor || "#0F6E56"}" style="border-radius:8px;">
+      <a href="${ctaUrl}"
+        target="_blank"
+        style="display:inline-block;padding:16px 32px;
+               background-color:${business.primaryColor || "#0F6E56"};color:#ffffff;
+               text-decoration:none;font-size:16px;
+               font-weight:700;border-radius:8px;
+               font-family:Arial,sans-serif;">
+        Book Now
+      </a>
+    </td>
+  </tr>
+</table>`;
+
+      // Convert newlines to <br>, then replace the raw ctaUrl text line with the button
+      const htmlBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;line-height:1.6;">${
+        bodyText
+          .replace(/\n/g, "<br>")
+          .replace(ctaUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), ctaButton)
+      }</div>`;
 
       // Attach files from the business file library (if provided)
       const { attachmentFileIds: seqAttachIds } = req.body;
