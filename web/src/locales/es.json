@@ -58,6 +58,66 @@
       "embedFormDesc": "Agrega un widget de reservas a tu sitio web. Los visitantes pueden pedir cotizaciones sin llamarte.",
       "shareLink": "Comparte un enlace de cotización",
       "shareLinkDesc": "Envía un enlace de marca que permite a cualquier prospecto solicitar una cotización de IA en 60 segundos."
+    },
+    "pipeline": {
+      "sent": "Enviado",
+      "viewed": "Visto",
+      "accepted": "Aceptado",
+      "empty": "El pipeline está vacío",
+      "emptyDesc": "Crea y envía presupuestos de limpieza para empezar a rastrear tu embudo de conversión.",
+      "createQuote": "Crear Presupuesto",
+      "avgValue": "Valor promedio",
+      "closeRate": "Tasa de cierre",
+      "daysToAccept": "Días promedio para aceptar",
+      "vsLastMonth": "vs mes pasado"
+    },
+    "attention": {
+      "followupsNeeded": "Seguimientos necesarios",
+      "followupsDesc": "{{amount}} en presupuestos enviados sin respuesta aún.",
+      "draftsReady": "Borradores listos para enviar",
+      "draftsDesc": "Los presupuestos sin enviar no cierran. Envíalos hoy.",
+      "acceptedNotScheduled": "Aceptado, no agendado",
+      "acceptedDesc": "{{amount}} en presupuestos aceptados esperando agendarse.",
+      "closeRateBelow": "Tasa de cierre por debajo del promedio",
+      "closeRateDesc": "Menos del 30% — da seguimiento más rápido para cerrar más limpiezas.",
+      "ghostQuotes": "Presupuestos fantasma (nunca abiertos)",
+      "ghostDesc": "{{count}} presupuesto{{s}} enviado{{s}} hace 48h+ sin ser visto. Es hora de llamar."
+    },
+    "aiTools": {
+      "title": "Asistente de Ingresos AI",
+      "handleObjections": "Manejar objeciones",
+      "handleObjectionsDesc": "Convierte la resistencia al precio en trabajos cerrados.",
+      "draftFollowup": "Redactar seguimiento",
+      "draftFollowupDesc": "Escribe un mensaje de seguimiento efectivo en segundos.",
+      "walkthroughToQuote": "De recorrido a presupuesto",
+      "walkthroughToQuoteDesc": "Pega las notas de tu inspección, obtén un presupuesto.",
+      "pitchRecurring": "Ofrecer plan recurrente",
+      "pitchRecurringDesc": "Genera un guion de venta para limpiezas recurrentes.",
+      "reengageLost": "Reconectar un cliente perdido",
+      "reengageLostDesc": "Trae de vuelta a un prospecto que se quedó callado."
+    },
+    "onboarding": {
+      "setPricing": "Establece tus tarifas de limpieza",
+      "createQuote": "Crea tu primer presupuesto de limpieza",
+      "addClient": "Agrega tu primer cliente de limpieza",
+      "activateFollowup": "Activa la automatización de seguimientos",
+      "ctaPricing": "Configurar Tarifas",
+      "ctaQuote": "Crear Presupuesto",
+      "ctaCustomer": "Agregar Cliente",
+      "ctaFollowup": "Revisar Seguimientos"
+    },
+    "weekly": {
+      "quotesSent": "Presupuestos enviados esta semana",
+      "quotesAccepted": "Presupuestos aceptados esta semana",
+      "revenueMonth": "Ingresos este mes",
+      "closeRate": "Tasa de cierre",
+      "avgClientRating": "Calificación promedio del cliente"
+    },
+    "revenue": {
+      "unchargedJobs": "Trabajos completados sin cobrar",
+      "chargeNow": "Cobrar Ahora",
+      "failedCharges": "Cobros fallidos requieren reintentar",
+      "retryCharge": "Reintentar Cobro"
     }
   },
   "quotes": {
@@ -394,7 +454,13 @@
       }
     },
     "loading": "Cargando datos financieros...",
-    "loadError": "No se pudieron cargar los datos financieros"
+    "loadError": "No se pudieron cargar los datos financieros",
+    "tabs": {
+      "overview": "Resumen",
+      "audit": "Auditoría",
+      "reports": "Reportes",
+      "askAi": "Preguntar a AI"
+    }
   },
   "nav": {
     "dashboard": "Panel de control",

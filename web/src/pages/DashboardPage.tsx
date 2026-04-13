@@ -585,11 +585,12 @@ function PipelineCard({
  navigate: (path: string) => void;
 }) {
  const max = Math.max(sentCount, viewedCount, acceptedCount, 1);
+ const { t } = useTranslation();
 
  const stages = [
- { label:"Sent", count: sentCount, color:"from-blue-500 to-blue-600", icon: Send, textColor:"text-blue-600"},
- { label:"Viewed", count: viewedCount, color:"from-violet-500 to-violet-600", icon: Eye, textColor:"text-violet-600"},
- { label:"Accepted", count: acceptedCount, color:"from-emerald-500 to-emerald-600", icon: CheckCircle, textColor:"text-emerald-600"},
+ { label: t("dashboard.pipeline.sent"), count: sentCount, color:"from-blue-500 to-blue-600", icon: Send, textColor:"text-blue-600"},
+ { label: t("dashboard.pipeline.viewed"), count: viewedCount, color:"from-violet-500 to-violet-600", icon: Eye, textColor:"text-violet-600"},
+ { label: t("dashboard.pipeline.accepted"), count: acceptedCount, color:"from-emerald-500 to-emerald-600", icon: CheckCircle, textColor:"text-emerald-600"},
  ];
 
  if (sentCount === 0) {
@@ -695,11 +696,12 @@ function StartHereChecklist({
  hasFollowUpActivity: boolean;
  navigate: (path: string) => void;
 }) {
+ const { t } = useTranslation();
  const steps = [
- { id:"pricing", done: hasPricing, label:"Set your cleaning rates", cta:"Set Up Pricing", path:"/settings?tab=pricing", icon: DollarSign },
- { id:"quote", done: hasQuotes, label:"Create your first cleaning quote", cta:"Create Quote", path:"/quotes/new", icon: FileText },
- { id:"customer", done: hasCustomers, label:"Add your first cleaning client", cta:"Add Client", path:"/customers/new", icon: Users },
- { id:"followup", done: hasFollowUpActivity, label:"Activate follow-up automation", cta:"Review Follow-Ups", path:"/follow-ups", icon: Zap },
+ { id:"pricing", done: hasPricing, label: t("dashboard.onboarding.setPricing"), cta: t("dashboard.onboarding.ctaPricing"), path:"/settings?tab=pricing", icon: DollarSign },
+ { id:"quote", done: hasQuotes, label: t("dashboard.onboarding.createQuote"), cta: t("dashboard.onboarding.ctaQuote"), path:"/quotes/new", icon: FileText },
+ { id:"customer", done: hasCustomers, label: t("dashboard.onboarding.addClient"), cta: t("dashboard.onboarding.ctaCustomer"), path:"/customers/new", icon: Users },
+ { id:"followup", done: hasFollowUpActivity, label: t("dashboard.onboarding.activateFollowup"), cta: t("dashboard.onboarding.ctaFollowup"), path:"/follow-ups", icon: Zap },
  ];
  const completedCount = steps.filter((s) => s.done).length;
  const allDone = completedCount === steps.length;
@@ -796,12 +798,13 @@ function StartHereChecklist({
 // ─── AI Growth Tools ──────────────────────────────────────────────────────────
 
 function AIGrowthTools({ navigate }: { navigate: (path: string) => void }) {
+ const { t } = useTranslation();
  const tools = [
- { icon: MessageSquare, label:"Handle objections", description:"Turn pricing pushback into closed jobs.", prompt:"help me handle objections"},
- { icon: Send, label:"Draft follow-up", description:"Write a sharp follow-up message in seconds.", prompt:"draft a follow-up message"},
- { icon: FileEdit, label:"Walk-through to quote", description:"Paste site-visit notes, get a quote.", prompt:"turn my notes into a quote"},
- { icon: Repeat, label:"Pitch recurring plan", description:"Generate an upsell script for recurring cleans.", prompt:"recurring upsell script"},
- { icon: RefreshCw, label:"Re-engage a lost client", description:"Bring back a prospect that went quiet.", prompt:"re-engage lost lead"},
+ { icon: MessageSquare, label: t("dashboard.aiTools.handleObjections"), description: t("dashboard.aiTools.handleObjectionsDesc"), prompt:"help me handle objections"},
+ { icon: Send, label: t("dashboard.aiTools.draftFollowup"), description: t("dashboard.aiTools.draftFollowupDesc"), prompt:"draft a follow-up message"},
+ { icon: FileEdit, label: t("dashboard.aiTools.walkthroughToQuote"), description: t("dashboard.aiTools.walkthroughToQuoteDesc"), prompt:"turn my notes into a quote"},
+ { icon: Repeat, label: t("dashboard.aiTools.pitchRecurring"), description: t("dashboard.aiTools.pitchRecurringDesc"), prompt:"recurring upsell script"},
+ { icon: RefreshCw, label: t("dashboard.aiTools.reengageLost"), description: t("dashboard.aiTools.reengageLostDesc"), prompt:"re-engage lost lead"},
  ];
 
  return (
@@ -1332,9 +1335,9 @@ export default function DashboardPage() {
  if (followUpQueueCount > 0) {
  items.push({
  icon: PhoneMissed,
- label:"Follow-ups needed",
+ label: t("dashboard.attention.followupsNeeded"),
  count: followUpQueueCount,
- description: `${fmt(amountAtRisk)} in sent quotes not yet responded to.`,
+ description: t("dashboard.attention.followupsDesc", { amount: fmt(amountAtRisk) }),
  path:"/follow-ups",
  severity: oldestQuoteDays >= 5 ?"critical": oldestQuoteDays >= 3 ?"warning":"warning",
  });
@@ -1343,9 +1346,9 @@ export default function DashboardPage() {
  if (draftQuotes.length > 0) {
  items.push({
  icon: Send,
- label:"Drafts ready to send",
+ label: t("dashboard.attention.draftsReady"),
  count: draftQuotes.length,
- description:"Unsent quotes can't close. Send them today.",
+ description: t("dashboard.attention.draftsDesc"),
  path:"/quotes",
  severity:"warning",
  });
@@ -1354,9 +1357,9 @@ export default function DashboardPage() {
  if (unscheduledAccepted > 0) {
  items.push({
  icon: Calendar,
- label:"Accepted, not scheduled",
+ label: t("dashboard.attention.acceptedNotScheduled"),
  count: unscheduledAccepted,
- description: `${fmt(pipelineValue)} in accepted quotes awaiting scheduling.`,
+ description: t("dashboard.attention.acceptedDesc", { amount: fmt(pipelineValue) }),
  path:"/quotes?filter=accepted",
  severity:"info",
  });
@@ -1365,9 +1368,9 @@ export default function DashboardPage() {
  if (closeRate > 0 && closeRate < 30) {
  items.push({
  icon: TrendingDown,
- label:"Close rate below average",
+ label: t("dashboard.attention.closeRateBelow"),
  count: Math.round(closeRate),
- description:"Under 30% — follow up faster to close more cleans.",
+ description: t("dashboard.attention.closeRateDesc"),
  path:"/quotes",
  severity:"warning",
  });
@@ -1377,16 +1380,16 @@ export default function DashboardPage() {
  if (ghostCount > 0) {
  items.push({
  icon: Eye,
- label:"Ghost quotes (never opened)",
+ label: t("dashboard.attention.ghostQuotes"),
  count: ghostCount,
- description:`${ghostCount} quote${ghostCount !== 1 ? "s" : ""} sent 48h+ ago with no view. Time to call.`,
+ description: t("dashboard.attention.ghostDesc", { count: ghostCount, s: ghostCount !== 1 ? "s" : "" }),
  path:"/quotes?filter=sent",
  severity:"warning",
  });
  }
 
  return items.slice(0, 4);
- }, [followUpQueueCount, amountAtRisk, draftQuotes, unscheduledAccepted, pipelineValue, closeRate, oldestQuoteDays, stats]);
+ }, [t, followUpQueueCount, amountAtRisk, draftQuotes, unscheduledAccepted, pipelineValue, closeRate, oldestQuoteDays, stats]);
 
  // ── Today's Revenue Moves ──────────────────────────────────────────────────
  const revenueActions = useMemo<RevenueAction[]>(() => {
@@ -2018,7 +2021,7 @@ export default function DashboardPage() {
  <div className="space-y-1">
  {[
  {
- label:"Quotes sent this week",
+ label: t("dashboard.weekly.quotesSent"),
  value: quotes.filter((q: any) => {
  const d = new Date(q.createdAt);
  return Date.now() - d.getTime() <= 7 * 24 * 60 * 60 * 1000;
@@ -2026,16 +2029,16 @@ export default function DashboardPage() {
  color:"text-slate-900",
  },
  {
- label:"Quotes accepted this week",
+ label: t("dashboard.weekly.quotesAccepted"),
  value: acceptedQuotes.filter((q: any) => {
  const d = new Date(q.createdAt);
  return Date.now() - d.getTime() <= 7 * 24 * 60 * 60 * 1000;
  }).length,
  color:"text-emerald-600",
  },
- { label:"Revenue this month", value: fmt(monthlyRevenue), color:"text-emerald-600"},
+ { label: t("dashboard.weekly.revenueMonth"), value: fmt(monthlyRevenue), color:"text-emerald-600"},
  {
- label:"Close rate",
+ label: t("dashboard.weekly.closeRate"),
  value: closeRate > 0 ? `${Math.round(closeRate)}%` :"—",
  color: closeRate >= 50 ?"text-emerald-600": closeRate >= 35 ?"text-amber-600":"text-red-500",
  },

@@ -4,6 +4,7 @@ import { useAuth } from "./lib/auth";
 import { isLoggedIn } from "./lib/employeeApi";
 import { applyLanguage } from "./lib/i18n";
 import LanguagePickerModal from "./components/LanguagePickerModal";
+import { I18nDebugOverlay } from "./components/I18nDebugOverlay";
 import { SubscriptionProvider } from "./lib/subscription";
 import { ThemeProvider } from "./lib/theme";
 import { WalkthroughProvider } from "./lib/walkthrough";
@@ -280,6 +281,7 @@ export default function App() {
       </Routes>
       {isAuthenticated && <WhatsNewModal />}
       {isAuthenticated && <LanguagePickerModal />}
+      {import.meta.env.DEV && <I18nDebugOverlay />}
     </WebAIConsentProvider>
     </SubscriptionProvider>
     </WalkthroughProvider>

@@ -58,6 +58,66 @@
       "embedFormDesc": "Put a booking widget on your website. Visitors can request quotes without calling you.",
       "shareLink": "Share a quote link",
       "shareLinkDesc": "Send a branded link that lets any prospect request an instant AI quote from you in 60 seconds."
+    },
+    "pipeline": {
+      "sent": "Sent",
+      "viewed": "Viewed",
+      "accepted": "Accepted",
+      "empty": "Pipeline is empty",
+      "emptyDesc": "Create and send cleaning quotes to start tracking your conversion funnel.",
+      "createQuote": "Create Quote",
+      "avgValue": "Avg value",
+      "closeRate": "Close rate",
+      "daysToAccept": "Avg days to accept",
+      "vsLastMonth": "vs last month"
+    },
+    "attention": {
+      "followupsNeeded": "Follow-ups needed",
+      "followupsDesc": "{{amount}} in sent quotes not yet responded to.",
+      "draftsReady": "Drafts ready to send",
+      "draftsDesc": "Unsent quotes cannot close. Send them today.",
+      "acceptedNotScheduled": "Accepted, not scheduled",
+      "acceptedDesc": "{{amount}} in accepted quotes awaiting scheduling.",
+      "closeRateBelow": "Close rate below average",
+      "closeRateDesc": "Under 30% — follow up faster to close more cleans.",
+      "ghostQuotes": "Ghost quotes (never opened)",
+      "ghostDesc": "{{count}} quote{{s}} sent 48h+ ago with no view. Time to call."
+    },
+    "aiTools": {
+      "title": "AI Revenue Assist",
+      "handleObjections": "Handle objections",
+      "handleObjectionsDesc": "Turn pricing pushback into closed jobs.",
+      "draftFollowup": "Draft follow-up",
+      "draftFollowupDesc": "Write a sharp follow-up message in seconds.",
+      "walkthroughToQuote": "Walk-through to quote",
+      "walkthroughToQuoteDesc": "Paste site-visit notes, get a quote.",
+      "pitchRecurring": "Pitch recurring plan",
+      "pitchRecurringDesc": "Generate an upsell script for recurring cleans.",
+      "reengageLost": "Re-engage a lost client",
+      "reengageLostDesc": "Bring back a prospect that went quiet."
+    },
+    "onboarding": {
+      "setPricing": "Set your cleaning rates",
+      "createQuote": "Create your first cleaning quote",
+      "addClient": "Add your first cleaning client",
+      "activateFollowup": "Activate follow-up automation",
+      "ctaPricing": "Set Up Pricing",
+      "ctaQuote": "Create Quote",
+      "ctaCustomer": "Add Client",
+      "ctaFollowup": "Review Follow-Ups"
+    },
+    "weekly": {
+      "quotesSent": "Quotes sent this week",
+      "quotesAccepted": "Quotes accepted this week",
+      "revenueMonth": "Revenue this month",
+      "closeRate": "Close rate",
+      "avgClientRating": "Avg client rating"
+    },
+    "revenue": {
+      "unchargedJobs": "Uncharged completed jobs",
+      "chargeNow": "Charge Now",
+      "failedCharges": "Failed charges need retry",
+      "retryCharge": "Retry Charge"
     }
   },
   "quotes": {
@@ -394,7 +454,13 @@
       }
     },
     "loading": "Loading financial data...",
-    "loadError": "Failed to load financial data"
+    "loadError": "Failed to load financial data",
+    "tabs": {
+      "overview": "Overview",
+      "audit": "Audit",
+      "reports": "Reports",
+      "askAi": "Ask AI"
+    }
   },
   "nav": {
     "dashboard": "Dashboard",
