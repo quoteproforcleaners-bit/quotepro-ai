@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { CheckCircle, Mail, Clock, Loader2, AlertCircle, Sparkles, ArrowRight, Home, Calendar } from "lucide-react";
+import { CheckCircle, Mail, Clock, Loader2, AlertCircle, Sparkles, ArrowRight, Calendar, Star } from "lucide-react";
 
 const API_BASE = typeof window !== "undefined" ? window.location.origin : "";
 const MAX_WAIT = 90;
@@ -18,18 +18,46 @@ interface QuoteData {
   cleanType?: string;
 }
 
+interface ServiceTier {
+  id: string;
+  name: string;
+  tag: "Good" | "Better" | "Best";
+  description: string;
+  priceMin: number;
+  priceMax: number;
+  multiplier: number;
+}
+
+const DEFAULT_TIERS: Omit<ServiceTier, "priceMin" | "priceMax">[] = [
+  { id: "standard",  name: "Standard Clean",     tag: "Good",   description: "Routine maintenance clean of all common areas", multiplier: 1.00 },
+  { id: "deep",      name: "Deep Clean",          tag: "Better", description: "Detailed top-to-bottom scrub including walls, baseboards & more", multiplier: 1.85 },
+  { id: "moveinout", name: "Move In / Move Out",  tag: "Best",   description: "Complete vacant property clean ready for new occupants", multiplier: 2.20 },
+];
+
+function buildTiers(quote: QuoteData): ServiceTier[] | null {
+  const baseMid = quote.exactAmount
+    ? Number(quote.exactAmount)
+    : ((Number(quote.rangeMin) || 0) + (Number(quote.rangeMax) || 0)) / 2;
+  if (!baseMid) return null;
+  return DEFAULT_TIERS.map((t) => {
+    const newMid = baseMid * t.multiplier;
+    const newMin = Math.max(50, Math.round((newMid * 0.88) / 5) * 5);
+    const newMax = Math.round((newMid * 1.15) / 5) * 5;
+    return { ...t, priceMin: newMin, priceMax: newMax };
+  });
+}
+
 const STEPS = [
-  { label: "Received your home details",   readyAt: ["queued", "generating", "quoted", "booked"] },
-  { label: "AI analyzing pricing factors", readyAt: ["generating", "quoted", "booked"] },
+  { label: "Received your home details",    readyAt: ["queued", "generating", "quoted", "booked"] },
+  { label: "AI analyzing pricing factors",  readyAt: ["generating", "quoted", "booked"] },
   { label: "Calculating personalized quote", readyAt: ["quoted", "booked"] },
   { label: "Finding available booking slots", readyAt: ["quoted", "booked"] },
-  { label: "Sending your quote email",     readyAt: ["quoted", "booked"] },
+  { label: "Sending your quote email",      readyAt: ["quoted", "booked"] },
 ];
 
 function stepState(stepIdx: number, leadStatus: string, elapsed: number): "done" | "active" | "pending" {
   const step = STEPS[stepIdx];
   if (step.readyAt.includes(leadStatus)) return "done";
-  // Animate steps forward using elapsed time as a fallback while waiting
   const timeThresholds = [2, 8, 20, 35, 50];
   if (elapsed >= timeThresholds[stepIdx]) return "active";
   return "pending";
@@ -57,7 +85,6 @@ export default function LeadPendingPage() {
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
 
-  // Load biz info
   useEffect(() => {
     if (!slug) return;
     fetch(`${API_BASE}/api/public/biz-info/${slug}`)
@@ -70,7 +97,6 @@ export default function LeadPendingPage() {
       .catch(() => {});
   }, [slug]);
 
-  // Polling + timer
   useEffect(() => {
     if (isManual || !leadId) return;
 
@@ -113,7 +139,6 @@ export default function LeadPendingPage() {
       }
     };
 
-    // Poll immediately, then every POLL_MS
     doPoll();
     pollRef.current = setInterval(doPoll, POLL_MS);
 
@@ -126,6 +151,7 @@ export default function LeadPendingPage() {
   const color = bizColor;
   const progress = Math.min((elapsed / 60) * 100, 95);
   const bookingUrl = bookingToken ? `${API_BASE}/book/${bookingToken}` : null;
+  const tiers = quoteData ? buildTiers(quoteData) : null;
 
   return (
     <div style={{ minHeight: "100vh", background: "#F3F4F6", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: "flex", flexDirection: "column" }}>
@@ -135,6 +161,8 @@ export default function LeadPendingPage() {
         @keyframes fadeUp { from { opacity:0;transform:translateY(16px) } to { opacity:1;transform:translateY(0) } }
         @keyframes popIn { 0% { opacity:0;transform:scale(0.88) } 60% { transform:scale(1.04) } 100% { opacity:1;transform:scale(1) } }
         * { box-sizing: border-box; }
+        .tier-card { cursor:pointer; transition: transform 0.15s, box-shadow 0.15s; }
+        .tier-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.12) !important; }
       `}</style>
 
       <div style={{ background: color, padding: "18px 16px", textAlign: "center" }}>
@@ -150,7 +178,6 @@ export default function LeadPendingPage() {
               <div style={{ width: 80, height: 80, borderRadius: "50%", background: rgba(color, 0.1), display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
                 <Sparkles size={36} style={{ color, animation: "pulse 2s ease-in-out infinite" }} />
               </div>
-
               <h2 style={{ fontSize: 24, fontWeight: 800, color: "#111827", margin: "0 0 10px" }}>
                 Generating your quote…
               </h2>
@@ -158,7 +185,6 @@ export default function LeadPendingPage() {
                 Our AI is calculating a personalized price for your home. You'll receive an email at{" "}
                 <strong style={{ color: "#111827" }}>{email}</strong> with your quote and available booking times.
               </p>
-
               <div style={{ background: "#F3F4F6", borderRadius: 8, height: 8, overflow: "hidden", marginBottom: 12 }}>
                 <div style={{ height: 8, background: color, borderRadius: 8, width: `${progress}%`, transition: "width 1s ease" }} />
               </div>
@@ -166,7 +192,6 @@ export default function LeadPendingPage() {
                 <span>Analyzing home details…</span>
                 <span>{elapsed}s / ~60s</span>
               </div>
-
               <div style={{ textAlign: "left" }}>
                 {STEPS.map((step, i) => {
                   const state = stepState(i, leadStatus, elapsed);
@@ -198,7 +223,6 @@ export default function LeadPendingPage() {
                   );
                 })}
               </div>
-
               <p style={{ fontSize: 12, color: "#9CA3AF", marginTop: 24, marginBottom: 0 }}>
                 This page will update automatically. You can also check your email.
               </p>
@@ -207,7 +231,7 @@ export default function LeadPendingPage() {
 
           {/* ── Success State ── */}
           {phase === "success" && (
-            <div style={{ background: "#fff", borderRadius: 20, padding: "40px 32px", textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", animation: "popIn .4s ease" }}>
+            <div style={{ background: "#fff", borderRadius: 20, padding: "32px 24px", textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", animation: "popIn .4s ease" }}>
               <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
                 <CheckCircle size={36} style={{ color: "#16A34A" }} />
               </div>
@@ -216,11 +240,13 @@ export default function LeadPendingPage() {
                 Your quote is ready!
               </h2>
               <p style={{ fontSize: 14, color: "#6B7280", margin: "0 0 24px" }}>
-                Here's your personalized cleaning estimate
+                Choose the level of clean that fits your needs
               </p>
 
-              {/* Quote card */}
-              {quoteData ? (
+              {/* Tier cards or fallback single price */}
+              {tiers ? (
+                <ServiceTierCards tiers={tiers} color={color} bookingUrl={bookingUrl} />
+              ) : quoteData ? (
                 <QuoteCard quote={quoteData} color={color} />
               ) : (
                 <div style={{ background: "#F9FAFB", borderRadius: 12, padding: "20px", marginBottom: 20, color: "#6B7280", fontSize: 14 }}>
@@ -228,25 +254,19 @@ export default function LeadPendingPage() {
                 </div>
               )}
 
-              {/* Email notice */}
-              <div style={{ background: "#F0FDF4", borderRadius: 12, padding: "14px 18px", marginBottom: 16, display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left" }}>
-                <Mail size={18} style={{ color: "#16A34A", flexShrink: 0, marginTop: 2 }} />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#166534", marginBottom: 2 }}>Full quote sent to {email}</div>
-                  <div style={{ fontSize: 12, color: "#15803D" }}>
-                    Your email includes booking times — click a slot to reserve your spot instantly.
-                  </div>
+              {/* Quote notes */}
+              {quoteData?.notes && !tiers && (
+                <div style={{
+                  fontSize: 13, color: "#374151", marginBottom: 16,
+                  padding: "12px 14px", background: "#F9FAFB",
+                  borderRadius: 10, fontStyle: "italic", lineHeight: 1.5, textAlign: "left",
+                }}>
+                  "{quoteData.notes}"
                 </div>
-              </div>
+              )}
 
-              {/* Urgency */}
-              <div style={{ background: "#FFF7ED", borderRadius: 12, padding: "12px 16px", fontSize: 12, color: "#92400E", textAlign: "left", display: "flex", gap: 10, marginBottom: 24 }}>
-                <Clock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>Booking slots fill up fast — click a time in the email to lock in your spot before it's taken.</span>
-              </div>
-
-              {/* CTAs */}
-              {bookingUrl && (
+              {/* Book Now — only shown when no tiers (tiers have their own CTAs) */}
+              {!tiers && bookingUrl && (
                 <a href={bookingUrl} style={{
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                   padding: "14px 24px", background: color, color: "#fff",
@@ -258,13 +278,26 @@ export default function LeadPendingPage() {
                   <ArrowRight size={16} />
                 </a>
               )}
-              <div style={{ fontSize: 13, color: "#9CA3AF" }}>
-                Or check your inbox for the booking link
+
+              {/* Email notice */}
+              <div style={{ background: "#F0FDF4", borderRadius: 12, padding: "14px 18px", marginBottom: 12, display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left" }}>
+                <Mail size={18} style={{ color: "#16A34A", flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#166534", marginBottom: 2 }}>Full quote sent to {email}</div>
+                  <div style={{ fontSize: 12, color: "#15803D" }}>
+                    Your email includes booking times — click a slot to reserve your spot instantly.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: "#FFF7ED", borderRadius: 12, padding: "12px 16px", fontSize: 12, color: "#92400E", textAlign: "left", display: "flex", gap: 10 }}>
+                <Clock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>Booking slots fill up fast — click a time in the email to lock in your spot before it's taken.</span>
               </div>
             </div>
           )}
 
-          {/* ── Timeout State (90s, no error) ── */}
+          {/* ── Timeout State ── */}
           {phase === "timeout" && (
             <div style={{ background: "#fff", borderRadius: 20, padding: "40px 32px", textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
               <div style={{ width: 72, height: 72, borderRadius: "50%", background: rgba(color, 0.1), display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
@@ -285,7 +318,7 @@ export default function LeadPendingPage() {
             </div>
           )}
 
-          {/* ── Error State (status = 'failed') ── */}
+          {/* ── Error State ── */}
           {phase === "error" && (
             <div style={{ background: "#fff", borderRadius: 20, padding: "40px 32px", textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
               <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#FEF2F2", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
@@ -297,9 +330,7 @@ export default function LeadPendingPage() {
               <p style={{ fontSize: 14, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.6 }}>
                 We had trouble generating your quote automatically. No worries —{" "}
                 <strong>{bizName}</strong> will follow up within 24 hours.
-                {bizPhone && (
-                  <> You can also call <strong>{bizPhone}</strong>.</>
-                )}
+                {bizPhone && <> You can also call <strong>{bizPhone}</strong>.</>}
               </p>
               <a href={`/request/${slug}`} style={{
                 display: "inline-flex", alignItems: "center", gap: 8,
@@ -339,7 +370,93 @@ export default function LeadPendingPage() {
   );
 }
 
-// ── Quote Card Component ──────────────────────────────────────────────────────
+// ── Service Tier Cards ────────────────────────────────────────────────────────
+
+function ServiceTierCards({ tiers, color, bookingUrl }: { tiers: ServiceTier[]; color: string; bookingUrl: string | null }) {
+  const tagColors: Record<string, { bg: string; text: string; border: string }> = {
+    Good:   { bg: "#F0FDF4", text: "#166534", border: "#86EFAC" },
+    Better: { bg: "#EFF6FF", text: "#1D4ED8", border: "#93C5FD" },
+    Best:   { bg: "#FDF4FF", text: "#7E22CE", border: "#D8B4FE" },
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
+      {tiers.map((tier, idx) => {
+        const isRecommended = tier.tag === "Better";
+        const tc = tagColors[tier.tag];
+        return (
+          <a
+            key={tier.id}
+            href={bookingUrl || "#"}
+            className="tier-card"
+            style={{
+              display: "block",
+              background: isRecommended ? rgba(color, 0.04) : "#FAFAFA",
+              border: isRecommended ? `2px solid ${color}` : "2px solid #E5E7EB",
+              borderRadius: 14,
+              padding: "16px 18px",
+              textDecoration: "none",
+              textAlign: "left",
+              position: "relative",
+              boxShadow: isRecommended ? `0 4px 16px ${rgba(color, 0.15)}` : "0 1px 4px rgba(0,0,0,0.06)",
+              animation: `popIn ${0.35 + idx * 0.1}s ease`,
+            }}
+          >
+            {isRecommended && (
+              <div style={{
+                position: "absolute", top: -11, left: "50%", transform: "translateX(-50%)",
+                background: color, color: "#fff", fontSize: 11, fontWeight: 700,
+                padding: "3px 12px", borderRadius: 20, letterSpacing: "0.04em",
+                whiteSpace: "nowrap",
+              }}>
+                MOST POPULAR
+              </div>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 20,
+                  background: tc.bg, color: tc.text, border: `1px solid ${tc.border}`,
+                  letterSpacing: "0.04em",
+                }}>
+                  {tier.tag === "Best" && <Star size={9} style={{ verticalAlign: "middle", marginRight: 3 }} />}
+                  {tier.tag}
+                </span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>{tier.name}</span>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <span style={{ fontSize: 17, fontWeight: 800, color: isRecommended ? color : "#111827" }}>
+                  ${tier.priceMin.toLocaleString()}
+                </span>
+                <span style={{ fontSize: 13, color: "#6B7280" }}> – ${tier.priceMax.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: 13, color: "#6B7280", margin: 0, lineHeight: 1.45 }}>
+              {tier.description}
+            </p>
+          </a>
+        );
+      })}
+
+      {bookingUrl && (
+        <a href={bookingUrl} style={{
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          padding: "15px 24px", background: color, color: "#fff",
+          borderRadius: 12, fontSize: 15, fontWeight: 700, textDecoration: "none",
+          marginTop: 4, boxShadow: `0 4px 12px ${rgba(color, 0.35)}`,
+        }}>
+          <Calendar size={16} />
+          Book Now
+          <ArrowRight size={16} />
+        </a>
+      )}
+    </div>
+  );
+}
+
+// ── Fallback Single Quote Card ────────────────────────────────────────────────
 
 function QuoteCard({ quote, color }: { quote: QuoteData; color: string }) {
   const priceStr =
@@ -351,41 +468,26 @@ function QuoteCard({ quote, color }: { quote: QuoteData; color: string }) {
     <div style={{
       background: `linear-gradient(135deg, ${rgba(color, 0.06)}, ${rgba(color, 0.12)})`,
       border: `2px solid ${rgba(color, 0.25)}`,
-      borderRadius: 16,
-      padding: "24px 20px",
-      textAlign: "center",
-      marginBottom: 20,
+      borderRadius: 16, padding: "24px 20px", textAlign: "center", marginBottom: 20,
       animation: "popIn .5s ease",
     }}>
-      {quote.cleanType && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 10 }}>
-          <Home size={14} style={{ color }} />
-          <span style={{ fontSize: 13, color, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            {quote.cleanType}
-          </span>
-        </div>
-      )}
-
       <div style={{ fontSize: 11, color: "#9CA3AF", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
         Your Quote
       </div>
       <div style={{ fontSize: 48, fontWeight: 900, color, lineHeight: 1, marginBottom: 4 }}>
         {priceStr}
       </div>
-
       {quote.quoteType === "range" && (
         <div style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>
           Final price confirmed before your appointment
         </div>
       )}
-
       {quote.estimatedDuration && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5, fontSize: 13, color: "#6B7280", marginTop: 8 }}>
           <Clock size={13} />
           Est. {quote.estimatedDuration}
         </div>
       )}
-
       {quote.notes && (
         <div style={{
           fontSize: 13, color: "#374151", marginTop: 14,
