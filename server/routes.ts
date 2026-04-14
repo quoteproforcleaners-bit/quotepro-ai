@@ -67,6 +67,7 @@ import businessRouter from "./routers/businessRouter";     // /api/business/*, /
 import aiRouter from "./routers/ai/index";                  // /api/ai/*, /api/send/*, /api/lead-finder/*
 import automationsRouter from "./routers/automationsRouter"; // /api/automations, /api/social/*, /api/streaks
 import integrationsRouter from "./routers/integrationsRouter"; // /api/google-calendar/*, /api/stripe/*, /api/api-keys, /api/webhook-endpoints, /api/internal/*
+import gbpRouter from "./routers/gbpRouter"; // /api/gbp/*
 
 // ─── Group C — hybrid routers with static pages (mounted at root) ─────────────
 import publicRouter from "./routers/publicRouter";         // /api/public/*, /q, /privacy, /terms, /calculators
@@ -159,6 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", aiRouter);
   app.use("/api", automationsRouter);
   app.use("/api", integrationsRouter);
+  app.use("/api/gbp", gbpRouter);
   app.use("/api", businessRouter);
 
   // 5. Mount Group C — hybrid routers at root (API + static pages)

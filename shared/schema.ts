@@ -231,6 +231,7 @@ export const quotes = pgTable("quotes", {
   stripeInvoiceId: text("stripe_invoice_id"),
   stripeInvoiceStatus: text("stripe_invoice_status"),
   stripeInvoiceSentAt: timestamp("stripe_invoice_sent_at"),
+  source: text("source").default("manual"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -1667,3 +1668,27 @@ export const bookedSlots = pgTable(
 );
 export type BookedSlot = typeof bookedSlots.$inferSelect;
 export type InsertBookedSlot = typeof bookedSlots.$inferInsert;
+
+// ─── Google Business Profile Integration ──────────────────────────────────────
+export const gbpConnections = pgTable("gbp_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at"),
+  accountId: varchar("account_id"),
+  locationId: varchar("location_id"),
+  locationName: varchar("location_name"),
+  connectedAt: timestamp("connected_at").defaultNow(),
+  lastSyncedAt: timestamp("last_synced_at"),
+});
+export type GbpConnection = typeof gbpConnections.$inferSelect;
+
+export const gbpLeads = pgTable("gbp_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  googleLeadId: varchar("google_lead_id", { length: 512 }).notNull(),
+  rawData: jsonb("raw_data"),
+  processedAt: timestamp("processed_at").defaultNow(),
+  quoteId: varchar("quote_id"),
+});

@@ -46,6 +46,7 @@ import {
   Home,
   ExternalLink,
   Users,
+  MapPin,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -2391,6 +2392,17 @@ export default function SettingsPage() {
               connectUrl="/api/google-calendar/connect"
               connectMethod="GET"
               disconnectUrl="/api/google-calendar/disconnect"
+              disconnectMethod="DELETE"
+              color="blue"
+            />
+            <IntegrationCard
+              name="Google Business Profile"
+              description="Auto-create draft quotes from reviews and Q&A on your Google listing"
+              icon={MapPin}
+              statusUrl="/api/gbp/status"
+              connectUrl="/api/gbp/connect"
+              connectMethod="GET"
+              disconnectUrl="/api/gbp/disconnect"
               disconnectMethod="DELETE"
               color="blue"
             />

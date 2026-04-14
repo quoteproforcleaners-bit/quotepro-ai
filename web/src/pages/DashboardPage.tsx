@@ -41,6 +41,7 @@ import {
  X,
  Crown,
  Gift,
+ MapPin,
 } from"lucide-react";
 import { Button, Badge, Card, CardHeader, ProgressBar, MetricRing, FunnelBar } from"../components/ui";
 import { type PlanTier } from"../lib/subscription";
@@ -1147,6 +1148,11 @@ export default function DashboardPage() {
  queryKey: ["/api/intake-requests/count"],
  refetchInterval: 60_000,
  });
+ const { data: gbpStatus } = useQuery<{ connected: boolean; unactionedDrafts: number; locationName: string }>({
+ queryKey: ["/api/gbp/status"],
+ refetchInterval: 5 * 60_000,
+ retry: false,
+ });
  const { data: autopilotSettings } = useQuery<{ autopilotEnabled: boolean }>({
  queryKey: ["/api/autopilot/settings"],
  retry: false,
@@ -1827,7 +1833,38 @@ export default function DashboardPage() {
  </div>
  ) : null}
 
- {/* 3. New Quote Requests banner */}
+ {/* 3. GBP leads banner */}
+ {(gbpStatus?.connected && (gbpStatus?.unactionedDrafts ?? 0) > 0) ? (
+ <button
+ onClick={() => navigate("/quotes?status=draft")}
+ className="w-full mb-4 rounded-2xl border border-blue-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-blue-300 transition-all text-left group"
+ >
+ <div className="px-5 py-4 flex items-center gap-4">
+ <div className="relative shrink-0">
+ <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center">
+ <MapPin className="w-5 h-5 text-blue-600"/>
+ </div>
+ <span
+ className="absolute -top-1.5 -right-1.5 flex items-center justify-center rounded-full bg-blue-500 text-white font-bold leading-none"
+ style={{ minWidth:"20px", height:"20px", fontSize:"11px", padding:"0 4px"}}
+ >
+ {(gbpStatus?.unactionedDrafts ?? 0) > 99 ? "99+" : gbpStatus?.unactionedDrafts}
+ </span>
+ </div>
+ <div className="flex-1 min-w-0">
+ <p className="font-bold text-slate-800 text-sm">
+ {gbpStatus?.unactionedDrafts === 1 ? "1 Google lead waiting for a quote" : `${gbpStatus?.unactionedDrafts} Google leads waiting for quotes`}
+ </p>
+ <p className="text-xs text-slate-500 mt-0.5">
+ Leads from your Google Business Profile — draft quotes are ready to send
+ </p>
+ </div>
+ <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors shrink-0"/>
+ </div>
+ </button>
+ ) : null}
+
+ {/* 3b. New Quote Requests banner */}
  {(intakeCountData?.newCount ?? 0) > 0 ? (
  <button
  onClick={() => navigate("/intake-requests")}

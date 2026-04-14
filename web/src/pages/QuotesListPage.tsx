@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Plus, FileText, ArrowUpDown, Sparkles, X } from "lucide-react";
+import { Plus, FileText, ArrowUpDown, Sparkles, X, MapPin } from "lucide-react";
 import {
   PageHeader,
   Card,
@@ -229,6 +229,12 @@ export default function QuotesListPage() {
                       <p className="font-medium text-slate-900">
                         {q.customerName || t("quotes.noCustomer")}
                       </p>
+                      {q.source === "gbp" ? (
+                        <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
+                          <MapPin className="w-2.5 h-2.5" />
+                          via Google Business Profile
+                        </span>
+                      ) : null}
                       <p className="text-xs text-slate-400 mt-0.5 md:hidden">
                         {getDaysSince(q.createdAt)}
                       </p>

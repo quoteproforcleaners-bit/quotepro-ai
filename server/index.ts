@@ -18,6 +18,7 @@ import { runAppointmentReminderScheduler, runTipRequestScheduler } from "./appoi
 import { runCleanerNotificationScheduler } from "./cleanerNotificationScheduler";
 import { seedPristineHomeDemo } from "./seedPristineDemo";
 import { initPortalTables, backfillPortalTokens } from "./routers/portalRouter";
+import { initGbpPoller } from "./gbpPoller";
 
 const app = express();
 const log = console.log;
@@ -847,6 +848,9 @@ async function seedToDoDemo() {
   // ─── Customer portal tables + token backfill ─────────────────────────────
   await initPortalTables();
   backfillPortalTokens().catch((e: any) => console.error("[portal] Backfill error:", e.message));
+
+  // ─── Google Business Profile lead poller ─────────────────────────────────
+  await initGbpPoller();
   // ─────────────────────────────────────────────────────────────────────────────
 
   // ─── Smart notification trigger scheduler: runs every 5 minutes ──────────
