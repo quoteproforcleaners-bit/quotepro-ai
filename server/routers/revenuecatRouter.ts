@@ -8,6 +8,12 @@ import { getStripe } from "../clients";
 
 const router = Router();
 
+// ── RevenueCat key helper ──────────────────────────────────────────────────
+// Supports both REVENUECAT_SECRET_KEY (preferred) and REVENUECAT_API_KEY (fallback)
+function getRcKey(): string | undefined {
+  return process.env.REVENUECAT_SECRET_KEY || process.env.REVENUECAT_API_KEY;
+}
+
 // ── Product ID → Tier mapping ──────────────────────────────────────────────
 const PRODUCT_TO_TIER: Record<string, string> = {
   "com.quotepro.starter": "starter",
@@ -220,9 +226,9 @@ export async function grantRevenueCatEntitlement(
   entitlementId: string,
   durationMonths: number = 1
 ): Promise<void> {
-  const rcSecretKey = process.env.REVENUECAT_SECRET_KEY;
+  const rcSecretKey = getRcKey();
   if (!rcSecretKey) {
-    console.warn("[RC] REVENUECAT_SECRET_KEY not set — skipping entitlement grant");
+    console.warn("[RC] No RevenueCat API key configured — skipping entitlement grant");
     return;
   }
 
@@ -253,7 +259,7 @@ export async function grantRevenueCatEntitlement(
  * Returns the verified tier string.
  */
 export async function syncRcUserTier(userId: string, rcUserId: string, force = false): Promise<string> {
-  const rcSecretKey = process.env.REVENUECAT_SECRET_KEY;
+  const rcSecretKey = getRcKey();
   if (!rcSecretKey || !rcUserId) return "unknown";
 
   // Skip if recently synced (unless forced)
@@ -287,9 +293,9 @@ export async function syncRcUserTier(userId: string, rcUserId: string, force = f
  * Called by the daily cron job.
  */
 export async function bulkSyncRcUsers(): Promise<void> {
-  const rcSecretKey = process.env.REVENUECAT_SECRET_KEY;
+  const rcSecretKey = getRcKey();
   if (!rcSecretKey) {
-    console.warn("[RC bulk sync] REVENUECAT_SECRET_KEY not set — skipping");
+    console.warn("[RC bulk sync] No RevenueCat API key configured — skipping");
     return;
   }
 
@@ -319,7 +325,7 @@ export async function bulkSyncRcUsers(): Promise<void> {
  * Get or create a RevenueCat subscriber and return their active tier.
  */
 export async function getRevenueCatTier(appUserId: string): Promise<string> {
-  const rcSecretKey = process.env.REVENUECAT_SECRET_KEY;
+  const rcSecretKey = getRcKey();
   if (!rcSecretKey) return "free";
 
   const resp = await fetch(

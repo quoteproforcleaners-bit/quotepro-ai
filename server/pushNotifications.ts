@@ -125,13 +125,31 @@ export async function sendPush(userId: string, notification: PushPayload): Promi
 
     const result = await response.json() as any;
     const tickets = Array.isArray(result.data) ? result.data : [result.data];
-    const errors = tickets.filter((t: any) => t?.status === "error");
-    if (errors.length > 0) {
-      console.warn("[push] Some tickets returned errors:", errors.map((e: any) => e.message));
+
+    // Clean up tokens that are no longer valid (unregistered device or bad credentials)
+    for (let i = 0; i < tickets.length; i++) {
+      const ticket = tickets[i];
+      if (ticket?.status === "error") {
+        const msg: string = ticket.message || "";
+        const isInvalid =
+          msg.includes("DeviceNotRegistered") ||
+          msg.includes("InvalidCredentials") ||
+          msg.includes("APNs credentials") ||
+          msg.includes("ExponentPushToken") && msg.includes("not registered");
+        if (isInvalid && tokens[i]) {
+          await pool.query("DELETE FROM push_tokens WHERE token = $1", [tokens[i]]).catch(() => {});
+          console.log(`[push] Removed invalid token for user ${userId}: ${msg.slice(0, 60)}`);
+        } else {
+          console.warn(`[push] Ticket error for user ${userId}: ${msg.slice(0, 100)}`);
+        }
+      }
     }
 
-    await logPushCommunication(userId, notification);
-    console.log(`[push] Sent "${notification.title}" to user ${userId} (${tokens.length} token(s))`);
+    const successCount = tickets.filter((t: any) => t?.status !== "error").length;
+    if (successCount > 0) {
+      await logPushCommunication(userId, notification);
+      console.log(`[push] Sent "${notification.title}" to user ${userId} (${successCount}/${tokens.length} token(s))`);
+    }
   } catch (err: any) {
     console.error("[push] sendPush failed silently:", err.message);
   }

@@ -607,8 +607,8 @@ const router = Router();
       }
 
       // Server-side verification with RevenueCat
-      // Only runs when REVENUECAT_SECRET_KEY is configured and appUserId is provided
-      const rcSecretKey = process.env.REVENUECAT_SECRET_KEY;
+      // Uses REVENUECAT_SECRET_KEY if set, falls back to REVENUECAT_API_KEY
+      const rcSecretKey = process.env.REVENUECAT_SECRET_KEY || process.env.REVENUECAT_API_KEY;
       if (rcSecretKey && appUserId) {
         try {
           const rcResp = await fetch(
@@ -646,7 +646,7 @@ const router = Router();
           return res.status(502).json({ message: "Subscription verification temporarily unavailable" });
         }
       } else if (!rcSecretKey) {
-        console.warn("REVENUECAT_SECRET_KEY not set — subscription sync proceeding without server-side verification");
+        console.warn("[RC] No API key configured — subscription sync proceeding without server-side verification");
       }
 
       const updatePayload: Record<string, any> = { subscriptionTier: tier, subscriptionPlatform: "revenuecat" };
