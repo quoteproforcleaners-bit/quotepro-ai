@@ -47,7 +47,7 @@ router.get("/status", requireAuth, async (req: Request, res: Response) => {
     // Unactioned GBP lead quotes
     const unactionedRes = await pool.query(
       `SELECT COUNT(*) AS count FROM quotes
-       WHERE business_id = (SELECT id FROM businesses WHERE owner_id = $1 LIMIT 1)
+       WHERE business_id = (SELECT id FROM businesses WHERE owner_user_id = $1 LIMIT 1)
        AND source = 'gbp' AND status = 'draft'`,
       [req.session.userId]
     );

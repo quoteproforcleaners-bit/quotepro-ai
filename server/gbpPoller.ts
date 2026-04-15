@@ -145,7 +145,7 @@ async function processLead(conn: GbpConn, googleLeadId: string, rawData: any) {
 
   // Get business for this user
   const bizRes = await pool.query(
-    `SELECT id FROM businesses WHERE owner_id = $1 LIMIT 1`,
+    `SELECT id FROM businesses WHERE owner_user_id = $1 LIMIT 1`,
     [conn.userId]
   );
   if (bizRes.rows.length === 0) return;
