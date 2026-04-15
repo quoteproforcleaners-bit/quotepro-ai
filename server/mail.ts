@@ -109,8 +109,8 @@ export async function sendEmail(opts: SendEmailOptions): Promise<void> {
 
 const CALENDLY_LINK = "https://calendly.com/mike-getquotepro/30min";
 
-function buildWelcomeEmailHtml(name: string | null): string {
-  const firstName = name?.split(" ")[0] || "there";
+function buildWelcomeEmailHtml(resolvedFirstName: string | null): string {
+  const firstName = resolvedFirstName || "there";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -566,11 +566,12 @@ export async function sendOwnerDailyRecap(pool: import("pg").Pool, periodLabel: 
  * Send a welcome email to a newly signed-up user.
  * Fire-and-forget — never throws. Logs errors only.
  */
-export function sendWelcomeEmail(email: string, name: string | null): void {
+export function sendWelcomeEmail(email: string, name: string | null, firstName?: string | null): void {
+  const resolvedFirstName = firstName?.trim() || (name ? name.split(" ")[0] : null) || null;
   sendEmail({
     to: email,
     subject: "Welcome to QuotePro — let's get you set up",
-    html: buildWelcomeEmailHtml(name),
+    html: buildWelcomeEmailHtml(resolvedFirstName),
     fromName: "Mike from QuotePro",
     replyTo: MIKE_EMAIL,
   }).catch((err) => {

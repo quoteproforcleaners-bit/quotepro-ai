@@ -145,6 +145,12 @@ const router = Router();
         signupIp,
       } as any);
 
+      // Save first_name to dedicated column for personalization
+      const firstNameVal = (firstName as string | undefined)?.trim() || null;
+      if (firstNameVal) {
+        pool.query("UPDATE users SET first_name = $1 WHERE id = $2", [firstNameVal, user.id]).catch(() => {});
+      }
+
       const business = await createBusiness(user.id);
       enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
       sendWelcomeEmail(email, user.name);
@@ -325,6 +331,12 @@ const router = Router();
         sendSignupNotification(email, user.name, "apple");
       }
 
+      // Backfill first_name from Apple profile if not yet set
+      pool.query(
+        "UPDATE users SET first_name = $1 WHERE id = $2 AND first_name IS NULL",
+        [parsedUser?.name?.firstName?.trim() || null, user.id]
+      ).catch(() => {});
+
       await new Promise<void>((resolve, reject) => {
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
@@ -401,6 +413,11 @@ const router = Router();
         enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
         sendWelcomeEmail(email, user.name);
         sendSignupNotification(email, user.name, "apple");
+        // Save first_name from Apple profile
+        pool.query(
+          "UPDATE users SET first_name = $1 WHERE id = $2 AND first_name IS NULL",
+          [fullName?.givenName?.trim() || null, user.id]
+        ).catch(() => {});
         await new Promise<void>((resolve, reject) => {
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
@@ -420,6 +437,11 @@ const router = Router();
       }
 
       const business = await getBusinessByOwner(user.id);
+      // Backfill first_name from Apple profile for existing users
+      pool.query(
+        "UPDATE users SET first_name = $1 WHERE id = $2 AND first_name IS NULL",
+        [fullName?.givenName?.trim() || null, user.id]
+      ).catch(() => {});
       await new Promise<void>((resolve, reject) => {
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
@@ -488,6 +510,12 @@ const router = Router();
         enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
         sendWelcomeEmail(email, user.name);
         sendSignupNotification(email, user.name, "google");
+        // Save first_name from Google profile
+        const googleFirstNameMobile = (payload.given_name || (name ? name.split(" ")[0] : "")).trim() || null;
+        pool.query(
+          "UPDATE users SET first_name = $1 WHERE id = $2 AND first_name IS NULL",
+          [googleFirstNameMobile, user.id]
+        ).catch(() => {});
         await new Promise<void>((resolve, reject) => {
           req.session.regenerate((err) => (err ? reject(err) : resolve()));
         });
@@ -507,6 +535,12 @@ const router = Router();
       }
 
       const business = await getBusinessByOwner(user.id);
+      // Backfill first_name from Google profile for existing users
+      const googleFirstNameMobileExisting = (payload.given_name || (name ? name.split(" ")[0] : "")).trim() || null;
+      pool.query(
+        "UPDATE users SET first_name = $1 WHERE id = $2 AND first_name IS NULL",
+        [googleFirstNameMobileExisting, user.id]
+      ).catch(() => {});
       await new Promise<void>((resolve, reject) => {
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
       });
@@ -628,6 +662,13 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
         const business = await getBusinessByOwner(user.id);
         needsOnboarding = !business?.onboardingComplete;
       }
+
+      // Backfill first_name from Google profile (new + returning users)
+      const googleFirstNameWeb = (payload.given_name || (name ? name.split(" ")[0] : "")).trim() || null;
+      pool.query(
+        "UPDATE users SET first_name = $1 WHERE id = $2 AND first_name IS NULL",
+        [googleFirstNameWeb, user.id]
+      ).catch(() => {});
 
       if (isWeb) {
         await new Promise<void>((resolve, reject) => {

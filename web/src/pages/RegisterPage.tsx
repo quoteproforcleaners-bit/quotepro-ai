@@ -199,8 +199,7 @@ export default function RegisterPage() {
                   type="text"
                   value={form.firstName}
                   onChange={set("firstName")}
-                  required
-                  placeholder="Your first name"
+                  placeholder="Your first name (optional)"
                   autoComplete="given-name"
                   className="w-full h-10 px-3.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
                 />

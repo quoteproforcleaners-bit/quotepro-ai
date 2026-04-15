@@ -986,6 +986,7 @@ async function seedToDoDemo() {
     try {
       await pool.query(`
         ALTER TABLE users
+          ADD COLUMN IF NOT EXISTS first_name text,
           ADD COLUMN IF NOT EXISTS first_quote_sent_at timestamptz,
           ADD COLUMN IF NOT EXISTS onboarding_nudge_sent boolean NOT NULL DEFAULT false
       `);

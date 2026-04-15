@@ -1318,6 +1318,7 @@ export function formatUser(u: any) {
     id: u.id,
     email: u.email,
     name: u.name,
+    firstName: u.firstName ?? u.first_name ?? null,
     subscriptionTier,
     trialExpired,
     createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
