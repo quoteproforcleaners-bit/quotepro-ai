@@ -11,7 +11,7 @@ import { processSentQuoteFollowUps } from "./quoteFollowUpScheduler";
 import { processDraftQuoteNudges } from "./draftQuoteNudge";
 import { processAutopilotJobs } from "./services/autopilotService";
 import { bulkSyncRcUsers } from "./routers/revenuecatRouter";
-import { processChurnSignals, computeAndUpdateChurnScores } from "./analytics";
+import { processChurnSignals, computeAndUpdateChurnScores, trackEvent } from "./analytics";
 import { sendPush } from "./pushNotifications";
 import { initNotificationTables, runNotificationScheduler } from "./notificationScheduler";
 import { runAppointmentReminderScheduler, runTipRequestScheduler } from "./appointmentReminderScheduler";
@@ -1059,6 +1059,144 @@ async function seedToDoDemo() {
     }, next7am.getTime() - now.getTime());
   }
   scheduleDunningCron();
+
+  // ─── Nightly crons: trial expiry + Stripe reconciliation (2:00 AM UTC) ──────
+  function scheduleNightlyCrons() {
+    function msUntilNext2amUtc(): number {
+      const now = new Date();
+      const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 2, 0, 0, 0));
+      if (next.getTime() <= now.getTime()) next.setUTCDate(next.getUTCDate() + 1);
+      return next.getTime() - now.getTime();
+    }
+
+    async function runTrialExpiryDowngrade() {
+      try {
+        // subscription_expires_at serves as the trial/subscription end date
+        const { rows } = await pool.query<{
+          id: string; email: string; name: string | null; subscription_tier: string;
+        }>(`
+          SELECT id, email, name, subscription_tier
+          FROM users
+          WHERE subscription_expires_at IS NOT NULL
+            AND subscription_expires_at < NOW()
+            AND (stripe_subscription_id IS NULL OR stripe_subscription_id = '')
+            AND subscription_tier NOT IN ('free', 'starter')
+        `);
+
+        if (rows.length === 0) {
+          console.log("[trial-expiry] No expired trials to downgrade");
+          return;
+        }
+        console.log(`[trial-expiry] Downgrading ${rows.length} expired trial(s)`);
+
+        const { sendEmail, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } = await import("./mail");
+        const { AnalyticsEvents } = await import("../shared/analytics-events");
+
+        for (const user of rows) {
+          const previousTier = user.subscription_tier;
+          await pool.query(
+            `UPDATE users
+             SET subscription_tier = 'starter',
+                 subscription_expires_at = NULL,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [user.id]
+          );
+          trackEvent(user.id, AnalyticsEvents.TRIAL_EXPIRED_DOWNGRADED, { previousTier }).catch(() => {});
+          sendEmail({
+            to: user.email,
+            fromEmail: PLATFORM_FROM_EMAIL,
+            fromName: PLATFORM_FROM_NAME,
+            subject: "Your QuotePro trial has ended",
+            html: `<p>Hi ${user.name || "there"},</p>
+<p>Your QuotePro trial has ended. You've been moved to the <strong>Starter plan</strong>, which keeps your account active with core quoting features.</p>
+<p>To unlock everything again — unlimited quotes, AI follow-ups, autopilot, and more — upgrade anytime at:</p>
+<p><a href="https://app.getquotepro.ai/app/pricing">app.getquotepro.ai/app/pricing</a></p>
+<p>Questions? Just reply to this email.</p>
+<p>— The QuotePro Team</p>`,
+            text: `Hi ${user.name || "there"},\n\nYour QuotePro trial has ended. You've been moved to the Starter plan.\n\nTo upgrade: https://app.getquotepro.ai/app/pricing\n\n— The QuotePro Team`,
+          }).catch((e: any) => console.error(`[trial-expiry] Email failed for ${user.email}:`, e.message));
+          console.log(`[trial-expiry] Downgraded ${user.email} from ${previousTier} → starter`);
+        }
+      } catch (e: any) {
+        console.error("[trial-expiry] Cron error:", e.message);
+      }
+    }
+
+    async function runStripeReconciliation() {
+      try {
+        const { getStripe } = await import("./clients");
+        const stripe = getStripe();
+        if (!stripe) {
+          console.log("[stripe-recon] Stripe not configured — skipping");
+          return;
+        }
+
+        const { rows } = await pool.query<{
+          id: string; email: string; subscription_tier: string; stripe_subscription_id: string;
+        }>(`
+          SELECT id, email, subscription_tier, stripe_subscription_id
+          FROM users
+          WHERE subscription_tier IN ('growth', 'pro')
+            AND stripe_subscription_id IS NOT NULL
+            AND stripe_subscription_id != ''
+        `);
+
+        if (rows.length === 0) {
+          console.log("[stripe-recon] No paid Stripe users to reconcile");
+          return;
+        }
+        console.log(`[stripe-recon] Reconciling ${rows.length} paid Stripe user(s)`);
+
+        const { AnalyticsEvents } = await import("../shared/analytics-events");
+        const BATCH_SIZE = 50;
+
+        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+          const batch = rows.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map(async (user) => {
+            try {
+              const sub = await stripe.subscriptions.retrieve(user.stripe_subscription_id);
+              if (sub.status !== "active" && sub.status !== "trialing") {
+                const previousTier = user.subscription_tier;
+                await pool.query(
+                  `UPDATE users SET subscription_tier = 'starter', updated_at = NOW() WHERE id = $1`,
+                  [user.id]
+                );
+                trackEvent(user.id, AnalyticsEvents.SUBSCRIPTION_RECONCILED_DOWNGRADED, {
+                  stripeStatus: sub.status,
+                  previousTier,
+                }).catch(() => {});
+                console.log(`[stripe-recon] Downgraded ${user.email} from ${previousTier} → starter (stripe status: ${sub.status})`);
+              }
+            } catch (e: any) {
+              console.error(`[stripe-recon] Failed to check subscription for ${user.email}:`, e.message);
+            }
+          }));
+          if (i + BATCH_SIZE < rows.length) {
+            await new Promise((r) => setTimeout(r, 100));
+          }
+        }
+        console.log("[stripe-recon] Reconciliation complete");
+      } catch (e: any) {
+        console.error("[stripe-recon] Cron error:", e.message);
+      }
+    }
+
+    async function runAllNightlyCrons() {
+      console.log("[nightly] Starting nightly crons (trial expiry + Stripe reconciliation)");
+      await runTrialExpiryDowngrade();
+      await runStripeReconciliation();
+      console.log("[nightly] Nightly crons complete");
+    }
+
+    const firstRun = msUntilNext2amUtc();
+    console.log(`[nightly] Crons scheduled — first run in ${Math.round(firstRun / 1000 / 60)} min`);
+    setTimeout(() => {
+      runAllNightlyCrons();
+      setInterval(runAllNightlyCrons, 24 * 60 * 60 * 1000);
+    }, firstRun);
+  }
+  scheduleNightlyCrons();
   // ─────────────────────────────────────────────────────────────────────────────
 
   const port = parseInt(process.env.PORT || "5000", 10);

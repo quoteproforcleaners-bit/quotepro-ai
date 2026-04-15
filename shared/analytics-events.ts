@@ -61,6 +61,10 @@ export const AnalyticsEvents = {
   CHURN_RISK_INACTIVE_TRIAL: "churn_risk_inactive_trial",
   CHURN_RISK_PAID_INACTIVE: "churn_risk_paid_inactive",
   CHURN_RISK_UPGRADE_ABANDONED: "churn_risk_upgrade_abandoned",
+
+  // ─── Nightly reconciliation ──────────────────────────────────────────────────
+  TRIAL_EXPIRED_DOWNGRADED: "trial_expired_downgraded",
+  SUBSCRIPTION_RECONCILED_DOWNGRADED: "subscription_reconciled_downgraded",
 } as const;
 
 export type AnalyticsEventName = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];
