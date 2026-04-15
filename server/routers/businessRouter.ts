@@ -600,57 +600,55 @@ const router = Router();
 
   router.post("/subscription/sync", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { tier, appUserId } = req.body;
-      const validTiers = ["free", "starter", "growth", "pro"];
-      if (!tier || !validTiers.includes(tier)) {
-        return res.status(400).json({ message: "Invalid tier" });
+      const { appUserId } = req.body;
+      // Client-sent tier is intentionally ignored — tier is determined solely by RevenueCat.
+
+      if (!appUserId) {
+        return res.status(400).json({ message: "appUserId is required" });
       }
 
-      // Server-side verification with RevenueCat
-      // Uses REVENUECAT_SECRET_KEY if set, falls back to REVENUECAT_API_KEY
       const rcSecretKey = process.env.REVENUECAT_SECRET_KEY || process.env.REVENUECAT_API_KEY;
-      if (rcSecretKey && appUserId) {
-        try {
-          const rcResp = await fetch(
-            `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`,
-            { headers: { Authorization: `Bearer ${rcSecretKey}` } }
-          );
-          if (!rcResp.ok) {
-            console.error("RevenueCat verification failed:", rcResp.status, "for appUserId:", appUserId);
-            return res.status(400).json({ message: "Could not verify subscription with RevenueCat" });
-          }
-          const rcData = await rcResp.json() as any;
-          const entitlements: Record<string, any> = rcData?.subscriber?.entitlements ?? {};
-
-          const isEntitlementActive = (id: string): boolean => {
-            const ent = entitlements[id];
-            if (!ent) return false;
-            if (!ent.expires_date) return true;
-            return new Date(ent.expires_date) > new Date();
-          };
-
-          // Map RC entitlements to the highest active tier
-          let verifiedTier = "free";
-          if (isEntitlementActive("pro")) verifiedTier = "pro";
-          else if (isEntitlementActive("growth")) verifiedTier = "growth";
-          else if (isEntitlementActive("starter")) verifiedTier = "starter";
-
-          // Client-requested tier must not exceed what RevenueCat confirms
-          const tierRank: Record<string, number> = { free: 0, starter: 1, growth: 2, pro: 3 };
-          if ((tierRank[tier] ?? 0) > (tierRank[verifiedTier] ?? 0)) {
-            console.warn(`RC sync tier escalation blocked: requested=${tier}, verified=${verifiedTier}, appUserId=${appUserId}`);
-            return res.status(403).json({ message: "Requested tier not verified by subscription provider" });
-          }
-        } catch (rcErr: any) {
-          console.error("RevenueCat API error during sync:", rcErr.message);
-          return res.status(502).json({ message: "Subscription verification temporarily unavailable" });
-        }
-      } else if (!rcSecretKey) {
-        console.warn("[RC] No API key configured — subscription sync proceeding without server-side verification");
+      if (!rcSecretKey) {
+        console.error("[RC] No secret key configured — cannot verify subscription");
+        return res.status(502).json({ message: "Subscription verification not available" });
       }
 
-      const updatePayload: Record<string, any> = { subscriptionTier: tier, subscriptionPlatform: "revenuecat" };
-      if (appUserId) updatePayload.revenuecatUserId = appUserId;
+      let verifiedTier: string;
+      try {
+        const rcResp = await fetch(
+          `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`,
+          { headers: { Authorization: `Bearer ${rcSecretKey}` } }
+        );
+        if (!rcResp.ok) {
+          console.error("[RC] Verification failed — status:", rcResp.status, "appUserId:", appUserId);
+          return res.status(502).json({ message: "Subscription verification failed — please try again" });
+        }
+        const rcData = await rcResp.json() as any;
+        const entitlements: Record<string, any> = rcData?.subscriber?.entitlements?.active ?? rcData?.subscriber?.entitlements ?? {};
+
+        const isEntitlementActive = (id: string): boolean => {
+          const ent = entitlements[id];
+          if (!ent) return false;
+          if (!ent.expires_date) return true;
+          return new Date(ent.expires_date) > new Date();
+        };
+
+        verifiedTier = "free";
+        if (isEntitlementActive("pro")) verifiedTier = "pro";
+        else if (isEntitlementActive("growth")) verifiedTier = "growth";
+        else if (isEntitlementActive("starter")) verifiedTier = "starter";
+
+        console.log(`[RC] sync verified: appUserId=${appUserId} → tier=${verifiedTier}`);
+      } catch (rcErr: any) {
+        console.error("[RC] API error during sync:", rcErr.message);
+        return res.status(502).json({ message: "Subscription verification temporarily unavailable" });
+      }
+
+      const updatePayload: Record<string, any> = {
+        subscriptionTier: verifiedTier,
+        subscriptionPlatform: "revenuecat",
+        revenuecatUserId: appUserId,
+      };
       const user = await updateUser(req.session.userId!, updatePayload as any);
       return res.json({ tier: user.subscriptionTier });
     } catch {
