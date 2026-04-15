@@ -436,6 +436,23 @@ const router = Router();
         [req.session.userId]
       ).catch(() => {});
 
+      // ── First-quote milestone: stamp timestamp + hoursAfterSignup analytics ──
+      pool.query<{ created_at: Date }>(
+        `UPDATE users SET first_quote_sent_at = NOW()
+         WHERE id = $1 AND first_quote_sent_at IS NULL
+         RETURNING created_at`,
+        [req.session.userId]
+      ).then((r) => {
+        if (r.rowCount && r.rowCount > 0) {
+          const createdAt = r.rows[0]?.created_at;
+          const hoursAfterSignup = createdAt
+            ? Math.round((Date.now() - new Date(createdAt).getTime()) / 36e5)
+            : 0;
+          trackEvent(req.session.userId!, AnalyticsEvents.FIRST_QUOTE_SENT, { hoursAfterSignup }).catch(() => {});
+        }
+      }).catch(() => {});
+      // ─────────────────────────────────────────────────────────────────────────
+
       await createCommunication({
         businessId: business.id,
         customerId: quote.customerId || undefined,

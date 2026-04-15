@@ -14,6 +14,7 @@ export const AnalyticsEvents = {
 
   // ─── Activation (first value moments) ──────────────────────────────────────
   ONBOARDING_COMPLETED: "onboarding_completed",
+  ONBOARDING_STALLED_72H: "onboarding_stalled_72h",
   FIRST_QUOTE_CREATED: "first_quote_created",
   FIRST_QUOTE_SENT: "first_quote_sent",
   FIRST_QUOTE_VIEWED_BY_CUSTOMER: "first_quote_viewed",

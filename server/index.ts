@@ -6,6 +6,7 @@ import * as path from "path";
 import bcrypt from "bcryptjs";
 import { pool } from "./db";
 import { processDripQueue, processActivationNudges, backfillReactivationEmails, fixAppleRelayEmailsUnreachable } from "./dripEmails";
+import { processOnboardingNudges } from "./onboardingNudge";
 import { sendOwnerDailyRecap } from "./mail";
 import { processSentQuoteFollowUps } from "./quoteFollowUpScheduler";
 import { processDraftQuoteNudges } from "./draftQuoteNudge";
@@ -913,6 +914,31 @@ async function seedToDoDemo() {
   }
   scheduleDraftQuoteNudgeCron();
 
+  // ─── Onboarding stall nudge: daily at 9am UTC ────────────────────────────
+  // Emails non-free users who signed up >72h ago and never sent a quote.
+  // Sends at most one email per user (onboarding_nudge_sent flag).
+  function scheduleOnboardingNudgeCron() {
+    function scheduleNext() {
+      const now = new Date();
+      const next = new Date();
+      next.setUTCHours(9, 0, 0, 0);
+      if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+      const ms = next.getTime() - now.getTime();
+      setTimeout(async () => {
+        try {
+          await processOnboardingNudges();
+        } catch (e: any) {
+          console.error("[onboarding-nudge] Cron failed:", e.message);
+        }
+        scheduleNext();
+      }, ms);
+    }
+    scheduleNext();
+  }
+  scheduleOnboardingNudgeCron();
+  console.log("[onboarding-nudge] Cron scheduled (daily 9am UTC)");
+  // ─────────────────────────────────────────────────────────────────────────
+
   // ─── Autopilot cron: advance pipeline every 15 minutes ───────────────────
   // Handles step1→step2 progression for enrolled leads where next_action_at <= NOW()
   function scheduleAutopilotCron() {
@@ -951,6 +977,20 @@ async function seedToDoDemo() {
       `);
     } catch (e: any) {
       console.error("[ai-agent] Failed to add ai_agent_calls_this_month column:", e.message);
+    }
+  })();
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ─── Onboarding signal columns ────────────────────────────────────────────
+  (async () => {
+    try {
+      await pool.query(`
+        ALTER TABLE users
+          ADD COLUMN IF NOT EXISTS first_quote_sent_at timestamptz,
+          ADD COLUMN IF NOT EXISTS onboarding_nudge_sent boolean NOT NULL DEFAULT false
+      `);
+    } catch (e: any) {
+      console.error("[onboarding] Failed to add onboarding columns:", e.message);
     }
   })();
   // ─────────────────────────────────────────────────────────────────────────
