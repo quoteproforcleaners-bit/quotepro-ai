@@ -129,8 +129,8 @@ const router = Router();
 
       const passwordHash = await bcrypt.hash(password, 12);
       const signupIp =
+        req.ip ||
         (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-        req.socket.remoteAddress ||
         null;
       // firstName takes precedence; fall back to legacy name param if present
       const resolvedName = (firstName as string | undefined)?.trim() || (name as string | undefined)?.trim() || null;

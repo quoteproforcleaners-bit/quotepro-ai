@@ -21,6 +21,7 @@ import { initPortalTables, backfillPortalTokens } from "./routers/portalRouter";
 import { initGbpPoller } from "./gbpPoller";
 
 const app = express();
+app.set("trust proxy", 1);
 const log = console.log;
 
 declare module "http" {
