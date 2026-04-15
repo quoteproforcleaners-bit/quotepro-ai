@@ -20,7 +20,7 @@ import {
  type GlassLevel,
  type TrafficLevel,
  TRAFFIC_LEVEL_MULTIPLIER,
-} from"../lib/pricingEngine";
+} from"shared/pricingEngine";
 import { CommercialLivePreview, LivePreviewPanel } from"../components/LiveQuotePreview";
 import type { ManualAdjustment } from"../components/LiveQuotePreview";
 import { Tooltip, LabelWithTooltip } from"../components/Tooltip";

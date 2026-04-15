@@ -26,7 +26,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { PageHeader, Card, CardHeader, Button, Badge, Alert } from "../components/ui";
-import { computeResidentialQuote } from "../lib/pricingEngine";
+import { computeResidentialQuote } from "shared/pricingEngine";
 import { ResidentialLivePreview, LivePreviewPanel } from "../components/LiveQuotePreview";
 import type { ManualAdjustment } from "../components/LiveQuotePreview";
 

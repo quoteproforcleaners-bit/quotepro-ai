@@ -5,7 +5,7 @@ import {
   TRAFFIC_LEVEL_MULTIPLIER,
   type FacilityType,
   type TrafficLevel,
-} from "../lib/pricingEngine";
+} from "shared/pricingEngine";
 import { PageHeader, Card, CardHeader } from "../components/ui";
 import {
   Settings, RefreshCw, Check, Info, ArrowLeft,

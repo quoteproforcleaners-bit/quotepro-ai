@@ -3,7 +3,7 @@
  * Sources: ISSA 2025 Cleaning Industry Benchmarks + BSCAI 2024 Market Survey.
  */
 
-import type { FacilityType } from "./pricingEngine";
+import type { FacilityType } from "shared/pricingEngine";
 
 // ─── National averages ($/sqft/month) ─────────────────────────────────────────
 

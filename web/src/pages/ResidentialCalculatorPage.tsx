@@ -13,7 +13,7 @@ import {
   DEFAULT_PRICING,
   ADD_ON_OPTIONS,
   type ResidentialProperty,
-} from "../lib/pricingEngine";
+} from "shared/pricingEngine";
 import {
   Home,
   ChevronRight,

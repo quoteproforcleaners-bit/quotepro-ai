@@ -22,7 +22,7 @@ import {
   type CommercialFrequency,
   type GlassLevel,
   type TrafficLevel,
-} from "../lib/pricingEngine";
+} from "shared/pricingEngine";
 import {
   Building2,
   ChevronRight,

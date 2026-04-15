@@ -9,7 +9,7 @@
 import { BadgeCheck, TrendingUp, TrendingDown, AlertTriangle, Info } from"lucide-react";
 import { Tooltip } from"./Tooltip";
 import { compareToBenchmark, benchmarkBadgeText, NATIONAL_AVERAGES, BENCHMARK_CITATIONS } from"../lib/benchmarks";
-import type { FacilityType } from"../lib/pricingEngine";
+import type { FacilityType } from"shared/pricingEngine";
 
 // ─── Residential benchmark data (HomeAdvisor / Angi 2026) ────────────────────
 

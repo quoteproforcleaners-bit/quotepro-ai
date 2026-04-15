@@ -16,7 +16,7 @@ import {
   ADD_ON_OPTIONS,
   DEFAULT_PRICING,
   type PricingSettings,
-} from "../lib/pricingEngine";
+} from "shared/pricingEngine";
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 

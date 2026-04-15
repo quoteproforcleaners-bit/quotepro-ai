@@ -6,8 +6,8 @@ import {
 } from"lucide-react";
 import type {
  ResidentialQuoteResult, CommercialQuoteResult, LineItem, Warning,
-} from"../lib/pricingEngine";
-import type { FacilityType } from"../lib/pricingEngine";
+} from"shared/pricingEngine";
+import type { FacilityType } from"shared/pricingEngine";
 import { compareToBenchmark, benchmarkBadgeText, BENCHMARK_CITATIONS, NATIONAL_AVERAGES } from"../lib/benchmarks";
 import { Tooltip, LabelWithTooltip } from"./Tooltip";
 import { CommercialBenchmarkBadge, ResidentialBenchmarkBadge } from"./BenchmarkBadge";
