@@ -11,7 +11,7 @@ import { sendEmail, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "./mail";
 import { trackEvent } from "./analytics";
 import { AnalyticsEvents } from "../shared/analytics-events";
 
-const APP_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
+const BASE_APP_URL = process.env.APP_URL || "https://getquotepro.ai/app";
 
 function getFirstName(name: string | null, email: string): string {
   if (name) {
@@ -77,7 +77,7 @@ function buildNudgeHtml(firstName: string, ctaUrl: string): string {
 }
 
 export async function processOnboardingNudges(): Promise<void> {
-  const ctaUrl = `${APP_URL}/app/quotes/new`;
+  const ctaUrl = `${BASE_APP_URL}/quotes/new`;
 
   const result = await pool.query<{
     id: number;

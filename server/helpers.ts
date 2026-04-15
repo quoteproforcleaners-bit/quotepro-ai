@@ -47,6 +47,8 @@ import { sendPush } from "./pushNotifications";
 import { trackEvent } from "./analytics";
 import { AnalyticsEvents } from "../shared/analytics-events";
 
+const BASE_APP_URL = process.env.APP_URL || "https://getquotepro.ai/app";
+
 const JOB_TYPE_EMAIL_LABEL: Record<string, string> = {
   regular: "Regular Clean",
   deep_clean: "Deep Clean",
@@ -2229,7 +2231,7 @@ export async function sendActivationNudges(): Promise<void> {
 
     if (!rows.length) return;
 
-    const appUrl = process.env.APP_URL || "https://app.getquotepro.ai";
+    const appUrl = BASE_APP_URL;
 
     for (const user of rows) {
       try {
@@ -2262,7 +2264,7 @@ export async function sendActivationNudges(): Promise<void> {
             It takes under a minute — type an address, pick your room count, and tap Send.
           </p>
           <table cellpadding="0" cellspacing="0"><tr><td>
-            <a href="${appUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;font-size:15px;font-weight:600;padding:13px 28px;border-radius:8px;text-decoration:none">
+            <a href="${appUrl}/quotes/new" style="display:inline-block;background:#2563eb;color:#ffffff;font-size:15px;font-weight:600;padding:13px 28px;border-radius:8px;text-decoration:none">
               Send my first quote
             </a>
           </td></tr></table>
@@ -2270,7 +2272,7 @@ export async function sendActivationNudges(): Promise<void> {
         <tr><td style="padding:20px 32px;border-top:1px solid #f1f5f9">
           <p style="margin:0;font-size:12px;color:#94a3b8">
             QuotePro &mdash; Built for residential cleaning pros.<br>
-            <a href="${appUrl}/unsubscribe" style="color:#94a3b8">Unsubscribe from these tips</a>
+            <a href="${appUrl}/settings" style="color:#94a3b8">Unsubscribe from these tips</a>
           </p>
         </td></tr>
       </table>
@@ -2283,7 +2285,7 @@ export async function sendActivationNudges(): Promise<void> {
               to: user.email,
               subject: `${firstName}, your first quote takes 60 seconds`,
               html,
-              text: `Hi ${firstName},\n\nYou signed up for QuotePro yesterday. Cleaning companies that send their first quote within 24 hours are 3x more likely to close their first job.\n\nIt takes under a minute — open the app, type an address, pick your room count, and tap Send.\n\n${appUrl}\n\nThe QuotePro Team`,
+              text: `Hi ${firstName},\n\nYou signed up for QuotePro yesterday. Cleaning companies that send their first quote within 24 hours are 3x more likely to close their first job.\n\nIt takes under a minute — open the app, type an address, pick your room count, and tap Send.\n\n${appUrl}/quotes/new\n\nThe QuotePro Team`,
               fromName: PLATFORM_FROM_NAME,
             });
           }
@@ -2331,7 +2333,7 @@ export async function sendActivationNudges(): Promise<void> {
             Don't let this one slip. It takes less than 60 seconds to send your first quote.
           </p>
           <table cellpadding="0" cellspacing="0"><tr><td>
-            <a href="${appUrl}" style="display:inline-block;background:#dc2626;color:#ffffff;font-size:15px;font-weight:600;padding:13px 28px;border-radius:8px;text-decoration:none">
+            <a href="${appUrl}/quotes/new" style="display:inline-block;background:#dc2626;color:#ffffff;font-size:15px;font-weight:600;padding:13px 28px;border-radius:8px;text-decoration:none">
               Send my first quote now
             </a>
           </td></tr></table>
@@ -2339,7 +2341,7 @@ export async function sendActivationNudges(): Promise<void> {
         <tr><td style="padding:20px 32px;border-top:1px solid #f1f5f9">
           <p style="margin:0;font-size:12px;color:#94a3b8">
             QuotePro &mdash; Built for residential cleaning pros.<br>
-            <a href="${appUrl}/unsubscribe" style="color:#94a3b8">Unsubscribe from these tips</a>
+            <a href="${appUrl}/settings" style="color:#94a3b8">Unsubscribe from these tips</a>
           </p>
         </td></tr>
       </table>
@@ -2352,7 +2354,7 @@ export async function sendActivationNudges(): Promise<void> {
               to: user.email,
               subject: `${firstName}, 2 hours left in your activation window`,
               html,
-              text: `Hi ${firstName},\n\nYour 72-hour activation window closes soon. Users who send at least one quote in the first 72 hours are 5x more likely to become paying customers.\n\nDon't let this one slip. It takes less than 60 seconds.\n\n${appUrl}\n\nThe QuotePro Team`,
+              text: `Hi ${firstName},\n\nYour 72-hour activation window closes soon. Users who send at least one quote in the first 72 hours are 5x more likely to become paying customers.\n\nDon't let this one slip. It takes less than 60 seconds.\n\n${appUrl}/quotes/new\n\nThe QuotePro Team`,
               fromName: PLATFORM_FROM_NAME,
             });
           }

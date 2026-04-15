@@ -17,6 +17,8 @@ export const MIKE_ALERTS_EMAIL   = "mquealy01@gmail.com";
 
 const SENDGRID_SEND_URL = "https://api.sendgrid.com/v3/mail/send";
 
+export const BASE_APP_URL = process.env.APP_URL || "https://getquotepro.ai/app";
+
 export interface MailAttachment {
   filename: string;
   content: Buffer | string;
@@ -245,9 +247,9 @@ function buildWelcomeEmailHtml(resolvedFirstName: string | null): string {
         <p style="font-size:14px;color:#374151;margin:0 0 4px;font-weight:600;">Mike &mdash; Founder, QuotePro</p>
         <p style="font-size:13px;color:#94a3b8;margin:0 0 16px;">Reply to this email anytime. I read every message.</p>
         <p style="font-size:12px;color:#cbd5e1;margin:0;">
-          <a href="https://app.getquotepro.ai" style="color:#94a3b8;text-decoration:none;">app.getquotepro.ai</a>
+          <a href="${BASE_APP_URL}" style="color:#94a3b8;text-decoration:none;">app.getquotepro.ai</a>
           &nbsp;&middot;&nbsp;
-          <a href="https://app.getquotepro.ai/settings" style="color:#94a3b8;text-decoration:none;">Manage preferences</a>
+          <a href="${BASE_APP_URL}/settings" style="color:#94a3b8;text-decoration:none;">Manage preferences</a>
         </p>
       </td>
     </tr>
