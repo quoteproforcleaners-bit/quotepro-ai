@@ -942,6 +942,19 @@ async function seedToDoDemo() {
     }
   })();
 
+  // ─── AI agent call counter column ────────────────────────────────────────
+  (async () => {
+    try {
+      await pool.query(`
+        ALTER TABLE users
+          ADD COLUMN IF NOT EXISTS ai_agent_calls_this_month integer NOT NULL DEFAULT 0
+      `);
+    } catch (e: any) {
+      console.error("[ai-agent] Failed to add ai_agent_calls_this_month column:", e.message);
+    }
+  })();
+  // ─────────────────────────────────────────────────────────────────────────
+
   function scheduleDunningCron() {
     async function runDunning() {
       try {

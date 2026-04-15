@@ -95,6 +95,10 @@ const router = Router();
         );
         console.log("Monthly reset: ai_follow_ups_used_this_month cleared");
         await pool.query(
+          "UPDATE users SET ai_agent_calls_this_month = 0 WHERE ai_agent_calls_this_month > 0"
+        );
+        console.log("Monthly reset: ai_agent_calls_this_month cleared");
+        await pool.query(
           "UPDATE users SET photo_quotes_used_this_month = 0 WHERE photo_quotes_used_this_month > 0"
         );
         console.log("Monthly reset: photo_quotes_used_this_month cleared");

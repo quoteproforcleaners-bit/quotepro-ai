@@ -352,6 +352,34 @@ ${contextStr}`;
       const message = sanitizeAndLog(req.body.message || "", req.session.userId!, "agent-chat");
       if (!message) return res.status(400).json({ message: "message is required" });
       if (!["business", "coach", "teach"].includes(mode)) return res.status(400).json({ message: "invalid mode" });
+
+      // ── Tier & monthly usage enforcement ─────────────────────────────────
+      const userId = req.session.userId!;
+      const userRow = await pool.query<{ subscription_tier: string; ai_agent_calls_this_month: number }>(
+        "SELECT subscription_tier, ai_agent_calls_this_month FROM users WHERE id = $1",
+        [userId]
+      );
+      const userTier = userRow.rows[0]?.subscription_tier || "free";
+      const callsThisMonth = userRow.rows[0]?.ai_agent_calls_this_month ?? 0;
+      const GROWTH_LIMIT = 100;
+      const isPro = userTier === "pro";
+
+      if (userTier === "free" || userTier === "starter") {
+        return res.status(403).json({
+          error: "upgrade_required",
+          message: "The AI assistant is a Growth+ feature. Upgrade to unlock it.",
+          upgradeUrl: "/app/pricing",
+        });
+      }
+      if (!isPro && callsThisMonth >= GROWTH_LIMIT) {
+        return res.status(403).json({
+          error: "monthly_ai_limit_reached",
+          message: "You have reached your 100 AI assistant sessions for this month. Upgrade to Pro for unlimited access.",
+          upgradeUrl: "/app/pricing",
+        });
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       trackEvent(req.session.userId!, AnalyticsEvents.AI_AGENT_OPENED, { mode }).catch(() => {});
       if (mode === "business") trackEvent(req.session.userId!, AnalyticsEvents.AI_AGENT_MY_BUSINESS_USED, {}).catch(() => {});
       else if (mode === "coach") trackEvent(req.session.userId!, AnalyticsEvents.AI_AGENT_COACH_USED, {}).catch(() => {});
@@ -638,6 +666,8 @@ SALES & MARKETING:
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-AI-Calls-Used", String(callsThisMonth + 1));
+        res.setHeader("X-AI-Calls-Limit", isPro ? "unlimited" : String(GROWTH_LIMIT));
         res.flushHeaders();
 
         try {
@@ -660,6 +690,10 @@ SALES & MARKETING:
           }
 
           res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+          pool.query(
+            "UPDATE users SET ai_agent_calls_this_month = ai_agent_calls_this_month + 1 WHERE id = $1",
+            [userId]
+          ).catch(() => {});
           res.end();
         } catch (err: any) {
           console.error("[agent-chat] Streaming error:", err.message);
@@ -684,6 +718,12 @@ SALES & MARKETING:
         console.error("AI agent chat error:", aiErr?.message || aiErr);
         reply = "I'm temporarily unavailable. Please try again in a moment.";
       }
+      res.set("X-AI-Calls-Used", String(callsThisMonth + 1));
+      res.set("X-AI-Calls-Limit", isPro ? "unlimited" : String(GROWTH_LIMIT));
+      pool.query(
+        "UPDATE users SET ai_agent_calls_this_month = ai_agent_calls_this_month + 1 WHERE id = $1",
+        [userId]
+      ).catch(() => {});
       return res.json({ reply, mode });
 
     } catch (error: any) {
