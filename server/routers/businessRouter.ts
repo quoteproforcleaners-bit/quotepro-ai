@@ -81,6 +81,12 @@ import { AnalyticsEvents } from "../../shared/analytics-events";
 
 const router = Router();
 
+// ── One-time column migrations for payment failure tracking ──────────────────
+pool.query(`
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_failed_at timestamptz;
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS payment_failure_count integer DEFAULT 0;
+`).catch((e: any) => console.error("[startup] payment failure column migration failed:", e.message));
+
   router.get("/business", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
@@ -1007,7 +1013,27 @@ const router = Router();
 
           break;
         }
-        case "customer.subscription.deleted":
+        case "customer.subscription.deleted": {
+          const deletedSub = event.data.object;
+          const deletedUserId = deletedSub.metadata?.userId;
+          if (deletedUserId) {
+            await updateUser(deletedUserId, {
+              subscriptionTier: "starter",
+              subscriptionExpiresAt: new Date(),
+              stripeSubscriptionId: deletedSub.id,
+              stripeSubscriptionStatus: deletedSub.status,
+              subscriptionPlatform: null,
+              subscriptionSyncedAt: new Date(),
+            } as any);
+            await pool.query(
+              `UPDATE users SET payment_failed_at = NULL, payment_failure_count = 0 WHERE id = $1`,
+              [deletedUserId]
+            );
+            console.log(`[webhook] subscription.deleted → user ${deletedUserId} downgraded to starter, payment failure fields reset`);
+          }
+          break;
+        }
+
         case "customer.subscription.updated": {
           const subscription = event.data.object;
           const userId = subscription.metadata?.userId;
@@ -1015,14 +1041,14 @@ const router = Router();
             const isActive = subscription.status === "active" || subscription.status === "trialing";
             const planFromMeta = subscription.metadata?.plan || "growth";
             await updateUser(userId, {
-              subscriptionTier: isActive ? planFromMeta : "free",
+              subscriptionTier: isActive ? planFromMeta : "starter",
               subscriptionExpiresAt: isActive ? null : new Date(),
               stripeSubscriptionId: subscription.id,
               stripeSubscriptionStatus: subscription.status,
               subscriptionPlatform: isActive ? "stripe" : null,
               subscriptionSyncedAt: new Date(),
             } as any);
-            console.log(`Subscription ${isActive ? "active (" + planFromMeta + ")" : "cancelled"} for user ${userId}`);
+            console.log(`[webhook] subscription.updated → user ${userId} ${isActive ? "active (" + planFromMeta + ")" : "downgraded to starter"}`);
           }
           break;
         }
@@ -1059,36 +1085,74 @@ const router = Router();
             }
             break;
           }
-          // ── Subscription invoice payment failed (existing logic) ──────────
+          // ── Subscription invoice payment failed ───────────────────────────
           const stripeCustomerId = invoice.customer as string;
           if (stripeCustomerId) {
             try {
-              const userResult = await pool.query(
-                "SELECT id, email, name FROM users WHERE stripe_customer_id = $1 LIMIT 1",
+              const userResult = await pool.query<{
+                id: string; email: string; name: string | null; payment_failure_count: number;
+              }>(
+                `SELECT id, email, name, COALESCE(payment_failure_count, 0) AS payment_failure_count
+                 FROM users WHERE stripe_customer_id = $1 LIMIT 1`,
                 [stripeCustomerId]
               );
               if (userResult.rows.length > 0) {
                 const failedUser = userResult.rows[0];
-                const { sendEmail, getBusinessSendParams } = await import("../mail");
-                const business = await getBusinessByOwner(failedUser.id);
-                const sendParams = business ? getBusinessSendParams(business) : null;
+                const newCount = (failedUser.payment_failure_count ?? 0) + 1;
+
+                await pool.query(
+                  `UPDATE users
+                   SET payment_failed_at = NOW(),
+                       payment_failure_count = $1,
+                       updated_at = NOW()
+                   WHERE id = $2`,
+                  [newCount, failedUser.id]
+                );
+
+                trackEvent(failedUser.id, AnalyticsEvents.PAYMENT_FAILED, { attempt: newCount }).catch(() => {});
+
+                const { sendEmail, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } = await import("../mail");
+                const billingUrl = `${process.env.EXPO_PUBLIC_DOMAIN || "https://app.getquotepro.ai"}/app/billing`;
                 await sendEmail({
                   to: failedUser.email,
-                  from: sendParams?.from,
-                  subject: "Action needed: Payment issue with your QuotePro subscription",
+                  fromEmail: PLATFORM_FROM_EMAIL,
+                  fromName: PLATFORM_FROM_NAME,
+                  subject: "Action required: update your QuotePro payment method",
                   html: `<div style="font-family:sans-serif;max-width:520px;margin:0 auto">
 <h2 style="color:#0f172a">Payment failed</h2>
 <p>Hi ${failedUser.name || "there"},</p>
-<p>We had trouble processing your most recent QuotePro payment. To keep your account active, please update your payment method.</p>
-<p><a href="${process.env.EXPO_PUBLIC_DOMAIN || "https://quotepro.ai"}/app/settings" style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">Update payment method</a></p>
-<p style="color:#64748b;font-size:0.875rem">If you believe this is an error, reply to this email and we'll help you right away.</p>
+<p>We weren't able to process your most recent QuotePro payment (attempt ${newCount}). To keep your account active, please update your payment method.</p>
+<p><a href="${billingUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600">Update payment method</a></p>
+<p style="color:#64748b;font-size:0.875rem">If you believe this is an error, reply to this email and we'll sort it out immediately.</p>
 </div>`,
-                  text: `Hi ${failedUser.name || "there"}, your recent QuotePro payment failed. Please update your payment method at: ${process.env.EXPO_PUBLIC_DOMAIN || "https://quotepro.ai"}/app/settings`,
+                  text: `Hi ${failedUser.name || "there"},\n\nYour QuotePro payment failed (attempt ${newCount}). Please update your payment method at: ${billingUrl}\n\n— The QuotePro Team`,
                 });
-                console.log(`Payment failed email sent to user ${failedUser.id}`);
+                console.log(`[webhook] invoice.payment_failed → user ${failedUser.id}, attempt ${newCount}`);
               }
-            } catch (emailErr: any) {
-              console.error("Failed to send payment_failed email:", emailErr.message);
+            } catch (e: any) {
+              console.error("[webhook] invoice.payment_failed handler error:", e.message);
+            }
+          }
+          break;
+        }
+
+        case "invoice.payment_succeeded": {
+          const paidInvoice = event.data.object as any;
+          // Only handle subscription invoices (not one-off quote invoices)
+          if (paidInvoice.subscription && paidInvoice.customer) {
+            try {
+              await pool.query(
+                `UPDATE users
+                 SET payment_failed_at = NULL,
+                     payment_failure_count = 0,
+                     updated_at = NOW()
+                 WHERE stripe_customer_id = $1
+                   AND (payment_failure_count > 0 OR payment_failed_at IS NOT NULL)`,
+                [paidInvoice.customer]
+              );
+              console.log(`[webhook] invoice.payment_succeeded → payment failure fields reset for customer ${paidInvoice.customer}`);
+            } catch (e: any) {
+              console.error("[webhook] invoice.payment_succeeded reset error:", e.message);
             }
           }
           break;

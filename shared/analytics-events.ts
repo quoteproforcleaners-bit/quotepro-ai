@@ -65,6 +65,9 @@ export const AnalyticsEvents = {
   // ─── Nightly reconciliation ──────────────────────────────────────────────────
   TRIAL_EXPIRED_DOWNGRADED: "trial_expired_downgraded",
   SUBSCRIPTION_RECONCILED_DOWNGRADED: "subscription_reconciled_downgraded",
+
+  // ─── Payment lifecycle ───────────────────────────────────────────────────────
+  PAYMENT_FAILED: "payment_failed",
 } as const;
 
 export type AnalyticsEventName = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];
