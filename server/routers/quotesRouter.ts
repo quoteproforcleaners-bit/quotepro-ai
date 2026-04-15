@@ -387,6 +387,9 @@ const router = Router();
   router.post("/quotes/:id/send", requireAuth, async (req: Request, res: Response) => {
     try {
       const { channel, content } = req.body;
+      if (channel === "sms") {
+        return res.status(400).json({ error: "SMS is not available. Please use email." });
+      }
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
@@ -437,7 +440,7 @@ const router = Router();
         businessId: business.id,
         customerId: quote.customerId || undefined,
         quoteId: quote.id,
-        channel: channel || "sms",
+        channel: channel || "email",
         content: content || "",
         status: "sent",
       });
@@ -450,7 +453,7 @@ const router = Router();
           const firstStep = (rules?.followupSchedule as any[])?.[0];
           const delayMinutes = firstStep?.delayMinutes ?? 1440;
           const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000);
-          const followupChannel = rules?.followupChannel || channel || "sms";
+          const followupChannel = rules?.followupChannel || channel || "email";
           await createCommunication({
             businessId: business.id,
             customerId: quote.customerId || undefined,
@@ -1303,7 +1306,10 @@ The email should:
       if (!quote) return res.status(404).json({ message: "Quote not found" });
       const customer = quote.customerId ? await getCustomerById(quote.customerId) : null;
       const business = await db_getBusinessById(quote.businessId);
-      const channel = req.body.channel || "sms";
+      const channel = req.body.channel || "email";
+      if (channel === "sms") {
+        return res.status(400).json({ error: "SMS is not available. Please use email." });
+      }
       const draft = await generateFollowUpMessage(quote, customer, business, channel);
       return res.json({ draft });
     } catch (error: any) {

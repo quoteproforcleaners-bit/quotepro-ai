@@ -575,32 +575,8 @@ router.post("/api/portal/send-link", async (req: Request, res: Response) => {
     const token = await getOrCreatePortalToken(customerId, business.id);
     const portalUrl = `${getPublicBaseUrl(req)}/home/${token}`;
 
-    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-
-    if (!twilioSid || !twilioToken || !twilioFrom) {
-      // Return the URL anyway so the owner can share it manually
-      return res.json({ success: true, portalUrl, smsSent: false });
-    }
-
-    const msg = `Hi ${customer.first_name}! ${business.company_name} has set up your personal cleaning portal. View your upcoming cleans, photos & more: ${portalUrl}`;
-    const toPhone = customer.phone.replace(/\D/g, "");
-    const normalizedPhone = toPhone.startsWith("1") ? `+${toPhone}` : `+1${toPhone}`;
-
-    const twilioRes = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64")}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({ From: twilioFrom, To: normalizedPhone, Body: msg }).toString(),
-      }
-    );
-
-    return res.json({ success: true, portalUrl, smsSent: twilioRes.ok });
+    // SMS sending has been removed. Return the portal URL so the owner can share it manually or via email.
+    return res.json({ success: true, portalUrl, smsSent: false });
   } catch (e: any) {
     console.error("[portal] send-link error:", e.message);
     return res.status(500).json({ message: "Failed to send portal link" });

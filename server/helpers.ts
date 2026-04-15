@@ -621,28 +621,7 @@ export async function sendFollowUpNow(commId: string, req: Request): Promise<{ s
       return { success: false, message: "Email could not be delivered. Please try again or contact support." };
     }
   } else {
-    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-    if (!twilioSid || !twilioToken || !twilioFrom) return { success: false, message: "SMS service not configured" };
-    const toPhone = customer?.phone;
-    if (!toPhone) return { success: false, message: "Customer phone not found" };
-    const quoteUrl = `${process.env.APP_URL || `https://${req.get("host")}`}/q/${quote.publicToken}`;
-    const smsText = `${messageText}\n${quoteUrl}`;
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
-    const twilioRes = await fetch(twilioUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({ From: twilioFrom, To: toPhone, Body: smsText }).toString(),
-    });
-    if (!twilioRes.ok) {
-      const errText = await twilioRes.text();
-      console.error("Follow-up SMS error:", twilioRes.status, errText);
-      return { success: false, message: "Failed to send follow-up SMS" };
-    }
+    return { success: false, message: "SMS is not available. Please use email for customer follow-ups." };
   }
 
   await updateCommunication(commId, { status: "sent", sentAt: new Date(), content: messageText });
@@ -801,29 +780,8 @@ export async function processPendingFollowUps() {
           continue;
         }
       } else {
-        const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-        const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-        const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-        const toPhone = customer?.phone;
-        if (!twilioSid || !twilioToken || !twilioFrom || !toPhone) {
-          await updateCommunication(comm.id, { status: "failed", errorMessage: !toPhone ? "No customer phone" : "Twilio not configured" });
-          continue;
-        }
-        const quoteUrl = `${process.env.APP_URL || "https://quotepro.app"}/q/${quote.publicToken}`;
-        const smsText = `${messageText}\n${quoteUrl}`;
-        const twilioRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
-          method: "POST",
-          headers: {
-            "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({ From: twilioFrom, To: toPhone, Body: smsText }).toString(),
-        });
-        if (!twilioRes.ok) {
-          const errText = await twilioRes.text();
-          await updateCommunication(comm.id, { status: "failed", errorMessage: errText.slice(0, 200) });
-          continue;
-        }
+        await updateCommunication(comm.id, { status: "failed", errorMessage: "SMS is not available. Customer communication is email-only." });
+        continue;
       }
       await updateCommunication(comm.id, { status: "sent", sentAt: new Date(), content: messageText });
       sent++;
@@ -2337,33 +2295,13 @@ export async function sendActivationNudges(): Promise<void> {
           continue; // one nudge per user per run
         }
 
-        // ── 48 h — SMS ────────────────────────────────────────────────────────
+        // ── 48 h — (SMS removed — channel was Twilio, now skipped) ──────────
         if (ageH >= 48 && !user.activation_nudge_48h_sent) {
-          if (!user.sms_opted_out && user.phone) {
-            const twilioSid   = process.env.TWILIO_ACCOUNT_SID;
-            const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-            const twilioFrom  = process.env.TWILIO_PHONE_NUMBER;
-            if (twilioSid && twilioToken && twilioFrom) {
-              const body = `Hi ${firstName}! Your QuotePro trial is halfway through. Have you sent a quote yet? It takes under a minute: ${appUrl} Reply STOP to opt out.`;
-              await fetch(
-                `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-                {
-                  method: "POST",
-                  headers: {
-                    Authorization: "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
-                    "Content-Type": "application/x-www-form-urlencoded",
-                  },
-                  body: new URLSearchParams({ To: user.phone, From: twilioFrom, Body: body }).toString(),
-                },
-              ).catch((e) => console.error("[activation-nudge] SMS 48h error:", e));
-            }
-          }
-
           await pool.query(
             `UPDATE users SET activation_nudge_48h_sent = true WHERE id = $1`,
             [user.id],
           );
-          trackEvent(user.id, AnalyticsEvents.ACTIVATION_NUDGE_48H_SENT, { channel: "sms" }).catch(() => {});
+          trackEvent(user.id, AnalyticsEvents.ACTIVATION_NUDGE_48H_SENT, { channel: "none" }).catch(() => {});
           continue; // one nudge per user per run
         }
 

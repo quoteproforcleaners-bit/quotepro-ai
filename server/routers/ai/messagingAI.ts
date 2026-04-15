@@ -389,7 +389,7 @@ router.post("/ai/generate-message", requireAuth, async (req: Request, res: Respo
     const customerName = sanitizeAndLog(req.body.customerName || "", req.session.userId!, "generate-message-customer");
     const companyName = sanitizeAndLog(req.body.companyName || "", req.session.userId!, "generate-message-company");
     const senderName = sanitizeAndLog(req.body.senderName || "", req.session.userId!, "generate-message-sender");
-    const msgType = (channel || "sms") as string;
+    const msgType = (channel || "email") as string;
     const purposeInstruction = SHARED_PURPOSE_DESCRIPTIONS[purpose] || `purpose: ${purpose}`;
 
     const genMsgBusiness = await getBusinessByOwner(req.session.userId!);

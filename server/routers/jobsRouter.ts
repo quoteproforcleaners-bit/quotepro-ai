@@ -508,43 +508,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
       if (!business) return res.status(404).json({ message: "Business not found" });
       const { channel, toPhone, toEmail, toName, message, subject } = req.body;
       if (channel === "sms") {
-        if (!toPhone) return res.status(400).json({ message: "Phone number required" });
-        const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-        const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-        const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-        if (!twilioSid || !twilioToken || !twilioFrom) {
-          return res.status(503).json({ message: "SMS is not configured. Add TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN to your environment secrets to enable text messaging." });
-        }
-        // Normalize to E.164 format (+1XXXXXXXXXX for US numbers)
-        const digitsOnly = toPhone.replace(/\D/g, "");
-        let normalizedPhone = toPhone;
-        if (digitsOnly.length === 10) {
-          normalizedPhone = `+1${digitsOnly}`;
-        } else if (digitsOnly.length === 11 && digitsOnly.startsWith("1")) {
-          normalizedPhone = `+${digitsOnly}`;
-        } else if (!toPhone.startsWith("+")) {
-          normalizedPhone = `+${digitsOnly}`;
-        }
-        console.log(`[Dispatch SMS] Sending to: ${normalizedPhone} from: ${twilioFrom}`);
-        const twilioRes = await fetch(
-          `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-          {
-            method: "POST",
-            headers: {
-              "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({ From: twilioFrom, To: normalizedPhone, Body: message }).toString(),
-          }
-        );
-        const twilioBody = await twilioRes.json() as any;
-        if (!twilioRes.ok) {
-          console.error("Dispatch SMS error:", twilioRes.status, JSON.stringify(twilioBody));
-          const twilioMsg = twilioBody?.message || twilioBody?.error_message || "Failed to deliver SMS";
-          return res.status(500).json({ message: `SMS failed: ${twilioMsg}` });
-        }
-        console.log(`[Dispatch SMS] Success — SID: ${twilioBody.sid}, Status: ${twilioBody.status}`);
-        return res.json({ success: true, recipient: toName || normalizedPhone });
+        return res.status(400).json({ error: "SMS is not available. Please use email." });
       } else if (channel === "email") {
         if (!toEmail) return res.status(400).json({ message: "Email required" });
         const sendParams = getBusinessSendParams(business);
@@ -963,53 +927,7 @@ async function resolveEmployeeId(ref: string, businessId: string): Promise<strin
 
       // ── SMS ────────────────────────────────────────────────────────────────
       if (channels.includes("sms")) {
-        const toPhone = customer?.phone;
-        if (!toPhone) {
-          results.sms = { success: false, message: "No phone number on file" };
-        } else {
-          const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-          const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-          const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
-          if (!twilioSid || !twilioToken || !twilioFrom) {
-            results.sms = { success: false, message: "SMS service not configured" };
-          } else {
-            const smsParts = [
-              `Hi ${customerFirstName} — your ${serviceLabel} is confirmed`,
-              dateStr ? ` for ${dateStr}` : "",
-              arrivalWindow ? ` with an arrival window of ${arrivalWindow}` : "",
-              address ? ` at ${address}` : "",
-              `. Reply with any questions. – ${senderName}`,
-            ];
-            const smsBody = smsParts.join("").slice(0, 160);
-            const twilioRes = await fetch(
-              `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: new URLSearchParams({ From: twilioFrom, To: toPhone, Body: smsBody }).toString(),
-              }
-            );
-            if (!twilioRes.ok) {
-              const errText = await twilioRes.text();
-              console.error("Confirmation SMS error:", twilioRes.status, errText);
-              results.sms = { success: false, message: "Failed to send SMS" };
-            } else {
-              results.sms = { success: true, message: "SMS sent" };
-              await createCommunication({
-                businessId: business.id,
-                customerId: customer?.id || undefined,
-                jobId: job.id,
-                channel: "sms",
-                content: smsBody,
-                templateKey: "appointment_confirmation",
-                status: "sent",
-              });
-            }
-          }
-        }
+        results.sms = { success: false, message: "SMS is not available. Please use email." };
       }
 
       // ── Email ──────────────────────────────────────────────────────────────
