@@ -444,27 +444,36 @@ pool.query(`
 
   router.post("/communications/:id/send-now", requireAuth, async (req: Request, res: Response) => {
     try {
-      // Starter AI follow-up quota: 3/month taste
       const user = await getUserById(req.session.userId!);
-      if (user && user.subscriptionTier === "starter") {
+      if (!user) return res.status(401).json({ message: "Not authenticated" });
+
+      // Autopilot entitlement check — source of truth is the DB column
+      if (!(user as any).autopilotEnabled) {
+        return res.status(403).json({
+          error: "autopilot_not_enabled",
+          upgradeUrl: "/app/pricing",
+        });
+      }
+
+      // Starter AI follow-up quota: 3/month taste
+      if (user.subscriptionTier === "starter") {
         const used = (user as any).aiFollowUpsUsedThisMonth ?? 0;
         if (used >= 3) {
           return res.status(403).json({
             error: "limit_reached",
             message: "You've used your 3 AI follow-ups for this month. Upgrade to Growth for unlimited AI follow-ups.",
-            upgradeUrl: "/pricing",
+            upgradeUrl: "/app/pricing",
             used,
             limit: 3,
           });
         }
-        // Increment counter after success below
       }
 
       const result = await sendFollowUpNow(req.params.id, req);
       if (!result.success) return res.status(400).json({ message: result.message });
 
       // Atomic increment for Starter users — avoids race condition
-      if (user && user.subscriptionTier === "starter") {
+      if (user.subscriptionTier === "starter") {
         await pool.query(
           "UPDATE users SET ai_follow_ups_used_this_month = ai_follow_ups_used_this_month + 1 WHERE id = $1",
           [user.id]
@@ -885,6 +894,25 @@ pool.query(`
             trackEvent(userId, AnalyticsEvents.UPGRADE_COMPLETED, { plan: planMeta, interval: intervalMeta }).catch(() => {});
             console.log(`Subscription activated for user ${userId} on plan ${planMeta}`);
 
+            // Autopilot entitlement: Pro always gets it; Growth gets it if add-on price is in session
+            const autopilotPriceId = process.env.STRIPE_AUTOPILOT_PRICE_ID;
+            if (planMeta === "pro") {
+              await pool.query("UPDATE users SET autopilot_enabled = true WHERE id = $1", [userId]);
+            } else if (session.metadata?.type === "autopilot_addon") {
+              await pool.query("UPDATE users SET autopilot_enabled = true WHERE id = $1", [userId]);
+            } else if (autopilotPriceId && session.subscription) {
+              try {
+                const stripeClient = getStripe();
+                if (stripeClient) {
+                  const sub = await stripeClient.subscriptions.retrieve(session.subscription as string);
+                  const hasAutopilot = sub.items.data.some((item: any) => item.price?.id === autopilotPriceId);
+                  await pool.query("UPDATE users SET autopilot_enabled = $1 WHERE id = $2", [hasAutopilot, userId]);
+                }
+              } catch (apErr: any) {
+                console.error("[webhook] Autopilot price check failed:", apErr.message);
+              }
+            }
+
             // Notify Mike of the new payment (fire-and-forget)
             getUserById(userId).then((paidUser) => {
               if (paidUser) {
@@ -1049,6 +1077,19 @@ pool.query(`
               subscriptionSyncedAt: new Date(),
             } as any);
             console.log(`[webhook] subscription.updated → user ${userId} ${isActive ? "active (" + planFromMeta + ")" : "downgraded to starter"}`);
+
+            // Autopilot entitlement sync
+            const autopilotPriceId = process.env.STRIPE_AUTOPILOT_PRICE_ID;
+            if (!isActive) {
+              await pool.query("UPDATE users SET autopilot_enabled = false WHERE id = $1", [userId]);
+            } else if (planFromMeta === "pro") {
+              await pool.query("UPDATE users SET autopilot_enabled = true WHERE id = $1", [userId]);
+            } else if (autopilotPriceId) {
+              const hasAutopilot = (subscription.items?.data ?? []).some(
+                (item: any) => item.price?.id === autopilotPriceId
+              );
+              await pool.query("UPDATE users SET autopilot_enabled = $1 WHERE id = $2", [hasAutopilot, userId]);
+            }
           }
           break;
         }

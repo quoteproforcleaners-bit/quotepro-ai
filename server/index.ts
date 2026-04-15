@@ -988,7 +988,8 @@ async function seedToDoDemo() {
         ALTER TABLE users
           ADD COLUMN IF NOT EXISTS first_name text,
           ADD COLUMN IF NOT EXISTS first_quote_sent_at timestamptz,
-          ADD COLUMN IF NOT EXISTS onboarding_nudge_sent boolean NOT NULL DEFAULT false
+          ADD COLUMN IF NOT EXISTS onboarding_nudge_sent boolean NOT NULL DEFAULT false,
+          ADD COLUMN IF NOT EXISTS autopilot_enabled boolean NOT NULL DEFAULT false
       `);
     } catch (e: any) {
       console.error("[onboarding] Failed to add onboarding columns:", e.message);
@@ -1153,6 +1154,7 @@ async function seedToDoDemo() {
             `UPDATE users
              SET subscription_tier = 'starter',
                  subscription_expires_at = NULL,
+                 autopilot_enabled = false,
                  updated_at = NOW()
              WHERE id = $1`,
             [user.id]
@@ -1214,7 +1216,7 @@ async function seedToDoDemo() {
               if (sub.status !== "active" && sub.status !== "trialing") {
                 const previousTier = user.subscription_tier;
                 await pool.query(
-                  `UPDATE users SET subscription_tier = 'starter', updated_at = NOW() WHERE id = $1`,
+                  `UPDATE users SET subscription_tier = 'starter', autopilot_enabled = false, updated_at = NOW() WHERE id = $1`,
                   [user.id]
                 );
                 trackEvent(user.id, AnalyticsEvents.SUBSCRIPTION_RECONCILED_DOWNGRADED, {

@@ -1326,6 +1326,7 @@ export function formatUser(u: any) {
     createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
     activeLocationId: u.activeLocationId ?? u.active_location_id ?? null,
     isMultiLocationEnabled: !!(u.isMultiLocationEnabled ?? u.is_multi_location_enabled ?? false),
+    autopilotEnabled: !!(u.autopilotEnabled ?? u.autopilot_enabled ?? false),
   };
 }
 
