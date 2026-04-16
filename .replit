@@ -79,14 +79,11 @@ ensurePreviewReachable = "/status"
 
 [userenv.shared]
 TWILIO_PHONE_NUMBER = "+19047887925"
-QBO_ENCRYPTION_KEY = "e7439fed61c39dd5eb27f3242fb7fb7954db5d08a682371c5ffb269be807993f"
 JOBBER_CLIENT_ID = "e7801669-3119-4785-9668-e041e35324ad"
 ENABLE_JOBBER_INTEGRATION = "true"
 EXPO_PUBLIC_REVENUECAT_API_KEY = "appl_knabujvvumnLXQVLBCGIcyDScWl"
 SENDGRID_FROM_EMAIL = "quote@getquotepro.ai"
 CUSTOM_DOMAIN = "app.getquotepro.ai"
-ADMIN_GRANT_PRO_SECRET = "qp-admin-2024-xK9m"
-ADMIN_TEST_KEY = "qp-admin-test-2024"
 ADMIN_EMAILS = "mquealy01@gmail.com"
 
 [userenv.production]
