@@ -1152,7 +1152,7 @@ pool.query(`
 
                 trackEvent(failedUser.id, AnalyticsEvents.PAYMENT_FAILED, { attempt: newCount }).catch(() => {});
 
-                const { sendEmail, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } = await import("../mail");
+                const { sendEmail, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME, MIKE_ALERTS_EMAIL } = await import("../mail");
                 const billingUrl = `${process.env.EXPO_PUBLIC_DOMAIN || "https://app.getquotepro.ai"}/app/billing`;
                 await sendEmail({
                   to: failedUser.email,
@@ -1169,6 +1169,27 @@ pool.query(`
                   text: `Hi ${failedUser.name || "there"},\n\nYour QuotePro payment failed (attempt ${newCount}). Please update your payment method at: ${billingUrl}\n\n— The QuotePro Team`,
                 });
                 console.log(`[webhook] invoice.payment_failed → user ${failedUser.id}, attempt ${newCount}`);
+
+                // Alert Mike immediately — fire and forget
+                const invoiceAmount = invoice.amount_due ? `$${(invoice.amount_due / 100).toFixed(2)}` : "unknown amount";
+                sendEmail({
+                  to: MIKE_ALERTS_EMAIL,
+                  fromEmail: PLATFORM_FROM_EMAIL,
+                  fromName: "QuotePro Alerts",
+                  subject: `Payment failed — ${failedUser.name || failedUser.email} (attempt ${newCount})`,
+                  html: `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px">
+<h2 style="color:#dc2626;margin:0 0 16px">Payment Failed</h2>
+<table style="width:100%;border-collapse:collapse;font-size:14px">
+  <tr><td style="color:#64748b;padding:6px 0;width:140px">Customer</td><td style="font-weight:600">${failedUser.name || "—"}</td></tr>
+  <tr><td style="color:#64748b;padding:6px 0">Email</td><td>${failedUser.email}</td></tr>
+  <tr><td style="color:#64748b;padding:6px 0">Amount</td><td style="font-weight:600">${invoiceAmount}</td></tr>
+  <tr><td style="color:#64748b;padding:6px 0">Attempt #</td><td>${newCount}</td></tr>
+  <tr><td style="color:#64748b;padding:6px 0">Stripe Customer</td><td><a href="https://dashboard.stripe.com/customers/${stripeCustomerId}">${stripeCustomerId}</a></td></tr>
+</table>
+<p style="margin:20px 0 0;color:#64748b;font-size:13px">The customer has been emailed to update their payment method. If this reaches attempt 3, the nightly reconciliation cron will downgrade them to Starter.</p>
+</div>`,
+                  text: `Payment failed\n\nCustomer: ${failedUser.name || failedUser.email}\nEmail: ${failedUser.email}\nAmount: ${invoiceAmount}\nAttempt: ${newCount}\nStripe: https://dashboard.stripe.com/customers/${stripeCustomerId}`,
+                }).catch(() => {});
               }
             } catch (e: any) {
               console.error("[webhook] invoice.payment_failed handler error:", e.message);
