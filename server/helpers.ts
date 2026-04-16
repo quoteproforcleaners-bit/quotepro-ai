@@ -2023,10 +2023,15 @@ export async function generateRecurringJobs(): Promise<void> {
       stripe_payment_method_id: string | null;
       default_price: number | null;
       customer_id: string | null;
+      stripe_account_id: string | null;
+      stripe_onboarding_complete: boolean;
     }>(`
-      SELECT id, business_id, auto_charge, stripe_payment_method_id, default_price, customer_id
-      FROM recurring_clean_series
-      WHERE status = 'active'
+      SELECT rcs.id, rcs.business_id, rcs.auto_charge, rcs.stripe_payment_method_id,
+             rcs.default_price, rcs.customer_id,
+             b.stripe_account_id, b.stripe_onboarding_complete
+      FROM recurring_clean_series rcs
+      JOIN businesses b ON b.id = rcs.business_id
+      WHERE rcs.status = 'active'
     `);
 
     if (!activeSeries.length) return;
@@ -2040,7 +2045,8 @@ export async function generateRecurringJobs(): Promise<void> {
         await generateSeriesJobs(series.id, 7);
 
         // Auto-charge: find newly-created unpaid jobs within the next 7 days
-        if (series.auto_charge && series.stripe_payment_method_id && stripe) {
+        if (series.auto_charge && series.stripe_payment_method_id && stripe
+            && series.stripe_account_id && series.stripe_onboarding_complete) {
           const amountCents = series.default_price ? Math.round(series.default_price * 100) : 0;
           if (amountCents <= 0) continue;
 
@@ -2070,7 +2076,7 @@ export async function generateRecurringJobs(): Promise<void> {
                 confirm: true,
                 automatic_payment_methods: { enabled: false },
                 metadata: { jobId: job.id, seriesId: series.id },
-              });
+              }, { stripeAccount: series.stripe_account_id });
 
               if (intent.status === "succeeded") {
                 await pool.query(

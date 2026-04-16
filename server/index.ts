@@ -1009,15 +1009,22 @@ async function seedToDoDemo() {
           stripe_payment_method_id: string;
           default_price: number | null;
           charge_failure_count: number;
+          stripe_account_id: string | null;
+          stripe_onboarding_complete: boolean;
         }>(`
-          SELECT id, business_id, customer_id, stripe_payment_method_id, default_price, charge_failure_count
-          FROM recurring_clean_series
-          WHERE auto_charge = true
-            AND stripe_payment_method_id IS NOT NULL
-            AND status = 'active'
-            AND charge_failure_count BETWEEN 1 AND 2
-            AND last_charge_failed_at IS NOT NULL
-            AND EXTRACT(DAY FROM (NOW() - last_charge_failed_at)) IN (1, 3, 7)
+          SELECT rcs.id, rcs.business_id, rcs.customer_id, rcs.stripe_payment_method_id,
+                 rcs.default_price, rcs.charge_failure_count,
+                 b.stripe_account_id, b.stripe_onboarding_complete
+          FROM recurring_clean_series rcs
+          JOIN businesses b ON b.id = rcs.business_id
+          WHERE rcs.auto_charge = true
+            AND rcs.stripe_payment_method_id IS NOT NULL
+            AND rcs.status = 'active'
+            AND rcs.charge_failure_count BETWEEN 1 AND 2
+            AND rcs.last_charge_failed_at IS NOT NULL
+            AND EXTRACT(DAY FROM (NOW() - rcs.last_charge_failed_at)) IN (1, 3, 7)
+            AND b.stripe_account_id IS NOT NULL
+            AND b.stripe_onboarding_complete = true
         `);
 
         if (!dunningSeries.length) return;
@@ -1048,7 +1055,7 @@ async function seedToDoDemo() {
               confirm: true,
               automatic_payment_methods: { enabled: false },
               metadata: { jobId: job.id, seriesId: series.id, dunning: "true" },
-            });
+            }, { stripeAccount: series.stripe_account_id });
 
             if (intent.status === "succeeded") {
               await pool.query(
