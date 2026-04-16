@@ -455,34 +455,53 @@ pool.query(`
         });
       }
 
-      // Starter AI follow-up quota: 3/month taste
+      // Starter AI follow-up quota: atomic pre-increment prevents both
+      // race conditions (two concurrent requests) and retry abuse after failures.
       if (user.subscriptionTier === "starter") {
-        const used = (user as any).aiFollowUpsUsedThisMonth ?? 0;
-        if (used >= 3) {
+        const incrementResult = await pool.query(
+          `UPDATE users
+           SET ai_follow_ups_used_this_month = ai_follow_ups_used_this_month + 1
+           WHERE id = $1 AND ai_follow_ups_used_this_month < 3
+           RETURNING ai_follow_ups_used_this_month`,
+          [user.id]
+        );
+
+        if (!incrementResult.rows.length) {
           return res.status(403).json({
             error: "limit_reached",
             message: "You've used your 3 AI follow-ups for this month. Upgrade to Growth for unlimited AI follow-ups.",
             upgradeUrl: "/app/pricing",
-            used,
+            used: 3,
             limit: 3,
           });
         }
       }
 
       const result = await sendFollowUpNow(req.params.id, req);
-      if (!result.success) return res.status(400).json({ message: result.message });
 
-      // Atomic increment for Starter users — avoids race condition
-      if (user.subscriptionTier === "starter") {
+      // Roll back the pre-increment if the send failed so the slot isn't wasted
+      if (!result.success && user.subscriptionTier === "starter") {
         await pool.query(
-          "UPDATE users SET ai_follow_ups_used_this_month = ai_follow_ups_used_this_month + 1 WHERE id = $1",
+          "UPDATE users SET ai_follow_ups_used_this_month = ai_follow_ups_used_this_month - 1 WHERE id = $1",
           [user.id]
         );
+        return res.status(400).json({ message: result.message });
       }
+
+      if (!result.success) return res.status(400).json({ message: result.message });
 
       return res.json({ success: true, message: result.message });
     } catch (error: any) {
       console.error("Send follow-up now error:", error);
+      // Roll back the pre-increment if an unexpected exception prevented sending.
+      // Condition on subscription_tier = 'starter' so this is a no-op for other tiers.
+      if (req.session.userId) {
+        await pool.query(
+          `UPDATE users SET ai_follow_ups_used_this_month = ai_follow_ups_used_this_month - 1
+           WHERE id = $1 AND subscription_tier = 'starter'`,
+          [req.session.userId]
+        ).catch(() => {});
+      }
       return res.status(500).json({ message: "Failed to send follow-up" });
     }
   });
