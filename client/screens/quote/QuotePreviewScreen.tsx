@@ -366,9 +366,14 @@ export default function QuotePreviewScreen({
       });
       const data = await res.json();
       console.log("[AI Price Check] Response:", JSON.stringify(data).slice(0, 300));
-      if (data.good && data.better && data.best) {
+      if (
+        data.good?.price && typeof data.good.price === "number" &&
+        data.better?.price && typeof data.better.price === "number" &&
+        data.best?.price && typeof data.best.price === "number"
+      ) {
         setAiPricing(data);
       } else {
+        console.warn("[AI Price Check] Invalid response structure:", data);
         setAiPricingError("Could not analyze pricing. Tap to retry.");
       }
     } catch (err: any) {
