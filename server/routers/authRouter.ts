@@ -143,10 +143,12 @@ const router = Router();
       }
 
       const passwordHash = await bcrypt.hash(password, 12);
-      const signupIp =
-        req.ip ||
-        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-        null;
+      // req.ip is populated by Express from the trusted proxy chain
+      // (trust proxy: 1 is set in index.ts). Never fall back to the raw
+      // X-Forwarded-For header — clients can forge it to any value,
+      // which would let them spoof their signup IP and bypass the
+      // same-IP referral fraud check.
+      const signupIp = req.ip || null;
       // firstName takes precedence; fall back to legacy name param if present
       const resolvedName = (firstName as string | undefined)?.trim() || (name as string | undefined)?.trim() || null;
       const user = await createUser({
