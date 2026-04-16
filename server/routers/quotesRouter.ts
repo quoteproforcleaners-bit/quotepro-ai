@@ -34,7 +34,7 @@ import {
   getBusinessByOwner, createBusiness, updateBusiness,
   getPricingByBusiness, upsertPricingSettings,
   getCustomersByBusiness, getCustomerById, createCustomer, updateCustomer, deleteCustomer,
-  getQuotesByBusiness, getQuoteById, getQuoteByToken, createQuote, updateQuote,
+  getQuotesWithCustomersByBusiness, getQuotesByBusiness, getQuoteById, getQuoteByToken, createQuote, updateQuote,
   deleteQuote as deleteQuoteRow,
   getLineItemsByQuote, createLineItem, deleteLineItemsByQuote,
   getJobsByBusiness, getJobById, createJob, updateJob, deleteJob,
@@ -88,17 +88,7 @@ const router = Router();
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
       const { status, customerId } = req.query as any;
-      const list = await getQuotesByBusiness(business.id, { status, customerId });
-      const customerIds = [...new Set(list.filter(q => q.customerId).map(q => q.customerId!))];
-      const customerMap: Record<string, string> = {};
-      for (const cid of customerIds) {
-        const c = await getCustomerById(cid);
-        if (c) customerMap[cid] = `${c.firstName} ${c.lastName}`.trim();
-      }
-      const enriched = list.map(q => ({
-        ...q,
-        customerName: q.customerId ? (customerMap[q.customerId] || null) : null,
-      }));
+      const enriched = await getQuotesWithCustomersByBusiness(business.id, { status, customerId });
       return res.json(enriched);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get quotes" });

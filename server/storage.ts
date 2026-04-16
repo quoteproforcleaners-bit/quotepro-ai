@@ -388,6 +388,37 @@ export async function getQuotesByBusiness(
     .orderBy(desc(quotes.createdAt));
 }
 
+/**
+ * Fetches quotes for a business joined with their customer name in a single
+ * query — replaces the former 1+N loop (1 quotes query + N customer lookups).
+ */
+export async function getQuotesWithCustomersByBusiness(
+  businessId: string,
+  opts?: { status?: string; customerId?: string }
+): Promise<(QuoteRow & { customerName: string | null })[]> {
+  const conditions = [eq(quotes.businessId, businessId), isNull(quotes.deletedAt)];
+  if (opts?.status) conditions.push(eq(quotes.status, opts.status));
+  if (opts?.customerId) conditions.push(eq(quotes.customerId, opts.customerId));
+
+  const rows = await db
+    .select({
+      quote: quotes,
+      firstName: customers.firstName,
+      lastName: customers.lastName,
+    })
+    .from(quotes)
+    .leftJoin(customers, eq(quotes.customerId, customers.id))
+    .where(and(...conditions))
+    .orderBy(desc(quotes.createdAt));
+
+  return rows.map(({ quote, firstName, lastName }) => ({
+    ...quote,
+    customerName: firstName || lastName
+      ? `${firstName ?? ""} ${lastName ?? ""}`.trim()
+      : null,
+  }));
+}
+
 export async function getQuoteById(id: string): Promise<QuoteRow | undefined> {
   const [q] = await db.select().from(quotes).where(and(eq(quotes.id, id), isNull(quotes.deletedAt)));
   if (!q) return undefined;
