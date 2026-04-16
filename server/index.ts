@@ -1,5 +1,6 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
@@ -24,6 +25,18 @@ import { acquireLock, releaseLock } from "./lockManager";
 
 const app = express();
 app.set("trust proxy", 1);
+
+// Security headers — HSTS, X-Frame-Options, X-Content-Type-Options, etc.
+// CSP disabled: Stripe.js + Expo web require broad script/connect-src rules that
+// are better managed explicitly when we harden CSP properly.
+// COEP disabled: Expo web assets are cross-origin; enabling it breaks font/image loads.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
 const log = console.log;
 
 declare module "http" {
