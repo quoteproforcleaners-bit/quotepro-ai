@@ -108,6 +108,21 @@ const router = Router();
         return res.status(400).json({ message: "Email and password are required" });
       }
 
+      if (password.length < 10) {
+        return res.status(400).json({ message: "Password must be at least 10 characters" });
+      }
+
+      const COMMON_PASSWORDS = [
+        "password", "password1", "password12", "password123",
+        "123456789", "1234567890", "12345678901",
+        "qwertyuiop", "qwerty123",
+        "iloveyou1", "admin12345", "welcome123",
+        "letmein123", "monkey1234", "dragon12345",
+      ];
+      if (COMMON_PASSWORDS.includes(password.toLowerCase())) {
+        return res.status(400).json({ message: "Please choose a stronger password" });
+      }
+
       const existing = await getUserByEmail(email);
       if (existing) {
         return res.status(409).json({ message: "An account with this email already exists" });

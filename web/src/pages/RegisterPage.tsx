@@ -39,6 +39,10 @@ export default function RegisterPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
+    if (form.password.length < 10) {
+      setError("Password must be at least 10 characters");
+      return;
+    }
     setLoading(true);
     try {
       await register({ ...form, ...(intent ? { intent } : {}) });
