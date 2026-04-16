@@ -17,7 +17,7 @@ export const MIKE_ALERTS_EMAIL   = "mquealy01@gmail.com";
 
 const SENDGRID_SEND_URL = "https://api.sendgrid.com/v3/mail/send";
 
-export const BASE_APP_URL = process.env.APP_URL || "https://getquotepro.ai/app";
+export const BASE_APP_URL = process.env.APP_URL || "https://app.getquotepro.ai/app";
 
 export interface MailAttachment {
   filename: string;

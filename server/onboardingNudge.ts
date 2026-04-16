@@ -11,7 +11,7 @@ import { sendEmail, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "./mail";
 import { trackEvent } from "./analytics";
 import { AnalyticsEvents } from "../shared/analytics-events";
 
-const BASE_APP_URL = process.env.APP_URL || "https://getquotepro.ai/app";
+const BASE_APP_URL = process.env.APP_URL || "https://app.getquotepro.ai/app";
 
 function getFirstName(name: string | null, email: string): string {
   if (name) {

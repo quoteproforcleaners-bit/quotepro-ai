@@ -47,7 +47,7 @@ import { sendPush } from "./pushNotifications";
 import { trackEvent } from "./analytics";
 import { AnalyticsEvents } from "../shared/analytics-events";
 
-const BASE_APP_URL = process.env.APP_URL || "https://getquotepro.ai/app";
+const BASE_APP_URL = process.env.APP_URL || "https://app.getquotepro.ai/app";
 
 const JOB_TYPE_EMAIL_LABEL: Record<string, string> = {
   regular: "Regular Clean",
