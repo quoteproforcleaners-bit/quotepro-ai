@@ -879,13 +879,27 @@ pool.query(`
         return res.status(400).send(`Webhook Error: ${err.message}`);
       }
 
-      // Log every incoming webhook event for audit purposes
-      pool.query(
-        `INSERT INTO stripe_webhook_log (event_id, event_type, payload, processed_at)
-         VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (event_id) DO NOTHING`,
-        [event.id, event.type, JSON.stringify(event.data.object)]
-      ).catch((e: any) => console.error("[webhook-log] Failed to log event:", e.message));
+      // Idempotency gate: insert BEFORE processing so Stripe retries are no-ops.
+      // RETURNING event_id is empty when the event was already inserted (ON CONFLICT DO NOTHING).
+      let logResult: { rows: { event_id: string }[] };
+      try {
+        logResult = await pool.query(
+          `INSERT INTO stripe_webhook_log (event_id, event_type, payload, processed_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (event_id) DO NOTHING
+           RETURNING event_id`,
+          [event.id, event.type, JSON.stringify(event.data.object)]
+        );
+      } catch (logErr: any) {
+        // Table may not exist yet (first deploy) — fall through and process anyway
+        console.error("[webhook-log] Failed to log event:", logErr.message);
+        logResult = { rows: [{ event_id: event.id }] }; // treat as new
+      }
+
+      if (!logResult.rows.length) {
+        console.log(`[webhook] Duplicate event ${event.id} (${event.type}) — skipping`);
+        return res.status(200).send("Event already processed");
+      }
 
       switch (event.type) {
         case "checkout.session.completed": {
