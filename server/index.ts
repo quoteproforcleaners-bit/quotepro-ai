@@ -20,6 +20,7 @@ import { runCleanerNotificationScheduler } from "./cleanerNotificationScheduler"
 import { seedPristineHomeDemo } from "./seedPristineDemo";
 import { initPortalTables, backfillPortalTokens } from "./routers/portalRouter";
 import { initGbpPoller } from "./gbpPoller";
+import { acquireLock, releaseLock } from "./lockManager";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -548,6 +549,23 @@ async function seedToDoDemo() {
 
   setupErrorHandler(app);
 
+  // ─── Distributed cron lock table ─────────────────────────────────────────────
+  (async () => {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS job_locks (
+          job_name   VARCHAR(100) PRIMARY KEY,
+          locked_at  TIMESTAMP NOT NULL,
+          locked_by  VARCHAR(200) NOT NULL,
+          expires_at TIMESTAMP NOT NULL
+        )
+      `);
+    } catch (e: any) {
+      console.error("[job-locks] Failed to create job_locks table:", e.message);
+    }
+  })();
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // ─── Demo accounts ────────────────────────────────────────────────────────────
   seedPristineHomeDemo();
 
@@ -578,7 +596,10 @@ async function seedToDoDemo() {
 
   // Run once at startup (catches any overdue records), then every 24 hours
   purgeSoftDeleted();
-  setInterval(purgeSoftDeleted, 24 * 60 * 60 * 1000);
+  setInterval(async () => {
+    if (!await acquireLock("purge-soft-deleted", 30)) return;
+    try { await purgeSoftDeleted(); } finally { await releaseLock("purge-soft-deleted"); }
+  }, 24 * 60 * 60 * 1000);
 
   // Analytics events TTL cleanup is scheduled via node-cron in server/routes.ts
   // (daily at 2am: "0 2 * * *") — no duplicate scheduler here.
@@ -591,8 +612,9 @@ async function seedToDoDemo() {
   // ─── Customer email sequence cron: fires every hour ─────────────────────
   import("./sequenceEmails").then(({ processSequenceQueue }) => {
     processSequenceQueue().catch((e: any) => console.error("[sequences] Initial queue run failed:", e.message));
-    setInterval(() => {
-      processSequenceQueue().catch((e: any) => console.error("[sequences] Cron failed:", e.message));
+    setInterval(async () => {
+      if (!await acquireLock("sequence-emails", 50)) return;
+      try { await processSequenceQueue(); } catch (e: any) { console.error("[sequences] Cron failed:", e.message); } finally { await releaseLock("sequence-emails"); }
     }, 60 * 60 * 1000);
     console.log("[sequences] Auto-send cron scheduled (hourly)");
   }).catch((e: any) => console.error("[sequences] Failed to load sequenceEmails:", e.message));
@@ -601,13 +623,9 @@ async function seedToDoDemo() {
   function scheduleDripCron() {
     setInterval(async () => {
       const d = new Date();
-      if (d.getHours() === 9 && d.getMinutes() < 60) {
-        try {
-          await processDripQueue();
-        } catch (e: any) {
-          console.error("[drip] Cron failed:", e.message);
-        }
-      }
+      if (d.getHours() !== 9) return;
+      if (!await acquireLock("drip-emails", 50)) return;
+      try { await processDripQueue(); } catch (e: any) { console.error("[drip] Cron failed:", e.message); } finally { await releaseLock("drip-emails"); }
     }, 60 * 60 * 1000); // check every hour
   }
   scheduleDripCron();
@@ -615,8 +633,9 @@ async function seedToDoDemo() {
   // ─── Activation nudge cron: runs every 2 hours ───────────────────────────
   // Sends 24h / 48h / 70h emails to free users who never created a quote.
   processActivationNudges().catch((e: any) => console.error("[activation-nudge] Startup run failed:", e.message));
-  setInterval(() => {
-    processActivationNudges().catch((e: any) => console.error("[activation-nudge] Cron failed:", e.message));
+  setInterval(async () => {
+    if (!await acquireLock("activation-nudges", 90)) return;
+    try { await processActivationNudges(); } catch (e: any) { console.error("[activation-nudge] Cron failed:", e.message); } finally { await releaseLock("activation-nudges"); }
   }, 2 * 60 * 60 * 1000);
   console.log("[activation-nudge] Cron scheduled (every 2h)");
 
@@ -633,11 +652,13 @@ async function seedToDoDemo() {
     next8am.setHours(8, 0, 0, 0);
     if (next8am <= now) next8am.setDate(next8am.getDate() + 1);
     const msUntil8am = next8am.getTime() - now.getTime();
+    const runChurnSignals = async () => {
+      if (!await acquireLock("churn-signals", 60)) return;
+      try { await processChurnSignals(); } catch (e: any) { console.error("Churn cron error:", e); } finally { await releaseLock("churn-signals"); }
+    };
     setTimeout(() => {
-      processChurnSignals().catch((e: any) => console.error("Churn cron error:", e));
-      setInterval(() => {
-        processChurnSignals().catch((e: any) => console.error("Churn cron error:", e));
-      }, 24 * 60 * 60 * 1000);
+      runChurnSignals();
+      setInterval(runChurnSignals, 24 * 60 * 60 * 1000);
     }, msUntil8am);
   }
   scheduleChurnCron();
@@ -649,11 +670,13 @@ async function seedToDoDemo() {
     next6am.setHours(6, 0, 0, 0);
     if (next6am <= now) next6am.setDate(next6am.getDate() + 1);
     const msUntil6am = next6am.getTime() - now.getTime();
+    const runChurnScoring = async () => {
+      if (!await acquireLock("churn-scoring", 60)) return;
+      try { await computeAndUpdateChurnScores(); } catch (e: any) { console.error("[churn-score] Cron error:", e); } finally { await releaseLock("churn-scoring"); }
+    };
     setTimeout(() => {
-      computeAndUpdateChurnScores().catch((e: any) => console.error("[churn-score] Cron error:", e));
-      setInterval(() => {
-        computeAndUpdateChurnScores().catch((e: any) => console.error("[churn-score] Cron error:", e));
-      }, 24 * 60 * 60 * 1000);
+      runChurnScoring();
+      setInterval(runChurnScoring, 24 * 60 * 60 * 1000);
     }, msUntil6am);
   }
   scheduleChurnScoringCron();
@@ -667,11 +690,13 @@ async function seedToDoDemo() {
     next3am.setHours(3, 0, 0, 0);
     if (next3am <= now) next3am.setDate(next3am.getDate() + 1);
     const msUntil3am = next3am.getTime() - now.getTime();
+    const runRcBulkSync = async () => {
+      if (!await acquireLock("rc-bulk-sync", 60)) return;
+      try { await bulkSyncRcUsers(); } catch (e: any) { console.error("[RC bulk sync] Cron error:", e.message); } finally { await releaseLock("rc-bulk-sync"); }
+    };
     setTimeout(() => {
-      bulkSyncRcUsers().catch((e: any) => console.error("[RC bulk sync] Cron error:", e.message));
-      setInterval(() => {
-        bulkSyncRcUsers().catch((e: any) => console.error("[RC bulk sync] Cron error:", e.message));
-      }, 24 * 60 * 60 * 1000);
+      runRcBulkSync();
+      setInterval(runRcBulkSync, 24 * 60 * 60 * 1000);
     }, msUntil3am);
   }
   scheduleRcBulkSync();
@@ -690,11 +715,13 @@ async function seedToDoDemo() {
     setInterval(async () => {
       const h = easternHour();
       if ((h === 7 || h === 19) && h !== lastRecapHour) {
+        const lockKey = `owner-recap-${h}`;
+        if (!await acquireLock(lockKey, 8)) return;
         lastRecapHour = h;
         const label = h === 7 ? "7 AM" : "7 PM";
-        sendOwnerDailyRecap(pool, label).catch((e: any) =>
-          console.error(`[recap] ${label} failed:`, e.message)
-        );
+        sendOwnerDailyRecap(pool, label)
+          .catch((e: any) => console.error(`[recap] ${label} failed:`, e.message))
+          .finally(() => releaseLock(lockKey));
       }
       // Reset tracker when we move out of the target hour
       if (h !== 7 && h !== 19) lastRecapHour = -1;
@@ -709,6 +736,7 @@ async function seedToDoDemo() {
       try {
         const d = new Date();
         if (d.getHours() !== 8 || d.getMinutes() > 30) return;
+        if (!await acquireLock("followup-push", 10)) return;
         // Get each business with pending follow-up communications
         const result = await pool.query(
           `SELECT b.owner_user_id, b.id as business_id,
@@ -733,6 +761,8 @@ async function seedToDoDemo() {
         }
       } catch (e: any) {
         console.error("[followup-push] Error:", e.message);
+      } finally {
+        await releaseLock("followup-push");
       }
     }, 60 * 60 * 1000);
   }
@@ -741,6 +771,7 @@ async function seedToDoDemo() {
   // ─── Job starting soon: checks every 30 min, pushes 1h before job ────────
   function scheduleJobStartingSoonCron() {
     setInterval(async () => {
+      if (!await acquireLock("job-starting-soon", 20)) return;
       try {
         const now = new Date();
         const in60 = new Date(now.getTime() + 60 * 60 * 1000);
@@ -775,6 +806,8 @@ async function seedToDoDemo() {
         }
       } catch (e: any) {
         console.error("[job-push] Error:", e.message);
+      } finally {
+        await releaseLock("job-starting-soon");
       }
     }, 30 * 60 * 1000);
   }
@@ -938,10 +971,16 @@ async function seedToDoDemo() {
       if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
       const ms = next.getTime() - now.getTime();
       setTimeout(async () => {
-        try {
-          await processOnboardingNudges();
-        } catch (e: any) {
-          console.error("[onboarding-nudge] Cron failed:", e.message);
+        if (await acquireLock("onboarding-nudge", 30)) {
+          try {
+            await processOnboardingNudges();
+          } catch (e: any) {
+            console.error("[onboarding-nudge] Cron failed:", e.message);
+          } finally {
+            await releaseLock("onboarding-nudge");
+          }
+        } else {
+          console.log("[onboarding-nudge] Skipping, lock held by another instance");
         }
         scheduleNext();
       }, ms);
@@ -959,10 +998,9 @@ async function seedToDoDemo() {
     processAutopilotJobs().catch((e: any) =>
       console.error("[autopilot] Startup run failed:", e.message)
     );
-    setInterval(() => {
-      processAutopilotJobs().catch((e: any) =>
-        console.error("[autopilot] Cron failed:", e.message)
-      );
+    setInterval(async () => {
+      if (!await acquireLock("autopilot", 14)) return;
+      try { await processAutopilotJobs(); } catch (e: any) { console.error("[autopilot] Cron failed:", e.message); } finally { await releaseLock("autopilot"); }
     }, 15 * 60 * 1000); // every 15 minutes
   }
   scheduleAutopilotCron();
@@ -1129,9 +1167,13 @@ async function seedToDoDemo() {
     const next7am = new Date(now);
     next7am.setHours(7, 0, 0, 0);
     if (next7am <= now) next7am.setDate(next7am.getDate() + 1);
+    const lockedDunning = async () => {
+      if (!await acquireLock("dunning", 90)) return;
+      try { await runDunning(); } finally { await releaseLock("dunning"); }
+    };
     setTimeout(() => {
-      runDunning();
-      setInterval(runDunning, 24 * 60 * 60 * 1000);
+      lockedDunning();
+      setInterval(lockedDunning, 24 * 60 * 60 * 1000);
     }, next7am.getTime() - now.getTime());
   }
   scheduleDunningCron();
@@ -1268,9 +1310,13 @@ async function seedToDoDemo() {
 
     const firstRun = msUntilNext2amUtc();
     console.log(`[nightly] Crons scheduled — first run in ${Math.round(firstRun / 1000 / 60)} min`);
+    const lockedNightly = async () => {
+      if (!await acquireLock("nightly-crons", 90)) return;
+      try { await runAllNightlyCrons(); } finally { await releaseLock("nightly-crons"); }
+    };
     setTimeout(() => {
-      runAllNightlyCrons();
-      setInterval(runAllNightlyCrons, 24 * 60 * 60 * 1000);
+      lockedNightly();
+      setInterval(lockedNightly, 24 * 60 * 60 * 1000);
     }, firstRun);
   }
   scheduleNightlyCrons();

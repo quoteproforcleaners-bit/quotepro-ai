@@ -23,6 +23,7 @@
 
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
+import { acquireLock, releaseLock } from "./lockManager";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -191,24 +192,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 7. Background workers
   // — 5-minute Autopilot cron
   setInterval(async () => {
+    if (!await acquireLock("autopilot", 4)) return;
     try {
       await processAutopilotJobs();
     } catch (e) {
       console.error("[autopilot] Cron error:", e);
+    } finally {
+      await releaseLock("autopilot");
     }
   }, 5 * 60 * 1000);
 
   // — Quote expiry: every hour on the hour
   cron.schedule("0 * * * *", async () => {
+    if (!await acquireLock("quote-expiry", 10)) return;
     try {
       await expireOldQuotes();
     } catch (e) {
       console.error("[worker] Quote expiry error:", e);
+    } finally {
+      await releaseLock("quote-expiry");
     }
   });
 
   // — Follow-up processing: every 30 minutes
   cron.schedule("*/30 * * * *", async () => {
+    if (!await acquireLock("follow-up-processing", 25)) return;
     try {
       const { sent, canceled } = await processPendingFollowUps();
       if (sent > 0 || canceled > 0) {
@@ -216,50 +224,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (e) {
       console.error("[worker] Follow-up processing error:", e);
+    } finally {
+      await releaseLock("follow-up-processing");
     }
   });
 
   // — Stale quote nudges: daily at 9am
   cron.schedule("0 9 * * *", async () => {
+    if (!await acquireLock("stale-quote-nudges", 30)) return;
     try {
       await sendStaleQuoteNudges();
     } catch (e) {
       console.error("[worker] Stale quote nudges error:", e);
+    } finally {
+      await releaseLock("stale-quote-nudges");
     }
   });
 
   // — Weekly digest emails: Mondays at 8am
   cron.schedule("0 8 * * 1", async () => {
+    if (!await acquireLock("weekly-digest", 60)) return;
     try {
       await sendWeeklyDigestEmails();
     } catch (e) {
       console.error("[worker] Weekly digest emails error:", e);
+    } finally {
+      await releaseLock("weekly-digest");
     }
   });
 
   // — Activation nudges, recurring job generation, win-loss follow-ups: every hour
   cron.schedule("0 * * * *", async () => {
+    if (!await acquireLock("hourly-jobs", 50)) return;
     try {
       await sendActivationNudges();
       await generateRecurringJobs();
       await sendWinLossFollowUps();
     } catch (e) {
       console.error("[worker] Hourly jobs error:", e);
+    } finally {
+      await releaseLock("hourly-jobs");
     }
   });
 
   // — Monthly AI follow-up reset: 1st of month at midnight
   cron.schedule("0 0 1 * *", async () => {
+    if (!await acquireLock("monthly-ai-reset", 10)) return;
     try {
       await pool.query("UPDATE users SET ai_follow_ups_used_this_month = 0");
       console.log("[worker] Monthly AI follow-up counter reset");
     } catch (e) {
       console.error("[worker] Monthly AI reset error:", e);
+    } finally {
+      await releaseLock("monthly-ai-reset");
     }
   });
 
   // — Analytics TTL cleanup: daily at 2am
   cron.schedule("0 2 * * *", async () => {
+    if (!await acquireLock("analytics-ttl", 10)) return;
     try {
       const result = await pool.query(
         `DELETE FROM analytics_events WHERE created_at < NOW() - INTERVAL '90 days'`
@@ -268,17 +291,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[analytics-ttl] Purged ${deleted} events older than 90 days`);
     } catch (e) {
       console.error("[analytics-ttl] Purge error:", e);
+    } finally {
+      await releaseLock("analytics-ttl");
     }
   });
 
   // — Lead finder worker: every hour on the hour
   cron.schedule("0 * * * *", async () => {
+    if (!await acquireLock("lead-finder", 50)) return;
     try {
       if ((app as any).__leadFinderWorker) {
         await (app as any).__leadFinderWorker();
       }
     } catch (e) {
       console.error("[worker] Lead finder error:", e);
+    } finally {
+      await releaseLock("lead-finder");
     }
   });
 

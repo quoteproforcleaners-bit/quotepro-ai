@@ -5,6 +5,7 @@
 import { pool } from "../db";
 import { chargeJob } from "../routers/paymentsRouter";
 import { sendEmail, getBusinessSendParams } from "../mail";
+import { acquireLock, releaseLock } from "../lockManager";
 
 export async function runAutoChargeForBusiness(businessId: string): Promise<{
   attempted: number; charged: number; failed: number; totalCents: number;
@@ -88,6 +89,7 @@ ${failed > 0 ? `<p><strong>Note:</strong> ${failed} charge(s) failed. Visit your
 export function startAutoChargeCron() {
   // Run every minute
   setInterval(async () => {
+    if (!await acquireLock("auto-charge", 2)) return;
     try {
       const now = new Date();
       // Get all businesses with auto-charge enabled
@@ -134,6 +136,8 @@ export function startAutoChargeCron() {
       }
     } catch (err: any) {
       console.error("[auto-charge] Cron error:", err.message);
+    } finally {
+      await releaseLock("auto-charge");
     }
   }, 60_000);
 
