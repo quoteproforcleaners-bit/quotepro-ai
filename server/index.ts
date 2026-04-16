@@ -45,6 +45,19 @@ function setupCors(app: express.Application) {
       });
     }
 
+    // Production domains — configure via ALLOWED_ORIGINS env var (comma-separated)
+    // before DNS cutover to avoid any gap in coverage
+    if (process.env.ALLOWED_ORIGINS) {
+      process.env.ALLOWED_ORIGINS.split(",").forEach((d) => {
+        if (d.trim()) origins.add(d.trim());
+      });
+    }
+
+    // Hard-coded fallback so production works even without the env var
+    origins.add("https://getquotepro.ai");
+    origins.add("https://app.getquotepro.ai");
+    origins.add("https://www.getquotepro.ai");
+
     const origin = req.header("origin");
 
     // Allow localhost origins for Expo web development (any port)
