@@ -873,6 +873,19 @@ pool.query(`
           const session = event.data.object;
           const userId = session.subscription_data?.metadata?.userId || session.metadata?.userId;
           if (userId && session.mode === "subscription") {
+            // Verify this userId owns (or is being assigned) this Stripe customer —
+            // prevents metadata tampering from hijacking another user's subscription.
+            // Allow null stripe_customer_id for first-time subscribers.
+            const ownerCheck = await pool.query(
+              `SELECT id FROM users WHERE id = $1
+               AND (stripe_customer_id IS NULL OR stripe_customer_id = $2)`,
+              [userId, session.customer]
+            );
+            if (!ownerCheck.rows.length) {
+              console.error(`[webhook] checkout.session.completed: user ${userId} does not own customer ${session.customer} — skipping`);
+              break;
+            }
+
             const planMeta = session.subscription_data?.metadata?.plan || session.metadata?.plan || "growth";
             const intervalMeta = session.subscription_data?.metadata?.interval || session.metadata?.interval || "monthly";
             const updateData: Record<string, any> = {
@@ -1045,6 +1058,14 @@ pool.query(`
           const deletedSub = event.data.object;
           const deletedUserId = deletedSub.metadata?.userId;
           if (deletedUserId) {
+            const ownerCheck = await pool.query(
+              "SELECT id FROM users WHERE id = $1 AND stripe_customer_id = $2",
+              [deletedUserId, deletedSub.customer]
+            );
+            if (!ownerCheck.rows.length) {
+              console.error(`[webhook] subscription.deleted: user ${deletedUserId} does not own customer ${deletedSub.customer} — skipping`);
+              break;
+            }
             await updateUser(deletedUserId, {
               subscriptionTier: "starter",
               subscriptionExpiresAt: new Date(),
@@ -1066,6 +1087,14 @@ pool.query(`
           const subscription = event.data.object;
           const userId = subscription.metadata?.userId;
           if (userId) {
+            const ownerCheck = await pool.query(
+              "SELECT id FROM users WHERE id = $1 AND stripe_customer_id = $2",
+              [userId, subscription.customer]
+            );
+            if (!ownerCheck.rows.length) {
+              console.error(`[webhook] subscription.updated: user ${userId} does not own customer ${subscription.customer} — skipping`);
+              break;
+            }
             const isActive = subscription.status === "active" || subscription.status === "trialing";
             const planFromMeta = subscription.metadata?.plan || "growth";
             await updateUser(userId, {
