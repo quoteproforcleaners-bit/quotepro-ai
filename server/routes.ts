@@ -105,6 +105,7 @@ function setupSession(app: Express) {
     session({
       store: new PgStore({
         pool: pool as any,
+        tableName: "user_sessions",
         createTableIfMissing: true,
       }),
       secret: (() => {
@@ -114,12 +115,13 @@ function setupSession(app: Express) {
         }
         return s;
       })(),
+      name: "quotepro_session",
       resave: false,
       saveUninitialized: false,
       cookie: {
         secure: isProduction,
         httpOnly: true,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
         sameSite: "lax",
       },
     })
