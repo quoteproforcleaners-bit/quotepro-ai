@@ -69,6 +69,10 @@ export const AnalyticsEvents = {
 
   // ─── Payment lifecycle ───────────────────────────────────────────────────────
   PAYMENT_FAILED: "payment_failed",
+
+  // ─── Referral program ────────────────────────────────────────────────────────
+  REFERRAL_CREDIT_APPLIED: "referral_credit_applied",
+  REFERRAL_CAP_REACHED: "referral_cap_reached",
 } as const;
 
 export type AnalyticsEventName = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];

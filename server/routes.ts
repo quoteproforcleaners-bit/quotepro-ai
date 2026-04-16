@@ -37,6 +37,7 @@ import {
   generateRecurringJobs,
   sendWinLossFollowUps,
 } from "./helpers";
+import { processDeferredReferralCredits } from "./cron/referralCredits";
 
 // ─── Payment + Intelligence routers ──────────────────────────────────────────
 import paymentsRouter from "./routers/paymentsRouter";     // → /api/payments
@@ -293,6 +294,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[analytics-ttl] Purge error:", e);
     } finally {
       await releaseLock("analytics-ttl");
+    }
+  });
+
+  // — Deferred referral credits: daily at 4am
+  cron.schedule("0 4 * * *", async () => {
+    if (!await acquireLock("deferred-referral-credits", 15)) return;
+    try {
+      await processDeferredReferralCredits();
+    } catch (e) {
+      console.error("[worker] Deferred referral credits error:", e);
+    } finally {
+      await releaseLock("deferred-referral-credits");
     }
   });
 

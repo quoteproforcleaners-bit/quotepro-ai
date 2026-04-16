@@ -1062,6 +1062,8 @@ pool.query(`
                         console.log(`Referral cap reached for user ${referrer.id} (${currentCredits} months already)`);
                       } else {
                         const newTotal = creditResult.rows[0].referral_credits_months;
+                        // Emit event so the deferred-credit cron knows this referral was already credited
+                        trackEvent(referrer.id, "REFERRAL_CREDIT_APPLIED", { referredUserId: userId, deferred: false }).catch(() => {});
                         console.log(`Referral credit applied to user ${referrer.id} (now ${newTotal} months)`);
                       }
                     }
