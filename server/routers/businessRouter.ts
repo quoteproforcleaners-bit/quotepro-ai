@@ -1045,17 +1045,24 @@ pool.query(`
                         // Flag but do NOT block — allow credit to proceed
                       }
 
-                      // ④ Cap at 6 credits
-                      const currentCredits = referrer.referral_credits_months ?? 0;
-                      if (currentCredits >= 6) {
+                      // ④ Cap at 6 credits — atomic conditional increment prevents
+                      // race conditions where two simultaneous checkouts both read
+                      // currentCredits < 6 and both apply a credit.
+                      const creditResult = await pool.query(
+                        `UPDATE users
+                         SET referral_credits_months = referral_credits_months + 1, updated_at = NOW()
+                         WHERE id = $1 AND COALESCE(referral_credits_months, 0) < 6
+                         RETURNING referral_credits_months`,
+                        [referrer.id]
+                      );
+
+                      if (!creditResult.rows.length) {
+                        const currentCredits = referrer.referral_credits_months ?? 0;
                         trackEvent(referrer.id, "REFERRAL_CAP_REACHED", { totalCredits: currentCredits }).catch(() => {});
                         console.log(`Referral cap reached for user ${referrer.id} (${currentCredits} months already)`);
                       } else {
-                        await pool.query(
-                          "UPDATE users SET referral_credits_months = referral_credits_months + 1, updated_at = NOW() WHERE id = $1",
-                          [referrer.id]
-                        );
-                        console.log(`Referral credit applied to user ${referrer.id} (now ${currentCredits + 1} months)`);
+                        const newTotal = creditResult.rows[0].referral_credits_months;
+                        console.log(`Referral credit applied to user ${referrer.id} (now ${newTotal} months)`);
                       }
                     }
                   }
