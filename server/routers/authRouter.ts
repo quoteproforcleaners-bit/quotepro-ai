@@ -209,13 +209,14 @@ const router = Router();
         return res.status(401).json({ message: "This account has been deactivated. Please create your own account to continue." });
       }
 
+      // Always run bcrypt regardless of whether the user exists — prevents
+      // timing-based email enumeration attacks.
+      const DUMMY_HASH = "$2a$12$LQv3c1yqBwlVHpPjrXHNa.DDRz0je4/O9vhI8A7fq8e9qr.3rR2fO";
       const user = await getUserByEmail(email);
-      if (!user || !user.passwordHash) {
-        return res.status(401).json({ message: "Invalid email or password" });
-      }
+      const hash = user?.passwordHash || DUMMY_HASH;
+      const valid = await bcrypt.compare(password, hash);
 
-      const valid = await bcrypt.compare(password, user.passwordHash);
-      if (!valid) {
+      if (!user || !user.passwordHash || !valid) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
