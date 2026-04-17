@@ -16,6 +16,7 @@ function AddressForm({
   loading,
   error,
   failureCount,
+  isServerOrRateLimitError,
   onSkip,
 }: {
   initialAddress: string;
@@ -23,6 +24,7 @@ function AddressForm({
   loading: boolean;
   error?: string;
   failureCount: number;
+  isServerOrRateLimitError: boolean;
   onSkip: () => void;
 }) {
   const [address, setAddress] = useState(initialAddress);
@@ -96,7 +98,7 @@ function AddressForm({
       <button type="submit" style={styles.primaryBtn} disabled={loading}>
         {loading ? "Generating quote..." : failureCount > 0 ? "Try again" : "Generate my quote"}
       </button>
-      {failureCount >= 2 && (
+      {(failureCount >= 2 || (failureCount >= 1 && isServerOrRateLimitError)) && (
         <button
           type="button"
           style={styles.skipLink}
@@ -115,6 +117,7 @@ export default function FirstQuotePage() {
   const [mode, setMode] = useState<"select" | "own_home">("select");
   const [apiError, setApiError] = useState<string | undefined>();
   const [failureCount, setFailureCount] = useState(0);
+  const [isServerOrRateLimitError, setIsServerOrRateLimitError] = useState(false);
 
   useEffect(() => {
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_STARTED);
@@ -204,10 +207,13 @@ export default function FirstQuotePage() {
       setFailureCount((prev) => prev + 1);
       const status = error?.status as number | undefined;
       if (status === 429) {
+        setIsServerOrRateLimitError(true);
         setApiError("Too many requests — please wait a minute and try again.");
       } else if (status !== undefined && status >= 500) {
+        setIsServerOrRateLimitError(true);
         setApiError("Our servers are having trouble right now. Try again in a moment.");
       } else {
+        setIsServerOrRateLimitError(false);
         setApiError("Something went wrong generating your quote. Please try again.");
       }
     },
@@ -280,7 +286,7 @@ export default function FirstQuotePage() {
           <div style={styles.ownHomeWrap}>
             <button
               style={styles.backLink}
-              onClick={() => { setMode("select"); setApiError(undefined); setFailureCount(0); }}
+              onClick={() => { setMode("select"); setApiError(undefined); setFailureCount(0); setIsServerOrRateLimitError(false); }}
             >
               &larr; Back
             </button>
@@ -288,10 +294,11 @@ export default function FirstQuotePage() {
             <p style={styles.subHead2}>We pre-filled what we know &mdash; adjust anything you like.</p>
             <AddressForm
               initialAddress={businessAddress}
-              onSubmit={(d) => { setApiError(undefined); createQuoteMutation.mutate(d); }}
+              onSubmit={(d) => { setApiError(undefined); setIsServerOrRateLimitError(false); createQuoteMutation.mutate(d); }}
               loading={createQuoteMutation.isPending}
               error={apiError}
               failureCount={failureCount}
+              isServerOrRateLimitError={isServerOrRateLimitError}
               onSkip={handleSkip}
             />
           </div>
