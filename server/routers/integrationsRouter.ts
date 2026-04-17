@@ -81,7 +81,7 @@ import { google } from "googleapis";
 
 const router = Router();
 
-  router.get("/internal/market-benchmark", async (req: Request, res: Response) => {
+  router.get("/internal/market-benchmark", requireAuth, async (req: Request, res: Response) => {
     try {
       const { zip, job_type, sqft } = req.query as { zip?: string; job_type?: string; sqft?: string };
       if (!zip && !job_type) {

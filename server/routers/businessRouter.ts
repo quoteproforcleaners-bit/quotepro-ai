@@ -1050,7 +1050,7 @@ pool.query(`
                       // currentCredits < 6 and both apply a credit.
                       const creditResult = await pool.query(
                         `UPDATE users
-                         SET referral_credits_months = referral_credits_months + 1, updated_at = NOW()
+                         SET referral_credits_months = COALESCE(referral_credits_months, 0) + 1, updated_at = NOW()
                          WHERE id = $1 AND COALESCE(referral_credits_months, 0) < 6
                          RETURNING referral_credits_months`,
                         [referrer.id]
