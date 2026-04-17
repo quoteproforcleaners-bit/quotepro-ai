@@ -3,6 +3,7 @@ import { useTranslation } from"react-i18next";
 import { useQuery } from"@tanstack/react-query";
 import { useNavigate } from"react-router-dom";
 import { useAuth } from"../lib/auth";
+import { apiPost } from"../lib/api";
 import { useSubscription } from"../lib/subscription";
 import { useDateFormat } from"../lib/useDateFormat";
 import {
@@ -1215,6 +1216,18 @@ export default function DashboardPage() {
    await consumePlanIntent();
    await startCheckout(intent || "growth", "monthly");
  }
+
+ // Silently retry the onboarding-skip API call if it failed during the gate.
+ // Without this retry, a network blip when the user clicked "skip" would leave
+ // has_completed_first_quote=false, sending them back to the gate on next login.
+ useEffect(() => {
+   try {
+     if (localStorage.getItem("qp_pending_skip_retry") !== "1") return;
+   } catch { return; }
+   apiPost("/api/quotes/onboarding-skip", {})
+     .then(() => { try { localStorage.removeItem("qp_pending_skip_retry"); } catch {} })
+     .catch((err) => { console.warn("[dashboard] silent skip retry failed:", err); });
+ }, []);
 
  // Revenue milestone modal
  const MILESTONES = [1000, 5000, 10000];

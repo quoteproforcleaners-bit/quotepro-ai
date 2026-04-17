@@ -129,8 +129,10 @@ export default function FirstQuotePage() {
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_OPTION_SELECTED, { option: "skipped_after_error" });
     try {
       await apiPost("/api/quotes/onboarding-skip", {});
+      try { localStorage.removeItem("qp_pending_skip_retry"); } catch {}
     } catch (err) {
       console.error("[handleSkip] onboarding-skip API call failed:", err);
+      try { localStorage.setItem("qp_pending_skip_retry", "1"); } catch {}
       setSkipWarning("Couldn't save your progress — you may see this screen again");
     }
     await refresh();
