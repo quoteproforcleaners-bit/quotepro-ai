@@ -66,3 +66,7 @@ quotepro-audit.md
 
 # Secrets / platform config
 google-services.json
+
+# Playwright
+test-results/
+playwright-report/
