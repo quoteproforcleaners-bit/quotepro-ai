@@ -7,6 +7,10 @@ import { AnalyticsEvents } from "../../../../shared/analytics-events";
 import AddressAutocompleteLine from "../../components/AddressAutocompleteLine";
 import { Toast } from "../../components/ui";
 
+const BRAND_GREEN = "#0F6E56";
+const BRAND_GREEN_DARK = "#0B5443";
+const BRAND_GOLD = "#C9920A";
+
 function trackEvent(eventName: string, properties?: Record<string, unknown>) {
   apiPost("/api/analytics/events", { eventName, properties: properties || {} }).catch(() => {});
 }
@@ -41,8 +45,8 @@ function AddressForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 440 }}>
-      <div style={{ marginBottom: 16 }}>
+    <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 480 }}>
+      <div style={{ marginBottom: 18 }}>
         <label style={styles.label}>Your home address</label>
         <AddressAutocompleteLine
           value={address}
@@ -51,41 +55,18 @@ function AddressForm({
           inputStyle={styles.input}
         />
       </div>
-      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
           <label style={styles.label}>Bedrooms</label>
-          <input
-            type="number"
-            min={1}
-            max={10}
-            style={styles.input}
-            value={beds}
-            onChange={(e) => setBeds(Number(e.target.value))}
-          />
+          <input type="number" min={1} max={10} style={styles.input} value={beds} onChange={(e) => setBeds(Number(e.target.value))} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={styles.label}>Bathrooms</label>
-          <input
-            type="number"
-            min={1}
-            max={10}
-            step={0.5}
-            style={styles.input}
-            value={baths}
-            onChange={(e) => setBaths(Number(e.target.value))}
-          />
+          <input type="number" min={1} max={10} step={0.5} style={styles.input} value={baths} onChange={(e) => setBaths(Number(e.target.value))} />
         </div>
         <div style={{ flex: 1 }}>
           <label style={styles.label}>Sq ft</label>
-          <input
-            type="number"
-            min={200}
-            max={10000}
-            step={100}
-            style={styles.input}
-            value={sqft}
-            onChange={(e) => setSqft(Number(e.target.value))}
-          />
+          <input type="number" min={200} max={10000} step={100} style={styles.input} value={sqft} onChange={(e) => setSqft(Number(e.target.value))} />
         </div>
       </div>
       {error && (
@@ -98,8 +79,13 @@ function AddressForm({
           <span>{error}</span>
         </div>
       )}
-      <button type="submit" style={styles.primaryBtn} disabled={loading}>
-        {loading ? "Generating quote..." : failureCount > 0 ? "Try again" : "Generate my quote"}
+      <button type="submit" className="qp-primary-btn" style={styles.primaryBtn} disabled={loading}>
+        {loading ? (
+          <span style={styles.btnInner}>
+            <span style={styles.btnSpinner} aria-hidden="true" />
+            Generating quote...
+          </span>
+        ) : failureCount > 0 ? "Try again" : "Generate my quote"}
       </button>
       {(failureCount >= 2 || (failureCount >= 1 && isServerOrRateLimitError)) && (
         <button
@@ -113,12 +99,63 @@ function AddressForm({
               <span style={styles.skipSpinner} aria-hidden="true" />
               Skipping...
             </span>
-          ) : (
-            "Skip this step and go to the dashboard"
-          )}
+          ) : "Skip this step and go to the dashboard"}
         </button>
       )}
     </form>
+  );
+}
+
+// ── Custom illustrations ──────────────────────────────────────────────────
+function LeadIllustration() {
+  return (
+    <svg width={64} height={64} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="leadGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#E6F5EF" />
+          <stop offset="100%" stopColor="#D1EDE2" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#leadGrad)" />
+      {/* Document */}
+      <rect x="16" y="14" width="28" height="36" rx="3" fill="#fff" stroke={BRAND_GREEN} strokeWidth="1.6" />
+      <line x1="20" y1="22" x2="36" y2="22" stroke={BRAND_GREEN} strokeWidth="1.6" strokeLinecap="round" opacity="0.5" />
+      <line x1="20" y1="28" x2="40" y2="28" stroke={BRAND_GREEN} strokeWidth="1.6" strokeLinecap="round" opacity="0.35" />
+      <line x1="20" y1="34" x2="34" y2="34" stroke={BRAND_GREEN} strokeWidth="1.6" strokeLinecap="round" opacity="0.35" />
+      {/* Check badge */}
+      <circle cx="46" cy="46" r="10" fill={BRAND_GREEN} />
+      <path d="M42 46l3 3 5-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
+
+function HomeIllustration() {
+  return (
+    <svg width={64} height={64} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="homeGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#E6F5EF" />
+          <stop offset="100%" stopColor="#C7E8DA" />
+        </linearGradient>
+        <linearGradient id="roofGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={BRAND_GREEN} />
+          <stop offset="100%" stopColor={BRAND_GREEN_DARK} />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#homeGrad)" />
+      {/* House body */}
+      <rect x="16" y="30" width="32" height="22" rx="2" fill="#fff" stroke={BRAND_GREEN} strokeWidth="1.6" />
+      {/* Roof */}
+      <path d="M12 32 L32 14 L52 32 Z" fill="url(#roofGrad)" stroke={BRAND_GREEN_DARK} strokeWidth="1.4" strokeLinejoin="round" />
+      {/* Door */}
+      <rect x="28" y="38" width="8" height="14" rx="1" fill={BRAND_GREEN} opacity="0.85" />
+      <circle cx="34" cy="45" r="0.8" fill={BRAND_GOLD} />
+      {/* Windows */}
+      <rect x="19" y="36" width="6" height="6" rx="0.8" fill="#E6F5EF" stroke={BRAND_GREEN} strokeWidth="1" />
+      <rect x="39" y="36" width="6" height="6" rx="0.8" fill="#E6F5EF" stroke={BRAND_GREEN} strokeWidth="1" />
+      {/* Sparkle */}
+      <path d="M50 18l1.2 2.6 2.6 1.2-2.6 1.2L50 25.6l-1.2-2.6L46.2 22l2.6-1.2z" fill={BRAND_GOLD} opacity="0.9" />
+    </svg>
   );
 }
 
@@ -147,14 +184,9 @@ export default function FirstQuotePage() {
     } catch (err) {
       console.error("[handleSkip] onboarding-skip API call failed:", err);
       skipFailed = true;
-      // Set the retry flag BEFORE navigating so FirstQuoteGate sees it on the
-      // very first render of /dashboard and doesn't bounce the user back here.
       try { localStorage.setItem("qp_pending_skip_retry", "1"); } catch {}
       setSkipWarning("Couldn't save your progress — retrying in the background");
     }
-    // Always refresh + navigate. On failure the gate is bypassed via the
-    // qp_pending_skip_retry localStorage flag, and DashboardPage's silent
-    // retry effect will update the server flag in the background.
     try { await refresh(); } catch {}
     navigate("/dashboard");
     if (skipFailed) setSkipping(false);
@@ -263,243 +295,456 @@ export default function FirstQuotePage() {
 
   return (
     <div style={styles.page}>
+      <style>{pageCss}</style>
+      <div style={styles.bgDecor} aria-hidden="true" />
+
       {skipWarning && (
-        <Toast
-          message={skipWarning}
-          variant="error"
-          onClose={() => setSkipWarning(null)}
-        />
+        <Toast message={skipWarning} variant="error" onClose={() => setSkipWarning(null)} />
       )}
-      <div style={styles.logoRow}>
-        <span style={styles.logo}>QuotePro</span>
-      </div>
 
-      <div style={styles.center}>
-        <div style={styles.header}>
-          <h1 style={styles.headline}>Let's send your first quote.</h1>
-          <p style={styles.subhead}>
-            Takes 90 seconds. You'll see exactly how QuotePro works.
-          </p>
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <header style={styles.header}>
+        <div style={styles.headerInner}>
+          <div style={styles.logoBlock}>
+            <div style={styles.logoMark} aria-hidden="true">
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                <path d="M5 12l5 5L20 7" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <span style={styles.logoText}>QuotePro</span>
+          </div>
+
+          <div style={styles.progressBlock} aria-label="Step 1 of 2">
+            <span style={styles.progressLabel}>Step 1 of 2</span>
+            <div style={styles.progressTrack}>
+              <div style={styles.progressFill} />
+            </div>
+          </div>
         </div>
+      </header>
 
-        {mode === "select" && (
-          <div style={styles.cardRow}>
-            <div style={styles.card}>
-              <div style={styles.iconWrap}>
-                <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </div>
-              <h3 style={styles.cardTitle}>Quote a real lead</h3>
-              <p style={styles.cardDesc}>
-                Enter a lead's details and generate a real quote you can send right now.
-              </p>
-              <button style={styles.outlineBtn} onClick={handleOptionA}>
-                Start quote
+      {/* ── Main ──────────────────────────────────────────────────────── */}
+      <main style={styles.main}>
+        <div style={styles.content}>
+          {/* Hero */}
+          <section className="qp-fade-up" style={styles.hero}>
+            <span style={styles.eyebrow}>
+              <span style={styles.eyebrowDot} />
+              Welcome to QuotePro
+            </span>
+            <h1 style={styles.headline}>Let's send your first quote.</h1>
+            <p style={styles.subhead}>
+              Takes 90 seconds. You'll see exactly how QuotePro works.
+            </p>
+            <p style={styles.proof}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={BRAND_GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9" fill={BRAND_GOLD} />
+              </svg>
+              Trusted by 500+ cleaning professionals
+            </p>
+          </section>
+
+          {mode === "select" && (
+            <section className="qp-fade-up qp-delay-1" style={styles.cardRow}>
+              {/* Option A — secondary */}
+              <button
+                type="button"
+                onClick={handleOptionA}
+                className="qp-card"
+                style={styles.card}
+                aria-label="Quote a real lead"
+              >
+                <div style={styles.cardIcon}><LeadIllustration /></div>
+                <h3 style={styles.cardTitle}>Quote a real lead</h3>
+                <p style={styles.cardDesc}>
+                  Enter a lead's details and generate a real quote you can send right now.
+                </p>
+                <span style={styles.outlineBtn}>Start quote</span>
               </button>
-            </div>
 
-            <div style={{ ...styles.card, border: "2px solid #0F6E56" }}>
-              <div style={styles.recommendedBadge}>Recommended &mdash; fastest way to see it work</div>
-              <div style={styles.iconWrap}>
-                <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="#0F6E56" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9,22 9,12 15,12 15,22" />
-                </svg>
-              </div>
-              <h3 style={styles.cardTitle}>Quote your own home</h3>
-              <p style={styles.cardDesc}>
-                See QuotePro in action using your own address. Your quote will be emailed to you.
-              </p>
-              <button style={styles.primaryBtn} onClick={handleOptionBStart}>
-                Try it on my home
+              {/* Option B — primary, recommended */}
+              <button
+                type="button"
+                onClick={handleOptionBStart}
+                className="qp-card qp-card-recommended"
+                style={{ ...styles.card, ...styles.cardRecommended }}
+                aria-label="Quote your own home (recommended)"
+              >
+                <span style={styles.recommendedBadge}>
+                  <svg width={10} height={10} viewBox="0 0 24 24" fill={BRAND_GOLD} aria-hidden="true">
+                    <polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9" />
+                  </svg>
+                  Recommended
+                </span>
+                <div style={styles.cardIcon}><HomeIllustration /></div>
+                <h3 style={styles.cardTitle}>Quote your own home</h3>
+                <p style={styles.cardDesc}>
+                  See QuotePro in action using your own address. Your quote will be emailed to you.
+                </p>
+                <span className="qp-primary-btn" style={styles.primaryBtn}>Try it on my home</span>
               </button>
-            </div>
-          </div>
-        )}
+            </section>
+          )}
 
-        {mode === "own_home" && (
-          <div style={styles.ownHomeWrap}>
-            <button
-              style={styles.backLink}
-              onClick={() => { setMode("select"); setApiError(undefined); setFailureCount(0); setIsServerOrRateLimitError(false); }}
-            >
-              &larr; Back
-            </button>
-            <h2 style={styles.subHeading}>Tell us about your home</h2>
-            <p style={styles.subHead2}>We pre-filled what we know &mdash; adjust anything you like.</p>
-            <AddressForm
-              initialAddress={businessAddress}
-              onSubmit={(d) => { setApiError(undefined); setIsServerOrRateLimitError(false); createQuoteMutation.mutate(d); }}
-              loading={createQuoteMutation.isPending}
-              error={apiError}
-              failureCount={failureCount}
-              isServerOrRateLimitError={isServerOrRateLimitError}
-              onSkip={handleSkip}
-              skipping={skipping}
-            />
-          </div>
-        )}
-      </div>
+          {mode === "own_home" && (
+            <section className="qp-fade-up" style={styles.ownHomeWrap}>
+              <button
+                type="button"
+                style={styles.backLink}
+                onClick={() => { setMode("select"); setApiError(undefined); setFailureCount(0); setIsServerOrRateLimitError(false); }}
+              >
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
+                  <line x1="19" y1="12" x2="5" y2="12" />
+                  <polyline points="12 19 5 12 12 5" />
+                </svg>
+                Back
+              </button>
+              <div style={styles.formCard}>
+                <h2 style={styles.subHeading}>Tell us about your home</h2>
+                <p style={styles.subHead2}>We pre-filled what we know — adjust anything you like.</p>
+                <AddressForm
+                  initialAddress={businessAddress}
+                  onSubmit={(d) => { setApiError(undefined); setIsServerOrRateLimitError(false); createQuoteMutation.mutate(d); }}
+                  loading={createQuoteMutation.isPending}
+                  error={apiError}
+                  failureCount={failureCount}
+                  isServerOrRateLimitError={isServerOrRateLimitError}
+                  onSkip={handleSkip}
+                  skipping={skipping}
+                />
+              </div>
+            </section>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
 
+// ── Page CSS (hover, animations, responsive) ──────────────────────────────
+const pageCss = `
+@keyframes qpFadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.qp-fade-up { animation: qpFadeUp 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.qp-delay-1 { animation-delay: 120ms; }
+
+.qp-card {
+  text-align: left;
+  cursor: pointer;
+  transition: transform 220ms cubic-bezier(0.22,1,0.36,1), box-shadow 220ms ease, border-color 220ms ease;
+  font-family: inherit;
+}
+.qp-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 48px -16px rgba(15, 110, 86, 0.18), 0 8px 16px -8px rgba(15, 23, 42, 0.08);
+}
+.qp-card:focus-visible {
+  outline: 3px solid ${BRAND_GREEN};
+  outline-offset: 3px;
+}
+.qp-card-recommended:hover {
+  border-color: ${BRAND_GREEN_DARK};
+}
+
+.qp-primary-btn {
+  transition: background 180ms ease, box-shadow 180ms ease, transform 120ms ease;
+}
+.qp-card:hover .qp-primary-btn,
+button.qp-primary-btn:hover {
+  background: ${BRAND_GREEN_DARK};
+  box-shadow: 0 8px 18px -6px rgba(15, 110, 86, 0.45);
+}
+button.qp-primary-btn:active { transform: translateY(1px); }
+button.qp-primary-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+@media (max-width: 720px) {
+  .qp-card:hover { transform: none; }
+}
+`;
+
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#FAFAFA",
+    position: "relative",
+    background:
+      "radial-gradient(1100px 700px at 85% -10%, rgba(15,110,86,0.10), transparent 60%)," +
+      "radial-gradient(900px 600px at -10% 110%, rgba(201,146,10,0.08), transparent 55%)," +
+      "linear-gradient(180deg, #FBFCFB 0%, #F5F8F6 100%)",
     display: "flex",
     flexDirection: "column",
+    fontFamily:
+      '"Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    overflowX: "hidden",
   },
-  logoRow: {
-    padding: "24px 32px",
-    borderBottom: "1px solid #F0F0F0",
-  },
-  logo: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#0F6E56",
-    letterSpacing: "-0.5px",
-  },
-  center: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "48px 24px",
+  bgDecor: {
+    position: "absolute",
+    inset: 0,
+    backgroundImage:
+      "radial-gradient(circle at 1px 1px, rgba(15,23,42,0.045) 1px, transparent 0)",
+    backgroundSize: "24px 24px",
+    opacity: 0.5,
+    pointerEvents: "none",
+    maskImage: "radial-gradient(ellipse at center, #000 30%, transparent 75%)",
+    WebkitMaskImage: "radial-gradient(ellipse at center, #000 30%, transparent 75%)",
   },
   header: {
-    textAlign: "center",
-    marginBottom: 48,
+    position: "relative",
+    zIndex: 1,
+    padding: "20px 24px",
   },
-  headline: {
-    fontSize: "clamp(24px, 5vw, 36px)",
-    fontWeight: 800,
-    color: "#0F172A",
-    letterSpacing: "-1px",
-    margin: "0 0 12px",
-  },
-  subhead: {
-    fontSize: 18,
-    color: "#64748B",
-    margin: 0,
-    lineHeight: 1.5,
-  },
-  cardRow: {
+  headerInner: {
+    maxWidth: 1200,
+    margin: "0 auto",
     display: "flex",
-    gap: 20,
-    width: "100%",
-    maxWidth: 720,
-    flexWrap: "wrap" as const,
-    justifyContent: "center",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
   },
-  card: {
-    background: "#fff",
-    border: "1.5px solid #E2E8F0",
-    borderRadius: 20,
-    padding: "32px 28px",
-    flex: "1 1 280px",
-    maxWidth: 340,
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-    position: "relative" as const,
-    boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-  },
-  recommendedBadge: {
-    position: "absolute" as const,
-    top: -14,
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: "#0F6E56",
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: 700,
-    padding: "4px 14px",
-    borderRadius: 20,
-    whiteSpace: "nowrap" as const,
-    letterSpacing: "0.3px",
-  },
-  iconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    background: "#F0FDF9",
+  logoBlock: { display: "flex", alignItems: "center", gap: 10 },
+  logoMark: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    background: `linear-gradient(135deg, ${BRAND_GREEN} 0%, ${BRAND_GREEN_DARK} 100%)`,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 4,
+    boxShadow: "0 4px 10px -2px rgba(15,110,86,0.35)",
+  },
+  logoText: {
+    fontSize: 18,
+    fontWeight: 800,
+    color: "#0F172A",
+    letterSpacing: "-0.4px",
+  },
+  progressBlock: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, minWidth: 120 },
+  progressLabel: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#64748B",
+    letterSpacing: "0.3px",
+    textTransform: "uppercase",
+  },
+  progressTrack: {
+    width: 120,
+    height: 4,
+    background: "rgba(15,110,86,0.12)",
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  progressFill: {
+    width: "50%",
+    height: "100%",
+    background: `linear-gradient(90deg, ${BRAND_GREEN} 0%, ${BRAND_GREEN_DARK} 100%)`,
+    borderRadius: 999,
+  },
+  main: {
+    position: "relative",
+    zIndex: 1,
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "32px 24px 64px",
+  },
+  content: {
+    width: "100%",
+    maxWidth: 1100,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  hero: {
+    textAlign: "center",
+    marginBottom: 48,
+    maxWidth: 720,
+  },
+  eyebrow: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    background: "rgba(15,110,86,0.08)",
+    color: BRAND_GREEN_DARK,
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: "0.6px",
+    textTransform: "uppercase",
+    padding: "6px 14px",
+    borderRadius: 999,
+    marginBottom: 20,
+  },
+  eyebrowDot: {
+    width: 6,
+    height: 6,
+    borderRadius: "50%",
+    background: BRAND_GREEN,
+    boxShadow: `0 0 0 4px rgba(15,110,86,0.18)`,
+  },
+  headline: {
+    fontSize: "clamp(32px, 5.4vw, 52px)",
+    fontWeight: 700,
+    color: "#0B1620",
+    letterSpacing: "-1.6px",
+    lineHeight: 1.06,
+    margin: "0 0 16px",
+  },
+  subhead: {
+    fontSize: "clamp(16px, 1.8vw, 19px)",
+    color: "#475569",
+    margin: "0 0 18px",
+    lineHeight: 1.55,
+    fontWeight: 500,
+  },
+  proof: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#64748B",
+    margin: 0,
+    letterSpacing: "0.1px",
+  },
+  cardRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+    gap: 24,
+    width: "100%",
+    maxWidth: 880,
+  },
+  card: {
+    background: "rgba(255,255,255,0.92)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1.5px solid #E6EBE9",
+    borderRadius: 24,
+    padding: 40,
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+    position: "relative",
+    boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.08)",
+    minHeight: 320,
+  },
+  cardRecommended: {
+    border: `1.5px solid ${BRAND_GREEN}`,
+    boxShadow:
+      "0 1px 2px rgba(15,110,86,0.08), 0 16px 36px -16px rgba(15,110,86,0.28)",
+    background:
+      "linear-gradient(180deg, #FFFFFF 0%, #F7FBF9 100%)",
+  },
+  recommendedBadge: {
+    position: "absolute",
+    top: -12,
+    right: 24,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    background: "#fff",
+    color: BRAND_GREEN_DARK,
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: "0.6px",
+    textTransform: "uppercase",
+    padding: "6px 12px",
+    borderRadius: 999,
+    border: `1.5px solid ${BRAND_GREEN}`,
+    boxShadow: "0 4px 10px -4px rgba(15,110,86,0.25)",
+  },
+  cardIcon: {
+    marginBottom: 6,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 700,
-    color: "#0F172A",
+    color: "#0B1620",
     margin: 0,
+    letterSpacing: "-0.5px",
   },
   cardDesc: {
-    fontSize: 14,
-    color: "#64748B",
+    fontSize: 15,
+    color: "#475569",
     lineHeight: 1.6,
-    margin: "0 0 8px",
+    margin: "0 0 12px",
     flex: 1,
   },
   primaryBtn: {
-    background: "#0F6E56",
+    background: BRAND_GREEN,
     color: "#fff",
     border: "none",
     borderRadius: 12,
-    padding: "14px 20px",
+    padding: "14px 28px",
     fontSize: 15,
     fontWeight: 700,
+    letterSpacing: "0.1px",
     cursor: "pointer",
     width: "100%",
-    transition: "background 0.15s",
+    minHeight: 48,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 4px 12px -4px rgba(15,110,86,0.35)",
   },
   outlineBtn: {
     background: "#fff",
-    color: "#0F172A",
-    border: "1.5px solid #CBD5E1",
+    color: BRAND_GREEN_DARK,
+    border: `1.5px solid ${BRAND_GREEN}`,
     borderRadius: 12,
-    padding: "14px 20px",
+    padding: "14px 28px",
     fontSize: 15,
-    fontWeight: 600,
+    fontWeight: 700,
+    letterSpacing: "0.1px",
     cursor: "pointer",
     width: "100%",
-    transition: "border-color 0.15s",
+    minHeight: 48,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
   ownHomeWrap: {
     width: "100%",
-    maxWidth: 440,
+    maxWidth: 560,
     display: "flex",
     flexDirection: "column",
-    alignItems: "center",
-    gap: 8,
+    alignItems: "stretch",
   },
   backLink: {
     background: "none",
     border: "none",
     color: "#64748B",
     fontSize: 14,
+    fontWeight: 600,
     cursor: "pointer",
     alignSelf: "flex-start",
-    padding: "4px 0",
-    marginBottom: 8,
+    padding: "6px 0",
+    marginBottom: 14,
+    display: "inline-flex",
+    alignItems: "center",
+  },
+  formCard: {
+    background: "rgba(255,255,255,0.96)",
+    border: "1.5px solid #E6EBE9",
+    borderRadius: 24,
+    padding: "36px 36px 32px",
+    boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 16px 36px -20px rgba(15,23,42,0.18)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
   },
   subHeading: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 700,
-    color: "#0F172A",
-    margin: "0 0 4px",
-    alignSelf: "flex-start",
+    color: "#0B1620",
+    margin: "0 0 6px",
+    letterSpacing: "-0.5px",
   },
   subHead2: {
     fontSize: 14,
     color: "#64748B",
-    margin: "0 0 20px",
-    alignSelf: "flex-start",
+    margin: "0 0 22px",
   },
   label: {
     display: "block",
@@ -512,11 +757,11 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     border: "1.5px solid #E2E8F0",
     borderRadius: 10,
-    padding: "11px 14px",
+    padding: "12px 14px",
     fontSize: 15,
     fontFamily: "inherit",
     outline: "none",
-    boxSizing: "border-box" as const,
+    boxSizing: "border-box",
     background: "#fff",
   },
   errorBox: {
@@ -532,6 +777,16 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#DC2626",
     lineHeight: 1.5,
   },
+  btnInner: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10 },
+  btnSpinner: {
+    display: "inline-block",
+    width: 14,
+    height: 14,
+    border: "2px solid rgba(255,255,255,0.45)",
+    borderTopColor: "#fff",
+    borderRadius: "50%",
+    animation: "spin 0.7s linear infinite",
+  },
   skipLink: {
     background: "none",
     border: "none",
@@ -539,18 +794,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     cursor: "pointer",
     textDecoration: "underline",
-    marginTop: 12,
+    marginTop: 14,
     padding: "4px 0",
-    textAlign: "center" as const,
+    textAlign: "center",
     width: "100%",
   },
-  skipInner: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    textDecoration: "none",
-  },
+  skipInner: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, textDecoration: "none" },
   skipSpinner: {
     display: "inline-block",
     width: 12,
