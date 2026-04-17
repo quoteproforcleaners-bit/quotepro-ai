@@ -1,6 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertTriangle, ShieldOff, CheckCircle, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { apiPost } from "../lib/api";
+
+interface OnboardingFunnel {
+  businesses_started: number;
+  chose_own_home: number;
+  chose_real_lead: number;
+  succeeded: number;
+  skipped: number;
+  retried_and_succeeded: number;
+  failed_twice_kept_trying: number;
+  conversion_rate_pct: number;
+  skip_rate_pct: number;
+}
 
 interface PhantomUser {
   id: string;
@@ -50,6 +62,33 @@ export default function PhantomAccountsPage() {
   const [grantEmail, setGrantEmail] = useState("");
   const [grantTier, setGrantTier] = useState("pro");
   const [grantResult, setGrantResult] = useState<string | null>(null);
+  const [funnel, setFunnel] = useState<OnboardingFunnel | null>(null);
+  const [funnelError, setFunnelError] = useState<string | null>(null);
+  const [funnelLoading, setFunnelLoading] = useState(false);
+
+  async function loadFunnel(s = secret) {
+    setFunnelLoading(true);
+    setFunnelError(null);
+    try {
+      const res = await fetch("/api/admin/onboarding-funnel", {
+        headers: { "x-admin-key": s },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || `Failed (${res.status})`);
+      }
+      setFunnel(await res.json());
+    } catch (e: any) {
+      setFunnelError(e.message);
+    } finally {
+      setFunnelLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (authed) loadFunnel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed]);
 
   async function load(s = secret) {
     setLoading(true);
@@ -176,6 +215,42 @@ export default function PhantomAccountsPage() {
           >
             <RefreshCw size={14} /> Refresh
           </button>
+        </div>
+
+        {/* Onboarding Gate panel */}
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 20, marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Onboarding Gate</h2>
+            <button
+              onClick={() => loadFunnel()}
+              disabled={funnelLoading}
+              style={{ display: "flex", alignItems: "center", gap: 6, background: "#f1f5f9", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#475569" }}
+            >
+              <RefreshCw size={12} /> {funnelLoading ? "Loading…" : "Refresh"}
+            </button>
+          </div>
+          {funnelError && (
+            <p style={{ margin: 0, color: "#dc2626", fontSize: 13 }} data-testid="text-onboarding-funnel-error">{funnelError}</p>
+          )}
+          {!funnelError && !funnel && !funnelLoading && (
+            <p style={{ margin: 0, color: "#94a3b8", fontSize: 13 }}>No data yet.</p>
+          )}
+          {funnel && (() => {
+            const started = funnel.businesses_started || 0;
+            const retryRate = started > 0
+              ? Math.round((funnel.retried_and_succeeded / started) * 100)
+              : 0;
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }} data-testid="panel-onboarding-funnel">
+                <Metric label="Started" value={started} testId="metric-started" />
+                <Metric label="Chose own home" value={funnel.chose_own_home} testId="metric-chose-own-home" />
+                <Metric label="Succeeded" value={funnel.succeeded} testId="metric-succeeded" color="#15803d" />
+                <Metric label="Skipped" value={funnel.skipped} testId="metric-skipped" color="#b45309" />
+                <Metric label="Retry rate" value={`${retryRate}%`} testId="metric-retry-rate" />
+                <Metric label="Conversion rate" value={`${funnel.conversion_rate_pct}%`} testId="metric-conversion-rate" color="#7c3aed" />
+              </div>
+            );
+          })()}
         </div>
 
         <p style={{ margin: "0 0 24px", color: "#64748b", fontSize: 14, lineHeight: 1.6 }}>
@@ -332,6 +407,15 @@ export default function PhantomAccountsPage() {
         </div>
 
       </div>
+    </div>
+  );
+}
+
+function Metric({ label, value, testId, color }: { label: string; value: number | string; testId: string; color?: string }) {
+  return (
+    <div style={{ background: "#f8fafc", borderRadius: 10, padding: "12px 14px", border: "1px solid #e2e8f0" }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: color ?? "#1e293b" }} data-testid={testId}>{value}</div>
     </div>
   );
 }
