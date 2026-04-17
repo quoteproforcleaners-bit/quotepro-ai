@@ -110,75 +110,134 @@ async function loginAs(page: import("@playwright/test").Page, email: string) {
 
 // ──────────────────────────────────────────────────────────────────────────────
 
-test.describe("First-Quote Gate – skip/retry after API failures", () => {
-  const retryEmail = `pw-gate-retry-${Date.now()}@example.com`;
+test.describe("First-Quote Gate – skip link visibility by error type", () => {
+  // Helpers --------------------------------------------------------------------
 
-  test.beforeAll(async () => {
-    await seedGateUser(retryEmail);
-  });
+  async function mockQuoteCreateStatus(
+    page: import("@playwright/test").Page,
+    status: number,
+    message: string
+  ) {
+    await page.route("**/api/quotes", async (route) => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({
+          status,
+          contentType: "application/json",
+          body: JSON.stringify({ message }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+  }
+
+  async function openOwnHomeForm(page: import("@playwright/test").Page) {
+    await expect(
+      page.getByRole("heading", { name: /let.s send your first quote/i })
+    ).toBeVisible({ timeout: 8000 });
+
+    const tryItBtn = page.getByRole("button", { name: /try it on my home/i });
+    await expect(tryItBtn).toBeVisible({ timeout: 8000 });
+
+    // Click and retry until the address form actually renders. React state
+    // updates can race with the analytics fire-and-forget call, so retry the
+    // click a few times if the form does not appear.
+    const addressInput = page.getByPlaceholder("Start typing your address...");
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await tryItBtn.click().catch(() => {});
+      try {
+        await expect(addressInput).toBeVisible({ timeout: 3000 });
+        break;
+      } catch {
+        if (attempt === 2) throw new Error("Address form did not appear");
+      }
+    }
+    await addressInput.fill("100 Main Street, Denver, CO 80201");
+  }
+
+  // Tests ----------------------------------------------------------------------
 
   test(
-    "error box, retry button, and skip link appear correctly after failures; skip navigates to dashboard",
+    "429 rate-limit response: skip link visible after the first failure",
     { timeout: 30000 },
     async ({ page }) => {
-      await loginAs(page, retryEmail);
+      const email = `pw-gate-429-${Date.now()}@example.com`;
+      await seedGateUser(email);
+      await loginAs(page, email);
       await page.goto(`${BASE_URL}/onboarding/first-quote`);
+      await mockQuoteCreateStatus(page, 429, "Too many requests");
+      await openOwnHomeForm(page);
 
-      // Confirm the gate page is fully loaded before doing anything else
-      await expect(
-        page.getByRole("heading", { name: /let.s send your first quote/i })
-      ).toBeVisible({ timeout: 8000 });
-
-      // Intercept POST /api/quotes (exactly) to return 500.
-      // The pattern **/api/quotes does NOT match /api/quotes/<subpath>,
-      // so onboarding-skip and delete calls pass through unaffected.
-      await page.route("**/api/quotes", async (route) => {
-        if (route.request().method() === "POST") {
-          await route.fulfill({
-            status: 500,
-            contentType: "application/json",
-            body: JSON.stringify({ message: "Simulated server error" }),
-          });
-        } else {
-          await route.continue();
-        }
-      });
-
-      // ── Switch to the "own home" form ─────────────────────────────────────
-      const tryItBtn = page.getByRole("button", { name: /try it on my home/i });
-      await expect(tryItBtn).toBeVisible({ timeout: 8000 });
-      await tryItBtn.click();
-
-      const addressInput = page.getByPlaceholder("123 Main St, City, State");
-      await expect(addressInput).toBeVisible({ timeout: 8000 });
-      await addressInput.fill("100 Main Street, Denver, CO 80201");
-
-      // ── First failure ─────────────────────────────────────────────────────
       await page.getByRole("button", { name: /generate my quote/i }).click();
 
-      // Error box with the expected message should appear
+      await expect(
+        page.getByText(/too many requests/i)
+      ).toBeVisible({ timeout: 8000 });
+
+      // Skip link must be visible after a single 429 failure
+      await expect(
+        page.getByRole("button", { name: /skip this step/i })
+      ).toBeVisible({ timeout: 5000 });
+    }
+  );
+
+  test(
+    "5xx server response: skip link visible after the first failure",
+    { timeout: 30000 },
+    async ({ page }) => {
+      const email = `pw-gate-5xx-${Date.now()}@example.com`;
+      await seedGateUser(email);
+      await loginAs(page, email);
+      await page.goto(`${BASE_URL}/onboarding/first-quote`);
+      await mockQuoteCreateStatus(page, 500, "Simulated server error");
+      await openOwnHomeForm(page);
+
+      await page.getByRole("button", { name: /generate my quote/i }).click();
+
+      await expect(
+        page.getByText(/our servers are having trouble/i)
+      ).toBeVisible({ timeout: 8000 });
+
+      // Skip link must be visible after a single 5xx failure
+      await expect(
+        page.getByRole("button", { name: /skip this step/i })
+      ).toBeVisible({ timeout: 5000 });
+    }
+  );
+
+  test(
+    "Generic client error (400): skip link hidden after 1 failure, visible after 2; skip navigates to dashboard",
+    { timeout: 30000 },
+    async ({ page }) => {
+      const email = `pw-gate-400-${Date.now()}@example.com`;
+      await seedGateUser(email);
+      await loginAs(page, email);
+      await page.goto(`${BASE_URL}/onboarding/first-quote`);
+      await mockQuoteCreateStatus(page, 400, "Bad request");
+      await openOwnHomeForm(page);
+
+      // ── First failure: skip link must NOT be visible ──────────────────────
+      await page.getByRole("button", { name: /generate my quote/i }).click();
+
       await expect(
         page.getByText(/something went wrong generating your quote/i)
       ).toBeVisible({ timeout: 8000 });
 
-      // Primary button label changes to "Try again"
       await expect(
         page.getByRole("button", { name: /try again/i })
       ).toBeVisible();
 
-      // Skip link must NOT be visible yet (only 1 failure)
       await expect(
         page.getByRole("button", { name: /skip this step/i })
       ).not.toBeVisible();
 
-      // ── Second failure ────────────────────────────────────────────────────
+      // ── Second failure: skip link must now be visible ─────────────────────
       await page.getByRole("button", { name: /try again/i }).click();
 
       await expect(
         page.getByText(/something went wrong generating your quote/i)
       ).toBeVisible({ timeout: 8000 });
 
-      // Skip link must now be visible after 2 failures
       const skipLink = page.getByRole("button", { name: /skip this step/i });
       await expect(skipLink).toBeVisible({ timeout: 5000 });
 
