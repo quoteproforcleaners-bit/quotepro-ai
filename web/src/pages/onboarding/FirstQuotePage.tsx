@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "../../lib/auth";
 import { apiPost, apiDelete } from "../../lib/api";
 import { AnalyticsEvents } from "../../../../shared/analytics-events";
+import AddressAutocompleteLine from "../../components/AddressAutocompleteLine";
 
 function trackEvent(eventName: string, properties?: Record<string, unknown>) {
   apiPost("/api/analytics/events", { eventName, properties: properties || {} }).catch(() => {});
@@ -38,12 +39,11 @@ function AddressForm({
     <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 440 }}>
       <div style={{ marginBottom: 16 }}>
         <label style={styles.label}>Your home address</label>
-        <input
-          style={styles.input}
+        <AddressAutocompleteLine
           value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="123 Main St, City, State"
-          required
+          onChange={setAddress}
+          placeholder="Start typing your address..."
+          inputStyle={styles.input}
         />
       </div>
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
