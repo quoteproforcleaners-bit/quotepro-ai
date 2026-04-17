@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "../../lib/auth";
-import { apiPost } from "../../lib/api";
+import { apiPost, apiDelete } from "../../lib/api";
 import { AnalyticsEvents } from "../../../../shared/analytics-events";
 
 function trackEvent(eventName: string, properties?: Record<string, unknown>) {
@@ -123,19 +123,26 @@ export default function FirstQuotePage() {
       };
 
       const q = await apiPost("/api/quotes", quoteData) as any;
-      return q;
-    },
-    onSuccess: async (data: any) => {
-      trackEvent(AnalyticsEvents.ONBOARDING_GATE_QUOTE_GENERATED, { option: "own_home" });
 
       const emailTo = user?.email;
-      if (emailTo && data.id) {
-        apiPost(`/api/quotes/${data.id}/onboarding-send`, {
-          to: emailTo,
-          subject: "Here's your QuotePro quote preview",
-        }).catch(() => {});
+      if (emailTo && q.id) {
+        try {
+          await apiPost(`/api/quotes/${q.id}/onboarding-send`, {
+            to: emailTo,
+            subject: "Here's your QuotePro quote preview",
+          });
+        } catch (mailErr: any) {
+          apiDelete(`/api/quotes/${q.id}`).catch(() => {});
+          throw new Error(
+            mailErr?.message || "Quote was created but we couldn't send the preview email. Please try again."
+          );
+        }
       }
 
+      return q;
+    },
+    onSuccess: (data: any) => {
+      trackEvent(AnalyticsEvents.ONBOARDING_GATE_QUOTE_GENERATED, { option: "own_home" });
       navigate(`/onboarding/complete?quoteId=${data.id}`);
     },
     onError: (err: any) => {

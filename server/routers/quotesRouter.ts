@@ -1176,6 +1176,8 @@ The email should:
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
+      if (quote.businessId !== business.id) return res.status(403).json({ message: "Forbidden" });
+
       const { to, subject } = req.body;
       if (!to) {
         return res.status(400).json({ message: "Recipient email is required" });
