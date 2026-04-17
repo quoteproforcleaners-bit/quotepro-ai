@@ -19,6 +19,17 @@ const SENDGRID_SEND_URL = "https://api.sendgrid.com/v3/mail/send";
 
 export const BASE_APP_URL = process.env.APP_URL || "https://app.getquotepro.ai/app";
 
+/**
+ * Consistent spam/junk-folder hint shown at the bottom of recurring
+ * customer-facing emails (follow-ups, reminders, drip messages, etc.).
+ * Mirrors the in-product wording so recipients get the same nudge across
+ * every touchpoint.
+ */
+export const SPAM_HINT_TEXT =
+  "Don't see this email next time? Check your spam or junk folder and mark it as not spam.";
+export const SPAM_HINT_HTML =
+  `<p style="margin:16px 0 0;font-size:12px;color:#9CA3AF;line-height:1.5;text-align:center;">${SPAM_HINT_TEXT}</p>`;
+
 export interface MailAttachment {
   filename: string;
   content: Buffer | string;

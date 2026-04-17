@@ -5,7 +5,7 @@
 
 import crypto from "crypto";
 import { pool } from "./db";
-import { sendEmail, getBusinessSendParams } from "./mail";
+import { sendEmail, getBusinessSendParams, SPAM_HINT_HTML, SPAM_HINT_TEXT } from "./mail";
 
 function formatDate(d: Date): string {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -125,12 +125,15 @@ export async function runAppointmentReminderScheduler(): Promise<void> {
   <p>See you ${label}!<br/><strong>${sendParams.fromName}</strong><br/>${biz.company_name}</p>
   <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;"/>
   <p style="color:#94a3b8;font-size:12px;">This reminder was sent automatically by QuotePro AI.</p>
+  ${SPAM_HINT_HTML}
 </div>`;
 
+            const text = `Hi ${job.first_name},\n\nThis is a friendly reminder that ${biz.company_name} is scheduled to clean your home:\n\n${dateStr} at ${timeStr}${job.address ? `\n${job.address}` : ""}\n\nIf you need to reschedule or cancel, please reply to this message or call us at ${biz.phone}.\n\nSee you ${label}!\n${sendParams.fromName}\n${biz.company_name}\n\n${SPAM_HINT_TEXT}`;
             await sendEmail({
               to: job.email,
               subject,
               html,
+              text,
               fromName: sendParams.fromName,
               replyTo: sendParams.replyTo,
             });
@@ -244,11 +247,14 @@ export async function sendTestReminder(businessId: string): Promise<{ emailSent:
   </div>
   <p>If you need to reschedule or cancel, please reply to this message or call us at <strong>${biz.phone}</strong>.</p>
   <p>See you ${label}!<br/><strong>${sendParams.fromName}</strong><br/>${biz.company_name}</p>
+  ${SPAM_HINT_HTML}
 </div>`;
+    const text = `[Test reminder] This is what your customers will receive.\n\nHi [Customer],\n\nThis is a friendly reminder that ${biz.company_name} is scheduled to clean your home:\n\n${dateStr} at ${timeStr}\n123 Example Street, Your City\n\nIf you need to reschedule or cancel, please reply to this message or call us at ${biz.phone}.\n\nSee you ${label}!\n${sendParams.fromName}\n${biz.company_name}\n\n${SPAM_HINT_TEXT}`;
     await sendEmail({
       to: biz.email,
       subject: testSubject,
       html,
+      text,
       fromName: sendParams.fromName,
       replyTo: sendParams.replyTo,
     });
@@ -330,6 +336,7 @@ export async function runTipRequestScheduler(): Promise<void> {
 <p style="color:#94a3b8;font-size:12px;line-height:1.5;text-align:center">
   Secure payment powered by Stripe. Completely optional — we're grateful either way!
 </p>
+${SPAM_HINT_HTML}
 </div>`;
           const { sendEmail, getBusinessSendParams } = await import("./mail");
           await sendEmail({
@@ -337,7 +344,7 @@ export async function runTipRequestScheduler(): Promise<void> {
             from: undefined,
             subject: `Hi ${firstName} — leave a tip for your ${cleanerBiz} crew?`,
             html,
-            text: `Hi ${firstName}! We just finished your ${jobType}. Leave a tip for your crew here: ${tipUrl}`,
+            text: `Hi ${firstName}! We just finished your ${jobType}. Leave a tip for your crew here: ${tipUrl}\n\n${SPAM_HINT_TEXT}`,
             fromName: job.sender_name || cleanerBiz,
             replyTo: job.email,
           });

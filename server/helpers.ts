@@ -42,6 +42,8 @@ import {
   getBusinessSendParams,
   PLATFORM_FROM_EMAIL,
   PLATFORM_FROM_NAME,
+  SPAM_HINT_HTML,
+  SPAM_HINT_TEXT,
 } from "./mail";
 import { sendPush } from "./pushNotifications";
 import { trackEvent } from "./analytics";
@@ -615,9 +617,9 @@ export async function sendFollowUpNow(commId: string, req: Request): Promise<{ s
     const subjectMatch = messageText.match(/^Subject:\s*(.+)/i);
     const subject = subjectMatch ? subjectMatch[1].trim() : `Following up on your quote from ${fromName}`;
     const body = subjectMatch ? messageText.replace(/^Subject:.*\n\n?/i, "").trim() : messageText;
-    const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${body.split('\n').map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join('')}${quoteButtonHtml}</td></tr><tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
+    const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${body.split('\n').map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join('')}${quoteButtonHtml}${SPAM_HINT_HTML}</td></tr><tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
     try {
-      await sendEmail({ to: toEmail, subject, html: htmlBody, text: body, fromName, replyTo });
+      await sendEmail({ to: toEmail, subject, html: htmlBody, text: `${body}\n\n${SPAM_HINT_TEXT}`, fromName, replyTo });
     } catch (mailErr: any) {
       console.error("[mail] Follow-up email error:", mailErr);
       return { success: false, message: "Email could not be delivered. Please try again or contact support." };
@@ -773,9 +775,9 @@ export async function processPendingFollowUps() {
         const subjectMatch = messageText.match(/^Subject:\s*(.+)/i);
         const subject = subjectMatch ? subjectMatch[1].trim() : `Following up on your quote from ${fromName}`;
         const body = subjectMatch ? messageText.replace(/^Subject:.*\n\n?/i, "").trim() : messageText;
-        const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${body.split('\n').map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join('')}${quoteButtonHtml}</td></tr><tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
+        const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:20px 0;"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><tr><td style="background:linear-gradient(135deg,#007AFF,#5856D6);padding:24px 32px;"><h2 style="color:#fff;margin:0;font-size:20px;">${fromName}</h2></td></tr><tr><td style="padding:32px;">${body.split('\n').map((l: string) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#333;">${l}</p>`).join('')}${quoteButtonHtml}${SPAM_HINT_HTML}</td></tr><tr><td style="padding:16px 32px 24px;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;">Sent via QuotePro</p></td></tr></table></td></tr></table></body></html>`;
         try {
-          await sendEmail({ to: toEmail, subject, html: htmlBody, text: body, fromName, replyTo });
+          await sendEmail({ to: toEmail, subject, html: htmlBody, text: `${body}\n\n${SPAM_HINT_TEXT}`, fromName, replyTo });
         } catch (mailErr: any) {
           console.error("[mail] Auto follow-up email error:", mailErr);
           await updateCommunication(comm.id, { status: "failed", errorMessage: String(mailErr?.message || mailErr).slice(0, 200) });
@@ -1980,6 +1982,7 @@ export async function sendWinLossFollowUps(): Promise<void> {
               Share Quick Feedback
             </a>
           </td></tr></table>
+          ${SPAM_HINT_HTML}
         </td></tr>
         <tr><td style="padding:20px 32px;border-top:1px solid #f1f5f9">
           <p style="margin:0;font-size:12px;color:#94a3b8">
@@ -1996,7 +1999,7 @@ export async function sendWinLossFollowUps(): Promise<void> {
           to: row.customer_email,
           subject: "Did you find what you were looking for?",
           html,
-          text: `Hi ${firstName},\n\nWe sent you a cleaning quote recently and wanted to check in. Did you end up booking with someone?\n\nYour feedback helps us improve. It takes 10 seconds:\n${feedbackUrl}\n\n${businessName}`,
+          text: `Hi ${firstName},\n\nWe sent you a cleaning quote recently and wanted to check in. Did you end up booking with someone?\n\nYour feedback helps us improve. It takes 10 seconds:\n${feedbackUrl}\n\n${businessName}\n\n${SPAM_HINT_TEXT}`,
           fromName: row.business_from_name,
         });
 

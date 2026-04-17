@@ -9,7 +9,7 @@
 import { db } from "./db";
 import { sequenceEnrollments, businesses } from "../shared/schema";
 import { eq, and } from "drizzle-orm";
-import { sendEmail, getBusinessSendParams } from "./mail";
+import { sendEmail, getBusinessSendParams, SPAM_HINT_HTML, SPAM_HINT_TEXT } from "./mail";
 import { BUILT_IN_SEQUENCES } from "./helpers";
 
 // ─── Core send-step helper ────────────────────────────────────────────────────
@@ -57,10 +57,10 @@ export async function sendSequenceStep(enrollmentId: string): Promise<{ sent: bo
 
   const subject = replacePlaceholders(step.subject);
   const bodyText = replacePlaceholders(step.body);
-  const htmlBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;line-height:1.6;">${bodyText.replace(/\n/g, "<br>")}</div>`;
+  const htmlBody = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;line-height:1.6;">${bodyText.replace(/\n/g, "<br>")}${SPAM_HINT_HTML}</div>`;
 
   try {
-    await sendEmail({ to: enrollment.customerEmail, subject, html: htmlBody, text: bodyText, fromName, replyTo });
+    await sendEmail({ to: enrollment.customerEmail, subject, html: htmlBody, text: `${bodyText}\n\n${SPAM_HINT_TEXT}`, fromName, replyTo });
   } catch (mailErr: any) {
     console.error("[sequenceEmails] Send failed for enrollment", enrollmentId, "step", stepIndex, mailErr?.message);
     return { sent: false, reason: "mail_error" };
