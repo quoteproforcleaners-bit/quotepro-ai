@@ -139,7 +139,7 @@ export default function FirstQuotePage() {
   async function handleSkip() {
     if (skipping) return;
     setSkipping(true);
-    trackEvent(AnalyticsEvents.ONBOARDING_GATE_OPTION_SELECTED, { option: "skipped_after_error" });
+    trackEvent(AnalyticsEvents.ONBOARDING_GATE_OPTION_SELECTED, { option: "skipped_after_error", failureCount });
     try {
       await apiPost("/api/quotes/onboarding-skip", {});
       try { localStorage.removeItem("qp_pending_skip_retry"); } catch {}
@@ -224,7 +224,7 @@ export default function FirstQuotePage() {
       return q;
     },
     onSuccess: (data: any) => {
-      trackEvent(AnalyticsEvents.ONBOARDING_GATE_QUOTE_GENERATED, { option: "own_home" });
+      trackEvent(AnalyticsEvents.ONBOARDING_GATE_QUOTE_GENERATED, { option: "own_home", failureCount });
       navigate(`/onboarding/complete?quoteId=${data.id}&from=own_home`);
     },
     onError: (error: any) => {
