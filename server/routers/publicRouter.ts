@@ -83,6 +83,7 @@ import { businessFiles, sequenceEnrollments, employees, schedulePublications, cl
 import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage, getMoveInOutCleaningCalculatorPage, getCleaningQuoteGeneratorPage, getUltimateCleaningPricingGuidePage } from "../seo-pages";
 import { getCalculatorBySlug, renderCalculatorPage, renderCalculatorIndex } from "../calculator-engine";
 import { sendEmail, getBusinessSendParams } from "../mail";
+import { buildBookingConfirmationEmail } from "../emails/customerEmails";
 import { sendPush } from "../pushNotifications";
 
 const router = Router();
@@ -2049,28 +2050,22 @@ loadMonth(nextMo);
       const { fromName: bookingFromName, replyTo: bookingReplyTo } = getBusinessSendParams(business);
       if (customerEmail) {
         try {
+          const { html: bookingHtml } = buildBookingConfirmationEmail({
+            bookingDateStr,
+            bookingTimeStr,
+            endTimeStr,
+            address,
+            serviceLabel,
+            total: Number(q.total || 0),
+            confirmMsg,
+            senderLine: business?.senderName || companyName,
+          });
           await sendEmail({
             to: customerEmail,
             subject: `Your cleaning is booked for ${bookingDateStr}`,
             fromName: bookingFromName,
             replyTo: bookingReplyTo,
-            html: `
-              <div style="font-family:Inter,system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px">
-                <h1 style="font-size:24px;font-weight:800;color:#0F172A;margin:0 0 4px">You're all booked!</h1>
-                <p style="font-size:15px;color:#64748B;margin:0 0 24px">Here are the details for your upcoming clean:</p>
-                <div style="background:#F8FAFC;border-radius:12px;padding:20px;margin-bottom:20px">
-                  <div style="display:flex;gap:12px;margin-bottom:12px">
-                    <span style="font-size:20px">&#128197;</span>
-                    <div><strong style="color:#0F172A">${bookingDateStr}</strong><br/><span style="color:#64748B">${bookingTimeStr} – ${endTimeStr}</span></div>
-                  </div>
-                  ${address ? `<div style="display:flex;gap:12px;margin-bottom:12px"><span style="font-size:20px">&#128205;</span><div><strong style="color:#0F172A">${address}</strong></div></div>` : ""}
-                  <div style="display:flex;gap:12px"><span style="font-size:20px">&#128246;</span><div><strong style="color:#0F172A">${serviceLabel}</strong><br/><span style="color:#64748B">$${Number(q.total || 0).toFixed(2)}</span></div></div>
-                </div>
-                <p style="font-size:14px;color:#64748B">${confirmMsg}</p>
-                <p style="font-size:14px;color:#64748B;margin-top:16px">— ${business?.senderName || companyName}</p>
-                <p style="font-size:12px;color:#94A3B8;margin-top:24px;line-height:1.5">Don't see this email next time? Check your spam or junk folder and mark it as not spam.</p>
-              </div>
-            `,
+            html: bookingHtml,
           });
         } catch (emailErr) {
           console.error("[mail] Booking confirmation email failed:", emailErr);
