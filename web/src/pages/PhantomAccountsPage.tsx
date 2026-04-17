@@ -2,16 +2,35 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, ShieldOff, CheckCircle, RefreshCw, ChevronDown, ChevronUp, TrendingUp } from "lucide-react";
 import { apiPost } from "../lib/api";
 
+interface FunnelBreakdownRow {
+  key: string;
+  businesses_started: number;
+  succeeded: number;
+  skipped: number;
+  conversion_rate_pct: number;
+}
+interface OnboardingFunnelDay {
+  day: string;
+  started: number;
+  succeeded: number;
+  skipped: number;
+}
+
 interface OnboardingFunnel {
   businesses_started: number;
-  chose_own_home: number;
   chose_real_lead: number;
+  chose_own_home: number;
   succeeded: number;
   skipped: number;
   retried_and_succeeded: number;
   failed_twice_kept_trying: number;
   conversion_rate_pct: number;
   skip_rate_pct: number;
+  retry_success_rate_pct: number;
+  window_days?: number;
+  daily?: OnboardingFunnelDay[];
+  groupBy: "tier" | "source" | null;
+  breakdown: FunnelBreakdownRow[] | null;
 }
 
 interface PhantomUser {
@@ -63,21 +82,23 @@ export default function PhantomAccountsPage() {
   const [grantTier, setGrantTier] = useState("pro");
   const [grantResult, setGrantResult] = useState<string | null>(null);
   const [funnel, setFunnel] = useState<OnboardingFunnel | null>(null);
-  const [funnelError, setFunnelError] = useState<string | null>(null);
+  const [funnelGroupBy, setFunnelGroupBy] = useState<"tier" | "source">("tier");
+  const [funnelDays, setFunnelDays] = useState<7 | 14 | 30>(7);
   const [funnelLoading, setFunnelLoading] = useState(false);
+  const [funnelError, setFunnelError] = useState<string | null>(null);
 
-  async function loadFunnel(s = secret) {
+  async function loadFunnel(s = secret, gb: "tier" | "source" = funnelGroupBy, days = funnelDays) {
     setFunnelLoading(true);
     setFunnelError(null);
     try {
-      const res = await fetch("/api/admin/onboarding-funnel", {
+      const res = await fetch(`/api/admin/onboarding-funnel?groupBy=${gb}&days=${days}`, {
         headers: { "x-admin-key": s },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.message || `Failed (${res.status})`);
       }
-      setFunnel(await res.json());
+      setFunnel((await res.json()) as OnboardingFunnel);
     } catch (e: any) {
       setFunnelError(e.message);
     } finally {
@@ -86,9 +107,9 @@ export default function PhantomAccountsPage() {
   }
 
   useEffect(() => {
-    if (authed) loadFunnel();
+    if (authed) loadFunnel(secret, funnelGroupBy, funnelDays);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed]);
+  }, [authed, funnelGroupBy, funnelDays]);
 
   async function load(s = secret) {
     setLoading(true);
@@ -145,8 +166,9 @@ export default function PhantomAccountsPage() {
   }
 
   const sorted = [...accounts].sort((a, b) => {
-    const av = a[sortField] ?? "";
-    const bv = b[sortField] ?? "";
+    const field = sortField === "tier" ? "subscription_tier" : sortField;
+    const av = (a as any)[field] ?? "";
+    const bv = (b as any)[field] ?? "";
     const cmp = av < bv ? -1 : av > bv ? 1 : 0;
     return sortDir === "asc" ? cmp : -cmp;
   });
@@ -217,45 +239,174 @@ export default function PhantomAccountsPage() {
           </button>
         </div>
 
-        {/* Onboarding Gate panel */}
+        {/* Onboarding Funnel Panel */}
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 20, marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Onboarding Gate</h2>
-            <button
-              onClick={() => loadFunnel()}
-              disabled={funnelLoading}
-              style={{ display: "flex", alignItems: "center", gap: 6, background: "#f1f5f9", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#475569" }}
-            >
-              <RefreshCw size={12} /> {funnelLoading ? "Loading…" : "Refresh"}
-            </button>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <TrendingUp size={18} color="#7c3aed" />
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Onboarding Funnel</h2>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", gap: 4, background: "#f1f5f9", borderRadius: 8, padding: 3 }}>
+                {([7, 14, 30] as const).map((d) => (
+                  <button
+                    key={d}
+                    data-testid={`button-window-${d}`}
+                    onClick={() => setFunnelDays(d)}
+                    style={{
+                      background: funnelDays === d ? "#fff" : "transparent",
+                      border: "none",
+                      borderRadius: 6,
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: funnelDays === d ? "#7c3aed" : "#64748b",
+                      cursor: "pointer",
+                      boxShadow: funnelDays === d ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+                    }}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>Group by</label>
+                <select
+                  data-testid="select-funnel-groupby"
+                  value={funnelGroupBy}
+                  onChange={e => setFunnelGroupBy(e.target.value as "tier" | "source")}
+                  style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 12, background: "#fff" }}
+                >
+                  <option value="tier">Plan tier</option>
+                  <option value="source">Signup source</option>
+                </select>
+              </div>
+              <button
+                onClick={() => loadFunnel()}
+                disabled={funnelLoading}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "#f1f5f9", border: "none", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#475569" }}
+              >
+                <RefreshCw size={12} /> {funnelLoading ? "Loading…" : "Refresh"}
+              </button>
+            </div>
           </div>
+
           {funnelError && (
-            <p style={{ margin: 0, color: "#dc2626", fontSize: 13 }} data-testid="text-onboarding-funnel-error">{funnelError}</p>
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 12px", marginBottom: 12, color: "#dc2626", fontSize: 13 }} data-testid="text-onboarding-funnel-error">
+              {funnelError}
+            </div>
           )}
-          {!funnelError && !funnel && !funnelLoading && (
-            <p style={{ margin: 0, color: "#94a3b8", fontSize: 13 }}>No data yet.</p>
-          )}
-          {funnel && (() => {
-            const started = funnel.businesses_started || 0;
-            const retryRate = started > 0
-              ? Math.round((funnel.retried_and_succeeded / started) * 100)
-              : 0;
-            return (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }} data-testid="panel-onboarding-funnel">
-                <Metric label="Started" value={started} testId="metric-started" />
+          {funnelLoading && !funnel && <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>Loading funnel…</p>}
+
+          {funnel && (
+            <div data-testid="panel-onboarding-funnel">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 20 }}>
+                <Metric label="Started" value={funnel.businesses_started} testId="metric-started" />
                 <Metric label="Chose own home" value={funnel.chose_own_home} testId="metric-chose-own-home" />
                 <Metric label="Succeeded" value={funnel.succeeded} testId="metric-succeeded" color="#15803d" />
                 <Metric label="Skipped" value={funnel.skipped} testId="metric-skipped" color="#b45309" />
-                <Metric label="Retry rate" value={`${retryRate}%`} testId="metric-retry-rate" />
-                <Metric label="Conversion rate" value={`${funnel.conversion_rate_pct}%`} testId="metric-conversion-rate" color="#7c3aed" />
+                <Metric label="Retry Success" value={`${funnel.retry_success_rate_pct}%`} testId="metric-retry-rate" color="#0891b2" />
+                <Metric label="Conversion" value={`${funnel.conversion_rate_pct}%`} testId="metric-conversion-rate" color="#7c3aed" />
               </div>
-            );
-          })()}
-        </div>
 
-        <p style={{ margin: "0 0 24px", color: "#64748b", fontSize: 14, lineHeight: 1.6 }}>
-          These users have a paid subscription tier in the database but <strong>no active Stripe subscription</strong>. They were granted access manually (beta testing, admin grant, seed scripts). Demoting moves them to Free — they can still upgrade normally.
-        </p>
+              {/* Trend Chart */}
+              {funnel.daily && (
+                <div style={{ marginBottom: 24, border: "1px solid #f1f5f9", borderRadius: 10, padding: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      Daily Trend ({funnelDays}d)
+                    </div>
+                    <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#475569" }}>
+                      <LegendDot color="#1e293b" label="Started" />
+                      <LegendDot color="#16a34a" label="Succeeded" />
+                      <LegendDot color="#d97706" label="Skipped" />
+                    </div>
+                  </div>
+                  
+                  <div
+                    data-testid="chart-onboarding-trend"
+                    style={{
+                      display: "flex", alignItems: "flex-end", gap: 6,
+                      height: 160, padding: "0 4px", borderBottom: "1px solid #e2e8f0",
+                    }}
+                  >
+                    {funnel.daily.length === 0 && (
+                      <div style={{ flex: 1, textAlign: "center", color: "#94a3b8", fontSize: 13, alignSelf: "center" }}>
+                        No data for this window.
+                      </div>
+                    )}
+                    {funnel.daily.map((d) => {
+                      const maxValue = Math.max(1, ...funnel.daily!.map(x => Math.max(x.started, x.succeeded, x.skipped)));
+                      return (
+                        <div key={d.day} title={`${d.day}\nStarted: ${d.started}\nSucceeded: ${d.succeeded}\nSkipped: ${d.skipped}`}
+                          data-testid={`bar-day-${d.day}`}
+                          style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1, height: "100%", minWidth: 4 }}
+                        >
+                          <Bar value={d.started} max={maxValue} color="#1e293b" />
+                          <Bar value={d.succeeded} max={maxValue} color="#16a34a" />
+                          <Bar value={d.skipped} max={maxValue} color="#d97706" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {funnel.daily.length > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
+                      <span>{fmtShort(funnel.daily[0].day)}</span>
+                      {funnel.daily.length >= 3 && <span>{fmtShort(funnel.daily[Math.floor(funnel.daily.length / 2)].day)}</span>}
+                      <span>{fmtShort(funnel.daily[funnel.daily.length - 1].day)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 1fr) 2fr", gap: 20, alignItems: "start" }}>
+                {/* Secondary Totals/Stats */}
+                <div data-testid="funnel-totals" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <FunnelStat label="Total Started" value={funnel.businesses_started} />
+                  <FunnelStat label="Total Succeeded" value={funnel.succeeded} />
+                  <FunnelStat label="Total Skipped" value={funnel.skipped} />
+                  <FunnelStat label="Avg Conversion" value={`${funnel.conversion_rate_pct}%`} accent="#7c3aed" />
+                  <FunnelStat label="Avg Skip rate" value={`${funnel.skip_rate_pct}%`} />
+                </div>
+
+                {/* Breakdown table */}
+                <div data-testid="funnel-breakdown" style={{ overflowX: "auto" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>
+                    Breakdown by {funnelGroupBy === "tier" ? "plan tier" : "signup source"}
+                  </div>
+                  {(!funnel.breakdown || funnel.breakdown.length === 0) ? (
+                    <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No data yet.</p>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: "#f8fafc" }}>
+                          <th style={breakdownThStyle}>{funnelGroupBy === "tier" ? "Tier" : "Source"}</th>
+                          <th style={{ ...breakdownThStyle, textAlign: "right" }}>Started</th>
+                          <th style={{ ...breakdownThStyle, textAlign: "right" }}>Succeeded</th>
+                          <th style={{ ...breakdownThStyle, textAlign: "right" }}>Skipped</th>
+                          <th style={{ ...breakdownThStyle, textAlign: "right" }}>Conv %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {funnel.breakdown.map((r, i) => (
+                          <tr key={r.key} data-testid={`funnel-breakdown-row-${r.key}`} style={{ borderTop: i === 0 ? "1px solid #e2e8f0" : "1px solid #f1f5f9" }}>
+                            <td style={breakdownTdStyle}>
+                              <span style={{ fontWeight: 600, color: "#1e293b", textTransform: "capitalize" }}>{r.key}</span>
+                            </td>
+                            <td style={{ ...breakdownTdStyle, textAlign: "right", color: "#475569" }}>{r.businesses_started}</td>
+                            <td style={{ ...breakdownTdStyle, textAlign: "right", color: "#475569" }}>{r.succeeded}</td>
+                            <td style={{ ...breakdownTdStyle, textAlign: "right", color: "#475569" }}>{r.skipped}</td>
+                            <td style={{ ...breakdownTdStyle, textAlign: "right", fontWeight: 700, color: "#7c3aed" }}>{r.conversion_rate_pct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Tier summary */}
         {accounts.length > 0 && (
@@ -364,8 +515,6 @@ export default function PhantomAccountsPage() {
           </div>
         )}
 
-        {/* Onboarding Gate trend */}
-        <OnboardingGatePanel secret={secret} />
 
         {/* Grant tier tool */}
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24, marginTop: 28 }}>
@@ -429,154 +578,23 @@ const thStyle: React.CSSProperties = {
 };
 const tdStyle: React.CSSProperties = { padding: "12px 16px", verticalAlign: "top" };
 
-interface OnboardingFunnelDay {
-  day: string;
-  started: number;
-  succeeded: number;
-  skipped: number;
-}
+const breakdownThStyle: React.CSSProperties = {
+  padding: "8px 12px", textAlign: "left", fontWeight: 700, fontSize: 11,
+  color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em",
+};
+const breakdownTdStyle: React.CSSProperties = { padding: "10px 12px", verticalAlign: "middle" };
 
-interface OnboardingFunnelData {
-  businesses_started: number;
-  succeeded: number;
-  skipped: number;
-  conversion_rate_pct: number;
-  skip_rate_pct: number;
-  retry_success_rate_pct: number;
-  window_days: number;
-  daily: OnboardingFunnelDay[];
-}
-
-function OnboardingGatePanel({ secret }: { secret: string }) {
-  const [days, setDays] = useState<7 | 14 | 30>(7);
-  const [data, setData] = useState<OnboardingFunnelData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(
-          `/api/admin/onboarding-funnel?days=${days}`,
-          { headers: { "x-admin-key": secret } },
-        );
-        if (!res.ok) throw new Error(await res.text());
-        const json = await res.json();
-        if (!cancelled) setData(json);
-      } catch (e: any) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [days, secret]);
-
-  const daily = data?.daily ?? [];
-  const maxValue = Math.max(
-    1,
-    ...daily.map((d) => Math.max(d.started, d.succeeded, d.skipped)),
-  );
-
+function FunnelStat({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
     <div
-      data-testid="panel-onboarding-gate"
-      style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24, marginTop: 28 }}
+      data-testid={`funnel-stat-${label.toLowerCase().replace(/\s+/g, "-")}`}
+      style={{
+        display: "flex", justifyContent: "space-between", alignItems: "baseline",
+        padding: "8px 12px", background: "#f8fafc", borderRadius: 8,
+      }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 6 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <TrendingUp size={18} color="#7c3aed" />
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Onboarding Gate Trend</h2>
-        </div>
-        <div style={{ display: "flex", gap: 4, background: "#f1f5f9", borderRadius: 8, padding: 3 }}>
-          {([7, 14, 30] as const).map((d) => (
-            <button
-              key={d}
-              data-testid={`button-window-${d}`}
-              onClick={() => setDays(d)}
-              style={{
-                background: days === d ? "#fff" : "transparent",
-                border: "none",
-                borderRadius: 6,
-                padding: "5px 12px",
-                fontSize: 12,
-                fontWeight: 700,
-                color: days === d ? "#7c3aed" : "#64748b",
-                cursor: "pointer",
-                boxShadow: days === d ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
-              }}
-            >
-              {d}d
-            </button>
-          ))}
-        </div>
-      </div>
-      <p style={{ margin: "0 0 16px", color: "#64748b", fontSize: 13 }}>
-        Daily breakdown of businesses that started, succeeded, or skipped the first-quote gate.
-      </p>
-
-      {error && (
-        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 14, color: "#dc2626", fontSize: 13 }}>
-          {error}
-        </div>
-      )}
-
-      {/* Totals */}
-      {data && (
-        <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
-          <Stat label="Started" value={data.businesses_started} color="#1e293b" testId="stat-started" />
-          <Stat label="Succeeded" value={data.succeeded} color="#16a34a" testId="stat-succeeded" />
-          <Stat label="Skipped" value={data.skipped} color="#d97706" testId="stat-skipped" />
-          <Stat label="Conversion" value={`${data.conversion_rate_pct}%`} color="#7c3aed" testId="stat-conversion" />
-          <Stat label="Retry Success" value={`${data.retry_success_rate_pct}%`} color="#0891b2" testId="stat-retry" />
-        </div>
-      )}
-
-      {/* Legend */}
-      <div style={{ display: "flex", gap: 14, marginBottom: 10, fontSize: 12, color: "#475569", flexWrap: "wrap" }}>
-        <LegendDot color="#1e293b" label="Started" />
-        <LegendDot color="#16a34a" label="Succeeded" />
-        <LegendDot color="#d97706" label="Skipped" />
-      </div>
-
-      {/* Bar chart */}
-      <div
-        data-testid="chart-onboarding-trend"
-        style={{
-          display: "flex", alignItems: "flex-end", gap: 6,
-          height: 160, padding: "0 4px", borderBottom: "1px solid #e2e8f0",
-          opacity: loading ? 0.5 : 1,
-        }}
-      >
-        {daily.length === 0 && !loading && (
-          <div style={{ flex: 1, textAlign: "center", color: "#94a3b8", fontSize: 13, alignSelf: "center" }}>
-            No data for this window.
-          </div>
-        )}
-        {daily.map((d) => (
-          <div key={d.day} title={`${d.day}\nStarted: ${d.started}\nSucceeded: ${d.succeeded}\nSkipped: ${d.skipped}`}
-            data-testid={`bar-day-${d.day}`}
-            style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1, height: "100%", minWidth: 4 }}
-          >
-            <Bar value={d.started} max={maxValue} color="#1e293b" />
-            <Bar value={d.succeeded} max={maxValue} color="#16a34a" />
-            <Bar value={d.skipped} max={maxValue} color="#d97706" />
-          </div>
-        ))}
-      </div>
-
-      {/* X-axis labels (first / mid / last) */}
-      {daily.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
-          <span>{fmtShort(daily[0].day)}</span>
-          {daily.length >= 3 && <span>{fmtShort(daily[Math.floor(daily.length / 2)].day)}</span>}
-          <span>{fmtShort(daily[daily.length - 1].day)}</span>
-        </div>
-      )}
+      <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>{label}</span>
+      <span style={{ fontSize: 18, fontWeight: 800, color: accent ?? "#1e293b" }}>{value}</span>
     </div>
   );
 }
@@ -585,15 +603,6 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
     <div style={{ flex: 1, height: `${pct}%`, minHeight: value > 0 ? 2 : 0, background: color, borderRadius: "2px 2px 0 0" }} />
-  );
-}
-
-function Stat({ label, value, color, testId }: { label: string; value: number | string; color: string; testId: string }) {
-  return (
-    <div data-testid={testId} style={{ background: "#f8fafc", borderRadius: 8, padding: "10px 14px", minWidth: 90 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 800, color, marginTop: 2 }}>{value}</div>
-    </div>
   );
 }
 

@@ -347,6 +347,8 @@ const router = Router();
     try {
       const requestedDays = parseInt(String(req.query.days ?? "7"), 10);
       const days = [7, 14, 30].includes(requestedDays) ? requestedDays : 7;
+      const groupByRaw = (req.query.groupBy as string | undefined)?.toLowerCase();
+      const groupBy = groupByRaw === "tier" || groupByRaw === "source" ? groupByRaw : null;
       const result = await pool.query(`
         WITH per_business AS (
           SELECT
@@ -363,6 +365,7 @@ const router = Router();
             'onboarding_gate_option_selected',
             'onboarding_gate_quote_generated'
           )
+          AND created_at >= NOW() - ($1::int || ' days')::interval
           GROUP BY business_id
         ),
         retry_stats AS (
@@ -406,10 +409,11 @@ const router = Router();
             'onboarding_gate_option_selected',
             'onboarding_gate_quote_generated'
           )
+          AND created_at >= NOW() - ($1::int || ' days')::interval
         )
         SELECT agg.*, retry_stats.retried_businesses, retry_stats.retried_then_succeeded
         FROM agg, retry_stats
-      `);
+      `, [days]);
       const dailyResult = await pool.query(
         `
         WITH days AS (
@@ -464,6 +468,58 @@ const router = Router();
       const skipped = Number(row.skipped ?? 0);
       const retriedBusinesses = Number(row.retried_businesses ?? 0);
       const retriedThenSucceeded = Number(row.retried_then_succeeded ?? 0);
+
+      let breakdown: Array<{
+        key: string;
+        businesses_started: number;
+        succeeded: number;
+        skipped: number;
+        conversion_rate_pct: number;
+      }> | undefined;
+
+      if (groupBy) {
+        const keyExpr = groupBy === "tier"
+          ? `COALESCE(u.subscription_tier, 'unknown')`
+          : `COALESCE(u.auth_provider, 'unknown')`;
+        const breakdownResult = await pool.query(`
+          WITH ev AS (
+            SELECT ae.business_id, ae.event_name, ae.properties, ${keyExpr} AS group_key
+            FROM analytics_events ae
+            LEFT JOIN businesses b ON b.id = ae.business_id
+            LEFT JOIN users u ON u.id = b.owner_user_id
+            WHERE ae.event_name IN (
+              'onboarding_gate_started',
+              'onboarding_gate_option_selected',
+              'onboarding_gate_quote_generated'
+            )
+            AND ae.created_at >= NOW() - ($1::int || ' days')::interval
+          )
+          SELECT
+            group_key AS key,
+            COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_started'
+              THEN business_id END)::int AS businesses_started,
+            COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_quote_generated'
+              THEN business_id END)::int AS succeeded,
+            COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_option_selected'
+              AND properties->>'option' = 'skipped_after_error'
+              THEN business_id END)::int AS skipped
+          FROM ev
+          GROUP BY group_key
+          ORDER BY businesses_started DESC, key ASC
+        `, [days]);
+        breakdown = breakdownResult.rows.map(r => {
+          const s = Number(r.businesses_started ?? 0);
+          const ok = Number(r.succeeded ?? 0);
+          return {
+            key: String(r.key ?? "unknown"),
+            businesses_started: s,
+            succeeded: ok,
+            skipped: Number(r.skipped ?? 0),
+            conversion_rate_pct: s > 0 ? Math.round((ok / s) * 100) : 0,
+          };
+        });
+      }
+
       return res.json({
         businesses_started: started,
         chose_real_lead: Number(row.chose_real_lead ?? 0),
@@ -481,6 +537,8 @@ const router = Router();
           : 0,
         window_days: days,
         daily,
+        groupBy: groupBy ?? null,
+        breakdown: breakdown ?? null,
       });
     } catch (err: any) {
       console.error("GET /api/admin/onboarding-funnel error:", err.message);
