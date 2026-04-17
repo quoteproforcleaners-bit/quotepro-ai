@@ -22,8 +22,8 @@ export default defineConfig({
   ],
   webServer: {
     command: "NODE_ENV=test tsx server/index.ts",
-    url: "http://localhost:5000",
+    url: "http://localhost:5000/api/health",
     timeout: 60000,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
   },
 });

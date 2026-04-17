@@ -119,8 +119,39 @@ jobs:
       - name: Push database schema
         run: npm run db:push
 
+      - name: Start server
+        run: npm run server:dev &> /tmp/server.log &
+
+      - name: Wait for server to be healthy
+        run: |
+          echo "Waiting for server to respond on :5000..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/api/health > /dev/null 2>&1; then
+              echo "Server is up (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i/30: server not ready yet, retrying in 2s..."
+            sleep 2
+          done
+          echo ""
+          echo "ERROR: Server failed to start within 60 seconds."
+          echo "This is a server startup failure, not a test failure."
+          echo "Check the server logs below for the root cause:"
+          echo "----------------------------------------------------"
+          cat /tmp/server.log
+          echo "----------------------------------------------------"
+          exit 1
+
       - name: Run Playwright e2e tests
         run: npx playwright test
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-startup-log
+          path: /tmp/server.log
+          retention-days: 7
 
       - name: Upload Playwright report
         if: failure()
