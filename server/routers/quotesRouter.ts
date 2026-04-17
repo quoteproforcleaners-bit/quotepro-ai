@@ -1031,6 +1031,7 @@ const quoteEmailLimiter = rateLimit({
           <div style="font-weight:600;color:#333333;margin-bottom:8px;">${business.companyName || 'QuotePro'}</div>
           ${business.phone ? `<div style="font-size:13px;color:#666666;margin-bottom:4px;">Phone: <a href="tel:${business.phone}" style="color:${primaryColor};text-decoration:none;">${business.phone}</a></div>` : ''}
           ${replyToEmail ? `<div style="font-size:13px;color:#666666;">Email: <a href="mailto:${replyToEmail}" style="color:${primaryColor};text-decoration:none;">${replyToEmail}</a></div>` : ''}
+          <div style="font-size:12px;color:#94a3b8;margin-top:12px;line-height:1.5;">Don't see this email next time? Check your spam or junk folder and mark it as not spam.</div>
         </td></tr>
       </table>
     </td></tr>
@@ -1038,9 +1039,10 @@ const quoteEmailLimiter = rateLimit({
 </body>
 </html>`;
 
-      const plainBody = customBody
+      const spamHintText = `\n\nDon't see this email next time? Check your spam or junk folder and mark it as not spam.`;
+      const plainBody = (customBody
         ? `${customBody}\n\nView your quote online: ${quoteUrl}`
-        : `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}`;
+        : `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}`) + spamHintText;
 
       const mailAttachments: import("../mail").MailAttachment[] = [];
       if (attachmentFileIds && Array.isArray(attachmentFileIds) && attachmentFileIds.length > 0) {
@@ -1377,6 +1379,7 @@ The email should:
           <div style="font-weight:700;color:${TEXT_DARK};margin-bottom:6px;font-size:14px;">${esc(business.companyName || 'QuotePro')}</div>
           ${business.phone ? `<div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:3px;">Phone: <a href="tel:${esc(business.phone)}" style="color:${BRAND_GREEN};text-decoration:none;">${esc(business.phone)}</a></div>` : ''}
           ${replyToEmail ? `<div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:10px;">Email: <a href="mailto:${esc(replyToEmail)}" style="color:${BRAND_GREEN};text-decoration:none;">${esc(replyToEmail)}</a></div>` : ''}
+          <div style="font-size:11px;color:${TEXT_MUTED};margin-top:12px;line-height:1.5;">Don't see this email next time? Check your spam or junk folder and mark it as not spam.</div>
           <div style="font-size:11px;color:${TEXT_MUTED};margin-top:12px;">Powered by <span style="color:${BRAND_GREEN};font-weight:700;">QuotePro</span></div>
         </td></tr>
 
@@ -1391,7 +1394,7 @@ The email should:
           to,
           subject: subject || `Your ${business.companyName || "QuotePro"} Quote`,
           html: emailHtml,
-          text: `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}`,
+          text: `Hi ${customerName},\n\nPlease see your quote details below.\n\nTo view and accept your quote online, visit: ${quoteUrl}\n\nDon't see this email next time? Check your spam or junk folder and mark it as not spam.`,
           fromName,
           replyTo: replyToEmail,
         });

@@ -2068,6 +2068,7 @@ loadMonth(nextMo);
                 </div>
                 <p style="font-size:14px;color:#64748B">${confirmMsg}</p>
                 <p style="font-size:14px;color:#64748B;margin-top:16px">— ${business?.senderName || companyName}</p>
+                <p style="font-size:12px;color:#94A3B8;margin-top:24px;line-height:1.5">Don't see this email next time? Check your spam or junk folder and mark it as not spam.</p>
               </div>
             `,
           });
