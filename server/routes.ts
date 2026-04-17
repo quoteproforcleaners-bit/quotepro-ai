@@ -105,7 +105,6 @@ function setupSession(app: Express) {
     session({
       store: new PgStore({
         pool: pool as any,
-        tableName: "user_sessions",
         createTableIfMissing: true,
       }),
       secret: (() => {
