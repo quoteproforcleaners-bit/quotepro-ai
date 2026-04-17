@@ -111,7 +111,7 @@ function AddressForm({
 
 export default function FirstQuotePage() {
   const navigate = useNavigate();
-  const { user, business } = useAuth();
+  const { user, business, refresh } = useAuth();
   const [mode, setMode] = useState<"select" | "own_home">("select");
   const [apiError, setApiError] = useState<string | undefined>();
   const [failureCount, setFailureCount] = useState(0);
@@ -123,6 +123,7 @@ export default function FirstQuotePage() {
   async function handleSkip() {
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_OPTION_SELECTED, { option: "skipped_after_error" });
     await apiPost("/api/quotes/onboarding-skip", {}).catch(() => {});
+    await refresh();
     navigate("/dashboard");
   }
 
