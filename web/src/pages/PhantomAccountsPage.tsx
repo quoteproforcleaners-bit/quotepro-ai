@@ -8,6 +8,7 @@ interface FunnelBreakdownRow {
   succeeded: number;
   skipped: number;
   conversion_rate_pct: number;
+  skip_rate_pct: number;
 }
 interface OnboardingFunnelDay {
   day: string;
@@ -381,10 +382,11 @@ export default function PhantomAccountsPage() {
                       <thead>
                         <tr style={{ background: "#f8fafc" }}>
                           <th style={breakdownThStyle}>{funnelGroupBy === "tier" ? "Tier" : "Source"}</th>
-                          <th style={{ ...breakdownThStyle, textAlign: "right" }}>Started</th>
+                          <th style={{ ...breakdownThStyle, textAlign: "right" }}>{funnelGroupBy === "source" ? "Signups" : "Started"}</th>
                           <th style={{ ...breakdownThStyle, textAlign: "right" }}>Succeeded</th>
                           <th style={{ ...breakdownThStyle, textAlign: "right" }}>Skipped</th>
                           <th style={{ ...breakdownThStyle, textAlign: "right" }}>Conv %</th>
+                          <th style={{ ...breakdownThStyle, textAlign: "right" }}>Skip %</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -397,6 +399,7 @@ export default function PhantomAccountsPage() {
                             <td style={{ ...breakdownTdStyle, textAlign: "right", color: "#475569" }}>{r.succeeded}</td>
                             <td style={{ ...breakdownTdStyle, textAlign: "right", color: "#475569" }}>{r.skipped}</td>
                             <td style={{ ...breakdownTdStyle, textAlign: "right", fontWeight: 700, color: "#7c3aed" }}>{r.conversion_rate_pct}%</td>
+                            <td style={{ ...breakdownTdStyle, textAlign: "right", fontWeight: 700, color: "#b45309" }}>{r.skip_rate_pct}%</td>
                           </tr>
                         ))}
                       </tbody>

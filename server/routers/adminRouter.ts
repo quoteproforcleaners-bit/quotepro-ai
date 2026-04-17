@@ -475,6 +475,7 @@ const router = Router();
         succeeded: number;
         skipped: number;
         conversion_rate_pct: number;
+        skip_rate_pct: number;
       }> | undefined;
 
       if (groupBy) {
@@ -484,7 +485,7 @@ const router = Router();
           // 'referral' when only a referrer code is present, then to 'direct'
           // for any remaining new users so the breakdown is never empty.
           : `COALESCE(
-              NULLIF(u.signup_source, ''),
+              NULLIF(NULLIF(LOWER(u.signup_source), ''), 'unknown'),
               CASE WHEN u.referred_by IS NOT NULL THEN 'referral' END,
               'direct'
             )`;
@@ -517,12 +518,14 @@ const router = Router();
         breakdown = breakdownResult.rows.map(r => {
           const s = Number(r.businesses_started ?? 0);
           const ok = Number(r.succeeded ?? 0);
+          const sk = Number(r.skipped ?? 0);
           return {
             key: String(r.key ?? "unknown"),
             businesses_started: s,
             succeeded: ok,
-            skipped: Number(r.skipped ?? 0),
+            skipped: sk,
             conversion_rate_pct: s > 0 ? Math.round((ok / s) * 100) : 0,
+            skip_rate_pct: s > 0 ? Math.round((sk / s) * 100) : 0,
           };
         });
       }
