@@ -872,7 +872,17 @@ ${gs?.includeReviewOnPdf && gs?.googleReviewLink?.trim() ? `<div style="margin-t
     }
   });
 
-  router.post("/quotes/:id/send-with-pdf", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+const quoteEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  keyGenerator: (req: Request) => String(req.session?.userId ?? "unknown"),
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  message: { message: "Too many emails sent. Please wait before sending another." },
+});
+
+  router.post("/quotes/:id/send-with-pdf", requireAuth, requireGrowth, quoteEmailLimiter, async (req: Request, res: Response) => {
     try {
       const quote = await getQuoteById(req.params.id);
       if (!quote) return res.status(404).json({ message: "Quote not found" });
@@ -1183,17 +1193,7 @@ The email should:
     }
   });
 
-const onboardingSendLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  keyGenerator: (req: Request) => String(req.session?.userId ?? "unknown"),
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
-  message: { message: "Too many emails sent. Please wait before sending another." },
-});
-
-  router.post("/quotes/:id/onboarding-send", requireAuth, onboardingSendLimiter, async (req: Request, res: Response) => {
+  router.post("/quotes/:id/onboarding-send", requireAuth, quoteEmailLimiter, async (req: Request, res: Response) => {
     try {
       const quote = await getQuoteById(req.params.id);
       if (!quote) return res.status(404).json({ message: "Quote not found" });
