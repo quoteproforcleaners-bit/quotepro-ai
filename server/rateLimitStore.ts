@@ -27,12 +27,18 @@ const CREATE_TABLE_SQL = `
   )
 `;
 
+const CREATE_INDEX_SQL = `
+  CREATE INDEX IF NOT EXISTS rate_limit_counters_expires_at_idx
+    ON rate_limit_counters (expires_at)
+`;
+
 let tableReady: Promise<void> | null = null;
 
 function ensureTable(pool: Pool): Promise<void> {
   if (!tableReady) {
     tableReady = pool
       .query(CREATE_TABLE_SQL)
+      .then(() => pool.query(CREATE_INDEX_SQL))
       .then(() => undefined)
       .catch((err) => {
         tableReady = null;
