@@ -13,9 +13,11 @@ export default function OnboardingCompletePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const quoteId = searchParams.get("quoteId");
+  const fromOwnHome = searchParams.get("from") === "own_home";
   const previewFired = useRef(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  const { refresh } = useAuth();
+  const { refresh, user } = useAuth();
+  const emailedTo = fromOwnHome ? (user?.email ?? null) : null;
 
   const quoteQuery = useQuery<any>({
     queryKey: ["/api/quotes", quoteId],
@@ -75,6 +77,18 @@ export default function OnboardingCompletePage() {
           This is exactly what your customer sees.
         </span>
       </div>
+
+      {emailedTo && (
+        <div style={styles.inboxCallout}>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+          </svg>
+          <span>
+            We just emailed this quote to <strong>{emailedTo}</strong> — check your inbox.
+          </span>
+        </div>
+      )}
 
       <div style={styles.iframeWrap}>
         {(!previewUrl || quoteQuery.isLoading) && (
@@ -145,6 +159,19 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 600,
     letterSpacing: "0.3px",
+  },
+  inboxCallout: {
+    background: "#EFF6FF",
+    borderBottom: "1px solid #BFDBFE",
+    color: "#1E40AF",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: "9px 20px",
+    fontSize: 13,
+    fontWeight: 500,
+    flexShrink: 0,
   },
   iframeWrap: {
     flex: 1,

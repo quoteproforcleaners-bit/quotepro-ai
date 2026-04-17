@@ -170,7 +170,7 @@ export default function FirstQuotePage() {
     },
     onSuccess: (data: any) => {
       trackEvent(AnalyticsEvents.ONBOARDING_GATE_QUOTE_GENERATED, { option: "own_home" });
-      navigate(`/onboarding/complete?quoteId=${data.id}`);
+      navigate(`/onboarding/complete?quoteId=${data.id}&from=own_home`);
     },
     onError: () => {
       setFailureCount((prev) => prev + 1);
