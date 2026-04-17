@@ -142,12 +142,37 @@ export default function FirstQuotePage() {
             : user?.name || "Demo Customer",
         },
         options: {
-          good: { name: "Standard Clean", price: Math.round(data.beds * 45 + data.baths * 25 + data.sqft * 0.02) },
-          better: { name: "Deep Clean", price: Math.round(data.beds * 60 + data.baths * 35 + data.sqft * 0.03) },
-          best: { name: "Premium Clean", price: Math.round(data.beds * 80 + data.baths * 45 + data.sqft * 0.04) },
+          good: {
+            name: "Standard Clean",
+            price: Math.round(data.beds * 45 + data.baths * 25 + data.sqft * 0.02),
+            scope: "Kitchen, bathrooms, dusting, vacuum, and mop",
+            serviceTypeId: "regular",
+            serviceTypeName: "Standard Cleaning",
+            addOnsIncluded: [],
+          },
+          better: {
+            name: "Deep Clean",
+            price: Math.round(data.beds * 60 + data.baths * 35 + data.sqft * 0.03),
+            scope: "Standard clean plus baseboards, blinds, and detail work",
+            serviceTypeId: "deep-clean",
+            serviceTypeName: "Deep Clean",
+            addOnsIncluded: ["Baseboards Detail", "Blinds Detail"],
+          },
+          best: {
+            name: "Premium Clean",
+            price: Math.round(data.beds * 80 + data.baths * 45 + data.sqft * 0.04),
+            scope: "Deep clean plus inside oven, cabinets, and interior windows",
+            serviceTypeId: "deep-clean",
+            serviceTypeName: "Premium Deep Clean",
+            addOnsIncluded: ["Baseboards Detail", "Blinds Detail", "Inside Oven", "Inside Cabinets", "Interior Windows"],
+          },
         },
-        selectedOption: "good",
-        total: Math.round(data.beds * 45 + data.baths * 25 + data.sqft * 0.02),
+        selectedOption: "better",
+        recommendedOption: "better",
+        frequencySelected: "one-time",
+        subtotal: Math.round(data.beds * 60 + data.baths * 35 + data.sqft * 0.03),
+        tax: 0,
+        total: Math.round(data.beds * 60 + data.baths * 35 + data.sqft * 0.03),
       };
 
       const q = await apiPost("/api/quotes", quoteData) as any;
