@@ -9,6 +9,8 @@ function trackEvent(eventName: string, properties?: Record<string, unknown>) {
   apiPost("/api/analytics/events", { eventName, properties: properties || {} }).catch(() => {});
 }
 
+type ResendState = "idle" | "loading" | "success" | "error";
+
 export default function OnboardingCompletePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -16,6 +18,7 @@ export default function OnboardingCompletePage() {
   const fromOwnHome = searchParams.get("from") === "own_home";
   const previewFired = useRef(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [resendState, setResendState] = useState<ResendState>("idle");
   const { refresh, user } = useAuth();
   const emailedTo = fromOwnHome ? (user?.email ?? null) : null;
 
@@ -59,6 +62,17 @@ export default function OnboardingCompletePage() {
     navigate("/quotes/new", { replace: true });
   }
 
+  async function handleResend() {
+    if (!quoteId || !emailedTo || resendState === "loading") return;
+    setResendState("loading");
+    try {
+      await apiPost(`/api/quotes/${quoteId}/onboarding-send`, { to: emailedTo });
+      setResendState("success");
+    } catch {
+      setResendState("error");
+    }
+  }
+
   if (quoteQuery.isError || (!quoteId)) {
     return (
       <div style={styles.errorPage}>
@@ -87,6 +101,18 @@ export default function OnboardingCompletePage() {
           <span>
             We just emailed this quote to <strong>{emailedTo}</strong> — check your inbox.
           </span>
+          <button
+            style={{
+              ...styles.resendBtn,
+              ...(resendState === "success" ? styles.resendBtnSuccess : {}),
+              ...(resendState === "error" ? styles.resendBtnError : {}),
+              ...(resendState === "loading" ? styles.resendBtnLoading : {}),
+            }}
+            onClick={handleResend}
+            disabled={resendState === "loading" || resendState === "success"}
+          >
+            {resendState === "loading" ? "Sending…" : resendState === "success" ? "Sent!" : resendState === "error" ? "Try again" : "Resend email"}
+          </button>
         </div>
       )}
 
@@ -274,5 +300,35 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 15,
     fontWeight: 600,
     padding: 0,
+  },
+  resendBtn: {
+    marginLeft: 12,
+    flexShrink: 0,
+    background: "transparent",
+    border: "1px solid #93C5FD",
+    color: "#1D4ED8",
+    borderRadius: 6,
+    padding: "3px 10px",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+    whiteSpace: "nowrap" as const,
+    transition: "background 0.15s, color 0.15s",
+  },
+  resendBtnLoading: {
+    opacity: 0.7,
+    cursor: "default",
+  },
+  resendBtnSuccess: {
+    background: "#DCFCE7",
+    borderColor: "#86EFAC",
+    color: "#166534",
+    cursor: "default",
+  },
+  resendBtnError: {
+    background: "#FEF2F2",
+    borderColor: "#FCA5A5",
+    color: "#991B1B",
+    cursor: "pointer",
   },
 };
