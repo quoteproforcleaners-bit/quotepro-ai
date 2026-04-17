@@ -160,9 +160,11 @@ export default function FirstQuotePage() {
           });
         } catch (mailErr: any) {
           apiDelete(`/api/quotes/${q.id}`).catch(() => {});
-          throw new Error(
+          const rethrown = new Error(
             mailErr?.message || "Quote was created but we couldn't send the preview email. Please try again."
           );
+          (rethrown as any).status = mailErr?.status;
+          throw rethrown;
         }
       }
 
@@ -172,9 +174,16 @@ export default function FirstQuotePage() {
       trackEvent(AnalyticsEvents.ONBOARDING_GATE_QUOTE_GENERATED, { option: "own_home" });
       navigate(`/onboarding/complete?quoteId=${data.id}&from=own_home`);
     },
-    onError: () => {
+    onError: (error: any) => {
       setFailureCount((prev) => prev + 1);
-      setApiError("Something went wrong generating your quote. Please try again.");
+      const status = error?.status as number | undefined;
+      if (status === 429) {
+        setApiError("Too many requests — please wait a minute and try again.");
+      } else if (status !== undefined && status >= 500) {
+        setApiError("Our servers are having trouble right now. Try again in a moment.");
+      } else {
+        setApiError("Something went wrong generating your quote. Please try again.");
+      }
     },
   });
 
