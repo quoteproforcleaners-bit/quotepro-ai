@@ -253,8 +253,11 @@ export default function QuoteBookingPage() {
               <h2 style={{ ...h2, color: "#16A34A" }}>Booking Confirmed!</h2>
               {confirmedInfo ? (
                 <>
-                  <p style={{ ...sub, marginBottom: 20 }}>
+                  <p style={{ ...sub, marginBottom: 6 }}>
                     We've confirmed your appointment and sent a confirmation email to <strong>{data?.contact.email}</strong>.
+                  </p>
+                  <p style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 20 }}>
+                    Don't see it? Check your spam or junk folder.
                   </p>
                   <div style={{ background: "#F9FAFB", borderRadius: 12, padding: "16px 20px", textAlign: "left", marginBottom: 16 }}>
                     <div style={{ fontSize: 14, color: "#374151", marginBottom: 6 }}>
@@ -272,7 +275,12 @@ export default function QuoteBookingPage() {
                   </div>
                 </>
               ) : (
-                <p style={sub}>Your booking has already been confirmed. Check your email for details.</p>
+                <>
+                  <p style={{ ...sub, marginBottom: 6 }}>Your booking has already been confirmed. Check your email for details.</p>
+                  <p style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 16 }}>
+                    Don't see it? Check your spam or junk folder.
+                  </p>
+                </>
               )}
               {data?.business.phone && <ContactInfo phone={data.business.phone} email={data.business.email} />}
             </Card>

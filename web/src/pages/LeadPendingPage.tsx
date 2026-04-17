@@ -287,6 +287,9 @@ export default function LeadPendingPage() {
                   <div style={{ fontSize: 12, color: "#15803D" }}>
                     Your email includes booking times — click a slot to reserve your spot instantly.
                   </div>
+                  <div style={{ fontSize: 11, color: "#16A34A", opacity: 0.8, marginTop: 4 }}>
+                    Don't see it? Check your spam or junk folder.
+                  </div>
                 </div>
               </div>
 
@@ -313,6 +316,9 @@ export default function LeadPendingPage() {
                 <Mail size={18} style={{ color, flexShrink: 0, marginTop: 2 }} />
                 <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
                   Look for an email at <strong>{email}</strong> from {bizName}. It'll contain your quote and booking options.
+                  <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
+                    Don't see it? Check your spam or junk folder.
+                  </div>
                 </div>
               </div>
             </div>

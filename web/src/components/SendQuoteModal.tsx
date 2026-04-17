@@ -189,6 +189,7 @@ export default function SendQuoteModal({ quoteId, quote, business, onClose, onSe
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">Quote sent!</h3>
             <p className="text-slate-400 text-sm">Your quote email has been delivered to {to}</p>
+            <p className="text-slate-500 text-xs mt-2">If they don't see it, ask them to check their spam or junk folder.</p>
           </div>
         ) : (
           <div className="px-6 py-5 space-y-5">
