@@ -94,13 +94,18 @@ export default function OnboardingCompletePage() {
 
       {emailedTo && (
         <div style={styles.inboxCallout}>
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
             <polyline points="22,6 12,13 2,6" />
           </svg>
-          <span>
-            We just emailed this quote to <strong>{emailedTo}</strong> — check your inbox.
-          </span>
+          <div style={styles.inboxCalloutText}>
+            <span>
+              We just emailed this quote to <strong>{emailedTo}</strong> — check your inbox.
+            </span>
+            <span style={styles.spamHint}>
+              Don't see it? Check your spam or junk folder.
+            </span>
+          </div>
           <button
             style={{
               ...styles.resendBtn,
@@ -191,13 +196,24 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: "1px solid #BFDBFE",
     color: "#1E40AF",
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
     gap: 8,
     padding: "9px 20px",
     fontSize: 13,
     fontWeight: 500,
     flexShrink: 0,
+  },
+  inboxCalloutText: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 2,
+  },
+  spamHint: {
+    fontSize: 11,
+    fontWeight: 400,
+    color: "#3B82F6",
+    opacity: 0.8,
   },
   iframeWrap: {
     flex: 1,
